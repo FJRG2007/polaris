@@ -149,12 +149,13 @@ describe("the side panel", () => {
 });
 
 describe("an empty panel", () => {
-    it("offers suggestions, shows the page it sees, and a composer", async () => {
+    it("offers suggestions and a composer, with no chip naming the page it sees", async () => {
         mount();
         await ready();
         expect(screen.getByText("What's on this page?")).toBeTruthy();
-        expect(screen.getByTitle(/Polar sees this page/)).toBeTruthy();
         expect(screen.getByLabelText("Message Polar")).toBeTruthy();
+        expect(screen.queryByText("/tasks")).toBeNull();
+        expect(screen.queryByRole("button", { name: "Stop sharing this page" })).toBeNull();
     });
 
     it("says in plain words that it needs a key, with the way to add one", async () => {

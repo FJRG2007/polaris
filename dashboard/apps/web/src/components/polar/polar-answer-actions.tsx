@@ -3,7 +3,8 @@
 /**
  * What an answer's row offers beyond copy and reply, the way ChatGPT's does:
  *
- * - `AnswerMarks` - good and bad, a bad one asking what was wrong.
+ * - `AnswerMarks` - one "Rate response" menu of good and bad, a bad one asking
+ *   what was wrong.
  * - `useReadAloud` - the answer said out loud, one sentence after another,
  *   through the same speech route a voice call uses. One answer at a time.
  * - `RegenerateMenu` - answer again as it was, with more detail, more concise,
@@ -11,7 +12,7 @@
  */
 
 import { useState, useSyncExternalStore } from "react";
-import { Bot, Check, ListMinus, ListPlus, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Bot, Check, ListMinus, ListPlus, RotateCcw, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -55,8 +56,33 @@ export type MarkChange = {
     note?: string | null;
 };
 
-/** Good and bad under an answer. Pressing the chosen one again takes it back;
- *  bad asks what was wrong, which can be skipped. */
+/** Lucide has no thumbs up and down in one: both, small and overlapped, at
+ *  the size of the row's other icons. */
+function RateIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            <g transform="scale(0.56)" strokeWidth={3.2}>
+                <path d="M7 10v12" />
+                <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+            </g>
+            <g transform="translate(10.56 10.56) scale(0.56)" strokeWidth={3.2}>
+                <path d="M17 14V2" />
+                <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" />
+            </g>
+        </svg>
+    );
+}
+
+/** One "Rate response" button under an answer, as ChatGPT's: a menu of good
+ *  and bad. Once rated it shows the thumb chosen, and the menu changes or
+ *  clears it; bad asks what was wrong, which can be skipped. */
 export function AnswerMarks({
     mark,
     onMark
@@ -67,31 +93,58 @@ export function AnswerMarks({
     const t = useTranslations("polar");
     const [asking, setAsking] = useState(false);
     const rating = mark?.rating ?? null;
+    const rateBad = () => {
+        // Bad already: the menu reopens what was wrong, to change it.
+        if (rating === "bad") return setAsking(true);
+        void onMark({ rating: "bad" }).then((saved) => saved && setAsking(true));
+    };
     return (
         <>
-            {rating !== "bad" ? (
-                <MessageAction
-                    label={t("actions.good")}
-                    aria-pressed={rating === "good"}
-                    className={cn(rating === "good" && "text-foreground")}
-                    onClick={() => void onMark({ rating: rating === "good" ? null : "good" })}
-                >
-                    <ThumbsUp className={cn(rating === "good" && "fill-current")} />
-                </MessageAction>
-            ) : null}
-            {rating !== "good" ? (
-                <MessageAction
-                    label={t("actions.bad")}
-                    aria-pressed={rating === "bad"}
-                    className={cn(rating === "bad" && "text-foreground")}
-                    onClick={() => {
-                        if (rating === "bad") return void onMark({ rating: null });
-                        void onMark({ rating: "bad" }).then((saved) => saved && setAsking(true));
-                    }}
-                >
-                    <ThumbsDown className={cn(rating === "bad" && "fill-current")} />
-                </MessageAction>
-            ) : null}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <MessageAction
+                        label={t("actions.rate")}
+                        className={cn(rating && "text-foreground")}
+                    >
+                        {rating === "good" ? (
+                            <ThumbsUp className="fill-current" />
+                        ) : rating === "bad" ? (
+                            <ThumbsDown className="fill-current" />
+                        ) : (
+                            <RateIcon />
+                        )}
+                    </MessageAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-44">
+                    <DropdownMenuItem
+                        aria-current={rating === "good" ? "true" : undefined}
+                        onSelect={() => {
+                            if (rating !== "good") void onMark({ rating: "good" });
+                        }}
+                    >
+                        <ThumbsUp className={cn(rating === "good" && "fill-current")} />
+                        <span className="min-w-0 flex-1 truncate">{t("actions.good")}</span>
+                        {rating === "good" ? <Check className="shrink-0" /> : null}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        aria-current={rating === "bad" ? "true" : undefined}
+                        onSelect={rateBad}
+                    >
+                        <ThumbsDown className={cn(rating === "bad" && "fill-current")} />
+                        <span className="min-w-0 flex-1 truncate">{t("actions.bad")}</span>
+                        {rating === "bad" ? <Check className="shrink-0" /> : null}
+                    </DropdownMenuItem>
+                    {rating ? (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={() => void onMark({ rating: null })}>
+                                <X />
+                                {t("actions.clearRating")}
+                            </DropdownMenuItem>
+                        </>
+                    ) : null}
+                </DropdownMenuContent>
+            </DropdownMenu>
             {asking ? (
                 <BadAnswerDialog
                     initial={mark}

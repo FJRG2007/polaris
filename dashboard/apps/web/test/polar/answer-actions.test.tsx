@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * What an answer's row offers: good and bad (a bad one asking what was wrong,
- * a refused save put back), reading it aloud only with a voice to read it in,
- * sharing the chat up to that answer, and answering again as it was, with
- * more detail, or on another model for that turn only.
+ * What an answer's row offers: one rate menu of good and bad (a bad one asking
+ * what was wrong, a refused save put back), reading it aloud only with a voice
+ * to read it in, sharing the chat up to that answer, and answering again as it
+ * was, with more detail, or on another model for that turn only.
  *
  * `useChat` is replaced by a store the test drives, and the transport's
  * request builder is caught so what a turn would send can be read.
@@ -164,10 +164,29 @@ async function mount() {
 const puts = () =>
     calls.filter((call) => call.url === "/api/polar/feedback" && call.method === "PUT");
 
-describe("good and bad", () => {
-    it("marks an answer good at once, and takes it back on a second press", async () => {
+/** Opens the one "Rate response" menu under the answer. */
+async function openRating() {
+    const trigger = screen.getByLabelText("Rate response");
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    await screen.findByRole("menu");
+}
+
+describe("rate response", () => {
+    it("is one button whose menu offers a good and a bad response", async () => {
         await mount();
-        fireEvent.click(screen.getByLabelText("Good answer"));
+        expect(screen.queryByLabelText("Good response")).toBeNull();
+        expect(screen.queryByLabelText("Bad response")).toBeNull();
+        await openRating();
+        expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+            "Good response",
+            "Bad response"
+        ]);
+    });
+
+    it("marks an answer good at once, shows it, and clears it from the menu", async () => {
+        await mount();
+        await openRating();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Good response" }));
         await waitFor(() => expect(puts()).toHaveLength(1));
         expect(puts()[0]?.body).toEqual({
             messageId: "a1",
@@ -175,16 +194,19 @@ describe("good and bad", () => {
             reasons: [],
             note: null
         });
-        expect(screen.getByLabelText("Good answer").getAttribute("aria-pressed")).toBe("true");
-        expect(screen.queryByLabelText("Bad answer")).toBeNull();
-        fireEvent.click(screen.getByLabelText("Good answer"));
+        await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+        const trigger = screen.getByLabelText("Rate response");
+        expect(trigger.querySelector(".lucide-thumbs-up.fill-current")).toBeTruthy();
+        await openRating();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Clear rating" }));
         await waitFor(() => expect(puts()).toHaveLength(2));
         expect(puts()[1]?.body).toEqual({ messageId: "a1", rating: null });
     });
 
     it("asks what was wrong after a bad mark and sends the reasons and note", async () => {
         await mount();
-        fireEvent.click(screen.getByLabelText("Bad answer"));
+        await openRating();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Bad response" }));
         expect(await screen.findByText("What went wrong?")).toBeTruthy();
         const send = screen.getByRole("button", { name: "Send" });
         expect(send.getAttribute("aria-disabled")).toBe("true");
@@ -204,17 +226,22 @@ describe("good and bad", () => {
     it("puts the mark back and says so when the save is refused", async () => {
         state.refuseMark = true;
         await mount();
-        fireEvent.click(screen.getByLabelText("Good answer"));
+        await openRating();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Good response" }));
         expect(await screen.findByText("Couldn't save your rating. Try again.")).toBeTruthy();
-        expect(screen.getByLabelText("Good answer").getAttribute("aria-pressed")).toBe("false");
-        expect(screen.getByLabelText("Bad answer")).toBeTruthy();
+        const trigger = screen.getByLabelText("Rate response");
+        expect(trigger.querySelector(".lucide-thumbs-up")).toBeNull();
     });
 
     it("shows the marks already given when the chat opens", async () => {
         state.marks = { a1: { rating: "bad", reasons: [], note: null } };
         await mount();
         await waitFor(() =>
-            expect(screen.getByLabelText("Bad answer").getAttribute("aria-pressed")).toBe("true")
+            expect(
+                screen
+                    .getByLabelText("Rate response")
+                    .querySelector(".lucide-thumbs-down.fill-current")
+            ).toBeTruthy()
         );
     });
 });

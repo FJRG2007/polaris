@@ -2,7 +2,7 @@
 
 /**
  * What this viewer switched off among Polar's tools: web search, single tools,
- * and whole MCP servers. Kept in this browser, as it always was, and read by
+ * whole MCP servers, and the page they are on going along as context. Kept in this browser, as it always was, and read by
  * both the chat (which sends it with every turn) and the settings page (which
  * changes it). A change on one is seen by the other at once, in this tab or
  * another, so the panel never sends a turn with the switches it had before the
@@ -15,8 +15,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { connectorServer, type ServedTool } from "@/lib/polar/tool-servers";
 
-/** Whether this viewer left web search on: "off" is the only value that is off. */
-export const WEB_KEY = "polar.web";
+/** Whether this viewer left web search on: "off" is the only value that is off.
+ *  A key of its own since web search became on by default: the old composer
+ *  toggle left "off" under `polar.web` for people who never chose it on the
+ *  settings page, and that value is not read any more. */
+export const WEB_KEY = "polar.webSearch";
+/** Whether the page this viewer is on goes with each turn: "off" is the only
+ *  value that is off. */
+export const PAGE_KEY = "polar.sharePage";
 /** The switch every connector shared before each became its own server: an
  *  "off" here still holds for every connector until one is switched again. */
 export const CONNECTORS_KEY = "polar.connectors";
@@ -29,6 +35,8 @@ const CHANGED = "polar:tool-prefs";
 
 export interface ToolPrefs {
     webOn: boolean;
+    /** Whether the page this viewer is on goes along as background context. */
+    pageOn: boolean;
     toolsOff: string[];
     serversOff: string[];
     /** The old all-connectors switch left off. */
@@ -38,6 +46,7 @@ export interface ToolPrefs {
 /** A viewer who never chose. */
 export const DEFAULT_TOOL_PREFS: ToolPrefs = {
     webOn: true,
+    pageOn: true,
     toolsOff: [],
     serversOff: [],
     connectorsOff: false
@@ -75,6 +84,7 @@ function names(raw: string | null): string[] {
 export function readToolPrefs(): ToolPrefs {
     return {
         webOn: read(WEB_KEY) !== "off",
+        pageOn: read(PAGE_KEY) !== "off",
         toolsOff: names(read(TOOLS_OFF_KEY)),
         serversOff: names(read(SERVERS_OFF_KEY)),
         connectorsOff: read(CONNECTORS_KEY) === "off"
@@ -107,6 +117,7 @@ export function useToolPrefs() {
 
     const commit = useCallback((next: ToolPrefs) => {
         write(WEB_KEY, next.webOn ? "on" : "off");
+        write(PAGE_KEY, next.pageOn ? "on" : "off");
         write(TOOLS_OFF_KEY, JSON.stringify(next.toolsOff));
         write(SERVERS_OFF_KEY, JSON.stringify(next.serversOff));
         write(CONNECTORS_KEY, next.connectorsOff ? "off" : null);
@@ -115,6 +126,8 @@ export function useToolPrefs() {
     }, []);
 
     const setWeb = (on: boolean) => commit({ ...readToolPrefs(), webOn: on });
+
+    const setPage = (on: boolean) => commit({ ...readToolPrefs(), pageOn: on });
 
     const setTool = (name: string, on: boolean) => {
         const now = readToolPrefs();
@@ -130,5 +143,5 @@ export function useToolPrefs() {
         commit({ ...now, connectorsOff: false, serversOff: on ? rest : [...rest, server] });
     };
 
-    return { prefs, setWeb, setTool, setServer };
+    return { prefs, setWeb, setPage, setTool, setServer };
 }

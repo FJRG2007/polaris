@@ -544,6 +544,7 @@ export function ToolSettings({
     tools,
     prefs,
     onWeb,
+    onPage,
     onTool,
     onServer
 }: {
@@ -555,6 +556,8 @@ export function ToolSettings({
     tools: Record<string, ServedTool>;
     prefs: ToolPrefs;
     onWeb: (on: boolean) => void;
+    /** Whether the page this person is on goes with each message. */
+    onPage: (on: boolean) => void;
     onTool: (name: string, on: boolean) => void;
     onServer: (server: string, on: boolean) => void;
 }) {
@@ -577,6 +580,11 @@ export function ToolSettings({
                         {t("settings.tools.webOff")}
                     </li>
                 ) : null}
+                <ToolRow
+                    label={t("settings.tools.sharePage")}
+                    checked={prefs.pageOn}
+                    onChange={onPage}
+                />
                 {groups.map((group) => (
                     <ServerRow
                         key={group.id}
@@ -603,7 +611,7 @@ export function ToolSettings({
  *  then the server's. `connectorsListed` says whether the page shows the
  *  connectors section the link under the list goes to. */
 export function PolarToolSettings({ connectorsListed = true }: { connectorsListed?: boolean }) {
-    const { prefs, setWeb, setTool, setServer } = useToolPrefs();
+    const { prefs, setWeb, setPage, setTool, setServer } = useToolPrefs();
     const { answer, failed, retry } = useSettingsModels();
     const t = useTranslations("polar");
     if (!answer) {
@@ -636,6 +644,7 @@ export function PolarToolSettings({ connectorsListed = true }: { connectorsListe
             tools={answer.tools}
             prefs={prefs}
             onWeb={setWeb}
+            onPage={setPage}
             onTool={setTool}
             onServer={(server, on) => setServer(server, on, answer.tools)}
         />

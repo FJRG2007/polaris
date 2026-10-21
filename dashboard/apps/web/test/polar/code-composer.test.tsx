@@ -147,7 +147,6 @@ describe("Code's composer is Chat's", () => {
         await screen.findByText("Model One", { exact: false });
         const chatButtons = composerButtons(screen.getByLabelText("Message Polar"));
         expect(chatButtons).toEqual([
-            "Stop sharing this page",
             "Attach files",
             "Dictate",
             "Microphone and model",
