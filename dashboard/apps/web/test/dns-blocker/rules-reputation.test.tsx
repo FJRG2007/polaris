@@ -13,9 +13,9 @@ import * as reputation from "@/lib/dns-blocker/reputation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const editDnsRuleAction = vi.fn(
-    async (..._args: unknown[]): Promise<unknown> => ({ error: "Saving failed" })
-);
+const editDnsRuleAction = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({
+    error: "Saving failed"
+}));
 
 vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
     dnsBlockerStatusAction: async () => ({ error: "x" }),
@@ -42,7 +42,10 @@ describe("rule edits", () => {
     });
 
     it("validates with the settings' own normalizer", () => {
-        const parsed = rules.dnsRuleInputSchema.safeParse({ action: "deny", rule: " ADS.Example " });
+        const parsed = rules.dnsRuleInputSchema.safeParse({
+            action: "deny",
+            rule: " ADS.Example "
+        });
         expect(parsed.success && parsed.data.rule).toBe("ads.example");
         const bad = (rule: string) =>
             rules.dnsRuleInputSchema.safeParse({ action: "deny", rule }).success;
@@ -111,7 +114,11 @@ describe("reputation", () => {
             log("nas.lan", "printer", "b.example", "a.example", "10.0.0.1");
         const all = read(text, 0);
         expect(all.entries.map((entry) => entry.domain)).toEqual(["a.example", "b.example"]);
-        expect(all).toMatchObject({ end: Buffer.byteLength(text), truncated: false, complete: true });
+        expect(all).toMatchObject({
+            end: Buffer.byteLength(text),
+            truncated: false,
+            complete: true
+        });
         const fromB = read(text, all.entries[1]!.start);
         expect(fromB.entries.map((entry) => entry.domain)).toEqual(["b.example", "a.example"]);
     });
@@ -141,7 +148,9 @@ describe("reputation", () => {
         const text = log("a.example", "b.example", "c.example");
         const slice = read(text, 0);
         const handled = new Set(["a.example"]);
-        expect(reputation.cursorAfter(slice.entries, handled, slice.end)).toBe(slice.entries[1]!.start);
+        expect(reputation.cursorAfter(slice.entries, handled, slice.end)).toBe(
+            slice.entries[1]!.start
+        );
         handled.add("b.example").add("c.example");
         expect(reputation.cursorAfter(slice.entries, handled, slice.end)).toBe(slice.end);
     });
@@ -154,10 +163,12 @@ describe("reputation", () => {
         expect(reputation.readPlan(null, "/logs/2026-10-21.log")).toEqual([
             { file: "/logs/2026-10-21.log", offset: 0 }
         ]);
-        expect(reputation.readPlan({ file: "/logs/2026-10-21.log", offset: 9 }, "/logs/2026-10-21.log")).toEqual([
-            { file: "/logs/2026-10-21.log", offset: 9 }
-        ]);
-        expect(reputation.readPlan({ file: "/logs/2026-10-20.log", offset: 9 }, "/logs/2026-10-21.log")).toEqual([
+        expect(
+            reputation.readPlan({ file: "/logs/2026-10-21.log", offset: 9 }, "/logs/2026-10-21.log")
+        ).toEqual([{ file: "/logs/2026-10-21.log", offset: 9 }]);
+        expect(
+            reputation.readPlan({ file: "/logs/2026-10-20.log", offset: 9 }, "/logs/2026-10-21.log")
+        ).toEqual([
             { file: "/logs/2026-10-20.log", offset: 9 },
             { file: "/logs/2026-10-21.log", offset: 0 }
         ]);
@@ -190,19 +201,24 @@ describe("reputation", () => {
     it("is off in stored settings that predate it, and keeps a valid choice", () => {
         const off = { fraud: false, adult: false };
         expect(dns.readDnsSettings({}).reputation).toEqual(off);
-        expect(dns.readDnsSettings({ reputation: { fraud: true, adult: "yes" } }).reputation).toEqual(
-            off
-        );
+        expect(
+            dns.readDnsSettings({ reputation: { fraud: true, adult: "yes" } }).reputation
+        ).toEqual(off);
         const on = dns.readDnsSettings({ reputation: { fraud: true, adult: false } });
         expect(on.reputation.fraud).toBe(true);
     });
 
     it("renders nothing new until a category is on, then a list every device blocks", () => {
         type Blocking = {
-            blocking: { denylists: Record<string, string[]>; clientGroupsBlock: Record<string, string[]> };
+            blocking: {
+                denylists: Record<string, string[]>;
+                clientGroupsBlock: Record<string, string[]>;
+            };
         };
         const off = blockyConfig(dns.DEFAULT_DNS_SETTINGS) as Blocking;
-        expect(Object.keys(off.blocking.denylists).some((list) => list.startsWith("dymo-"))).toBe(false);
+        expect(Object.keys(off.blocking.denylists).some((list) => list.startsWith("dymo-"))).toBe(
+            false
+        );
         const on = blockyConfig({
             ...dns.DEFAULT_DNS_SETTINGS,
             reputation: { fraud: true, adult: false },
@@ -216,10 +232,10 @@ describe("reputation", () => {
 
 describe("the rules editor", () => {
     async function draw(settings: Partial<dns.DnsSettings>) {
-        const { DnsBlockerProvider } = await import(
-            "../../src/app/(app)/apps/dns-blocker/dns-blocker-context"
-        );
-        const { DnsRulesEditor } = await import("../../src/app/(app)/apps/dns-blocker/rules-editor");
+        const { DnsBlockerProvider } =
+            await import("../../src/app/(app)/apps/dns-blocker/dns-blocker-context");
+        const { DnsRulesEditor } =
+            await import("../../src/app/(app)/apps/dns-blocker/rules-editor");
         render(
             <MessagesWrapper>
                 <DnsBlockerProvider initial={{ ...dns.DEFAULT_DNS_SETTINGS, ...settings }}>

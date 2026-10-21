@@ -52,7 +52,10 @@ export type DnsRuleRefusal = "duplicate" | "tooMany" | "missing";
  * action leaves the other, as the query log's Allow and Block buttons do.
  */
 export function applyRuleEdit(rules: Rules, edit: DnsRuleEdit): Rules | DnsRuleRefusal {
-    const lists: Record<DnsRuleAction, string[]> = { allow: [...rules.allow], deny: [...rules.deny] };
+    const lists: Record<DnsRuleAction, string[]> = {
+        allow: [...rules.allow],
+        deny: [...rules.deny]
+    };
     if (edit.op !== "add") {
         const at = lists[edit.from.action].indexOf(edit.from.rule);
         if (at < 0) return "missing";
@@ -82,7 +85,9 @@ export function applyRuleEdit(rules: Rules, edit: DnsRuleEdit): Rules | DnsRuleR
 }
 
 /** Every rule as one row, allowed first, each in the order it was added. */
-export function ruleRows(rules: Rules): { action: DnsRuleAction; rule: string; kind: DnsRuleKind }[] {
+export function ruleRows(
+    rules: Rules
+): { action: DnsRuleAction; rule: string; kind: DnsRuleKind }[] {
     return DNS_RULE_ACTIONS.flatMap((action) =>
         rules[action].map((rule) => ({ action, rule, kind: ruleKind(rule) }))
     );

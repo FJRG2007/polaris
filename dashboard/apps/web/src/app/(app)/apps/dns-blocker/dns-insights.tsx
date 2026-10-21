@@ -135,8 +135,7 @@ export function listLabel(t: Translate, list: string): string {
     if (list === "polaris") return t("insights.ownList");
     if (list.startsWith("service-")) return serviceName(list.slice("service-".length));
     const flagged = reputationCategoryOf(list);
-    if (flagged)
-        return t("reputation.logLabel", { category: t(`reputation.category.${flagged}`) });
+    if (flagged) return t("reputation.logLabel", { category: t(`reputation.category.${flagged}`) });
     const key = `categories.${list}` as NamespaceKey<"dnsBlocker">;
     return t.has(key) ? t(key) : list;
 }

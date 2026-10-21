@@ -59,7 +59,10 @@ describe("blockyConfig", () => {
     it("names the allow file once, in the polaris group, whether or not it holds a rule", () => {
         const none = render.blockyConfig(settings());
         const some = render.blockyConfig(
-            settings({ allow: ["ok.example.test", "*.cdn.example.test"], deny: ["ads.example.test"] })
+            settings({
+                allow: ["ok.example.test", "*.cdn.example.test"],
+                deny: ["ads.example.test"]
+            })
         );
         expect(blocking(none).allowlists).toEqual({ polaris: [render.RULES_ALLOW_PATH] });
         // A rule added or removed leaves the configuration - and so the running
@@ -69,9 +72,14 @@ describe("blockyConfig", () => {
     });
 
     it("writes the rules as the two files the configuration names", () => {
-        const files = render.ruleFiles({ allow: ["ok.example.test"], deny: ["*.ads.test", "/^ad/"] });
+        const files = render.ruleFiles({
+            allow: ["ok.example.test"],
+            deny: ["*.ads.test", "/^ad/"]
+        });
         expect(files.get(render.RULES_ALLOW_PATH)).toBe("# Polaris: your rules\nok.example.test\n");
-        expect(files.get(render.RULES_DENY_PATH)).toBe("# Polaris: your rules\n*.ads.test\n/^ad/\n");
+        expect(files.get(render.RULES_DENY_PATH)).toBe(
+            "# Polaris: your rules\n*.ads.test\n/^ad/\n"
+        );
         expect(render.ruleFiles({ allow: [], deny: [] }).get(render.RULES_DENY_PATH)).toBe(
             "# Polaris: your rules\n"
         );

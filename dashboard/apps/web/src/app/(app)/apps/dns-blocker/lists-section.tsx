@@ -180,7 +180,7 @@ export function DnsListsSection() {
                 </CardBody>
             </Card>
 
-<DnsRulesEditor />
+            <DnsRulesEditor />
             {badAllow.length > 0 || badDeny.length > 0 || tooMany ? (
                 <p className="text-xs text-danger">
                     {tooMany
