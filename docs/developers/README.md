@@ -4,15 +4,14 @@ Polaris is a monorepo with three pillars:
 
 - **`dashboard/`** - the web control plane: an npm-workspaces monorepo (Next.js
   app, shared `@polaris/*` packages). This is the main product surface.
-- **`plugins/`** + **`crates/`** - the Rust side: Home Assistant integrations
-  and their on-device agents, plus the privileged `polaris-hostd` host daemon.
-  These form one Cargo workspace.
+- **`crates/`** - the Rust side: the privileged `polaris-hostd` host daemon,
+  in one Cargo workspace.
 - **`desktop/`** - the native desktop app (Electron): its own npm workspace,
   independent of `dashboard/`. See [`../../desktop/README.md`](../../desktop/README.md).
 
 The three are independent: you can work on the dashboard without a Rust
-toolchain, on a plugin without touching Node, and on the desktop app without
-either.
+toolchain, on the host daemon without touching Node, and on the desktop app
+without either.
 
 ## Layout
 
@@ -22,11 +21,6 @@ polaris/
 ├── rust-toolchain.toml        # pinned toolchain + musl cross targets
 ├── crates/
 │   └── polaris-hostd/         # privileged host daemon (full edition)
-├── plugins/
-│   └── unifi-unas/            # a plugin: UniFi UNAS monitoring + fan control
-│       ├── core/              # polaris-unas-core   (Rust lib, reusable)
-│       ├── agent/             # polaris-unas-agent  (Rust bin, on-device)
-│       └── homeassistant/     # HACS-installable integration (Python glue)
 ├── dashboard/
 │   ├── apps/web/              # the dashboard (Next.js App Router)
 │   ├── apps/places/           # an installable app, kept out of core (see docs/installable-apps-plan.md)
@@ -76,7 +70,7 @@ flight is tracked in [`../../dashboard/ROADMAP.md`](../../dashboard/ROADMAP.md).
 Adding an MCP tool, a `polaris_search` provider or a scope category:
 [`mcp.md`](mcp.md).
 
-## Rust (plugins + host daemon)
+## Rust (host daemon)
 
 ```sh
 cargo test                     # run all workspace tests
@@ -84,17 +78,8 @@ cargo clippy --all-targets     # lint (CI runs it with -D warnings)
 cargo fmt --check
 ```
 
-Each plugin has three execution contexts that share one domain crate
-(`plugins/<name>/core/`):
-
-1. **Home Assistant process** (`homeassistant/`) - loaded in-process by HA, so
-   it is Python (config flow, MQTT-backed entities, deploying the agent).
-2. **On-device agent** (`agent/`) - a single static `musl` binary that replaces
-   interpreted scripts and removes runtime dependencies from the device.
-3. **`polaris-hostd`** (`crates/`) - the privileged daemon that unlocks the
-   dashboard's full edition (native mounts, host filesystem, Docker access).
-
-Cross-plugin Rust graduates to `crates/` only once a second consumer needs it.
+`polaris-hostd` (`crates/`) is the privileged daemon that unlocks the
+dashboard's full edition (native mounts, host filesystem, Docker access).
 
 ## Desktop app
 
@@ -104,8 +89,6 @@ commands.
 
 ## Distribution
 
-- **Plugins** install manually from GitHub Releases: a release workflow builds
-  the on-device agent and attaches an installable ZIP. See each plugin's README.
 - **Dashboard** ships as a container image published to GHCR on `dashboard-v*`
   tags, alongside the `polaris-hostd` static musl binaries.
 - **Desktop app** ships as platform installers attached to a GitHub release on

@@ -526,7 +526,6 @@ flowchart TB
     end
     hostd[crates/polaris-hostd: Rust host daemon]
     desk[desktop: Electron app]
-    plug[plugins/unifi-unas]
     web --> pkgs
     apps --> pkgs
     cli --> web

@@ -932,3 +932,30 @@ export function OpenClawMark(props: SVGProps<SVGSVGElement>) {
         </svg>
     );
 }
+
+/** Cohere's three-shape mark in its own colours. The deep green shape is the
+ *  brand's near-black ink, drawn in `currentColor` so it stays visible on a
+ *  dark surface; the pink and coral shapes carry the brand. */
+export function CohereMark(props: SVGProps<SVGSVGElement>) {
+    return (
+        <svg
+            viewBox="0 0 256 263"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            {...mark(props)}
+        >
+            <path
+                fill="currentColor"
+                d="M82.937 156.277c6.89 0 20.596-.389 39.541-8.385c22.077-9.32 66.001-26.238 97.685-43.615c22.16-12.154 31.874-28.23 31.874-49.877c0-30.044-23.754-54.4-53.056-54.4H76.209C34.119 0 0 34.984 0 78.138s31.946 78.139 82.937 78.139"
+            />
+            <path
+                fill="#D18EE2"
+                d="M103.707 210.119c0-21.154 12.42-40.227 31.476-48.336l38.664-16.451C212.955 128.69 256 158.157 256 201.572c0 33.636-26.599 60.9-59.405 60.891l-41.86-.011c-28.184-.007-51.028-23.435-51.028-52.333"
+            />
+            <path
+                fill="#FF7759"
+                d="M43.932 166.556C19.669 166.556 0 186.723 0 211.6v5.835c0 24.877 19.669 45.043 43.932 45.043s43.932-20.166 43.932-45.043V211.6c0-24.877-19.669-45.044-43.932-45.044"
+            />
+        </svg>
+    );
+}

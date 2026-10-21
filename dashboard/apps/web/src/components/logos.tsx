@@ -31,6 +31,7 @@ const MODEL_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     // The seeded tail. A slug missing here is drawn as its monogram, which is
     // the honest answer for a provider whose mark could not be sourced.
     mistral: models.MistralMark,
+    cohere: models.CohereMark,
     zai: models.ZaiMark,
     minimax: models.MiniMaxMark,
     llama: models.MetaMark,

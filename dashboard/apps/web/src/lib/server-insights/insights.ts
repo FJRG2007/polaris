@@ -46,7 +46,9 @@ const MIN_DELTA: Record<InsightMetric, number> = {
     cpu: 15,
     memory: 10,
     disk: 5,
-    network: 512 * 1024
+    // A home server's traffic doubles from 1 to 3 MB/s on any big download, and
+    // nobody acts on that; only a jump of several MB/s is worth telling.
+    network: 5 * 1024 * 1024
 };
 
 /** The day before a point is its normal; a modified z-score of 3.5 is the usual
