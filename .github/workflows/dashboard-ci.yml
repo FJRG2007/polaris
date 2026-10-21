@@ -100,6 +100,14 @@ env:
   # (`spawnSync .../esbuild ETXTBSY`) and `npm ci` fails on a commit that
   # touched nothing near it. One script at a time leaves no such moment.
   NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
+  # The registry dropping a connection partway through a tarball
+  # (`network read ECONNRESET`) took `npm ci` down seven minutes in, on a commit
+  # that touched no dependency. npm's default is two retries a minute apart at
+  # most; a few more, with a longer back-off, ride out a blip like that instead
+  # of failing the run on it.
+  NPM_CONFIG_FETCH_RETRIES: "5"
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "20000"
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
 
 jobs:
   checks:
