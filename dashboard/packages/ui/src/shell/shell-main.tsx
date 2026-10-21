@@ -8,7 +8,9 @@
  * AppShell the window does not scroll. So this box does both itself: it keeps
  * its scroll position per address and puts it back when the user returns to
  * one, and a scrolling key pressed while nothing has focus moves focus here
- * first, so the keyboard scrolls the content rather than nothing.
+ * first, so the keyboard scrolls the content rather than nothing. Only that
+ * key makes the box focusable, and a pointer press or a blur takes it back, so
+ * a click on the page still leaves focus on the body as it would anywhere else.
  */
 
 import { cn } from "../lib/cn";
@@ -64,12 +66,21 @@ export function ShellMain({ className, children }: { className?: string; childre
             const focused = document.activeElement;
             if (focused && focused !== document.body) return;
             if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
-            if (SCROLL_KEYS.has(event.key)) main.focus({ preventScroll: true });
+            if (!SCROLL_KEYS.has(event.key)) return;
+            main.tabIndex = -1;
+            main.focus({ preventScroll: true });
+        };
+        const release = () => {
+            if (!main.hasAttribute("tabindex")) return;
+            if (document.activeElement === main) main.blur();
+            main.removeAttribute("tabindex");
         };
 
         main.addEventListener("scroll", record, { passive: true });
         window.addEventListener("popstate", onPop);
         window.addEventListener("keydown", onKey);
+        main.addEventListener("blur", release);
+        window.addEventListener("pointerdown", release, { capture: true, passive: true });
         const interrupts = ["wheel", "touchstart", "pointerdown"] as const;
         for (const type of interrupts)
             window.addEventListener(type, stopRestoring, { passive: true });
@@ -79,17 +90,14 @@ export function ShellMain({ className, children }: { className?: string; childre
             main.removeEventListener("scroll", record);
             window.removeEventListener("popstate", onPop);
             window.removeEventListener("keydown", onKey);
+            main.removeEventListener("blur", release);
+            window.removeEventListener("pointerdown", release, { capture: true });
             for (const type of interrupts) window.removeEventListener(type, stopRestoring);
         };
     }, []);
 
     return (
-        <main
-            ref={ref}
-            data-shell-scroll=""
-            tabIndex={-1}
-            className={cn("outline-none", className)}
-        >
+        <main ref={ref} data-shell-scroll="" className={cn("outline-none", className)}>
             {children}
         </main>
     );

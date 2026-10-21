@@ -221,6 +221,33 @@ notice pushes its bottom off a window that does not scroll.
   screen - `test/mail/page-height.test.ts` only holds `PAGE_BLEED`'s own
   string, not a screen's private formula.
 
+## The shell scrolls its content, never the window
+
+`AppShell` (`packages/ui/src/shell/app-shell.tsx`) is exactly the viewport
+(`h-dvh overflow-hidden`); the window never scrolls. The one box that does is
+`ShellMain` (`packages/ui/src/shell/shell-main.tsx`), the content area under
+the header, marked with `data-shell-scroll`. It also keeps a screen's scroll
+position per address across back/forward (the browser's own restore only
+targets the window) and sends a scrolling key to itself when nothing has
+focus (the browser only sends those to the window too).
+
+- **Nothing may measure or scroll `window`** - no `window.scrollY`,
+  `window.pageYOffset`, `useWindowVirtualizer`, `h-below-header`, or a
+  `top-[calc(var(--header-height)...]` sticky offset. Ask
+  `shellScroller(element)` (`@polaris/ui`) for the ancestor to measure or
+  scroll against instead - it returns the closest `[data-shell-scroll]`, or
+  `null` outside the shell. `test/ui/shell-scrolls-its-content.test.tsx` greps
+  every app's `src` (the extension excluded - it renders outside the shell)
+  for these and fails on the first hit.
+- **A list virtualized against the shell** uses `useVirtualizer` with
+  `getScrollElement: () => shellScroller(element)`, never
+  `useWindowVirtualizer` (see `components/paged-list/virtual-table-body.tsx`).
+- **A screen that owns every scrollbar in it** (`PAGE_BLEED`) stops the
+  content area from scrolling too, via `[data-shell-scroll]:has(.page-bleed)`
+  in `tokens.css`, kept inside `@media screen` - not `html:has(...)` alone,
+  since the window was never the scroller to stop, and not applied when
+  printing, which wants the content area's real height instead.
+
 ## A menu's own height still respects the screen
 
 `DropdownMenuContent`/`DropdownMenuSubContent`

@@ -13,10 +13,13 @@ const TOKENS = readFileSync(
     "utf8"
 );
 
-function ruleAfter(marker: string): string {
-    const start = TOKENS.indexOf(marker);
+/** Where the field selector closes, however a formatter indented it. */
+const FIELDS = TOKENS.search(/textarea\s*\):focus-visible/);
+
+function ruleAfter(marker: string | number): string {
+    const start = typeof marker === "number" ? marker : TOKENS.indexOf(marker);
     expect(start).toBeGreaterThan(-1);
-    const open = TOKENS.indexOf("{", start + marker.length);
+    const open = TOKENS.indexOf("{", start);
     return TOKENS.slice(start, TOKENS.indexOf("}", open) + 1);
 }
 
@@ -28,17 +31,13 @@ describe("the focus ring", () => {
 
     it("sits on the edge of a field, after the general rule so it wins", () => {
         const general = TOKENS.indexOf(':where(a, button, [role="button"]');
-        const fields = TOKENS.indexOf("textarea\n    ):focus-visible");
-        expect(fields).toBeGreaterThan(general);
-        const rule = ruleAfter("textarea\n    ):focus-visible");
+        expect(FIELDS).toBeGreaterThan(general);
+        const rule = ruleAfter(FIELDS);
         expect(rule).toContain("outline-offset: -1px;");
     });
 
     it("leaves checkboxes and radios with the outside ring", () => {
-        const selector = TOKENS.slice(
-            TOKENS.indexOf("input:not("),
-            TOKENS.indexOf("textarea\n    ):focus-visible")
-        );
+        const selector = TOKENS.slice(TOKENS.indexOf("input:not("), FIELDS);
         expect(selector).toContain('[type="checkbox"]');
         expect(selector).toContain('[type="radio"]');
     });
