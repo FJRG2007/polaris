@@ -87,23 +87,22 @@ export default defineConfig({
                 suggested_key: { default: "Ctrl+Shift+L", mac: "Command+Shift+L" },
                 description: "__MSG_commandFillLogin__"
             },
-            // Polar beside the page (`src/entrypoints/sidepanel`). Firefox opens
-            // its sidebar from its own reserved command; Chromium has none for a
-            // side panel, so the worker opens it from ours. Alt+P: no browser
-            // binds it, and the browser's shortcuts screen changes it.
-            ...(browser === "firefox"
-                ? {
-                      _execute_sidebar_action: {
-                          suggested_key: { default: "Alt+P" },
-                          description: "__MSG_commandOpenPolar__"
-                      }
-                  }
-                : {
-                      "open-polar": {
-                          suggested_key: { default: "Alt+P" },
-                          description: "__MSG_commandOpenPolar__"
-                      }
-                  })
+            // Polar beside the page (`src/entrypoints/sidepanel`), opened and
+            // closed by the worker on both browsers, so on a Polaris tab the
+            // press goes to the page's own Polar instead (`src/lib/polar-panel`).
+            // Firefox's reserved sidebar command never reaches the worker, so it
+            // is not used. Chromium suggests Polaris's own key for Polar, Ctrl+J
+            // (Command+J on a Mac); Firefox keeps that key for its Downloads
+            // window and never hands it to an extension, so there it is Alt+P.
+            // A suggested key is applied when the extension is installed: an
+            // install that already had Alt+P keeps it until changed in Settings.
+            "open-polar": {
+                suggested_key:
+                    browser === "firefox"
+                        ? { default: "Alt+P" }
+                        : { default: "Ctrl+J", mac: "Command+J" },
+                description: "__MSG_commandOpenPolar__"
+            }
         },
         // Every web page on version 3 (see the top of this file), and the
         // runtime request on version 2, under the name version 2 has for it:

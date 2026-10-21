@@ -18,6 +18,7 @@ import { clientHost, clientIp, clientUserAgent } from "@/lib/request-context";
 import { scopeChoices } from "@/lib/workspace-scope";
 import { bearerToken, readExtensionToken, revokeExtensionToken } from "@/lib/extension/sessions";
 import { storedLocale } from "@/lib/i18n/locale-service";
+import { polarAccessFor } from "@/lib/polar/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,9 +43,16 @@ export async function GET(request: Request): Promise<Response> {
     // is one to offer rather than leading somebody to a refusal.
     // And the language it chose for Polaris, which the extension speaks too -
     // none when it never chose one, so the extension goes by the browser.
-    const [vault, locale] = await Promise.all([
+    // Polar too, decided the way the dashboard decides it, so the extension
+    // shows its Polar entries only to an account the administrator keeps it for.
+    // A failed decision is a no: an entry that only answers "not for you" is
+    // what the field exists to keep off the screen.
+    const [vault, locale, polar] = await Promise.all([
         userHasPermission(principal.userId, "vault.use"),
-        storedLocale(principal.userId).catch(() => null)
+        storedLocale(principal.userId).catch(() => null),
+        polarAccessFor(principal.userId)
+            .then((access) => access.use)
+            .catch(() => false)
     ]);
 
     // The organizations it may switch between, as the header switcher in the
@@ -60,14 +68,19 @@ export async function GET(request: Request): Promise<Response> {
         : [];
     return Response.json({
         connection: { id: principal.id, name: principal.name },
-        account: { id: account.id, name: account.name ?? "", email: account.email, ...(locale ? { locale } : {}) },
+        account: {
+            id: account.id,
+            name: account.name ?? "",
+            email: account.email,
+            ...(locale ? { locale } : {})
+        },
         organizations: organizations.map((org) => ({
             id: org.id,
             name: org.name,
             slug: org.slug,
             vaultId: vaults.find((one) => one.organizationId === org.id)?.id ?? null
         })),
-        can: { vault }
+        can: { vault, polar }
     });
 }
 

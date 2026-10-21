@@ -54,6 +54,71 @@ export function pageFrom(data: unknown): SiteContext | null | undefined {
     return page.success ? page.data : null;
 }
 
+/** Something asked from the extension's right-click menu: a quote for the
+ *  composer, a question typed under it, or both. Nothing is sent by itself. */
+export interface ExtensionAsk {
+    readonly quote?: string;
+    readonly draft?: string;
+}
+
+const askFields = {
+    quote: z.string().max(4000).optional(),
+    draft: z.string().max(2000).optional()
+};
+
+const askMessage = z.object({
+    source: z.literal(FROM_EXTENSION),
+    kind: z.literal("ask"),
+    ...askFields
+});
+
+/** A question the panel hands the embed, or null for a message that is not one. */
+export function askFrom(data: unknown): ExtensionAsk | null {
+    const message = askMessage.safeParse(data);
+    if (!message.success) return null;
+    return { quote: message.data.quote, draft: message.data.draft };
+}
+
+const polarCommand = z.discriminatedUnion("action", [
+    z.object({
+        source: z.literal(FROM_EXTENSION),
+        kind: z.literal("polar"),
+        action: z.literal("toggle")
+    }),
+    z.object({
+        source: z.literal(FROM_EXTENSION),
+        kind: z.literal("polar"),
+        action: z.literal("ask"),
+        ...askFields
+    })
+]);
+
+export type PolarCommand = z.infer<typeof polarCommand>;
+
+/**
+ * What the extension tells a Polaris page about its Polar: open or close it -
+ * the extension's shortcut is the same Ctrl+J as the page's, and the browser
+ * gives it to the extension first - or open it with something to ask. The
+ * extension posts it into the page's own window, so a page only takes it from
+ * itself, on its own origin; anything else, or any other shape, is null.
+ */
+export function polarCommandFrom(
+    event: { data: unknown; origin: string; source: unknown },
+    self: { location: { origin: string } }
+): PolarCommand | null {
+    if (event.source !== self || event.origin !== self.location.origin) return null;
+    const command = polarCommand.safeParse(event.data);
+    return command.success ? command.data : null;
+}
+
+/** The conversation a panel asked for by `?chat=`: a tab's own, or null for
+ *  the one every tab shares. */
+export function chatScope(value: unknown): string | null {
+    return typeof value === "string" && /^tab-(?:[a-z0-9]{1,16}-)?\d{1,12}$/.test(value)
+        ? value
+        : null;
+}
+
 /** The embed asking the panel to read the page again, for a fresh selection. */
 export const REFRESH_MESSAGE = { source: FROM_EMBED, kind: "refresh" } as const;
 

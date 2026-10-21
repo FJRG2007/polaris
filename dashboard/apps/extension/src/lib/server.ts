@@ -57,6 +57,22 @@ export async function saveServers(next: readonly SavedServer[]): Promise<void> {
  */
 export { readOrigin } from "@/lib/address";
 
+/**
+ * Every Polaris this browser is connected to or knows: the one in front and the
+ * saved list. Their pages carry Polar of their own, so the extension's panel
+ * and shortcut hand over to it there instead of opening a second copy.
+ */
+export async function polarisOrigins(): Promise<string[]> {
+    const [saved, active] = await Promise.all([savedServers(), ORIGIN.getValue()]);
+    return [...new Set([...saved.map((one) => one.origin), ...(active ? [active] : [])])];
+}
+
+/** Call `onChange` whenever the servers `polarisOrigins` reads change. */
+export function watchPolarisOrigins(onChange: () => void): void {
+    SERVERS.watch(() => onChange());
+    ORIGIN.watch(() => onChange());
+}
+
 /** The stored server, or null while the extension has not been told one. */
 export async function currentOrigin(): Promise<string | null> {
     return ORIGIN.getValue();

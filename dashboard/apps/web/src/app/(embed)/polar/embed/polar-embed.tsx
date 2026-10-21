@@ -11,23 +11,35 @@
  * refuses to be framed.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buttonVariants, cn } from "@polaris/ui";
 import * as bridge from "@/lib/polar/embed-bridge";
 import type { SiteContext } from "@/lib/polar/shared";
-import { PolarChat } from "@/components/polar/polar-panel";
+import { PolarChat, usePolar } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarAvatar } from "@/components/polar/motion/polar-avatar";
 
-export function PolarEmbed({ parent }: { parent: string | null }) {
+export function PolarEmbed({
+    parent,
+    chat = null
+}: {
+    parent: string | null;
+    chat?: string | null;
+}) {
     const [site, setSite] = useState<SiteContext | null>(null);
+    const { ask } = usePolar();
+    const askRef = useRef(ask);
+    askRef.current = ask;
 
     useEffect(() => {
         const framed = parent !== null && window.parent !== window;
         function onMessage(event: MessageEvent) {
             if (!framed || event.source !== window.parent || event.origin !== parent) return;
             const page = bridge.pageFrom(event.data);
-            if (page !== undefined) setSite(page);
+            if (page !== undefined) return setSite(page);
+            // Asked from the extension's right-click menu: into the composer.
+            const asked = bridge.askFrom(event.data);
+            if (asked) askRef.current(asked.quote ?? "", asked.draft);
         }
         // Coming back to the panel is when a selection made in the tab is new.
         function refresh() {
@@ -56,7 +68,7 @@ export function PolarEmbed({ parent }: { parent: string | null }) {
 
     return (
         <div className="flex h-dvh min-h-0 overflow-hidden bg-card">
-            <PolarChat fullPage site={parent ? site : undefined} />
+            <PolarChat fullPage site={parent ? site : undefined} chatScope={chat} />
         </div>
     );
 }

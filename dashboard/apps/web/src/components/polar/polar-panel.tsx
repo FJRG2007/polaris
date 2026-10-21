@@ -88,6 +88,7 @@ import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
 import { PolarCodeView, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
 import * as polarShared from "@/lib/polar/shared";
+import * as embedBridge from "@/lib/polar/embed-bridge";
 import * as settingsPath from "@/lib/polar/settings-path";
 import { readStored, writeStored } from "@/lib/polar/stored";
 import * as droppedItems from "@/lib/polar/dropped-items";
@@ -195,9 +196,12 @@ interface PolarState {
     /** Text somebody asked Polar about from a menu, waiting for a chat to
      *  quote it. Taken once, by whichever chat is on screen. */
     asked: string | null;
-    /** Quotes `text` in the composer and opens the panel. Does nothing for an
-     *  account Polar is not for. */
-    ask: (text: string) => void;
+    /** A question typed in the composer from outside it - the extension's
+     *  right-click menu - taken with `asked`. */
+    drafted: string | null;
+    /** Quotes `text` in the composer, types `draft` under it, and opens the
+     *  panel. Does nothing for an account Polar is not for. */
+    ask: (text: string, draft?: string) => void;
     takeAsked: () => void;
 }
 
@@ -279,6 +283,36 @@ export function pageContextFrom(
 const OPEN_KEY = "polar.open";
 const WIDTH_KEY = "polar.width";
 const THREAD_KEY = "polar.thread";
+/** The scoped chats remembered, newest last, so the oldest can be let go. */
+const SCOPES_KEY = "polar.thread.scopes";
+const SCOPES_MOST = 30;
+
+/** Where the open chat is remembered: the shared key, or one per scope. */
+export function scopedThreadKey(scope: string | null): string {
+    return scope ? `${THREAD_KEY}:${scope}` : THREAD_KEY;
+}
+
+/** Remember a scoped chat's key, forgetting the oldest beyond the most kept:
+ *  a tab's key is never asked for again once it closes, so it would stay forever. */
+function keepScope(key: string): void {
+    let kept: string[] = [];
+    try {
+        const parsed: unknown = JSON.parse(readStored(SCOPES_KEY) ?? "[]");
+        if (Array.isArray(parsed))
+            kept = parsed.filter((one): one is string => typeof one === "string");
+    } catch {
+        kept = [];
+    }
+    const next = [...kept.filter((one) => one !== key), key];
+    for (const old of next.splice(0, Math.max(0, next.length - SCOPES_MOST))) {
+        try {
+            window.localStorage.removeItem(old);
+        } catch {
+            // A private window: nothing was kept to let go of.
+        }
+    }
+    writeStored(SCOPES_KEY, JSON.stringify(next));
+}
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
 
@@ -292,6 +326,8 @@ export function PolarProvider({
     const [stored, setOpenState] = useState(false);
     const open = allowed && stored;
     const [extra, setExtra] = useState<ExtraContext | null>(null);
+    /** When this page's own Ctrl+J last toggled the panel. */
+    const lastKey = useRef(0);
     useEffect(() => setOpenState(readStored(OPEN_KEY) === "1"), []);
     const setOpen = useCallback((next: boolean) => {
         setOpenState(next);
@@ -307,6 +343,7 @@ export function PolarProvider({
                 event.key.toLowerCase() === "j"
             ) {
                 event.preventDefault();
+                lastKey.current = Date.now();
                 setOpenState((current) => {
                     writeStored(OPEN_KEY, current ? "0" : "1");
                     return !current;
@@ -317,19 +354,48 @@ export function PolarProvider({
         return () => window.removeEventListener("keydown", onKey);
     }, [allowed]);
     const [asked, setAsked] = useState<string | null>(null);
+    const [drafted, setDrafted] = useState<string | null>(null);
     const ask = useCallback(
-        (text: string) => {
+        (text: string, draft?: string) => {
             const quote = polarShared.selectionQuote(text);
-            if (!allowed || !quote) return;
+            const typed = draft?.trim().slice(0, 2000) || null;
+            if (!allowed || (!quote && !typed)) return;
             setAsked(quote);
+            setDrafted(typed);
             setOpen(true);
         },
         [allowed, setOpen]
     );
-    const takeAsked = useCallback(() => setAsked(null), []);
+    const takeAsked = useCallback(() => {
+        setAsked(null);
+        setDrafted(null);
+    }, []);
+    // The browser extension on this page: its shortcut is this page's Ctrl+J,
+    // which the browser hands to the extension first, so the extension passes
+    // it on here (`polarCommandFrom`). A press that reached this page as well
+    // is not counted twice.
+    useEffect(() => {
+        if (!allowed) return;
+        function onMessage(event: MessageEvent) {
+            const command = embedBridge.polarCommandFrom(event, window);
+            if (!command) return;
+            if (command.action === "toggle") {
+                if (Date.now() - lastKey.current < 500) return;
+                setOpenState((current) => {
+                    writeStored(OPEN_KEY, current ? "0" : "1");
+                    return !current;
+                });
+                return;
+            }
+            if (command.quote || command.draft) ask(command.quote ?? "", command.draft);
+            else setOpen(true);
+        }
+        window.addEventListener("message", onMessage);
+        return () => window.removeEventListener("message", onMessage);
+    }, [allowed, ask, setOpen]);
     const value = useMemo(
-        () => ({ allowed, open, setOpen, extra, setExtra, asked, ask, takeAsked }),
-        [allowed, open, setOpen, extra, asked, ask, takeAsked]
+        () => ({ allowed, open, setOpen, extra, setExtra, asked, drafted, ask, takeAsked }),
+        [allowed, open, setOpen, extra, asked, drafted, ask, takeAsked]
     );
     return <PolarContext.Provider value={value}>{children}</PolarContext.Provider>;
 }
@@ -667,10 +733,14 @@ async function uploadFile(
 export function PolarChat({
     onClose,
     fullPage = false,
-    site
+    site,
+    chatScope = null
 }: {
     onClose?: () => void;
     fullPage?: boolean;
+    /** A conversation of its own to come back to - the extension's panel, one
+     *  per tab - instead of the one every Polar here shares. */
+    chatScope?: string | null;
     /**
      * A page outside Polaris standing in for this one: the browser extension's
      * side panel passes the tab somebody allowed (or null while none is), and
@@ -790,14 +860,18 @@ export function PolarChat({
     const code = usePolarCode();
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
-    // Text asked about from a right-click menu: quoted here, once.
+    // Text asked about from a right-click menu: quoted here, once, with the
+    // question typed under it when the menu brought one.
     const asked = state?.asked ?? null;
+    const drafted = state?.drafted ?? null;
     useEffect(() => {
-        if (!asked) return;
-        setQuote(asked);
+        if (!asked && !drafted) return;
+        if (asked) setQuote(asked);
+        if (drafted) setInput(drafted);
         state?.takeAsked();
         textarea.current?.focus();
-    }, [asked]);
+    }, [asked, drafted]);
+    const threadKey = scopedThreadKey(chatScope);
     const drawerButton = useRef<HTMLButtonElement>(null);
     const composerNext = useRef(false);
     const [, setTreeTick] = useState(0);
@@ -1172,7 +1246,7 @@ export function PolarChat({
     const openThread = async (id: string) => {
         const response = await fetch(`/api/polar/threads/${id}`).catch(() => null);
         // A remembered chat that was deleted, or belongs to another account.
-        if (response?.status === 404 && readStored(THREAD_KEY) === id) writeStored(THREAD_KEY, "");
+        if (response?.status === 404 && readStored(threadKey) === id) writeStored(threadKey, "");
         if (!response?.ok) return;
         const { thread } = (await response.json().catch(() => ({}))) as {
             thread?: {
@@ -1216,14 +1290,15 @@ export function PolarChat({
     useEffect(() => {
         const named = fullPage ? new URLSearchParams(window.location.search).get("thread") : null;
         if (named) window.history.replaceState(null, "", window.location.pathname);
-        const reopen = named ?? readStored(THREAD_KEY);
+        const reopen = named ?? readStored(threadKey);
         if (reopen) void openThread(reopen);
     }, []);
     // Remembered once it has something in it; a temporary chat is deleted when
     // the page goes, so there is nothing to come back to.
     useEffect(() => {
         if (temporary || chat.messages.length === 0) return;
-        writeStored(THREAD_KEY, threadId);
+        writeStored(threadKey, threadId);
+        if (chatScope) keepScope(threadKey);
     }, [threadId, temporary, chat.messages.length]);
 
     /** Empties the composer's files, letting go of their local previews. */
@@ -1254,7 +1329,7 @@ export function PolarChat({
         tree.current = new Map();
         setOpening([]);
         setThreadId(newId());
-        writeStored(THREAD_KEY, "");
+        writeStored(threadKey, "");
         setQueue([]);
         setInput("");
         setQuote(null);

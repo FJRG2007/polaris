@@ -12,12 +12,72 @@
 
 import { storage } from "#imports";
 import { useWords } from "../popup/words";
+import { originsOf } from "../popup/polar-row";
 import * as polar from "@/lib/polar-panel";
 import { askBackground } from "@/lib/messages";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Sites somebody allowed Polar to read, by origin. */
 const ALLOWED_SITES = storage.defineItem<string[]>("local:polar.sites", { fallback: [] });
+
+type PanelPort = ReturnType<typeof browser.runtime.connect>;
+
+/** Whose conversation this panel shows: chosen in the popup's settings. */
+const CHAT_SCOPE = storage.defineItem<polar.ChatScope>(polar.CHAT_SCOPE_KEY, {
+    fallback: "shared"
+});
+
+/** This browser run's mark, made by the first panel to open in it. */
+const BROWSER_RUN = storage.defineItem<string | null>(polar.BROWSER_RUN_KEY, { fallback: null });
+
+async function browserRun(): Promise<string> {
+    const kept = await BROWSER_RUN.getValue();
+    if (kept) return kept;
+    const made = polar.newBrowserRun();
+    await BROWSER_RUN.setValue(made);
+    return made;
+}
+
+/** The tab this panel is the tab's own panel for, or null for the shared one. */
+const OWN_TAB = ((): number | null => {
+    const raw = new URLSearchParams(location.search).get("tab");
+    const id = raw === null ? Number.NaN : Number(raw);
+    return Number.isInteger(id) ? id : null;
+})();
+
+/**
+ * The port that tells the worker this panel is open - and where - for as long
+ * as it is: a shortcut pressed while it is open closes it. The worker can be
+ * recycled under it, which drops the port, so it is made again. Messages from
+ * the worker arrive through `onMessage`.
+ */
+function holdPort(
+    onMessage: (message: polar.PanelMessage) => void,
+    onPort: (port: PanelPort | null) => void
+): () => void {
+    let port: PanelPort | null = null;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const connect = async (): Promise<void> => {
+        if (stopped) return;
+        const here = await browser.windows?.getCurrent?.().catch(() => undefined);
+        port = browser.runtime.connect({ name: polar.PANEL_PORT });
+        onPort(port);
+        port.onMessage.addListener((message) => onMessage(message as polar.PanelMessage));
+        port.onDisconnect.addListener(() => {
+            port = null;
+            onPort(null);
+            if (!stopped) timer = setTimeout(() => void connect(), 1000);
+        });
+        port.postMessage({ kind: "hello", windowId: here?.id ?? null, tabId: OWN_TAB });
+    };
+    void connect();
+    return () => {
+        stopped = true;
+        clearTimeout(timer);
+        port?.disconnect();
+    };
+}
 
 const WEB_PAGES = ["https://*/*", "http://*/*"];
 
@@ -67,7 +127,50 @@ export function Panel(): React.JSX.Element {
     const [front, setFront] = useState<Front>(NO_FRONT);
     const [allowed, setAllowed] = useState<string[]>([]);
     const [dismissed, setDismissed] = useState<string | null>(null);
+    const [chatScope, setChatScope] = useState<polar.ChatScope | null>(null);
+    const [run, setRun] = useState<string | null>(null);
     const frame = useRef<HTMLIFrameElement>(null);
+    /** A question from a right-click, held until the chat in the frame is ready. */
+    const waiting = useRef<polar.PolarAsk | null>(null);
+    /** The frame whose chat has said it is listening. */
+    const listening = useRef<Window | null>(null);
+    const portRef = useRef<PanelPort | null>(null);
+    /** Checked once: opened on a Polaris tab, this panel hands over and closes. */
+    const checked = useRef(false);
+
+    useEffect(() => {
+        void CHAT_SCOPE.getValue().then((scope) => setChatScope(polar.readChatScope(scope)));
+        return CHAT_SCOPE.watch((scope) => setChatScope(polar.readChatScope(scope)));
+    }, []);
+
+    useEffect(() => {
+        void browserRun()
+            .catch(() => polar.newBrowserRun())
+            .then(setRun);
+    }, []);
+
+    const deliver = useCallback(() => {
+        const target = frame.current?.contentWindow;
+        const ask = waiting.current;
+        if (!target || !server || !ask || target !== listening.current) return;
+        target.postMessage(polar.askMessage(ask), new URL(server).origin);
+        waiting.current = null;
+    }, [server]);
+
+    useEffect(
+        () =>
+            holdPort(
+                (message) => {
+                    if (message.kind === "close") window.close();
+                    else if (message.kind === "ask") {
+                        waiting.current = { quote: message.quote, draft: message.draft };
+                        deliver();
+                    }
+                },
+                (port) => (portRef.current = port)
+            ),
+        [deliver]
+    );
 
     const connect = useCallback(async () => {
         setReach("asking");
@@ -96,6 +199,22 @@ export function Panel(): React.JSX.Element {
     const look = useCallback(async () => {
         const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) return setFront(NO_FRONT);
+        // Opened on a Polaris tab - by a press the worker had not yet read the
+        // deployments for - this is a second copy of the page's own Polar: hand
+        // the press to it and close. Only on opening; a panel somebody already
+        // has open stays open as they move between tabs.
+        if (!checked.current && server) {
+            checked.current = true;
+            const origins = await askBackground({ kind: "status" }).then((reply) =>
+                reply.ok && "status" in reply ? originsOf(reply.status) : [server]
+            );
+            if (polar.isPolarisTab(tab.url, origins)) {
+                portRef.current?.postMessage({ kind: "bounce", tabId: tab.id });
+                // Let the message leave before the page goes.
+                setTimeout(() => window.close(), 100);
+                return;
+            }
+        }
         setFront({
             tabId: tab.id,
             site: polar.siteOf(tab.url, server),
@@ -139,11 +258,15 @@ export function Panel(): React.JSX.Element {
     useEffect(() => {
         if (!server) return;
         const onMessage = (event: MessageEvent): void => {
-            if (polar.isRefresh(event, frame.current?.contentWindow, server)) void send();
+            if (!polar.isRefresh(event, frame.current?.contentWindow, server)) return;
+            listening.current = frame.current?.contentWindow ?? null;
+            void send();
+            // The chat is listening now: a question waiting for it goes in.
+            deliver();
         };
         window.addEventListener("message", onMessage);
         return () => window.removeEventListener("message", onMessage);
-    }, [send, server]);
+    }, [send, server, deliver]);
 
     // The browser's own question first, inside this click: an await before it
     // and the browser refuses to ask at all.
@@ -165,7 +288,8 @@ export function Panel(): React.JSX.Element {
         void ALLOWED_SITES.setValue(allowed.filter((site) => site !== front.site));
     };
 
-    if (reach === "asking") return <div className="side-app" />;
+    if (reach === "asking" || chatScope === null || run === null)
+        return <div className="side-app" />;
     if (reach === "none" || !server) {
         return (
             <div className="side-app">
@@ -218,10 +342,17 @@ export function Panel(): React.JSX.Element {
                 </div>
             ) : null}
             <iframe
+                // A conversation per tab is a frame per tab: a new tab in front
+                // is that tab's chat, opened where it was left.
+                key={polar.chatScopeFor(chatScope, OWN_TAB ?? front.tabId, run) ?? "shared"}
                 ref={frame}
                 className="side-frame"
                 title={t("polar.title")}
-                src={polar.embedUrl(server, new URL(browser.runtime.getURL("/")).origin)}
+                src={polar.embedUrl(
+                    server,
+                    new URL(browser.runtime.getURL("/")).origin,
+                    polar.chatScopeFor(chatScope, OWN_TAB ?? front.tabId, run)
+                )}
                 onLoad={() => void send()}
                 allow="microphone; clipboard-write"
             />

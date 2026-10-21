@@ -102,6 +102,9 @@ export interface VaultStatus {
     /** Whether that account may use a vault at all, so the popup offers one only
      *  where there is one to offer rather than leading somebody to a refusal. */
     readonly canVault: boolean;
+    /** Whether that account may use Polar, so the popup's Polar row and the
+     *  right-click entries show only where it can. */
+    readonly canPolar: boolean;
     readonly email: string | null;
     /** Signed in, in the sense that there is a token: the vault may still be locked. */
     readonly connected: boolean;

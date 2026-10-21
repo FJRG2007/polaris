@@ -1,6 +1,7 @@
 /**
- * What Polaris adds to the browser's own right-click menu on a box you can type
- * into.
+ * What Polaris adds to the browser's own right-click menu: the vault's entries
+ * on a box you can type into, and Polar's on a selection, a link, an image or
+ * the page itself.
  *
  * Pure, so which entries a box gets can be asserted without a browser. The
  * worker creates the entries and does what they say; the page's script tells it
@@ -15,6 +16,7 @@
  */
 
 import { ENGLISH, type Words } from "@/lib/words";
+import type { PolarAsk } from "@/lib/polar-panel";
 
 /** The ids the entries are created and answered under. */
 export const MENU = {
@@ -64,4 +66,114 @@ export function visibleEntries(target: MenuTarget): Record<MenuEntry["id"], bool
         [MENU.code]: !password,
         [MENU.email]: !password
     };
+}
+
+/** Where the browser's menu shows Polaris at all: every context an entry has. */
+export const ROOT_CONTEXTS = ["editable", "selection", "link", "image", "page"] as const;
+
+/** What the menu is made of for an account: Polar's entries, and the contexts
+ *  they need, only when it may use Polar. */
+export function menuPlan(
+    withPolar: boolean,
+    t: Words = ENGLISH
+): {
+    contexts: readonly [(typeof ROOT_CONTEXTS)[number], ...(typeof ROOT_CONTEXTS)[number][]];
+    polar: readonly PolarMenuEntry[];
+} {
+    return withPolar
+        ? { contexts: ROOT_CONTEXTS, polar: polarMenuEntries(t) }
+        : { contexts: ["editable"], polar: [] };
+}
+
+/** The ids Polar's entries are created and answered under. */
+export const POLAR_MENU = {
+    selection: "polaris-polar-selection",
+    explain: "polaris-polar-explain",
+    summarize: "polaris-polar-summarize",
+    translate: "polaris-polar-translate",
+    link: "polaris-polar-link",
+    image: "polaris-polar-image",
+    page: "polaris-polar-page"
+} as const;
+
+export type PolarMenuId = (typeof POLAR_MENU)[keyof typeof POLAR_MENU];
+
+export type PolarContext = "selection" | "link" | "image" | "page";
+
+/** One of Polar's entries: its title and the one context it shows in. */
+export interface PolarMenuEntry {
+    readonly id: PolarMenuId;
+    readonly title: string;
+    readonly context: PolarContext;
+}
+
+/**
+ * Polar's entries, titled in the reader's words. Each one puts what was
+ * clicked into Polar's composer, with a question already typed, and stops
+ * there: nothing is sent until the person sends it.
+ */
+export function polarMenuEntries(t: Words = ENGLISH): readonly PolarMenuEntry[] {
+    return [
+        { id: POLAR_MENU.selection, title: t("menu.polar.selection"), context: "selection" },
+        { id: POLAR_MENU.explain, title: t("menu.polar.explain"), context: "selection" },
+        { id: POLAR_MENU.summarize, title: t("menu.polar.summarize"), context: "selection" },
+        { id: POLAR_MENU.translate, title: t("menu.polar.translate"), context: "selection" },
+        { id: POLAR_MENU.link, title: t("menu.polar.link"), context: "link" },
+        { id: POLAR_MENU.image, title: t("menu.polar.image"), context: "image" },
+        { id: POLAR_MENU.page, title: t("menu.polar.page"), context: "page" }
+    ];
+}
+
+export const POLAR_MENU_ENTRIES: readonly PolarMenuEntry[] = polarMenuEntries();
+
+/** Whether a clicked entry is one of Polar's. */
+export function isPolarEntry(id: string | number): id is PolarMenuId {
+    return POLAR_MENU_ENTRIES.some((entry) => entry.id === id);
+}
+
+/** What the browser says was under the pointer, as far as an entry reads it. */
+export interface MenuClick {
+    readonly selectionText?: string;
+    readonly linkUrl?: string;
+    readonly srcUrl?: string;
+    readonly pageUrl?: string;
+}
+
+const webAddress = (value: string | undefined): string | undefined =>
+    value && /^https?:\/\//i.test(value) ? value.slice(0, 2048) : undefined;
+
+/**
+ * What an entry asks Polar. The selection goes in as a quote; a link, an image
+ * or the page as its address in the question, because Polar reads text and an
+ * address is what the browser hands over - nothing is fetched here. Null for
+ * a click with nothing to ask about.
+ */
+export function polarAskFor(
+    id: PolarMenuId,
+    click: MenuClick,
+    t: Words = ENGLISH
+): PolarAsk | null {
+    const selection = click.selectionText?.trim();
+    switch (id) {
+        case POLAR_MENU.selection:
+            return selection ? { quote: selection } : null;
+        case POLAR_MENU.explain:
+            return selection ? { quote: selection, draft: t("menu.polar.explainDraft") } : null;
+        case POLAR_MENU.summarize:
+            return selection ? { quote: selection, draft: t("menu.polar.summarizeDraft") } : null;
+        case POLAR_MENU.translate:
+            return selection ? { quote: selection, draft: t("menu.polar.translateDraft") } : null;
+        case POLAR_MENU.link: {
+            const url = webAddress(click.linkUrl);
+            return url ? { draft: t("menu.polar.linkDraft", { url }) } : null;
+        }
+        case POLAR_MENU.image: {
+            const url = webAddress(click.srcUrl);
+            return url ? { draft: t("menu.polar.imageDraft", { url }) } : null;
+        }
+        case POLAR_MENU.page: {
+            const url = webAddress(click.pageUrl);
+            return url ? { draft: t("menu.polar.pageDraft", { url }) } : null;
+        }
+    }
 }

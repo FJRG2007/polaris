@@ -67,6 +67,42 @@ The cryptography is not reimplemented here either. `@polaris/vault-crypto` is th
 module the Polaris web vault uses, pinned against Bitwarden's own test vectors, so
 an item saved in one opens in the other by construction rather than by luck.
 
+## Polar beside the page
+
+The popup's Polar row, the Polaris shortcut (`Ctrl+J`, `Command+J` on a Mac;
+Firefox keeps `Alt+P`, since it never hands Ctrl+J to an extension) and a
+right-click entry all open the same thing: Polar in a side panel (Chromium) or
+sidebar (Firefox) that frames this deployment's own `/polar/embed`, so the chat
+is always the one Polaris serves and a dashboard update reaches it with no
+extension release. On a tab of a Polaris this browser already knows, all three
+hand over to that page's own Polar instead of opening a second copy beside it -
+the same key there toggles it, counted once even though the page saw the press
+too.
+
+Right-click a selection, a link, an image or the page itself for Polar's
+entries (explain, summarize, translate the selection; ask about a link, an
+image, or the page). Each one puts what was clicked into Polar's composer, with
+a question already typed where one applies, and sends nothing until the person
+does. `src/lib/context-menu.ts` is the pure logic the worker draws the menu
+from; `src/lib/polar-panel.ts` is the rest - the shortcut's routing, the panel's
+messages to the embed, and the two settings below.
+
+Settings in the popup list where Polar opens - every tab shares one panel, or
+each tab gets its own - and whether each tab keeps its own conversation or they
+all share one; both are read and written straight from the browser's storage
+(`src/lib/polar-panel.ts`), and Firefox is always the shared panel since it has
+one sidebar per window. The same screen lists this extension's shortcuts the
+way the account page lists its own, read from the browser rather than the
+manifest, since only Chromium's own shortcuts screen (which "Change" opens
+there) or Firefox's in-place recording actually change one.
+
+An account Polar is kept from - the way the dashboard decides it, same as any
+other permission - gets none of this: no Polar row in the popup, no right-click
+entries (remade the moment the answer changes), and the shortcut only opens the
+panel, which says Polar is not available to this account rather than asking
+anything on its behalf. A dashboard too old to say leaves Polar shown, so an
+entry already there does not vanish because the server has not been updated.
+
 ## Running it
 
 ```sh
@@ -110,10 +146,12 @@ src/lib/fields.ts        which box is the username, which password is which, wha
 src/lib/capture.ts       whether a submitted login is worth saving, replacing, or neither
 src/lib/breach.ts        whether a password being invented is already public
 src/lib/injection.ts     which granted sites the inline script may run on
+src/lib/context-menu.ts  what the right-click menu offers, for the vault and for Polar
+src/lib/polar-panel.ts   Polar beside the page: the shortcut's routing, panel scope, chat scope
 src/lib/update.ts        whether a newer build is out, and who is going to install it
 src/lib/self-update.ts   restarting into a version the install script's updater put on disk
 src/lib/messages.ts      what the popup may ask the worker for, as a closed list
-src/entrypoints/         background worker and popup
+src/entrypoints/         background worker, popup (including its Settings) and side panel
 test/                    the decisions that can do harm: what matches, and when it locks
 ```
 

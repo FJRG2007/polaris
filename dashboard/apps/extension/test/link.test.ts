@@ -154,6 +154,8 @@ describe("asking whether the connection still stands", () => {
             account: { id: "u1", name: "Ada", email: "ada@example.com" },
             connectionName: "Chrome on Windows",
             vault: true,
+            // A server too old to say: Polar stays.
+            polar: true,
             organizations: [],
             // A server too old to say, where the browser's own language is spoken.
             locale: null
@@ -282,5 +284,22 @@ describe("a face", () => {
     it("refuses anything that is not a picture", async () => {
         picture(200, "text/html", [60]);
         expect(await fetchFace(ORIGIN, "t", null)).toBeNull();
+    });
+});
+
+describe("whether the account may use Polar", () => {
+    it("hides Polar only on an explicit no", async () => {
+        const body = {
+            connection: { id: "c1", name: "Chrome" },
+            account: { id: "u1", name: "Ada", email: "ada@example.com" }
+        };
+        answering(200, { ...body, can: { vault: true, polar: false } });
+        expect((await checkLink(ORIGIN, "t")) as { polar: boolean }).toMatchObject({
+            polar: false
+        });
+        answering(200, { ...body, can: { vault: true, polar: true } });
+        expect((await checkLink(ORIGIN, "t")) as { polar: boolean }).toMatchObject({ polar: true });
+        answering(200, { ...body, can: { vault: true } });
+        expect((await checkLink(ORIGIN, "t")) as { polar: boolean }).toMatchObject({ polar: true });
     });
 });

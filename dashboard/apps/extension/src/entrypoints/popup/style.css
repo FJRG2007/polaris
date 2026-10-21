@@ -1333,3 +1333,102 @@ button.picker-button {
     opacity: 0.5;
     cursor: default;
 }
+
+/* Settings: the shortcuts list drawn as Polaris's account page draws it - a
+   box per group, a row per action, the keys as caps at the end. */
+.settings {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.settings section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+.sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.sheet-group {
+    min-width: 0;
+}
+.sheet-title {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.sheet-box {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+}
+.sheet-box.skeleton {
+    height: 76px;
+    background: hsl(var(--elevated));
+}
+.sheet-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 8px;
+    min-width: 0;
+    padding: 6px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid hsl(var(--border));
+}
+.sheet-row:last-child {
+    border-bottom: 0;
+}
+.sheet-label {
+    display: flex;
+    flex: 1 1 140px;
+    flex-direction: column;
+    min-width: 0;
+}
+.sheet-name {
+    overflow-wrap: anywhere;
+}
+.sheet-keys {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+.key-caps {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+}
+.key-cap {
+    display: inline-flex;
+    min-width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+    background: hsl(var(--elevated));
+    border: 1px solid hsl(var(--border-strong));
+    border-bottom-width: 2px;
+    border-radius: 4px;
+}
+.setting {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+.setting p {
+    margin: 0;
+}

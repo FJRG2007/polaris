@@ -5,7 +5,7 @@ import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { EmbedNotice, PolarEmbed } from "./polar-embed";
-import { extensionOrigin } from "@/lib/polar/embed-bridge";
+import { chatScope, extensionOrigin } from "@/lib/polar/embed-bridge";
 import { PolarProvider } from "@/components/polar/polar-panel";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,7 +25,9 @@ export default async function PolarEmbedPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const parent = extensionOrigin((await searchParams).ext);
+    const params = await searchParams;
+    const parent = extensionOrigin(params.ext);
+    const chat = parent ? chatScope(params.chat) : null;
     const user = await guardedUser();
     const access = user ? await polarAccessFor(user.id) : null;
     return (
@@ -37,7 +39,7 @@ export default async function PolarEmbedPage({
             ) : (
                 <ToastProvider>
                     <PolarProvider allowed>
-                        <PolarEmbed parent={parent} />
+                        <PolarEmbed parent={parent} chat={chat} />
                     </PolarProvider>
                 </ToastProvider>
             )}
