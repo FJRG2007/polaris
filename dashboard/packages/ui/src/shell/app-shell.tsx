@@ -88,9 +88,7 @@ export function AppShell({
                     scroll padding matches the padding, so the router bringing a
                     new screen into view lands on its top rather than 20px into
                     it. */}
-                <ShellMain
-                    className="min-w-0 flex-1 scroll-pt-3 overflow-y-auto overscroll-contain p-3 [--page-inset:1.5rem] sm:scroll-pt-4 sm:p-4 sm:[--page-inset:2rem] md:scroll-pt-5 md:px-6 md:py-5 md:[--page-inset:2.5rem]"
-                >
+                <ShellMain className="min-w-0 flex-1 scroll-pt-3 overflow-y-auto overscroll-contain p-3 [--page-inset:1.5rem] sm:scroll-pt-4 sm:p-4 sm:[--page-inset:2rem] md:scroll-pt-5 md:px-6 md:py-5 md:[--page-inset:2.5rem]">
                     {children}
                 </ShellMain>
                 {aside}

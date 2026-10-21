@@ -71,7 +71,8 @@ export function ShellMain({ className, children }: { className?: string; childre
         window.addEventListener("popstate", onPop);
         window.addEventListener("keydown", onKey);
         const interrupts = ["wheel", "touchstart", "pointerdown"] as const;
-        for (const type of interrupts) window.addEventListener(type, stopRestoring, { passive: true });
+        for (const type of interrupts)
+            window.addEventListener(type, stopRestoring, { passive: true });
         return () => {
             cancelAnimationFrame(recordFrame);
             stopRestoring();
@@ -83,7 +84,12 @@ export function ShellMain({ className, children }: { className?: string; childre
     }, []);
 
     return (
-        <main ref={ref} data-shell-scroll="" tabIndex={-1} className={cn("outline-none", className)}>
+        <main
+            ref={ref}
+            data-shell-scroll=""
+            tabIndex={-1}
+            className={cn("outline-none", className)}
+        >
             {children}
         </main>
     );
