@@ -6,7 +6,7 @@
  * stored (encrypted) on the Drive connection, signed in over HTTPS - rather
  * than through the Home Assistant agent's MQTT topics. That needs no broker, no
  * SSH and nothing installed on the NAS, so it works the moment the Drive
- * connection exists. Endpoint sources: plugins/unifi-unas/docs/data-sources.md
+ * connection exists. Endpoint sources: docs/unifi-unas-data-sources.md
  * (Drive paths are served under `/proxy/drive` through UniFi OS).
  */
 

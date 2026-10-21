@@ -1,13 +1,9 @@
 # Polaris workspace.
-# Shared Rust crates that power both the Home Assistant plugins (on-device
-# agents) and the future native Polaris dashboard. Each plugin keeps its own
-# crates under plugins/<name>/; cross-plugin code graduates to crates/ later.
+# The Rust side of Polaris: the privileged host daemon.
 [workspace]
 resolver = "2"
 members = [
     "crates/polaris-hostd",
-    "plugins/unifi-unas/core",
-    "plugins/unifi-unas/agent",
 ]
 
 [workspace.package]

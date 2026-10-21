@@ -1,8 +1,7 @@
 name: Dashboard Release
 
 # On a `dashboard-v*` tag, cross-compiles the polaris-hostd static musl binaries
-# (aarch64 + x86_64) and attaches them to the GitHub Release (mirrors
-# release-unifi-unas.yml). The container image is not versioned - it is published
+# (aarch64 + x86_64) and attaches them to the GitHub Release. The container image is not versioned - it is published
 # as `latest` only by dashboard-publish.yml on every push to main.
 #
 # Trigger: push a tag like `dashboard-v0.1.0`.

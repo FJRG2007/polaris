@@ -68,7 +68,6 @@ dashboard/.dev-data/
 *.db-journal
 
 # Prebuilt on-device agent binaries (produced by CI, never committed)
-plugins/*/homeassistant/custom_components/*/bin/polaris-unas-agent-*
 
 # Secrets / local env / logs - never commit
 .env

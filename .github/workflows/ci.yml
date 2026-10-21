@@ -14,14 +14,13 @@ on:
   # this workflow, both instances land in the concurrency group below, and with
   # cancellation off on main the called one waited out the standalone one and then
   # repeated it - four minutes before the daemon image could start building. The
-  # call is the run there. A push to main touching only `plugins/**` or
+  # call is the run there. A push to main touching only
   # `rust-toolchain.toml` (which the publish does not watch, since the daemon
-  # depends on neither) gets no run; it was checked on its pull request.
+  # does not depend on it) gets no run; it was checked on its pull request.
   push:
     branches-ignore: [main]
     paths:
       - "crates/**"
-      - "plugins/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -29,7 +28,6 @@ on:
   pull_request:
     paths:
       - "crates/**"
-      - "plugins/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -68,21 +66,3 @@ jobs:
       # about how long the gates take, not about which code they accept.
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all
-      - name: Check generated Python is up to date
-        run: |
-          cargo run -q -p polaris-unas-core --example gen_python > /tmp/_generated.py
-          diff -u plugins/unifi-unas/homeassistant/custom_components/unifi_unas/_generated.py /tmp/_generated.py
-
-  python:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.13"
-      # Syntax check only; a full Home Assistant runtime check happens via
-      # hassfest in the published integration repo.
-      - run: python -m compileall -q plugins/unifi-unas/homeassistant/custom_components
-      - run: pip install pytest==9.0.3
-      - run: python -m pytest -q plugins/unifi-unas/homeassistant/tests
