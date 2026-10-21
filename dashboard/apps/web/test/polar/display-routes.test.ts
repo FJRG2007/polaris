@@ -11,7 +11,7 @@ const MINE = "11111111-1111-4111-8111-111111111111";
 const THEIRS = "22222222-2222-4222-8222-222222222222";
 
 const state = {
-    preference: null as null | Record<string, boolean>,
+    preference: null as null | Record<string, unknown>,
     upserts: [] as { where: unknown; create: unknown; update: unknown }[],
     aggregates: [] as { where: unknown }[],
     counts: [] as { where: unknown }[]
@@ -84,7 +84,9 @@ describe("chat display settings", () => {
             showCost: true,
             showContextBar: true,
             autoCompact: true,
-            transcriptionModel: null
+            transcriptionModel: null,
+            suggestions: true,
+            helperModel: null
         });
     });
 
@@ -95,9 +97,26 @@ describe("chat display settings", () => {
             showCost: true,
             showContextBar: false,
             autoCompact: true,
-            transcriptionModel: "groq/whisper-large-v3-turbo"
+            transcriptionModel: "groq/whisper-large-v3-turbo",
+            suggestions: false,
+            helperModel: { provider: "openai", model: "gpt-mini", payer: "own" }
         };
         expect(await (await preferences.GET()).json()).toEqual(state.preference);
+    });
+
+    it("read an older row, or a helper model that no longer reads, as the defaults", async () => {
+        state.preference = { memory: true, helperModel: { provider: "openai" } };
+        expect(await (await preferences.GET()).json()).toMatchObject({
+            suggestions: true,
+            helperModel: null
+        });
+    });
+
+    it("store a helper model and switch suggestions off", async () => {
+        const chosen = { provider: "openai", model: "gpt-mini", payer: null };
+        const response = await patch({ suggestions: false, helperModel: chosen });
+        expect(response.status).toBe(200);
+        expect(state.upserts[0]?.update).toEqual({ suggestions: false, helperModel: chosen });
     });
 
     it("change one switch for its owner only, and answer the whole result", async () => {
@@ -132,6 +151,8 @@ describe("chat display settings", () => {
         expect((await patch({})).status).toBe(400);
         expect((await patch({ showCost: false, theme: "dark" })).status).toBe(400);
         expect((await patch({ autoCompact: "no" })).status).toBe(400);
+        expect((await patch({ helperModel: { provider: "openai" } })).status).toBe(400);
+        expect((await patch({ suggestions: "yes" })).status).toBe(400);
         expect(state.upserts).toEqual([]);
     });
 });

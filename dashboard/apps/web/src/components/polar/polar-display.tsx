@@ -92,7 +92,10 @@ export async function changePolarDisplay(key: PolarDisplayKey, value: boolean): 
     return false;
 }
 
-const ROWS: readonly { key: PolarDisplayKey; hint?: "settings.display.autoCompactHint" }[] = [
+/** The suggestion switch lives with the helper model (`polar-helper-settings.tsx`). */
+type DisplayRow = Exclude<PolarDisplayKey, "suggestions">;
+
+const ROWS: readonly { key: DisplayRow; hint?: "settings.display.autoCompactHint" }[] = [
     { key: "showTokens" },
     { key: "showCost" },
     { key: "showContextBar" },

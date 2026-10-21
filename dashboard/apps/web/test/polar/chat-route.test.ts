@@ -30,10 +30,13 @@ const state = {
     executed: [] as string[],
     saved: [] as unknown[],
     titled: [] as unknown[][],
+    suggested: [] as unknown[][],
+    suggestions: true,
     resolveCalls: 0,
     ensured: [] as unknown[][],
     signals: [] as unknown[],
     source: "own" as "own" | "instance",
+    helperSource: null as null | "own" | "instance",
     hit: null as null | { used: number; amount: number; period: string },
     recorded: [] as unknown[],
     web: true,
@@ -88,6 +91,12 @@ vi.mock("@/lib/polar/threads", () => ({
 vi.mock("@/lib/polar/titles", () => ({
     startPolarTitle: (...args: unknown[]) => void state.titled.push(args)
 }));
+vi.mock("@/lib/polar/preferences", () => ({
+    polarPreferences: async () => ({ suggestions: state.suggestions, helperModel: null })
+}));
+vi.mock("@/lib/polar/suggestions", () => ({
+    startPolarSuggestion: (...args: unknown[]) => void state.suggested.push(args)
+}));
 
 /** The first step streams `state.parts`; any step after a tool ran just answers. */
 function model() {
@@ -125,7 +134,11 @@ vi.mock("@/lib/polar/models", () => ({
         { provider: "anthropic", models: [{ provider: "anthropic", model: "m-1" }] }
     ],
     reasoningFor: () => undefined,
-    resolvePolarModel: async (_user: string, choice: { model: string }, signals?: unknown) => {
+    resolvePolarModel: async (
+        _user: string,
+        choice: { model: string; intelligence?: string },
+        signals?: unknown
+    ) => {
         state.resolveCalls++;
         state.signals.push(signals);
         if (state.resolved === "no_key") return "no_key";
@@ -135,7 +148,13 @@ vi.mock("@/lib/polar/models", () => ({
         return {
             model: model(),
             option: OPTION,
-            credential: { source: state.source, provider: OPTION.provider }
+            credential: {
+                source:
+                    choice.intelligence === "fast"
+                        ? (state.helperSource ?? state.source)
+                        : state.source,
+                provider: OPTION.provider
+            }
         };
     }
 }));
@@ -230,6 +249,7 @@ beforeEach(() => {
     state.limited = false;
     state.resolved = "ok";
     state.source = "own";
+    state.helperSource = null;
     state.hit = null;
     state.recorded = [];
     state.owned = true;
@@ -237,6 +257,8 @@ beforeEach(() => {
     state.executed = [];
     state.saved = [];
     state.titled = [];
+    state.suggested = [];
+    state.suggestions = true;
     state.resolveCalls = 0;
     state.ensured = [];
     state.signals = [];
@@ -485,6 +507,45 @@ describe("what a request has to look like", () => {
         ];
         expect([userId, threadId]).toEqual([USER.id, THREAD]);
         expect(finished.map((message) => message.role)).toEqual(["user", "assistant"]);
+        const chosen = (await (state.titled[0]![2] as Promise<{ model: unknown }>)) ?? null;
+        expect(chosen?.model).toBeTruthy();
+    });
+
+    it("names the thread on the chat's own model once the shared key's ceiling is reached", async () => {
+        state.helperSource = "instance";
+        state.hit = { used: 10, amount: 10, period: "month" };
+        await (await post(body())).text();
+        const chosen = await (state.titled[0]![2] as Promise<{ model: unknown }>);
+        expect(chosen.model).toBe(state.models[0]);
+    });
+
+    it("names the thread on the helper model while the shared key has room", async () => {
+        state.helperSource = "instance";
+        await (await post(body())).text();
+        const chosen = await (state.titled[0]![2] as Promise<{ model: unknown }>);
+        expect(state.models.length).toBeGreaterThan(1);
+        expect(chosen.model).not.toBe(state.models[0]);
+    });
+
+    it("starts a suggested next message on the helper model after the reply", async () => {
+        await (await post(body())).text();
+        expect(state.suggested).toHaveLength(1);
+        const [userId, threadId, finished, helper] = state.suggested[0] as [
+            string,
+            string,
+            UIMessage[],
+            Promise<{ source: string } | null>
+        ];
+        expect([userId, threadId]).toEqual([USER.id, THREAD]);
+        expect(finished.at(-1)?.role).toBe("assistant");
+        expect((await helper)?.source).toBe("automatic");
+    });
+
+    it("gives the suggestion no model when the person switched suggestions off", async () => {
+        state.suggestions = false;
+        await (await post(body())).text();
+        const helper = state.suggested[0]![3] as Promise<unknown>;
+        expect(await helper).toBeNull();
     });
 });
 

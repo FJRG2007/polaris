@@ -16,12 +16,15 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { POLAR_TITLE_MAX } from "@/lib/polar/shared";
 import { classifyProviderFailure, failureLogLine } from "@/lib/polar/provider-failure";
-import { generateText, type LanguageModel, type UIMessage } from "ai";
+import { generateText, type LanguageModel, type LanguageModelUsage, type UIMessage } from "ai";
 
 /** Where a thread's title came from (`PolarThread.titleSource`). */
 export type TitleSource = "placeholder" | "generating" | "model" | "user";
 
 type TitleReasoning = Parameters<typeof generateText>[0]["reasoning"];
+
+/** Told what the call spent, for the usage record. */
+type TitleSpent = (usage: LanguageModelUsage) => Promise<void> | void;
 
 /** How much of the conversation the model reads to name it. */
 const EXCERPT_MAX = 2000;
@@ -98,7 +101,8 @@ export async function titlePolarThread(
     threadId: string,
     model: LanguageModel,
     messages: readonly UIMessage[],
-    reasoning?: TitleReasoning
+    reasoning?: TitleReasoning,
+    spent?: TitleSpent
 ): Promise<void> {
     const asked = textOf(messages.find((message) => message.role === "user"));
     if (!asked) return;
@@ -110,7 +114,7 @@ export async function titlePolarThread(
     const answered = textOf(messages.find((message) => message.role === "assistant"));
     let title: string | null = null;
     try {
-        const { text } = await generateText({
+        const { text, totalUsage } = await generateText({
             model,
             system: SYSTEM,
             prompt: `User:\n${asked}${answered ? `\n\nAssistant:\n${answered}` : ""}`,
@@ -118,6 +122,7 @@ export async function titlePolarThread(
             reasoning,
             abortSignal: AbortSignal.timeout(TIMEOUT_MS)
         });
+        await spent?.(totalUsage);
         title = sanitizeTitle(text);
         if (!title) console.warn("polar: the model gave no usable title", { threadId });
     } catch (error) {
@@ -133,16 +138,34 @@ export async function titlePolarThread(
     });
 }
 
-/** Starts naming the thread without holding anything up. */
+/** The model a title is asked of, with how hard it thinks and where it spends. */
+export interface TitleModel {
+    model: LanguageModel;
+    reasoning?: TitleReasoning;
+    spent?: TitleSpent;
+}
+
+/**
+ * Starts naming the thread without holding anything up. The model may still
+ * be being decided (the helper model, `helper-model.ts`): the job is counted
+ * as running from this moment, so the screen's request waits for it either
+ * way.
+ */
 export function startPolarTitle(
     userId: string,
     threadId: string,
-    model: LanguageModel,
+    model: LanguageModel | Promise<TitleModel>,
     messages: readonly UIMessage[],
-    reasoning?: TitleReasoning
+    reasoning?: TitleReasoning,
+    spent?: TitleSpent
 ): void {
     if (running.has(threadId)) return;
-    const job = titlePolarThread(userId, threadId, model, messages, reasoning)
+    const chosen: Promise<TitleModel> =
+        model instanceof Promise ? model : Promise.resolve({ model, reasoning, spent });
+    const job = chosen
+        .then((entry) =>
+            titlePolarThread(userId, threadId, entry.model, messages, entry.reasoning, entry.spent)
+        )
         .catch((error) =>
             console.warn(
                 `polar: could not name the thread: ${error instanceof Error ? error.message : String(error)}`

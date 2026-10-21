@@ -130,6 +130,52 @@ function block(token: Token, origin: string | null): JSONContent | null {
     }
 }
 
+/** The reader-only node a GFM table becomes (`tablesOf`). */
+export const READER_TABLE = "readerTable";
+
+/**
+ * The table a `markdownBlock` holds, as a reader-only node, or null when its
+ * source is anything else. Rows are `tableRow` nodes (the first one marked
+ * `header`), cells are `tableCell` nodes holding inline content, and the
+ * table carries each column's alignment.
+ */
+export function markdownTable(source: string, origin: string | null = null): JSONContent | null {
+    const tokens = marked
+        .lexer(source ?? "", { gfm: true })
+        .filter((token) => token.type !== "space");
+    if (tokens.length !== 1 || tokens[0]?.type !== "table") return null;
+    const table = tokens[0] as Tokens.Table;
+    const row = (cells: readonly Tokens.TableCell[], header: boolean): JSONContent => ({
+        type: "tableRow",
+        attrs: { header },
+        content: cells.map((cell) => ({ type: "tableCell", content: inline(cell.tokens, origin) }))
+    });
+    return {
+        type: READER_TABLE,
+        attrs: { align: table.align.map((entry) => entry ?? null) },
+        content: [row(table.header, true), ...table.rows.map((cells) => row(cells, false))]
+    };
+}
+
+/**
+ * The document with every table it carries as source drawn as a table.
+ *
+ * The document keeps a table as its Markdown, so the editor - which has no
+ * table node - still round-trips it untouched; only the reader swaps it for
+ * `READER_TABLE`. One pass, so every screen that reads Markdown through
+ * `RichText` gets real tables, never one screen at a time.
+ */
+export function tablesOf(doc: JSONContent, origin: string | null = null): JSONContent {
+    const walk = (node: JSONContent): JSONContent => {
+        if (node.type === MARKDOWN_BLOCK) {
+            const source = (node.content ?? []).map((child) => child.text ?? "").join("");
+            return markdownTable(source, origin) ?? node;
+        }
+        return node.content ? { ...node, content: node.content.map(walk) } : node;
+    };
+    return walk(doc);
+}
+
 function list(token: Tokens.List, origin: string | null): JSONContent {
     const tasks = token.items.length > 0 && token.items.every((item) => item.task);
     if (tasks) {

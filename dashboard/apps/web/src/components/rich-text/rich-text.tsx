@@ -28,7 +28,14 @@ import { FlaggedAnchor } from "./flagged-link";
 import { EmojiRun, type CustomEmojiSet } from "./custom-emoji";
 import { Spoiler } from "@/app/(app)/chat/spoiler";
 import type { JSONContent } from "@tiptap/core";
-import { markdownToDoc, splitChannelMentions, MARKDOWN_BLOCK, REFERENCE } from "./markdown";
+import {
+    tablesOf,
+    REFERENCE,
+    markdownToDoc,
+    READER_TABLE,
+    MARKDOWN_BLOCK,
+    splitChannelMentions
+} from "./markdown";
 
 /**
  * What a reference turned out to be, for the reader in front of it.
@@ -107,9 +114,8 @@ export function RichText({
     remoteImages?: boolean;
 }) {
     if (!value.trim()) return null;
-    const doc = references
-        ? resolve(markdownToDoc(value, origin), references)
-        : markdownToDoc(value, origin);
+    const parsed = tablesOf(markdownToDoc(value, origin), origin);
+    const doc = references ? resolve(parsed, references) : parsed;
     // Everything it said was an address that is drawn underneath instead. The
     // blank line that would otherwise sit above the card is not worth a div.
     if ((doc.content ?? []).length === 0) return null;
@@ -211,7 +217,9 @@ function resolve(
         // A paragraph whose only content was a removed address is a blank line
         // where the card is about to be. The document itself is never dropped:
         // an empty one renders as nothing, which is the answer.
-        if (content.length === 0 && node.content.length > 0 && node.type !== "doc") return GONE;
+        // A table cell stays, empty, so the columns after it do not shift left.
+        const kept = node.type === "doc" || node.type === "tableCell";
+        if (content.length === 0 && node.content.length > 0 && !kept) return GONE;
         return { ...node, content };
     };
     return walk(doc) ?? { type: "doc", content: [] };
@@ -263,6 +271,8 @@ function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
                     <code>{text(node)}</code>
                 </pre>
             );
+        case READER_TABLE:
+            return <Table node={node} scope={scope} />;
         case "horizontalRule":
             return <hr />;
         case "image":
@@ -270,6 +280,50 @@ function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
         default:
             return <>{blocks(node.content, scope)}</>;
     }
+}
+
+const ALIGN: Record<string, string> = {
+    left: "text-left",
+    center: "text-center",
+    right: "text-right"
+};
+
+/**
+ * A GFM table, bounded to the column it is read in: wider than that, it
+ * scrolls sideways inside its own frame rather than pushing the page. Cells
+ * keep their words whole - the prose's `break-words` would otherwise break a
+ * narrow column a letter at a time instead of letting the frame scroll.
+ */
+function Table({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
+    const align = Array.isArray(node.attrs?.align) ? (node.attrs.align as unknown[]) : [];
+    const [head, ...body] = node.content ?? [];
+    const cells = (row: JSONContent | undefined, Tag: "th" | "td") =>
+        (row?.content ?? []).map((cell, index) => (
+            <Tag
+                key={index}
+                className={cn(
+                    "border-b border-border px-3 py-1.5 align-top [overflow-wrap:normal]",
+                    Tag === "th" && "whitespace-nowrap bg-muted font-semibold",
+                    ALIGN[String(align[index] ?? "")] ?? "text-left"
+                )}
+            >
+                {inline(cell.content, scope)}
+            </Tag>
+        ));
+    return (
+        <div data-table className="max-w-full overflow-x-auto rounded-md border border-border">
+            <table className="min-w-full border-collapse text-sm [&_tr:last-child>td]:border-b-0">
+                <thead>
+                    <tr>{cells(head, "th")}</tr>
+                </thead>
+                <tbody>
+                    {body.map((row, index) => (
+                        <tr key={index}>{cells(row, "td")}</tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
 }
 
 function listItems(nodes: readonly JSONContent[] | undefined, scope: EmojiScope): React.ReactNode {

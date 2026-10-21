@@ -15208,6 +15208,12 @@ model PolarPreference {
     // The speech-to-text model dictation and voice mode use, as
     // `provider/model`. Null, or one whose key is gone, is the fastest held.
     transcriptionModel String?
+    // Whether a suggested next message follows each answer.
+    suggestions    Boolean  @default(true)
+    // The model titles and suggestions are written with, as
+    // { provider, model, payer }; null is Automatic (the fastest one the
+    // person can use). Read through a schema: an unreadable value is Automatic.
+    helperModel    Json?
     updatedAt      DateTime @updatedAt
 }
 

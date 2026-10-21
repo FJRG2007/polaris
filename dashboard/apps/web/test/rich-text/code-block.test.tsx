@@ -64,9 +64,7 @@ describe("markup inside a fence", () => {
         // The shape somebody would actually try: end the code element early and
         // open an image whose error handler runs. It is one text node, so there
         // is nothing to close.
-        const markup = render(
-            "```js\n</code></pre><img src=x onerror=alert(1)>\n```"
-        );
+        const markup = render("```js\n</code></pre><img src=x onerror=alert(1)>\n```");
         expect(markup).not.toContain("<img");
         expect(markup).toContain("&lt;img");
     });
@@ -81,10 +79,10 @@ describe("markup inside a fence", () => {
 
 describe("markdown the editor has no node for", () => {
     it("keeps its source without pretending it is code in a language", () => {
-        // A table comes through verbatim. It is not a fence and has no language
-        // to declare, so it gets the plain frame rather than a header saying
-        // "code".
-        const markup = render("| a | b |\n| - | - |\n| 1 | 2 |");
+        // Raw HTML comes through verbatim (a table is drawn as one, see
+        // tables.test.tsx). It is not a fence and has no language to declare,
+        // so it gets the plain frame rather than a header saying "code".
+        const markup = render("<div>raw</div>");
         expect(markup).toContain("<pre>");
         expect(markup).not.toContain("Copy this code");
     });

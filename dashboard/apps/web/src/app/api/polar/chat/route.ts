@@ -57,6 +57,15 @@ import {
     polarMemoryTools
 } from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
+import { polarPreferences } from "@/lib/polar/preferences";
+import { startPolarSuggestion } from "@/lib/polar/suggestions";
+import {
+    helperReasoning,
+    helperMaySpend,
+    polarHelperModel,
+    recordHelperUsage,
+    type PolarHelper
+} from "@/lib/polar/helper-model";
 import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
 import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
 import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
@@ -451,15 +460,40 @@ export async function POST(request: Request): Promise<Response> {
                     console.error("polar: could not record the turn's usage", error);
                 }
             }
-            // A new thread is named by its model once the first answer is in,
-            // behind the reply; the screen asks for the title when it is ready.
+            // The small jobs run behind the reply on the helper model the
+            // person picked (`helper-model.ts`): a new thread's title once the
+            // first answer is in, and the suggested next message after every
+            // answer unless it is switched off. The screen asks for each when
+            // it is ready; nothing here holds the stream open.
+            const preferences = polarPreferences(user.id).catch(() => null);
+            const helper: Promise<PolarHelper | null> = preferences
+                .then((settings) =>
+                    polarHelperModel(user.id, resolved, settings?.helperModel ?? null, access)
+                )
+                .catch(() => null);
+            // Switched off, the suggestion's model is none and no call is made.
+            startPolarSuggestion(
+                user.id,
+                body.data.threadId,
+                finished,
+                preferences.then((settings) => (settings?.suggestions === false ? null : helper))
+            );
             if (temporary) return;
             startPolarTitle(
                 user.id,
                 body.data.threadId,
-                resolved.model,
-                finished,
-                reasoningFor("fast", resolved.option)
+                helper.then(async (side) => {
+                    const job: PolarHelper =
+                        side && (await helperMaySpend(user.id, side))
+                            ? side
+                            : { resolved, source: "chat" };
+                    return {
+                        model: job.resolved.model,
+                        reasoning: helperReasoning(job),
+                        spent: (usage) => recordHelperUsage(user.id, body.data.threadId, job, usage)
+                    };
+                }),
+                finished
             );
         }
     });
