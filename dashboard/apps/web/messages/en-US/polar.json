@@ -122,6 +122,7 @@
     "empty": "Ask about this page, or anything you can do in Polaris.",
     "errors": {
         "failed": "Polar could not answer. Try again, or pick another model.",
+        "unanswered": "Polar stopped without an answer.",
         "modelGone": "The model this conversation used is no longer offered, so Polar answered with your first available one.",
         "provider": {
             "key": "{provider} refused the key Polar used. It may be wrong, revoked or missing a permission.",

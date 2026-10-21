@@ -104,6 +104,27 @@ export function rankTools(
         .map((row) => row.entry);
 }
 
+/**
+ * What the next step of a turn may do. The tools `find_tools` turned up are sent
+ * from the step after; the turn's last step may call none, so a turn that spends
+ * its whole budget looking still ends in an answer instead of stopping on a tool
+ * call with nothing said.
+ */
+export function nextStep<T extends string>(
+    stepNumber: number,
+    stepMax: number,
+    steps: Parameters<typeof foundInSteps>[0],
+    activeFor: (found: ReadonlySet<string>) => T[]
+): { activeTools?: T[]; toolChoice?: "none" } | undefined {
+    const found = foundInSteps(steps);
+    const last = stepNumber >= stepMax - 1;
+    if (!last && found.size === 0) return undefined;
+    return {
+        ...(found.size > 0 ? { activeTools: activeFor(found) } : {}),
+        ...(last ? { toolChoice: "none" as const } : {})
+    };
+}
+
 /** Tool names `find_tools` turned up in this turn's steps so far. */
 export function foundInSteps(
     steps: readonly { toolResults?: readonly { toolName: string; output: unknown }[] }[]
