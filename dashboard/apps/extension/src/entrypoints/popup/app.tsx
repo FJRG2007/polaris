@@ -3,19 +3,13 @@ import { screenFor } from "@/lib/screen";
 import { timeoutChoices } from "@/lib/lock";
 import { EVERY_SITE } from "@/lib/injection";
 import { readIntendedLogin } from "@/lib/save";
-import type { UpdateNotice } from "@/lib/update";
+import { isNewer, type UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
 import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { Picker } from "./picker";
 import { CheckMark, CopyMark } from "./marks";
 import { ServersFold, ServersPanel } from "./servers";
-import {
-    detectOs,
-    installLine,
-    installShell,
-    repoFromReleaseUrl
-} from "@polaris/core/extension-install";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { useWords } from "./words";
 import type { Words } from "@/lib/words";
@@ -97,39 +91,49 @@ function useStatus(): [VaultStatus | null, () => Promise<void>] {
     return [status, read];
 }
 
-/** What the worker's last check found, if it found anything - and a newer
- *  version already on disk, waiting to be started. */
-function useUpdate(): { notice: UpdateNotice | null; pending: string | null } {
-    const [state, setState] = useState<{ notice: UpdateNotice | null; pending: string | null }>({
-        notice: null,
-        pending: null
-    });
+/** What the worker's last check found, if it found anything - a newer version
+ *  already on disk, waiting to be started, and the newest one that is out. */
+interface UpdateState {
+    readonly notice: UpdateNotice | null;
+    readonly pending: string | null;
+    readonly latest: string | null;
+}
+
+function useUpdate(): UpdateState {
+    const [state, setState] = useState<UpdateState>({ notice: null, pending: null, latest: null });
     useEffect(() => {
         void (async () => {
             const reply = await askBackground({ kind: "updateStatus" });
             if (reply.ok && "update" in reply)
-                setState({ notice: reply.update, pending: reply.pending });
+                setState({
+                    notice: reply.update,
+                    pending: reply.pending,
+                    latest: reply.latest ?? null
+                });
         })();
     }, []);
     return state;
 }
 
+/** Where the steps for updating by hand are: this Polaris's downloads page, or
+ *  the release itself before a Polaris has been named. */
+function stepsUrl(notice: UpdateNotice, server: string | null): string {
+    return server ? `${server}/account/downloads` : notice.url;
+}
+
 /**
- * The one thing this popup says without being asked.
- *
- * What it says depends on how this copy got here, because the readers have
- * nothing to do with each other:
+ * The one thing this popup says without being asked, and only when there is
+ * something for the reader to do:
  *
  * - A newer version already on disk, put there by the install script's updater,
  *   starts by itself at the next safe moment (`lib/self-update.ts`). Said, with
  *   the way to start it now and what that costs.
- * - A store install, and a copy the updater keeps current, are updated for
- *   them: there is nothing to do, and saying so is the whole message.
- * - A Chromium copy loaded by hand, or by the script before it set up the
- *   updater, updates never - until the one line is run once. So that line is
- *   shown, for this system, with a copy button.
- * - Firefox has no updater at all: its temporary add-on is gone when Firefox
- *   closes. It keeps pointing at the steps.
+ * - A copy loaded by hand stays on its version until it is loaded again, by hand,
+ *   for now. Said, with the link to the steps on their own Polaris - never a
+ *   command to type.
+ *
+ * A store install, a copy the updater keeps current and one the desktop app
+ * looks after need nothing from anybody; the version line at the foot says it.
  */
 function UpdateBanner({
     notice,
@@ -141,7 +145,6 @@ function UpdateBanner({
     server: string | null;
 }): React.JSX.Element | null {
     const t = useWords();
-    const [copied, mark] = useCopied();
     const [starting, setStarting] = useState(false);
 
     if (pending) {
@@ -162,62 +165,13 @@ function UpdateBanner({
             </div>
         );
     }
-    if (!notice) return null;
-    if (notice.kind === "store") {
-        return (
-            <div className="notice small">
-                {t("popup.update.store", { version: notice.version })}
-            </div>
-        );
-    }
-    if (notice.kind === "auto") {
-        return (
-            <div className="notice small">
-                {t("popup.update.auto", { version: notice.version })}
-            </div>
-        );
-    }
-    const repo = repoFromReleaseUrl(notice.url);
-    if (import.meta.env.BROWSER !== "firefox" && repo) {
-        const os = detectOs(navigator.userAgent);
-        const line = installLine(os, repo);
-        return (
-            <div className="notice small">
-                <p>
-                    {t("popup.update.runOnce", {
-                        version: notice.version,
-                        shell: installShell(os)
-                    })}
-                </p>
-                <div className="install-line">
-                    <code>{line}</code>
-                    <button
-                        className={copied === "line" ? "icon copied" : "icon"}
-                        aria-label={t("popup.update.copyLine")}
-                        title={
-                            copied === "line" ? t("generator.copied") : t("popup.update.copyLine")
-                        }
-                        onClick={() =>
-                            void navigator.clipboard.writeText(line).then(() => mark("line"))
-                        }
-                    >
-                        {copied === "line" ? <CheckMark /> : <CopyMark />}
-                    </button>
-                </div>
-            </div>
-        );
-    }
+    if (notice?.kind !== "manual") return null;
     return (
         <div className="notice small">
             {t.rich("popup.update.byHand", {
                 version: notice.version,
                 link: (chunks) => (
-                    <a
-                        key="link"
-                        href={server ? `${server}/account/downloads` : notice.url}
-                        target="_blank"
-                        rel="noreferrer"
-                    >
+                    <a key="link" href={stepsUrl(notice, server)} target="_blank" rel="noreferrer">
                         {chunks}
                     </a>
                 ),
@@ -227,10 +181,50 @@ function UpdateBanner({
     );
 }
 
+/**
+ * Which version this is, at the foot of every screen, and whether a newer one
+ * is out - with what happens next for this kind of install.
+ *
+ * "Up to date" only once Polaris has actually named a version: no answer yet is
+ * not the same as nothing new.
+ */
+function VersionLine({
+    notice,
+    pending,
+    latest,
+    server
+}: UpdateState & { server: string | null }): React.JSX.Element {
+    const t = useWords();
+    const running = browser.runtime.getManifest().version;
+    const newer = pending ?? (notice && notice.kind !== "desktop" ? notice.version : null);
+    return (
+        <p className="version-line">
+            <span>{t("popup.version.running", { version: running })}</span>
+            {newer ? (
+                <>
+                    <span>{t("popup.version.available", { version: newer })}</span>
+                    {pending ? null : notice?.kind === "manual" ? (
+                        <a href={stepsUrl(notice, server)} target="_blank" rel="noreferrer">
+                            {t("popup.version.manual")}
+                        </a>
+                    ) : notice?.kind === "store" ? (
+                        <span>{t("popup.version.store")}</span>
+                    ) : notice?.kind === "auto" ? (
+                        <span>{t("popup.version.auto")}</span>
+                    ) : null}
+                </>
+            ) : latest && !isNewer(latest, running) ? (
+                <span>{t("popup.version.current")}</span>
+            ) : null}
+        </p>
+    );
+}
+
 export function App(): React.JSX.Element {
     const t = useWords();
     const [status, refresh] = useStatus();
-    const { notice: update, pending } = useUpdate();
+    const updates = useUpdate();
+    const { notice: update, pending } = updates;
     const [section, setSection] = useSection();
     /**
      * Asking Polaris to let this browser in, from the locked screen.
@@ -274,6 +268,7 @@ export function App(): React.JSX.Element {
                 )}
                 <Accounts status={status} onChange={refresh} />
                 <ServersFold status={status} onChange={refresh} />
+                <VersionLine {...updates} server={status.server} />
             </div>
         );
     }
@@ -330,6 +325,7 @@ export function App(): React.JSX.Element {
                     {shown === "signIn" || shown === "unlock" ? <Generator /> : null}
                 </>
             )}
+            <VersionLine {...updates} server={status.server} />
         </div>
     );
 }

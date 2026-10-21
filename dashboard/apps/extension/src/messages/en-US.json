@@ -125,14 +125,11 @@
     },
     "popup": {
         "update": {
-            "store": "Version {version} is out. Your browser installs it once the store has reviewed it, so there is nothing to do here.",
-            "byHand": "Version {version} is out. This copy was loaded by hand, so it has to be loaded again the same way. <link>{where, select, polaris {The steps are on your Polaris} other {See what changed}}</link>.",
-            "auto": "Version {version} is out. This copy updates itself within a few hours.",
+            "byHand": "Version {version} is out. This copy was installed by hand, so for now it is updated by hand too. <link>{where, select, polaris {See the steps on your Polaris} other {See what changed}}</link>.",
             "ready": "Version {version} is installed. It starts by itself once the vault is locked and this is closed.",
             "startNow": "Start it now",
             "startNowHint": "Restarts the extension, so you sign in to the vault again.",
-            "runOnce": "Version {version} is out. Run this once in {shell} and this copy updates itself from then on:",
-            "copyLine": "Copy the line"
+            "title": "version {version} is available"
         },
         "connect": {
             "hint": "The address you open the dashboard at.",
@@ -243,6 +240,14 @@
             "signingIn": "Signing in to another account",
             "switchCount": "Switch ({count})",
             "accounts": "Accounts"
+        },
+        "version": {
+            "running": "Version {version}",
+            "current": "Up to date",
+            "available": "Version {version} is available",
+            "store": "Your browser installs it",
+            "auto": "Installs itself within hours",
+            "manual": "How to update"
         }
     },
     "inline": {

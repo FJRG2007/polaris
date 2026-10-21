@@ -450,9 +450,15 @@ export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
     /**
      * A build newer than this one, or null when this one is current - and the
-     * version already on disk waiting for a safe moment to start, or null.
+     * version already on disk waiting for a safe moment to start, or null - and
+     * the newest version Polaris last said is out, or null when it never has.
      */
-    | { readonly ok: true; readonly update: UpdateNotice | null; readonly pending: string | null }
+    | {
+          readonly ok: true;
+          readonly update: UpdateNotice | null;
+          readonly pending: string | null;
+          readonly latest?: string | null;
+      }
     | { readonly ok: true; readonly items: readonly ItemSummary[] }
     | { readonly ok: true; readonly value: string }
     /** The site in front of somebody, and whether they have shut this out of it. */

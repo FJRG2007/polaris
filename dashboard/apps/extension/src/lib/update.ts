@@ -3,18 +3,19 @@
  * person running this one.
  *
  * An extension loaded by hand never updates itself unless something replaces its
- * files. The install script now leaves exactly that behind - a job that swaps in
- * each new release - but a copy loaded before it, a zip unpacked by hand, and
- * Firefox's temporary add-on have nothing of the kind: somebody who unpacked a
- * .zip in March is still running March's build, with nothing anywhere that would
- * ever say so.
+ * files. The one-line install from the downloads page leaves exactly that behind -
+ * a job of the user's own that swaps in each new release - but a copy loaded by
+ * following the steps, a zip unpacked by hand, and Firefox's temporary add-on have
+ * nothing of the kind: somebody who unpacked a .zip in March is still running
+ * March's build, with nothing anywhere that would ever say so.
  *
  * What to tell them depends entirely on how it got here, so that is read rather
  * than assumed. A build installed from a store is updated by the store once the
  * new version is reviewed, and the only honest thing to say is that it is coming;
  * telling that person to go and re-load a folder would be sending them to undo a
  * working install. A build loaded from disk has to be loaded again, by hand, by
- * them.
+ * them - and the popup points at the steps on their own Polaris, never at a
+ * command to type.
  *
  * Everything here is pure. The comparison in particular: a version is not a
  * number and is not a string either, and comparing two of them as text puts 0.10
@@ -23,11 +24,12 @@
  */
 
 /**
- * How this build got here, in the three answers that change what to say: from a
- * store, loaded from a folder the install script keeps current (`auto` - see
- * `lib/self-update.ts`), or loaded by hand with nothing keeping it current.
+ * How this build got here, in the answers that change what to say: from a store,
+ * loaded from a folder the install script's job keeps current (`auto` - see
+ * `lib/self-update.ts`), loaded by hand with nothing keeping it current, or kept
+ * current by the Polaris desktop app (`desktop` - see `managedByDesktop`).
  */
-export type InstallKind = "store" | "auto" | "manual";
+export type InstallKind = "store" | "auto" | "manual" | "desktop";
 
 /** A newer build, and what the reader can do about it. */
 export interface UpdateNotice {
@@ -94,8 +96,15 @@ export function isNewer(available: string, running: string): boolean {
  * everything that is not plainly a store install is told how to do it by hand,
  * which is the direction that leaves nobody stranded on an old build.
  */
-export function installKind(installType: string | undefined | null, covered = false): InstallKind {
+export function installKind(
+    installType: string | undefined | null,
+    covered = false,
+    desktop = false
+): InstallKind {
     if (installType === "normal") return "store";
+    // Ahead of the updater's marker: once the desktop app looks after this copy,
+    // it is the one that says when a new version is going in.
+    if (desktop) return "desktop";
     // Only an unpacked load can be kept current by replacing its files, and only
     // one whose folder the updater marked as its own.
     if (installType === "development" && covered) return "auto";
@@ -113,12 +122,64 @@ export function noticeFor(
     answer: VersionAnswer | null,
     running: string,
     installType: string | undefined | null,
-    covered = false
+    covered = false,
+    desktop = false
 ): UpdateNotice | null {
-    if (!answer) return null;
-    const { version, url } = answer;
-    if (typeof version !== "string" || version === "") return null;
-    if (typeof url !== "string" || url === "") return null;
+    const version = publishedVersion(answer);
+    const url = answer?.url;
+    if (version === null || typeof url !== "string" || url === "") return null;
     if (!isNewer(version, running)) return null;
-    return { version, url, kind: installKind(installType, covered) };
+    return { version, url, kind: installKind(installType, covered, desktop) };
+}
+
+/**
+ * The version the server says is out, or null when it named none - which is
+ * what lets the popup say "up to date" only after somebody actually answered.
+ */
+export function publishedVersion(answer: VersionAnswer | null): string | null {
+    const version = answer?.version;
+    return typeof version === "string" && version !== "" ? version : null;
+}
+
+/**
+ * Whether the Polaris desktop app keeps this copy current.
+ *
+ * Always false: there is no desktop app yet. It is the one place to change when
+ * there is, and a `desktop` notice is never shown - the app that installs the
+ * new version is the one that says so.
+ */
+export function managedByDesktop(): boolean {
+    return false;
+}
+
+/** The toolbar badge's two colours: the count of logins, and an update. */
+export const COUNT_COLOR = "#2f6feb";
+export const UPDATE_COLOR = "#d97706";
+
+/** What the toolbar icon shows. */
+export interface BadgeState {
+    readonly text: string;
+    readonly color: string;
+    /** The version to name in the icon's tooltip, or null to leave it as it is. */
+    readonly announce: string | null;
+}
+
+/**
+ * The badge, from the login count for the tab in front and the update notice.
+ *
+ * One badge, two things to say, and the count wins: it is about the page
+ * somebody is on right now and is what the badge means every day, while an
+ * update can wait for the next tab with nothing saved. The update still reaches
+ * the icon either way, through its tooltip, and the popup says it in full.
+ *
+ * The mark itself is only for a copy somebody has to update by hand. A store
+ * install, a folder the updater keeps current and the desktop app all deliver
+ * the new version without anybody doing anything, and an icon asking for
+ * attention it cannot use is one people learn to ignore.
+ */
+export function badgeFor(count: string, notice: UpdateNotice | null): BadgeState {
+    const announce = notice && notice.kind !== "desktop" ? notice.version : null;
+    if (count !== "") return { text: count, color: COUNT_COLOR, announce };
+    if (notice?.kind === "manual") return { text: "!", color: UPDATE_COLOR, announce };
+    return { text: "", color: COUNT_COLOR, announce };
 }

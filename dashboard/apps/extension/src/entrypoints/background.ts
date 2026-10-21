@@ -22,6 +22,7 @@ import { EMAIL_FIELD, hostOf, readUriMatch, type UriMatch } from "@polaris/core"
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
+import * as update from "@/lib/update";
 import { installKind, isNewer, noticeFor, type UpdateNotice } from "@/lib/update";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
@@ -247,6 +248,9 @@ const DEVICE = storage.defineItem<string | null>("local:vault.device", { fallbac
  * reloading the extension should still be told tomorrow.
  */
 const UPDATE = storage.defineItem<UpdateNotice | null>("local:update.notice", { fallback: null });
+/** The newest version this Polaris last said is out, newer or not: what lets the
+ *  popup say "up to date" only once somebody has actually answered. */
+const LATEST = storage.defineItem<string | null>("local:update.latest", { fallback: null });
 /**
  * A login somebody has just submitted on a page, waiting to be offered.
  *
@@ -2171,22 +2175,36 @@ async function freshBeforeListing(): Promise<void> {
 }
 
 /**
- * How many logins are saved for the tab in front of somebody.
+ * How many logins are saved for the tab in front of somebody - or, on a tab with
+ * none, that a newer version is waiting to be installed by hand.
  *
- * The only thing this extension says without being asked, and it is the signal
- * that it is working at all. Blank while locked rather than zero: none saved and
- * cannot tell are different answers.
+ * The count is the signal that this is working at all. Blank while locked rather
+ * than zero: none saved and cannot tell are different answers. How the two share
+ * one badge is `update.badgeFor`; the update is always in the icon's tooltip.
  */
 async function badge(): Promise<void> {
     try {
         const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
         const url = tab?.url ?? "";
-        const text =
+        const count =
             (await vault()) && /^https?:/i.test(url)
                 ? String((await forUrl(url)).length || "")
                 : "";
-        await browser.action.setBadgeText({ text });
-        await browser.action.setBadgeBackgroundColor({ color: "#2f6feb" });
+        // The stored notice rather than `currentNotice()`, which reads files and
+        // asks the browser on every tab switch. Checked against the running
+        // version, so the mark is gone the moment the new one is.
+        const held = await UPDATE.getValue();
+        const notice =
+            held && isNewer(held.version, browser.runtime.getManifest().version) ? held : null;
+        const shown = update.badgeFor(count, notice);
+        await browser.action.setBadgeText({ text: shown.text });
+        await browser.action.setBadgeBackgroundColor({ color: shown.color });
+        const name = browser.i18n.getMessage("extName") || "Polaris";
+        await browser.action.setTitle({
+            title: shown.announce
+                ? `${name} - ${await say("popup.update.title", { version: shown.announce })}`
+                : name
+        });
     } catch {
         // A badge is not worth an error path: a tab that went away between the
         // query and the write is the normal case, not a fault.
@@ -2906,7 +2924,10 @@ async function updaterCovers(): Promise<boolean> {
 async function currentNotice(): Promise<UpdateNotice | null> {
     const held = await UPDATE.getValue();
     if (!held || !isNewer(held.version, browser.runtime.getManifest().version)) return null;
-    return { ...held, kind: installKind(await installType(), await updaterCovers()) };
+    return {
+        ...held,
+        kind: installKind(await installType(), await updaterCovers(), update.managedByDesktop())
+    };
 }
 
 /**
@@ -2940,14 +2961,18 @@ async function checkForUpdate(): Promise<void> {
         });
         if (!response.ok) return;
         const answer = (await response.json()) as { version?: unknown; url?: unknown };
+        await LATEST.setValue(update.publishedVersion(answer));
         await UPDATE.setValue(
             noticeFor(
                 answer,
                 browser.runtime.getManifest().version,
                 await installType(),
-                await updaterCovers()
+                await updaterCovers(),
+                update.managedByDesktop()
             )
         );
+        // The toolbar icon is where somebody with the popup closed finds out.
+        await badge();
     } catch {
         // Unreachable, or an answer that was not JSON. What is stored stands.
     }
@@ -3539,7 +3564,12 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // one out (a restart into it leaves the old notice behind), and
                 // how it gets here read again, since the install script may have
                 // started keeping this copy current since the notice was made.
-                return { ok: true, update: await currentNotice(), pending: await diskVersion() };
+                return {
+                    ok: true,
+                    update: await currentNotice(),
+                    pending: await diskVersion(),
+                    latest: await LATEST.getValue()
+                };
 
             case "restartNow": {
                 // Only into a version that is actually waiting: a restart with

@@ -247,8 +247,10 @@ browser start, or the popup's "Start it now".
 
 An extension loaded by hand never updates itself unless something replaces its
 files, and nothing in a browser will ever mention it. So the worker asks - when
-the browser starts, and twice a day after that - and the popup carries a line
-above whichever screen is showing when there is something to say.
+the browser starts, and twice a day after that. The popup's foot always says which
+version is running and, once Polaris has answered, either that it is up to date or
+which version is out; a line above whichever screen is showing appears only when
+the reader has something to do.
 
 It asks **your Polaris**, not GitHub. The manifest declares no host permission,
 the one origin this may reach is the one you named, and the dashboard already
@@ -262,11 +264,17 @@ reports - the one method of that API that needs no `management` permission.
 Installed from a package, the browser updates it once the store has reviewed the
 new version and there is nothing for you to do. An unpacked folder the install
 script's job keeps current - it writes `polaris-updater.json` into the folder -
-is told the same. Any other unpacked Chromium copy is shown the one line to run,
-for its system, which sets that job up. Firefox's temporary add-on has nothing on
-disk to keep current, and the line points at the steps on your own Polaris.
-Anything else - put there by other software, or by policy - is told the same as
-loaded-by-hand, because Polaris cannot promise those are being kept current.
+is told the same, and is offered "Start it now" once the new files are in. Any
+other copy loaded by hand is updated by hand for now: the popup links to the steps
+on your own Polaris and never shows a command. Anything else - put there by other
+software, or by policy - is told the same as loaded-by-hand, because Polaris cannot
+promise those are being kept current. `managedByDesktop()` in `src/lib/update.ts`
+is where a future Polaris desktop app will take over; it answers no today.
+
+The toolbar badge counts the logins saved for the tab in front. On a tab with no
+count, a copy that has to be updated by hand shows an amber `!` instead; the count
+wins when both apply, and the icon's tooltip names the new version either way. The
+mark goes as soon as the running version catches up.
 
 ## Lifting it out of this monorepo
 

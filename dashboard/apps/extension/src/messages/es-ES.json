@@ -125,14 +125,11 @@
     },
     "popup": {
         "update": {
-            "store": "Ya está disponible la versión {version}. Tu navegador la instala en cuanto la tienda la revise, así que aquí no hay nada que hacer.",
-            "byHand": "Ya está disponible la versión {version}. Esta copia se cargó a mano, así que hay que volver a cargarla de la misma forma. <link>{where, select, polaris {Los pasos están en tu Polaris} other {Ver qué ha cambiado}}</link>.",
-            "auto": "Ya está la versión {version}. Esta copia se actualiza sola en unas horas.",
+            "byHand": "Ya está disponible la versión {version}. Esta copia se instaló a mano, así que por ahora se actualiza a mano. <link>{where, select, polaris {Mira los pasos en tu Polaris} other {Ver qué ha cambiado}}</link>.",
             "ready": "La versión {version} ya está instalada. Arranca sola al bloquear la bóveda y cerrar esto.",
             "startNow": "Arrancarla ya",
             "startNowHint": "Reinicia la extensión, así que vuelves a entrar en la bóveda.",
-            "runOnce": "Ya está la versión {version}. Ejecuta esto una vez en {shell} y esta copia se actualizará sola:",
-            "copyLine": "Copiar la línea"
+            "title": "la versión {version} está disponible"
         },
         "connect": {
             "hint": "La dirección en la que abres el panel.",
@@ -243,6 +240,14 @@
             "signingIn": "Iniciando sesión en otra cuenta",
             "switchCount": "Cambiar ({count})",
             "accounts": "Cuentas"
+        },
+        "version": {
+            "running": "Versión {version}",
+            "current": "Actualizada",
+            "available": "Versión {version} disponible",
+            "store": "Tu navegador la instala",
+            "auto": "Se instala sola en horas",
+            "manual": "Cómo actualizar"
         }
     },
     "inline": {
