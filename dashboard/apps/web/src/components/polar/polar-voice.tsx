@@ -3,7 +3,8 @@
 /**
  * Polar's two voice buttons: dictation, which turns what you say into text in
  * the composer for you to read before sending, and voice mode, a call in the
- * same thread where Polar listens, answers and reads the answer back.
+ * same thread where Polar listens, answers and says the answer out loud - with
+ * a key's voice where one can speak, and the browser's own where none can.
  *
  * Both reuse Chat's microphone: the same recorder, the same constraints a call
  * opens the device with, the same level meter and gate. What is new is where
@@ -14,11 +15,23 @@ import type { Payer } from "@/lib/polar/shared";
 import type { ChatStatus, UIMessage } from "ai";
 import { isWebTool, webStepOf } from "@/lib/polar/web-sources";
 import { micConstraints } from "@/app/(app)/chat/mic-cleanup";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { VoiceOrb, type OrbState } from "@/components/polar/voice-orb";
+import { browserCanSpeak, speakInBrowser } from "@/lib/polar/browser-voice";
 import type { ToolState } from "@/components/polar/elements/tool";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { PromptInputButton } from "@/components/polar/elements/prompt-input";
-import { AudioLines, Check, ChevronDown, Loader2, Mic, MicOff, PhoneOff, X } from "lucide-react";
+import {
+    AudioLines,
+    Check,
+    ChevronDown,
+    Loader2,
+    Mic,
+    MicOff,
+    PhoneOff,
+    Square,
+    X
+} from "lucide-react";
 import { affectedBy, Confirmation } from "@/components/polar/elements/confirmation";
 import { measureVoice, speaking, type VoiceLevel } from "@/app/(app)/chat/voice-level";
 import type { TranscriptionOption } from "@/lib/polar/transcription";
@@ -26,10 +39,6 @@ import { setMicDevice, useMicrophones } from "@/app/(app)/chat/mic-device";
 import {
     Button,
     cn,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -470,12 +479,15 @@ function waitingParts(message: UIMessage | undefined): Array<{ part: ApprovalPar
 export interface VoiceCallProps {
     messages: UIMessage[];
     status: ChatStatus;
-    /** Whether answers can be spoken; without it the call still shows them. */
+    /** Whether a key here can speak; without one the browser's voice does. */
     speech: boolean;
     /** Who pays, as picked for the chat. */
     payer?: Payer | null;
     /** The model picked in the mic menu, `provider/model`. */
     transcriber?: string | null;
+    /** The models a key is held for, for the call's mic menu. */
+    transcribers?: readonly TranscriptionOption[];
+    onTranscriber?: (id: string) => void;
     tools: Record<string, { title: string; destructive: boolean }>;
     /** Send what was said as the next message of this thread. */
     onSend: (text: string) => void;
@@ -485,29 +497,77 @@ export interface VoiceCallProps {
     onEnd: () => void;
 }
 
-/** Voice mode: an overlay over the thread, keyboard reachable, Escape ends it. */
+/** One sentence ready to be said: audio from a key here, or text for the
+ *  browser's own voice (with why the key could not say it, when one tried),
+ *  or why it cannot be said at all. */
+type Spoken = { audio: Blob } | { browser: string; cause?: CallError } | { error: CallError };
+
+/** The microphone level (0-100) the orb reads as full. A voice rarely reads
+ *  much above this, so a normal one fills it. */
+const MIC_FULL = 60;
+
+/**
+ * Voice mode, inline: it takes the composer's place under the thread, which
+ * stays in view as the transcript - what you said and what Polar answered
+ * arrive there as messages. Escape or the end button ends it.
+ */
 export function VoiceCall(props: VoiceCallProps) {
     const t = useTranslations("polar");
+    const locale = useLocale();
     const [state, dispatch] = useReducer(callReducer, INITIAL_CALL);
     const live = useRef(state);
     live.current = state;
     const latest = useRef(props);
     latest.current = props;
+    const lang = useRef(locale);
+    lang.current = locale;
 
     /** Where this call's replies start in the thread, set at each send. */
     const baseline = useRef<number | null>(null);
     const spokenUpTo = useRef(0);
     /** Sentences fetched ahead, in the order they are to be said. */
-    const queue = useRef<Array<Promise<Blob | CallError>>>([]);
+    const queue = useRef<Array<Promise<Spoken>>>([]);
     const playing = useRef(false);
     const audio = useRef<HTMLAudioElement | null>(null);
-    /** Ends the sentence being played, which pausing alone never does. */
+    /** Ends the sentence being said, which pausing alone never does. */
     const played = useRef<(() => void) | null>(null);
     /** Bumped to cancel everything that is being said or fetched. */
     const generation = useRef(0);
     const fetches = useRef(new Set<AbortController>());
     const recorder = useRef<{ media: MediaRecorder; keep: boolean; began: number } | null>(null);
     const stream = useRef<MediaStream | null>(null);
+    /** Whether to ask the server for a voice; off once it says it has none. */
+    const serverVoice = useRef(props.speech);
+    const [browserVoice, setBrowserVoice] = useState(() => !props.speech && browserCanSpeak());
+
+    // What the orb follows: the microphone, or the voice being played.
+    const micLevel = useRef(0);
+    const context = useRef<AudioContext | null>(null);
+    const analyser = useRef<AnalyserNode | null>(null);
+    const samples = useRef<Float32Array<ArrayBuffer> | null>(null);
+    const voicing = useRef<"server" | "browser" | null>(null);
+    const wordAt = useRef(0);
+
+    const level = useCallback((): number => {
+        if (live.current.phase !== "speaking") return micLevel.current / MIC_FULL;
+        const now = performance.now();
+        const node = analyser.current;
+        if (node) {
+            const buffer =
+                samples.current?.length === node.fftSize
+                    ? samples.current
+                    : (samples.current = new Float32Array(node.fftSize));
+            node.getFloatTimeDomainData(buffer);
+            let sum = 0;
+            for (const sample of buffer) sum += sample * sample;
+            return Math.sqrt(Math.sqrt(sum / buffer.length)) * 1.6;
+        }
+        // No audio graph to read (the browser's voice, or a context the page
+        // was not allowed to start): an envelope that pulses at each word.
+        const pulse = Math.max(0, 1 - (now - wordAt.current) / 260);
+        const sway = Math.abs(Math.sin(now / 150));
+        return voicing.current === "browser" ? 0.22 + 0.15 * sway + 0.45 * pulse : 0.3 + 0.3 * sway;
+    }, []);
 
     const silence = useCallback(() => {
         generation.current += 1;
@@ -519,6 +579,8 @@ export function VoiceCall(props: VoiceCallProps) {
         played.current?.();
         played.current = null;
         playing.current = false;
+        voicing.current = null;
+        analyser.current = null;
     }, []);
 
     const finishIfDone = useCallback(() => {
@@ -539,56 +601,114 @@ export function VoiceCall(props: VoiceCallProps) {
         }
     }, []);
 
+    /** Plays one sentence of audio, through an analyser when the page may. */
+    const playAudio = useCallback((blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const player = new Audio(url);
+        audio.current = player;
+        voicing.current = "server";
+        let source: MediaElementAudioSourceNode | null = null;
+        const graph = context.current;
+        // A suspended context would play nothing at all, so only a running
+        // one is put between the sentence and the speakers.
+        if (graph && graph.state === "running") {
+            try {
+                source = graph.createMediaElementSource(player);
+                const node = graph.createAnalyser();
+                node.fftSize = 512;
+                source.connect(node);
+                node.connect(graph.destination);
+                analyser.current = node;
+            } catch {
+                source = null;
+            }
+        }
+        return new Promise<void>((resolve) => {
+            const finish = () => {
+                source?.disconnect();
+                analyser.current = null;
+                URL.revokeObjectURL(url);
+                resolve();
+            };
+            played.current = finish;
+            player.onended = finish;
+            player.onerror = finish;
+            player.play().catch(finish);
+        });
+    }, []);
+
     const pump = useCallback(async () => {
         if (playing.current) return;
         playing.current = true;
         const mine = generation.current;
         while (queue.current.length > 0 && mine === generation.current) {
-            const blob = await queue.current.shift()!;
+            const item = await queue.current.shift()!;
             if (mine !== generation.current) return;
-            if (typeof blob === "string") {
-                dispatch({ type: "failed", error: blob });
+            if ("error" in item) {
+                dispatch({ type: "failed", error: item.error });
+                continue;
+            }
+            if ("browser" in item && !browserCanSpeak()) {
+                dispatch({ type: "failed", error: item.cause ?? "no_speech_provider" });
                 continue;
             }
             dispatch({ type: "speaking" });
-            const url = URL.createObjectURL(blob);
-            const player = new Audio(url);
-            audio.current = player;
-            let stop: (() => void) | null = null;
-            await new Promise<void>((resolve) => {
-                stop = resolve;
-                played.current = resolve;
-                player.onended = () => resolve();
-                player.onerror = () => resolve();
-                player.play().catch(() => resolve());
-            });
-            if (played.current === stop) played.current = null;
-            URL.revokeObjectURL(url);
+            if ("audio" in item) {
+                await playAudio(item.audio);
+            } else {
+                if (!item.cause) setBrowserVoice(true);
+                voicing.current = "browser";
+                const speech = speakInBrowser(item.browser, lang.current, () => {
+                    wordAt.current = performance.now();
+                });
+                await new Promise<void>((resolve) => {
+                    played.current = () => {
+                        speech.cancel();
+                        resolve();
+                    };
+                    void speech.done.then(() => resolve());
+                });
+            }
+            played.current = null;
+            voicing.current = null;
         }
         if (mine !== generation.current) return;
         playing.current = false;
         audio.current = null;
         finishIfDone();
-    }, [finishIfDone]);
+    }, [finishIfDone, playAudio]);
 
     const say = useCallback(
         (sentence: string) => {
+            if (!serverVoice.current) {
+                queue.current.push(Promise.resolve({ browser: sentence }));
+                void pump();
+                return;
+            }
             const controller = new AbortController();
             fetches.current.add(controller);
-            const pending: Promise<Blob | CallError> = fetch("/api/polar/speak", {
+            const pending: Promise<Spoken> = fetch("/api/polar/speak", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: sentence, payer: latest.current.payer ?? null }),
+                body: JSON.stringify({
+                    text: sentence,
+                    payer: latest.current.payer ?? null,
+                    lang: lang.current
+                }),
                 signal: controller.signal
             })
-                .then((response): Promise<Blob | CallError> | CallError =>
-                    response.ok
-                        ? response.blob()
-                        : response.status === 409
-                          ? "no_speech_provider"
-                          : "speak_failed"
-                )
-                .catch((): CallError => "speak_failed")
+                .then(async (response): Promise<Spoken> => {
+                    if (response.ok) return { audio: await response.blob() };
+                    // No key here speaks this language: the browser does, and
+                    // is asked straight away for the rest of the call.
+                    if (response.status === 409) {
+                        serverVoice.current = false;
+                        return { browser: sentence };
+                    }
+                    return { browser: sentence, cause: "speak_failed" };
+                })
+                // A voice that failed still leaves one that works.
+                .catch((): Spoken => ({ browser: sentence, cause: "speak_failed" }))
                 .finally(() => fetches.current.delete(controller));
             queue.current.push(pending);
             void pump();
@@ -596,7 +716,7 @@ export function VoiceCall(props: VoiceCallProps) {
         [pump]
     );
 
-    // The answer as it streams: captions, approvals, and each finished sentence.
+    // The answer as it streams: approvals, and each finished sentence.
     useEffect(() => {
         const phase = live.current.phase;
         if (baseline.current === null) return;
@@ -604,7 +724,6 @@ export function VoiceCall(props: VoiceCallProps) {
         const last = props.messages.at(-1);
         if (props.messages.length > baseline.current && last?.role === "assistant") {
             const text = replyText(last);
-            dispatch({ type: "reply", text });
             if (waitingParts(last).length > 0) {
                 dispatch({ type: "approval" });
                 return;
@@ -612,10 +731,10 @@ export function VoiceCall(props: VoiceCallProps) {
             const done = props.status === "ready" || props.status === "error";
             const { sentences, upTo } = readySentences(text, spokenUpTo.current, done);
             spokenUpTo.current = upTo;
-            if (props.speech) for (const sentence of sentences) say(sentence);
+            for (const sentence of sentences) say(sentence);
         }
         finishIfDone();
-    }, [props.messages, props.status, props.speech, say, finishIfDone]);
+    }, [props.messages, props.status, say, finishIfDone]);
 
     // Talked over: stop the voice, the fetches and the turn.
     useEffect(() => {
@@ -636,6 +755,27 @@ export function VoiceCall(props: VoiceCallProps) {
     useEffect(() => {
         if (state.discarded > 0) dropRecording();
     }, [state.discarded, dropRecording]);
+
+    // The playback graph, opened by the click that started the call so the
+    // browser lets it run.
+    useEffect(() => {
+        const Context =
+            window.AudioContext ??
+            (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!Context) return;
+        let graph: AudioContext;
+        try {
+            graph = new Context();
+        } catch {
+            return;
+        }
+        context.current = graph;
+        void graph.resume().catch(() => undefined);
+        return () => {
+            context.current = null;
+            void graph.close().catch(() => undefined);
+        };
+    }, []);
 
     // The microphone, open for as long as the call is.
     useEffect(() => {
@@ -705,10 +845,12 @@ export function VoiceCall(props: VoiceCallProps) {
                     if (!micOpen(current)) {
                         gate = false;
                         voicedMs = 0;
+                        micLevel.current = 0;
                         if (recorder.current && current.phase !== "transcribing") dropRecording();
                         return;
                     }
                     const level = meter?.read() ?? 0;
+                    micLevel.current = level;
                     const threshold =
                         current.phase === "speaking" ? OPEN_AT_WHILE_SPEAKING : OPEN_AT;
                     gate = speaking(level, threshold, gate);
@@ -751,138 +893,157 @@ export function VoiceCall(props: VoiceCallProps) {
         };
     }, [dropRecording, silence]);
 
-    const end = () => {
+    const end = useCallback(() => {
+        if (live.current.ended) return;
         dispatch({ type: "end" });
-        props.onEnd();
-    };
+        latest.current.onEnd();
+    }, []);
+
+    // Escape ends the call from anywhere on the page, except inside a menu or a
+    // dialog, which Escape closes first, or a field elsewhere on the page.
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key !== "Escape" || event.defaultPrevented) return;
+            const target = event.target instanceof Element ? event.target : null;
+            if (target?.closest("[role=dialog],[role=alertdialog],[role=menu],[role=listbox]")) {
+                return;
+            }
+            if (
+                target?.closest(
+                    "input,textarea,select,[contenteditable]:not([contenteditable=false])"
+                ) &&
+                !target.closest("[data-voice-call]")
+            ) {
+                return;
+            }
+            end();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [end]);
+
+    // Keyboard users land in the call, on its first control.
+    const first = useRef<HTMLButtonElement>(null);
+    useEffect(() => first.current?.focus(), []);
+
+    const toggleMute = () => dispatch({ type: state.muted ? "unmute" : "mute" });
     const waiting = state.phase === "approval" ? waitingParts(props.messages.at(-1)) : [];
     const webAction = (name: string, input: unknown) => {
         const step = webStepOf(name, input);
         return step?.kind === "read" ? t("web.reading", { site: step.detail }) : null;
     };
-    const lively = state.phase === "hearing" || state.phase === "speaking";
     const errorText =
         state.error === "mic_denied"
             ? t("voice.micDenied")
             : state.error
               ? t(`voice.errors.${state.error}`)
               : null;
+    const orb: OrbState = state.muted
+        ? "muted"
+        : state.error && state.phase === "listening"
+          ? "error"
+          : state.phase;
 
     return (
-        <Dialog open onOpenChange={(open) => (open ? undefined : end())}>
-            <DialogContent
-                className="flex max-w-md flex-col items-center gap-4 text-center"
-                onKeyDown={(event) => {
-                    if (
-                        event.key.toLowerCase() === "m" &&
-                        !event.ctrlKey &&
-                        !event.metaKey &&
-                        !event.altKey &&
-                        !(event.target instanceof HTMLTextAreaElement) &&
-                        !(event.target instanceof HTMLInputElement)
-                    ) {
-                        event.preventDefault();
-                        dispatch({ type: state.muted ? "unmute" : "mute" });
-                    }
-                }}
-            >
-                <DialogTitle>{t("voice.callTitle")}</DialogTitle>
-                <DialogDescription className="sr-only">
-                    {t("voice.callDescription")}
-                </DialogDescription>
-                <div
-                    aria-hidden
-                    className={cn(
-                        "mt-2 flex size-24 items-center justify-center rounded-full transition-colors duration-fast",
-                        state.muted ? "bg-muted" : "bg-primary/15",
-                        lively && !state.muted && "motion-safe:animate-pulse"
-                    )}
-                >
-                    {state.muted ? (
-                        <MicOff className="size-8 text-muted-foreground" />
-                    ) : state.phase === "transcribing" || state.phase === "thinking" ? (
-                        <Loader2 className="size-8 text-primary motion-safe:animate-spin" />
-                    ) : (
-                        <AudioLines className="size-8 text-primary" />
-                    )}
-                </div>
+        <section
+            aria-label={t("voice.callTitle")}
+            data-voice-call=""
+            className="flex w-full min-w-0 flex-col items-center gap-3 rounded-xl border border-border bg-card px-3 py-4 shadow-sm"
+            onKeyDown={(event) => {
+                if (
+                    event.key.toLowerCase() === "m" &&
+                    !event.ctrlKey &&
+                    !event.metaKey &&
+                    !event.altKey &&
+                    !(event.target instanceof HTMLTextAreaElement) &&
+                    !(event.target instanceof HTMLInputElement)
+                ) {
+                    event.preventDefault();
+                    toggleMute();
+                }
+            }}
+        >
+            <VoiceOrb state={orb} level={level} className="size-20 sm:size-24" />
+            <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
                 <p aria-live="polite" className="text-sm font-medium text-foreground">
                     {state.muted ? t("voice.muted") : t(`voice.phase.${state.phase}`)}
                 </p>
                 {errorText ? (
-                    <p role="alert" className="text-sm text-danger-ink">
+                    <p role="alert" className="max-w-full break-words text-xs text-danger-ink">
                         {errorText}
                     </p>
-                ) : null}
-                <section
-                    aria-label={t("voice.captions")}
-                    className="max-h-48 w-full min-w-0 space-y-2 overflow-y-auto overscroll-contain text-left text-sm"
-                >
-                    {state.heard ? (
-                        <p className="break-words">
-                            <span className="font-medium text-foreground">{t("voice.you")}: </span>
-                            <span className="text-muted-foreground">{state.heard}</span>
-                        </p>
-                    ) : null}
-                    {state.reply ? (
-                        <p className="whitespace-pre-wrap break-words">
-                            <span className="font-medium text-foreground">
-                                {t("voice.polar")}:{" "}
-                            </span>
-                            <span className="text-muted-foreground">{state.reply}</span>
-                        </p>
-                    ) : null}
-                </section>
-                {waiting.map(({ part, name }) => (
-                    <Confirmation
-                        key={part.approval!.id}
-                        state={part.state}
-                        approval={part.approval}
-                        action={props.tools[name]?.title ?? webAction(name, part.input) ?? name}
-                        affects={affectedBy(part.input)}
-                        destructive={props.tools[name]?.destructive ?? !isWebTool(name)}
-                        input={part.input}
-                        className="text-left"
-                        onApprove={() => {
-                            dispatch({ type: "approved" });
-                            props.onApprove(part.approval!.id, true);
-                        }}
-                        onReject={() => {
-                            dispatch({ type: "approved" });
-                            props.onApprove(part.approval!.id, false);
-                        }}
+                ) : (
+                    <p className="max-w-full truncate text-xs text-muted-foreground">
+                        {browserVoice ? t("voice.browserVoice") : t("voice.callDescription")}
+                    </p>
+                )}
+            </div>
+            {waiting.map(({ part, name }) => (
+                <Confirmation
+                    key={part.approval!.id}
+                    state={part.state}
+                    approval={part.approval}
+                    action={props.tools[name]?.title ?? webAction(name, part.input) ?? name}
+                    affects={affectedBy(part.input)}
+                    destructive={props.tools[name]?.destructive ?? !isWebTool(name)}
+                    input={part.input}
+                    className="w-full min-w-0 text-left"
+                    onApprove={() => {
+                        dispatch({ type: "approved" });
+                        props.onApprove(part.approval!.id, true);
+                    }}
+                    onReject={() => {
+                        dispatch({ type: "approved" });
+                        props.onApprove(part.approval!.id, false);
+                    }}
+                />
+            ))}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+                <span className="inline-flex items-center">
+                    <Button
+                        ref={first}
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        aria-pressed={state.muted}
+                        aria-label={state.muted ? t("voice.unmute") : t("voice.mute")}
+                        title={state.muted ? t("voice.unmute") : t("voice.mute")}
+                        onClick={toggleMute}
+                    >
+                        {state.muted ? <MicOff /> : <Mic />}
+                    </Button>
+                    <DictationMenu
+                        transcribers={props.transcribers ?? []}
+                        transcriber={props.transcriber ?? null}
+                        onTranscriber={props.onTranscriber}
                     />
-                ))}
-                <div className="flex flex-wrap items-center justify-center gap-2">
+                </span>
+                {state.phase === "speaking" || state.phase === "thinking" ? (
                     <Button
                         type="button"
                         variant="secondary"
-                        aria-pressed={state.muted}
-                        onClick={() => dispatch({ type: state.muted ? "unmute" : "mute" })}
+                        onClick={() => {
+                            silence();
+                            baseline.current = null;
+                            props.onStop();
+                            dispatch({ type: "reply-done" });
+                        }}
                     >
-                        {state.muted ? <Mic /> : <MicOff />}
-                        {state.muted ? t("voice.unmute") : t("voice.mute")}
+                        <Square />
+                        {t("voice.interrupt")}
                     </Button>
-                    {state.phase === "speaking" || state.phase === "thinking" ? (
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => {
-                                silence();
-                                baseline.current = null;
-                                props.onStop();
-                                dispatch({ type: "reply-done" });
-                            }}
-                        >
-                            {t("voice.interrupt")}
-                        </Button>
-                    ) : null}
-                    <Button type="button" variant="hangUp" onClick={end}>
-                        <PhoneOff />
-                        {t("voice.end")}
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
+                ) : null}
+                <Button
+                    type="button"
+                    variant="hangUp"
+                    size="icon"
+                    aria-label={t("voice.end")}
+                    title={t("voice.end")}
+                    onClick={end}
+                >
+                    <PhoneOff />
+                </Button>
+            </div>
+        </section>
     );
 }

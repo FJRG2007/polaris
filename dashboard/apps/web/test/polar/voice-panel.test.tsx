@@ -98,7 +98,7 @@ describe("voice in the composer", () => {
         expect(screen.getAllByRole("button", { name: UNAVAILABLE })).toHaveLength(2);
     });
 
-    it("opens voice mode over the thread, and ends it", async () => {
+    it("opens voice mode in the composer's place, not over the thread, and ends it", async () => {
         models = {
             providers: PROVIDERS,
             tools: {},
@@ -121,10 +121,14 @@ describe("voice in the composer", () => {
         await ready();
         expect(screen.getByRole("button", { name: "Dictate" })).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Voice mode" }));
-        expect(await screen.findByRole("dialog", { name: "Voice mode" })).toBeTruthy();
+        expect(await screen.findByRole("region", { name: "Voice mode" })).toBeTruthy();
+        expect(screen.queryByRole("dialog")).toBeNull();
+        // The composer is put away for the call, its draft kept.
+        expect(screen.getByRole("textbox").closest(".hidden")).not.toBeNull();
         fireEvent.click(screen.getByRole("button", { name: "End call" }));
         await waitFor(() =>
-            expect(screen.queryByRole("dialog", { name: "Voice mode" })).toBeNull()
+            expect(screen.queryByRole("region", { name: "Voice mode" })).toBeNull()
         );
+        expect(screen.getByRole("textbox").closest(".hidden")).toBeNull();
     });
 });

@@ -2,7 +2,8 @@
  * POST /api/polar/speak - one sentence of Polar's answer, said out loud. The
  * body is `{ text }`; the answer is the audio itself. A voice call asks for
  * each sentence as soon as it is written, so a long answer starts playing
- * before it has finished.
+ * before it has finished. 409 `no_voice_provider` means no key here can say it
+ * in that language, and the page speaks it with the browser's own voice.
  */
 
 import { NextResponse } from "next/server";
@@ -42,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
     const body = speakBodySchema.safeParse(raw);
     if (!body.success) return refuse("invalid", 400);
 
-    const speaker = await polarSpeaker(user.id, body.data.payer);
+    const speaker = await polarSpeaker(user.id, body.data.payer, body.data.lang);
     if (!speaker) return refuse("no_voice_provider", 409);
     try {
         const result = await generateSpeech({

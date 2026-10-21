@@ -44,6 +44,7 @@ import {
 } from "@/lib/polar/answer-feedback";
 import type { PolarRefine } from "@/lib/polar/prompt";
 import { readySentences } from "@/lib/polar/voice-call";
+import { browserCanSpeak, speakInBrowser } from "@/lib/polar/browser-voice";
 
 // ---------------------------------------------------------------------------
 // Good and bad
@@ -215,7 +216,7 @@ function fetchSentence(text: string, payer: string | null, signal: AbortSignal) 
     return fetch("/api/polar/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, payer }),
+        body: JSON.stringify({ text, payer, lang: pageLanguage() }),
         signal
     }).then(async (response): Promise<Blob | ReadError> => {
         if (response.ok) return response.blob();
@@ -223,6 +224,11 @@ function fetchSentence(text: string, payer: string | null, signal: AbortSignal) 
         if (response.status === 429) return "rate_limited";
         return "speak_failed";
     });
+}
+
+/** The language the page is drawn in, for the voice that reads it. */
+function pageLanguage(): string {
+    return document.documentElement.lang || navigator.language || "en";
 }
 
 /** Stops whatever answer is being read. */
@@ -245,6 +251,7 @@ export function readAloud(
     if (sentences.length === 0) return;
     const controller = new AbortController();
     let player: HTMLAudioElement | null = null;
+    let browser: (() => void) | null = null;
     let stopped = false;
     const stop = () => {
         if (stopped) return;
@@ -252,6 +259,7 @@ export function readAloud(
         controller.abort();
         player?.pause();
         player = null;
+        browser?.();
         if (stopCurrent === stop) stopCurrent = null;
         if (reading.id === id) setReading({ id: null, loading: false });
     };
@@ -273,7 +281,18 @@ export function readAloud(
                       )
                     : null;
             if (typeof blob === "string") {
-                onError(blob);
+                if (blob !== "no_speech_provider" || !browserCanSpeak()) {
+                    onError(blob);
+                    break;
+                }
+                // No key here can say it: the browser's own voice reads the rest.
+                setReading({ id, loading: false });
+                for (const sentence of sentences.slice(index)) {
+                    if (stopped) return;
+                    const speech = speakInBrowser(sentence, pageLanguage());
+                    browser = speech.cancel;
+                    await speech.done;
+                }
                 break;
             }
             setReading({ id, loading: false });

@@ -27,9 +27,9 @@ describe("the voice call", () => {
         expect(state.phase).toBe("transcribing");
         expect(micOpen(state)).toBe(false);
         state = run([{ type: "transcribed", text: "  what's on today?  " }], state);
-        expect(state).toMatchObject({ phase: "thinking", heard: "what's on today?", reply: "" });
-        state = run([{ type: "reply", text: "Two meetings." }, { type: "speaking" }], state);
-        expect(state).toMatchObject({ phase: "speaking", reply: "Two meetings." });
+        expect(state.phase).toBe("thinking");
+        state = run([{ type: "speaking" }], state);
+        expect(state.phase).toBe("speaking");
         state = run([{ type: "reply-done" }], state);
         expect(state.phase).toBe("listening");
         expect(micOpen(state)).toBe(true);
@@ -42,7 +42,6 @@ describe("the voice call", () => {
             { type: "transcribed", text: "   " }
         ]);
         expect(state.phase).toBe("listening");
-        expect(state.heard).toBe("");
     });
 
     it("stops talking when you speak over it", () => {

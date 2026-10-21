@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * Polar's voice buttons and the voice-mode overlay: available, unavailable
- * (visible, focusable, and saying what to connect) and a microphone the
- * browser refused; the overlay opens on the thread, mutes, and ends on its
- * button or on Escape.
+ * Polar's voice buttons and voice mode: available, unavailable (visible,
+ * focusable, and saying what to connect) and a microphone the browser refused;
+ * the call opens inline with its orb following the phases, mutes, ends on its
+ * button or on Escape, and speaks with the browser's voice when no key can.
  */
 
 import { MessagesWrapper } from "../setup/i18n";
@@ -23,10 +23,12 @@ const recorder = {
         null | ((file: File, sound: { durationMs: number; waveform: string }) => void)
 };
 let recordable = true;
+let recordType: string | null = null;
+let micLevel = 0;
 
 vi.mock("@/app/(app)/chat/voice-recorder", () => ({
     canRecord: () => recordable,
-    recordingType: () => null,
+    recordingType: () => recordType,
     spokenLength: (seconds: number) => `0:${String(seconds).padStart(2, "0")}`,
     useVoiceRecording: (
         onRecorded: (file: File, sound: { durationMs: number; waveform: string }) => void
@@ -36,6 +38,40 @@ vi.mock("@/app/(app)/chat/voice-recorder", () => ({
     }
 }));
 
+vi.mock("@/app/(app)/chat/voice-level", () => ({
+    measureVoice: () => ({ read: () => micLevel, peak: () => 0, stop: () => undefined }),
+    speaking: (level: number, threshold: number) => level >= threshold
+}));
+
+function openMicrophone() {
+    recordType = "audio/webm";
+    vi.stubGlobal(
+        "MediaRecorder",
+        class {
+            state = "inactive";
+            ondataavailable: ((event: { data: Blob }) => void) | null = null;
+            onstop: (() => void) | null = null;
+            start() {
+                this.state = "recording";
+            }
+            stop() {
+                this.state = "inactive";
+                this.ondataavailable?.({ data: new Blob(["sound"]) });
+                this.onstop?.();
+            }
+        }
+    );
+    Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+            getUserMedia: vi.fn(async () => ({
+                getAudioTracks: () => [{}],
+                getTracks: () => []
+            }))
+        }
+    });
+}
+
 const { DictationButton, VoiceCall, VoiceModeButton } =
     await import("@/components/polar/polar-voice");
 
@@ -44,6 +80,8 @@ beforeEach(() => {
     recorder.error = null;
     recorder.start.mockClear();
     recordable = true;
+    recordType = null;
+    micLevel = 0;
 });
 afterEach(() => {
     cleanup();
@@ -209,14 +247,18 @@ describe("the voice call", () => {
         });
     }
 
-    it("opens listening, and explains a refused microphone", async () => {
+    const orb = () => document.querySelector("[data-state]")!.getAttribute("data-state");
+
+    it("opens inline, listening, and explains a refused microphone", async () => {
         denyMicrophone();
         render(<VoiceCall {...props()} />, { wrapper: MessagesWrapper });
-        expect(screen.getByRole("dialog", { name: "Voice mode" })).toBeTruthy();
+        expect(screen.getByRole("region", { name: "Voice mode" })).toBeTruthy();
+        expect(screen.queryByRole("dialog")).toBeNull();
         expect(screen.getByText("Listening")).toBeTruthy();
         expect((await screen.findByRole("alert")).textContent).toBe(
             "Polar can't use your microphone. Allow it for this site in your browser, then try again."
         );
+        expect(orb()).toBe("error");
     });
 
     it("mutes and unmutes, from the button and from M", () => {
@@ -224,6 +266,7 @@ describe("the voice call", () => {
         render(<VoiceCall {...props()} />, { wrapper: MessagesWrapper });
         fireEvent.click(screen.getByRole("button", { name: "Mute microphone" }));
         expect(screen.getByText("Microphone off")).toBeTruthy();
+        expect(orb()).toBe("muted");
         const unmute = screen.getByRole("button", { name: "Turn microphone on" });
         expect(unmute.getAttribute("aria-pressed")).toBe("true");
         fireEvent.keyDown(unmute, { key: "m" });
@@ -239,7 +282,133 @@ describe("the voice call", () => {
         cleanup();
         const second = props();
         render(<VoiceCall {...second} />, { wrapper: MessagesWrapper });
-        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+        fireEvent.keyDown(document.body, { key: "Escape" });
         expect(second.onEnd).toHaveBeenCalledTimes(1);
     });
+
+    it("keeps the call when Escape is pressed in a field elsewhere on the page", () => {
+        denyMicrophone();
+        const base = props();
+        render(
+            <>
+                <input aria-label="Search mail" />
+                <VoiceCall {...base} />
+            </>,
+            { wrapper: MessagesWrapper }
+        );
+        fireEvent.keyDown(screen.getByRole("textbox", { name: "Search mail" }), { key: "Escape" });
+        expect(base.onEnd).not.toHaveBeenCalled();
+    });
+
+    it("says the key failed, not that none can speak, when the browser cannot take over", async () => {
+        openMicrophone();
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string) =>
+                url.startsWith("/api/polar/transcribe")
+                    ? new Response(JSON.stringify({ text: "Hello" }), { status: 200 })
+                    : new Response(JSON.stringify({ error: "speak_failed" }), { status: 502 })
+            )
+        );
+        const base = props();
+        const view = render(<VoiceCall {...base} />, { wrapper: MessagesWrapper });
+        micLevel = 80;
+        await waitFor(() => expect(orb()).toBe("hearing"), { timeout: 2000 });
+        micLevel = 0;
+        await waitFor(() => expect(base.onSend).toHaveBeenCalledWith("Hello"), {
+            timeout: 4000
+        });
+        view.rerender(
+            <VoiceCall
+                {...base}
+                messages={[
+                    { id: "u", role: "user", parts: [{ type: "text", text: "Hello" }] },
+                    { id: "a", role: "assistant", parts: [{ type: "text", text: "Hi there." }] }
+                ]}
+                status="ready"
+            />
+        );
+        await waitFor(() =>
+            expect(screen.getByRole("alert").textContent).toBe(
+                "Polar couldn't say this answer out loud. It's on screen."
+            )
+        );
+        expect(screen.queryByText("Speaking with your browser's voice")).toBeNull();
+    }, 10_000);
+
+    it("hears, thinks, and says the answer with the browser's voice when no key can", async () => {
+        openMicrophone();
+        const fetched: string[] = [];
+        const bodies: unknown[] = [];
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string, init?: RequestInit) => {
+                fetched.push(url);
+                if (url.startsWith("/api/polar/transcribe")) {
+                    return new Response(JSON.stringify({ text: "Hello" }), { status: 200 });
+                }
+                bodies.push(JSON.parse(String(init?.body)));
+                return new Response(JSON.stringify({ error: "no_voice_provider" }), {
+                    status: 409
+                });
+            })
+        );
+        type Said = { text: string; lang: string; onend: (() => void) | null };
+        const said: Said[] = [];
+        vi.stubGlobal(
+            "SpeechSynthesisUtterance",
+            class {
+                lang = "";
+                voice: unknown = null;
+                onend: (() => void) | null = null;
+                onerror: (() => void) | null = null;
+                onboundary: (() => void) | null = null;
+                constructor(public text: string) {}
+            }
+        );
+        vi.stubGlobal("speechSynthesis", {
+            getVoices: () => [{ lang: "en-US", default: true, name: "Fixture voice" }],
+            speak: (utterance: Said) => said.push(utterance),
+            cancel: vi.fn(),
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn()
+        });
+
+        const base = props();
+        const view = render(<VoiceCall {...base} />, { wrapper: MessagesWrapper });
+        micLevel = 80;
+        await waitFor(() => expect(orb()).toBe("hearing"), { timeout: 2000 });
+        micLevel = 0;
+        await waitFor(() => expect(base.onSend).toHaveBeenCalledWith("Hello"), {
+            timeout: 4000
+        });
+        expect(orb()).toBe("thinking");
+
+        view.rerender(
+            <VoiceCall
+                {...base}
+                messages={[
+                    { id: "u", role: "user", parts: [{ type: "text", text: "Hello" }] },
+                    {
+                        id: "a",
+                        role: "assistant",
+                        parts: [{ type: "text", text: "Hi there. How can I help?" }]
+                    }
+                ]}
+                status="ready"
+            />
+        );
+        await waitFor(() => expect(said).toHaveLength(1));
+        expect(said[0]).toMatchObject({ text: "Hi there.", lang: "en-US" });
+        expect(bodies[0]).toMatchObject({ text: "Hi there.", lang: "en-US" });
+        expect(orb()).toBe("speaking");
+        expect(screen.getByText("Speaking with your browser's voice")).toBeTruthy();
+        act(() => said[0]!.onend?.());
+        await waitFor(() => expect(said).toHaveLength(2));
+        expect(said[1]!.text).toBe("How can I help?");
+        act(() => said[1]!.onend?.());
+        await waitFor(() => expect(orb()).toBe("listening"));
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(fetched.filter((url) => url === "/api/polar/speak")).toHaveLength(2);
+    }, 10_000);
 });

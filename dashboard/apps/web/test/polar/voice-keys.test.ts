@@ -49,7 +49,10 @@ vi.mock("@ai-sdk/groq", () => ({
     createGroq: () => ({ transcription: (id: string) => ({ id, provider: "groq" }) })
 }));
 vi.mock("@ai-sdk/elevenlabs", () => ({
-    createElevenLabs: () => ({ transcription: (id: string) => ({ id, provider: "elevenlabs" }) })
+    createElevenLabs: () => ({
+        transcription: (id: string) => ({ id, provider: "elevenlabs" }),
+        speech: (id: string) => ({ id, provider: "elevenlabs" })
+    })
 }));
 vi.mock("@ai-sdk/google", () => ({
     createGoogle: () => ({
@@ -130,11 +133,19 @@ describe("the model Polar hears with", () => {
     });
 
     it("can hear with a key that cannot speak, and says it cannot speak", async () => {
+        state.sources = new Map([["assemblyai", "own"]]);
+        expect(await voice.polarVoiceAvailability(`user-${user}`)).toMatchObject({
+            dictation: true,
+            speech: false
+        });
+    });
+
+    it("hears and speaks with one ElevenLabs key", async () => {
         state.sources = new Map([["elevenlabs", "own"]]);
         const availability = await voice.polarVoiceAvailability(`user-${user}`);
         expect(availability).toMatchObject({
             dictation: true,
-            speech: false,
+            speech: true,
             transcriber: "elevenlabs/scribe_v2"
         });
         const heard = await voice.polarTranscriber(`user-${user}`);
@@ -192,5 +203,52 @@ describe("the model Polar hears with", () => {
             transcriber: null
         });
         expect(await voice.polarTranscriber(`user-${user}`)).toBeNull();
+    });
+});
+
+describe("the voice Polar speaks with", () => {
+    const held = (...slugs: string[]) => new Set(slugs);
+
+    it("speaks with the keys of a deployment that has no OpenAI or Google key", async () => {
+        // The providers of a real deployment that could not speak before.
+        state.sources = new Map(
+            ["mistral", "moonshot", "openrouter", "cerebras", "anthropic", "groq"].map(
+                (slug) => [slug, "instance"] as [string, string]
+            )
+        );
+        state.instanceKey = true;
+        const availability = await voice.polarVoiceAvailability(`user-${user}`);
+        expect(availability.speech).toBe(true);
+        const speaker = await voice.polarSpeaker(`user-${user}`, null, "es-ES");
+        expect(speaker).toMatchObject({ voice: "en_paul_neutral", format: "mp3" });
+        expect(state.asked.map((entry) => entry.provider)).toEqual(["mistral"]);
+    });
+
+    it("puts the multilingual voices first, best first", () => {
+        expect(
+            voice
+                .speechCandidates(
+                    held("groq", "deepgram", "mistral", "google-ai", "elevenlabs", "openai")
+                )
+                .map((provider) => provider.slug)
+        ).toEqual(["openai", "elevenlabs", "google-ai", "mistral", "deepgram", "groq"]);
+    });
+
+    it("skips an English-only voice for an answer in another language", () => {
+        const slugs = (lang: string | null) =>
+            voice.speechCandidates(held("groq", "deepgram"), lang).map((provider) => provider.slug);
+        expect(slugs("es-ES")).toEqual([]);
+        expect(slugs("en-US")).toEqual(["deepgram", "groq"]);
+        expect(slugs(null)).toEqual(["deepgram", "groq"]);
+        expect(slugs("not a language!")).toEqual(["deepgram", "groq"]);
+    });
+
+    it("leaves the browser to speak when no key held can say it", async () => {
+        state.sources = new Map([["groq", "own"]]);
+        expect(await voice.polarSpeaker(`user-${user}`, null, "es-ES")).toBeNull();
+        expect(await voice.polarSpeaker(`user-${user}`, null, "en-GB")).toMatchObject({
+            voice: "troy",
+            format: "wav"
+        });
     });
 });
