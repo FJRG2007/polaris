@@ -163,8 +163,7 @@ import {
     type ModelChoice,
     type PageContext,
     type SiteContext,
-    type QueuedMessage,
-    screenOf
+    type QueuedMessage
 } from "@/lib/polar/shared";
 import { screenFor } from "@/lib/polar/screen";
 import { titleWithBadge } from "@/lib/favicon-style";
@@ -720,7 +719,9 @@ export function PolarChat({
     const [choice, setChoice] = useState<ModelChoice | null>(null);
     const [input, setInput] = useState("");
     const [quote, setQuote] = useState<string | null>(null);
-    const [withPage, setWithPage] = useState(true);
+    /** "/page" with the page switched off in settings: the page goes with the
+     *  next message only. */
+    const pageOnce = useRef(false);
     const [queue, setQueue] = useState<QueuedMessage[]>([]);
     const [editing, setEditing] = useState<string | null>(null);
     const [files, setFiles] = useState<AttachmentData[]>([]);
@@ -803,25 +804,24 @@ export function PolarChat({
     const [, setTreeTick] = useState(0);
     const toast = useToast();
 
-    // Polar's own screens are not a page to ask about: a chip saying "/polar"
-    // under Polar is the chat quoting itself.
+    // The page this person is on, sent as background context and never shown
+    // in the composer: whether it goes is the "Share the page you're on"
+    // switch in Polar's settings. Polar's own screens are not a page to ask
+    // about - "/polar" under Polar is the chat quoting itself.
     const context = useMemo(
         () =>
-            !withPage
-                ? null
-                : site !== undefined
-                  ? site && { route: pathname, title: site.title, site }
-                  : onPolarPage(pathname)
-                    ? null
-                    : pageContextFrom(
-                          pathname,
-                          typeof document === "undefined" ? "" : document.title,
-                          state?.extra ?? null
-                      ),
-        [withPage, pathname, state?.extra, site]
+            site !== undefined
+                ? site && { route: pathname, title: site.title, site }
+                : onPolarPage(pathname)
+                  ? null
+                  : pageContextFrom(
+                        pathname,
+                        typeof document === "undefined" ? "" : document.title,
+                        state?.extra ?? null
+                    ),
+        [pathname, state?.extra, site]
     );
-    // Another page in the browser is another thing to leave out or not.
-    useEffect(() => setWithPage(true), [site?.url]);
+    const pageOn = prefs.pageOn;
     const web = webAllowed && prefs.webOn;
     const toolsOff = prefs.toolsOff;
     const serversOff = toolPrefs.serversOffOf(prefs, tools);
@@ -830,6 +830,7 @@ export function PolarChat({
         threadId,
         choice,
         context,
+        pageOn,
         newProject,
         temporary,
         turnChoice,
@@ -843,6 +844,7 @@ export function PolarChat({
         threadId,
         choice,
         context,
+        pageOn,
         newProject,
         temporary,
         turnChoice,
@@ -853,6 +855,10 @@ export function PolarChat({
         connectorsOn
     };
 
+    /** The page as it goes with the next turn: null with sharing off. */
+    const sharedContext = () =>
+        live.current.pageOn || pageOnce.current ? live.current.context : null;
+
     const transport = useMemo(
         () =>
             new DefaultChatTransport({
@@ -861,6 +867,8 @@ export function PolarChat({
                     // Asked for one answer: the turns after it are plain.
                     const refining = live.current.refine.current;
                     live.current.refine.current = null;
+                    const context = sharedContext();
+                    pageOnce.current = false;
                     return {
                         body: {
                             threadId: live.current.threadId,
@@ -869,7 +877,7 @@ export function PolarChat({
                             // thread stays on the chosen one.
                             choice: live.current.turnChoice.current ?? live.current.choice,
                             remember: live.current.turnChoice.current === null,
-                            context: live.current.context,
+                            context,
                             projectId: live.current.newProject,
                             temporary: live.current.temporary,
                             web: live.current.web,
@@ -1479,7 +1487,11 @@ export function PolarChat({
         if (LATER.has(command)) return;
         setInput("");
         if (command === "new") return startNew();
-        if (command === "page") return setWithPage(true);
+        if (command === "page") {
+            if (!context) return;
+            pageOnce.current = true;
+            return void toast.show({ title: t("context.attached") });
+        }
         if (command === "model") return setModelOpen(true);
         if (command === "file") {
             return document
@@ -1525,14 +1537,14 @@ export function PolarChat({
 
     /** Sends a turn, compacting the chat first when this turn would bring it
      *  near the model's window and the person has automatic compaction on. */
-    /** The message with the screen it is asked on, which its bubble names. */
+    /** The message with the screen it is asked on, kept for later turns. */
     const withScreen = (message: Parameters<typeof chat.sendMessage>[0]) =>
-        message && "text" in message && live.current.context
+        message && "text" in message && sharedContext()
             ? {
                   ...message,
                   metadata: {
                       ...((message.metadata as object | undefined) ?? {}),
-                      screen: live.current.context
+                      screen: sharedContext()
                   }
               }
             : message;
@@ -1969,14 +1981,6 @@ export function PolarChat({
                 onSubmit={submit}
                 header={
                     <>
-                        {context ? (
-                            <Chip
-                                title={t("context.title")}
-                                label={context.record?.name ?? context.title ?? context.route}
-                                removeLabel={t("context.remove")}
-                                onRemove={() => setWithPage(false)}
-                            />
-                        ) : null}
                         {quote ? (
                             <Chip
                                 label={`${t("reply.to")} "${quote}"`}
@@ -2548,19 +2552,17 @@ function moveItem<T>(list: T[], from: number, to: number): T[] {
 
 function Chip({
     label,
-    title,
     removeLabel,
     onRemove
 }: {
     label: string;
-    title?: string;
     removeLabel: string;
     onRemove: () => void;
 }) {
     return (
         <span
             className="inline-flex min-w-0 max-w-full items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
-            title={title ? `${title}: ${label}` : label}
+            title={label}
         >
             <span className="min-w-0 truncate">{label}</span>
             <button
@@ -2641,10 +2643,6 @@ function MessageView({
         usage?: unknown;
     };
     const spent = answerSpendOf(meta.usage);
-    const screen = mine ? screenOf(message.metadata) : null;
-    const askedOn = screen
-        ? (screen.record?.name ?? screen.section ?? screen.title ?? screen.route)
-        : null;
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
     const toolName = (name: string) =>
@@ -2880,14 +2878,6 @@ function MessageView({
                         onPrevious={() => onVersion(-1)}
                         onNext={() => onVersion(1)}
                     />
-                    {askedOn ? (
-                        <span
-                            className="min-w-0 max-w-40 truncate text-xs text-muted-foreground"
-                            title={t("context.askedOn", { place: askedOn })}
-                        >
-                            {t("context.askedOn", { place: askedOn })}
-                        </span>
-                    ) : null}
                     {mine ? (
                         <>
                             <MessageAction label={t("actions.edit")} onClick={onEdit}>

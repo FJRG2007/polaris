@@ -100,8 +100,10 @@
         "regenerate": "Regenerar",
         "copied": "Copiado",
         "branch": "Ramificar en chat nuevo",
-        "good": "Me gusta",
-        "bad": "No me gusta",
+        "rate": "Valorar",
+        "good": "Buena respuesta",
+        "bad": "Mala respuesta",
+        "clearRating": "Quitar voto",
         "readAloud": "Leer en alto",
         "stopReading": "Dejar de leer",
         "share": "Compartir hasta aquí",
@@ -174,9 +176,7 @@
         }
     },
     "context": {
-        "title": "Polar ve esta página",
-        "remove": "Dejar de compartir la página",
-        "askedOn": "Preguntado en {place}"
+        "attached": "Esta página va con tu próximo mensaje."
     },
     "reply": {
         "to": "Respondiendo a:",
@@ -372,6 +372,7 @@
             "title": "Herramientas",
             "intro": "Lo que Polar puede usar en un chat. Si apagas una, no se le ofrece.",
             "webOff": "Tu administrador ha desactivado la búsqueda web.",
+            "sharePage": "Compartir la página actual",
             "manageConnectors": "Añadir o gestionar conectores MCP",
             "loadFailed": "No se pudieron cargar las herramientas. Revisa tu conexión y reinténtalo.",
             "retry": "Reintentar",

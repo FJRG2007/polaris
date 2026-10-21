@@ -103,7 +103,23 @@ describe("Polar on the web", () => {
         expect(toggle.getAttribute("aria-checked")).toBe("true");
         fireEvent.click(toggle);
         expect(toggle.getAttribute("aria-checked")).toBe("false");
-        expect(kept.get("polar.web")).toBe("off");
+        expect(kept.get("polar.webSearch")).toBe("off");
+    });
+
+    it("stays on for a viewer the old composer toggle left off under the old key", async () => {
+        kept.set("polar.web", "off");
+        render(<PolarToolSettings />, { wrapper: MessagesWrapper });
+        const toggle = await screen.findByRole("switch", { name: "Search the web" });
+        expect(toggle.getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("shares the page the viewer is on until it is switched off in settings", async () => {
+        render(<PolarToolSettings />, { wrapper: MessagesWrapper });
+        const toggle = await screen.findByRole("switch", { name: "Share the page you're on" });
+        expect(toggle.getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(toggle);
+        expect(toggle.getAttribute("aria-checked")).toBe("false");
+        expect(kept.get("polar.sharePage")).toBe("off");
     });
 
     it("says the web is off, and cannot be switched on, where an administrator turned it off", async () => {

@@ -100,8 +100,10 @@
         "regenerate": "Answer again",
         "copied": "Copied",
         "branch": "Branch into new chat",
-        "good": "Good answer",
-        "bad": "Bad answer",
+        "rate": "Rate response",
+        "good": "Good response",
+        "bad": "Bad response",
+        "clearRating": "Clear rating",
         "readAloud": "Read aloud",
         "stopReading": "Stop reading",
         "share": "Share up to here",
@@ -174,9 +176,7 @@
         }
     },
     "context": {
-        "title": "Polar sees this page",
-        "remove": "Stop sharing this page",
-        "askedOn": "Asked on {place}"
+        "attached": "This page goes with your next message."
     },
     "reply": {
         "to": "Replying to:",
@@ -372,6 +372,7 @@
             "title": "Polar's tools",
             "intro": "What Polar may use in a chat. One switched off is never offered to it.",
             "webOff": "Your administrator has turned web search off.",
+            "sharePage": "Share the page you're on",
             "manageConnectors": "Add or manage MCP connectors",
             "loadFailed": "Could not load the tools. Check your connection and try again.",
             "retry": "Try again",
