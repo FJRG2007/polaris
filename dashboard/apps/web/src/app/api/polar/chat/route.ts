@@ -391,7 +391,8 @@ export async function POST(request: Request): Promise<Response> {
         activeTools: activeFor(new Set()),
         // A tool find_tools turned up is sent from the next step on, and the
         // last step has to answer.
-        prepareStep: ({ stepNumber, steps }) => nextStep(stepNumber, STEP_MAX, steps as never, activeFor),
+        prepareStep: ({ stepNumber, steps }) =>
+            nextStep(stepNumber, STEP_MAX, steps as never, activeFor),
         toolApproval: {
             ...toolset.approval,
             ...(body.data.connectors ? connectorSet.approval : {}),
