@@ -114,7 +114,13 @@ export function optionField(field: DeckField): OptionField {
             max
         };
     }
-    return { type: "textinput", id: field.name, label: field.label, default: "", useVariables: true };
+    return {
+        type: "textinput",
+        id: field.name,
+        label: field.label,
+        default: "",
+        useVariables: true
+    };
 }
 
 /** An action's options: the entry's fields, and a dial's level. */
@@ -144,7 +150,11 @@ export function feedbackOptions(entry: DeckAction): OptionField[] {
  * level), numbers as numbers, and text that is empty left out so Polaris's own
  * check reports what is missing rather than an empty string.
  */
-export function deckOptions(entry: DeckAction, values: OptionValues, forRun = true): Record<string, unknown> {
+export function deckOptions(
+    entry: DeckAction,
+    values: OptionValues,
+    forRun = true
+): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     let names = entry.options.map((field) => field.name);
     if (!forRun) names = names.filter((name) => name !== LEVEL_OPTION);
@@ -242,7 +252,9 @@ export function defaults(entry: DeckAction): Record<string, unknown> {
 }
 
 /** The variables the catalogue gives: each standalone live entry's value. */
-export function catalogueVariables(catalogue: readonly DeckAction[]): { id: string; name: string }[] {
+export function catalogueVariables(
+    catalogue: readonly DeckAction[]
+): { id: string; name: string }[] {
     return watchable(catalogue)
         .filter(standalone)
         .map((entry) => ({ id: companionId(entry.id), name: entry.label }));

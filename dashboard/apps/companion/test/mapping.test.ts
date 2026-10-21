@@ -111,12 +111,22 @@ describe("the catalogue as Companion's lists", () => {
             useVariables: true
         });
         expect(
-            mapping.optionField({ name: "n", type: "number", label: "N", required: false, min: 5, max: 9 })
+            mapping.optionField({
+                name: "n",
+                type: "number",
+                label: "N",
+                required: false,
+                min: 5,
+                max: 9
+            })
         ).toMatchObject({ type: "number", default: 5, min: 5, max: 9 });
     });
 
     it("gives a dial a level to set, which its feedback does not watch", () => {
-        expect(mapping.actionOptions(LIGHT).map((field) => field.id)).toEqual(["deviceId", "level"]);
+        expect(mapping.actionOptions(LIGHT).map((field) => field.id)).toEqual([
+            "deviceId",
+            "level"
+        ]);
         expect(mapping.feedbackOptions(LIGHT).map((field) => field.id)).toEqual(["deviceId"]);
         const values = { deviceId: "lamp", level: "70", _text: true };
         expect(mapping.deckOptions(LIGHT, values)).toEqual({ deviceId: "lamp", level: 70 });
@@ -208,8 +218,15 @@ describe("presets", () => {
 
 describe("the connection's status", () => {
     it("shows the code and where to approve it while signing in", () => {
-        const phase = { phase: "signing-in", userCode: "ABCD-EFGH", url: "https://p.test/device" } as const;
-        expect(phaseStatus(phase)).toEqual(["Connecting", "Approve code ABCD-EFGH at https://p.test/device"]);
+        const phase = {
+            phase: "signing-in",
+            userCode: "ABCD-EFGH",
+            url: "https://p.test/device"
+        } as const;
+        expect(phaseStatus(phase)).toEqual([
+            "Connecting",
+            "Approve code ABCD-EFGH at https://p.test/device"
+        ]);
         expect(phaseText(phase, undefined)).toContain("ABCD-EFGH");
         expect(phaseStatus({ phase: "unauthorized" })[0]).toBe("AuthenticationFailure");
         expect(phaseText({ phase: "online" }, "Ada")).toBe("Signed in as Ada.");
@@ -223,7 +240,9 @@ describe("the connection's status", () => {
 
 describe("the version", () => {
     it("is the package's, which is what Companion reads", () => {
-        const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+        const pkg = JSON.parse(
+            readFileSync(new URL("../package.json", import.meta.url), "utf8")
+        ) as {
             version: string;
         };
         expect(VERSION).toBe(pkg.version);

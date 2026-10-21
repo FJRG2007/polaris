@@ -145,7 +145,11 @@ export class Connection {
     }
 
     /** Run an entry. Null when there is nothing signed in to run it with. */
-    async run(action: string, options: Record<string, unknown>, step?: number): Promise<RunResult | null> {
+    async run(
+        action: string,
+        options: Record<string, unknown>,
+        step?: number
+    ): Promise<RunResult | null> {
         const credentials = this.credentials;
         if (!credentials || this.current.phase === "unauthorized") return null;
         try {

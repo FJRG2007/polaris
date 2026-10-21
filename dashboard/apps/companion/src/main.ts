@@ -35,7 +35,6 @@ import {
     type DeckState
 } from "../../streamdeck/src/polaris";
 
-
 type Config = { address: string };
 type Secrets = { token?: string; keyId?: string; account?: string; address?: string };
 
@@ -53,8 +52,7 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         phase: (phase) => this.#phase(phase),
         catalogue: (catalogue) => this.#define(catalogue),
         readings: (readings) => this.#read(readings),
-        save: (credentials) =>
-            this.saveConfig(undefined, credentials ? { ...credentials } : {}),
+        save: (credentials) => this.saveConfig(undefined, credentials ? { ...credentials } : {}),
         log: (level, message) => this.log(level, message)
     });
     /** The last state for each stream key: a feedback's id, or `var:<id>`. */
@@ -194,7 +192,11 @@ export default class PolarisInstance extends InstanceBase<Schema> {
                 ],
                 affectedProperties: ["text", "color", "bgcolor"],
                 callback: (feedback) => {
-                    this.#watchFeedback(feedback.id, entry, mapping.deckOptions(entry, feedback.options, false));
+                    this.#watchFeedback(
+                        feedback.id,
+                        entry,
+                        mapping.deckOptions(entry, feedback.options, false)
+                    );
                     return mapping.stateStyle(
                         entry.label,
                         this.#states.get(feedback.id),
@@ -210,7 +212,11 @@ export default class PolarisInstance extends InstanceBase<Schema> {
                     options: mapping.feedbackOptions(entry),
                     defaultStyle: { bgcolor: mapping.COLORS.ok, color: mapping.COLORS.white },
                     callback: (feedback) => {
-                        this.#watchFeedback(feedback.id, entry, mapping.deckOptions(entry, feedback.options, false));
+                        this.#watchFeedback(
+                            feedback.id,
+                            entry,
+                            mapping.deckOptions(entry, feedback.options, false)
+                        );
                         return this.#states.get(feedback.id)?.on === true;
                     },
                     unsubscribe: (feedback) => this.#unwatchFeedback(feedback.id)
@@ -219,7 +225,10 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         }
 
         const variables: CompanionVariableDefinitions = {};
-        for (const variable of [...mapping.FIXED_VARIABLES, ...mapping.catalogueVariables(catalogue)]) {
+        for (const variable of [
+            ...mapping.FIXED_VARIABLES,
+            ...mapping.catalogueVariables(catalogue)
+        ]) {
             variables[variable.id] = { name: variable.name };
         }
 
@@ -229,15 +238,27 @@ export default class PolarisInstance extends InstanceBase<Schema> {
             presets[spec.id] = {
                 type: "simple",
                 name: spec.name,
-                style: { text: spec.name, size: "auto", color: mapping.COLORS.white, bgcolor: mapping.COLORS.black },
+                style: {
+                    text: spec.name,
+                    size: "auto",
+                    color: mapping.COLORS.white,
+                    bgcolor: mapping.COLORS.black
+                },
                 steps: [
                     {
-                        down: spec.actionId ? [{ actionId: spec.actionId, options: spec.options }] : [],
+                        down: spec.actionId
+                            ? [{ actionId: spec.actionId, options: spec.options }]
+                            : [],
                         up: []
                     }
                 ],
                 feedbacks: spec.feedbackId
-                    ? [{ feedbackId: spec.feedbackId, options: { ...spec.options, [mapping.TEXT_OPTION]: true } }]
+                    ? [
+                          {
+                              feedbackId: spec.feedbackId,
+                              options: { ...spec.options, [mapping.TEXT_OPTION]: true }
+                          }
+                      ]
                     : []
             } as CompanionPresetDefinitions<Schema>[string];
             sections.set(spec.area, [...(sections.get(spec.area) ?? []), spec.id]);

@@ -13,7 +13,15 @@ afterEach(() => {
 
 const ADDRESS = "https://polaris.example.com";
 const CATALOGUE = [
-    { id: "chat.unread", kind: "state", area: "chat", label: "Unread", icon: "m", options: [], live: true }
+    {
+        id: "chat.unread",
+        kind: "state",
+        area: "chat",
+        label: "Unread",
+        icon: "m",
+        options: [],
+        live: true
+    }
 ];
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -54,7 +62,9 @@ describe("signing in", () => {
             const path = String(url).slice(ADDRESS.length);
             calls.push(`${init?.method ?? "GET"} ${path}`);
             if (path === "/api/deck/authorize") {
-                expect(new Headers(init?.headers).get("user-agent")).toMatch(/^polaris-companion\//);
+                expect(new Headers(init?.headers).get("user-agent")).toMatch(
+                    /^polaris-companion\//
+                );
                 return json({
                     userCode: "ABCD-EFGH",
                     deviceCode: "dev",
@@ -96,7 +106,10 @@ describe("signing in", () => {
     it("does not reuse a key kept for a different Polaris", async () => {
         const fetcher = vi.fn(async (_url: string | URL | Request) => json({ error: "nope" }, 500));
         const { host, phases } = recorder();
-        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        const connection = new Connection(
+            new PolarisClient("0.1.0", fetcher as typeof fetch),
+            host
+        );
         await connection.start(ADDRESS, { address: "https://other.example.com", token: "t" });
         await vi.waitFor(() => expect(phases).toEqual(["sign-in-failed"]));
         expect(String(fetcher.mock.calls[0]?.[0])).toBe(`${ADDRESS}/api/deck/authorize`);
@@ -117,7 +130,10 @@ describe("signing in", () => {
                 : json({ status: "pending" })
         );
         const { host } = recorder();
-        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        const connection = new Connection(
+            new PolarisClient("0.1.0", fetcher as typeof fetch),
+            host
+        );
         let returned = false;
         void connection.start(ADDRESS, null).then(() => (returned = true));
         await vi.advanceTimersByTimeAsync(0);
@@ -142,7 +158,10 @@ describe("signing in", () => {
             });
         });
         const { host } = recorder();
-        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        const connection = new Connection(
+            new PolarisClient("0.1.0", fetcher as typeof fetch),
+            host
+        );
         await connection.start(ADDRESS, null);
         await vi.advanceTimersByTimeAsync(1500);
         expect(connection.current.phase).toBe("sign-in-failed");
@@ -160,7 +179,9 @@ describe("signing in", () => {
         const calls: string[] = [];
         const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
             const path = String(url).slice(ADDRESS.length);
-            calls.push(`${init?.method ?? "GET"} ${path} ${new Headers(init?.headers).get("authorization") ?? ""}`);
+            calls.push(
+                `${init?.method ?? "GET"} ${path} ${new Headers(init?.headers).get("authorization") ?? ""}`
+            );
             if (path === "/api/deck/authorize") {
                 return json({
                     userCode: "ABCD-EFGH",
@@ -183,7 +204,10 @@ describe("signing in", () => {
             return new Response(null, { status: 404 });
         });
         const { host } = recorder();
-        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        const connection = new Connection(
+            new PolarisClient("0.1.0", fetcher as typeof fetch),
+            host
+        );
         await connection.start(ADDRESS, { address: ADDRESS, token: "plr_old", keyId: "k1" });
         const signedIn = connection.signIn();
         await vi.advanceTimersByTimeAsync(1500);
@@ -197,7 +221,10 @@ describe("signing in", () => {
 
     it("refuses an address that is not one", async () => {
         const { host, phases } = recorder();
-        const connection = new Connection(new PolarisClient("0.1.0", vi.fn() as typeof fetch), host);
+        const connection = new Connection(
+            new PolarisClient("0.1.0", vi.fn() as typeof fetch),
+            host
+        );
         await connection.start("ftp://polaris", null);
         await connection.start("", null);
         expect(phases).toEqual(["invalid", "unset"]);
@@ -210,7 +237,10 @@ describe("a signed-in connection", () => {
     it("stops and asks to sign in again when the key is gone", async () => {
         const fetcher = vi.fn(async () => new Response(null, { status: 401 }));
         const { host } = recorder();
-        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        const connection = new Connection(
+            new PolarisClient("0.1.0", fetcher as typeof fetch),
+            host
+        );
         await connection.start(ADDRESS, kept);
         expect(connection.current.phase).toBe("unauthorized");
         expect(await connection.run("chat.unread", {})).toBeNull();
@@ -224,9 +254,15 @@ describe("a signed-in connection", () => {
                 : json({ error: "Too many requests" }, 429, { "retry-after": "5" })
         );
         const { host } = recorder();
-        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        const connection = new Connection(
+            new PolarisClient("0.1.0", fetcher as typeof fetch),
+            host
+        );
         await connection.start(ADDRESS, kept);
-        expect(await connection.run("chat.unread", {})).toEqual({ ok: false, message: "Too many requests" });
+        expect(await connection.run("chat.unread", {})).toEqual({
+            ok: false,
+            message: "Too many requests"
+        });
         expect(connection.current.phase).toBe("online");
         connection.stop();
     });
