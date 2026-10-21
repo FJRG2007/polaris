@@ -2101,6 +2101,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
+            label: "Polaris apps", // i18n-ignore
+            href: "/admin/apps",
+            adminOnly: true,
+            icon: Store,
+            keywords: ["marketplace", "install", "catalog", "built in"],
+            group: ADMIN_GENERAL_GROUP
+        },
+        {
             label: "Get started", // i18n-ignore
             href: "/admin/setup",
             adminOnly: true,

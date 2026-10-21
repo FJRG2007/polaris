@@ -603,6 +603,7 @@ export async function installGameServersAction(): Promise<{ error?: string }> {
         });
         revalidatePath("/apps/games");
         revalidatePath("/apps/marketplace");
+        revalidatePath("/admin/apps");
         return {};
     } catch (caught) {
         return {

@@ -8,7 +8,7 @@
         "body": "Install it to block ads, trackers and malware on every device that uses your network. Installing starts nothing; you turn the filter on afterwards.",
         "pending": "Installing...",
         "install": "Install",
-        "view": "View in Marketplace"
+        "view": "View in Polaris apps"
     },
     "status": {
         "title": "Status",
@@ -183,7 +183,7 @@
         "cacheRange": "The least time cannot be more than the most."
     },
     "errors": {
-        "notInstalled": "Network filter is not installed. Install it from the Marketplace first.",
+        "notInstalled": "Network filter is not installed. Install it from Polaris apps first.",
         "tooLarge": "These rules are too long to apply. Remove some of your own rules and save again.",
         "noAddress": "This machine has no address on your network yet. Check again in a minute.",
         "portTaken": "Another DNS server already answers on port 53 here. Turn it off, then retry.",

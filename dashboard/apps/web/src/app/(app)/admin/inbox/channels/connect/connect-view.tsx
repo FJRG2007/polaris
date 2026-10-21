@@ -63,7 +63,7 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
                                   link: (chunks) => (
                                       <Link
                                           key="link"
-                                          href="/apps/marketplace"
+                                          href="/admin/apps?app=messaging-bridge"
                                           className="text-primary hover:underline"
                                       >
                                           {chunks}

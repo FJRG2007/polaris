@@ -31,7 +31,13 @@ import {
 import { ScreenshotGallery } from "./screenshot-gallery";
 import { AppPreview, PrimaryActionButton, StatusBadge } from "../store-card";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { ADDED_ON, installBadge, primaryAction } from "@/lib/apps/marketplace-store";
+import {
+    ADDED_ON,
+    installBadge,
+    primaryAction,
+    storeHome,
+    storeScope
+} from "@/lib/apps/marketplace-store";
 import { GameLogo } from "@/components/game-logo";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
@@ -142,7 +148,7 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
     return (
         <div className="flex min-w-0 flex-col gap-6">
             <Link
-                href="/apps/marketplace"
+                href={storeHome(storeScope(app))}
                 className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
             >
                 <ArrowLeft className="size-4" />

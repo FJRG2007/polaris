@@ -188,7 +188,7 @@
         "notYourOrg": "You cannot manage this organization's mail servers.",
         "noAdmin": "This mail server has no administrator credential yet. Run setup again.",
         "notInstalled": "Mail server is not installed.",
-        "notInstalledHint": "Mail server is not installed. Install it from the Marketplace first.",
+        "notInstalledHint": "Mail server is not installed. Install it from Polaris apps first.",
         "uninstallOwner": "Only whoever installed Mail server, or an administrator, can uninstall it.",
         "notRunning": "This mail server is not running yet. Finish setting it up first.",
         "reportTooBig": "That report unpacks to more than any real report does.",
@@ -349,7 +349,7 @@
     "uninstall": {
         "title": "Uninstall Mail server",
         "removeFirst": "Remove your mail servers first. Each one's page has Remove from Polaris at the bottom of its overview.",
-        "body": "It leaves the menu and search. Nothing runs for it, so nothing is stopped, and you can install it again from the Marketplace.",
+        "body": "It leaves the menu and search. Nothing runs for it, so nothing is stopped, and you can install it again from Polaris apps.",
         "open": "Open",
         "close": "Close",
         "pending": "Uninstalling"
@@ -366,12 +366,12 @@
         "submit": "Set it up"
     },
     "install": {
-        "title": "Install Mail server from the Marketplace",
+        "title": "Install Mail server from Polaris apps",
         "body": "Mail at your own domains: SPF, DKIM and DMARC written and checked, mailboxes and aliases. Installing downloads nothing - a server is set up only when you choose a machine for it.",
         "bodyAsk": "Mail at your own domains: SPF, DKIM and DMARC written and checked, mailboxes and aliases. Ask somebody who can install apps to add it.",
         "pending": "Installing",
         "install": "Install",
-        "view": "View in Marketplace"
+        "view": "View in Polaris apps"
     },
     "page": {
         "title": "Mail server",

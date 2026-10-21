@@ -44,6 +44,11 @@
         "shelves": {
             "polaris": "Polaris apps",
             "community": "From other developers"
+        },
+        "empty": {
+            "title": "Nothing to deploy yet",
+            "body": "Apps from other developers that Polaris can run for you will be listed here.",
+            "polaris": "Open Polaris apps"
         }
     },
     "uninstall": {
@@ -128,5 +133,12 @@
         "needsSettings": "Settings you fill in: {fields}.",
         "needsOnce": "One install serves everyone on this Polaris.",
         "needsPermission": "Installing it needs permission to manage apps."
+    },
+    "polaris": {
+        "title": "Polaris apps",
+        "description": "Switch on Polaris's own apps for everybody here.",
+        "builtIn": "Built in",
+        "builtInBadge": "Built in",
+        "builtInHint": "Comes with Polaris"
     }
 }

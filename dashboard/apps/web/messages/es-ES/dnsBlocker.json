@@ -8,7 +8,7 @@
         "body": "Instálalo para bloquear anuncios, rastreadores y malware en cada dispositivo de tu red. Instalarlo no arranca nada; enciendes el filtro después.",
         "pending": "Instalando...",
         "install": "Instalar",
-        "view": "Ver en Marketplace"
+        "view": "Ver en Apps de Polaris"
     },
     "status": {
         "title": "Estado",
@@ -183,7 +183,7 @@
         "cacheRange": "El tiempo mínimo no puede pasar del máximo."
     },
     "errors": {
-        "notInstalled": "Filtro de red no está instalado. Instálalo antes desde el Marketplace.",
+        "notInstalled": "Filtro de red no está instalado. Instálalo antes desde Apps de Polaris.",
         "tooLarge": "Estas reglas son demasiado largas para aplicarlas. Quita algunas de las tuyas y guarda de nuevo.",
         "noAddress": "Esta máquina aún no tiene dirección en tu red. Vuelve a comprobarlo en un minuto.",
         "portTaken": "Otro servidor DNS ya responde aquí en el puerto 53. Apágalo y vuelve a intentarlo.",

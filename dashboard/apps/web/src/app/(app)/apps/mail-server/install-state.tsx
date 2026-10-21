@@ -18,9 +18,16 @@ import { installMailServerAppAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Where the app sits in the marketplace; the marketplace opens on it. */
-const MAIL_SERVER_LISTING = "/apps/marketplace?app=mail-server";
+const MAIL_SERVER_LISTING = "/admin/apps?app=mail-server";
 
-export function MailServerInstallState({ canInstall }: { canInstall: boolean }) {
+export function MailServerInstallState({
+    canInstall,
+    canBrowse = false
+}: {
+    canInstall: boolean;
+    /** Whether the reader may open the admin screen the app is listed on. */
+    canBrowse?: boolean;
+}) {
     const t = useTranslations("mailServer");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -52,9 +59,11 @@ export function MailServerInstallState({ canInstall }: { canInstall: boolean }) 
                                 {pending ? <Loader2 className="animate-spin" /> : null}
                                 {pending ? t("install.pending") : t("install.install")}
                             </Button>
-                            <Button asChild size="sm" variant="ghost">
-                                <Link href={MAIL_SERVER_LISTING}>{t("install.view")}</Link>
-                            </Button>
+                            {canBrowse ? (
+                                <Button asChild size="sm" variant="ghost">
+                                    <Link href={MAIL_SERVER_LISTING}>{t("install.view")}</Link>
+                                </Button>
+                            ) : null}
                         </>
                     ) : null
                 }

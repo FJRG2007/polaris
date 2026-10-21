@@ -13,7 +13,7 @@ import { Button, EmptyState } from "@polaris/ui";
 import { installDnsBlockerAppAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-const LISTING = "/apps/marketplace?app=dns-blocker";
+const LISTING = "/admin/apps?app=dns-blocker";
 
 export function DnsBlockerInstallState() {
     const t = useTranslations("dnsBlocker");

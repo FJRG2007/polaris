@@ -5,6 +5,7 @@
  * app's own page and the tests all read the same answers.
  */
 
+import { POLARIS_APPS, type AppEntry } from "@/lib/apps";
 import { appProvenance } from "@/lib/apps/provenance";
 import { hasScreenshots } from "@/lib/apps/app-screenshots";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
@@ -176,4 +177,50 @@ export function installBadge(
     if (!first) return null;
     if (app.installMethod === "builtin") return { kind: "installed" };
     return { kind: "status", status: first.status };
+}
+
+/**
+ * Which marketplace an app is listed in.
+ *
+ * `deployable` is /apps/marketplace: other developers' software that Polaris
+ * deploys and runs for you. `polaris` is the admin screen (/admin/apps): the
+ * apps that are part of Polaris itself and switch on for the whole instance.
+ */
+export type StoreScope = "deployable" | "polaris";
+
+export function storeScope(app: AppManifest): StoreScope {
+    return storeShelf(app) === "polaris" ? "polaris" : "deployable";
+}
+
+/** The admin marketplace's address, opened on one app when one is named. */
+export const POLARIS_APPS_PATH = "/admin/apps";
+
+export function polarisAppsHref(appId?: string): string {
+    return appId ? `${POLARIS_APPS_PATH}?app=${encodeURIComponent(appId)}` : POLARIS_APPS_PATH;
+}
+
+/** The user marketplace's address: other developers' apps. */
+export const DEPLOYABLE_APPS_PATH = "/apps/marketplace";
+
+/** The grid an app is listed in. */
+export function storeHome(scope: StoreScope): string {
+    return scope === "polaris" ? POLARIS_APPS_PATH : DEPLOYABLE_APPS_PATH;
+}
+
+/** An app's own page, in the marketplace that lists it. */
+export function listingHref(app: AppManifest): string {
+    return `${storeHome(storeScope(app))}/${encodeURIComponent(app.id)}`;
+}
+
+/** Entries of the switcher that are screens of the shell rather than apps anybody installs. */
+const NOT_AN_APP = new Set(["overview", "admin", "account"]);
+
+/**
+ * The apps every Polaris comes with: in the switcher with no marketplace app
+ * behind them (`requiresApp`), so nothing installs them and nothing removes
+ * them yet. Listed on the admin screen the way a phone lists the apps it
+ * shipped with.
+ */
+export function builtInApps(): AppEntry[] {
+    return POLARIS_APPS.filter((app) => !app.requiresApp && !app.hidden && !NOT_AN_APP.has(app.id));
 }

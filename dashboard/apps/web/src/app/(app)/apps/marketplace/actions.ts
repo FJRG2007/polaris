@@ -21,6 +21,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { validationMessage } from "@/components/i18n/validation-message";
 
 const MARKETPLACE_PATH = "/apps/marketplace";
+const POLARIS_APPS_PATH = "/admin/apps";
 
 export interface InstallTarget {
     id: string;
@@ -83,6 +84,7 @@ export async function installAppAction(
             targetId: result.installedAppId
         });
         revalidatePath(MARKETPLACE_PATH);
+        revalidatePath(POLARIS_APPS_PATH);
         return { installedAppId: result.installedAppId };
     } catch (caught) {
         return {

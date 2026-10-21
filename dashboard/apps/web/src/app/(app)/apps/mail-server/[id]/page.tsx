@@ -34,7 +34,10 @@ export default async function MailServerDetailPage({
                     title={t("page.title")}
                     description={t("page.description")}
                 />
-                <MailServerInstallState canInstall={await sessionCan(user, "deploy.manage")} />
+                <MailServerInstallState
+                    canInstall={await sessionCan(user, "deploy.manage")}
+                    canBrowse={user.isAdmin}
+                />
             </div>
         );
     }

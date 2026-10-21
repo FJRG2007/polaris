@@ -101,6 +101,7 @@ function refreshApp(): void {
     revalidatePath("/", "layout");
     revalidatePath("/apps/mail-server");
     revalidatePath("/apps/marketplace");
+    revalidatePath("/admin/apps");
 }
 
 /**

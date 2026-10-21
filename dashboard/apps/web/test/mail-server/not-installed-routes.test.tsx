@@ -13,9 +13,10 @@ import { withMessages } from "../setup/i18n";
 
 let installed: string | null;
 let canInstall: boolean;
+let isAdmin = true;
 
 vi.mock("@/lib/session", () => ({
-    requirePermission: async () => ({ id: "user-1", isAdmin: false }),
+    requirePermission: async () => ({ id: "user-1", isAdmin }),
     sessionCan: async () => canInstall
 }));
 vi.mock("@/lib/i18n/request", async () => {
@@ -56,26 +57,34 @@ async function render(page: Promise<JSX.Element>): Promise<string> {
 beforeEach(() => {
     installed = null;
     canInstall = true;
+    isAdmin = true;
 });
 
 describe("before the app is installed", () => {
-    it("offers the install on the list, and a way to the marketplace", async () => {
+    it("offers the install on the list, and a way to its listing in Polaris apps", async () => {
         const html = await render(ListPage());
-        expect(html).toContain("Install Mail server from the Marketplace");
+        expect(html).toContain("Install Mail server from Polaris apps");
         expect(html).toContain(">Install<");
-        expect(html).toContain('href="/apps/marketplace?app=mail-server"');
+        expect(html).toContain('href="/admin/apps?app=mail-server"');
         expect(html).not.toContain("data-list");
+    });
+
+    it("offers no link to the admin screen to somebody who cannot open it", async () => {
+        isAdmin = false;
+        const html = await render(ListPage());
+        expect(html).toContain(">Install<");
+        expect(html).not.toContain("/admin/apps");
     });
 
     it("answers a link to a server with the same, not a 404", async () => {
         const html = await render(DetailPage({ params: Promise.resolve({ id: SERVER_ID }) }));
-        expect(html).toContain("Install Mail server from the Marketplace");
+        expect(html).toContain("Install Mail server from Polaris apps");
         expect(html).not.toContain("data-server");
     });
 
     it("answers even a malformed link with the install", async () => {
         const html = await render(DetailPage({ params: Promise.resolve({ id: "not-an-id" }) }));
-        expect(html).toContain("Install Mail server from the Marketplace");
+        expect(html).toContain("Install Mail server from Polaris apps");
     });
 
     it("offers no button to somebody who cannot install apps", async () => {

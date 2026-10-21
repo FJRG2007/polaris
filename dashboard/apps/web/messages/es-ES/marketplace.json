@@ -44,6 +44,11 @@
         "shelves": {
             "polaris": "Apps de Polaris",
             "community": "De otros desarrolladores"
+        },
+        "empty": {
+            "title": "Nada que desplegar aún",
+            "body": "Aquí aparecerán las apps de otros desarrolladores que Polaris puede ejecutar por ti.",
+            "polaris": "Abrir apps de Polaris"
         }
     },
     "uninstall": {
@@ -128,5 +133,12 @@
         "needsSettings": "Ajustes que rellenas: {fields}.",
         "needsOnce": "Una instalación sirve a todos en este Polaris.",
         "needsPermission": "Instalarla requiere permiso para gestionar apps."
+    },
+    "polaris": {
+        "title": "Apps de Polaris",
+        "description": "Activa para todos las apps propias de Polaris.",
+        "builtIn": "Incluidas",
+        "builtInBadge": "Incluida",
+        "builtInHint": "Viene con Polaris"
     }
 }

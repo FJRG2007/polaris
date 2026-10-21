@@ -14,14 +14,10 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { isNativeApp } from "@/lib/apps/native-apps";
 import { findApp } from "@/lib/apps/catalog";
-import { uninstallAccess } from "@/lib/apps/install-access";
-import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
-import { AppDetail, AppInstallPanel, AppInstallPanelSkeleton } from "./app-detail";
-import {
-    installForReader,
-    instanceWideInstallIds,
-    listInstalledApps
-} from "@/lib/apps/install-service";
+import { requirePermission } from "@/lib/session";
+import { AppInstallState } from "../store-installs";
+import { listingHref, storeScope } from "@/lib/apps/marketplace-store";
+import { AppDetail, AppInstallPanelSkeleton } from "./app-detail";
 
 export const dynamic = "force-dynamic";
 
@@ -37,29 +33,13 @@ export default async function MarketplaceAppPage({
     if (!app || app.internal) notFound();
     // Part of Servers on every Polaris: old links to its marketplace page open it.
     if (isNativeApp(app.id) && app.opensAt) redirect(app.opensAt);
+    // Polaris's own apps have their page on the admin screen; old links open it.
+    if (storeScope(app) === "polaris") redirect(listingHref(app));
     return (
         <AppDetail appId={app.id}>
             <Suspense fallback={<AppInstallPanelSkeleton />}>
-                <InstallState appId={app.id} user={user} />
+                <AppInstallState appId={app.id} user={user} />
             </Suspense>
         </AppDetail>
     );
-}
-
-/** Whether this Polaris has the app, and what this reader may do about it. */
-async function InstallState({ appId, user }: { appId: string; user: SessionUser }) {
-    const [installed, canInstall] = await Promise.all([
-        instanceWideInstallIds().then((ids) => listInstalledApps(user.id, ids)),
-        sessionCan(user, "deploy.manage")
-    ]);
-    const installs = await Promise.all(
-        installed
-            .filter((item) => item.catalogId === appId)
-            .map(async (item) => {
-                const canUninstall =
-                    (await uninstallAccess(user, item.id).catch(() => null)) !== null;
-                return { ...installForReader(item, user.id, canUninstall), canUninstall };
-            })
-    );
-    return <AppInstallPanel appId={appId} canInstall={canInstall} installs={installs} />;
 }

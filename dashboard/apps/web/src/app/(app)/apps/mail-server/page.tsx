@@ -32,7 +32,7 @@ export default async function MailServerPage() {
             {installed ? (
                 <MailServersView canUninstall={canInstall} />
             ) : (
-                <MailServerInstallState canInstall={canInstall} />
+                <MailServerInstallState canInstall={canInstall} canBrowse={user.isAdmin} />
             )}
         </div>
     );

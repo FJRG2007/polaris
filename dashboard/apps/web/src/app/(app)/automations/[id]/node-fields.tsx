@@ -9,6 +9,8 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
+import { findApp } from "@/lib/apps/catalog";
+import { listingHref } from "@/lib/apps/marketplace-store";
 import {
     Button,
     Checkbox,
@@ -163,6 +165,12 @@ export function configValid(node: core.GraphNode): boolean {
     return core.nodeTypeApp(node.type) !== null;
 }
 
+/** Where an app's node sends somebody to install the app: its own store page. */
+function installHref(app: string): string {
+    const manifest = findApp(app);
+    return manifest ? listingHref(manifest) : `/apps/marketplace/${encodeURIComponent(app)}`;
+}
+
 /** An app's node: drawn by the app where it is installed, and said to need it where it is not. */
 function AppNodeFields({
     node,
@@ -192,7 +200,7 @@ function AppNodeFields({
             <span className="min-w-0 flex-1">{t("appNodes.missing")}</span>
             {app ? (
                 <Button asChild size="sm" variant="outline">
-                    <Link href={`/apps/marketplace/${app}`}>{t("appNodes.install")}</Link>
+                    <Link href={installHref(app)}>{t("appNodes.install")}</Link>
                 </Button>
             ) : null}
         </div>

@@ -1,7 +1,7 @@
 {
     "wizard": {
         "title": "Configurar Polaris",
-        "intro": "Di para qué usarás Polaris y solo se instalarán las apps que encajan. Puedes añadir más luego desde Marketplace.",
+        "intro": "Di para qué usarás Polaris y solo se instalarán las apps que encajan. Puedes añadir más luego desde Apps de Polaris.",
         "useCasesLabel": "¿Para qué usarás Polaris?",
         "useCases": {
             "hosting": {
@@ -40,7 +40,7 @@
         "retry": "Repetir",
         "retryNamed": "Repetir {app}",
         "allDone": "Todo listo. Las apps elegidas están en el menú de apps.",
-        "someFailed": "Algunas apps no se instalaron. Repítelas, o termina y añádelas luego desde Marketplace.",
+        "someFailed": "Algunas apps no se instalaron. Repítelas, o termina y añádelas luego desde Apps de Polaris.",
         "reopenHint": "Puedes volver a abrirlo desde Gestión, en Primeros pasos.",
         "step": "Paso {current} de {total}",
         "loading": "Comprobando lo instalado"
@@ -52,7 +52,7 @@
     "errors": {
         "adminOnly": "Solo un administrador puede instalar apps.",
         "unknownApp": "Esa app no se ofrece aquí.",
-        "install": "{app} no se instaló. Repite, o ábrela en Marketplace para ver qué necesita.",
+        "install": "{app} no se instaló. Repite, o ábrela en Apps de Polaris para ver qué necesita.",
         "network": "Polaris no respondió. Comprueba tu conexión y repite."
     },
     "presets": {

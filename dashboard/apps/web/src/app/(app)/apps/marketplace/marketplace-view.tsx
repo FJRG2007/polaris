@@ -25,7 +25,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { UninstallDialog } from "./uninstall-dialog";
 import { appProvenance } from "@/lib/apps/provenance";
@@ -42,14 +42,19 @@ import {
     type AppManifest
 } from "@/lib/apps/catalog";
 import {
+    POLARIS_APPS_PATH,
     STORE_SORTS,
+    builtInApps,
     featuredApps,
+    listingHref,
+    storeScope,
     filterStoreApps,
     installBadge,
     primaryAction,
     storeCategories,
     storeShelves,
     type StoreCategory,
+    type StoreScope,
     type StoreSort
 } from "@/lib/apps/marketplace-store";
 import {
@@ -75,6 +80,7 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    EmptyState,
     Input,
     PageHeader,
     Select,
@@ -117,7 +123,9 @@ export type StoreInstallRow = InstalledAppReaderView & { readonly canUninstall?:
 export function MarketplaceView({
     installed,
     initialQuery = "",
-    canInstall = false
+    canInstall = false,
+    scope = "deployable",
+    canBrowsePolaris = false
 }: {
     installed: StoreInstallRow[];
     /** What the search starts with - an app's name, when a screen sent somebody
@@ -125,6 +133,12 @@ export function MarketplaceView({
     initialQuery?: string;
     /** deploy.manage, the permission the install action requires. */
     canInstall?: boolean;
+    /** Which marketplace this is: deployable apps (/apps/marketplace) or
+     *  Polaris's own (/admin/apps). Each lists only its own apps. */
+    scope?: StoreScope;
+    /** Whether the reader may open the admin screen, for the way there from an
+     *  empty user marketplace. */
+    canBrowsePolaris?: boolean;
 }) {
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
@@ -141,9 +155,11 @@ export function MarketplaceView({
     const all = useMemo(
         () =>
             appsByCategory().flatMap((group) =>
-                group.apps.map((app) => localizeApp(words, app, navLabel))
+                group.apps
+                    .filter((app) => storeScope(app) === scope)
+                    .map((app) => localizeApp(words, app, navLabel))
             ),
-        [words, navLabel]
+        [words, navLabel, scope]
     );
     const categories = useMemo(() => storeCategories(all), [all]);
     const shown = useMemo(
@@ -177,9 +193,37 @@ export function MarketplaceView({
         />
     );
 
+    const header = (
+        <PageHeader
+            title={scope === "polaris" ? t("polaris.title") : t("view.title")}
+            description={scope === "polaris" ? t("polaris.description") : t("view.description")}
+        />
+    );
+
+    // Nothing is offered here at all, so a search box and categories would only
+    // be a way to find out the same thing more slowly.
+    if (all.length === 0 && installed.length === 0)
+        return (
+            <div className="flex min-w-0 flex-col gap-6">
+                {header}
+                <EmptyState
+                    icon={<Store />}
+                    title={t("view.empty.title")}
+                    description={t("view.empty.body")}
+                    action={
+                        canBrowsePolaris ? (
+                            <Button asChild size="sm" variant="secondary">
+                                <Link href={POLARIS_APPS_PATH}>{t("view.empty.polaris")}</Link>
+                            </Button>
+                        ) : null
+                    }
+                />
+            </div>
+        );
+
     return (
         <div className="flex min-w-0 flex-col gap-6">
-            <PageHeader title={t("view.title")} description={t("view.description")} />
+            {header}
 
             <div className="flex min-w-0 flex-col gap-3">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -230,6 +274,8 @@ export function MarketplaceView({
             {browsing && installed.length > 0 && (
                 <InstalledSection installed={installed} onUninstall={setRemoving} />
             )}
+
+            {scope === "polaris" && <BuiltInSection query={query} />}
 
             {featured.length > 0 && (
                 <section className="flex min-w-0 flex-col gap-3" aria-label={t("view.featured")}>
@@ -359,7 +405,7 @@ function InstalledSection({
                         entries.push({
                             key: "details",
                             label: t("card.details"),
-                            onSelect: () => router.push(`/apps/marketplace/${manifest.id}`)
+                            onSelect: () => router.push(listingHref(manifest))
                         });
                     // Offered from the same check the uninstall action makes, so a
                     // reader the server would refuse is never shown it.
@@ -418,6 +464,64 @@ function InstalledSection({
 }
 
 /**
+ * The apps every Polaris comes with, listed beside the ones an admin installs
+ * the way a phone lists the apps it shipped with. Nothing installs them, so
+ * nothing offers to remove them: the row says so instead of offering an
+ * Uninstall the server would refuse.
+ */
+function BuiltInSection({ query }: { query: string }) {
+    const t = useTranslations("marketplace");
+    const navLabel = useNavLabel();
+    const needle = query.trim().toLowerCase();
+    const apps = builtInApps()
+        .map((app) => ({ ...app, label: navLabel(app.label) }))
+        .filter((app) => !needle || app.label.toLowerCase().includes(needle));
+    if (apps.length === 0) return null;
+    return (
+        <section className="flex min-w-0 flex-col gap-3" aria-label={t("polaris.builtIn")}>
+            <h2 className="text-sm font-medium text-muted-foreground">{t("polaris.builtIn")}</h2>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                {apps.map((app) => {
+                    const Icon = app.icon;
+                    return (
+                        <div
+                            key={app.id}
+                            data-built-in={app.id}
+                            className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
+                        >
+                            <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md border">
+                                <Icon className="size-4" aria-hidden="true" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <Link
+                                    href={app.href}
+                                    className="block truncate text-sm font-medium hover:underline"
+                                    title={app.label}
+                                >
+                                    {app.label}
+                                </Link>
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                    <Badge>{t("polaris.builtInBadge")}</Badge>
+                                    <span
+                                        className="truncate text-xs text-muted-foreground"
+                                        title={t("polaris.builtInHint")}
+                                    >
+                                        {t("polaris.builtInHint")}
+                                    </span>
+                                </div>
+                            </div>
+                            <Button asChild size="sm" variant="secondary">
+                                <Link href={app.href}>{t("card.open")}</Link>
+                            </Button>
+                        </div>
+                    );
+                })}
+            </div>
+        </section>
+    );
+}
+
+/**
  * One line naming who is behind an app.
  *
  * Both halves when they differ - somebody else's software in somebody else's
@@ -464,7 +568,7 @@ function StoreCard({
     const from = appProvenance(app);
     const action = primaryAction(app, { installs, canInstall, installing });
     const badge = installBadge(app, installs);
-    const detailHref = `/apps/marketplace/${app.id}`;
+    const detailHref = listingHref(app);
 
     const entries: OverflowEntry[] = [
         { key: "details", label: t("card.details"), onSelect: () => router.push(detailHref) }

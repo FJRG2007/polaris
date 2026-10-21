@@ -65,7 +65,9 @@ describe("uninstalling from the marketplace grid", () => {
         vi.mocked(uninstallInstalledAppAction).mockResolvedValue({
             error: "Delete your game servers first (Ark Island). Uninstalling Game servers never deletes a world."
         });
-        render(<MarketplaceView installed={[installed({})]} />, { wrapper: MessagesWrapper });
+        render(<MarketplaceView scope="polaris" installed={[installed({})]} />, {
+            wrapper: MessagesWrapper
+        });
 
         await pressUninstall("Game servers");
         const dialog = await screen.findByRole("dialog");
@@ -84,6 +86,7 @@ describe("uninstalling from the marketplace grid", () => {
         vi.mocked(uninstallInstalledAppAction).mockResolvedValue({});
         render(
             <MarketplaceView
+                scope="polaris"
                 installed={[installed({ id: "install-2", catalogId: "home", name: "Places" })]}
             />,
             { wrapper: MessagesWrapper }
@@ -109,6 +112,7 @@ describe("uninstalling from the marketplace grid", () => {
     it("says where kept data is listed for an app with containers", async () => {
         render(
             <MarketplaceView
+                scope="polaris"
                 installed={[
                     installed({
                         id: "install-3",
@@ -128,7 +132,9 @@ describe("uninstalling from the marketplace grid", () => {
     });
 
     it("leaves the app installed when Cancel is pressed", async () => {
-        render(<MarketplaceView installed={[installed({})]} />, { wrapper: MessagesWrapper });
+        render(<MarketplaceView scope="polaris" installed={[installed({})]} />, {
+            wrapper: MessagesWrapper
+        });
 
         await pressUninstall("Game servers");
         const dialog = await screen.findByRole("dialog");
@@ -141,9 +147,12 @@ describe("uninstalling from the marketplace grid", () => {
 
 describe("who is offered Uninstall in the grid", () => {
     it("leaves it out of the menu for somebody the server would refuse", async () => {
-        render(<MarketplaceView installed={[installed({ canUninstall: false })]} />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <MarketplaceView scope="polaris" installed={[installed({ canUninstall: false })]} />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         const shelf = screen.getByRole("region", { name: "Installed" });
         fireEvent.pointerDown(within(shelf).getByLabelText("More for Game servers"), {
             button: 0,

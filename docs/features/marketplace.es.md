@@ -6,6 +6,12 @@ Las apps que Polaris puede añadir, instaladas con un clic: Calendario, CRM,
 Herramientas, un servidor de correo para tus dominios, servidores de juegos,
 Places para cámaras y dispositivos, y el puente de mensajería detrás del Inbox.
 
+Hay dos catálogos. Las apps propias de Polaris las activa para todos un
+administrador, desde **Gestión > Apps de Polaris**, que también lista las
+apps con las que viene todo Polaris - Drive, Chat, Correo, Tareas y el resto -
+marcadas como Incluidas, sin nada que desinstalar. **Apps > Catálogo** es para
+el software de otros desarrolladores que Polaris despliega y ejecuta por ti.
+
 Cada imagen es la interfaz real dibujada con personas y datos inventados, y
 sigue tu ajuste claro u oscuro. Las versiones para móvil están en
 [docs/assets/media](../assets/media).

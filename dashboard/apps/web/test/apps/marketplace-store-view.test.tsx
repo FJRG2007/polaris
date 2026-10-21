@@ -32,7 +32,7 @@ function cardOf(name: string): HTMLElement {
 
 describe("the store listing", () => {
     it("shows a real capture where one exists and the placeholder where none does", () => {
-        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        render(<MarketplaceView scope="polaris" installed={[]} />, { wrapper: MessagesWrapper });
         const calendar = cardOf("Calendar");
         expect(
             calendar.querySelector('img[src="/marketplace/calendar-dark-en-desktop.webp"]')
@@ -44,14 +44,14 @@ describe("the store listing", () => {
     });
 
     it("features only apps with a capture", () => {
-        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        render(<MarketplaceView scope="polaris" installed={[]} />, { wrapper: MessagesWrapper });
         const featured = screen.getByRole("region", { name: "Featured" });
         expect(within(featured).getByRole("link", { name: "Calendar" })).toBeTruthy();
         expect(within(featured).queryByRole("link", { name: "CRM" })).toBeNull();
     });
 
     it("filters by the category chip pressed, and hides the featured row while filtered", () => {
-        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        render(<MarketplaceView scope="polaris" installed={[]} />, { wrapper: MessagesWrapper });
         const chips = screen.getByRole("group", { name: "Categories" });
         const games = within(chips).getByRole("button", { name: "Game servers" });
         fireEvent.click(games);
@@ -62,12 +62,12 @@ describe("the store listing", () => {
     });
 
     it("leads with Install for a reader who may, and says why for one who may not", () => {
-        const { unmount } = render(<MarketplaceView installed={[]} canInstall />, {
+        const { unmount } = render(<MarketplaceView scope="polaris" installed={[]} canInstall />, {
             wrapper: MessagesWrapper
         });
         expect(within(cardOf("CRM")).getByRole("button", { name: "Install" })).toBeTruthy();
         unmount();
-        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        render(<MarketplaceView scope="polaris" installed={[]} />, { wrapper: MessagesWrapper });
         const crm = cardOf("CRM");
         expect(within(crm).queryByRole("button", { name: "Install" })).toBeNull();
         const locked = within(crm).getByRole("button", { name: /Needs permission/ });
@@ -79,6 +79,7 @@ describe("the store listing", () => {
     it("leads with Open for an app this Polaris already has", () => {
         render(
             <MarketplaceView
+                scope="polaris"
                 installed={[
                     {
                         id: "install-1",
