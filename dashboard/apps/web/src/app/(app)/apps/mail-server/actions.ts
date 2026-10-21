@@ -80,7 +80,7 @@ async function say(
 
 /** Said by every action below once the app has been uninstalled under an open
  *  screen: there is nothing left for it to act on. */
-const NOT_INSTALLED = "Mail server is not installed. Install it from the Marketplace first.";
+const NOT_INSTALLED = "Mail server is not installed. Install it from Polaris apps first.";
 
 async function actor(): Promise<MailServerActor & { user: SessionUser }> {
     const user = await requirePermission("mailserver.manage");

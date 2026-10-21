@@ -19,7 +19,7 @@ const EXACT: Readonly<Record<string, Key>> = {
     "You cannot manage this organization's mail servers.": "refusals.notYourOrg",
     "This mail server has no administrator credential yet. Run setup again.": "refusals.noAdmin",
     "Mail server is not installed.": "refusals.notInstalled",
-    "Mail server is not installed. Install it from the Marketplace first.": "refusals.notInstalledHint",
+    "Mail server is not installed. Install it from Polaris apps first.": "refusals.notInstalledHint",
     "Only whoever installed Mail server, or an administrator, can uninstall it.": "refusals.uninstallOwner",
     "This mail server is not running yet. Finish setting it up first.": "refusals.notRunning",
     "That report unpacks to more than any real report does.": "refusals.reportTooBig",
