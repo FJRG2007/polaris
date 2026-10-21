@@ -74,9 +74,7 @@ export function NicknameDialog({
                     placeholder={t("nickname.leaveItEmptyToUse")}
                     onChange={(event) => setNickname(event.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                    {t("nickname.onlyYouSeeThisThey")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("nickname.onlyYouSeeThisThey")}</p>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>

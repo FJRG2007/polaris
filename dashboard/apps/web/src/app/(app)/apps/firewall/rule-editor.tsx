@@ -69,7 +69,9 @@ export function emptyRule(count: number, t: Words): WafCustomRule {
 function anyEmpty(conditions: readonly WafCondition[]): boolean {
     return conditions.some((condition) => {
         if (core.isWafSignalCondition(condition)) return false;
-        return core.isWafConditionGroup(condition) ? anyEmpty(condition.conditions) : condition.values.length === 0;
+        return core.isWafConditionGroup(condition)
+            ? anyEmpty(condition.conditions)
+            : condition.values.length === 0;
     });
 }
 
@@ -79,9 +81,14 @@ function blockingReason(rule: WafCustomRule, t: Words): string | null {
     if (rule.name.trim() === "") return t("editor.blocked.name");
     if (rule.conditions.length === 0) return t("editor.blocked.noCondition");
     if (anyEmpty(rule.conditions)) return t("editor.blocked.emptyValue");
-    const tests = rule.conditions.reduce((total, condition) => total + core.wafConditionTests(condition), 0);
-    if (tests > core.WAF_RULE_TESTS_MAX) return t("editor.blocked.tooMany", { max: core.WAF_RULE_TESTS_MAX });
-    if (rule.action === "skip" && (rule.skip ?? []).length === 0) return t("editor.blocked.nothingSkipped");
+    const tests = rule.conditions.reduce(
+        (total, condition) => total + core.wafConditionTests(condition),
+        0
+    );
+    if (tests > core.WAF_RULE_TESTS_MAX)
+        return t("editor.blocked.tooMany", { max: core.WAF_RULE_TESTS_MAX });
+    if (rule.action === "skip" && (rule.skip ?? []).length === 0)
+        return t("editor.blocked.nothingSkipped");
     return null;
 }
 
@@ -118,7 +125,10 @@ export function RuleEditor({
 
     return (
         <div className="flex flex-col gap-4">
-            <PageHeader title={creating ? t("editor.createTitle") : t("editor.editTitle")} onBack={onCancel} />
+            <PageHeader
+                title={creating ? t("editor.createTitle") : t("editor.editTitle")}
+                onBack={onCancel}
+            />
 
             <Section title={t("editor.name")} hint={t("editor.nameHint")}>
                 <Input
@@ -142,15 +152,24 @@ export function RuleEditor({
 
             <Section title={t("editor.then")}>
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">{t("editor.chooseAction")}</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                        {t("editor.chooseAction")}
+                    </span>
                     <Select
                         value={rule.action}
                         aria-label={t("list.columns.action")}
                         className="max-w-xs"
-                        options={ACTIONS.map((action) => ({ value: action, label: t(`actions.${action}`) }))}
-                        onValueChange={(value) => setRule({ ...rule, action: value as WafCustomRule["action"] })}
+                        options={ACTIONS.map((action) => ({
+                            value: action,
+                            label: t(`actions.${action}`)
+                        }))}
+                        onValueChange={(value) =>
+                            setRule({ ...rule, action: value as WafCustomRule["action"] })
+                        }
                     />
-                    <p className="text-xs text-muted-foreground">{t(`editor.effects.${rule.action}`)}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t(`editor.effects.${rule.action}`)}
+                    </p>
                 </div>
 
                 {/* Only under the action that gives them meaning. The choice is kept
@@ -158,9 +177,14 @@ export function RuleEditor({
                     picked rather than to nothing. */}
                 {rule.action === "skip" ? (
                     <fieldset className="flex flex-col gap-2 border-t border-border pt-3">
-                        <legend className="text-xs font-medium text-muted-foreground">{t("editor.whatToSkip")}</legend>
+                        <legend className="text-xs font-medium text-muted-foreground">
+                            {t("editor.whatToSkip")}
+                        </legend>
                         {SKIP_COMPONENTS.map((component) => (
-                            <label key={component} className="flex w-fit cursor-pointer items-start gap-2 text-sm">
+                            <label
+                                key={component}
+                                className="flex w-fit cursor-pointer items-start gap-2 text-sm"
+                            >
                                 <Checkbox
                                     className="mt-0.5"
                                     checked={skip.includes(component)}
@@ -189,12 +213,17 @@ export function RuleEditor({
             <Section title={t("editor.order")} hint={t("editor.orderHint")}>
                 <div className="flex flex-wrap gap-4">
                     <div className="flex min-w-0 flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("editor.selectOrder")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("editor.selectOrder")}
+                        </span>
                         <Select
                             value={position.kind === "after" ? "custom" : position.kind}
                             aria-label={t("list.columns.order")}
                             className="w-40"
-                            options={POSITIONS.map((one) => ({ value: one, label: t(`editor.positions.${one}`) }))}
+                            options={POSITIONS.map((one) => ({
+                                value: one,
+                                label: t(`editor.positions.${one}`)
+                            }))}
                             onValueChange={(value) => {
                                 if (value === "custom") {
                                     setPosition({ kind: "after", index: others[0]?.index ?? 0 });
@@ -210,7 +239,9 @@ export function RuleEditor({
                                 {t("editor.fireAfter")}
                             </span>
                             {others.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">{t("editor.noOther")}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {t("editor.noOther")}
+                                </p>
                             ) : (
                                 <Select
                                     value={String(position.index)}
@@ -220,7 +251,9 @@ export function RuleEditor({
                                         value: String(entry.index),
                                         label: entry.name
                                     }))}
-                                    onValueChange={(value) => setPosition({ kind: "after", index: Number(value) })}
+                                    onValueChange={(value) =>
+                                        setPosition({ kind: "after", index: Number(value) })
+                                    }
                                 />
                             )}
                         </div>

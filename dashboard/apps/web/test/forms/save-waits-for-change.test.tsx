@@ -69,19 +69,21 @@ describe("a dialog opened on a stored record", () => {
         render(
             withMessages(
                 <AlertDialog
-                    rule={{
-                        id: "rule-1",
-                        name: "Night",
-                        placeId: "place-1",
-                        cameraId: null,
-                        kinds: ["person"],
-                        label: null,
-                        zones: [],
-                        hours: null,
-                        recipients: ["user-1"],
-                        notify: false,
-                        enabled: true
-                    } as never}
+                    rule={
+                        {
+                            id: "rule-1",
+                            name: "Night",
+                            placeId: "place-1",
+                            cameraId: null,
+                            kinds: ["person"],
+                            label: null,
+                            zones: [],
+                            hours: null,
+                            recipients: ["user-1"],
+                            notify: false,
+                            enabled: true
+                        } as never
+                    }
                     cameras={[]}
                     people={[{ id: "user-1", name: "Ana" }]}
                     known={[]}

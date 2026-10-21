@@ -150,7 +150,9 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 label: agentWord(t, "pushPolicy", value)
                             }))}
                         />
-                        <p className="text-xs text-muted-foreground">{agentWord(t, "pushPolicyNote", push)}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {agentWord(t, "pushPolicyNote", push)}
+                        </p>
                     </div>
 
                     <div className="space-y-1">
@@ -163,7 +165,9 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 label: agentWord(t, "shellPolicy", value)
                             }))}
                         />
-                        <p className="text-xs text-muted-foreground">{agentWord(t, "shellPolicyNote", shell)}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {agentWord(t, "shellPolicyNote", shell)}
+                        </p>
                         {!repo.isPrivate && shell === "enabled" ? (
                             <p className="text-xs text-warning">{t("repoDialog.publicShell")}</p>
                         ) : null}

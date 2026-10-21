@@ -130,7 +130,9 @@ function RuleEditor({
                     <span>{t("automations.when")}</span>
                     <Select
                         value={draft.trigger}
-                        onValueChange={(trigger) => onChange({ ...draft, trigger: trigger as core.AutomationTrigger })}
+                        onValueChange={(trigger) =>
+                            onChange({ ...draft, trigger: trigger as core.AutomationTrigger })
+                        }
                         options={core.AUTOMATION_TRIGGERS.map((trigger) => ({
                             value: trigger,
                             label: optionLabel(t, "automationTrigger", trigger)
@@ -152,7 +154,9 @@ function RuleEditor({
                 </div>
 
                 <div>
-                    <p className="mb-1 text-xs text-muted-foreground">{t("automations.onlyMatching")}</p>
+                    <p className="mb-1 text-xs text-muted-foreground">
+                        {t("automations.onlyMatching")}
+                    </p>
                     <FilterBar
                         filter={draft.conditions}
                         onChange={(conditions) => onChange({ ...draft, conditions })}
@@ -193,7 +197,9 @@ function RuleEditor({
                                             onChange({
                                                 ...draft,
                                                 actions: draft.actions.map((entry, position) =>
-                                                    position === index ? { ...entry, targetId } : entry
+                                                    position === index
+                                                        ? { ...entry, targetId }
+                                                        : entry
                                                 )
                                             })
                                         }
@@ -204,7 +210,8 @@ function RuleEditor({
                                     />
                                 )}
 
-                                {(action.type === "addComment" || action.type === "createSubtask") && (
+                                {(action.type === "addComment" ||
+                                    action.type === "createSubtask") && (
                                     <Input
                                         value={action.text ?? ""}
                                         placeholder={
@@ -217,7 +224,9 @@ function RuleEditor({
                                             onChange({
                                                 ...draft,
                                                 actions: draft.actions.map((entry, position) =>
-                                                    position === index ? { ...entry, text: event.target.value } : entry
+                                                    position === index
+                                                        ? { ...entry, text: event.target.value }
+                                                        : entry
                                                 )
                                             })
                                         }
@@ -236,7 +245,12 @@ function RuleEditor({
                                                     ...draft,
                                                     actions: draft.actions.map((entry, position) =>
                                                         position === index
-                                                            ? { ...entry, offsetDays: Number(event.target.value) }
+                                                            ? {
+                                                                  ...entry,
+                                                                  offsetDays: Number(
+                                                                      event.target.value
+                                                                  )
+                                                              }
                                                             : entry
                                                     )
                                                 })
@@ -254,7 +268,9 @@ function RuleEditor({
                                     onClick={() =>
                                         onChange({
                                             ...draft,
-                                            actions: draft.actions.filter((_, position) => position !== index)
+                                            actions: draft.actions.filter(
+                                                (_, position) => position !== index
+                                            )
                                         })
                                     }
                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
@@ -367,13 +383,24 @@ export function AutomationsPanel({
                     <li key={rule.id}>
                         <Card>
                             <CardBody className="flex flex-wrap items-center gap-3 p-3">
-                                <Zap className={cn("size-4", rule.enabled ? "text-primary" : "text-muted-foreground")} />
+                                <Zap
+                                    className={cn(
+                                        "size-4",
+                                        rule.enabled ? "text-primary" : "text-muted-foreground"
+                                    )}
+                                />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium">{rule.name}</p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {optionLabel(t, "automationTrigger", rule.trigger)} -{" "}
-                                        {rule.actions.map((action) => optionLabel(t, "automationAction", action.type)).join(", ")}
-                                        {rule.runCount > 0 ? t("automations.ran", { count: rule.runCount }) : ""}
+                                        {rule.actions
+                                            .map((action) =>
+                                                optionLabel(t, "automationAction", action.type)
+                                            )
+                                            .join(", ")}
+                                        {rule.runCount > 0
+                                            ? t("automations.ran", { count: rule.runCount })
+                                            : ""}
                                     </p>
                                 </div>
                                 <Switch
@@ -381,7 +408,12 @@ export function AutomationsPanel({
                                     aria-label={t("automations.enable", { name: rule.name })}
                                     onChange={async (enabled) => {
                                         await runAction(
-                                            () => actions.setAutomationEnabledAction(context.spaceId, rule.id, enabled),
+                                            () =>
+                                                actions.setAutomationEnabledAction(
+                                                    context.spaceId,
+                                                    rule.id,
+                                                    enabled
+                                                ),
                                             setError
                                         );
                                     }}
@@ -402,7 +434,11 @@ export function AutomationsPanel({
                                     title={t("automations.deleteRule")}
                                     onClick={async () => {
                                         await runAction(
-                                            () => actions.deleteAutomationAction(context.spaceId, rule.id),
+                                            () =>
+                                                actions.deleteAutomationAction(
+                                                    context.spaceId,
+                                                    rule.id
+                                                ),
                                             setError
                                         );
                                     }}
@@ -473,9 +509,7 @@ export function FormsPanel({
                             aria-label={t("forms.list")}
                             className="h-8 text-xs"
                         />
-                        <p className="text-xs text-muted-foreground">
-                            {t("forms.startsWith")}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("forms.startsWith")}</p>
                         {error && <p className="text-xs text-danger">{error}</p>}
                         <div className="flex gap-2">
                             <Button
@@ -542,7 +576,10 @@ export function FormsPanel({
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm font-medium">{form.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {t("forms.filesInto", { list: form.listName, count: form.submissionCount })}
+                                            {t("forms.filesInto", {
+                                                list: form.listName,
+                                                count: form.submissionCount
+                                            })}
                                         </p>
                                     </div>
                                     <code className="hidden max-w-64 truncate rounded bg-muted px-2 py-1 text-[0.6875rem] md:block">
@@ -551,10 +588,15 @@ export function FormsPanel({
                                     <CopyButton value={url} label={t("forms.copyLink")} />
                                     <button
                                         type="button"
-                                        aria-label={t("automations.deleteNamed", { name: form.name })}
+                                        aria-label={t("automations.deleteNamed", {
+                                            name: form.name
+                                        })}
                                         title={t("forms.delete")}
                                         onClick={async () => {
-                                            await runAction(() => actions.deleteFormAction(spaceId, form.id), setError);
+                                            await runAction(
+                                                () => actions.deleteFormAction(spaceId, form.id),
+                                                setError
+                                            );
                                         }}
                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                     >

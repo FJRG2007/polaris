@@ -103,9 +103,7 @@ export function FolderDialog({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t("app.folders")}</DialogTitle>
-                        <DialogDescription>
-                            {t("folders.intro")}
-                        </DialogDescription>
+                        <DialogDescription>{t("folders.intro")}</DialogDescription>
                     </DialogHeader>
 
                     <div className="flex flex-col gap-2">
@@ -156,7 +154,9 @@ export function FolderDialog({
                                                         if (event.key === "Escape")
                                                             setEditingId(null);
                                                     }}
-                                                    aria-label={t("vaults.renameNamed", { name: folder.name })}
+                                                    aria-label={t("vaults.renameNamed", {
+                                                        name: folder.name
+                                                    })}
                                                 />
                                                 <Button
                                                     size="icon"
@@ -192,7 +192,9 @@ export function FolderDialog({
                                                     size="icon"
                                                     variant="ghost"
                                                     title={t("vaults.rename")}
-                                                    aria-label={t("vaults.renameNamed", { name: folder.name })}
+                                                    aria-label={t("vaults.renameNamed", {
+                                                        name: folder.name
+                                                    })}
                                                     onClick={() => {
                                                         setEditingId(folder.id);
                                                         setEditingName(folder.name);
@@ -204,7 +206,9 @@ export function FolderDialog({
                                                     size="icon"
                                                     variant="ghost"
                                                     title={t("vaults.delete")}
-                                                    aria-label={t("vaults.deleteNamed", { name: folder.name })}
+                                                    aria-label={t("vaults.deleteNamed", {
+                                                        name: folder.name
+                                                    })}
                                                     disabled={pending}
                                                     onClick={() => void remove(folder)}
                                                 >

@@ -15,9 +15,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 
 vi.mock("@polaris-app/game-servers/src/screens/installed/ark-actions", () => ({}));
 
-const { ArkPlayerDialog } = await import(
-    "@polaris-app/game-servers/src/screens/installed/ark-player-dialogs"
-);
+const { ArkPlayerDialog } =
+    await import("@polaris-app/game-servers/src/screens/installed/ark-player-dialogs");
 
 afterEach(cleanup);
 

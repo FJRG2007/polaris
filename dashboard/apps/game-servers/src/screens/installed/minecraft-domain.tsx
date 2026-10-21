@@ -42,7 +42,9 @@ export function MinecraftDomain({
 }) {
     const t = useGameText("minecraft");
     const [editing, setEditing] = useState(false);
-    const [label, setLabel] = useState(() => (hostname && suffix ? hostname.slice(0, -suffix.length) : ""));
+    const [label, setLabel] = useState(() =>
+        hostname && suffix ? hostname.slice(0, -suffix.length) : ""
+    );
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -110,13 +112,18 @@ export function MinecraftDomain({
                                 className="min-w-36 flex-1"
                                 aria-label={t("domain.subdomain")}
                             />
-                            <span className="font-mono text-sm text-muted-foreground">{suffix}</span>
+                            <span className="font-mono text-sm text-muted-foreground">
+                                {suffix}
+                            </span>
                             <Button
                                 size="sm"
                                 onClick={save}
-                                disabled={pending || normalized.length === 0 || preview === hostname}
+                                disabled={
+                                    pending || normalized.length === 0 || preview === hostname
+                                }
                             >
-                                {pending && <Loader2 className="size-4 animate-spin" />} {t("domain.save")}
+                                {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                                {t("domain.save")}
                             </Button>
                             <Button
                                 size="sm"
@@ -155,7 +162,10 @@ export function MinecraftDomain({
                                     <code className="truncate font-mono text-sm" title={address}>
                                         {address}
                                     </code>
-                                    <CopyButton value={address} label={t("domain.copyTheServerAddress")} />
+                                    <CopyButton
+                                        value={address}
+                                        label={t("domain.copyTheServerAddress")}
+                                    />
                                 </>
                             ) : (
                                 <span className="text-xs text-muted-foreground">
@@ -174,9 +184,16 @@ export function MinecraftDomain({
                                         ? t("domain.sharesPort25565WithThe")
                                         : t("domain.giveItItsOwnPort")}
                                 </p>
-                                <Button size="sm" variant="secondary" onClick={toggleRouted} disabled={pending}>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={toggleRouted}
+                                    disabled={pending}
+                                >
                                     {pending && <Loader2 className="size-4 animate-spin" />}
-                                    {routed ? t("domain.giveItItsOwnPort2") : t("domain.useTheSharedPort")}
+                                    {routed
+                                        ? t("domain.giveItItsOwnPort2")
+                                        : t("domain.useTheSharedPort")}
                                 </Button>
                             </div>
                         )}

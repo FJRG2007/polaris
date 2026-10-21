@@ -251,7 +251,9 @@ export function EmailChannelDialog({
 
                     {editing && (
                         <div className="flex flex-col gap-1 rounded-md border border-border p-3">
-                            <span className="text-sm font-medium">{t("inboxChannels.email.testTitle")}</span>
+                            <span className="text-sm font-medium">
+                                {t("inboxChannels.email.testTitle")}
+                            </span>
                             <div className="flex items-start gap-2">
                                 <Input
                                     type="email"
@@ -290,7 +292,9 @@ export function EmailChannelDialog({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            aria-label={t("inboxChannels.email.removeNamed", { name: channel.name })}
+                            aria-label={t("inboxChannels.email.removeNamed", {
+                                name: channel.name
+                            })}
                             title={t("inboxChannels.manage.remove")}
                             onClick={() => void remove()}
                             disabled={busy}
@@ -335,7 +339,10 @@ function SettingField({
             <span className="font-medium">
                 {field.label}
                 {field.optional ? (
-                    <span className="text-muted-foreground"> {t("inboxChannels.email.optional")}</span>
+                    <span className="text-muted-foreground">
+                        {" "}
+                        {t("inboxChannels.email.optional")}
+                    </span>
                 ) : null}
             </span>
             <Input

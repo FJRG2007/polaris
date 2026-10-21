@@ -86,7 +86,9 @@ export function EnvironmentDialog({
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{t("environment.title", { name: target?.name ?? "" })}</DialogTitle>
+                    <DialogTitle>
+                        {t("environment.title", { name: target?.name ?? "" })}
+                    </DialogTitle>
                     <DialogDescription>{t("environment.intro")}</DialogDescription>
                 </DialogHeader>
                 {suggestion ? (
@@ -126,13 +128,17 @@ export function EnvironmentDialog({
                                         </span>
                                     ) : null}
                                 </span>
-                                <span className="text-xs text-muted-foreground">{meta.summary}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {meta.summary}
+                                </span>
                                 <span className="text-xs text-foreground/70">{meta.routing}</span>
                             </button>
                         );
                     })}
                 </div>
-                {target?.hostId ? <ServerWildcard hostId={target.hostId} current={target.wildcardDomain} /> : null}
+                {target?.hostId ? (
+                    <ServerWildcard hostId={target.hostId} current={target.wildcardDomain} />
+                ) : null}
                 {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
             </DialogContent>
         </Dialog>

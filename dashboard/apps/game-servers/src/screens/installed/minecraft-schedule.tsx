@@ -40,7 +40,11 @@ import {
 } from "../../lib/minecraft/schedule";
 
 /** What each mode does, in the words the operator has to choose between. */
-const MODES: { value: GameScheduleMode; label: GameKey<"minecraft">; hint: GameKey<"minecraft"> }[] = [
+const MODES: {
+    value: GameScheduleMode;
+    label: GameKey<"minecraft">;
+    hint: GameKey<"minecraft">;
+}[] = [
     { value: "on", label: "schedule.modes.on", hint: "schedule.modes.onHint" },
     { value: "sleep", label: "schedule.modes.sleep", hint: "schedule.modes.sleepHint" },
     { value: "off", label: "schedule.modes.off", hint: "schedule.modes.offHint" }
@@ -101,7 +105,9 @@ export function MinecraftSchedule({
     const summary = useMemo(() => describeSchedule(schedule, new Date()), [schedule]);
     // Whether anything in this schedule actually waits for the server to empty.
     const sleeps = useMemo(
-        () => schedule.otherwise === "sleep" || schedule.windows.some((window) => window.mode === "sleep"),
+        () =>
+            schedule.otherwise === "sleep" ||
+            schedule.windows.some((window) => window.mode === "sleep"),
         [schedule]
     );
 
@@ -112,7 +118,9 @@ export function MinecraftSchedule({
 
     function updateWindow(index: number, patch: Partial<GameScheduleWindow>): void {
         update({
-            windows: schedule.windows.map((window, at) => (at === index ? { ...window, ...patch } : window))
+            windows: schedule.windows.map((window, at) =>
+                at === index ? { ...window, ...patch } : window
+            )
         });
     }
 
@@ -191,9 +199,14 @@ export function MinecraftSchedule({
                             <Field label={t("schedule.theRestOfTheTime")}>
                                 <Select
                                     value={schedule.otherwise}
-                                    onValueChange={(otherwise) => update({ otherwise: otherwise as GameScheduleMode })}
+                                    onValueChange={(otherwise) =>
+                                        update({ otherwise: otherwise as GameScheduleMode })
+                                    }
                                     aria-label={t("schedule.whatHappensOutsideEveryWindow")}
-                                    options={MODES.map((mode) => ({ value: mode.value, label: t(mode.label) }))}
+                                    options={MODES.map((mode) => ({
+                                        value: mode.value,
+                                        label: t(mode.label)
+                                    }))}
                                 />
                             </Field>
                             {/* Only a rule that says "sleep when empty" ever reads
@@ -211,10 +224,15 @@ export function MinecraftSchedule({
                                         disabled={!sleeps}
                                         aria-label={t("schedule.minutesWithNobodyPlayingBefore")}
                                         onChange={(event) =>
-                                            update({ idleMinutes: Number.parseInt(event.target.value, 10) || 0 })
+                                            update({
+                                                idleMinutes:
+                                                    Number.parseInt(event.target.value, 10) || 0
+                                            })
                                         }
                                     />
-                                    <span className="shrink-0 text-xs text-muted-foreground">{t("schedule.minutes")}</span>
+                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                        {t("schedule.minutes")}
+                                    </span>
                                 </div>
                                 {!sleeps && (
                                     <span className="text-xs text-muted-foreground">
@@ -233,7 +251,9 @@ export function MinecraftSchedule({
                             (routed ? (
                                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
                                     <div>
-                                        <p className="text-sm font-medium">{t("schedule.startItWhenSomebodyJoins")}</p>
+                                        <p className="text-sm font-medium">
+                                            {t("schedule.startItWhenSomebodyJoins")}
+                                        </p>
                                         <p className="max-w-xl text-xs text-muted-foreground">
                                             {t("schedule.whileItIsAsleepThe")}
                                         </p>
@@ -265,7 +285,11 @@ export function MinecraftSchedule({
                                         window={window}
                                         onChange={(patch) => updateWindow(index, patch)}
                                         onRemove={() =>
-                                            update({ windows: schedule.windows.filter((_, at) => at !== index) })
+                                            update({
+                                                windows: schedule.windows.filter(
+                                                    (_, at) => at !== index
+                                                )
+                                            })
                                         }
                                     />
                                 ))
@@ -274,7 +298,9 @@ export function MinecraftSchedule({
                                 size="sm"
                                 variant="secondary"
                                 className="w-fit"
-                                onClick={() => update({ windows: [...schedule.windows, OVERNIGHT] })}
+                                onClick={() =>
+                                    update({ windows: [...schedule.windows, OVERNIGHT] })
+                                }
                             >
                                 <Plus className="size-4" /> {t("schedule.addAWindow")}
                             </Button>
@@ -303,7 +329,11 @@ export function MinecraftSchedule({
                                         })
                                     }
                                     onRemove={() =>
-                                        update({ routines: schedule.routines.filter((_, at) => at !== index) })
+                                        update({
+                                            routines: schedule.routines.filter(
+                                                (_, at) => at !== index
+                                            )
+                                        })
                                     }
                                 />
                             ))}
@@ -333,7 +363,8 @@ export function MinecraftSchedule({
 
                         <div className="flex flex-col gap-1">
                             <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                                {schedule.enabled && readGameMessage(summary)?.key === "lib.schedule.idle" ? (
+                                {schedule.enabled &&
+                                readGameMessage(summary)?.key === "lib.schedule.idle" ? (
                                     <Moon className="size-3.5" />
                                 ) : (
                                     <Power className="size-3.5" />
@@ -346,7 +377,9 @@ export function MinecraftSchedule({
                                 second is what somebody reports as "I set it and it
                                 did nothing". */}
                             {state !== null && !changed && (
-                                <p className="text-xs text-muted-foreground">{describeLastCheck(t, state)}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {describeLastCheck(t, state)}
+                                </p>
                             )}
                         </div>
                     </>
@@ -356,7 +389,11 @@ export function MinecraftSchedule({
 
                 <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-muted-foreground">
-                        {saved_ && !changed ? t("schedule.saved") : changed ? t("schedule.notSavedYet") : t("schedule.thisIsWhatTheServer")}
+                        {saved_ && !changed
+                            ? t("schedule.saved")
+                            : changed
+                              ? t("schedule.notSavedYet")
+                              : t("schedule.thisIsWhatTheServer")}
                     </span>
                     <Button onClick={save} disabled={pending || !changed}>
                         {pending && <Loader2 className="size-4 animate-spin" />}
@@ -434,7 +471,9 @@ function WindowRow({
                             onClick={() =>
                                 onChange({
                                     days: every
-                                        ? DAYS.map((_, index) => index).filter((index) => index !== day)
+                                        ? DAYS.map((_, index) => index).filter(
+                                              (index) => index !== day
+                                          )
                                         : picked
                                           ? window.days.filter((held) => held !== day)
                                           : [...window.days, day].sort()
@@ -451,7 +490,10 @@ function WindowRow({
                     );
                 })}
                 <span className="ml-1 text-xs text-muted-foreground">
-                    {[window.days.length === 0 ? t("schedule.everyDay") : null, wraps ? t("schedule.pastMidnight") : null]
+                    {[
+                        window.days.length === 0 ? t("schedule.everyDay") : null,
+                        wraps ? t("schedule.pastMidnight") : null
+                    ]
                         .filter(Boolean)
                         .join(", ")}
                 </span>
@@ -468,7 +510,10 @@ function WindowRow({
  * anybody coordinating across places, and whatever the server was already set to
  * so a saved schedule never silently reads as something else.
  */
-function timezoneOptions(current: string, t: GameText<"minecraft">): { value: string; label: string }[] {
+function timezoneOptions(
+    current: string,
+    t: GameText<"minecraft">
+): { value: string; label: string }[] {
     const here = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     const supported =
         typeof Intl.supportedValuesOf === "function"
@@ -502,7 +547,9 @@ function describeLastCheck(t: GameText<"minecraft">, state: ScheduleState): stri
             : ago < 60
               ? t("schedule.minutesAgo", { count: ago })
               : new Date(checked).toLocaleString();
-    const empty = state.emptySince ? Math.max(0, Math.round((Date.now() - Date.parse(state.emptySince)) / 60_000)) : null;
+    const empty = state.emptySince
+        ? Math.max(0, Math.round((Date.now() - Date.parse(state.emptySince)) / 60_000))
+        : null;
     return empty === null
         ? `${t("schedule.lastChecked", { when })}${started}`
         : `${t("schedule.lastCheckedEmpty", { when, count: empty })}${started}`;
@@ -517,7 +564,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     );
 }
 
-
 /** The words for each kind of step, in the order somebody would think of them. */
 const ACTION_LABELS: {
     value: RoutineActionKind;
@@ -526,8 +572,18 @@ const ACTION_LABELS: {
     placeholder: GameKey<"minecraft"> | null;
 }[] = [
     { value: "restart", label: "schedule.actions.restart", needs: false, placeholder: null },
-    { value: "broadcast", label: "schedule.actions.broadcast", needs: true, placeholder: "schedule.actions.broadcastExample" },
-    { value: "command", label: "schedule.actions.command", needs: true, placeholder: "schedule.actions.commandExample" },
+    {
+        value: "broadcast",
+        label: "schedule.actions.broadcast",
+        needs: true,
+        placeholder: "schedule.actions.broadcastExample"
+    },
+    {
+        value: "command",
+        label: "schedule.actions.command",
+        needs: true,
+        placeholder: "schedule.actions.commandExample"
+    },
     { value: "backup", label: "schedule.actions.backup", needs: false, placeholder: null }
 ];
 
@@ -564,7 +620,10 @@ function RoutineRow({
                     />
                 </Field>
                 <label className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
-                    <Switch checked={routine.enabled} onChange={(on: boolean) => onChange({ enabled: on })} />
+                    <Switch
+                        checked={routine.enabled}
+                        onChange={(on: boolean) => onChange({ enabled: on })}
+                    />
                     {t("schedule.on")}
                 </label>
                 <Button
@@ -572,7 +631,9 @@ function RoutineRow({
                     variant="ghost"
                     className="ml-auto"
                     onClick={onRemove}
-                    aria-label={t("schedule.removeNamed", { name: routine.name || t("schedule.thisRoutine") })}
+                    aria-label={t("schedule.removeNamed", {
+                        name: routine.name || t("schedule.thisRoutine")
+                    })}
                 >
                     <Trash2 className="size-4" />
                 </Button>
@@ -589,11 +650,16 @@ function RoutineRow({
                                 onValueChange={(kind) =>
                                     onChange({
                                         actions: routine.actions.map((entry, at) =>
-                                            at === index ? { ...entry, kind: kind as RoutineActionKind } : entry
+                                            at === index
+                                                ? { ...entry, kind: kind as RoutineActionKind }
+                                                : entry
                                         )
                                     })
                                 }
-                                options={ACTION_LABELS.map((entry) => ({ value: entry.value, label: t(entry.label) }))}
+                                options={ACTION_LABELS.map((entry) => ({
+                                    value: entry.value,
+                                    label: t(entry.label)
+                                }))}
                                 className="w-48"
                             />
                             {spec?.needs && (
@@ -602,7 +668,9 @@ function RoutineRow({
                                     onChange={(event) =>
                                         onChange({
                                             actions: routine.actions.map((entry, at) =>
-                                                at === index ? { ...entry, value: event.target.value } : entry
+                                                at === index
+                                                    ? { ...entry, value: event.target.value }
+                                                    : entry
                                             )
                                         })
                                     }
@@ -612,7 +680,11 @@ function RoutineRow({
                             )}
                             {action.kind === "broadcast" && (
                                 <span className="text-xs text-muted-foreground">
-                                    {t("schedule.reachesAs", { text: action.value || (spec?.placeholder ? t(spec.placeholder) : "") })}
+                                    {t("schedule.reachesAs", {
+                                        text:
+                                            action.value ||
+                                            (spec?.placeholder ? t(spec.placeholder) : "")
+                                    })}
                                 </span>
                             )}
                             <Button
@@ -620,7 +692,9 @@ function RoutineRow({
                                 variant="ghost"
                                 disabled={routine.actions.length === 1}
                                 onClick={() =>
-                                    onChange({ actions: routine.actions.filter((_, at) => at !== index) })
+                                    onChange({
+                                        actions: routine.actions.filter((_, at) => at !== index)
+                                    })
                                 }
                                 aria-label={t("schedule.removeThisStep")}
                             >
@@ -634,7 +708,11 @@ function RoutineRow({
                     variant="ghost"
                     className="w-fit"
                     disabled={routine.actions.length >= 8}
-                    onClick={() => onChange({ actions: [...routine.actions, { kind: "broadcast", value: "" }] })}
+                    onClick={() =>
+                        onChange({
+                            actions: [...routine.actions, { kind: "broadcast", value: "" }]
+                        })
+                    }
                 >
                     <Plus className="size-4" /> {t("schedule.addAStep")}
                 </Button>
@@ -645,7 +723,12 @@ function RoutineRow({
                 screen says which. */}
             {run && (
                 <p className={`text-xs ${run.ok ? "text-muted-foreground" : "text-danger"}`}>
-                    {t("schedule.lastRun", { date: new Date(run.at).toLocaleString(), result: run.ok ? t("schedule.wentThrough") : run.detail || t("schedule.failed") })}
+                    {t("schedule.lastRun", {
+                        date: new Date(run.at).toLocaleString(),
+                        result: run.ok
+                            ? t("schedule.wentThrough")
+                            : run.detail || t("schedule.failed")
+                    })}
                 </p>
             )}
         </div>

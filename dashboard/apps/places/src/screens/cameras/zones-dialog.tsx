@@ -226,9 +226,7 @@ export function ZonesDialog({
             <DialogContent className="w-[min(64rem,95vw)] max-w-[min(64rem,95vw)]">
                 <DialogHeader>
                     <DialogTitle>{t("zones.title", { name: camera.name })}</DialogTitle>
-                    <DialogDescription>
-                        {t("zones.intro")}
-                    </DialogDescription>
+                    <DialogDescription>{t("zones.intro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_20rem]">
@@ -344,7 +342,9 @@ export function ZonesDialog({
                             <span className="text-[0.75rem] text-foreground-subtle">
                                 {enough
                                     ? t("zones.corners", { count: draft.points.length })
-                                    : t("zones.needMore", { count: zoning.MIN_ZONE_POINTS - draft.points.length })}
+                                    : t("zones.needMore", {
+                                          count: zoning.MIN_ZONE_POINTS - draft.points.length
+                                      })}
                             </span>
                         </div>
                     </div>
@@ -383,7 +383,9 @@ export function ZonesDialog({
                                                 {zone.name}
                                             </button>
                                             {zone.kind === "ignore" ? (
-                                                <Badge variant="neutral">{t("zones.ignored")}</Badge>
+                                                <Badge variant="neutral">
+                                                    {t("zones.ignored")}
+                                                </Badge>
                                             ) : null}
                                             {!zone.enabled ? (
                                                 <Badge variant="neutral">{t("zones.off")}</Badge>
@@ -391,7 +393,9 @@ export function ZonesDialog({
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                aria-label={t("cameras.removeName", { name: zone.name })}
+                                                aria-label={t("cameras.removeName", {
+                                                    name: zone.name
+                                                })}
                                                 title={t("cameras.remove")}
                                                 disabled={busy}
                                                 onClick={() => void remove(zone)}

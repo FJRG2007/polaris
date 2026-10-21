@@ -71,7 +71,13 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
             void runAction(() => syncTrackerAction(tracker.id), setError).then((result) => {
                 if (!result) return;
                 if (result.error) setError(result.error);
-                else setNote(t("trackers.pulled", { added: result.added ?? 0, updated: result.updated ?? 0 }));
+                else
+                    setNote(
+                        t("trackers.pulled", {
+                            added: result.added ?? 0,
+                            updated: result.updated ?? 0
+                        })
+                    );
             });
         });
     };
@@ -115,13 +121,15 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                                     <p className="truncate text-xs text-muted-foreground">
                                         {tracker.syncedAt
                                             ? t("trackers.summary", {
-                                                  provider: core.ISSUE_TRACKER_LABELS[tracker.provider],
+                                                  provider:
+                                                      core.ISSUE_TRACKER_LABELS[tracker.provider],
                                                   space: tracker.spaceName,
                                                   list: tracker.listName,
                                                   linked: tracker.linked
                                               })
                                             : t("trackers.summaryNeverPulled", {
-                                                  provider: core.ISSUE_TRACKER_LABELS[tracker.provider],
+                                                  provider:
+                                                      core.ISSUE_TRACKER_LABELS[tracker.provider],
                                                   space: tracker.spaceName,
                                                   list: tracker.listName,
                                                   linked: tracker.linked
@@ -172,7 +180,9 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => setRemoving(tracker)}
-                                    aria-label={t("trackers.disconnectNamed", { name: tracker.label })}
+                                    aria-label={t("trackers.disconnectNamed", {
+                                        name: tracker.label
+                                    })}
                                     title={t("trackers.disconnect")}
                                 >
                                     <Trash2 className="size-4 shrink-0" />
@@ -286,13 +296,17 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {tracker ? t("trackers.editNamed", { name: tracker.label }) : t("trackers.connect")}
+                        {tracker
+                            ? t("trackers.editNamed", { name: tracker.label })
+                            : t("trackers.connect")}
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-3">
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">{t("trackers.tracker")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("trackers.tracker")}
+                        </span>
                         <Select
                             value={provider}
                             onValueChange={(value) => setProvider(value as core.IssueTracker)}
@@ -305,7 +319,9 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                     </label>
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">{t("trackers.nameIt")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("trackers.nameIt")}
+                        </span>
                         <Input
                             value={label}
                             onChange={(event) => setLabel(event.target.value)}
@@ -317,8 +333,12 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                         <label key={field.key} className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
                                 {t("trackers.fieldLine", {
-                                    label: t(`trackers.fields.${field.key}.label` as NamespaceKey<"tasks">),
-                                    hint: t(`trackers.fields.${field.key}.hint` as NamespaceKey<"tasks">)
+                                    label: t(
+                                        `trackers.fields.${field.key}.label` as NamespaceKey<"tasks">
+                                    ),
+                                    hint: t(
+                                        `trackers.fields.${field.key}.hint` as NamespaceKey<"tasks">
+                                    )
                                 })}
                             </span>
                             <Input
@@ -339,7 +359,9 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
 
                     <label className="block space-y-1">
                         <span className="text-xs text-muted-foreground">
-                            {provider === "linear" ? t("trackers.linearQuery") : t("trackers.jiraQuery")}
+                            {provider === "linear"
+                                ? t("trackers.linearQuery")
+                                : t("trackers.jiraQuery")}
                         </span>
                         <Input
                             value={query}
@@ -378,7 +400,9 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
                         <div className="min-w-0">
                             <p className="text-sm">{t("trackers.push")}</p>
-                            <p className="text-xs text-muted-foreground">{t("trackers.pushHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("trackers.pushHint")}
+                            </p>
                         </div>
                         <Switch checked={pushStatus} onChange={setPushStatus} />
                     </div>

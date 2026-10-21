@@ -408,7 +408,9 @@ export function HomeSettingsView({
                         <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
                             <p className="flex items-center gap-1.5 text-[0.75rem] text-foreground">
                                 <CircleAlert className="size-3.5 shrink-0 text-warning" />
-                                {t("settings.offButRunning", { server: serverWords(settings.installedOn, t) })}
+                                {t("settings.offButRunning", {
+                                    server: serverWords(settings.installedOn, t)
+                                })}
                             </p>
                             <p className="text-[0.6875rem] text-foreground-subtle">
                                 {t("settings.offButRunningHint")}
@@ -444,10 +446,16 @@ export function HomeSettingsView({
                                         <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                                     )}
                                     {settings.answering
-                                        ? t("settings.runningOn", { server: serverWords(settings.installedOn, t) })
+                                        ? t("settings.runningOn", {
+                                              server: serverWords(settings.installedOn, t)
+                                          })
                                         : waited
-                                          ? t("settings.notAnsweringOn", { server: serverWords(settings.installedOn, t) })
-                                          : t("settings.startingOn", { server: serverWords(settings.installedOn, t) })}
+                                          ? t("settings.notAnsweringOn", {
+                                                server: serverWords(settings.installedOn, t)
+                                            })
+                                          : t("settings.startingOn", {
+                                                server: serverWords(settings.installedOn, t)
+                                            })}
                                 </p>
                                 <p className="text-[0.6875rem] text-foreground-subtle">
                                     {settings.answering

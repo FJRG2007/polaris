@@ -1276,14 +1276,7 @@ function NumberField({
 
 /** The groups the settings are read under. */
 type SettingsGroup =
-    | "schedule"
-    | "layers"
-    | "difficulty"
-    | "who"
-    | "shown"
-    | "cheats"
-    | "season"
-    | "shared";
+    "schedule" | "layers" | "difficulty" | "who" | "shown" | "cheats" | "season" | "shared";
 
 function SettingsFields({
     settings,

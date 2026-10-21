@@ -73,18 +73,31 @@ export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
                             <li key={sender.id} className="flex flex-col gap-1 px-4 py-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium">{sender.name}</p>
+                                        <p className="truncate text-sm font-medium">
+                                            {sender.name}
+                                        </p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {t("inboxChannels.sms.sendsFrom", { provider: PROVIDER.label, from: sender.from })}
+                                            {t("inboxChannels.sms.sendsFrom", {
+                                                provider: PROVIDER.label,
+                                                from: sender.from
+                                            })}
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1.5">
-                                        <Badge variant={sender.status === "connected" ? "success" : "danger"}>
+                                        <Badge
+                                            variant={
+                                                sender.status === "connected" ? "success" : "danger"
+                                            }
+                                        >
                                             {sender.status === "connected"
                                                 ? t("inboxChannels.sms.working")
                                                 : t("inboxChannels.sms.notWorking")}
                                         </Badge>
-                                        <Button size="sm" variant="ghost" onClick={() => setEditing(sender)}>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setEditing(sender)}
+                                        >
                                             {t("inboxChannels.sms.edit")}
                                         </Button>
                                         <button
@@ -103,7 +116,9 @@ export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
                                         </button>
                                     </div>
                                 </div>
-                                {sender.error ? <p className="text-xs text-danger">{sender.error}</p> : null}
+                                {sender.error ? (
+                                    <p className="text-xs text-danger">{sender.error}</p>
+                                ) : null}
                             </li>
                         ))}
                     </ul>
@@ -170,7 +185,11 @@ function SmsSenderDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{sender ? t("inboxChannels.sms.editTitle") : t("inboxChannels.sms.connectTitle")}</DialogTitle>
+                    <DialogTitle>
+                        {sender
+                            ? t("inboxChannels.sms.editTitle")
+                            : t("inboxChannels.sms.connectTitle")}
+                    </DialogTitle>
                     <DialogDescription>
                         <a
                             href={PROVIDER.docsUrl}
@@ -194,7 +213,10 @@ function SmsSenderDialog({
                                 value={settings[field.name] ?? ""}
                                 placeholder={field.placeholder}
                                 onChange={(event) =>
-                                    setSettings((current) => ({ ...current, [field.name]: event.target.value }))
+                                    setSettings((current) => ({
+                                        ...current,
+                                        [field.name]: event.target.value
+                                    }))
                                 }
                             />
                             {field.hint ? (

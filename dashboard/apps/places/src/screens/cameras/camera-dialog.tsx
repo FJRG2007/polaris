@@ -454,9 +454,7 @@ export function CameraDialog({
                 <DialogHeader>
                     <DialogTitle>{camera ? camera.name : t("cameras.add")}</DialogTitle>
                     <DialogDescription>
-                        {camera
-                            ? t("dialog.editIntro")
-                            : t("dialog.addIntro")}
+                        {camera ? t("dialog.editIntro") : t("dialog.addIntro")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -469,10 +467,7 @@ export function CameraDialog({
                                 placeholder={t("dialog.namePlaceholder")}
                             />
                         </Field>
-                        <Field
-                            label={t("dialog.zone")}
-                            hint={t("dialog.zoneHint")}
-                        >
+                        <Field label={t("dialog.zone")} hint={t("dialog.zoneHint")}>
                             <Input
                                 value={form.zone}
                                 onChange={(event) => set("zone", event.target.value)}
@@ -496,11 +491,7 @@ export function CameraDialog({
                                 }
                             />
                         </Field>
-                        <Field
-                            label={t("dialog.model")}
-                            hint={t("dialog.modelHint")}
-                            required
-                        >
+                        <Field label={t("dialog.model")} hint={t("dialog.modelHint")} required>
                             <ModelPicker
                                 value={form.modelId}
                                 brand={form.brand}
@@ -521,10 +512,7 @@ export function CameraDialog({
                             one to take if you have no opinion marked as such
                             rather than merely listed first. */}
                         {connections.length > 1 ? (
-                            <Field
-                                label={t("dialog.connection")}
-                                hint={t("dialog.connectionHint")}
-                            >
+                            <Field label={t("dialog.connection")} hint={t("dialog.connectionHint")}>
                                 <Select
                                     value={vendorId}
                                     onValueChange={(value) => set("vendor", value)}
@@ -532,7 +520,10 @@ export function CameraDialog({
                                         const name = vendorMethod(id, t);
                                         return {
                                             value: id,
-                                            label: index === 0 ? t("dialog.recommended", { name }) : name
+                                            label:
+                                                index === 0
+                                                    ? t("dialog.recommended", { name })
+                                                    : name
                                         };
                                     })}
                                 />
@@ -547,10 +538,7 @@ export function CameraDialog({
                             </p>
                         ) : null}
                         {askPower ? (
-                            <Field
-                                label={t("dialog.power")}
-                                hint={t("dialog.powerHint")}
-                            >
+                            <Field label={t("dialog.power")} hint={t("dialog.powerHint")}>
                                 <Select
                                     value={form.power}
                                     onValueChange={(value) => set("power", value as PowerSource)}
@@ -590,7 +578,9 @@ export function CameraDialog({
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                                 {t.rich("dialog.appConsent", {
                                     path: vendor.appConsent,
-                                    em: (chunks) => <span className="text-foreground">{chunks}</span>
+                                    em: (chunks) => (
+                                        <span className="text-foreground">{chunks}</span>
+                                    )
                                 })}
                             </p>
                         ) : null}
@@ -684,20 +674,14 @@ export function CameraDialog({
                         </div>
                         {usesRtsp ? (
                             <div className="grid gap-3 sm:grid-cols-2">
-                                <Field
-                                    label={t("dialog.mainPath")}
-                                    hint={t("dialog.mainPathHint")}
-                                >
+                                <Field label={t("dialog.mainPath")} hint={t("dialog.mainPathHint")}>
                                     <Input
                                         value={form.mainPath}
                                         onChange={(event) => set("mainPath", event.target.value)}
                                         placeholder={vendor.mainPath || "/stream1"}
                                     />
                                 </Field>
-                                <Field
-                                    label={t("dialog.subPath")}
-                                    hint={t("dialog.subPathHint")}
-                                >
+                                <Field label={t("dialog.subPath")} hint={t("dialog.subPathHint")}>
                                     <Input
                                         value={form.subPath}
                                         onChange={(event) => set("subPath", event.target.value)}
@@ -708,10 +692,7 @@ export function CameraDialog({
                         ) : null}
                     </Section>
 
-                    <Section
-                        title={t("dialog.sections.reach")}
-                        hint={t("dialog.reachHint")}
-                    >
+                    <Section title={t("dialog.sections.reach")} hint={t("dialog.reachHint")}>
                         <Select
                             value={form.reachVia}
                             onValueChange={(value) => set("reachVia", value)}
@@ -783,10 +764,7 @@ export function CameraDialog({
                                 // dragging it back across the link Polaris could
                                 // not reach the camera over, to look at it here,
                                 // would be the slowest possible way to do it.
-                                <Field
-                                    label={t("dialog.runsOn")}
-                                    hint={t("dialog.runsOnHint")}
-                                >
+                                <Field label={t("dialog.runsOn")} hint={t("dialog.runsOnHint")}>
                                     <Input
                                         value={
                                             servers.find((server) => server.id === reachedVia)
@@ -833,10 +811,7 @@ export function CameraDialog({
                                         />
                                     </Field>
                                 ) : null}
-                                <Field
-                                    label={t("dialog.settle")}
-                                    hint={t("dialog.settleHint")}
-                                >
+                                <Field label={t("dialog.settle")} hint={t("dialog.settleHint")}>
                                     <Input
                                         value={form.settleSeconds}
                                         onChange={(event) =>
@@ -846,10 +821,7 @@ export function CameraDialog({
                                         inputMode="numeric"
                                     />
                                 </Field>
-                                <Field
-                                    label={t("dialog.gap")}
-                                    hint={t("dialog.gapHint")}
-                                >
+                                <Field label={t("dialog.gap")} hint={t("dialog.gapHint")}>
                                     <Input
                                         value={form.minGapSeconds}
                                         onChange={(event) =>
@@ -963,10 +935,7 @@ export function CameraDialog({
                             </p>
                         ) : null}
                         {form.recording !== "off" ? (
-                            <Field
-                                label={t("dialog.storeOn")}
-                                hint={t("dialog.storeOnHint")}
-                            >
+                            <Field label={t("dialog.storeOn")} hint={t("dialog.storeOnHint")}>
                                 <Select
                                     value={form.storageTarget}
                                     onValueChange={(value) => set("storageTarget", value)}
@@ -1082,11 +1051,7 @@ function DetectorActivity({ activity }: { activity: CameraActivity | null | unde
     const t = usePlacesT();
     if (activity === undefined) return <Skeleton className="h-4 w-64" />;
     if (activity === null) {
-        return (
-            <p className="text-[0.75rem] leading-relaxed text-warning">
-                {t("activity.none")}
-            </p>
-        );
+        return <p className="text-[0.75rem] leading-relaxed text-warning">{t("activity.none")}</p>;
     }
 
     const lines = [
@@ -1133,7 +1098,8 @@ function since(at: number, t: PlacesTranslator): string {
 /** The vision worker's two reasons for looking less than it was asked to,
  *  in the reader's words; anything else as the worker said it. */
 function limitReason(reason: string, t: PlacesTranslator): string {
-    if (reason === "this machine has no detection model, so movement only") return t("activity.noModel");
+    if (reason === "this machine has no detection model, so movement only")
+        return t("activity.noModel");
     if (reason === "the camera would not say how big its picture is, so movement only") {
         return t("activity.noSize");
     }

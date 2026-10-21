@@ -15,7 +15,9 @@
  */
 
 function blank(value: unknown): boolean {
-    return value === null || value === undefined || (typeof value === "string" && value.trim() === "");
+    return (
+        value === null || value === undefined || (typeof value === "string" && value.trim() === "")
+    );
 }
 
 function numeric(value: unknown): number | null {
@@ -31,7 +33,8 @@ export function sameValue(a: unknown, b: unknown): boolean {
     if (blank(a) || blank(b)) return blank(a) && blank(b);
     const na = numeric(a);
     const nb = numeric(b);
-    if (na !== null && nb !== null && (typeof a === "number" || typeof b === "number")) return na === nb;
+    if (na !== null && nb !== null && (typeof a === "number" || typeof b === "number"))
+        return na === nb;
     if (typeof a === "string" && typeof b === "string") return a.trim() === b.trim();
     if (typeof a !== "object" || typeof b !== "object") return false;
     if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
@@ -56,5 +59,7 @@ export function sameValue(a: unknown, b: unknown): boolean {
  * the saved values become the new `initial`.
  */
 export function isDirty<T>(initial: T, current: T, normalize?: (value: T) => unknown): boolean {
-    return normalize ? !sameValue(normalize(initial), normalize(current)) : !sameValue(initial, current);
+    return normalize
+        ? !sameValue(normalize(initial), normalize(current))
+        : !sameValue(initial, current);
 }

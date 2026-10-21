@@ -188,7 +188,9 @@ export function AgentDefaultsCard({
                     )}
                 </div>
 
-                <p className="text-xs text-muted-foreground">{t("defaultsCard.intro", { from: inheritedFrom })}</p>
+                <p className="text-xs text-muted-foreground">
+                    {t("defaultsCard.intro", { from: inheritedFrom })}
+                </p>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Field label={t("defaultsCard.publicRepos")}>
@@ -236,7 +238,9 @@ export function AgentDefaultsCard({
                         options={[
                             {
                                 value: INHERIT,
-                                label: t("settingsFields.inherit", { value: agentWord(t, "gateMode", inherited.gate) })
+                                label: t("settingsFields.inherit", {
+                                    value: agentWord(t, "gateMode", inherited.gate)
+                                })
                             },
                             ...AGENT_GATE_MODES.map((value) => ({
                                 value,
@@ -269,7 +273,9 @@ export function AgentDefaultsCard({
                     </Field>
                     <Field
                         label={t("defaultsCard.howMuch")}
-                        hint={t(`defaultsCard.scopeNotes.${tier.enigma.scope ?? "all"}` as NamespaceKey<"agents">)}
+                        hint={t(
+                            `defaultsCard.scopeNotes.${tier.enigma.scope ?? "all"}` as NamespaceKey<"agents">
+                        )}
                     >
                         <Select
                             value={tier.enigma.scope ?? INHERIT}
@@ -283,7 +289,9 @@ export function AgentDefaultsCard({
                                 { value: INHERIT, label: t("defaultsCard.inherit") },
                                 ...core.ENIGMA_SCOPES.map((value) => ({
                                     value,
-                                    label: t(`defaultsCard.scopes.${value}` as NamespaceKey<"agents">)
+                                    label: t(
+                                        `defaultsCard.scopes.${value}` as NamespaceKey<"agents">
+                                    )
                                 }))
                             ]}
                         />
@@ -389,7 +397,9 @@ export function AgentDefaultsCard({
                 </div>
 
                 <div className="flex items-center justify-end gap-3">
-                    {saved ? <span className="text-xs text-success">{t("defaultsCard.saved")}</span> : null}
+                    {saved ? (
+                        <span className="text-xs text-success">{t("defaultsCard.saved")}</span>
+                    ) : null}
                     <Button size="sm" onClick={save} disabled={pending || unchanged}>
                         {pending ? t("rules.saving") : t("rules.save")}
                     </Button>

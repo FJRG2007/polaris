@@ -120,7 +120,9 @@ export function ComparisonEditor({
                                         : "text-muted-foreground hover:bg-card hover:text-foreground"
                                 )}
                             >
-                                {one === "table" ? t("comparison.table") : t("comparison.positioningMap")}
+                                {one === "table"
+                                    ? t("comparison.table")
+                                    : t("comparison.positioningMap")}
                             </button>
                         ))}
                     </ScrollRow>
@@ -168,7 +170,9 @@ export function ComparisonEditor({
                                                     </span>
                                                 )}
                                                 {subject.us ? (
-                                                    <Badge variant="primary">{t("comparison.us")}</Badge>
+                                                    <Badge variant="primary">
+                                                        {t("comparison.us")}
+                                                    </Badge>
                                                 ) : null}
                                                 {editable ? (
                                                     <>
@@ -176,7 +180,10 @@ export function ComparisonEditor({
                                                             variant="ghost"
                                                             size="icon"
                                                             className="ml-auto"
-                                                            aria-label={t("comparison.describeNamed", { name: subject.name })}
+                                                            aria-label={t(
+                                                                "comparison.describeNamed",
+                                                                { name: subject.name }
+                                                            )}
                                                             title={t("comparison.whatTheyDo")}
                                                             onClick={() =>
                                                                 setDescribing(subject.id)
@@ -190,7 +197,10 @@ export function ComparisonEditor({
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            aria-label={t("comparison.removeNamed", { name: subject.name })}
+                                                            aria-label={t(
+                                                                "comparison.removeNamed",
+                                                                { name: subject.name }
+                                                            )}
                                                             title={t("comparison.remove")}
                                                             onClick={() =>
                                                                 removeSubject(doc, subject.id)
@@ -255,7 +265,9 @@ export function ComparisonEditor({
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={t("comparison.removeNamed", { name: criterion.name })}
+                                                    aria-label={t("comparison.removeNamed", {
+                                                        name: criterion.name
+                                                    })}
                                                     title={t("comparison.remove")}
                                                     onClick={() =>
                                                         removeCriterion(doc, criterion.id)
@@ -344,7 +356,9 @@ function CellBox({
                         {read}
                     </span>
                 ) : (
-                    <span className="block text-muted-foreground">{t("comparison.notAnswered")}</span>
+                    <span className="block text-muted-foreground">
+                        {t("comparison.notAnswered")}
+                    </span>
                 )}
                 {cell.evidence ? (
                     <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
@@ -418,13 +432,13 @@ function SubjectDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>{subject.name}</DialogTitle>
-                    <DialogDescription>
-                        {t("comparison.whatTheyDoSoThis")}
-                    </DialogDescription>
+                    <DialogDescription>{t("comparison.whatTheyDoSoThis")}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("comparison.name")}</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            {t("comparison.name")}
+                        </span>
                         <Input value={name} onChange={(event) => setName(event.target.value)} />
                     </label>
                     <label className="block">
@@ -546,7 +560,8 @@ function CellDialog({
                                 if (!parsed.success) {
                                     toast.show({
                                         title:
-                                            parsed.error.issues[0]?.message ?? t("comparison.thatDidNotSave")
+                                            parsed.error.issues[0]?.message ??
+                                            t("comparison.thatDidNotSave")
                                     });
                                     return;
                                 }
