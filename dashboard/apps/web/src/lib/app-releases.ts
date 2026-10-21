@@ -50,6 +50,7 @@ const LOOKUP_TIMEOUT_MS = 6000;
 export const DESKTOP_TAG_PREFIX = "desktop-v";
 export const EXTENSION_TAG_PREFIX = "extension-v";
 export const STREAMDECK_TAG_PREFIX = "streamdeck-v";
+export const COMPANION_TAG_PREFIX = "companion-v";
 
 /** One release, in the fields this module reads. Everything is `unknown` because
  *  it arrives from the network and is checked here rather than trusted. */
@@ -273,4 +274,9 @@ export async function extensionDownload(repo: string): Promise<AppDownload | nul
 /** The Stream Deck plugin, as the one `.streamDeckPlugin` installer. */
 export async function streamDeckDownload(repo: string): Promise<AppDownload | null> {
     return appDownload(repo, STREAMDECK_TAG_PREFIX);
+}
+
+/** The Bitfocus Companion module, as the one `.tgz` package Companion imports. */
+export async function companionDownload(repo: string): Promise<AppDownload | null> {
+    return appDownload(repo, COMPANION_TAG_PREFIX);
 }

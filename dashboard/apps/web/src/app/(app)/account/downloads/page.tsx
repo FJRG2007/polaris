@@ -26,12 +26,13 @@ import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { listApiKeys } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
-import { streamDeckDownload } from "@/lib/app-releases";
+import { companionDownload, streamDeckDownload } from "@/lib/app-releases";
 import { publicAppUrl } from "@/lib/domain-service";
 import { CliSection } from "./cli-section";
 import { ExtensionSteps } from "./extension-steps";
 import { getTranslations } from "@/lib/i18n/request";
-import { StreamDeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
+import { DeckInstallSteps } from "./deck-install-steps";
+import { DeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
 import { ExtensionCommand } from "./extension-command";
 import { InstallAppCard } from "@/components/installed-app";
 import { Puzzle, Smartphone } from "lucide-react";
@@ -40,9 +41,14 @@ import { Badge, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris
 
 export const dynamic = "force-dynamic";
 
-/** The Stream Deck installer, once GitHub has answered. */
+/** The Stream Deck plugin's installer, once GitHub has answered. */
 async function StreamDeckRelease({ repo }: { repo: string }) {
-    return <StreamDeckFile download={await streamDeckDownload(repo)} />;
+    return <DeckFile download={await streamDeckDownload(repo)} suffix=".streamDeckPlugin" />;
+}
+
+/** The Companion module's package, once GitHub has answered. */
+async function CompanionRelease({ repo }: { repo: string }) {
+    return <DeckFile download={await companionDownload(repo)} suffix=".tgz" />;
 }
 
 /** The decks connected to this account: its live keys of kind "streamdeck". */
@@ -160,10 +166,20 @@ export default async function DownloadsPage() {
 
             <StreamDeckSection
                 decks={decks}
-                file={
-                    <Suspense fallback={<Skeleton className="h-9 w-48" />}>
-                        <StreamDeckRelease repo={repo} />
-                    </Suspense>
+                install={
+                    <DeckInstallSteps
+                        address={serverUrl?.replace(/\/+$/, "") ?? null}
+                        pluginFile={
+                            <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                                <StreamDeckRelease repo={repo} />
+                            </Suspense>
+                        }
+                        moduleFile={
+                            <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                                <CompanionRelease repo={repo} />
+                            </Suspense>
+                        }
+                    />
                 }
             />
 

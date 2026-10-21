@@ -1275,14 +1275,26 @@
             "download": "Download {version}",
             "downloadNone": "Download",
             "notReleased": "No version has been published yet.",
-            "connectHint": "Open the file to install it in the Stream Deck app, then press Connect in the settings of any Polaris key and approve the code here.",
             "connected": "Connected decks",
             "noneConnected": "No Stream Deck is connected to this account.",
             "lastUsed": "Last used <time></time>",
             "notUsedYet": "Not used yet",
             "disconnect": "Disconnect",
             "disconnectTitle": "Disconnect {name}?",
-            "disconnectHint": "Its keys stop working at once. Connecting it again needs a new code."
+            "disconnectHint": "Its keys stop working at once. Connecting it again needs a new code.",
+            "install": {
+                "where": "Where you install it",
+                "downloadPlugin": "Download the plugin.",
+                "openFile": "Open the downloaded file and confirm the install in the Stream Deck app.",
+                "connectKey": "Drag a Polaris key onto the deck, press <press>Connect</press> in its settings and approve the code that opens in your browser.",
+                "node": "Install Node.js 20 or newer on this computer, from <link>nodejs.org</link> or your system's software store. OpenDeck runs the plugin with it, and only a native install works: the Node.js Flatpak is not used.",
+                "fromFile": "In OpenDeck, open <press>Plugins</press>, press <press>Install from file</press> and pick the downloaded file.",
+                "downloadModule": "Download the module. It needs Companion 5.0 or newer.",
+                "importModule": "In Companion, open <press>Modules</press>, press <press>Import module package</press> and pick the downloaded file.",
+                "addConnection": "Open <press>Connections</press>, find Polaris in the list, add it and type this address in its settings:",
+                "approveCode": "The connection's status then shows a code and the page to approve it on. Open that page, sign in and approve the code. It uses your account: it can do only what you can, and it shows under Connected decks below, where you can disconnect it.",
+                "lockCompanion": "Companion's pages can usually be opened from any computer on your network, and anyone there could press these keys. In Companion, open <press>Settings</press>, then <press>Advanced</press>, turn on <press>Admin UI Password</press> and set a password."
+            }
         }
     },
     "cli": {

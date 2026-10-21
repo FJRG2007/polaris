@@ -1,0 +1,23 @@
+{
+    "$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
+    "type": "connection",
+    "id": "polaris",
+    "name": "Polaris",
+    "shortname": "polaris",
+    "description": "Run Polaris actions and show live Polaris state on Companion buttons.",
+    "version": "0.0.0",
+    "license": "AGPL-3.0-only",
+    "repository": "git+https://github.com/FJRG2007/polaris.git",
+    "bugs": "https://github.com/FJRG2007/polaris/issues",
+    "maintainers": [{ "name": "FJRG2007", "github": "FJRG2007" }],
+    "runtime": {
+        "type": "node22",
+        "api": "nodejs-ipc",
+        "apiVersion": "0.0.0",
+        "entrypoint": "../src/main.ts"
+    },
+    "legacyIds": [],
+    "manufacturer": "Polaris",
+    "products": ["Polaris"],
+    "keywords": ["polaris", "self-hosted", "home", "chat", "deploy"]
+}

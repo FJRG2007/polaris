@@ -94,9 +94,10 @@ export function readCredentials(raw: unknown): Credentials | null {
 }
 
 /** `polaris-streamdeck/<version> (<platform>; <arch>; node <version>)`, the
- *  shape Polaris reads a client's system from. */
-export function userAgent(version: string): string {
-    return `polaris-streamdeck/${version} (${process.platform}; ${process.arch}; node ${process.versions.node})`;
+ *  shape Polaris reads a client's system from. The Companion module shares this
+ *  client and names itself `polaris-companion`. */
+export function userAgent(version: string, product = "polaris-streamdeck"): string {
+    return `${product}/${version} (${process.platform}; ${process.arch}; node ${process.versions.node})`;
 }
 
 /** What `/api/deck/authorize` answers. */
@@ -122,14 +123,15 @@ type Fetch = typeof fetch;
 export class PolarisClient {
     constructor(
         readonly version: string,
-        private readonly fetcher: Fetch = fetch
+        private readonly fetcher: Fetch = fetch,
+        private readonly product = "polaris-streamdeck"
     ) {}
 
     #headers(token?: string): Record<string, string> {
         return {
             accept: "application/json",
             "content-type": "application/json",
-            "user-agent": userAgent(this.version),
+            "user-agent": userAgent(this.version, this.product),
             ...(token ? { authorization: `Bearer ${token}` } : {})
         };
     }

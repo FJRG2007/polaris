@@ -1,0 +1,20 @@
+{
+    "name": "@polaris/companion",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Polaris in Bitfocus Companion: buttons that run Polaris actions and show live Polaris state.",
+    "license": "AGPL-3.0-only",
+    "main": "src/main.ts",
+    "scripts": {
+        "build": "companion-module-build --ignore-license-rules",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@companion-module/base": "2.1.3"
+    },
+    "devDependencies": {
+        "@companion-module/tools": "3.2.0"
+    }
+}
