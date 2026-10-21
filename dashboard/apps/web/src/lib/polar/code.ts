@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
+import { sessionCursor } from "@/lib/agents/session-cursor";
 import { dedupeCodeRows, POLAR_CODE_PAGE } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 import {
@@ -116,12 +117,13 @@ export async function polarCodeOverview(
         getTranslations("agents")
     ]);
     const page = list.slice(0, POLAR_CODE_PAGE);
+    const last = page.at(-1);
     return {
         access,
         sessions: dedupeCodeRows(page.map((session) => rowOf(t, session))),
         // The last session read, not the last one listed: a repeat dropped from
         // the page must not be read again on the next.
-        next: list.length > POLAR_CODE_PAGE ? (page.at(-1)?.id ?? null) : null
+        next: list.length > POLAR_CODE_PAGE && last ? sessionCursor(last) : null
     };
 }
 

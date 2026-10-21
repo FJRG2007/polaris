@@ -1,14 +1,20 @@
 /**
  * Polar's Code history: each session once, each task once by its newest
- * session, newest first - on the server's page and across the pages the
- * browser has read.
+ * session unless one of it is still live, newest first - on the server's page
+ * and across the pages the browser has read.
  */
 
 import { describe, expect, it } from "vitest";
 import { codeTaskKey, dedupeCodeRows, mergeCodeRows } from "@/lib/polar/code-history";
 
-function row(id: string, title: string, createdAt: string, repo = "acme/web") {
-    return { id, title, repo, createdAt };
+function row(
+    id: string,
+    title: string,
+    createdAt: string,
+    repo = "acme/web",
+    { branch = "main", live = false } = {}
+) {
+    return { id, title, repo, branch, live, createdAt };
 }
 
 describe("codeTaskKey", () => {
@@ -23,6 +29,13 @@ describe("codeTaskKey", () => {
         expect(codeTaskKey(row("b", "Fix the form", "1", "acme/api"))).not.toBe(here);
         expect(codeTaskKey(row("c", "Fix the form", "1", ""))).not.toBe(here);
     });
+
+    it("is another task on another branch of the same repository", () => {
+        const here = codeTaskKey(row("a", "Fix the form", "1"));
+        expect(codeTaskKey(row("b", "Fix the form", "1", "acme/web", { branch: "next" }))).not.toBe(
+            here
+        );
+    });
 });
 
 describe("dedupeCodeRows", () => {
@@ -33,6 +46,23 @@ describe("dedupeCodeRows", () => {
             row("new", "Fix the form", "2026-10-20T10:00:00.000Z")
         ];
         expect(dedupeCodeRows(rows).map((entry) => entry.id)).toEqual(["new", "other"]);
+    });
+
+    it("never merges away a session still live behind a newer attempt that ended", () => {
+        const rows = [
+            row("running", "Fix the form", "2026-10-20T09:00:00.000Z", "acme/web", { live: true }),
+            row("failed", "Fix the form", "2026-10-20T10:00:00.000Z"),
+            row("older", "Fix the form", "2026-10-19T10:00:00.000Z")
+        ];
+        expect(dedupeCodeRows(rows).map((entry) => entry.id)).toEqual(["running"]);
+    });
+
+    it("keeps every live session of one task", () => {
+        const rows = [
+            row("a", "Fix the form", "2026-10-20T09:00:00.000Z", "acme/web", { live: true }),
+            row("b", "Fix the form", "2026-10-20T10:00:00.000Z", "acme/web", { live: true })
+        ];
+        expect(dedupeCodeRows(rows).map((entry) => entry.id)).toEqual(["b", "a"]);
     });
 
     it("lists newest first, breaking a tie on the time by the id", () => {

@@ -89,13 +89,14 @@ beforeEach(() => {
     state.page = undefined;
 });
 
-/** A session `minutes` after the first, on the same repository. */
+/** A finished session `minutes` after the first, on the same repository. */
 function at(index: number, title = `Task ${index}`) {
     const minute = String(index).padStart(2, "0");
     return {
         ...session,
         id: `00000000-0000-4000-8000-0000000000${minute}`,
         title,
+        state: "stopped",
         createdAt: `2026-10-20T10:${minute}:00.000Z`
     };
 }
@@ -148,9 +149,9 @@ describe("polarCodeOverview", () => {
         );
         const first = await polarCodeOverview(USER);
         expect(first.sessions).toHaveLength(19);
-        expect(first.next).toBe(at(21).id);
+        expect(first.next).toBe(`${at(21).createdAt}_${at(21).id}`);
         await polarCodeOverview(USER, first.next);
-        expect(state.page).toEqual({ mine: true, after: at(21).id });
+        expect(state.page).toEqual({ mine: true, after: first.next });
     });
 
     it("says manage for somebody who can start sessions", async () => {

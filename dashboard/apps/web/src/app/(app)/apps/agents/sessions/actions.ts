@@ -19,6 +19,7 @@ import * as taskAccess from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
+import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import {
@@ -72,7 +73,7 @@ export async function sessionChoicesAction(): Promise<{
 }
 
 const listPage = z
-    .object({ mine: z.boolean().optional(), after: z.string().trim().uuid().optional() })
+    .object({ mine: z.boolean().optional(), after: sessionCursorSchema.optional() })
     .strict();
 
 export async function listSessionsAction(

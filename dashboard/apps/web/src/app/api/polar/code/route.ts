@@ -4,11 +4,12 @@ import { NextResponse } from "next/server";
 import { polarCaller } from "@/lib/polar/access";
 import { codeAnswer } from "@/lib/polar/code-route";
 import { polarCodeOverview } from "@/lib/polar/code";
+import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const query = z.object({ after: z.string().trim().uuid().optional() }).strict();
+const query = z.object({ after: sessionCursorSchema.optional() }).strict();
 
 export async function GET(request: Request): Promise<Response> {
     const user = await polarCaller();
