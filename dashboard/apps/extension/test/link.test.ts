@@ -294,7 +294,9 @@ describe("whether the account may use Polar", () => {
             account: { id: "u1", name: "Ada", email: "ada@example.com" }
         };
         answering(200, { ...body, can: { vault: true, polar: false } });
-        expect((await checkLink(ORIGIN, "t")) as { polar: boolean }).toMatchObject({ polar: false });
+        expect((await checkLink(ORIGIN, "t")) as { polar: boolean }).toMatchObject({
+            polar: false
+        });
         answering(200, { ...body, can: { vault: true, polar: true } });
         expect((await checkLink(ORIGIN, "t")) as { polar: boolean }).toMatchObject({ polar: true });
         answering(200, { ...body, can: { vault: true } });

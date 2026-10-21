@@ -73,7 +73,10 @@ export const ROOT_CONTEXTS = ["editable", "selection", "link", "image", "page"] 
 
 /** What the menu is made of for an account: Polar's entries, and the contexts
  *  they need, only when it may use Polar. */
-export function menuPlan(withPolar: boolean, t: Words = ENGLISH): {
+export function menuPlan(
+    withPolar: boolean,
+    t: Words = ENGLISH
+): {
     contexts: readonly [(typeof ROOT_CONTEXTS)[number], ...(typeof ROOT_CONTEXTS)[number][]];
     polar: readonly PolarMenuEntry[];
 } {
@@ -145,7 +148,11 @@ const webAddress = (value: string | undefined): string | undefined =>
  * address is what the browser hands over - nothing is fetched here. Null for
  * a click with nothing to ask about.
  */
-export function polarAskFor(id: PolarMenuId, click: MenuClick, t: Words = ENGLISH): PolarAsk | null {
+export function polarAskFor(
+    id: PolarMenuId,
+    click: MenuClick,
+    t: Words = ENGLISH
+): PolarAsk | null {
     const selection = click.selectionText?.trim();
     switch (id) {
         case POLAR_MENU.selection:

@@ -312,7 +312,8 @@ function keepScope(key: string): void {
     let kept: string[] = [];
     try {
         const parsed: unknown = JSON.parse(readStored(SCOPES_KEY) ?? "[]");
-        if (Array.isArray(parsed)) kept = parsed.filter((one): one is string => typeof one === "string");
+        if (Array.isArray(parsed))
+            kept = parsed.filter((one): one is string => typeof one === "string");
     } catch {
         kept = [];
     }

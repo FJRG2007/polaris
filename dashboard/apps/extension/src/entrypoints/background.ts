@@ -1687,19 +1687,29 @@ function activeIdOf(
  * state right after signing out and while somebody is adding their second account.
  */
 async function activeAccount(): Promise<accounts.ParkedAccount | null> {
-    const [origin, email, refresh, wrapped, accountKey, who, linkToken, linkAccount, linkVault, linkPolar] =
-        await Promise.all([
-            currentOrigin(),
-            EMAIL.getValue(),
-            REFRESH.getValue(),
-            WRAPPED.getValue(),
-            ACCOUNT_KEY.getValue(),
-            ACCOUNT.getValue(),
-            LINK_TOKEN.getValue(),
-            LINK_ACCOUNT.getValue(),
-            LINK_VAULT.getValue(),
-            LINK_POLAR.getValue()
-        ]);
+    const [
+        origin,
+        email,
+        refresh,
+        wrapped,
+        accountKey,
+        who,
+        linkToken,
+        linkAccount,
+        linkVault,
+        linkPolar
+    ] = await Promise.all([
+        currentOrigin(),
+        EMAIL.getValue(),
+        REFRESH.getValue(),
+        WRAPPED.getValue(),
+        ACCOUNT_KEY.getValue(),
+        ACCOUNT.getValue(),
+        LINK_TOKEN.getValue(),
+        LINK_ACCOUNT.getValue(),
+        LINK_VAULT.getValue(),
+        LINK_POLAR.getValue()
+    ]);
     // A connection with no vault session yet is still an account to set aside:
     // it is what switching to another server and back has to find again.
     if (!origin || (!refresh && !linkToken)) return null;
@@ -4001,10 +4011,7 @@ const PANEL_SCOPE = storage.defineItem<polar.PanelScope>(polar.PANEL_SCOPE_KEY, 
 /** Something a right-click asked that a panel still has to hand its chat. */
 const PENDING_ASK = storage.defineItem<
     (polar.PolarAsk & { at: number; tabId?: number; windowId?: number }) | null
->(
-    "session:polar.pendingAsk",
-    { fallback: null }
-);
+>("session:polar.pendingAsk", { fallback: null });
 /** How long a waiting question is worth handing over: a panel opens in well under it. */
 const ASK_FOR_MS = 30_000;
 
@@ -4050,7 +4057,9 @@ function closePanel(tab: { id?: number; windowId?: number }): void {
     const side = (browser as unknown as { sidePanel?: polar.SidePanelApi }).sidePanel;
     if (side?.close && tab.windowId !== undefined) {
         side.close(
-            panelScope === "tab" && tab.id !== undefined ? { tabId: tab.id } : { windowId: tab.windowId }
+            panelScope === "tab" && tab.id !== undefined
+                ? { tabId: tab.id }
+                : { windowId: tab.windowId }
         ).catch(() => undefined);
     }
 }
@@ -4142,7 +4151,11 @@ function polarFromMenu(
     if (polar.isPolarisTab(tab.url, knownPolaris) && tab.id !== undefined) {
         const tabId = tab.id;
         void words().then((t) =>
-            polar.sendToPolarisTab(browser, tabId, polar.polarisCommand(polarAskFor(id, click, t) ?? english))
+            polar.sendToPolarisTab(
+                browser,
+                tabId,
+                polar.polarisCommand(polarAskFor(id, click, t) ?? english)
+            )
         );
         return;
     }
@@ -4186,7 +4199,9 @@ function onPanelPort(port: {
                 polar.sendToPolarisTab(
                     browser,
                     tabId,
-                    polar.polarisCommand(fresh ? { quote: fresh.quote, draft: fresh.draft } : undefined)
+                    polar.polarisCommand(
+                        fresh ? { quote: fresh.quote, draft: fresh.draft } : undefined
+                    )
                 );
             });
         }

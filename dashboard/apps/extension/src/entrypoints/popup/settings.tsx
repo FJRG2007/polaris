@@ -45,7 +45,11 @@ export interface ShortcutGroup {
 /** The actions this extension has keys for, grouped and titled, with the keys
  *  the browser answers to now (empty for none). Polar's only for an account
  *  that may use it. */
-export function shortcutGroups(all: readonly Command[], t: Words, withPolar = true): ShortcutGroup[] {
+export function shortcutGroups(
+    all: readonly Command[],
+    t: Words,
+    withPolar = true
+): ShortcutGroup[] {
     const keys = (name: string): string => all.find((one) => one.name === name)?.shortcut ?? "";
     const groups: ShortcutGroup[] = [
         {
@@ -119,7 +123,9 @@ export function ShortcutSheet({
                         {group.rows.map((row) => {
                             const listening = recording === row.name;
                             const hint =
-                                row.name === polar.OPEN_POLAR && !firefox && !matchesPolaris(row.keys)
+                                row.name === polar.OPEN_POLAR &&
+                                !firefox &&
+                                !matchesPolaris(row.keys)
                                     ? t("settings.polarisKeys", { keys: polar.POLARIS_SHORTCUT })
                                     : null;
                             return (
@@ -132,7 +138,9 @@ export function ShortcutSheet({
                                         {row.keys ? (
                                             <KeyCaps binding={row.keys} />
                                         ) : (
-                                            <span className="muted small">{t("settings.none")}</span>
+                                            <span className="muted small">
+                                                {t("settings.none")}
+                                            </span>
                                         )}
                                         <button
                                             className={listening ? "chip" : "ghost"}
@@ -146,8 +154,14 @@ export function ShortcutSheet({
                                                     ? t("polar.pressKeys")
                                                     : t("settings.changeFor", { action: row.label })
                                             }
-                                            onClick={() => (listening ? onStop() : onChange(row.name))}
-                                            onKeyDown={listening ? (event) => onKey(row.name, event) : undefined}
+                                            onClick={() =>
+                                                listening ? onStop() : onChange(row.name)
+                                            }
+                                            onKeyDown={
+                                                listening
+                                                    ? (event) => onKey(row.name, event)
+                                                    : undefined
+                                            }
                                             onBlur={listening ? onStop : undefined}
                                         >
                                             {listening ? t("polar.pressKeys") : t("polar.change")}
@@ -305,7 +319,11 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
                         hint={
                             firefox
                                 ? t("settings.firefoxSidebar")
-                                : t(panelScope === "all" ? "settings.allTabsHint" : "settings.oneTabHint")
+                                : t(
+                                      panelScope === "all"
+                                          ? "settings.allTabsHint"
+                                          : "settings.oneTabHint"
+                                  )
                         }
                         onChange={choosePanel}
                     />
@@ -316,7 +334,11 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
                             { value: "shared", label: t("settings.sharedChat") },
                             { value: "tab", label: t("settings.tabChat") }
                         ]}
-                        hint={t(chatScope === "shared" ? "settings.sharedChatHint" : "settings.tabChatHint")}
+                        hint={t(
+                            chatScope === "shared"
+                                ? "settings.sharedChatHint"
+                                : "settings.tabChatHint"
+                        )}
                         onChange={chooseChat}
                     />
                 </section>

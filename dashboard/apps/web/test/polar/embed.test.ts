@@ -257,13 +257,22 @@ describe("a page outside Polaris, as the model reads it", () => {
 describe("what the extension tells Polar", () => {
     const self = { location: { origin: "https://polaris.example" } };
     const command = (data: unknown, overrides: Partial<{ origin: string; source: unknown }> = {}) =>
-        bridge.polarCommandFrom({ data, origin: self.location.origin, source: self, ...overrides }, self);
+        bridge.polarCommandFrom(
+            { data, origin: self.location.origin, source: self, ...overrides },
+            self
+        );
 
     it("toggles or asks, on the page's own window and origin only", () => {
         const toggle = { source: bridge.FROM_EXTENSION, kind: "polar", action: "toggle" };
         expect(command(toggle)).toEqual(toggle);
         expect(
-            command({ source: bridge.FROM_EXTENSION, kind: "polar", action: "ask", quote: "q", draft: "d" })
+            command({
+                source: bridge.FROM_EXTENSION,
+                kind: "polar",
+                action: "ask",
+                quote: "q",
+                draft: "d"
+            })
         ).toMatchObject({ action: "ask", quote: "q", draft: "d" });
         expect(command(toggle, { origin: "https://evil.example" })).toBeNull();
         expect(command(toggle, { source: {} })).toBeNull();
@@ -276,8 +285,12 @@ describe("what the extension tells Polar", () => {
             quote: undefined,
             draft: "d"
         });
-        expect(bridge.askFrom({ source: bridge.FROM_EXTENSION, kind: "ask", quote: "x".repeat(4001) })).toBeNull();
-        expect(bridge.askFrom({ source: bridge.FROM_EXTENSION, kind: "page", page: null })).toBeNull();
+        expect(
+            bridge.askFrom({ source: bridge.FROM_EXTENSION, kind: "ask", quote: "x".repeat(4001) })
+        ).toBeNull();
+        expect(
+            bridge.askFrom({ source: bridge.FROM_EXTENSION, kind: "page", page: null })
+        ).toBeNull();
     });
 
     it("keeps a tab's own conversation only under a tab's name", () => {
@@ -290,4 +303,3 @@ describe("what the extension tells Polar", () => {
         expect(bridge.chatScope(["tab-1"])).toBeNull();
     });
 });
-

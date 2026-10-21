@@ -19,7 +19,13 @@ import { PolarChat, usePolar } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarAvatar } from "@/components/polar/motion/polar-avatar";
 
-export function PolarEmbed({ parent, chat = null }: { parent: string | null; chat?: string | null }) {
+export function PolarEmbed({
+    parent,
+    chat = null
+}: {
+    parent: string | null;
+    chat?: string | null;
+}) {
     const [site, setSite] = useState<SiteContext | null>(null);
     const { ask } = usePolar();
     const askRef = useRef(ask);

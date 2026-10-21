@@ -22,7 +22,11 @@ export function originsOf(status: Pick<VaultStatus, "server" | "servers">): stri
     return [...(status.server ? [status.server] : []), ...status.servers.map((one) => one.origin)];
 }
 
-export function PolarRow({ status }: { status: Pick<VaultStatus, "server" | "servers"> }): React.JSX.Element {
+export function PolarRow({
+    status
+}: {
+    status: Pick<VaultStatus, "server" | "servers">;
+}): React.JSX.Element {
     const t = useWords();
     const [front, setFront] = useState<Front>({});
     const [scope, setScope] = useState<polar.PanelScope>("all");

@@ -288,7 +288,8 @@ export function Panel(): React.JSX.Element {
         void ALLOWED_SITES.setValue(allowed.filter((site) => site !== front.site));
     };
 
-    if (reach === "asking" || chatScope === null || run === null) return <div className="side-app" />;
+    if (reach === "asking" || chatScope === null || run === null)
+        return <div className="side-app" />;
     if (reach === "none" || !server) {
         return (
             <div className="side-app">

@@ -68,7 +68,12 @@ export async function GET(request: Request): Promise<Response> {
         : [];
     return Response.json({
         connection: { id: principal.id, name: principal.name },
-        account: { id: account.id, name: account.name ?? "", email: account.email, ...(locale ? { locale } : {}) },
+        account: {
+            id: account.id,
+            name: account.name ?? "",
+            email: account.email,
+            ...(locale ? { locale } : {})
+        },
         organizations: organizations.map((org) => ({
             id: org.id,
             name: org.name,

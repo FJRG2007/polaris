@@ -259,11 +259,9 @@ export function sendToPolarisTab(api: unknown, tabId: number, message: unknown):
             tabs?: { executeScript?(id: number, details: { code: string }): Promise<unknown> };
         }
     ).tabs;
-    tabs
-        ?.executeScript?.(tabId, {
-            code: `(${postToPolarisPage.toString()})(${JSON.stringify(message)})`
-        })
-        ?.catch(() => undefined);
+    tabs?.executeScript?.(tabId, {
+        code: `(${postToPolarisPage.toString()})(${JSON.stringify(message)})`
+    })?.catch(() => undefined);
 }
 
 /** Chromium's side panel calls used here, as far as each version has them. */
