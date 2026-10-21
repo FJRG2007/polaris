@@ -53,7 +53,6 @@ describe("integration logos", () => {
  * stops being wired - or one added without leaving this list - fails here.
  */
 const MONOGRAM_PROVIDERS = [
-    "cohere",
     "venice",
     "sarvam",
     "chutes",
