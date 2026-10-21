@@ -1292,7 +1292,8 @@
                 "downloadModule": "Download the module. It needs Companion 5.0 or newer.",
                 "importModule": "In Companion, open <press>Modules</press>, press <press>Import module package</press> and pick the downloaded file.",
                 "addConnection": "Open <press>Connections</press>, find Polaris in the list, add it and type this address in its settings:",
-                "approveCode": "The connection's status then shows a code and the page to approve it on. Open that page, sign in and approve the code."
+                "approveCode": "The connection's status then shows a code and the page to approve it on. Open that page, sign in and approve the code.",
+                "lockCompanion": "Companion's pages can usually be opened from any computer on your network, and anyone there could press these keys. In Companion, open <press>Settings</press>, then <press>Advanced</press>, turn on <press>Admin UI Password</press> and set a password."
             }
         }
     },

@@ -148,6 +148,7 @@ export function DeckInstallSteps({
                         </span>
                     </li>
                     <li>{t("downloads.streamdeck.install.approveCode")}</li>
+                    <li>{t.rich("downloads.streamdeck.install.lockCompanion", { press })}</li>
                 </ol>
             ) : null}
         </div>

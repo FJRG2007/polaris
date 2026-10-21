@@ -84,6 +84,9 @@ describe("the app a deck is installed in", () => {
         expect(screen.getByText("Import module package")).toBeTruthy();
         expect(screen.getByText("https://polaris.example.com")).toBeTruthy();
         expect(screen.getByText(/Companion 5\.0 or newer/)).toBeTruthy();
+        // Its pages are open to the network by default, and so would the keys be.
+        expect(screen.getByText("Admin UI Password")).toBeTruthy();
+        expect(screen.getByText("Advanced")).toBeTruthy();
     });
 
     it("never offers a choice that does not work yet", async () => {
