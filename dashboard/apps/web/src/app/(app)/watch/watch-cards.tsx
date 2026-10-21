@@ -10,12 +10,13 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, Container, Rocket, Server } from "lucide-react";
 import { cn, Select, Skeleton } from "@polaris/ui";
 import type { WatchCard, WatchSubjectKind } from "@/lib/watch-overview-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { watchText } from "@/lib/watch/words";
+import * as cardOrder from "@/lib/watch/card-order";
 import { sortByConsumption, type ConsumptionOrder } from "@/lib/watch/card-order";
 
 const KIND_ICON: Record<WatchSubjectKind, typeof Server> = {
@@ -131,8 +132,8 @@ export function WatchCardGridSkeleton({ count = 6 }: { count?: number }) {
 }
 
 /** The orders a list of these offers, busiest first because that is what somebody
- *  opens Watch to find. */
-const ORDERS: ConsumptionOrder[] = ["cpu", "memory", "name", "state"];
+ *  opens the list to find. */
+const ORDERS = cardOrder.CONSUMPTION_ORDERS;
 
 /**
  * A whole list of cards, with the control that decides what comes first.
@@ -153,6 +154,23 @@ export function WatchCardList({
 }) {
     const t = useTranslations("watch");
     const [order, setOrder] = useState<ConsumptionOrder>("cpu");
+    // The order last picked on this browser, in Watch or in Places: read after the
+    // first paint so the server's render and the browser's agree.
+    useEffect(() => {
+        try {
+            setOrder(cardOrder.storedOrder(window.localStorage.getItem(cardOrder.ORDER_STORAGE_KEY)));
+        } catch {
+            // Storage refused (a private window): busiest first, as before.
+        }
+    }, []);
+    const choose = (value: ConsumptionOrder) => {
+        setOrder(value);
+        try {
+            window.localStorage.setItem(cardOrder.ORDER_STORAGE_KEY, value);
+        } catch {
+            // Remembered for this visit only.
+        }
+    };
     const sorted = useMemo(() => sortByConsumption(cards, order), [cards, order]);
 
     return (
@@ -162,7 +180,7 @@ export function WatchCardList({
                     <span className="text-xs text-muted-foreground">{t("cards.sortBy")}</span>
                     <Select
                         value={order}
-                        onValueChange={(value) => setOrder(value as ConsumptionOrder)}
+                        onValueChange={(value) => choose(cardOrder.storedOrder(value))}
                         aria-label={t("cards.sortLabel", { label })}
                         className="w-32"
                         options={ORDERS.map((option) => ({ value: option, label: t(`cards.order.${option}`) }))}
