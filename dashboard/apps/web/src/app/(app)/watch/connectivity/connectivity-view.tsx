@@ -19,7 +19,7 @@ import { OutageTable } from "./outage-table";
 import { MergeGapForm } from "./merge-gap-form";
 import * as rules from "@/lib/connectivity/outages";
 import { checkConnectivityAction } from "./actions";
-import { DowntimeHeatmap } from "@/components/metrics/downtime-heatmap";
+import { DowntimeHeatmap, spanWith } from "@/components/metrics/downtime-heatmap";
 import * as list from "@/lib/connectivity/outage-list";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -47,11 +47,6 @@ const POLL_MS = 30_000;
 const HEATMAP_DAYS = 90;
 
 type Words = NamespaceTranslator<"watch">;
-
-/** A length of time in this screen's words. */
-export function spanWith(t: Words): (ms: number) => string {
-    return (ms) => rules.formatSpan(ms, (form, values) => t(`span.${form}`, values));
-}
 
 export function kindLabel(t: Words, kind: rules.OutageKind): string {
     return t(`connectivity.kinds.${kind}`);

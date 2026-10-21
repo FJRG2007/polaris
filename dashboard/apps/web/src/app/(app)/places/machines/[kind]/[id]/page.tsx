@@ -74,7 +74,7 @@ export default async function MachinePage({ params }: { params: Promise<{ kind: 
 
     if (kind === "container") {
         if (!owns) notFound();
-        const card = (await machines.machineContainers(user.id)).find((entry) => entry.id === id);
+        const card = await machines.machineContainer(user.id, id);
         if (!card) notFound();
         return <MachineDetailView kind="container" id={id} name={card.name} detail={card.detail} container={card} />;
     }

@@ -105,7 +105,14 @@ export function reachesNothing(reach: PlacesReach): boolean {
  * refusal's destination asks this three times and pays for it once.
  */
 export const reachesPlaces = cache(async (userId: string): Promise<boolean> =>
-    reachesAnySubject(userId, ["place.camera", "place.device", "place.ups"])
+    reachesAnySubject(userId, [
+        "place.camera",
+        "place.device",
+        "place.ups",
+        "place.nas",
+        "place.server",
+        "place.domain"
+    ])
 );
 
 /** Whether a reach covers one camera. */

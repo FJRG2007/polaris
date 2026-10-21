@@ -21,8 +21,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { BreakdownMetric } from "@/lib/watch/breakdown-shape";
 import type { DomainDevice } from "@/lib/machines/machines-service";
-import { DowntimeHeatmap } from "@/components/metrics/downtime-heatmap";
-import { spanWith } from "@/app/(app)/watch/connectivity/connectivity-view";
+import { DowntimeHeatmap, spanWith } from "@/components/metrics/downtime-heatmap";
 import { dailyDowntime, type DayDowntime } from "@/lib/connectivity/outages";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { episodesFrom, mergedSpans, type AlarmEventPoint } from "@/lib/machines/alarm-episodes";
@@ -82,7 +81,7 @@ export function MachineDetailView({
         : kind === "server"
             ? { href: "/apps/servers", label: t("machines.openServers") }
             : kind === "container"
-              ? { href: container?.href.startsWith("/apps/") ? container.href : "/apps/containers", label: t("machines.openContainers") }
+              ? { href: container?.href ?? "/apps/containers", label: t("machines.openContainers") }
               : domain
                 ? { href: `/apps/deploy/${domain.projectId}?service=${domain.serviceId}`, label: t("machines.openDeploy") }
                 : null;

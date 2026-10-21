@@ -21,10 +21,16 @@ import { cn } from "@polaris/ui";
 import { useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { dayStep, type DayDowntime } from "@/lib/connectivity/outages";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { dayStep, formatSpan, type DayDowntime } from "@/lib/connectivity/outages";
 
 /** The four steps, weakest first: share of the danger colour mixed into the card. */
 const STEP_MIX = [55, 70, 85, 100] as const;
+
+/** A length of time in Watch's words. */
+export function spanWith(t: NamespaceTranslator<"watch">): (ms: number) => string {
+    return (ms) => formatSpan(ms, (form, values) => t(`span.${form}`, values));
+}
 
 export function stepColor(step: 1 | 2 | 3 | 4): string {
     return `color-mix(in oklab, hsl(var(--danger)) ${STEP_MIX[step - 1]}%, hsl(var(--card)))`;

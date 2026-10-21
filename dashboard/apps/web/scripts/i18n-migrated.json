@@ -2135,6 +2135,22 @@
         "web/src/lib/polar/item-attachments.ts",
         "web/src/lib/polar/shared.ts",
         "web/src/lib/search/open-search.ts",
-        "web/src/lib/selection-menu.ts"
+        "web/src/lib/selection-menu.ts",
+        "web/src/app/(app)/apps/deploy/[projectId]/page.tsx",
+        "web/src/app/(app)/apps/deploy/access-context.tsx",
+        "web/src/app/(app)/breakdown-actions.ts",
+        "web/src/app/(app)/places/machines/[kind]/[id]/machine-detail-view.tsx",
+        "web/src/app/(app)/places/machines/[kind]/[id]/page.tsx",
+        "web/src/app/(app)/places/machines/layout.tsx",
+        "web/src/app/(app)/places/machines/page.tsx",
+        "web/src/app/(app)/watch/connectivity/connectivity-view.tsx",
+        "web/src/components/metrics/downtime-heatmap.tsx",
+        "web/src/lib/access/grants.ts",
+        "web/src/lib/host-service.ts",
+        "web/src/lib/machines/alarm-episodes.ts",
+        "web/src/lib/machines/machine-access.ts",
+        "web/src/lib/machines/machine-links.ts",
+        "web/src/lib/machines/machines-service.ts",
+        "web/src/lib/watch/card-order.ts"
     ]
 }

@@ -46,6 +46,12 @@ export async function machineContainers(ownerId: string): Promise<WatchCard[]> {
     return (await getWatchContainers(ownerId)).map(inPlaces);
 }
 
+/** One of the account's containers as Watch lists it, its link still into
+ *  Containers. */
+export async function machineContainer(ownerId: string, id: string): Promise<WatchCard | null> {
+    return (await getWatchContainers(ownerId)).find((card) => card.id === id) ?? null;
+}
+
 /**
  * The servers lent to this account to watch, as cards: each owner's own cards,
  * cut to the lent ones, with where the server lives left out. The machine
