@@ -258,5 +258,7 @@ describe("signing out", () => {
 it("names the system from the CLI's user-agent, and from a browser's otherwise", () => {
     expect(cliOs("polaris-cli/0.4.6 (win32; x64; node 22.0.0)")).toBe("Windows");
     expect(cliOs("polaris-cli/0.4.6 (linux; arm64; node 22.0.0)")).toBe("Linux");
+    expect(cliOs("polaris-streamdeck/0.1.0 (darwin; arm64; node 24.0.0)")).toBe("macOS");
+    expect(cliOs("polaris-companion/0.1.0 (linux; x64; node 22.20.0)")).toBe("Linux");
     expect(cliOs("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")).toBe("macOS");
 });
