@@ -461,7 +461,9 @@
         "errors": {
             "unsupportedChoice": "Opción no admitida.",
             "notABoolean": "Eso no es un sí o un no."
-        }
+        },
+        "loadFailed": "No se pudo leer el formato por defecto.",
+        "retry": "Reintentar"
     },
     "domains": {
         "page": {

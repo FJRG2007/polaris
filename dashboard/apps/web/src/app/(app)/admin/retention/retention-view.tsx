@@ -8,7 +8,8 @@
  * and that second line is the whole reason this screen is worth opening: it says
  * what the setting is about to do before it is saved.
  *
- * The counts are the ones the page arrived with, so they describe the period that
+ * The counts are read after the first paint (a whole-table count is a scan on a
+ * large instance) and kept for the next visit, so they describe the period that
  * is saved rather than the one being considered. Said as much, rather than
  * recomputed as the selector moves: a number that changed as somebody scrolled a
  * menu would look like rows disappearing while they decided.
@@ -18,7 +19,8 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { grouped } from "@/app/(app)/apps/firewall/page-parts";
 import { Loader2, Trash2 } from "lucide-react";
-import { Button, Card, CardBody, Select } from "@polaris/ui";
+import { Button, Card, CardBody, Select, Skeleton } from "@polaris/ui";
+import { useLiveResource } from "@/components/use-live-resource";
 import { saveRetentionAction, sweepRetentionAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -29,14 +31,19 @@ import {
     type RetentionSubject
 } from "@polaris/core";
 
-export function RetentionView({
-    policy,
-    totals
-}: {
-    policy: RetentionPolicy;
-    totals: Record<RetentionSubject, { total: number; due: number }>;
-}) {
+export type RetentionTotals = Record<RetentionSubject, { total: number; due: number }>;
+
+export const RETENTION_TOTALS_URL = "/api/admin/retention/totals";
+
+export function RetentionView({ policy }: { policy: RetentionPolicy }) {
     const t = useTranslations("admin");
+    const live = useLiveResource<RetentionTotals>({
+        url: RETENTION_TOTALS_URL,
+        cacheKey: "admin.retention.totals",
+        intervalMs: 0,
+        select: (body) => body as RetentionTotals
+    });
+    const totals = live.data;
     const tc = useTranslations("common");
     const [draft, setDraft] = useState<RetentionPolicy>(policy);
     const [busy, setBusy] = useState(false);
@@ -57,6 +64,8 @@ export function RetentionView({
             return;
         }
         setNote(t("retention.saved"));
+        // What is due depends on the period just saved.
+        live.refresh();
     };
 
     const sweepNow = async () => {
@@ -69,6 +78,7 @@ export function RetentionView({
             if (result?.error) setError(result.error);
             return;
         }
+        live.refresh();
         const removed = result.removed ?? 0;
         setNote(
             removed === 0
@@ -82,10 +92,10 @@ export function RetentionView({
     return (
         <div className="flex flex-col gap-4">
             {RETENTION_SUBJECTS.map((subject) => {
-                const counts = totals[subject];
+                const counts = totals?.[subject] ?? null;
                 const keeping = policy[subject];
                 const label = t(`retention.subjects.${subject}.label`);
-                const record = { count: counts.total, total: grouped(counts.total) };
+                const record = counts && { count: counts.total, total: grouped(counts.total) };
                 return (
                     <Card key={subject}>
                         <CardBody className="flex flex-col gap-3">
@@ -116,20 +126,26 @@ export function RetentionView({
                             {/* What is in there now, against what is saved rather
                                 than against what is on the selector - so the
                                 number does not change while somebody is deciding. */}
-                            <p className="text-muted-foreground border-t border-border pt-3 text-xs">
-                                {keeping === 0
-                                    ? t("retention.counts.forever", record)
-                                    : counts.due === 0
-                                      ? t("retention.counts.noneDue", {
-                                            ...record,
-                                            period: t(`retention.periodsInline.d${keeping}`)
-                                        })
-                                      : t("retention.counts.due", {
-                                            ...record,
-                                            due: grouped(counts.due),
-                                            period: t(`retention.periodsInline.d${keeping}`)
-                                        })}
-                            </p>
+                            {!counts || !record ? (
+                                <div className="border-t border-border pt-3">
+                                    <Skeleton className="h-4 w-64 max-w-full" />
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground border-t border-border pt-3 text-xs">
+                                    {keeping === 0
+                                        ? t("retention.counts.forever", record)
+                                        : counts.due === 0
+                                          ? t("retention.counts.noneDue", {
+                                                ...record,
+                                                period: t(`retention.periodsInline.d${keeping}`)
+                                            })
+                                          : t("retention.counts.due", {
+                                                ...record,
+                                                due: grouped(counts.due),
+                                                period: t(`retention.periodsInline.d${keeping}`)
+                                            })}
+                                </p>
+                            )}
                         </CardBody>
                     </Card>
                 );

@@ -461,7 +461,9 @@
         "errors": {
             "unsupportedChoice": "Unsupported choice.",
             "notABoolean": "That is not a yes or a no."
-        }
+        },
+        "loadFailed": "The display defaults could not be read.",
+        "retry": "Try again"
     },
     "domains": {
         "page": {
