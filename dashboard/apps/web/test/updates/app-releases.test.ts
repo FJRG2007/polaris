@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+    COMPANION_TAG_PREFIX,
     DESKTOP_TAG_PREFIX,
     EXTENSION_TAG_PREFIX,
+    STREAMDECK_TAG_PREFIX,
     desktopDownload,
     extensionDownload,
     pickFile,
@@ -59,6 +61,21 @@ describe("pickRelease", () => {
         ];
         expect(pickRelease(releases, DESKTOP_TAG_PREFIX)?.version).toBe("0.2.0");
         expect(pickRelease(releases, EXTENSION_TAG_PREFIX)?.version).toBe("0.1.0");
+    });
+
+    it("gives the plugin and the Companion module their own newest, whatever was released after", () => {
+        // Both release on every push that changes them, so either can be the
+        // newest release of all, many times over.
+        const releases = [
+            release({ tag_name: "companion-v1.0.7", published_at: "2026-10-21T12:00:00Z" }),
+            release({ tag_name: "extension-v0.3.0", published_at: "2026-10-21T11:00:00Z" }),
+            release({ tag_name: "streamdeck-v0.1.5", published_at: "2026-10-21T10:00:00Z" }),
+            release({ tag_name: "streamdeck-v0.1.4", published_at: "2026-10-20T10:00:00Z" }),
+            release({ tag_name: "companion-v1.0.6", published_at: "2026-10-19T10:00:00Z" })
+        ];
+        expect(pickRelease(releases, STREAMDECK_TAG_PREFIX)?.version).toBe("0.1.5");
+        expect(pickRelease(releases, COMPANION_TAG_PREFIX)?.version).toBe("1.0.7");
+        expect(pickRelease(releases, EXTENSION_TAG_PREFIX)?.version).toBe("0.3.0");
     });
 
     it("never offers a draft, which only the repository's editors can open", () => {
