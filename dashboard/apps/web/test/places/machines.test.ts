@@ -73,11 +73,13 @@ describe("machines in Places", () => {
         expect(machineHref("container", "local:abc")).toBe("/places/machines/container/local%3Aabc");
     });
 
-    it("is a Places device screen, behind the permission its pages ask", () => {
+    it("is a Places device screen anybody can open, so a lent machine can be reached", () => {
         const entry = Object.values(APP_SECTIONS)
             .flat()
             .find((section) => section.href === "/places/machines");
-        expect(entry?.needs).toBe("deploy.read");
+        expect(entry).toBeDefined();
+        // Somebody lent a server without Deploy has no other way in.
+        expect(entry?.needs).toBeUndefined();
     });
 
     it("keeps the Overview's usage card and opens it in Places", () => {

@@ -1174,7 +1174,8 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: DEVICES_GROUP,
             href: "/places/machines",
             icon: Server,
-            needs: "deploy.read",
+            // Open to everyone, as NAS is: a server or a domain can be lent to
+            // somebody without Deploy, and this is the only way they reach it.
             keywords: ["server", "container", "domain", "cpu", "memory", "uptime", "outage", "watch"]
         },
         {

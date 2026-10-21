@@ -1297,6 +1297,7 @@
         "noServers": "No servers yet.",
         "noContainers": "No containers running on your servers.",
         "noDomains": "No domains on your services.",
+        "nothing": "Nothing here yet. Machines you run, or that somebody lends you, show up here.",
         "back": "Machines",
         "metrics": "Load",
         "history": "Alarm history",

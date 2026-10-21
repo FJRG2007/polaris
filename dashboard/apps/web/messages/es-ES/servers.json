@@ -1297,6 +1297,7 @@
         "noServers": "Aún no hay servidores.",
         "noContainers": "No hay contenedores en tus servidores.",
         "noDomains": "Tus servicios no tienen dominios.",
+        "nothing": "Aún no hay nada. Aquí verás las máquinas que gestionas o que alguien te presta.",
         "back": "Máquinas",
         "metrics": "Carga",
         "history": "Alarmas pasadas",

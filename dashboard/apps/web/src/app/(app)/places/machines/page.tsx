@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { grantedSubjects } from "@/lib/access/grants";
-import { homePathForUser, requireUser, sessionCan } from "@/lib/session";
+import { requireUser, sessionCan } from "@/lib/session";
 import { PageHeader, Skeleton } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import * as machines from "@/lib/machines/machines-service";
@@ -27,7 +26,14 @@ export default async function MachinesPage() {
         grantedSubjects(user.id, "place.domain")
     ]);
     const borrows = lentServers.size > 0 || lentDomains.size > 0;
-    if (!owns && !borrows) redirect(`${await homePathForUser(user)}?denied=1`);
+    if (!owns && !borrows) {
+        return (
+            <div className="flex flex-col gap-6">
+                <PageHeader title={t("machines.heading")} description={t("machines.intro")} />
+                <p className="text-sm text-muted-foreground">{t("machines.nothing")}</p>
+            </div>
+        );
+    }
     const ownerId = owns ? user.id : null;
     return (
         <div className="flex flex-col gap-6">
