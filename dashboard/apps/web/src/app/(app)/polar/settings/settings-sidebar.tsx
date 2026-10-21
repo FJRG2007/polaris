@@ -71,7 +71,7 @@ export function SettingsWithSidebar({ children }: { children: ReactNode }) {
                     </DialogContent>
                 </Dialog>
             ) : null}
-            <div className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+            <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6">
                 {!wide ? (
                     <Button
                         type="button"
