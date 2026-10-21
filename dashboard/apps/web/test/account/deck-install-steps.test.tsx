@@ -86,6 +86,8 @@ describe("the app a deck is installed in", () => {
         expect(screen.getByText(/Companion 5\.0 or newer/)).toBeTruthy();
         // Its pages are open to the network by default, and so would the keys be.
         expect(screen.getByText("Admin UI Password")).toBeTruthy();
+        // It acts as the reader, and is disconnected where their decks are.
+        expect(screen.getByText(/It uses your account/)).toBeTruthy();
         expect(screen.getByText("Advanced")).toBeTruthy();
     });
 
