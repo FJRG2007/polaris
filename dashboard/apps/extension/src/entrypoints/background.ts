@@ -23,7 +23,6 @@ import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import * as update from "@/lib/update";
-import { installKind, isNewer, noticeFor, type UpdateNotice } from "@/lib/update";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
 import {
@@ -247,7 +246,9 @@ const DEVICE = storage.defineItem<string | null>("local:vault.device", { fallbac
  * released rather than a credential, and somebody who has not got round to
  * reloading the extension should still be told tomorrow.
  */
-const UPDATE = storage.defineItem<UpdateNotice | null>("local:update.notice", { fallback: null });
+const UPDATE = storage.defineItem<update.UpdateNotice | null>("local:update.notice", {
+    fallback: null
+});
 /** The newest version this Polaris last said is out, newer or not: what lets the
  *  popup say "up to date" only once somebody has actually answered. */
 const LATEST = storage.defineItem<string | null>("local:update.latest", { fallback: null });
@@ -2195,7 +2196,9 @@ async function badge(): Promise<void> {
         // version, so the mark is gone the moment the new one is.
         const held = await UPDATE.getValue();
         const notice =
-            held && isNewer(held.version, browser.runtime.getManifest().version) ? held : null;
+            held && update.isNewer(held.version, browser.runtime.getManifest().version)
+                ? held
+                : null;
         const shown = update.badgeFor(count, notice);
         await browser.action.setBadgeText({ text: shown.text });
         await browser.action.setBadgeBackgroundColor({ color: shown.color });
@@ -2921,13 +2924,19 @@ async function updaterCovers(): Promise<boolean> {
  * The stored notice, as it stands now: gone once this version is the one out,
  * and with how this copy is kept current read again.
  */
-async function currentNotice(): Promise<UpdateNotice | null> {
+async function currentNotice(): Promise<update.UpdateNotice | null> {
     const held = await UPDATE.getValue();
-    if (!held || !isNewer(held.version, browser.runtime.getManifest().version)) return null;
-    return {
-        ...held,
-        kind: installKind(await installType(), await updaterCovers(), update.managedByDesktop())
-    };
+    if (!held || !update.isNewer(held.version, browser.runtime.getManifest().version)) return null;
+    const kind = update.installKind(
+        await installType(),
+        await updaterCovers(),
+        update.managedByDesktop()
+    );
+    if (kind === held.kind) return held;
+    const current = { ...held, kind };
+    await UPDATE.setValue(current);
+    await badge();
+    return current;
 }
 
 /**
@@ -2963,7 +2972,7 @@ async function checkForUpdate(): Promise<void> {
         const answer = (await response.json()) as { version?: unknown; url?: unknown };
         await LATEST.setValue(update.publishedVersion(answer));
         await UPDATE.setValue(
-            noticeFor(
+            update.noticeFor(
                 answer,
                 browser.runtime.getManifest().version,
                 await installType(),
