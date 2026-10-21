@@ -24,7 +24,8 @@ import {
     type InstanceTypes,
     type SomeCompanionConfigField
 } from "@companion-module/base";
-import { phaseStatus, phaseText } from "./status";
+import { updateFor } from "../../streamdeck/src/update";
+import { phaseStatus, phaseText, type Update } from "./status";
 import { VERSION } from "./version";
 import { Connection, type Phase } from "./connection";
 import * as mapping from "./mapping";
@@ -95,20 +96,37 @@ export default class PolarisInstance extends InstanceBase<Schema> {
                 type: "static-text",
                 id: "state",
                 label: "Sign-in",
-                value: phaseText(this.#connection.current, this.#connection.credentials?.account),
+                value: phaseText(
+                    this.#connection.current,
+                    this.#connection.credentials?.account,
+                    this.#update()
+                ),
                 width: 12
             }
         ];
     }
 
+    /** A newer module than this one, from what its Polaris last said. */
+    #update(): Update | null {
+        return updateFor(
+            this.#connection.latest,
+            VERSION,
+            this.#connection.credentials?.address ?? null,
+            "companion"
+        );
+    }
+
     #phase(phase: Phase): void {
-        const [status, message] = phaseStatus(phase, this.#connection.credentials?.account);
+        const update = this.#update();
+        const [status, message] = phaseStatus(phase, this.#connection.credentials?.account, update);
         this.updateStatus(InstanceStatus[status], message);
         this.setVariableValues({
             connection: phase.phase,
             account: this.#connection.credentials?.account ?? "",
             sign_in_code: phase.phase === "signing-in" ? phase.userCode : "",
-            sign_in_url: phase.phase === "signing-in" ? phase.url : ""
+            sign_in_url: phase.phase === "signing-in" ? phase.url : "",
+            update_version: update?.version ?? "",
+            update_url: update?.url ?? ""
         });
         this.checkAllFeedbacks();
     }

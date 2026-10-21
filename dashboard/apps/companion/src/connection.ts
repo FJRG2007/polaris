@@ -19,6 +19,7 @@ import {
     Unauthorized,
     type Credentials,
     type DeckAction,
+    type DeckReleases,
     type DeckState,
     type PolarisClient,
     type RunResult
@@ -60,6 +61,8 @@ const RESTART_DEBOUNCE_MS = 400;
 export class Connection {
     credentials: Credentials | null = null;
     catalogue: DeckAction[] = [];
+    /** The newest releases this Polaris knows of, from the last catalogue. */
+    latest: DeckReleases | null = null;
     current: Phase = { phase: "unset" };
     #address: string | null = null;
     #catalogueAt = 0;
@@ -123,7 +126,9 @@ export class Connection {
         if (!force && Date.now() - this.#catalogueAt < 5_000) return;
         this.#catalogueAt = Date.now();
         try {
-            this.catalogue = await this.client.catalogue(credentials);
+            const listing = await this.client.listing(credentials);
+            this.catalogue = listing.actions;
+            this.latest = listing.latest;
             this.host.catalogue(this.catalogue);
             this.#set({ phase: "online" });
         } catch (caught) {
@@ -283,6 +288,7 @@ export class Connection {
         this.#stopStream();
         this.credentials = null;
         this.catalogue = [];
+        this.latest = null;
         this.host.catalogue([]);
         this.host.save(null);
         this.#set({ phase: "unauthorized" });

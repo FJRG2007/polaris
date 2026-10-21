@@ -265,7 +265,9 @@ export const FIXED_VARIABLES = [
     { id: "connection", name: "Connection to Polaris" },
     { id: "account", name: "Signed-in account" },
     { id: "sign_in_code", name: "Code to approve in Polaris" },
-    { id: "sign_in_url", name: "Page to approve the code on" }
+    { id: "sign_in_url", name: "Page to approve the code on" },
+    { id: "update_version", name: "Newer module version, empty when this is the newest" },
+    { id: "update_url", name: "Page to download the newer module from" }
 ] as const;
 
 /** A preset button, in the plain shape this file produces. */
