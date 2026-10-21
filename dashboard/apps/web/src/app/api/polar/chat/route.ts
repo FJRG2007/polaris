@@ -42,6 +42,7 @@ import {
     usedInMessages
 } from "@/lib/polar/tool-relevance";
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
+import { polarVisualTools } from "@/lib/polar/visual-tool";
 import {
     NATIVE_SEARCH_STAND_INS,
     WEB_APPROVAL,
@@ -216,12 +217,14 @@ export async function POST(request: Request): Promise<Response> {
         ),
         ...findToolsTool(catalog)
     };
+    const visualTools = polarVisualTools();
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
         tools: {
             ...toolset.tools,
             ...screenTools,
             ...memoryTools,
+            ...visualTools,
             ...NATIVE_SEARCH_STAND_INS,
             ...polarWebTools("", ""),
             ...connectorSet.tools,
@@ -283,6 +286,7 @@ export async function POST(request: Request): Promise<Response> {
         ...screenTools,
         ...Object.fromEntries(Object.entries(toolset.tools).filter(([name]) => !off.has(name))),
         ...(remembers ? memoryTools : {}),
+        ...visualTools,
         ...webTools,
         ...(body.data.connectors
             ? Object.fromEntries(
@@ -296,6 +300,7 @@ export async function POST(request: Request): Promise<Response> {
     const always = [
         READ_CURRENT_VIEW,
         FIND_TOOLS,
+        ...Object.keys(visualTools),
         ...Object.keys(remembers ? memoryTools : {}),
         ...Object.keys(webTools),
         // A connector is one the person added on purpose: its tools are always sent.

@@ -163,6 +163,52 @@ describe("formats", () => {
         expect(markdown).toContain("Next answer");
     });
 
+    it("writes a view Polar drew as its Markdown, and leaves out one that never drew", () => {
+        const at = new Date(0).toISOString();
+        const markdown = exporter.threadMarkdown(
+            {
+                id: ID,
+                title: "Plans",
+                createdAt: at,
+                updatedAt: at,
+                truncated: false,
+                messages: [
+                    {
+                        id: "a",
+                        parentId: null,
+                        role: "assistant",
+                        parts: [
+                            { type: "text", text: "Here they are." },
+                            {
+                                type: "tool-polar_show",
+                                state: "output-available",
+                                input: {
+                                    view: {
+                                        kind: "table",
+                                        columns: [{ label: "Plan" }, { label: "Price" }],
+                                        rows: [["Pro", 12]]
+                                    }
+                                }
+                            },
+                            {
+                                type: "tool-polar_show",
+                                state: "output-error",
+                                input: { view: { kind: "x" } }
+                            }
+                        ],
+                        metadata: null,
+                        createdAt: at
+                    }
+                ]
+            },
+            NAMES
+        );
+        expect(markdown).toContain(
+            "Here they are.\n\n| Plan | Price |\n| --- | --- |\n| Pro | 12 |"
+        );
+        expect(markdown).not.toContain("Usó polar_show");
+    });
+
     it("writes the newest path as Markdown, tools and files by name only", async () => {
         const thread = (await exporter.readExportThread("u1", ID))!;
         const markdown = exporter.threadMarkdown(thread, NAMES);

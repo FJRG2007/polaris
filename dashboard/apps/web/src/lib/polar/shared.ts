@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import type { PolarVisual } from "@/lib/polar/visuals";
 
 /** How hard the model thinks. Mapped to the AI SDK's provider-neutral
  *  `reasoning` call option, which each provider translates to its own effort
@@ -643,11 +644,18 @@ export interface SharedPolarFile {
     mediaType: string;
 }
 
+/** One piece of a shared answer, in order: words, or a view Polar drew. */
+export type SharedPolarBlock =
+    { kind: "text"; text: string } | { kind: "visual"; visual: PolarVisual };
+
 export interface SharedPolarMessage {
     id: string;
     role: "user" | "assistant";
+    /** Everything as text, each view as its Markdown: what a copy continues from. */
     text: string;
     files: SharedPolarFile[];
+    /** Present only when the message drew a view: the pieces to draw, in order. */
+    blocks?: SharedPolarBlock[];
 }
 
 export interface SharedPolarThread {

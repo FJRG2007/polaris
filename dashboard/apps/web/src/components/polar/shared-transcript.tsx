@@ -3,14 +3,16 @@
 /**
  * A shared Polar chat's messages, read-only: the question on the right, the
  * answer below it, the way the chat itself lays them out, with the files the
- * snapshot shows. Drawn by the public link's page and by the page of a chat
- * somebody sent you, which differ only in where a file is read from.
+ * snapshot shows and the views an answer drew. Drawn by the public link's page
+ * and by the page of a chat somebody sent you, which differ only in where a
+ * file is read from.
  */
 
 import { cn } from "@polaris/ui";
 import { FileText } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MessageResponse } from "@/components/polar/elements/message";
+import { PolarVisualView } from "@/components/polar/visuals/visual-view";
 import type { SharedPolarFile, SharedPolarMessage } from "@/lib/polar/shared";
 
 const PICTURES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -41,7 +43,15 @@ export function SharedMessages({
                     {message.files.length > 0 ? (
                         <Files files={message.files} fileUrl={fileUrl} />
                     ) : null}
-                    {message.text ? (
+                    {message.blocks ? (
+                        message.blocks.map((block, index) =>
+                            block.kind === "visual" ? (
+                                <PolarVisualView key={index} visual={block.visual} />
+                            ) : (
+                                <MessageResponse key={index}>{block.text}</MessageResponse>
+                            )
+                        )
+                    ) : message.text ? (
                         message.role === "user" ? (
                             <p className="min-w-0 whitespace-pre-wrap break-words rounded-2xl bg-muted px-4 py-2.5 text-sm text-foreground">
                                 {message.text}
