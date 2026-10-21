@@ -30,10 +30,7 @@ export default async function MailServerDetailPage({
         const t = await getTranslations("mailServer");
         return (
             <div className="mx-auto flex w-full max-w-5xl flex-col">
-                <PageHeader
-                    title={t("page.title")}
-                    description={t("page.description")}
-                />
+                <PageHeader title={t("page.title")} description={t("page.description")} />
                 <MailServerInstallState
                     canInstall={await sessionCan(user, "deploy.manage")}
                     canBrowse={user.isAdmin}

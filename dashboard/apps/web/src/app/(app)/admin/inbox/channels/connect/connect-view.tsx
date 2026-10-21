@@ -49,13 +49,19 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
                 >
                     <ArrowLeft className="size-3" /> {t("inboxChannels.title")}
                 </Link>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxChannels.connect")}</h1>
-                <p className="text-sm text-muted-foreground">{t("inboxChannels.connectPage.intro")}</p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("inboxChannels.connect")}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                    {t("inboxChannels.connectPage.intro")}
+                </p>
             </div>
 
             <section className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">{t("inboxChannels.connectPage.messaging")}</h2>
+                    <h2 className="text-sm font-medium">
+                        {t("inboxChannels.connectPage.messaging")}
+                    </h2>
                     <p className="text-xs text-muted-foreground">
                         {bridgeReady
                             ? t("inboxChannels.connectPage.messagingHint")

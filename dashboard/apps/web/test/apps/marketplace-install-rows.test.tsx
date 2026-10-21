@@ -35,12 +35,10 @@ vi.mock("@/lib/apps/install-service", async (importOriginal) => {
     return {
         installForReader: actual.installForReader,
         instanceWideInstallIds: vi.fn(async () => ["install-theirs"]),
-        listInstalledApps: vi.fn(
-            async (): Promise<InstalledAppView[]> => [
-                row("install-mine", "reader-1"),
-                row("install-theirs", "owner-2")
-            ]
-        )
+        listInstalledApps: vi.fn(async (): Promise<InstalledAppView[]> => [
+            row("install-mine", "reader-1"),
+            row("install-theirs", "owner-2")
+        ])
     };
 });
 vi.mock("@/app/(app)/apps/marketplace/marketplace-view", () => ({ MarketplaceView: () => null }));

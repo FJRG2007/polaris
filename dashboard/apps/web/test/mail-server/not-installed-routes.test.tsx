@@ -21,7 +21,9 @@ vi.mock("@/lib/session", () => ({
 }));
 vi.mock("@/lib/i18n/request", async () => {
     const { translatorFor } = await import("@/lib/i18n/translate");
-    return { getTranslations: async (namespace: "mailServer") => translatorFor("en-US", namespace) };
+    return {
+        getTranslations: async (namespace: "mailServer") => translatorFor("en-US", namespace)
+    };
 });
 vi.mock("@/lib/mail-server/app-install", () => ({ adoptMailServerApp: async () => installed }));
 vi.mock("@/lib/mail-server/access", () => ({
@@ -39,7 +41,9 @@ vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
     uninstallMailServerAppAction: async () => ({})
 }));
 vi.mock("@/app/(app)/apps/mail-server/mail-servers-view", () => ({
-    MailServersView: ({ canUninstall }: { canUninstall: boolean }) => <div data-list={String(canUninstall)} />
+    MailServersView: ({ canUninstall }: { canUninstall: boolean }) => (
+        <div data-list={String(canUninstall)} />
+    )
 }));
 vi.mock("@/app/(app)/apps/mail-server/[id]/server-view", () => ({
     ServerView: ({ hostname }: { hostname: string }) => <div data-server={hostname} />
@@ -112,6 +116,8 @@ describe("once it is installed", () => {
     });
 
     it("still refuses a malformed link", async () => {
-        await expect(DetailPage({ params: Promise.resolve({ id: "not-an-id" }) })).rejects.toThrow("NEXT_NOT_FOUND");
+        await expect(DetailPage({ params: Promise.resolve({ id: "not-an-id" }) })).rejects.toThrow(
+            "NEXT_NOT_FOUND"
+        );
     });
 });
