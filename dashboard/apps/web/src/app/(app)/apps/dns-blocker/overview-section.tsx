@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Ad blocker's Overview: where it stands, pausing it, what it has been doing,
+ * The Network filter's Overview: where it stands, pausing it, what it has been doing,
  * and - until the network uses it - what to type into the router.
  */
 

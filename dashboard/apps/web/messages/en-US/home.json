@@ -90,7 +90,7 @@
             "description": "What was done with your account, and from where."
         },
         "dnsBlocker": {
-            "label": "Ad blocker",
+            "label": "Network filter",
             "description": "The last 24 hours' lookups on your network, and how many were blocked."
         }
     },
@@ -202,9 +202,9 @@
         "decrease": "Lower {label} on {name}"
     },
     "dnsBlocker": {
-        "unavailable": "The ad blocker could not be read just now.",
+        "unavailable": "The network filter could not be read just now.",
         "off": "Blocking is off, so nothing is filtered yet.",
-        "open": "Open Ad blocker",
+        "open": "Open Network filter",
         "active": "Blocking",
         "paused": "Paused",
         "pausedFor": "Paused for {minutes} min",

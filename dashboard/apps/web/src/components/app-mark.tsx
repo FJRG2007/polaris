@@ -9,7 +9,7 @@
  * shelf is the same six glyphs is a store nobody can scan.
  *
  * A catalog entry that installs one of Polaris's own apps (Tools, Calendar,
- * CRM, Status pages, the Ad blocker, Places, Game servers) wears that app's
+ * CRM, Status pages, the Network filter, Places, Game servers) wears that app's
  * own `AppLogo` (`OWN_APPS` below), so the card in the store is the tile the
  * launcher will show once it is installed.
  *

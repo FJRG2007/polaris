@@ -48,7 +48,7 @@ ungrouped; People, Access and Communication are as they were.
 
 ## Apps rail
 
-Deploy and Marketplace stay ungrouped at the top. Mail server and Ad blocker
+Deploy and Marketplace stay ungrouped at the top. Mail server and Network filter
 appear only once installed.
 
 | Screen | Path | Before | After |
@@ -65,7 +65,7 @@ appear only once installed.
 | Containers | `/apps/containers` | Machines | Machines |
 | Tunnels | `/apps/tunnels` | Machines | Network |
 | Firewall | `/apps/firewall` | Operations | Network |
-| Ad blocker | `/apps/dns-blocker` | Operations | Network |
+| Network filter | `/apps/dns-blocker` | Operations | Network |
 | Databases | `/apps/databases` | Operations | Data & services |
 | Backups | `/apps/backups` | Operations | Data & services |
 | Mail server | `/apps/mail-server` | Operations | Data & services |

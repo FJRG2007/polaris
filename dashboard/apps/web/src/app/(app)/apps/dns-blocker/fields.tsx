@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Small pieces every section of the Ad blocker shares: rules and resolvers edited
+ * Small pieces every section of the Network filter shares: rules and resolvers edited
  * one per line, and how a service or a list group is named on screen.
  */
 

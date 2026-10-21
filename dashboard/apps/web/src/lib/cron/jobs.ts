@@ -71,6 +71,7 @@ import { watchDisks } from "@/lib/deploy/disk-watch";
 import { runCutoverPass } from "@/lib/deploy/dns-cutover-service";
 import { reapplyAfterClockChange } from "@/lib/dns-blocker/service";
 import { rollUpHistory } from "@/lib/dns-blocker/insights";
+import { runReputationPass } from "@/lib/dns-blocker/reputation-service";
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 
 const MINUTE = 60 * 1000;
@@ -205,6 +206,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // once would each read the same files (the row itself is written once).
         leaseMs: 2 * HOUR,
         run: () => rollUpHistory()
+    },
+    {
+        key: "dns-blocker-reputation",
+        // Every five minutes: how long a domain nobody had asked for before
+        // goes unchecked after its first visit. A pass with the lookups off
+        // reads two rows; one with them on asks about twenty names at most.
+        everyMs: 5 * MINUTE,
+        // Leased: two passes would each spend the budget on the same names.
+        leaseMs: 10 * MINUTE,
+        run: () => runReputationPass()
     },
     {
         key: "dns-cutovers",

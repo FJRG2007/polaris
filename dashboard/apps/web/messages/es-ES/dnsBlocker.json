@@ -1,11 +1,11 @@
 {
     "page": {
-        "title": "Antianuncios",
+        "title": "Filtro de red",
         "description": "Bloquea anuncios, rastreadores y malware en todos los dispositivos de tu red."
     },
     "install": {
-        "title": "Antianuncios no está instalado",
-        "body": "Instálalo para bloquear anuncios, rastreadores y malware en cada dispositivo de tu red. Instalarlo no arranca nada; enciendes el bloqueador después.",
+        "title": "Filtro de red no está instalado",
+        "body": "Instálalo para bloquear anuncios, rastreadores y malware en cada dispositivo de tu red. Instalarlo no arranca nada; enciendes el filtro después.",
         "pending": "Instalando...",
         "install": "Instalar",
         "view": "Ver en Marketplace"
@@ -19,11 +19,11 @@
     "states": {
         "off": {
             "label": "Apagado",
-            "body": "El bloqueador está apagado. Enciéndelo para arrancar un servidor DNS en esta máquina en {address}."
+            "body": "El filtro está apagado. Enciéndelo para arrancar un servidor DNS en esta máquina en {address}."
         },
         "portTaken": {
             "label": "Puerto ocupado",
-            "body": "Otro servidor DNS ya responde en el puerto 53 de {address}, así que el bloqueador no puede arrancar ahí. Apaga ese y vuelve a intentarlo."
+            "body": "Otro servidor DNS ya responde en el puerto 53 de {address}, así que el filtro no puede arrancar ahí. Apaga ese y vuelve a intentarlo."
         },
         "starting": {
             "label": "Arrancando",
@@ -39,7 +39,7 @@
         },
         "conflict": {
             "label": "Sin respuesta",
-            "body": "Algo distinto del bloqueador responde en el puerto 53 de {address}. Reintenta para arrancar el bloqueador de nuevo."
+            "body": "Algo distinto del filtro responde en el puerto 53 de {address}. Reintenta para arrancar el filtro de nuevo."
         },
         "blocking": {
             "label": "Bloqueando",
@@ -57,7 +57,7 @@
     },
     "router": {
         "title": "Apunta tu red hacia él",
-        "intro": "Los dispositivos usan el bloqueador cuando tu router reparte su dirección como servidor DNS.",
+        "intro": "Los dispositivos usan el filtro cuando tu router reparte su dirección como servidor DNS.",
         "dnsServer": "Servidor DNS",
         "noAddress": "Aún no se sabe",
         "step1": "Abre la página de ajustes de tu router y busca los ajustes de DHCP o LAN.",
@@ -96,9 +96,41 @@
     },
     "rules": {
         "title": "Tus reglas",
-        "intro": "Una por línea: un nombre, *.nombre para todo lo que cuelga de él, o /regex/. Los nombres permitidos ganan a cualquier lista.",
+        "intro": "Nombres que siempre permites o siempre bloqueas. Los permitidos ganan a cualquier lista.",
         "allow": "Permitir siempre",
-        "deny": "Bloquear siempre"
+        "deny": "Bloquear siempre",
+        "add": "Nueva regla",
+        "addTitle": "Añadir regla",
+        "editTitle": "Editar regla",
+        "syntax": "Un nombre, *.nombre para todo lo que cuelga de él, o /regex/ entre barras.",
+        "actionLabel": "Acción",
+        "value": "Nombre o patrón",
+        "detected": "Se lee como: {kind}",
+        "cancel": "Cancelar",
+        "addRule": "Añadir",
+        "saveRule": "Guardar",
+        "search": "Buscar reglas",
+        "filter": "Mostrar",
+        "filterAll": "Todas",
+        "noMatch": "Ninguna regla coincide con la búsqueda.",
+        "empty": "Sin reglas aún",
+        "emptyHint": "Añade un nombre para permitirlo siempre, o para bloquearlo siempre.",
+        "edit": "Editar {rule}",
+        "remove": "Quitar {rule}",
+        "action": {
+            "allow": "Permitir",
+            "deny": "Bloquear"
+        },
+        "kind": {
+            "exact": "Exacta",
+            "wildcard": "Comodín",
+            "regex": "Regex"
+        },
+        "refusal": {
+            "duplicate": "Esa regla ya está en la lista.",
+            "tooMany": "La lista ya tiene todas las reglas que admite.",
+            "missing": "Esa regla ha cambiado entretanto. Recarga la página y vuelve a intentarlo."
+        }
     },
     "upstream": {
         "title": "Resolutor",
@@ -151,7 +183,7 @@
         "cacheRange": "El tiempo mínimo no puede pasar del máximo."
     },
     "errors": {
-        "notInstalled": "Antianuncios no está instalado. Instálalo antes desde el Marketplace.",
+        "notInstalled": "Filtro de red no está instalado. Instálalo antes desde el Marketplace.",
         "tooLarge": "Estas reglas son demasiado largas para aplicarlas. Quita algunas de las tuyas y guarda de nuevo.",
         "noAddress": "Esta máquina aún no tiene dirección en tu red. Vuelve a comprobarlo en un minuto.",
         "portTaken": "Otro servidor DNS ya responde aquí en el puerto 53. Apágalo y vuelve a intentarlo.",
@@ -294,7 +326,7 @@
         "save": "Después pulsa <b>{button}</b>.",
         "ipv6": "Si tu red usa IPv6, ve a <b>{path}</b> y pon en <b>{field}</b>",
         "conflict": "Ve a <b>{path}</b> y desactiva <b>{field}</b>. Mientras esté activo, el router manda los dispositivos a su propio DNS y se salta este.",
-        "relayNote": "Este router sigue repartiendo su propia dirección y pregunta al bloqueador en nombre de cada dispositivo. Los anuncios se bloquean igual, pero todas las consultas aparecen como del router.",
+        "relayNote": "Este router sigue repartiendo su propia dirección y pregunta al filtro en nombre de cada dispositivo. El filtrado sigue funcionando, pero todas las consultas aparecen como del router.",
         "source": "Pasos de la documentación de {brand}",
         "notes": {
             "fritzbox": "Para IPv6, marca también \"Also announce DNSv6 server via router advertisement (RFC 5006)\". Después puede que fritz.box deje de abrir en tus dispositivos; usa 192.168.178.1.",
@@ -309,11 +341,11 @@
             "title": "¿Lo usan los dispositivos?",
             "failed": "Polaris no ha podido leer el registro ahora. Vuelve a comprobarlo en un momento.",
             "again": "Comprobar",
-            "none": "Ningún dispositivo ha preguntado nada al bloqueador en las últimas 24 horas. El router aún reparte otro servidor DNS, o los dispositivos no han renovado su dirección.",
-            "routerOnly": "Solo el router ({router}) pregunta al bloqueador. Los dispositivos pasan por el router, así que están cubiertos, pero el bloqueador no los distingue. Cambia arriba el DNS del DHCP para ver cada uno.",
-            "relayed": "El router ({router}) pregunta al bloqueador por tus dispositivos, como se espera en este router. Los anuncios se están bloqueando.",
-            "devices": "{count, plural, one {Un dispositivo ha} other {# dispositivos han}} usado el bloqueador en las últimas 24 horas:",
-            "logOff": "El bloqueador aún no guarda registro, así que Polaris no puede ver qué dispositivos lo usan. Aplica una vez los ajustes de abajo y vuelve a comprobar."
+            "none": "Ningún dispositivo ha preguntado nada al filtro en las últimas 24 horas. El router aún reparte otro servidor DNS, o los dispositivos no han renovado su dirección.",
+            "routerOnly": "Solo el router ({router}) pregunta al filtro. Los dispositivos pasan por el router, así que están cubiertos, pero el filtro no los distingue. Cambia arriba el DNS del DHCP para ver cada uno.",
+            "relayed": "El router ({router}) pregunta al filtro por tus dispositivos, como se espera en este router. Se están filtrando sin problema.",
+            "devices": "{count, plural, one {Un dispositivo ha} other {# dispositivos han}} usado el filtro en las últimas 24 horas:",
+            "logOff": "El filtro aún no guarda registro, así que Polaris no puede ver qué dispositivos lo usan. Aplica una vez los ajustes de abajo y vuelve a comprobar."
         }
     },
     "devices": {
@@ -391,7 +423,7 @@
     },
     "engine": {
         "title": "Motor",
-        "intro": "Cómo responde el bloqueador, más allá de qué bloquea.",
+        "intro": "Cómo responde el filtro, más allá de qué bloquea.",
         "cacheMin": "Guardar respuestas mínimo (min)",
         "cacheMax": "Guardar respuestas máximo (min)",
         "cacheHint": "0 guarda cada respuesta lo que dure su propio TTL.",
@@ -406,7 +438,7 @@
     },
     "lookup": {
         "title": "¿Se bloquea este nombre?",
-        "intro": "Pregunta al bloqueador por un nombre, como un equipo sin grupo propio.",
+        "intro": "Pregunta al filtro por un nombre, como un equipo sin grupo propio.",
         "domain": "Nombre a mirar",
         "ask": "Mirar",
         "invalid": "Escribe un nombre, como ads.example.com, sin * ni /.",
@@ -436,11 +468,11 @@
     },
     "transfer": {
         "title": "Copia y restauración",
-        "intro": "Todos los ajustes del bloqueador en un archivo, para guardar o llevar a otro Polaris.",
+        "intro": "Todos los ajustes del filtro en un archivo, para guardar o llevar a otro Polaris.",
         "export": "Bajar ajustes",
         "import": "Restaurar archivo",
         "notJson": "Ese archivo no es de ajustes.",
-        "notExport": "Ese archivo no es una copia del bloqueador.",
+        "notExport": "Ese archivo no es una copia del filtro de red.",
         "invalid": "No se cargó nada: estos ajustes del archivo no son válidos: {fields}.",
         "same": "El archivo coincide con lo guardado.",
         "changes": "Cargar este archivo cambia:",
@@ -471,5 +503,28 @@
             "namesFrom": "Origen nombres",
             "engine": "Motor"
         }
+    },
+    "reputation": {
+        "title": "Reputación",
+        "intro": "Bloquea los dominios que Dymo señala, además de tus listas. Cada dominio nuevo se consulta una vez y se recuerda.",
+        "category": {
+            "fraud": "Fraude y estafas",
+            "adult": "Contenido adulto"
+        },
+        "logLabel": "{category} (Dymo)",
+        "firstVisit": "Un dominio se comprueba poco después de su primera visita, así que esa primera visita pasa. El bloqueo empieza en pocos minutos.",
+        "connect": "Abrir Integraciones",
+        "off": {
+            "integrationOff": "Dymo no está conectado, así que no se bloquea nada por reputación.",
+            "noKey": "Dymo aún no tiene clave de API, así que no se bloquea nada por reputación.",
+            "noCategory": "Activa antes una categoría arriba y guarda.",
+            "budget": "Ya se han gastado las consultas de ahora. Prueba dentro de un minuto.",
+            "failed": "Dymo no ha respondido. Prueba dentro de un minuto."
+        },
+        "search": "Buscar dominios señalados",
+        "none": "Aún no se ha señalado ningún dominio.",
+        "allowed": "Permitido",
+        "allow": "Permitir siempre {domain}",
+        "recheck": "Volver a comprobar {domain}"
     }
 }

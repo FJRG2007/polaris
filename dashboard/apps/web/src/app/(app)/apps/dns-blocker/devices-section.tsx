@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Ad blocker's Devices: names for the addresses in the log, and groups of
+ * The Network filter's Devices: names for the addresses in the log, and groups of
  * devices with lists of their own.
  */
 

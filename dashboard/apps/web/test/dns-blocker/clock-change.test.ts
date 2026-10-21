@@ -1,5 +1,5 @@
 /**
- * Applying the ad blocker's configuration again after a daylight-saving change:
+ * Applying the network filter's configuration again after a daylight-saving change:
  * only when the clock is the whole difference, and never with no server to take it.
  */
 
@@ -66,7 +66,7 @@ describe("clockChangeDecision", () => {
 
     it("leaves every difference that is not the clock to the screen", () => {
         // Saved while the server could not take it: more than the hours differ.
-        const older = encodeBlockyConfig(settings({ deny: ["example.test"] }), BEFORE_FALL);
+        const older = encodeBlockyConfig(settings({ safeSearch: true }), BEFORE_FALL);
         expect(
             clockChangeDecision({
                 engine: RUNNING,
@@ -81,7 +81,7 @@ describe("clockChangeDecision", () => {
             clockChangeDecision({
                 engine: RUNNING,
                 stored: encodeBlockyConfig(
-                    settings({ schedules: [], deny: ["example.test"] }),
+                    settings({ schedules: [], safeSearch: true }),
                     AFTER_FALL
                 ),
                 settings: unscheduled,
@@ -101,7 +101,7 @@ describe("clockChangeDecision", () => {
     it("never treats a zone without daylight saving as moved", () => {
         const fixed = settings({ timeZone: "Asia/Kolkata" });
         const stored = encodeBlockyConfig(
-            settings({ timeZone: "Asia/Kolkata", deny: ["a.test"] }),
+            settings({ timeZone: "Asia/Kolkata", safeSearch: true }),
             BEFORE_FALL
         );
         expect(

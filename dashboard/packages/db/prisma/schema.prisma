@@ -5955,6 +5955,22 @@ model AddressReputation {
     @@index([checkedAt])
 }
 
+// What Dymo said about one domain the network filter saw asked for, so each
+// domain is one paid lookup a day at most rather than one per visit. `flagged`
+// is `fraud || adult`, kept as a column so the list the DNS server downloads
+// and the screen's list of flagged domains are each one indexed read.
+model DnsReputation {
+    domain    String   @id
+    fraud     Boolean  @default(false)
+    adult     Boolean  @default(false)
+    flagged   Boolean  @default(false)
+    checkedAt DateTime @default(now())
+    expiresAt DateTime
+
+    @@index([flagged, checkedAt])
+    @@index([expiresAt])
+}
+
 // A database somebody opens in the data browser.
 //
 // Two kinds in one table, told apart by `managedDatabaseId`. One Polaris already

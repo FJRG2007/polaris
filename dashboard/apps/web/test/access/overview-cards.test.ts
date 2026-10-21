@@ -48,7 +48,7 @@ describe("availableOverviewWidgets", () => {
         ).not.toContain("games");
     });
 
-    it("offers the ad blocker only to an administrator of an instance that installed it", async () => {
+    it("offers the network filter only to an administrator of an instance that installed it", async () => {
         const installed = { features: { dnsBlocker: true } };
         expect(await availableOverviewWidgets({ ...holding(), ...installed })).not.toContain(
             "dnsBlocker"

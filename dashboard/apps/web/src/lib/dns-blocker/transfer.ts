@@ -1,5 +1,5 @@
 /**
- * The ad blocker's settings as one file, Pi-hole's Teleporter for this blocker:
+ * The network filter's settings as one file, Pi-hole's Teleporter for this blocker:
  * written from what is saved, read back with the same schema a save is checked
  * with, and compared with what is saved so the screen can say what an import
  * changes before anything is applied.

@@ -119,11 +119,13 @@ describe("the work Polaris runs on a schedule", () => {
             "deploy-recycle-bin",
             // Two passes would each sweep the same low disk at once.
             "disk-watch",
-            // Two passes would each redeploy the ad blocker's DNS server after a
+            // Two passes would each redeploy the network filter's DNS server after a
             // daylight-saving change.
             "dns-blocker-clock",
             // Two passes would each read the same days of log from the DNS server.
             "dns-blocker-history",
+            // Two passes would each spend the lookup budget on the same names.
+            "dns-blocker-reputation",
             // A cutover's steps each claim their phase first, so a second pass does
             // nothing; it would only ask the public resolvers twice.
             "dns-cutovers",

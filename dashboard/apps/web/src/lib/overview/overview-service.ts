@@ -167,7 +167,7 @@ export interface OverviewData {
     dnsBlocker?: OverviewDnsBlocker | null;
 }
 
-/** The network's ad blocker today. `today` is null while its DNS server is not
+/** The network's network filter today. `today` is null while its DNS server is not
  *  running, which is a state of its own rather than a failed read. */
 export interface OverviewDnsBlocker {
     today: DnsBlockerSummary | null;
@@ -234,7 +234,7 @@ export async function getOverviewData(
             ? card(() => getWatchOverview(user.id))
             : null;
 
-    // The ad blocker answers every device's lookups, so its screen is for
+    // The network filter answers every device's lookups, so its screen is for
     // administrators only, and so is its card: the same check as the app.
     const canDnsBlocker = asked.has("dnsBlocker") && user.isAdmin;
 

@@ -105,7 +105,7 @@
             "notAnApp": "That is not an app.",
             "appMissing": "This version of Polaris does not have that app.",
             "native": "This is part of Servers and cannot be uninstalled.",
-            "dnsBlockerRunning": "Turn the ad blocker off on its screen first. Uninstalling it while it runs would leave every device pointed at it without DNS."
+            "dnsBlockerRunning": "Turn the network filter off on its screen first. Uninstalling it while it runs would leave every device pointed at it without DNS."
         },
         "mail": {
             "channelGone": "That email channel no longer exists.",

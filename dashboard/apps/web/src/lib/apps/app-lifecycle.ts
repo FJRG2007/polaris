@@ -47,7 +47,7 @@ export async function appUninstallRefusal(row: {
     // Part of Servers on every Polaris: an install row left from when it was a
     // marketplace app is not something to remove.
     if (isNativeApp(row.catalogId)) return (await readerWords("api"))("refusals.apps.native");
-    // The ad blocker answers DNS for every device pointed at it. Taking the app
+    // The network filter answers DNS for every device pointed at it. Taking the app
     // away while its engine runs would leave the engine with no screen to turn it
     // off from - or, paused with the app, the whole network without names.
     if (row.catalogId === DNS_BLOCKER_APP) {

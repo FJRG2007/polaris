@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Pointing the network at the ad blocker, in the menus of the router in front of
+ * Pointing the network at the network filter, in the menus of the router in front of
  * the operator, and whether it worked.
  *
  * The steps come from the same catalogue as the port-forwarding guide on the

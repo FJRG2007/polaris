@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Ad blocker's Settings: who answers what it lets through, safe search,
+ * The Network filter's Settings: who answers what it lets through, safe search,
  * and how long it keeps what it saw and how often it reads its lists again.
  */
 
