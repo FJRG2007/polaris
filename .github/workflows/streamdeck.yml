@@ -104,6 +104,12 @@ jobs:
             elif [ -n "$newest" ] && git merge-base --is-ancestor HEAD "$newest"; then
               echo "$newest already contains this commit; nothing to release."
               version="${newest#"$PREFIX"}"
+            elif [ -n "$newest" ] && git diff --quiet "$newest" HEAD -- apps/streamdeck \
+                ':(exclude)apps/streamdeck/test' \
+                ':(exclude)apps/streamdeck/vitest.config.ts' \
+                ':(exclude)apps/streamdeck/*.md'; then
+              echo "Nothing the plugin ships changed since $newest; nothing to release."
+              version="${newest#"$PREFIX"}"
             else
               version="$(git tag -l "$PREFIX*" | node scripts/release-version.mjs next --prefix "$PREFIX" --package "$pkg")"
               release=true

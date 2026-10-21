@@ -1,9 +1,9 @@
 /**
  * The version a release cut from `main` gets, and stamping it into the build.
  *
- * The Stream Deck plugin and the Companion module release themselves on every
- * push to `main` that changes what they ship, so nobody bumps a version by hand
- * and no bump commit is ever written. The next version is the newest released
+ * The Stream Deck plugin releases itself on every push to `main` that changes
+ * what it ships (the Companion module will too, once it exists), so nobody bumps
+ * a version by hand and no bump commit is ever written. The next version is the newest released
  * tag with its patch moved on, or the version in the package's `package.json`
  * when somebody raised that past every release (which is how a minor or major
  * release is asked for). The answer is stamped into `package.json`, and into the

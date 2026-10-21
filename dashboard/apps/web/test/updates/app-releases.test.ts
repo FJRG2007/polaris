@@ -309,6 +309,22 @@ describe("appDownload", () => {
         }
     });
 
+    it("shares one lookup between everybody asking while it is still running", async () => {
+        const fetching = answering({ "1": [release({ tag_name: "desktop-v0.3.0" })] });
+        vi.stubGlobal("fetch", fetching);
+        try {
+            const answers = await Promise.all([
+                desktopDownload("example/shares"),
+                desktopDownload("example/shares"),
+                desktopDownload("example/shares")
+            ]);
+            expect(answers.map((found) => found?.version)).toEqual(["0.3.0", "0.3.0", "0.3.0"]);
+            expect(fetching).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
     describe("once its answer is two minutes old", () => {
         // A release published a minute ago was shown as the one before it for ten
         // minutes, on a screen with no refresh of its own.
