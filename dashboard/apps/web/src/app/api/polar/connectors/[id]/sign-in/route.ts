@@ -20,7 +20,10 @@ export async function POST(_request: Request, { params }: Params): Promise<Respo
     if (user instanceof NextResponse) return user;
     const refused = await connectorGate(user, 10);
     if (refused) return refused;
-    const id = z.string().uuid().safeParse((await params).id);
+    const id = z
+        .string()
+        .uuid()
+        .safeParse((await params).id);
     if (!id.success) return refuse("not_found", 404);
     const started = await startSignIn(user.id, id.data);
     if (typeof started === "string") return refuse(started, started === "not_found" ? 404 : 409);

@@ -160,7 +160,12 @@ export function PolarConnectors({
                     </p>
                 </div>
                 {!adding ? (
-                    <Button type="button" size="sm" variant="outline" onClick={() => setAdding(true)}>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAdding(true)}
+                    >
                         <Plug className="h-3.5 w-3.5 shrink-0" />
                         {t("polarConnectors.add")}
                     </Button>
@@ -192,7 +197,9 @@ export function PolarConnectors({
             {rows.length === 0 && !adding ? (
                 <Card>
                     <CardBody>
-                        <p className="text-sm text-muted-foreground">{t("polarConnectors.empty")}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {t("polarConnectors.empty")}
+                        </p>
                     </CardBody>
                 </Card>
             ) : null}
@@ -213,10 +220,16 @@ export function PolarConnectors({
                                     )}
                                 />
                                 <span className="min-w-0">
-                                    <span className="block truncate text-sm font-medium" title={row.name}>
+                                    <span
+                                        className="block truncate text-sm font-medium"
+                                        title={row.name}
+                                    >
                                         {row.name}
                                     </span>
-                                    <span className="block truncate text-xs text-muted-foreground" title={row.url}>
+                                    <span
+                                        className="block truncate text-xs text-muted-foreground"
+                                        title={row.url}
+                                    >
                                         {row.url}
                                     </span>
                                 </span>
@@ -225,12 +238,16 @@ export function PolarConnectors({
                             <Switch
                                 checked={row.enabled}
                                 aria-label={t("polarConnectors.enabled", { name: row.name })}
-                                onChange={(enabled) => void patch(row, { ...row, enabled }, { enabled })}
+                                onChange={(enabled) =>
+                                    void patch(row, { ...row, enabled }, { enabled })
+                                }
                             />
                         </div>
                         {row.status === "error" ? (
                             <p role="status" className="text-xs text-danger">
-                                {t(`polarConnectors.errors.${isErrorCode(row.lastError) ? row.lastError : "failed"}`)}
+                                {t(
+                                    `polarConnectors.errors.${isErrorCode(row.lastError) ? row.lastError : "failed"}`
+                                )}
                             </p>
                         ) : null}
                         <div className="flex flex-wrap items-center gap-2">
@@ -253,7 +270,10 @@ export function PolarConnectors({
                                 onClick={() => void test(row)}
                             >
                                 <RefreshCw
-                                    className={cn("h-3.5 w-3.5 shrink-0", busy === row.id && "animate-spin")}
+                                    className={cn(
+                                        "h-3.5 w-3.5 shrink-0",
+                                        busy === row.id && "animate-spin"
+                                    )}
                                 />
                                 {t("polarConnectors.test")}
                             </Button>
@@ -286,7 +306,13 @@ export function PolarConnectors({
                                                         {tool.title}
                                                     </span>
                                                     {!tool.readOnly ? (
-                                                        <Badge variant={tool.destructive ? "warning" : "neutral"}>
+                                                        <Badge
+                                                            variant={
+                                                                tool.destructive
+                                                                    ? "warning"
+                                                                    : "neutral"
+                                                            }
+                                                        >
                                                             {t("polarConnectors.writes")}
                                                         </Badge>
                                                     ) : null}
@@ -303,7 +329,9 @@ export function PolarConnectors({
                                             <SegmentedControl<Policy>
                                                 size="sm"
                                                 value={tool.policy}
-                                                aria-label={t("polarConnectors.policyLabel", { tool: tool.title })}
+                                                aria-label={t("polarConnectors.policyLabel", {
+                                                    tool: tool.title
+                                                })}
                                                 options={POLICIES.map((value) => ({
                                                     value,
                                                     label: t(`polarConnectors.policy.${value}`)
@@ -314,7 +342,9 @@ export function PolarConnectors({
                                                         {
                                                             ...row,
                                                             tools: row.tools.map((entry) =>
-                                                                entry.name === tool.name ? { ...entry, policy } : entry
+                                                                entry.name === tool.name
+                                                                    ? { ...entry, policy }
+                                                                    : entry
                                                             )
                                                         },
                                                         { tool: { name: tool.name, policy } }
@@ -345,7 +375,13 @@ function StatusBadge({ row }: { row: ConnectorView }) {
     const t = useTranslations("account");
     const status = row.auth === "oauth" && !row.signedIn ? "sign_in" : row.status;
     const variant =
-        status === "ok" ? "success" : status === "error" ? "danger" : status === "sign_in" ? "warning" : "neutral";
+        status === "ok"
+            ? "success"
+            : status === "error"
+              ? "danger"
+              : status === "sign_in"
+                ? "warning"
+                : "neutral";
     return (
         <Badge variant={variant} className="shrink-0">
             {t(`polarConnectors.status.${status}`)}
@@ -424,7 +460,9 @@ function AddConnector({
                             placeholder={t("polarConnectors.urlPlaceholder")}
                         />
                         {urlBad ? (
-                            <span className="text-xs text-danger">{t("polarConnectors.urlInvalid")}</span>
+                            <span className="text-xs text-danger">
+                                {t("polarConnectors.urlInvalid")}
+                            </span>
                         ) : null}
                     </label>
                     <div className="flex flex-col gap-1 text-sm">
@@ -454,7 +492,9 @@ function AddConnector({
                     ) : null}
                     {auth === "oauth" ? (
                         <>
-                            <p className="text-xs text-muted-foreground">{t("polarConnectors.oauthHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("polarConnectors.oauthHint")}
+                            </p>
                             <label className="flex flex-col gap-1 text-sm">
                                 <span>{t("polarConnectors.clientId")}</span>
                                 <Input
@@ -503,7 +543,9 @@ function AddConnector({
                             aria-disabled={!complete || pending}
                             disabled={pending}
                         >
-                            {auth === "oauth" ? t("polarConnectors.addAndSignIn") : t("polarConnectors.save")}
+                            {auth === "oauth"
+                                ? t("polarConnectors.addAndSignIn")
+                                : t("polarConnectors.save")}
                         </Button>
                     </div>
                 </form>

@@ -15,7 +15,10 @@ export async function POST(_request: Request, { params }: Params): Promise<Respo
     if (user instanceof NextResponse) return user;
     const refused = await connectorGate(user, 20);
     if (refused) return refused;
-    const id = z.string().uuid().safeParse((await params).id);
+    const id = z
+        .string()
+        .uuid()
+        .safeParse((await params).id);
     if (!id.success) return refuse("not_found", 404);
     const view = await checkConnector(user.id, id.data);
     if (!view) return refuse("not_found", 404);

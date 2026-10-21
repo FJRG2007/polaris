@@ -152,7 +152,10 @@ describe("Polar access policy", () => {
 
     it("opens connectors to everybody who uses Polar until an administrator narrows them", () => {
         expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member).connectors).toBe(true);
-        const saved = polarPolicySchema.parse({ use: { who: "everyone" }, spend: { who: "admins" } });
+        const saved = polarPolicySchema.parse({
+            use: { who: "everyone" },
+            spend: { who: "admins" }
+        });
         expect(saved.connectors).toEqual({ who: "everyone", hosts: [], privateNetwork: false });
         const admins = { ...saved, connectors: { ...saved.connectors, who: "admins" as const } };
         expect(decidePolarAccess(admins, member).connectors).toBe(false);

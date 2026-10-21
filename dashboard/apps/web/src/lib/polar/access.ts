@@ -151,8 +151,7 @@ export function decidePolarAccess(policy: PolarPolicy, facts: AccessFacts): Pola
         spend: use && audienceAdmits(policy.spend, facts),
         web: use && policy.web,
         connectors:
-            use &&
-            (connectors.who === "everyone" || (connectors.who === "admins" && facts.isAdmin))
+            use && (connectors.who === "everyone" || (connectors.who === "admins" && facts.isAdmin))
     };
 }
 

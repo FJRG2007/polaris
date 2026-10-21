@@ -9,7 +9,9 @@ describe("connector addresses", () => {
         expect(policy.canonicalServerUrl(" https://MCP.example.com/mcp/#x ")).toBe(
             "https://mcp.example.com/mcp"
         );
-        expect(policy.canonicalServerUrl("https://mcp.example.com/")).toBe("https://mcp.example.com");
+        expect(policy.canonicalServerUrl("https://mcp.example.com/")).toBe(
+            "https://mcp.example.com"
+        );
     });
 
     it("refuses credentials, other schemes, and plain http unless allowed", () => {
@@ -40,7 +42,9 @@ describe("connector addresses", () => {
 
 describe("tool namespacing", () => {
     it("prefixes every tool with its connector", () => {
-        expect(policy.connectorToolName(connector, "create_issue")).toBe("mcp_linear__create_issue");
+        expect(policy.connectorToolName(connector, "create_issue")).toBe(
+            "mcp_linear__create_issue"
+        );
         expect(policy.isConnectorToolName("mcp_linear__create_issue")).toBe(true);
         expect(policy.isConnectorToolName("chat_send")).toBe(false);
     });
@@ -59,9 +63,17 @@ describe("tool namespacing", () => {
 describe("tool policy", () => {
     it("lets reads run and makes everything else ask", () => {
         const tools = policy.toCachedTools([
-            { name: "search", inputSchema: { type: "object" }, annotations: { readOnlyHint: true } },
+            {
+                name: "search",
+                inputSchema: { type: "object" },
+                annotations: { readOnlyHint: true }
+            },
             { name: "create", inputSchema: { type: "object" } },
-            { name: "delete", inputSchema: { type: "object" }, annotations: { destructiveHint: true } },
+            {
+                name: "delete",
+                inputSchema: { type: "object" },
+                annotations: { destructiveHint: true }
+            },
             { name: "search" },
             { name: "bad", inputSchema: { type: "string" } }
         ]);
@@ -75,9 +87,9 @@ describe("tool policy", () => {
     it("reads stored lists total", () => {
         expect(policy.readToolPolicies({ a: "allow", b: "maybe", c: 3 })).toEqual({ a: "allow" });
         expect(policy.readToolPolicies(null)).toEqual({});
-        expect(policy.readCachedTools([{ name: "" }, { name: "ok" }]).map((tool) => tool.name)).toEqual([
-            "ok"
-        ]);
+        expect(
+            policy.readCachedTools([{ name: "" }, { name: "ok" }]).map((tool) => tool.name)
+        ).toEqual(["ok"]);
     });
 
     it("refuses input that is plainly not a call to the tool", () => {
@@ -99,7 +111,10 @@ describe("tool policy", () => {
 describe("untrusted output", () => {
     it("caps a connector's answer and fences it", () => {
         const { text, isError } = policy.connectorOutputText({
-            content: [{ type: "text", text: "a".repeat(30_000) }, { type: "image", data: "..." }]
+            content: [
+                { type: "text", text: "a".repeat(30_000) },
+                { type: "image", data: "..." }
+            ]
         });
         expect(isError).toBe(false);
         expect(text.length).toBeLessThan(policy.OUTPUT_MAX + 100);

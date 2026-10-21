@@ -143,7 +143,9 @@ function toRow(row: Selected): ConnectorRow {
     };
 }
 
-function decrypt(row: Pick<Selected, "secret" | "secretNonce" | "secretKeyId">): ConnectorSecret | null {
+function decrypt(
+    row: Pick<Selected, "secret" | "secretNonce" | "secretKeyId">
+): ConnectorSecret | null {
     if (!row.secret || !row.secretNonce) return null;
     try {
         const plain = decryptSecret(
@@ -251,7 +253,12 @@ export async function createConnector(
         input.auth === "bearer"
             ? { token: input.token }
             : input.auth === "oauth" && input.clientId
-              ? { registered: { clientId: input.clientId, clientSecret: input.clientSecret ?? null } }
+              ? {
+                    registered: {
+                        clientId: input.clientId,
+                        clientSecret: input.clientSecret ?? null
+                    }
+                }
               : null;
     const created = (await prisma.polarConnector.create({
         data: {

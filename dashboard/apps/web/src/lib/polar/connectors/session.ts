@@ -59,7 +59,8 @@ function failureOf(error: unknown): ConnectorFailure {
     const message = typeof record?.message === "string" ? record.message : "";
     if (/\b401\b|unauthori[sz]ed/i.test(message)) return "sign_in";
     if (record?.name === "RefusedAddressError") return "refused";
-    if (/fetch failed|ENOTFOUND|ECONNREFUSED|timed? ?out|aborted/i.test(message)) return "unreachable";
+    if (/fetch failed|ENOTFOUND|ECONNREFUSED|timed? ?out|aborted/i.test(message))
+        return "unreachable";
     return "failed";
 }
 
@@ -113,11 +114,11 @@ async function refresh(row: store.ConnectorRow, policy: PolarConnectorPolicy): P
     return stored;
 }
 
-/** Opens the connector, runs `use`, and always closes it again. */
+/** Opens the connector, runs `run`, and always closes it again. */
 async function withClient<T>(
     found: { row: store.ConnectorRow; secret: store.ConnectorSecret | null },
     policy: PolarConnectorPolicy,
-    use: (client: Client) => Promise<T>
+    run: (client: Client) => Promise<T>
 ): Promise<T> {
     // Checked again on every use: an administrator may have narrowed the
     // hosts since this connector was added.
@@ -139,7 +140,7 @@ async function withClient<T>(
     const client = new Client({ name: "Polaris", version: "1.0.0" }, { capabilities: {} });
     try {
         await client.connect(transport, { timeout: 20_000 });
-        return await use(client);
+        return await run(client);
     } catch (error) {
         throw new ConnectorError(failureOf(error));
     } finally {
@@ -151,7 +152,10 @@ async function withClient<T>(
  * Test connection: reads the tool list, stores it, and answers the connector
  * as the screen shows it. A failure is stored as its code.
  */
-export async function checkConnector(ownerId: string, id: string): Promise<store.ConnectorView | null> {
+export async function checkConnector(
+    ownerId: string,
+    id: string
+): Promise<store.ConnectorView | null> {
     const found = await store.ownConnector(ownerId, id);
     if (!found) return null;
     const policy = await store.connectorPolicy();
@@ -159,8 +163,14 @@ export async function checkConnector(ownerId: string, id: string): Promise<store
         const listed = await withClient(found, policy, async (client) => {
             const tools: unknown[] = [];
             let cursor: string | undefined;
-            for (let page = 0; page < LIST_PAGES && tools.length < CONNECTOR_TOOL_LIMIT; page += 1) {
-                const answer = await client.listTools(cursor ? { cursor } : undefined, { timeout: 20_000 });
+            for (
+                let page = 0;
+                page < LIST_PAGES && tools.length < CONNECTOR_TOOL_LIMIT;
+                page += 1
+            ) {
+                const answer = await client.listTools(cursor ? { cursor } : undefined, {
+                    timeout: 20_000
+                });
                 tools.push(...answer.tools);
                 cursor = answer.nextCursor;
                 if (!cursor) break;
@@ -170,7 +180,10 @@ export async function checkConnector(ownerId: string, id: string): Promise<store
         await store.recordCheck(ownerId, id, { status: "ok", tools: toCachedTools(listed) });
     } catch (error) {
         const code = failureOf(error);
-        await store.recordCheck(ownerId, id, { status: code === "sign_in" ? "sign_in" : "error", error: code });
+        await store.recordCheck(ownerId, id, {
+            status: code === "sign_in" ? "sign_in" : "error",
+            error: code
+        });
     }
     const after = await store.ownConnector(ownerId, id);
     return after ? store.viewOf(after.row, after.secret) : null;
@@ -195,10 +208,14 @@ export async function callConnectorTool(
     );
 }
 
-export type SignInRefusal = "not_found" | "not_oauth" | "host" | oauth.ConnectorAuthError["code"] | "failed";
+export type SignInRefusal =
+    "not_found" | "not_oauth" | "host" | oauth.ConnectorAuthError["code"] | "failed";
 
 /** Where to send the person to sign the connector in. */
-export async function startSignIn(ownerId: string, id: string): Promise<{ url: string } | SignInRefusal> {
+export async function startSignIn(
+    ownerId: string,
+    id: string
+): Promise<{ url: string } | SignInRefusal> {
     const found = await store.ownConnector(ownerId, id);
     if (!found) return "not_found";
     if (found.row.auth !== "oauth") return "not_oauth";
@@ -224,7 +241,11 @@ export async function startSignIn(ownerId: string, id: string): Promise<{ url: s
 }
 
 /** The callback: spends the code, stores the tokens, and checks the connector. */
-export async function finishSignIn(ownerId: string, state: string, code: string): Promise<string | null> {
+export async function finishSignIn(
+    ownerId: string,
+    state: string,
+    code: string
+): Promise<string | null> {
     const id = oauth.stateConnectorId(state);
     if (!id) return null;
     const found = await store.ownConnector(ownerId, id);
@@ -236,7 +257,10 @@ export async function finishSignIn(ownerId: string, state: string, code: string)
         return rest;
     };
     try {
-        const tokens = await oauth.finishAuthorization(fetchFor(policy, "auth"), pending, { state, code });
+        const tokens = await oauth.finishAuthorization(fetchFor(policy, "auth"), pending, {
+            state,
+            code
+        });
         const client = {
             clientId: pending.clientId,
             clientSecret: pending.clientSecret,
@@ -251,7 +275,9 @@ export async function finishSignIn(ownerId: string, state: string, code: string)
     } catch {
         // A refused code leaves the pending authorization spent either way.
         await store.updateSecret(ownerId, id, (current) =>
-            current?.pending?.stateHash === pending.stateHash ? { secret: spend(current), result: true } : null
+            current?.pending?.stateHash === pending.stateHash
+                ? { secret: spend(current), result: true }
+                : null
         );
         return null;
     }

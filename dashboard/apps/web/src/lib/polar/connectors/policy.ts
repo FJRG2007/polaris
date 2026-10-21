@@ -70,10 +70,7 @@ export function canonicalServerUrl(raw: string, insecure = false): string | null
 
 export const connectorInputSchema = z
     .object({
-        name: z
-            .string()
-            .transform(normalizeConnectorName)
-            .pipe(z.string().min(1).max(40)),
+        name: z.string().transform(normalizeConnectorName).pipe(z.string().min(1).max(40)),
         url: z.string().trim().min(1).max(2048),
         transport: z.enum(CONNECTOR_TRANSPORTS).default("http"),
         auth: z.enum(CONNECTOR_AUTHS).default("none"),
@@ -99,9 +96,7 @@ export const connectorPatchSchema = z
     .object({
         enabled: z.boolean().optional(),
         /** One tool's answer, by the tool's own name. */
-        tool: z
-            .object({ name: z.string().min(1).max(128), policy: toolPolicySchema })
-            .optional()
+        tool: z.object({ name: z.string().min(1).max(128), policy: toolPolicySchema }).optional()
     })
     .refine((value) => value.enabled !== undefined || value.tool !== undefined);
 
@@ -172,7 +167,9 @@ export function toCachedTools(listed: readonly unknown[]): CachedTool[] {
         const readOnly = parsed.data.annotations?.readOnlyHint === true;
         tools.push({
             name: parsed.data.name,
-            title: (parsed.data.title ?? parsed.data.annotations?.title ?? null)?.slice(0, 200) ?? null,
+            title:
+                (parsed.data.title ?? parsed.data.annotations?.title ?? null)?.slice(0, 200) ??
+                null,
             description: (parsed.data.description ?? "").slice(0, 2000),
             inputSchema: schema,
             readOnly,
@@ -318,7 +315,8 @@ export function connectorOutputText(result: unknown): { text: string; isError: b
         }
     }
     let text = pieces.join("\n");
-    if (text.length > OUTPUT_MAX) text = `${text.slice(0, OUTPUT_MAX)}\n[cut at ${OUTPUT_MAX} characters]`;
+    if (text.length > OUTPUT_MAX)
+        text = `${text.slice(0, OUTPUT_MAX)}\n[cut at ${OUTPUT_MAX} characters]`;
     return { text, isError: parsed.data.isError === true };
 }
 
@@ -327,9 +325,7 @@ const FENCE = "untrusted_connector_output";
 /** A connector's answer, fenced so the model reads it as quoted content. */
 export function fenceConnectorOutput(connector: string, text: string): string {
     const clean = text.replace(new RegExp(`</?${FENCE}[^>]*>`, "gi"), "");
-    return [
-        `<${FENCE} connector="${connector.replace(/["<>]/g, "")}">`,
-        clean,
-        `</${FENCE}>`
-    ].join("\n");
+    return [`<${FENCE} connector="${connector.replace(/["<>]/g, "")}">`, clean, `</${FENCE}>`].join(
+        "\n"
+    );
 }

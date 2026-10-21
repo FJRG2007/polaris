@@ -76,7 +76,10 @@ export async function polarConnectorTools(
                 }),
                 async execute(input: unknown, options) {
                     if (!rules.inputFits(entry.inputSchema, input)) {
-                        return { ok: false, text: `${name} was called with input it does not take.` };
+                        return {
+                            ok: false,
+                            text: `${name} was called with input it does not take.`
+                        };
                     }
                     const session = await import("@/lib/polar/connectors/session");
                     try {
@@ -95,7 +98,8 @@ export async function polarConnectorTools(
                             untrusted: true
                         };
                     } catch (error) {
-                        const code = error instanceof session.ConnectorError ? error.code : "failed";
+                        const code =
+                            error instanceof session.ConnectorError ? error.code : "failed";
                         if (code === "failed") console.error(`polar: ${name} failed`, error);
                         return { ok: false, text: `${row.name} ${FAILED[code] ?? FAILED.failed}.` };
                     }

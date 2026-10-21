@@ -141,7 +141,11 @@ async function readJson(response: Response): Promise<unknown> {
 }
 
 /** A JSON GET that answers null for anything but a 200 with a body that reads. */
-async function getJson<T>(fetch: ConnectorFetch, url: string, schema: z.ZodType<T>): Promise<T | null> {
+async function getJson<T>(
+    fetch: ConnectorFetch,
+    url: string,
+    schema: z.ZodType<T>
+): Promise<T | null> {
     let response: Response;
     try {
         response = await fetch(url, { headers: { accept: "application/json" } });
@@ -187,7 +191,10 @@ export function serverMetadataUrls(issuer: string): string[] {
 }
 
 /** An MCP `initialize` with no token, to be told how to sign in. */
-async function probe(fetch: ConnectorFetch, server: string): Promise<{ metadata: string | null; scope: string | null }> {
+async function probe(
+    fetch: ConnectorFetch,
+    server: string
+): Promise<{ metadata: string | null; scope: string | null }> {
     try {
         const response = await fetch(server, {
             method: "POST",
@@ -276,10 +283,15 @@ export async function discover(fetch: ConnectorFetch, server: string): Promise<D
     return { metadata, resource: resource.resource ?? server, scope };
 }
 
-function authMethodFor(metadata: ServerMetadata, secret: string | null): ConnectorClient["authMethod"] {
+function authMethodFor(
+    metadata: ServerMetadata,
+    secret: string | null
+): ConnectorClient["authMethod"] {
     if (!secret) return "none";
     const methods = metadata.token_endpoint_auth_methods_supported;
-    return methods && !methods.includes("client_secret_basic") && methods.includes("client_secret_post")
+    return methods &&
+        !methods.includes("client_secret_basic") &&
+        methods.includes("client_secret_post")
         ? "client_secret_post"
         : "client_secret_basic";
 }
@@ -470,6 +482,9 @@ export async function refreshTokens(
 }
 
 /** Whether an access token is too close to its end to send. */
-export function tokenExpiring(tokens: Pick<ConnectorTokens, "expiresAt">, now = Date.now()): boolean {
+export function tokenExpiring(
+    tokens: Pick<ConnectorTokens, "expiresAt">,
+    now = Date.now()
+): boolean {
     return tokens.expiresAt !== null && tokens.expiresAt - 60_000 <= now;
 }

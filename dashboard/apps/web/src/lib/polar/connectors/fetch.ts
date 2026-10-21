@@ -30,7 +30,10 @@ export interface ConnectorFetchOptions {
 }
 
 /** A body that errors once more than `max` bytes went through it. */
-export function cappedBody(body: ReadableStream<Uint8Array>, max: number): ReadableStream<Uint8Array> {
+export function cappedBody(
+    body: ReadableStream<Uint8Array>,
+    max: number
+): ReadableStream<Uint8Array> {
     let seen = 0;
     return body.pipeThrough(
         new TransformStream<Uint8Array, Uint8Array>({

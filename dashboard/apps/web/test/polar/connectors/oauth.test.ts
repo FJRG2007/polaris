@@ -15,10 +15,15 @@ interface Seen {
 }
 
 /** A fake MCP server and authorization server, answering only what the spec says. */
-function fakeServers(overrides: { pkce?: string[] | null; registration?: boolean; challenge?: boolean } = {}) {
+function fakeServers(
+    overrides: { pkce?: string[] | null; registration?: boolean; challenge?: boolean } = {}
+) {
     const seen: Seen[] = [];
     const json = (value: unknown, status = 200) =>
-        new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
+        new Response(JSON.stringify(value), {
+            status,
+            headers: { "content-type": "application/json" }
+        });
     const fetch: oauth.ConnectorFetch = async (url, init = {}) => {
         const body = typeof init.body === "string" ? init.body : "";
         seen.push({ url, method: init.method ?? "GET", headers: new Headers(init.headers), body });
@@ -35,7 +40,11 @@ function fakeServers(overrides: { pkce?: string[] | null; registration?: boolean
             });
         }
         if (url === "https://mcp.example.com/.well-known/oauth-protected-resource/mcp") {
-            return json({ resource: SERVER, authorization_servers: [ISSUER], scopes_supported: ["read"] });
+            return json({
+                resource: SERVER,
+                authorization_servers: [ISSUER],
+                scopes_supported: ["read"]
+            });
         }
         if (url === "https://auth.example.com/.well-known/oauth-authorization-server/tenant") {
             return json({}, 404);
@@ -45,8 +54,12 @@ function fakeServers(overrides: { pkce?: string[] | null; registration?: boolean
                 issuer: ISSUER,
                 authorization_endpoint: `${ISSUER}/authorize`,
                 token_endpoint: `${ISSUER}/token`,
-                ...(overrides.registration === false ? {} : { registration_endpoint: `${ISSUER}/register` }),
-                ...(overrides.pkce === null ? {} : { code_challenge_methods_supported: overrides.pkce ?? ["S256"] })
+                ...(overrides.registration === false
+                    ? {}
+                    : { registration_endpoint: `${ISSUER}/register` }),
+                ...(overrides.pkce === null
+                    ? {}
+                    : { code_challenge_methods_supported: overrides.pkce ?? ["S256"] })
             });
         }
         if (url === `${ISSUER}/register`) return json({ client_id: "dyn-client" }, 201);
@@ -93,8 +106,16 @@ describe("connector OAuth", () => {
         const registration = seen.find((entry) => entry.url.endsWith("/register"))!;
         expect(JSON.parse(registration.body).redirect_uris).toEqual([REDIRECT]);
 
-        const tokens = await oauth.finishAuthorization(fetch, pending, { state, code: "the-code", now: 2_000 });
-        expect(tokens).toEqual({ accessToken: "access-1", refreshToken: "refresh-1", expiresAt: 3_602_000 });
+        const tokens = await oauth.finishAuthorization(fetch, pending, {
+            state,
+            code: "the-code",
+            now: 2_000
+        });
+        expect(tokens).toEqual({
+            accessToken: "access-1",
+            refreshToken: "refresh-1",
+            expiresAt: 3_602_000
+        });
         const exchange = new URLSearchParams(seen.at(-1)!.body);
         expect(exchange.get("code_verifier")).toBe(pending.verifier);
         expect(exchange.get("resource")).toBe(SERVER);
@@ -119,7 +140,11 @@ describe("connector OAuth", () => {
             oauth.finishAuthorization(fetch, pending, { state: `${state}x`, code: "c", now: 1 })
         ).rejects.toThrow(oauth.ConnectorAuthError);
         await expect(
-            oauth.finishAuthorization(fetch, pending, { state, code: "c", now: oauth.PENDING_TTL_MS + 1 })
+            oauth.finishAuthorization(fetch, pending, {
+                state,
+                code: "c",
+                now: oauth.PENDING_TTL_MS + 1
+            })
         ).rejects.toThrow(oauth.ConnectorAuthError);
     });
 
@@ -140,7 +165,9 @@ describe("connector OAuth", () => {
                 registered: null
             })
         ).rejects.toMatchObject({ code: "no_registration" });
-        expect(seen.some((entry) => entry.url.endsWith("/oauth-protected-resource/mcp"))).toBe(true);
+        expect(seen.some((entry) => entry.url.endsWith("/oauth-protected-resource/mcp"))).toBe(
+            true
+        );
         const { pending } = await oauth.beginAuthorization(fetch, {
             connectorId: CONNECTOR,
             server: SERVER,
@@ -163,8 +190,12 @@ describe("connector OAuth", () => {
         expect(oauth.resourceMetadataUrls("https://x.example.com")).toEqual([
             "https://x.example.com/.well-known/oauth-protected-resource"
         ]);
-        expect(oauth.resourceCovers("https://x.example.com/mcp", "https://x.example.com/mcp")).toBe(true);
-        expect(oauth.resourceCovers("https://y.example.com/mcp", "https://x.example.com/mcp")).toBe(false);
+        expect(oauth.resourceCovers("https://x.example.com/mcp", "https://x.example.com/mcp")).toBe(
+            true
+        );
+        expect(oauth.resourceCovers("https://y.example.com/mcp", "https://x.example.com/mcp")).toBe(
+            false
+        );
         expect(oauth.tokenExpiring({ expiresAt: 100_000 }, 50_000)).toBe(true);
         expect(oauth.tokenExpiring({ expiresAt: null })).toBe(false);
     });

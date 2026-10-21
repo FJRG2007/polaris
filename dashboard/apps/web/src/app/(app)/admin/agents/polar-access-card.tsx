@@ -304,7 +304,9 @@ export function PolarAccessCard({
                                 </p>
                                 <Switch
                                     checked={connectors.privateNetwork}
-                                    onChange={(privateNetwork) => changeConnectors({ privateNetwork })}
+                                    onChange={(privateNetwork) =>
+                                        changeConnectors({ privateNetwork })
+                                    }
                                     disabled={pending}
                                     aria-label={t("agents.polarAccess.connectors.privateNetwork")}
                                 />
