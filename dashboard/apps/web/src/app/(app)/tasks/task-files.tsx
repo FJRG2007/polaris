@@ -17,7 +17,8 @@ import Image from "next/image";
 import * as actions from "./actions";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Input, cn } from "@polaris/ui";
+import { Button, Input } from "@polaris/ui";
+import { DropZone } from "@/components/drop-zone";
 import { CopyButton } from "@/components/copy-button";
 import { asFiles } from "@/components/file-picker/as-files";
 import type { PickedFile } from "@/components/file-picker/picked-file";
@@ -26,7 +27,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CommitLink } from "@/lib/tasks/commit-service";
 import type { AttachmentView } from "@/lib/tasks/attachment-service";
-import { FileText, GitCommitHorizontal, Loader2, Paperclip, Trash2, Upload, X } from "lucide-react";
+import { FileText, GitCommitHorizontal, Loader2, Trash2, Upload, X } from "lucide-react";
 
 /** Bytes as a person reads them. */
 function readableSize(bytes: number): string {
@@ -66,7 +67,6 @@ export function AttachmentSection({
     const tFiles = useTranslations("components");
     const [busy, setBusy] = useState(false);
     const [picking, setPicking] = useState(false);
-    const [dragging, setDragging] = useState(false);
 
     /**
      * Files chosen from somewhere other than this machine.
@@ -117,21 +117,6 @@ export function AttachmentSection({
         <section className="flex flex-col gap-2">
             <header className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">{t("files.title")}</h3>
-                {canEdit && (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => setPicking(true)}
-                    >
-                        {busy ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                            <Paperclip className="size-3.5" />
-                        )}
-                        {t("files.attach")}
-                    </Button>
-                )}
             </header>
 
             {picking && (
@@ -143,27 +128,21 @@ export function AttachmentSection({
             )}
 
             {canEdit && (
-                <div
-                    onDragOver={(event) => {
-                        event.preventDefault();
-                        setDragging(true);
-                    }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={(event) => {
-                        event.preventDefault();
-                        setDragging(false);
-                        void upload(event.dataTransfer.files);
-                    }}
-                    className={cn(
-                        "rounded-md border border-dashed px-3 py-4 text-center text-xs transition-colors",
-                        dragging
-                            ? "border-primary bg-primary/5 text-foreground"
-                            : "border-border text-muted-foreground"
-                    )}
+                // The zone is the attach button: pressing it opens the picker,
+                // dropping on it uploads.
+                <DropZone
+                    disabled={busy}
+                    onChoose={() => setPicking(true)}
+                    onFiles={(files) => void upload(files)}
+                    className="w-full px-3 py-4 text-center text-xs text-muted-foreground hover:text-foreground"
                 >
-                    <Upload className="mx-auto mb-1 size-4 opacity-60" />
+                    {busy ? (
+                        <Loader2 className="mx-auto mb-1 size-4 animate-spin opacity-60" aria-hidden />
+                    ) : (
+                        <Upload className="mx-auto mb-1 size-4 opacity-60" aria-hidden />
+                    )}
                     {t("files.drop")}
-                </div>
+                </DropZone>
             )}
 
             {images.length > 0 && (

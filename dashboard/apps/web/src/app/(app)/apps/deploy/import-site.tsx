@@ -12,12 +12,11 @@ import { z } from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
-import { useCallback, useEffect, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FileArchive, Loader2, Upload } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
-    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -25,6 +24,7 @@ import {
     DialogTitle
 } from "@polaris/ui";
 import type { KeptPick } from "@/components/file-picker/as-files";
+import { DropZone } from "@/components/drop-zone";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** The largest backup the server takes (`MAX_BACKUP_UPLOAD` in the route). */
@@ -161,7 +161,6 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
     const [open, setOpen] = useState(false);
     const [file, setFile] = useState<File | KeptPick | null>(null);
     const [pickError, setPickError] = useState<string | null>(null);
-    const [over, setOver] = useState(false);
     const [phase, setPhase] = useState<Phase>({ kind: "idle" });
     const [tick, setTick] = useState(0);
     const job = phase.kind === "job" ? phase.job : null;
@@ -243,12 +242,6 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
         setPickError(null);
         setPhase({ kind: "idle" });
         setFile(next);
-    }
-
-    function dropped(event: DragEvent<HTMLDivElement>) {
-        event.preventDefault();
-        setOver(false);
-        pick(event.dataTransfer.files[0]);
     }
 
     async function start() {
@@ -395,22 +388,24 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
                         </div>
                     ) : (
                         <div className="flex flex-col gap-3 text-sm">
-                            <div
-                                onDragOver={(event) => {
-                                    event.preventDefault();
-                                    if (!busy) setOver(true);
-                                }}
-                                onDragLeave={() => setOver(false)}
-                                onDrop={dropped}
-                                className={cn(
-                                    "flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-5 text-center",
-                                    over && "border-primary bg-primary/5"
-                                )}
+                            {/* The zone is the chooser: pressing it opens the
+                                picker, dropping on it takes the archive. */}
+                            <DropZone
+                                disabled={busy}
+                                onFiles={(files) => pick(files[0])}
+                                onChoose={() =>
+                                    void chooseFiles({
+                                        accept: ".tar.gz,.tgz,application/gzip",
+                                        onFailed: setPickError,
+                                        onDrive: ([kept]) => pick(kept)
+                                    }).then((files) => pick(files[0]))
+                                }
+                                className="flex flex-col items-center gap-2 rounded-lg px-4 py-5 text-center"
                             >
-                                <FileArchive className="size-5 text-muted-foreground" />
+                                <FileArchive className="size-5 text-muted-foreground" aria-hidden />
                                 {file ? (
                                     <span
-                                        className="w-full min-w-0 truncate font-medium"
+                                        className="block w-full min-w-0 truncate font-medium"
                                         title={file.name}
                                     >
                                         {file.name}
@@ -423,22 +418,11 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
                                         {t("importSite.drop")}
                                     </span>
                                 )}
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={busy}
-                                    onClick={() =>
-                                        void chooseFiles({
-                                            accept: ".tar.gz,.tgz,application/gzip",
-                                            onFailed: setPickError,
-                                            onDrive: ([kept]) => pick(kept)
-                                        }).then((files) => pick(files[0]))
-                                    }
-                                >
+                                <span className="text-xs font-medium text-primary">
                                     {t("importSite.choose")}
-                                </Button>
-                                {chooser}
-                            </div>
+                                </span>
+                            </DropZone>
+                            {chooser}
 
                             {pickError && <p className="text-danger-ink">{pickError}</p>}
 
