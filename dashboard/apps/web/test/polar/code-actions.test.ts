@@ -11,6 +11,7 @@ const SESSION = "11111111-1111-4111-8111-111111111111";
 const state = {
     held: new Set<string>(),
     listed: 0,
+    limit: undefined as number | undefined,
     detailed: 0
 };
 
@@ -34,8 +35,9 @@ vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => `t:${key}`
 }));
 vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
-    listSessionsAction: async () => {
+    listSessionsAction: async (limit?: number) => {
         state.listed += 1;
+        state.limit = limit;
         return [session, { ...session, id: "s2", state: "stopped", repoFullName: "" }];
     },
     sessionChoicesAction: async () => ({
@@ -88,6 +90,7 @@ describe("polarCodeOverview", () => {
             stateLabel: "t:labels.sessionState.working"
         });
         expect(overview.sessions[1]).toMatchObject({ live: false, repo: "" });
+        expect(state.limit).toBe(50);
     });
 
     it("says manage for somebody who can start sessions", async () => {

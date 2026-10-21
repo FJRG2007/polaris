@@ -90,6 +90,7 @@
     "actions": {
         "new": "New chat",
         "openPage": "Open as a page",
+        "more": "More actions",
         "close": "Close Polar",
         "stop": "Stop",
         "send": "Send (Enter)",
@@ -696,6 +697,8 @@
         "back": "All sessions",
         "openSession": "Open the full session",
         "gone": "This session is no longer available to you.",
+        "unreachable": "Couldn't load this session.",
+        "retry": "Try again",
         "quiet": "Nothing yet. The agent is getting its machine ready.",
         "ended": "This session has ended. Open the full session to read everything it did.",
         "reply": "Reply to the agent",

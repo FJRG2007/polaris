@@ -103,8 +103,8 @@ function rowOf(
 export async function polarCodeOverview(user: SessionUser): Promise<PolarCodeOverview> {
     const access = await accessOf(user);
     if (access === "none") return { access, sessions: [] };
-    const [list, t] = await Promise.all([listSessionsAction(), getTranslations("agents")]);
-    return { access, sessions: list.slice(0, LISTED).map((session) => rowOf(t, session)) };
+    const [list, t] = await Promise.all([listSessionsAction(LISTED), getTranslations("agents")]);
+    return { access, sessions: list.map((session) => rowOf(t, session)) };
 }
 
 /** One session as the thread shows it, or null when it is not this account's. */

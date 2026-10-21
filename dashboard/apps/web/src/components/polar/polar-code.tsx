@@ -152,7 +152,7 @@ export function PolarModeSwitch({ code }: { code: PolarCodeState }) {
                     label: (
                         <span className="flex items-center gap-1">
                             <MessageSquare className="size-3.5 shrink-0" aria-hidden />
-                            {t("code.chat")}
+                            <span className="polar-mode-label">{t("code.chat")}</span>
                         </span>
                     ),
                     title: t("code.chat")
@@ -162,7 +162,7 @@ export function PolarModeSwitch({ code }: { code: PolarCodeState }) {
                     label: (
                         <span className="flex items-center gap-1">
                             <Code2 className="size-3.5 shrink-0" aria-hidden />
-                            {t("code.code")}
+                            <span className="polar-mode-label">{t("code.code")}</span>
                         </span>
                     ),
                     title: closed ? t("code.noAccess") : t("code.code"),
@@ -188,7 +188,9 @@ export function PolarCode({ code, split }: { code: PolarCodeState; split: boolea
     };
 
     const list = <SessionList sessions={sessions} activeId={selected} onOpen={open} />;
-    const home = <CodeHome canStart={access === "manage"} onStarted={started} />;
+    const home = (
+        <CodeHome canStart={access === "manage"} pending={overview === null} onStarted={started} />
+    );
 
     if (split) {
         return (
@@ -321,7 +323,15 @@ function StateDot({ state }: { state: PolarCodeRow["state"] }) {
 type Choices = PolarCodeChoices;
 
 /** A new task: what to do, and where - repository, branch and agent. */
-function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: string) => void }) {
+function CodeHome({
+    canStart,
+    pending,
+    onStarted
+}: {
+    canStart: boolean;
+    pending: boolean;
+    onStarted: (id: string) => void;
+}) {
     const t = useTranslations("polar");
     const [choices, setChoices] = useState<Choices | null>(null);
     const [prompt, setPrompt] = useState("");
@@ -395,10 +405,13 @@ function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: 
             <h2 className="text-center text-lg font-semibold text-foreground">
                 {t("code.heading")}
             </h2>
-            {!canStart ? (
+            {!canStart && !pending ? (
                 <p className="text-center text-sm text-muted-foreground">{t("code.readOnly")}</p>
             ) : null}
-            <div className="rounded-xl border border-border bg-background p-2">
+            <div
+                aria-busy={pending || undefined}
+                className="rounded-xl border border-border bg-background p-2"
+            >
                 <Textarea
                     value={prompt}
                     onChange={(event) => setPrompt(event.target.value)}
@@ -514,6 +527,7 @@ function CodeThread({
     const t = useTranslations("polar");
     // Undefined while the first answer is on its way; null when it is not there.
     const [thread, setThread] = useState<PolarCodeThread | null | undefined>(undefined);
+    const [failed, setFailed] = useState(false);
     const [reply, setReply] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
@@ -522,12 +536,16 @@ function CodeThread({
 
     const read = useCallback(() => {
         readPoll<PolarCodeThread | null>("/api/polar/code/thread", { sessionId }, signal())
-            .then(setThread)
-            .catch(() => setThread((current) => current ?? null));
+            .then((answer) => {
+                setThread(answer);
+                setFailed(false);
+            })
+            .catch(() => setFailed(true));
     }, [sessionId, signal]);
 
     useEffect(() => {
         setThread(undefined);
+        setFailed(false);
         read();
     }, [read]);
 
@@ -540,8 +558,9 @@ function CodeThread({
         return () => clearInterval(timer);
     }, [live, read]);
 
-    const count = thread?.entries.length ?? 0;
-    useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [count]);
+    const last = thread?.entries.at(-1);
+    const tail = last ? `${thread?.entries.length}:${last.at}:${last.type}:${last.text}` : "";
+    useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [tail]);
 
     const send = () => {
         const text = reply.trim();
@@ -591,7 +610,16 @@ function CodeThread({
                 </Link>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
-                {thread === undefined ? (
+                {thread === undefined && failed ? (
+                    <div className="flex flex-col items-start gap-2">
+                        <p role="alert" className="text-sm text-muted-foreground">
+                            {t("code.unreachable")}
+                        </p>
+                        <Button type="button" size="sm" variant="outline" onClick={read}>
+                            {t("code.retry")}
+                        </Button>
+                    </div>
+                ) : thread === undefined ? (
                     <div className="space-y-2">
                         {[0, 1, 2, 3].map((key) => (
                             <div

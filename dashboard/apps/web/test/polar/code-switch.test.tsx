@@ -174,4 +174,43 @@ describe("the Chat / Code switch", () => {
         expect(await screen.findByText(/This session has ended/)).toBeTruthy();
         expect(screen.queryByText(/getting its machine ready/)).toBeNull();
     });
+
+    it("does not call a session gone when its first read fails, and tries again", async () => {
+        access = "manage";
+        const row = {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Fix the login form",
+            repo: "acme/web",
+            branch: "",
+            state: "stopped",
+            stateLabel: "Stopped",
+            live: false,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        };
+        let fail = true;
+        vi.mocked(fetch).mockImplementation(async (url) => {
+            if (String(url).startsWith("/api/polar/code/thread"))
+                return fail
+                    ? new Response("", { status: 500 })
+                    : answer({ session: row, entries: [], error: null });
+            if (String(url).startsWith("/api/polar/code/choices")) return answer(CHOICES);
+            return answer({ access, sessions: [row] });
+        });
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: /Fix the login form/ }));
+        expect(await screen.findByText("Couldn't load this session.")).toBeTruthy();
+        expect(screen.queryByText(/no longer available/)).toBeNull();
+        fail = false;
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+        expect(await screen.findByText(/This session has ended/)).toBeTruthy();
+    });
+
+    it("does not call somebody a reader before their access is known", async () => {
+        vi.mocked(fetch).mockImplementation(() => new Promise<Response>(() => undefined));
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        expect(await screen.findByRole("textbox", { name: "Task for the agent" })).toBeTruthy();
+        expect(screen.queryByText(/needs permission to manage Agents/)).toBeNull();
+    });
 });

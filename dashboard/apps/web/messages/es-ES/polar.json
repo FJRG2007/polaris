@@ -90,6 +90,7 @@
     "actions": {
         "new": "Nuevo chat",
         "openPage": "Abrir como página",
+        "more": "Más acciones",
         "close": "Cerrar Polar",
         "stop": "Parar",
         "send": "Enviar (Intro)",
@@ -696,6 +697,8 @@
         "back": "Ver sesiones",
         "openSession": "Abrir la sesión completa",
         "gone": "Esta sesión ya no está disponible para ti.",
+        "unreachable": "No se pudo cargar esta sesión.",
+        "retry": "Reintentar",
         "quiet": "Aún nada. El agente está preparando su máquina.",
         "ended": "Esta sesión terminó. Abre la sesión completa para ver todo lo que hizo.",
         "reply": "Responder al agente",

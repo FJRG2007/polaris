@@ -10,6 +10,7 @@
  * itself may have ended.
  */
 
+import { z } from "zod";
 import { after } from "next/server";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
@@ -70,9 +71,10 @@ export async function sessionChoicesAction(): Promise<{
     };
 }
 
-export async function listSessionsAction(): Promise<sessions.SessionView[]> {
+export async function listSessionsAction(limit?: number): Promise<sessions.SessionView[]> {
     const user = await requirePermission("agents.read");
-    return sessions.listSessions(user.id);
+    const take = z.number().int().positive().optional().safeParse(limit);
+    return sessions.listSessions(user.id, { limit: take.success ? take.data : undefined });
 }
 
 export async function sessionDetailAction(sessionId: string): Promise<{
