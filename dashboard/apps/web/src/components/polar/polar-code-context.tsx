@@ -157,7 +157,7 @@ export function CodeRepoBar({
                     setOpen(next);
                 }}
             >
-                <DropdownMenuTrigger asChild disabled={disabled || choices === null}>
+                <DropdownMenuTrigger asChild disabled={disabled || (choices === null && refreshing)}>
                     <button
                         type="button"
                         aria-label={`${t("code.where")}: ${full}`}
@@ -336,7 +336,7 @@ export function AgentPicker({
                 className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2"
             >
                 {searchable ? (
-                    <MenuSearch value={query} onChange={setQuery} placeholder={t("picker.search")} />
+                    <MenuSearch value={query} onChange={setQuery} placeholder={t("code.searchAgents")} />
                 ) : null}
                 <DropdownMenuLabel>{t("code.agent")}</DropdownMenuLabel>
                 {shown.map((option) => (
@@ -366,7 +366,7 @@ export function AgentPicker({
                 ))}
                 {searchable && query.trim() && shown.length === 0 ? (
                     <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                        {t("picker.noMatch")}
+                        {t("code.noAgentMatch")}
                     </p>
                 ) : null}
                 <DropdownMenuSeparator />

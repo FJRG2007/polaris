@@ -720,11 +720,13 @@
         "noRepoMatch": "No repository matches",
         "addRepos": "Add repositories",
         "addReposHint": "Opens GitHub to grant access to more repositories",
-        "addReposUnavailable": "No GitHub App is set up on this Polaris",
+        "addReposUnavailable": "An administrator sets this up",
         "connectInAgents": "Connect a repository",
         "refresh": "Refresh the list",
         "agentSettings": "Manage agents",
         "notSignedIn": "Not signed in",
+        "searchAgents": "Find an agent",
+        "noAgentMatch": "No agents match",
         "noFiles": "An agent session can't take attached files yet",
         "noVoice": "Voice talks to Polar's chat, not to an agent"
     }

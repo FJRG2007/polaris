@@ -2105,6 +2105,8 @@
         "web/src/components/polar/visuals/visual-chart.tsx",
         "web/src/components/polar/visuals/visual-diagram.tsx",
         "web/src/components/polar/polar-code.tsx",
+        "web/src/components/polar/polar-code-context.tsx",
+        "web/src/components/polar/polar-composer.tsx",
         "web/src/lib/polar/code.ts",
         "web/src/lib/polar/code-route.ts",
         "web/src/lib/polar/stored.ts",

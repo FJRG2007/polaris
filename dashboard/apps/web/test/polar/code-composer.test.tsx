@@ -217,6 +217,32 @@ describe("the repository bar", () => {
         press(screen.getByRole("button", { name: /^Where the agent works/ }));
         const add = await screen.findByRole("menuitem", { name: /Add repositories/ });
         expect(add.getAttribute("aria-disabled")).toBe("true");
-        expect(add.textContent).toContain("No GitHub App is set up on this Polaris");
+        expect(add.textContent).toContain("An administrator sets this up");
+    });
+
+    it("can still refresh after the first load of the list fails", async () => {
+        const fetched = globalThis.fetch as ReturnType<typeof vi.fn>;
+        const served = fetched.getMockImplementation() as (url: string) => Promise<Response>;
+        let failed = false;
+        fetched.mockImplementation(async (url: string) => {
+            if (url.startsWith("/api/polar/code/choices") && !failed) {
+                failed = true;
+                return new Response("{}", { status: 500 });
+            }
+            return served(url);
+        });
+        render(<PolarChat />, { wrapper: MessagesWrapper });
+        const codeOption = await screen.findByRole("radio", { name: /code/i });
+        await waitFor(() => expect((codeOption as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(codeOption);
+        const bar = await screen.findByRole("button", { name: /^Where the agent works/ });
+        await waitFor(() => expect(failed).toBe(true));
+        await waitFor(() => expect((bar as HTMLButtonElement).disabled).toBe(false));
+
+        press(bar);
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Refresh the list" }));
+        expect(
+            await screen.findByRole("menuitem", { name: /acme\/web/ })
+        ).toBeTruthy();
     });
 });
