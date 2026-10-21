@@ -28,7 +28,7 @@ import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
  * extension points, not something it does. The value keeps its old spelling so
  * a popup that was closed on that screen opens on it again.
  */
-export type Section = "home" | "vault" | "servers";
+export type Section = "home" | "vault" | "servers" | "settings";
 
 const SECTION_KEY = "polaris.section";
 
@@ -361,6 +361,16 @@ function AccountMenu({
                     </button>
                 ) : null}
                 <hr />
+                <button
+                    className="menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                        setOpen(false);
+                        onOpen("settings");
+                    }}
+                >
+                    <span className="menu-text">{t("shell.settings")}</span>
+                </button>
                 <HostEntries
                     hosts={status.servers}
                     onSwitch={(server) => void switchHost(server)}
@@ -477,7 +487,7 @@ export function Home({
                         </svg>
                     </button>
                 </li>
-                <PolarRow />
+                <PolarRow status={status} />
             </ul>
         </main>
     );

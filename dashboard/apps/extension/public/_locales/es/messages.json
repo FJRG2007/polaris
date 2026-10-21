@@ -12,7 +12,7 @@
         "description": "The keyboard shortcut's name in the browser's shortcuts screen."
     },
     "commandOpenPolar": {
-        "message": "Abrir Polar junto a la página",
+        "message": "Abrir o cerrar Polar a un lado",
         "description": "El nombre del atajo de Polar en la pantalla de atajos del navegador."
     }
 }

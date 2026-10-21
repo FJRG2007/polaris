@@ -1,76 +1,52 @@
 /**
- * Polar on the home screen: the row that opens it beside the page, and the
- * shortcut that does the same from the keyboard.
+ * Polar on the home screen: the row that opens it beside the page. Its
+ * shortcut is listed and changed in Settings, with the extension's others.
  *
- * The browser owns the shortcut. Chromium changes it only in its own shortcuts
- * screen, so the button opens that; Firefox lets an extension set it, so there
- * the button takes the next key press in place.
+ * On a tab of a Polaris this browser knows, the page already carries Polar, so
+ * the row opens that one instead of a second copy beside it.
  */
 
 import { useWords } from "./words";
 import * as polar from "@/lib/polar-panel";
 import { useEffect, useState } from "react";
-import { chromiumBrowser } from "@/lib/browser-name";
+import type { VaultStatus } from "@/lib/messages";
 
-interface Commands {
-    getAll(): Promise<{ name?: string; shortcut?: string }[]>;
-    update?(details: { name: string; shortcut: string }): Promise<void>;
+interface Front {
+    readonly id?: number;
+    readonly windowId?: number;
+    readonly url?: string;
 }
 
-const firefox = (): boolean =>
-    typeof (browser as unknown as polar.PanelOpeners).sidebarAction !== "undefined";
+/** The Polaris deployments a status names: the one in front and the saved ones. */
+export function originsOf(status: Pick<VaultStatus, "server" | "servers">): string[] {
+    return [...(status.server ? [status.server] : []), ...status.servers.map((one) => one.origin)];
+}
 
-/** Read when used, never while drawing: a test draws this with no browser. */
-const commands = (): Commands => browser.commands as unknown as Commands;
-
-const commandName = (): string => (firefox() ? polar.FIREFOX_SIDEBAR : polar.OPEN_POLAR);
-
-export function PolarRow(): React.JSX.Element {
+export function PolarRow({ status }: { status: Pick<VaultStatus, "server" | "servers"> }): React.JSX.Element {
     const t = useWords();
-    const [keys, setKeys] = useState<string | null>(null);
-    const [windowId, setWindowId] = useState<number | undefined>(undefined);
-    const [capturing, setCapturing] = useState(false);
-    const [refused, setRefused] = useState(false);
+    const [front, setFront] = useState<Front>({});
+    const [scope, setScope] = useState<polar.PanelScope>("all");
 
     useEffect(() => {
-        // The window is looked up now, not on the click: the panel opens only
-        // inside the click itself, with nothing awaited before it.
-        void browser.windows?.getCurrent?.().then((current) => setWindowId(current.id));
-        void commands()
-            .getAll()
-            .then((all) => setKeys(all.find((one) => one.name === commandName())?.shortcut ?? ""))
-            .catch(() => setKeys(""));
+        // Looked up now, not on the click: the panel opens only inside the
+        // click itself, with nothing awaited before it.
+        void browser.tabs
+            ?.query?.({ active: true, currentWindow: true })
+            .then(([tab]) => setFront({ id: tab?.id, windowId: tab?.windowId, url: tab?.url }))
+            .catch(() => undefined);
+        void polar
+            .readScopes(browser)
+            .then((scopes) => setScope(scopes.panel))
+            .catch(() => undefined);
     }, []);
 
     const open = (): void => {
-        if (polar.openSidePanel(browser, windowId)) window.close();
-    };
-
-    const change = (): void => {
-        setRefused(false);
-        if (commands().update) return setCapturing(true);
-        const name = chromiumBrowser(
-            (navigator as { userAgentData?: { brands?: { brand: string }[] } }).userAgentData
-                ?.brands ?? [],
-            navigator.userAgent
-        );
-        void browser.tabs.create({ url: polar.shortcutsPage(name) });
-    };
-
-    const onKey = (event: React.KeyboardEvent): void => {
-        if (event.key === "Escape") return setCapturing(false);
-        if (event.key === "Tab") return;
-        event.preventDefault();
-        const mac = /mac/i.test(navigator.platform);
-        const shortcut = polar.shortcutFrom(event, mac);
-        if (!shortcut) return;
-        commands()
-            .update?.({ name: commandName(), shortcut })
-            .then(() => {
-                setKeys(shortcut);
-                setCapturing(false);
-            })
-            .catch(() => setRefused(true));
+        if (polar.isPolarisTab(front.url, originsOf(status)) && front.id !== undefined) {
+            polar.sendToPolarisTab(browser, front.id, polar.polarisCommand({}));
+            window.close();
+            return;
+        }
+        if (polar.openPolarFor(browser, front, scope)) window.close();
     };
 
     return (
@@ -90,32 +66,10 @@ export function PolarRow(): React.JSX.Element {
                     <span className="strong">{t("polar.title")}</span>
                     <span className="muted small">{t("polar.open")}</span>
                 </span>
+                <svg className="chevron-right" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m9 18 6-6-6-6" />
+                </svg>
             </button>
-            <div className="row">
-                <span className="muted small grow">
-                    {keys
-                        ? t("polar.shortcut", { keys })
-                        : keys === ""
-                          ? t("polar.noShortcut")
-                          : ""}
-                </span>
-                {capturing ? (
-                    <input
-                        autoFocus
-                        readOnly
-                        className="small"
-                        aria-label={t("polar.pressKeys")}
-                        placeholder={t("polar.pressKeys")}
-                        onKeyDown={onKey}
-                        onBlur={() => setCapturing(false)}
-                    />
-                ) : (
-                    <button className="ghost" onClick={change}>
-                        {t("polar.change")}
-                    </button>
-                )}
-            </div>
-            {refused ? <p className="problem">{t("polar.shortcutRefused")}</p> : null}
         </li>
     );
 }

@@ -50,7 +50,22 @@
         "fill": "Rellenar el acceso de este sitio",
         "generate": "Generar una contraseña",
         "code": "Rellenar el código temporal",
-        "email": "Poner mi correo"
+        "email": "Poner mi correo",
+        "polar": {
+            "selection": "Preguntar a Polar",
+            "explain": "Explicar con Polar",
+            "summarize": "Resumir con Polar",
+            "translate": "Traducir con Polar",
+            "link": "Preguntar por el enlace",
+            "image": "Preguntar por la imagen",
+            "page": "Preguntar por la página",
+            "explainDraft": "Explícalo con sencillez.",
+            "summarizeDraft": "Resúmelo en pocas líneas.",
+            "translateDraft": "Tradúcelo al español.",
+            "linkDraft": "¿Qué hay en el enlace? {url}",
+            "imageDraft": "¿Qué sale en la imagen? {url}",
+            "pageDraft": "¿De qué trata la página? {url}"
+        }
     },
     "lock": {
         "minutes": "{count, plural, one {# minuto} other {# minutos}}",
@@ -121,7 +136,8 @@
         "host": "Host",
         "hosts": "Hosts",
         "manageHosts": "Gestionar hosts",
-        "hostTitle": "{name} ({host})"
+        "hostTitle": "{name} ({host})",
+        "settings": "Ajustes"
     },
     "popup": {
         "update": {
@@ -296,8 +312,6 @@
     "polar": {
         "title": "Polar",
         "open": "Abrir Polar junto a la página",
-        "shortcut": "Atajo: {keys}",
-        "noShortcut": "Sin atajo",
         "change": "Cambiar",
         "pressKeys": "Pulsa las teclas",
         "shortcutRefused": "Ese atajo no se puede usar. Prueba otro.",
@@ -311,5 +325,25 @@
         "notNow": "Ahora no",
         "reading": "Polar lee {site}",
         "stop": "Parar"
+    },
+    "settings": {
+        "shortcuts": "Atajos",
+        "shortcutsChromium": "El navegador guarda estas teclas. Cambiar abre su pantalla.",
+        "shortcutsFirefox": "Pulsa Cambiar y luego las teclas.",
+        "togglePolar": "Abrir o cerrar Polar",
+        "none": "Nada",
+        "changeFor": "Cambiar teclas de {action}",
+        "polarisKeys": "Polaris abre Polar con {keys}.",
+        "openIn": "Abrir Polar en",
+        "allTabs": "Todas",
+        "oneTab": "Una pestaña",
+        "allTabsHint": "Un panel que sigue entre pestañas.",
+        "oneTabHint": "Solo sale en la pestaña donde lo abres.",
+        "firefoxSidebar": "Firefox tiene una barra por ventana: sale en todas las pestañas.",
+        "chat": "Conversación",
+        "sharedChat": "La misma siempre",
+        "tabChat": "Una por pestaña",
+        "sharedChatHint": "El chat sigue al cambiar de pestaña.",
+        "tabChatHint": "Cada pestaña tiene su chat."
     }
 }

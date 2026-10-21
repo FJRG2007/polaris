@@ -1,3 +1,4 @@
+import { Settings } from "./settings";
 import { storage } from "#imports";
 import { screenFor } from "@/lib/screen";
 import { timeoutChoices } from "@/lib/lock";
@@ -280,6 +281,11 @@ export function App(): React.JSX.Element {
             <TopBar status={status} onChange={refresh} onOpen={setSection} />
             {section === "home" ? (
                 <Home status={status} onOpen={setSection} />
+            ) : section === "settings" ? (
+                <>
+                    <SectionBar title={t("shell.settings")} onBack={() => setSection("home")} />
+                    <Settings />
+                </>
             ) : section === "servers" ? (
                 <>
                     <SectionBar title={t("shell.hosts")} onBack={() => setSection("home")} />

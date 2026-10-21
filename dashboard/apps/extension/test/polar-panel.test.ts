@@ -76,11 +76,17 @@ describe("the frame", () => {
 });
 
 describe("the shortcut", () => {
-    it("is Alt+P on Chromium, as a command the worker answers", () => {
+    it("is Polaris's own Ctrl+J on Chromium, as a command the worker answers", () => {
         const commands = manifestFor({ browser: "chrome", manifestVersion: 3 })[
             "commands"
-        ] as Record<string, { suggested_key: { default: string }; description: string }>;
-        expect(commands[polar.OPEN_POLAR]?.suggested_key.default).toBe(polar.DEFAULT_SHORTCUT);
+        ] as Record<
+            string,
+            { suggested_key: { default: string; mac?: string }; description: string }
+        >;
+        expect(commands[polar.OPEN_POLAR]?.suggested_key).toEqual({
+            default: polar.POLARIS_SHORTCUT,
+            mac: polar.POLARIS_SHORTCUT_MAC
+        });
         expect(commands[polar.OPEN_POLAR]?.description).toBe("__MSG_commandOpenPolar__");
         expect(commands[polar.FIREFOX_SIDEBAR]).toBeUndefined();
         // Chromium allows four suggested shortcuts in all.
@@ -88,12 +94,14 @@ describe("the shortcut", () => {
         expect(commands["fill-login"]).toBeDefined();
     });
 
-    it("is Firefox's own sidebar command there", () => {
+    it("is a command the worker hears on Firefox too, on a key Firefox does not keep", () => {
         const commands = manifestFor({ browser: "firefox", manifestVersion: 2 })[
             "commands"
         ] as Record<string, { suggested_key: { default: string } }>;
-        expect(commands[polar.FIREFOX_SIDEBAR]?.suggested_key.default).toBe(polar.DEFAULT_SHORTCUT);
-        expect(commands[polar.OPEN_POLAR]).toBeUndefined();
+        expect(commands[polar.OPEN_POLAR]?.suggested_key.default).toBe(polar.FIREFOX_SHORTCUT);
+        // The reserved sidebar command never reaches the worker, so it could
+        // not hand the press to a Polaris tab.
+        expect(commands[polar.FIREFOX_SIDEBAR]).toBeUndefined();
     });
 
     it("is read from a key press the way Firefox takes one", () => {
@@ -141,5 +149,85 @@ describe("opening the panel", () => {
         expect(polar.openSidePanel({ sidebarAction: { open } }, undefined)).toBe(true);
         expect(open).toHaveBeenCalledOnce();
         expect(polar.openSidePanel({}, 1)).toBe(false);
+    });
+});
+
+describe("which Polar a press reaches", () => {
+    const KNOWN = [SERVER, "https://other.example:8443"];
+
+    it("hands it to the page's own Polar on a Polaris tab", () => {
+        expect(polar.isPolarisTab(`${SERVER}/home`, KNOWN)).toBe(true);
+        expect(polar.isPolarisTab("https://other.example:8443/polar", KNOWN)).toBe(true);
+        expect(polar.routeFor({ url: `${SERVER}/tasks` }, KNOWN, true)).toBe("polaris");
+        expect(polar.routeFor({ url: `${SERVER}/tasks` }, KNOWN, false)).toBe("polaris");
+    });
+
+    it("opens or closes the extension's panel everywhere else", () => {
+        expect(polar.isPolarisTab("https://other.example/x", KNOWN)).toBe(false);
+        expect(polar.isPolarisTab("https://polaris.example.evil.test/", KNOWN)).toBe(false);
+        expect(polar.isPolarisTab("chrome://newtab", KNOWN)).toBe(false);
+        expect(polar.isPolarisTab(undefined, KNOWN)).toBe(false);
+        expect(polar.routeFor({ url: "https://news.example" }, KNOWN, false)).toBe("open");
+        expect(polar.routeFor({ url: "https://news.example" }, KNOWN, true)).toBe("close");
+        expect(polar.routeFor(undefined, [], false)).toBe("open");
+    });
+
+    it("tells a Polaris page to toggle, or to open with a question", () => {
+        expect(polar.polarisCommand()).toEqual({
+            source: polar.FROM_EXTENSION,
+            kind: "polar",
+            action: "toggle"
+        });
+        expect(polar.polarisCommand({ quote: "  hi  ", draft: "Explain" })).toEqual({
+            source: polar.FROM_EXTENSION,
+            kind: "polar",
+            action: "ask",
+            quote: "hi",
+            draft: "Explain"
+        });
+        const long = polar.askMessage({ quote: "x".repeat(polar.SELECTION_MOST + 9) });
+        expect(long.quote).toHaveLength(polar.SELECTION_MOST);
+    });
+
+    it("sends the command into the tab with the browser's script call", () => {
+        const executeScript = vi.fn(async () => []);
+        polar.sendToPolarisTab({ scripting: { executeScript } }, 7, { a: 1 });
+        expect(executeScript).toHaveBeenCalledWith({
+            target: { tabId: 7 },
+            func: polar.postToPolarisPage,
+            args: [{ a: 1 }]
+        });
+        const legacy = vi.fn(async (_id: number, _details: unknown) => []);
+        polar.sendToPolarisTab({ tabs: { executeScript: legacy } }, 8, { a: 1 });
+        expect(legacy.mock.calls[0]?.[0]).toBe(8);
+    });
+
+    it("opens a tab's own panel in the per-tab scope, the window's otherwise", () => {
+        const calls: string[] = [];
+        const sidePanel = {
+            open: vi.fn(async (options: object) => {
+                calls.push(`open ${JSON.stringify(options)}`);
+            }),
+            setOptions: vi.fn(async (options: object) => {
+                calls.push(`set ${JSON.stringify(options)}`);
+            })
+        };
+        expect(polar.openPolarFor({ sidePanel }, { id: 3, windowId: 1 }, "tab")).toBe(true);
+        expect(calls).toEqual([
+            `set {"tabId":3,"path":"sidepanel.html?tab=3","enabled":true}`,
+            `open {"tabId":3}`
+        ]);
+        calls.length = 0;
+        expect(polar.openPolarFor({ sidePanel }, { id: 3, windowId: 1 }, "all")).toBe(true);
+        expect(calls).toEqual([`open {"windowId":1}`]);
+    });
+
+    it("keeps a conversation per tab only when asked to", () => {
+        expect(polar.chatScopeFor("shared", 4)).toBeNull();
+        expect(polar.chatScopeFor("tab", 4)).toBe("tab-4");
+        expect(polar.chatScopeFor("tab", null)).toBeNull();
+        expect(polar.embedUrl(SERVER, EXT, "tab-4")).toContain("chat=tab-4");
+        expect(polar.readPanelScope("weird")).toBe("all");
+        expect(polar.readChatScope(undefined)).toBe("shared");
     });
 });

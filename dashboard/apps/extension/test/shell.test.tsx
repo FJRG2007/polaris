@@ -112,6 +112,14 @@ describe("the home screen", () => {
         expect(markup.match(/class="section"/g)).toHaveLength(2);
         expect(markup).toContain("Open Polar beside the page");
     });
+
+    it("draws Polar as an app entry, its shortcut left to Settings", () => {
+        const markup = renderToStaticMarkup(<Home status={STATUS} onOpen={() => {}} />);
+        // A chevron on each entry, Vault's and Polar's alike.
+        expect(markup.match(/class="chevron-right"/g)).toHaveLength(2);
+        expect(markup).not.toContain("Shortcut:");
+        expect(markup).not.toContain("Change");
+    });
 });
 
 describe("a section", () => {

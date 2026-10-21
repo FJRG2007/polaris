@@ -12,7 +12,7 @@ import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
 import { chromiumBrowser } from "@/lib/browser-name";
-import { OPEN_POLAR, openSidePanel } from "@/lib/polar-panel";
+import * as polar from "@/lib/polar-panel";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
@@ -30,7 +30,12 @@ import {
     MENU_ENTRIES,
     menuEntries,
     visibleEntries,
-    type MenuTarget
+    type MenuTarget,
+    ROOT_CONTEXTS,
+    isPolarEntry,
+    polarAskFor,
+    polarMenuEntries,
+    type MenuClick
 } from "@/lib/context-menu";
 import { SECOND_STEP_FOR_MS, sameSite, stepFor, type SecondStep } from "@/lib/second-step";
 import {
@@ -45,6 +50,8 @@ import * as servers from "@/lib/servers";
 import * as selfUpdate from "@/lib/self-update";
 import {
     currentOrigin,
+    polarisOrigins,
+    watchPolarisOrigins,
     forgetOrigin,
     holdsOrigin,
     readOrigin,
@@ -3914,14 +3921,23 @@ async function setupMenus(): Promise<void> {
     if (!menus) return;
     await menus.removeAll();
     fitted = null;
+    const t = await words();
     // i18n-ignore the product's name
-    menus.create({ id: MENU.root, title: "Polaris", contexts: ["editable"] });
-    for (const entry of menuEntries(await words())) {
+    menus.create({ id: MENU.root, title: "Polaris", contexts: [...ROOT_CONTEXTS] });
+    for (const entry of menuEntries(t)) {
         menus.create({
             id: entry.id,
             parentId: MENU.root,
             title: entry.title,
             contexts: ["editable"]
+        });
+    }
+    for (const entry of polarMenuEntries(t)) {
+        menus.create({
+            id: entry.id,
+            parentId: MENU.root,
+            title: entry.title,
+            contexts: [entry.context]
         });
     }
 }
@@ -3931,11 +3947,212 @@ async function setupMenus(): Promise<void> {
 async function retitleMenus(): Promise<void> {
     const menus = browser.contextMenus;
     if (!menus) return;
+    const t = await words();
     await Promise.all(
-        menuEntries(await words()).map((entry) =>
+        [...menuEntries(t), ...polarMenuEntries(t)].map((entry) =>
             Promise.resolve(menus.update(entry.id, { title: entry.title })).catch(() => undefined)
         )
     );
+}
+
+/*
+ * Polar from the keyboard and the right-click menu.
+ *
+ * Both have to decide inside the gesture - a side panel opens only in the same
+ * turn as the press, with nothing awaited before it - so what they decide from
+ * is kept here, in memory, and kept current: the Polaris deployments this
+ * browser knows (whose pages carry Polar of their own), the scope chosen in
+ * settings, and which panels are open (each holds a port to the worker while it
+ * is). When the worker has just been woken by the press itself and has not read
+ * them yet, it opens the panel, and the panel finds out it is on a Polaris tab
+ * and hands over (`bounce` below) - so the press still lands in the right place.
+ */
+
+/** The Polaris deployments this browser knows, once read. */
+let knownPolaris: string[] = [];
+/** The scope chosen in settings, once read. */
+let panelScope: polar.PanelScope = "all";
+
+const PANEL_SCOPE = storage.defineItem<polar.PanelScope>(polar.PANEL_SCOPE_KEY, {
+    fallback: "all"
+});
+
+/** Something a right-click asked that a panel still has to hand its chat. */
+const PENDING_ASK = storage.defineItem<(polar.PolarAsk & { at: number }) | null>(
+    "session:polar.pendingAsk",
+    { fallback: null }
+);
+/** How long a waiting question is worth handing over: a panel opens in well under it. */
+const ASK_FOR_MS = 30_000;
+
+/** Open panels by port: the window they are in, and the tab when one is a tab's own. */
+const panels = new Map<
+    { postMessage(message: polar.PanelMessage): void },
+    { windowId: number | null; tabId: number | null }
+>();
+
+/** Whether a panel is open where `tab` is: its own, or the window's shared one. */
+function panelFor(tab: { id?: number; windowId?: number }): boolean {
+    for (const where of panels.values()) {
+        if (where.tabId !== null ? where.tabId === tab.id : where.windowId === tab.windowId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Close the panel open where `tab` is: the browser's own call where it has one
+ *  (Chrome 141), and the panel closing itself everywhere else. */
+function closePanel(tab: { id?: number; windowId?: number }): void {
+    for (const [port, where] of panels) {
+        const here = where.tabId !== null ? where.tabId === tab.id : where.windowId === tab.windowId;
+        if (here) port.postMessage({ kind: "close" });
+    }
+    const side = (browser as unknown as { sidePanel?: polar.SidePanelApi }).sidePanel;
+    if (side?.close && tab.windowId !== undefined) {
+        side.close(
+            panelScope === "tab" && tab.id !== undefined ? { tabId: tab.id } : { windowId: tab.windowId }
+        ).catch(() => undefined);
+    }
+}
+
+/** Read what the decisions above are made from, and keep it current. */
+function followPolar(): void {
+    const readOrigins = (): void =>
+        void polarisOrigins()
+            .then((origins) => (knownPolaris = origins))
+            .catch(() => undefined);
+    readOrigins();
+    watchPolarisOrigins(readOrigins);
+    void PANEL_SCOPE.getValue().then((scope) => applyPanelScope(polar.readPanelScope(scope)));
+    PANEL_SCOPE.watch((scope) => applyPanelScope(polar.readPanelScope(scope)));
+}
+
+/**
+ * Put the browser's side panel in the chosen scope. Shared: one panel the whole
+ * window keeps as tabs change. Per tab: the shared one switched off, so a panel
+ * exists only on a tab it was opened on and the browser hides it everywhere
+ * else. Chrome has no call that hands a tab back to the shared panel, so a tab
+ * opened per tab before a switch back to shared keeps its own until it closes.
+ */
+function applyPanelScope(scope: polar.PanelScope): void {
+    panelScope = scope;
+    const side = (browser as unknown as { sidePanel?: polar.SidePanelApi }).sidePanel;
+    side?.setOptions({ path: polar.PANEL_PAGE, enabled: scope === "all" }).catch(() => undefined);
+}
+
+/**
+ * The shortcut, or a right-click entry with something to ask. Synchronous up to
+ * the browser call.
+ */
+function polarFrom(
+    tab: { id?: number; windowId?: number; url?: string } | undefined,
+    ask: polar.PolarAsk | null
+): void {
+    if (!tab) return;
+    const route = polar.routeFor(tab, knownPolaris, panelFor(tab));
+    if (route === "polaris" && tab.id !== undefined) {
+        polar.sendToPolarisTab(browser, tab.id, polar.polarisCommand(ask ?? undefined));
+        return;
+    }
+    if (polar.isFirefox(browser)) {
+        const sidebar = (
+            browser as unknown as {
+                sidebarAction: { open(): Promise<void>; toggle?(): Promise<void> };
+            }
+        ).sidebarAction;
+        // The sidebar is the window's and Firefox knows whether it is open, so
+        // the bare shortcut toggles it; a question only ever opens it.
+        if (!ask && sidebar.toggle) sidebar.toggle().catch(() => undefined);
+        else sidebar.open().catch(() => undefined);
+    } else if (route === "close" && !ask) {
+        // A question goes to the panel that is open; only the bare shortcut
+        // closes it.
+        closePanel(tab);
+        return;
+    } else {
+        polar.openPolarFor(browser, tab, panelScope);
+    }
+    if (ask) {
+        void PENDING_ASK.setValue({ ...ask, at: Date.now() });
+        // A panel already open takes it now; one opening asks for it when ready.
+        for (const port of panels.keys()) port.postMessage({ kind: "ask", ...ask });
+    }
+}
+
+/** A right-click on one of Polar's entries. The panel opens first, in the gesture;
+ *  the question is worded after, in the reader's words. */
+function polarFromMenu(
+    id: Parameters<typeof polarAskFor>[0],
+    click: MenuClick,
+    tab: { id?: number; windowId?: number; url?: string } | undefined
+): void {
+    if (!tab) return;
+    const english = polarAskFor(id, click);
+    if (!english) return;
+    if (polar.isPolarisTab(tab.url, knownPolaris) && tab.id !== undefined) {
+        const tabId = tab.id;
+        void words().then((t) =>
+            polar.sendToPolarisTab(browser, tabId, polar.polarisCommand(polarAskFor(id, click, t) ?? english))
+        );
+        return;
+    }
+    polarFrom(tab, english);
+    // Worded again in the reader's language, replacing the English stand-in.
+    void words().then((t) => {
+        const ask = polarAskFor(id, click, t);
+        if (!ask) return;
+        void PENDING_ASK.setValue({ ...ask, at: Date.now() });
+        for (const port of panels.keys()) port.postMessage({ kind: "ask", ...ask });
+    });
+}
+
+/** A panel opening, closing, or finding itself on a Polaris tab. */
+function onPanelPort(port: {
+    name: string;
+    postMessage(message: polar.PanelMessage): void;
+    onMessage: { addListener(listener: (message: unknown) => void): void };
+    onDisconnect: { addListener(listener: () => void): void };
+}): void {
+    if (port.name !== polar.PANEL_PORT) return;
+    port.onMessage.addListener((raw) => {
+        const message = raw as polar.PanelMessage;
+        if (message?.kind === "hello") {
+            panels.set(port, { windowId: message.windowId, tabId: message.tabId });
+            // A question asked from a right-click that is still fresh.
+            void PENDING_ASK.getValue().then((ask) => {
+                if (!ask || Date.now() - ask.at > ASK_FOR_MS) return;
+                void PENDING_ASK.setValue(null);
+                port.postMessage({ kind: "ask", quote: ask.quote, draft: ask.draft });
+            });
+            return;
+        }
+        if (message?.kind === "bounce" && typeof message.tabId === "number") {
+            // Opened on a Polaris tab before the worker knew it was one: the
+            // panel closes itself, and the page's own Polar gets the press.
+            const tabId = message.tabId;
+            void PENDING_ASK.getValue().then((ask) => {
+                const fresh = ask && Date.now() - ask.at <= ASK_FOR_MS ? ask : null;
+                if (fresh) void PENDING_ASK.setValue(null);
+                polar.sendToPolarisTab(
+                    browser,
+                    tabId,
+                    polar.polarisCommand(fresh ? { quote: fresh.quote, draft: fresh.draft } : undefined)
+                );
+            });
+        }
+    });
+    port.onDisconnect.addListener(() => panels.delete(port));
+}
+
+/** Keep a tab's own panel off a Polaris page, in the per-tab scope: there the
+ *  page's Polar is the one to use. */
+function fitTabPanel(tabId: number, url: string | undefined): void {
+    if (panelScope !== "tab") return;
+    const side = (browser as unknown as { sidePanel?: polar.SidePanelApi }).sidePanel;
+    if (side && polar.isPolarisTab(url, knownPolaris)) {
+        side.setOptions({ tabId, enabled: false }).catch(() => undefined);
+    }
 }
 
 /** What the entries were last fitted to, so a hover over a box of the same kind costs nothing. */
@@ -3963,7 +4180,8 @@ browser.tabs.onActivated.addListener(() => {
     void badge();
     void freshen();
 });
-browser.tabs.onUpdated.addListener((_id, change) => {
+browser.tabs.onUpdated.addListener((id, change) => {
+    if (change.url) fitTabPanel(id, change.url);
     if (change.url || change.status === "complete") void badge();
     if (change.status === "complete") void freshen();
 });
@@ -4053,16 +4271,23 @@ export default defineBackground(() => {
     // listener that has to survive the worker being recycled.
     browser.commands.onCommand.addListener((command, tab) => {
         // Nothing awaited first: a side panel opens only inside the gesture.
-        if (command === OPEN_POLAR) openSidePanel(browser, tab?.windowId);
+        if (command === polar.OPEN_POLAR) polarFrom(tab, null);
         else void fillFromKeyboard(command);
     });
+
+    // Polar's state, read once and followed (see `polarFrom`), and the ports
+    // open panels hold - registered here for the same reason as the command.
+    followPolar();
+    browser.runtime.onConnect.addListener((port) => onPanelPort(port as never));
 
     // The right-click entries, registered here for the same reason as the
     // command above: the build's stand-in browser has no menu API.
     void setupMenus();
-    browser.contextMenus?.onClicked.addListener(
-        (info, tab) => void fromMenu(info.menuItemId, tab, info.frameId, info.frameUrl)
-    );
+    browser.contextMenus?.onClicked.addListener((info, tab) => {
+        // Polar's entries decide in the gesture, like the shortcut.
+        if (isPolarEntry(info.menuItemId)) return polarFromMenu(info.menuItemId, info, tab);
+        void fromMenu(info.menuItemId, tab, info.frameId, info.frameUrl);
+    });
 
     // The deadline is enforced on a period, not only when something asks. On
     // Firefox nothing else would: a persistent background page goes on holding the

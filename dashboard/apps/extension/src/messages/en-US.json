@@ -50,7 +50,22 @@
         "fill": "Fill the login for this site",
         "generate": "Generate a password",
         "code": "Fill the one-time code",
-        "email": "Fill my email"
+        "email": "Fill my email",
+        "polar": {
+            "selection": "Ask Polar about this",
+            "explain": "Explain with Polar",
+            "summarize": "Summarize with Polar",
+            "translate": "Translate with Polar",
+            "link": "Ask Polar about this link",
+            "image": "Ask Polar about this image",
+            "page": "Ask Polar about this page",
+            "explainDraft": "Explain this in simple terms.",
+            "summarizeDraft": "Summarize this in a few lines.",
+            "translateDraft": "Translate this into English.",
+            "linkDraft": "What is at this link? {url}",
+            "imageDraft": "What does this image show? {url}",
+            "pageDraft": "What is this page about? {url}"
+        }
     },
     "lock": {
         "minutes": "{count, plural, one {# minute} other {# minutes}}",
@@ -121,7 +136,8 @@
         "host": "Host",
         "hosts": "Hosts",
         "manageHosts": "Manage hosts",
-        "hostTitle": "{name} ({host})"
+        "hostTitle": "{name} ({host})",
+        "settings": "Settings"
     },
     "popup": {
         "update": {
@@ -296,8 +312,6 @@
     "polar": {
         "title": "Polar",
         "open": "Open Polar beside the page",
-        "shortcut": "Shortcut: {keys}",
-        "noShortcut": "No shortcut set",
         "change": "Change",
         "pressKeys": "Press the new keys",
         "shortcutRefused": "That shortcut cannot be used. Try another.",
@@ -311,5 +325,25 @@
         "notNow": "Not now",
         "reading": "Polar can read {site}",
         "stop": "Stop"
+    },
+    "settings": {
+        "shortcuts": "Shortcuts",
+        "shortcutsChromium": "Your browser keeps these keys. Change opens its shortcuts screen.",
+        "shortcutsFirefox": "Press Change, then the new keys.",
+        "togglePolar": "Open or close Polar",
+        "none": "None",
+        "changeFor": "Change the keys for {action}",
+        "polarisKeys": "Polaris opens Polar with {keys}.",
+        "openIn": "Open Polar in",
+        "allTabs": "Every tab",
+        "oneTab": "One tab only",
+        "allTabsHint": "One panel stays open as you switch tabs.",
+        "oneTabHint": "The panel shows only on the tab you open it on.",
+        "firefoxSidebar": "Firefox keeps one sidebar per window, so it shows on every tab.",
+        "chat": "Conversation",
+        "sharedChat": "Same on every tab",
+        "tabChat": "A new one per tab",
+        "sharedChatHint": "The chat carries on as you switch tabs.",
+        "tabChatHint": "Each tab keeps its own chat."
     }
 }
