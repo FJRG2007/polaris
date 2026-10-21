@@ -237,7 +237,6 @@
         "Game servers": "Game servers",
         "Goals": "Goals",
         "Get started": "Get started",
-        "General": "General",
         "Groups": "Groups",
         "How it works": "How it works",
         "Inbox": "Inbox",
@@ -368,7 +367,10 @@
         "Query log": "Query log",
         "Lists": "Lists",
         "Local DNS": "Local DNS",
-        "Email & SMS": "Email & SMS"
+        "Email & SMS": "Email & SMS",
+        "People & access": "People & access",
+        "Platform": "Platform",
+        "Areas": "Areas"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

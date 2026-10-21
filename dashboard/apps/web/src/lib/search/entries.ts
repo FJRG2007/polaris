@@ -159,6 +159,9 @@ export function navigationEntries(
         );
         if (owner && !allowed.has(owner.id)) continue;
         for (const section of subapp.sections) {
+            // A Management area's screens are an administrator's, like the
+            // app's own sections above.
+            if (section.adminOnly && !isAdmin) continue;
             if (!offered(section)) continue;
             if (entries.some((entry) => entry.href === section.href)) continue;
             entries.push({

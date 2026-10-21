@@ -626,24 +626,423 @@ const PRIVACY_GROUP = "Privacy";
  *  model keys and the domains their deploys answer on. */
 const DEVELOPERS_GROUP = "Developers";
 
+/** The heading the Management areas are listed under, below the screens that
+ *  answer before you know which area your question is in. */
+const ADMIN_AREAS_GROUP = "Areas";
+
 /**
- * The headings the Management rail is read under.
+ * The Management areas, each a rail of its own.
  *
- * An operator arrives with one question: who is here, what they may do, how
- * Polaris reaches people, or how the deployment itself is set up. That last one
- * was a single Platform heading of thirteen entries, so it is split the way
- * GitHub, Vercel and Nextcloud split their own settings: the deployment's basics,
- * what it connects to, where its data lives, and what it is using. Overview,
- * Activity and Evidence stay ungrouped at the top, because they are where you
- * look before you know which question you have.
+ * Twenty-odd screens under seven headings was still a list to read through, so
+ * the Management rail now holds only Overview, Activity, Evidence and one entry
+ * per area - the way Agents sits inside Apps. Opening an area swaps the rail to
+ * its screens with a way back, and the screens keep the addresses they had,
+ * which is why most areas claim theirs through `match` rather than `base`.
  */
-const ADMIN_PEOPLE_GROUP = "People";
-const ADMIN_ACCESS_GROUP = "Access";
-const ADMIN_COMMUNICATION_GROUP = "Communication";
-const ADMIN_GENERAL_GROUP = "General";
-const ADMIN_INTEGRATIONS_GROUP = "Integrations & AI";
-const ADMIN_STORAGE_GROUP = "Storage & data";
-const ADMIN_USAGE_GROUP = "Usage & health";
+const ADMIN_AREAS: AppSubapp[] = [
+    {
+        id: "admin-people",
+        label: "People & access", // i18n-ignore
+        icon: Users,
+        base: "/admin/users",
+        match: [
+            "/admin/groups",
+            "/admin/organizations",
+            "/admin/roles",
+            "/admin/policies",
+            "/admin/security",
+            "/admin/sso"
+        ],
+        parent: { label: "Management", href: "/admin" }, // i18n-ignore
+        parentAppId: "admin",
+        sections: [
+            {
+                label: "Users", // i18n-ignore
+                href: "/admin/users",
+                adminOnly: true,
+                icon: Users,
+                keywords: ["accounts", "invites"]
+            },
+            {
+                label: "Groups", // i18n-ignore
+                href: "/admin/groups",
+                adminOnly: true,
+                icon: UsersRound,
+                keywords: ["teams"]
+            },
+            {
+                label: "Organizations", // i18n-ignore
+                href: "/admin/organizations",
+                adminOnly: true,
+                icon: Building2,
+                keywords: ["org", "orgs", "teams", "company", "limits", "turn off"]
+            },
+            {
+                label: "Roles", // i18n-ignore
+                href: "/admin/roles",
+                adminOnly: true,
+                icon: IdCard,
+                keywords: [
+                    "permissions",
+                    "member",
+                    "viewer",
+                    "guest",
+                    "what they can do",
+                    "capabilities",
+                    "view as"
+                ]
+            },
+            {
+                label: "Policies", // i18n-ignore
+                href: "/admin/policies",
+                adminOnly: true,
+                icon: Scale,
+                keywords: ["permissions", "access"]
+            },
+            {
+                label: "Security", // i18n-ignore
+                href: "/admin/security",
+                adminOnly: true,
+                icon: ShieldCheck,
+                keywords: [
+                    "2fa",
+                    "two-factor",
+                    "two-step",
+                    "authenticator",
+                    "require",
+                    "mandatory",
+                    "sign-in",
+                    "enrolment",
+                    "enrollment"
+                ]
+            },
+            {
+                label: "Single sign-on", // i18n-ignore
+                href: "/admin/sso",
+                adminOnly: true,
+                icon: ShieldCheck,
+                keywords: ["sso", "saml", "identity provider", "idp", "okta", "entra", "domain"]
+            }
+        ]
+    },
+    {
+        id: "admin-communication",
+        label: "Communication", // i18n-ignore
+        icon: MessageSquare,
+        base: "/admin/email",
+        match: ["/admin/chat", "/admin/safety"],
+        parent: { label: "Management", href: "/admin" }, // i18n-ignore
+        parentAppId: "admin",
+        sections: [
+            {
+                // Senders belong to whoever added them, so anybody who can open the
+                // Inbox can add their own; only the account-mail choice is an admin's.
+                label: "Email & SMS", // i18n-ignore
+                href: "/admin/email",
+                needs: "inbox.read",
+                icon: Mail,
+                keywords: [
+                    "smtp",
+                    "sender",
+                    "sms",
+                    "texts",
+                    "twilio",
+                    "resend",
+                    "brevo",
+                    "mailjet",
+                    "ses",
+                    "outgoing",
+                    "account mail"
+                ]
+            },
+            {
+                label: "Chat", // i18n-ignore
+                href: "/admin/chat",
+                adminOnly: true,
+                icon: MessageSquare,
+                keywords: [
+                    "messages",
+                    "limits",
+                    "edit history",
+                    "delete",
+                    "attachments",
+                    "rate limit",
+                    "direct messages",
+                    "group chats",
+                    "calls",
+                    "call server",
+                    "video calls",
+                    "meetings"
+                ]
+            },
+            {
+                label: "Safety", // i18n-ignore
+                href: "/admin/safety",
+                adminOnly: true,
+                icon: Flag,
+                keywords: [
+                    "reports",
+                    "moderation",
+                    "abuse",
+                    "spam",
+                    "flagged",
+                    "chat",
+                    "lockdown",
+                    "locked down",
+                    "quarantine",
+                    "reported user",
+                    "reported account"
+                ]
+            }
+        ]
+    },
+    {
+        id: "admin-platform",
+        label: "Platform", // i18n-ignore
+        icon: Settings,
+        base: "/admin/settings",
+        match: ["/admin/apps", "/admin/setup", "/admin/display", "/admin/domains"],
+        parent: { label: "Management", href: "/admin" }, // i18n-ignore
+        parentAppId: "admin",
+        sections: [
+            {
+                label: "Updates & settings", // i18n-ignore
+                href: "/admin/settings",
+                adminOnly: true,
+                icon: Settings,
+                keywords: ["version", "upgrade"]
+            },
+            {
+                label: "Polaris apps", // i18n-ignore
+                href: "/admin/apps",
+                adminOnly: true,
+                icon: Store,
+                keywords: ["marketplace", "install", "catalog", "built in"]
+            },
+            {
+                label: "Get started", // i18n-ignore
+                href: "/admin/setup",
+                adminOnly: true,
+                icon: Rocket,
+                keywords: ["setup", "first run", "wizard", "install apps", "onboarding"]
+            },
+            {
+                label: "Display defaults", // i18n-ignore
+                href: "/admin/display",
+                adminOnly: true,
+                icon: SlidersHorizontal,
+                keywords: ["units", "formats"]
+            },
+            {
+                label: "Domains", // i18n-ignore
+                href: "/admin/domains",
+                adminOnly: true,
+                icon: Globe,
+                keywords: ["dns", "tunnels", "certificates"]
+            }
+        ]
+    },
+    {
+        id: "admin-integrations",
+        label: "Integrations & AI", // i18n-ignore
+        icon: Blocks,
+        base: "/admin/integrations",
+        match: ["/admin/agents"],
+        parent: { label: "Management", href: "/admin" }, // i18n-ignore
+        parentAppId: "admin",
+        sections: [
+            {
+                label: "Integrations", // i18n-ignore
+                href: "/admin/integrations",
+                adminOnly: true,
+                icon: Blocks,
+                keywords: ["github", "cloudflare", "connect"]
+            },
+            {
+                label: "AI provider keys", // i18n-ignore
+                href: "/admin/integrations/models",
+                adminOnly: true,
+                icon: Sparkles,
+                keywords: [
+                    "models",
+                    "providers",
+                    "anthropic",
+                    "claude",
+                    "openai",
+                    "gemini",
+                    "grok",
+                    "deepseek",
+                    "kimi",
+                    "groq",
+                    "cerebras",
+                    "openrouter",
+                    "api key",
+                    "agents"
+                ]
+            },
+            {
+                label: "Agent defaults", // i18n-ignore
+                href: "/admin/agents",
+                adminOnly: true,
+                icon: Bot,
+                keywords: [
+                    "agents",
+                    "quality gate",
+                    "enigma",
+                    "public",
+                    "private",
+                    "pull requests",
+                    "issues"
+                ]
+            }
+        ]
+    },
+    {
+        id: "admin-storage",
+        label: "Storage & data", // i18n-ignore
+        icon: HardDrive,
+        base: "/admin/storage",
+        match: ["/admin/uploads", "/admin/retention"],
+        parent: { label: "Management", href: "/admin" }, // i18n-ignore
+        parentAppId: "admin",
+        sections: [
+            {
+                label: "Storage locations", // i18n-ignore
+                href: "/admin/storage",
+                adminOnly: true,
+                icon: HardDrive,
+                keywords: [
+                    "storage",
+                    "nas",
+                    "smb",
+                    "nfs",
+                    "cifs",
+                    "share",
+                    "disk",
+                    "volumes",
+                    "move",
+                    "space",
+                    "full"
+                ]
+            },
+            {
+                label: "Uploads", // i18n-ignore
+                href: "/admin/uploads",
+                adminOnly: true,
+                icon: HardDrive,
+                keywords: [
+                    "attachments",
+                    "files",
+                    "storage",
+                    "nas",
+                    "size limit",
+                    "avatars",
+                    "profile photos",
+                    "gravatar"
+                ]
+            },
+            {
+                label: "Keeping records", // i18n-ignore
+                href: "/admin/retention",
+                adminOnly: true,
+                icon: Trash2,
+                keywords: [
+                    "retention",
+                    "logs",
+                    "notifications",
+                    "activity",
+                    "audit",
+                    "history",
+                    "delete old",
+                    "purge",
+                    "prune",
+                    "how long",
+                    "days",
+                    "gdpr",
+                    "cleanup",
+                    "disk",
+                    "mail",
+                    "bodies",
+                    "cache"
+                ]
+            }
+        ]
+    },
+    {
+        id: "admin-usage",
+        label: "Usage & health", // i18n-ignore
+        icon: Gauge,
+        base: "/admin/consumption",
+        match: ["/admin/billing", "/admin/diagnostics"],
+        parent: { label: "Management", href: "/admin" }, // i18n-ignore
+        parentAppId: "admin",
+        sections: [
+            {
+                label: "Consumption", // i18n-ignore
+                href: "/admin/consumption",
+                adminOnly: true,
+                icon: Gauge,
+                keywords: [
+                    "usage",
+                    "resources",
+                    "memory",
+                    "ram",
+                    "cpu",
+                    "disk",
+                    "footprint",
+                    "what is using",
+                    "containers",
+                    "apps",
+                    "marketplace"
+                ]
+            },
+            {
+                label: "Billing", // i18n-ignore
+                href: "/admin/billing",
+                adminOnly: true,
+                icon: Wallet,
+                keywords: [
+                    "cost",
+                    "costs",
+                    "prices",
+                    "rates",
+                    "charge back",
+                    "chargeback",
+                    "invoice",
+                    "statement",
+                    "budget",
+                    "spend",
+                    "usage",
+                    "vcpu",
+                    "per project"
+                ]
+            },
+            {
+                label: "Diagnostics", // i18n-ignore
+                href: "/admin/diagnostics",
+                adminOnly: true,
+                icon: Stethoscope,
+                keywords: ["health", "doctor", "speed test", "support bundle", "troubleshoot"]
+            }
+        ]
+    }
+];
+
+/** An area's entry in the Management rail: it opens on the area's first screen,
+ *  and search finds it by any of its screens' names. Administrators only unless
+ *  one of its screens is open to somebody else. */
+function areaEntry(area: AppSubapp): AppSection {
+    const open = area.sections.find((section) => !section.adminOnly);
+    return {
+        label: area.label,
+        href: area.base,
+        icon: area.icon,
+        ...(open ? { needs: open.needs } : { adminOnly: true }),
+        keywords: area.sections.flatMap((section) => [section.label, ...(section.keywords ?? [])]),
+        group: ADMIN_AREAS_GROUP
+    };
+}
+
 
 export const APP_SECTIONS: Record<string, AppSection[]> = {
     drive: [
@@ -1953,86 +2352,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "certification"
             ]
         },
-        {
-            label: "Users", // i18n-ignore
-            href: "/admin/users",
-            adminOnly: true,
-            icon: Users,
-            keywords: ["accounts", "invites"],
-            group: ADMIN_PEOPLE_GROUP
-        },
-        {
-            label: "Groups", // i18n-ignore
-            href: "/admin/groups",
-            adminOnly: true,
-            icon: UsersRound,
-            keywords: ["teams"],
-            group: ADMIN_PEOPLE_GROUP
-        },
-        {
-            label: "Organizations", // i18n-ignore
-            href: "/admin/organizations",
-            adminOnly: true,
-            icon: Building2,
-            keywords: ["org", "orgs", "teams", "company", "limits", "turn off"],
-            group: ADMIN_PEOPLE_GROUP
-        },
-        {
-            label: "Roles", // i18n-ignore
-            href: "/admin/roles",
-            adminOnly: true,
-            icon: IdCard,
-            keywords: [
-                "permissions",
-                "member",
-                "viewer",
-                "guest",
-                "what they can do",
-                "capabilities",
-                "view as"
-            ],
-            group: ADMIN_ACCESS_GROUP
-        },
-        {
-            label: "Policies", // i18n-ignore
-            href: "/admin/policies",
-            adminOnly: true,
-            icon: Scale,
-            keywords: ["permissions", "access"],
-            group: ADMIN_ACCESS_GROUP
-        },
-        {
-            label: "Security", // i18n-ignore
-            href: "/admin/security",
-            adminOnly: true,
-            icon: ShieldCheck,
-            keywords: [
-                "2fa",
-                "two-factor",
-                "two-step",
-                "authenticator",
-                "require",
-                "mandatory",
-                "sign-in",
-                "enrolment",
-                "enrollment"
-            ],
-            group: ADMIN_ACCESS_GROUP
-        },
-        {
-            label: "Single sign-on", // i18n-ignore
-            href: "/admin/sso",
-            adminOnly: true,
-            icon: ShieldCheck,
-            keywords: ["sso", "saml", "identity provider", "idp", "okta", "entra", "domain"],
-            group: ADMIN_ACCESS_GROUP
-        },
+        ...ADMIN_AREAS.slice(0, 2).map(areaEntry),
         {
             // The messaging bridge's two-way chat. Only here once the bridge is
             // installed: without it nothing on these screens can connect or send.
             label: "Inbox", // i18n-ignore
             href: "/admin/inbox",
             requiresApp: "messaging-bridge",
+            group: ADMIN_AREAS_GROUP,
             icon: MessagesSquare,
             keywords: [
                 "conversations",
@@ -2042,272 +2369,9 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "telegram",
                 "slack",
                 "contacts"
-            ],
-            group: ADMIN_COMMUNICATION_GROUP
+            ]
         },
-        {
-            // Senders belong to whoever added them, so anybody who can open the
-            // Inbox can add their own; only the account-mail choice is an admin's.
-            label: "Email & SMS", // i18n-ignore
-            href: "/admin/email",
-            needs: "inbox.read",
-            icon: Mail,
-            keywords: [
-                "smtp",
-                "sender",
-                "sms",
-                "texts",
-                "twilio",
-                "resend",
-                "brevo",
-                "mailjet",
-                "ses",
-                "outgoing",
-                "account mail"
-            ],
-            group: ADMIN_COMMUNICATION_GROUP
-        },
-        {
-            label: "Chat", // i18n-ignore
-            href: "/admin/chat",
-            adminOnly: true,
-            icon: MessageSquare,
-            keywords: [
-                "messages",
-                "limits",
-                "edit history",
-                "delete",
-                "attachments",
-                "rate limit",
-                "direct messages",
-                "group chats",
-                "calls",
-                "call server",
-                "video calls",
-                "meetings"
-            ],
-            group: ADMIN_COMMUNICATION_GROUP
-        },
-        {
-            label: "Safety", // i18n-ignore
-            href: "/admin/safety",
-            adminOnly: true,
-            icon: Flag,
-            keywords: [
-                "reports",
-                "moderation",
-                "abuse",
-                "spam",
-                "flagged",
-                "chat",
-                "lockdown",
-                "locked down",
-                "quarantine",
-                "reported user",
-                "reported account"
-            ],
-            group: ADMIN_COMMUNICATION_GROUP
-        },
-        {
-            label: "Polaris apps", // i18n-ignore
-            href: "/admin/apps",
-            adminOnly: true,
-            icon: Store,
-            keywords: ["marketplace", "install", "catalog", "built in"],
-            group: ADMIN_GENERAL_GROUP
-        },
-        {
-            label: "Get started", // i18n-ignore
-            href: "/admin/setup",
-            adminOnly: true,
-            icon: Rocket,
-            keywords: ["setup", "first run", "wizard", "install apps", "onboarding"],
-            group: ADMIN_GENERAL_GROUP
-        },
-        {
-            label: "Updates & settings", // i18n-ignore
-            href: "/admin/settings",
-            adminOnly: true,
-            icon: Settings,
-            keywords: ["version", "upgrade"],
-            group: ADMIN_GENERAL_GROUP
-        },
-        {
-            label: "Display defaults", // i18n-ignore
-            href: "/admin/display",
-            adminOnly: true,
-            icon: SlidersHorizontal,
-            keywords: ["units", "formats"],
-            group: ADMIN_GENERAL_GROUP
-        },
-        {
-            label: "Domains", // i18n-ignore
-            href: "/admin/domains",
-            adminOnly: true,
-            icon: Globe,
-            keywords: ["dns", "tunnels", "certificates"],
-            group: ADMIN_GENERAL_GROUP
-        },
-        {
-            label: "Integrations", // i18n-ignore
-            href: "/admin/integrations",
-            adminOnly: true,
-            icon: Blocks,
-            keywords: ["github", "cloudflare", "connect"],
-            group: ADMIN_INTEGRATIONS_GROUP
-        },
-        {
-            label: "AI provider keys", // i18n-ignore
-            href: "/admin/integrations/models",
-            adminOnly: true,
-            icon: Sparkles,
-            keywords: [
-                "models",
-                "providers",
-                "anthropic",
-                "claude",
-                "openai",
-                "gemini",
-                "grok",
-                "deepseek",
-                "kimi",
-                "groq",
-                "cerebras",
-                "openrouter",
-                "api key",
-                "agents"
-            ],
-            group: ADMIN_INTEGRATIONS_GROUP
-        },
-        {
-            label: "Agent defaults", // i18n-ignore
-            href: "/admin/agents",
-            adminOnly: true,
-            icon: Bot,
-            keywords: [
-                "agents",
-                "quality gate",
-                "enigma",
-                "public",
-                "private",
-                "pull requests",
-                "issues"
-            ],
-            group: ADMIN_INTEGRATIONS_GROUP
-        },
-        {
-            label: "Storage locations", // i18n-ignore
-            href: "/admin/storage",
-            adminOnly: true,
-            icon: HardDrive,
-            keywords: [
-                "storage",
-                "nas",
-                "smb",
-                "nfs",
-                "cifs",
-                "share",
-                "disk",
-                "volumes",
-                "move",
-                "space",
-                "full"
-            ],
-            group: ADMIN_STORAGE_GROUP
-        },
-        {
-            label: "Uploads", // i18n-ignore
-            href: "/admin/uploads",
-            adminOnly: true,
-            icon: HardDrive,
-            keywords: [
-                "attachments",
-                "files",
-                "storage",
-                "nas",
-                "size limit",
-                "avatars",
-                "profile photos",
-                "gravatar"
-            ],
-            group: ADMIN_STORAGE_GROUP
-        },
-        {
-            label: "Keeping records", // i18n-ignore
-            href: "/admin/retention",
-            adminOnly: true,
-            icon: Trash2,
-            keywords: [
-                "retention",
-                "logs",
-                "notifications",
-                "activity",
-                "audit",
-                "history",
-                "delete old",
-                "purge",
-                "prune",
-                "how long",
-                "days",
-                "gdpr",
-                "cleanup",
-                "disk",
-                "mail",
-                "bodies",
-                "cache"
-            ],
-            group: ADMIN_STORAGE_GROUP
-        },
-        {
-            label: "Consumption", // i18n-ignore
-            href: "/admin/consumption",
-            adminOnly: true,
-            icon: Gauge,
-            keywords: [
-                "usage",
-                "resources",
-                "memory",
-                "ram",
-                "cpu",
-                "disk",
-                "footprint",
-                "what is using",
-                "containers",
-                "apps",
-                "marketplace"
-            ],
-            group: ADMIN_USAGE_GROUP
-        },
-        {
-            label: "Billing", // i18n-ignore
-            href: "/admin/billing",
-            adminOnly: true,
-            icon: Wallet,
-            keywords: [
-                "cost",
-                "costs",
-                "prices",
-                "rates",
-                "charge back",
-                "chargeback",
-                "invoice",
-                "statement",
-                "budget",
-                "spend",
-                "usage",
-                "vcpu",
-                "per project"
-            ],
-            group: ADMIN_USAGE_GROUP
-        },
-        {
-            label: "Diagnostics", // i18n-ignore
-            href: "/admin/diagnostics",
-            adminOnly: true,
-            icon: Stethoscope,
-            keywords: ["health", "doctor", "speed test", "support bundle", "troubleshoot"],
-            group: ADMIN_USAGE_GROUP
-        }
+        ...ADMIN_AREAS.slice(2).map(areaEntry)
     ]
 };
 
@@ -2333,6 +2397,9 @@ export interface AppSubapp {
     icon: LucideIcon;
     /** The path it owns, and where "back" comes back to. */
     base: string;
+    /** Further paths it owns, for a subject whose screens share no prefix -
+     *  a Management area keeps the addresses its screens had before it. */
+    match?: string[];
     parent: { label: string; href: string };
     /** The app "back" returns to, when not everybody who reaches this subject can
      *  open it. Inbox is Management's, and a member holds `inbox.read` without
@@ -2343,6 +2410,7 @@ export interface AppSubapp {
 }
 
 export const APP_SUBAPPS: AppSubapp[] = [
+    ...ADMIN_AREAS,
     {
         id: "inbox",
         label: "Inbox", // i18n-ignore
@@ -2991,8 +3059,11 @@ export function resolveSubapp(pathname: string): AppSubapp | null {
     const slug = orgSlugForPath(pathname);
     if (slug) return orgSubapp(slug);
     return (
-        APP_SUBAPPS.find((sub) => pathname === sub.base || pathname.startsWith(`${sub.base}/`)) ??
-        null
+        APP_SUBAPPS.find((sub) =>
+            [sub.base, ...(sub.match ?? [])].some(
+                (root) => pathname === root || pathname.startsWith(`${root}/`)
+            )
+        ) ?? null
     );
 }
 

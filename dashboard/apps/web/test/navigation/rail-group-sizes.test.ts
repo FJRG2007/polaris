@@ -6,11 +6,12 @@
  * place the eye lands. This holds every heading of the two rails - the ungrouped
  * entries at the top included - to a size that can be taken in at a glance, keeps
  * each heading's entries together in the order they are declared, and keeps every
- * screen the two rails offered before they were regrouped.
+ * screen the two rails offered before they were regrouped - Management's now one
+ * level down, inside the area its rail entry opens.
  */
 
 import { describe, expect, it } from "vitest";
-import { APP_SECTIONS, type AppSection } from "@/lib/apps";
+import { APP_SECTIONS, APP_SUBAPPS, type AppSection } from "@/lib/apps";
 
 /** The most entries one heading may hold. */
 const MAX_PER_HEADING = 8;
@@ -92,7 +93,7 @@ describe.each(Object.keys(PREVIOUS))("the %s rail", (rail) => {
 
     it("draws more than one heading, each with more than one entry", () => {
         const groups = headings(sections);
-        expect(groups.size).toBeGreaterThan(3);
+        expect(groups.size).toBeGreaterThan(rail === "admin" ? 1 : 3);
         for (const [group, items] of groups) expect(items.length, group).toBeGreaterThan(1);
     });
 
@@ -104,7 +105,17 @@ describe.each(Object.keys(PREVIOUS))("the %s rail", (rail) => {
 
     it("still offers every screen it offered before", () => {
         const hrefs = sections.map((section) => section.href);
-        expect(PREVIOUS[rail]!.filter((href) => !hrefs.includes(href))).toEqual([]);
+        // A subject whose base this rail lists is reached through it.
+        const nested = APP_SUBAPPS.filter((subapp) => hrefs.includes(subapp.base)).flatMap(
+            (subapp) => subapp.sections.map((section) => section.href)
+        );
+        expect(PREVIOUS[rail]!.filter((href) => ![...hrefs, ...nested].includes(href))).toEqual([]);
         expect(new Set(hrefs).size).toBe(hrefs.length);
+    });
+});
+
+describe("the Management rail", () => {
+    it("opens on its areas rather than every screen", () => {
+        expect((APP_SECTIONS.admin ?? []).filter((entry) => !entry.hidden).length).toBeLessThanOrEqual(10);
     });
 });
