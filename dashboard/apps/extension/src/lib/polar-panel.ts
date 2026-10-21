@@ -312,10 +312,19 @@ export function routeFor(
     return panelOpen ? "close" : "open";
 }
 
+/** This browser run, kept until the browser closes: tab ids start over when it opens again. */
+export const BROWSER_RUN_KEY = "session:polar.browserRun";
+
+/** A new browser run's mark: short, lowercase letters and digits. */
+export function newBrowserRun(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(6));
+    return Array.from(bytes, (one) => one.toString(36).padStart(2, "0")).join("");
+}
+
 /** The conversation a panel shows, for the embed: none for the one every tab
- *  shares, the tab's own otherwise. */
-export function chatScopeFor(scope: ChatScope, tabId: number | null): string | null {
-    return scope === "tab" && tabId !== null ? `tab-${tabId}` : null;
+ *  shares, the tab's own in this browser run otherwise. */
+export function chatScopeFor(scope: ChatScope, tabId: number | null, run: string): string | null {
+    return scope === "tab" && tabId !== null ? `tab-${run}-${tabId}` : null;
 }
 
 /** The message that hands the embed a page, or tells it there is none. */

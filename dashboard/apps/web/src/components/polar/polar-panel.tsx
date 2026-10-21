@@ -307,7 +307,7 @@ export function scopedThreadKey(scope: string | null): string {
 }
 
 /** Remember a scoped chat's key, forgetting the oldest beyond the most kept:
- *  a tab's id is never reused once it closes, so its key would stay forever. */
+ *  a tab's key is never asked for again once it closes, so it would stay forever. */
 function keepScope(key: string): void {
     let kept: string[] = [];
     try {

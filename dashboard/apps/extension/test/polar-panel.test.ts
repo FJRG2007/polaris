@@ -223,10 +223,12 @@ describe("which Polar a press reaches", () => {
     });
 
     it("keeps a conversation per tab only when asked to", () => {
-        expect(polar.chatScopeFor("shared", 4)).toBeNull();
-        expect(polar.chatScopeFor("tab", 4)).toBe("tab-4");
-        expect(polar.chatScopeFor("tab", null)).toBeNull();
-        expect(polar.embedUrl(SERVER, EXT, "tab-4")).toContain("chat=tab-4");
+        expect(polar.chatScopeFor("shared", 4, "run1")).toBeNull();
+        expect(polar.chatScopeFor("tab", 4, "run1")).toBe("tab-run1-4");
+        expect(polar.chatScopeFor("tab", 4, "run2")).not.toBe(polar.chatScopeFor("tab", 4, "run1"));
+        expect(polar.chatScopeFor("tab", null, "run1")).toBeNull();
+        expect(polar.newBrowserRun()).toMatch(/^[a-z0-9]{12}$/);
+        expect(polar.embedUrl(SERVER, EXT, "tab-run1-4")).toContain("chat=tab-run1-4");
         expect(polar.readPanelScope("weird")).toBe("all");
         expect(polar.readChatScope(undefined)).toBe("shared");
     });

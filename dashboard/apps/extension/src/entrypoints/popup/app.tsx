@@ -284,7 +284,7 @@ export function App(): React.JSX.Element {
             ) : section === "settings" ? (
                 <>
                     <SectionBar title={t("shell.settings")} onBack={() => setSection("home")} />
-                    <Settings />
+                    <Settings canPolar={status.canPolar !== false} />
                 </>
             ) : section === "servers" ? (
                 <>

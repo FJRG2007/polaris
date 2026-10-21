@@ -74,7 +74,7 @@ export const ROOT_CONTEXTS = ["editable", "selection", "link", "image", "page"] 
 /** What the menu is made of for an account: Polar's entries, and the contexts
  *  they need, only when it may use Polar. */
 export function menuPlan(withPolar: boolean, t: Words = ENGLISH): {
-    contexts: readonly (typeof ROOT_CONTEXTS)[number][];
+    contexts: readonly [(typeof ROOT_CONTEXTS)[number], ...(typeof ROOT_CONTEXTS)[number][]];
     polar: readonly PolarMenuEntry[];
 } {
     return withPolar

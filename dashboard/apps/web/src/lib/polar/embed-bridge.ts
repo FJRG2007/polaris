@@ -110,7 +110,7 @@ export function polarCommandFrom(
 /** The conversation a panel asked for by `?chat=`: a tab's own, or null for
  *  the one every tab shares. */
 export function chatScope(value: unknown): string | null {
-    return typeof value === "string" && /^tab-\d{1,12}$/.test(value) ? value : null;
+    return typeof value === "string" && /^tab-(?:[a-z0-9]{1,16}-)?\d{1,12}$/.test(value) ? value : null;
 }
 
 /** The embed asking the panel to read the page again, for a fresh selection. */

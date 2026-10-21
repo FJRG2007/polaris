@@ -27,6 +27,11 @@ describe("the shortcuts list", () => {
         expect(groups[1]?.rows[0]).toMatchObject({ label: "Open or close Polar", keys: "" });
     });
 
+    it("leaves Polar's out for an account that may not use it", () => {
+        const groups = shortcutGroups([{ name: "open-polar", shortcut: "Ctrl+J" }], ENGLISH, false);
+        expect(groups.map((group) => group.id)).toEqual(["vault"]);
+    });
+
     it("draws keys as caps, a row per action, and says None for no key", () => {
         const markup = renderToStaticMarkup(
             <ShortcutSheet

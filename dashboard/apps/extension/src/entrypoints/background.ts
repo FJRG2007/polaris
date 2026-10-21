@@ -3999,7 +3999,9 @@ const PANEL_SCOPE = storage.defineItem<polar.PanelScope>(polar.PANEL_SCOPE_KEY, 
 });
 
 /** Something a right-click asked that a panel still has to hand its chat. */
-const PENDING_ASK = storage.defineItem<(polar.PolarAsk & { at: number }) | null>(
+const PENDING_ASK = storage.defineItem<
+    (polar.PolarAsk & { at: number; tabId?: number; windowId?: number }) | null
+>(
     "session:polar.pendingAsk",
     { fallback: null }
 );
@@ -4012,22 +4014,38 @@ const panels = new Map<
     { windowId: number | null; tabId: number | null }
 >();
 
-/** Whether a panel is open where `tab` is: its own, or the window's shared one. */
+/** Whether a panel at `where` is the one beside `tab`: its own, or the window's shared one. */
+function panelBeside(
+    where: { windowId: number | null; tabId: number | null },
+    tab: { id?: number; windowId?: number }
+): boolean {
+    return where.tabId !== null ? where.tabId === tab.id : where.windowId === tab.windowId;
+}
+
+/** Whether a panel is open where `tab` is. */
 function panelFor(tab: { id?: number; windowId?: number }): boolean {
-    for (const where of panels.values()) {
-        if (where.tabId !== null ? where.tabId === tab.id : where.windowId === tab.windowId) {
-            return true;
-        }
-    }
+    for (const where of panels.values()) if (panelBeside(where, tab)) return true;
     return false;
+}
+
+/** Hand a question to the panel open beside `tab`, or keep it for the one opening there. */
+function askPanel(tab: { id?: number; windowId?: number }, ask: polar.PolarAsk): void {
+    let handed = false;
+    for (const [port, where] of panels) {
+        if (!panelBeside(where, tab)) continue;
+        port.postMessage({ kind: "ask", ...ask });
+        handed = true;
+    }
+    void PENDING_ASK.setValue(
+        handed ? null : { ...ask, at: Date.now(), tabId: tab.id, windowId: tab.windowId }
+    );
 }
 
 /** Close the panel open where `tab` is: the browser's own call where it has one
  *  (Chrome 141), and the panel closing itself everywhere else. */
 function closePanel(tab: { id?: number; windowId?: number }): void {
     for (const [port, where] of panels) {
-        const here = where.tabId !== null ? where.tabId === tab.id : where.windowId === tab.windowId;
-        if (here) port.postMessage({ kind: "close" });
+        if (panelBeside(where, tab)) port.postMessage({ kind: "close" });
     }
     const side = (browser as unknown as { sidePanel?: polar.SidePanelApi }).sidePanel;
     if (side?.close && tab.windowId !== undefined) {
@@ -4107,11 +4125,8 @@ function polarFrom(
     } else {
         polar.openPolarFor(browser, tab, panelScope);
     }
-    if (ask) {
-        void PENDING_ASK.setValue({ ...ask, at: Date.now() });
-        // A panel already open takes it now; one opening asks for it when ready.
-        for (const port of panels.keys()) port.postMessage({ kind: "ask", ...ask });
-    }
+    // A panel already open takes it now; one opening asks for it when ready.
+    if (ask) askPanel(tab, ask);
 }
 
 /** A right-click on one of Polar's entries. The panel opens first, in the gesture;
@@ -4135,9 +4150,7 @@ function polarFromMenu(
     // Worded again in the reader's language, replacing the English stand-in.
     void words().then((t) => {
         const ask = polarAskFor(id, click, t);
-        if (!ask) return;
-        void PENDING_ASK.setValue({ ...ask, at: Date.now() });
-        for (const port of panels.keys()) port.postMessage({ kind: "ask", ...ask });
+        if (ask) askPanel(tab, ask);
     });
 }
 
@@ -4152,10 +4165,12 @@ function onPanelPort(port: {
     port.onMessage.addListener((raw) => {
         const message = raw as polar.PanelMessage;
         if (message?.kind === "hello") {
-            panels.set(port, { windowId: message.windowId, tabId: message.tabId });
-            // A question asked from a right-click that is still fresh.
+            const where = { windowId: message.windowId, tabId: message.tabId };
+            panels.set(port, where);
+            // A question asked from a right-click beside this panel that is still fresh.
             void PENDING_ASK.getValue().then((ask) => {
                 if (!ask || Date.now() - ask.at > ASK_FOR_MS) return;
+                if (!panelBeside(where, { id: ask.tabId, windowId: ask.windowId })) return;
                 void PENDING_ASK.setValue(null);
                 port.postMessage({ kind: "ask", quote: ask.quote, draft: ask.draft });
             });

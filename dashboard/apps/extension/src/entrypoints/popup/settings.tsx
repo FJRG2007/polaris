@@ -43,10 +43,11 @@ export interface ShortcutGroup {
 }
 
 /** The actions this extension has keys for, grouped and titled, with the keys
- *  the browser answers to now (empty for none). */
-export function shortcutGroups(all: readonly Command[], t: Words): ShortcutGroup[] {
+ *  the browser answers to now (empty for none). Polar's only for an account
+ *  that may use it. */
+export function shortcutGroups(all: readonly Command[], t: Words, withPolar = true): ShortcutGroup[] {
     const keys = (name: string): string => all.find((one) => one.name === name)?.shortcut ?? "";
-    return [
+    const groups: ShortcutGroup[] = [
         {
             id: "vault",
             title: t("shell.vault"),
@@ -64,6 +65,7 @@ export function shortcutGroups(all: readonly Command[], t: Words): ShortcutGroup
             ]
         }
     ];
+    return withPolar ? groups : groups.filter((group) => group.id !== "polar");
 }
 
 /** A binding as key caps: "Ctrl+Shift+L" is three, a Mac's "⌘⇧L" is one each. */
@@ -204,7 +206,7 @@ function Choice<T extends string>({
 
 const firefoxBrowser = (): boolean => polar.isFirefox(browser);
 
-export function Settings(): React.JSX.Element {
+export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX.Element {
     const t = useWords();
     const [all, setAll] = useState<Command[] | null>(null);
     const [recording, setRecording] = useState<string | null>(null);
@@ -278,7 +280,7 @@ export function Settings(): React.JSX.Element {
                     <div className="sheet-box skeleton" aria-hidden="true" />
                 ) : (
                     <ShortcutSheet
-                        groups={shortcutGroups(all, t)}
+                        groups={shortcutGroups(all, t, canPolar)}
                         firefox={firefox}
                         recording={recording}
                         onChange={change}
@@ -289,34 +291,36 @@ export function Settings(): React.JSX.Element {
                 )}
                 {refused ? <p className="problem">{t("polar.shortcutRefused")}</p> : null}
             </section>
-            <section aria-labelledby="settings-polar">
-                <h2 id="settings-polar">{t("polar.title")}</h2>
-                <Choice
-                    label={t("settings.openIn")}
-                    value={firefox ? "all" : panelScope}
-                    disabled={firefox}
-                    options={[
-                        { value: "all", label: t("settings.allTabs") },
-                        { value: "tab", label: t("settings.oneTab") }
-                    ]}
-                    hint={
-                        firefox
-                            ? t("settings.firefoxSidebar")
-                            : t(panelScope === "all" ? "settings.allTabsHint" : "settings.oneTabHint")
-                    }
-                    onChange={choosePanel}
-                />
-                <Choice
-                    label={t("settings.chat")}
-                    value={chatScope}
-                    options={[
-                        { value: "shared", label: t("settings.sharedChat") },
-                        { value: "tab", label: t("settings.tabChat") }
-                    ]}
-                    hint={t(chatScope === "shared" ? "settings.sharedChatHint" : "settings.tabChatHint")}
-                    onChange={chooseChat}
-                />
-            </section>
+            {canPolar ? (
+                <section aria-labelledby="settings-polar">
+                    <h2 id="settings-polar">{t("polar.title")}</h2>
+                    <Choice
+                        label={t("settings.openIn")}
+                        value={firefox ? "all" : panelScope}
+                        disabled={firefox}
+                        options={[
+                            { value: "all", label: t("settings.allTabs") },
+                            { value: "tab", label: t("settings.oneTab") }
+                        ]}
+                        hint={
+                            firefox
+                                ? t("settings.firefoxSidebar")
+                                : t(panelScope === "all" ? "settings.allTabsHint" : "settings.oneTabHint")
+                        }
+                        onChange={choosePanel}
+                    />
+                    <Choice
+                        label={t("settings.chat")}
+                        value={chatScope}
+                        options={[
+                            { value: "shared", label: t("settings.sharedChat") },
+                            { value: "tab", label: t("settings.tabChat") }
+                        ]}
+                        hint={t(chatScope === "shared" ? "settings.sharedChatHint" : "settings.tabChatHint")}
+                        onChange={chooseChat}
+                    />
+                </section>
+            ) : null}
         </main>
     );
 }

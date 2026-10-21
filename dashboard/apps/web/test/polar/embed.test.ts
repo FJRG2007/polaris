@@ -282,6 +282,9 @@ describe("what the extension tells Polar", () => {
 
     it("keeps a tab's own conversation only under a tab's name", () => {
         expect(bridge.chatScope("tab-42")).toBe("tab-42");
+        expect(bridge.chatScope("tab-k3x9q2-42")).toBe("tab-k3x9q2-42");
+        expect(bridge.chatScope("tab-K3X-42")).toBeNull();
+        expect(bridge.chatScope("tab-run-")).toBeNull();
         expect(bridge.chatScope("tab-")).toBeNull();
         expect(bridge.chatScope("../polar.open")).toBeNull();
         expect(bridge.chatScope(["tab-1"])).toBeNull();
