@@ -93,19 +93,47 @@ describe("web search", () => {
         expect((toggle as HTMLButtonElement).disabled).toBe(false);
     });
 
-    it("stays on when the server's answer does not say, or does not come", async () => {
+    it("stays on when the server's answer does not say", async () => {
         answer = { providers: [], tools: TOOLS };
         page();
         const toggle = await screen.findByRole("switch", { name: "Search the web" });
         expect(toggle.getAttribute("aria-checked")).toBe("true");
-        cleanup();
+    });
+});
+
+describe("loading the list", () => {
+    it("says it failed, with a way to ask again, instead of an empty list", async () => {
+        const failing = vi.fn(async () => Response.json({}, { status: 500 }));
+        vi.stubGlobal("fetch", failing);
+        page();
+        expect((await screen.findByRole("alert")).textContent).toContain(
+            "Could not load the tools"
+        );
+        expect(screen.queryByRole("button", { name: /Polaris/ })).toBeNull();
         vi.stubGlobal(
             "fetch",
-            vi.fn(async () => Response.json({}, { status: 500 }))
+            vi.fn(async () => Response.json(answer))
         );
-        page();
-        const again = await screen.findByRole("switch", { name: "Search the web" });
-        expect(again.getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+        expect(await screen.findByRole("button", { name: /Polaris/ })).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("is read once for the whole page", async () => {
+        const reads = vi.fn(async (url: string) =>
+            url === "/api/polar/models" ? Response.json(answer) : Response.json({})
+        );
+        vi.stubGlobal("fetch", reads);
+        render(
+            <>
+                <PolarToolSettings />
+                <PolarHelperSettings />
+            </>,
+            { wrapper: MessagesWrapper }
+        );
+        await screen.findByRole("button", { name: /Polaris/ });
+        const models = reads.mock.calls.filter(([url]) => url === "/api/polar/models");
+        expect(models).toHaveLength(1);
     });
 });
 
@@ -190,6 +218,16 @@ describe("tools by MCP server", () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(screen.getByRole("button", { name: /Linear/ })).toBeTruthy();
         expect(JSON.parse(session.get("polar.settingsTools")!)).toEqual(cached);
+    });
+
+    it("links to the connectors only where the page lists them", async () => {
+        page();
+        await screen.findByRole("button", { name: /Linear/ });
+        expect(screen.getByRole("link", { name: "Add or manage MCP connectors" })).toBeTruthy();
+        cleanup();
+        render(<PolarToolSettings connectorsListed={false} />, { wrapper: MessagesWrapper });
+        await screen.findByRole("button", { name: /Linear/ });
+        expect(screen.queryByRole("link", { name: "Add or manage MCP connectors" })).toBeNull();
     });
 
     it("hides the connectors where the deployment does not allow them", async () => {

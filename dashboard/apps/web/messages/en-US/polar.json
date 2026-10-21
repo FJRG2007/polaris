@@ -373,6 +373,8 @@
             "intro": "What Polar may use in a chat. One switched off is never offered to it.",
             "webOff": "Your administrator has turned web search off.",
             "manageConnectors": "Add or manage MCP connectors",
+            "loadFailed": "Could not load the tools. Check your connection and try again.",
+            "retry": "Try again",
             "polaris": "Polaris",
             "builtIn": "Built in",
             "count": "{on} of {total} on",
