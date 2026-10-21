@@ -31,7 +31,6 @@ import {
     useMemo,
     useRef,
     useState,
-    useSyncExternalStore,
     type KeyboardEvent as ReactKeyboardEvent,
     type ReactNode
 } from "react";
@@ -90,7 +89,8 @@ import { PolarCodeView, PolarModeSwitch, usePolarCode } from "@/components/polar
 import * as polarShared from "@/lib/polar/shared";
 import * as embedBridge from "@/lib/polar/embed-bridge";
 import * as settingsPath from "@/lib/polar/settings-path";
-import { readStored, writeStored } from "@/lib/polar/stored";
+import { SIDEBAR_KEY, THREAD_KEY, readStored, writeStored } from "@/lib/polar/stored";
+import { useWide } from "@/components/polar/use-wide";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import * as polarCommands from "@/components/polar/polar-commands";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
@@ -281,7 +281,6 @@ export function pageContextFrom(
 
 const OPEN_KEY = "polar.open";
 const WIDTH_KEY = "polar.width";
-const THREAD_KEY = "polar.thread";
 /** The scoped chats remembered, newest last, so the oldest can be let go. */
 const SCOPES_KEY = "polar.thread.scopes";
 const SCOPES_MOST = 30;
@@ -620,26 +619,6 @@ export function ownCommandIn(
 }
 
 const NEW_COMMAND = "new-command";
-
-const SIDEBAR_KEY = "polar.sidebar";
-const WIDE_QUERY = "(min-width: 768px)";
-
-/** Whether the screen is wide enough for the sidebar beside the chat. Wide on
- *  the server and where there is no media query, which is what the CSS also
- *  assumes until the page is live. */
-function useWide(): boolean {
-    return useSyncExternalStore(
-        (notify) => {
-            if (typeof window.matchMedia !== "function") return () => undefined;
-            const query = window.matchMedia(WIDE_QUERY);
-            query.addEventListener("change", notify);
-            return () => query.removeEventListener("change", notify);
-        },
-        () =>
-            typeof window.matchMedia === "function" ? window.matchMedia(WIDE_QUERY).matches : true,
-        () => true
-    );
-}
 
 /** A staged file the message cannot go without yet: uploading, or failed. */
 function stillStaging(file: AttachmentData): boolean {
@@ -1294,12 +1273,22 @@ export function PolarChat({
         setShowHistory(fullPage);
         setDrawer(false);
     };
-    // A chat named in the page's address (a shared chat just continued) opens
-    // once, and the address goes back to plain /polar. Otherwise the chat that
-    // was open before a reload opens again.
+    // A chat named in the page's address (a shared chat just continued, a
+    // chat picked beside the settings) opens once, and the address goes back
+    // to plain /polar; `new` starts one, in the project it names if any.
+    // Otherwise the chat that was open before a reload opens again.
     useEffect(() => {
-        const named = fullPage ? new URLSearchParams(window.location.search).get("thread") : null;
-        if (named) window.history.replaceState(null, "", window.location.pathname);
+        const params = fullPage ? new URLSearchParams(window.location.search) : null;
+        const named = params?.get("thread") ?? null;
+        const fresh = params?.get("new") ?? null;
+        if (named || fresh) {
+            window.history.replaceState(null, "", window.location.pathname);
+            code.setMode("chat");
+        }
+        if (fresh) {
+            startNew(fresh === "1" ? null : fresh);
+            return;
+        }
         const reopen = named ?? readStored(threadKey);
         if (reopen) void openThread(reopen);
     }, []);

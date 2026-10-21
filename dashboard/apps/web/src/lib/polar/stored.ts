@@ -25,3 +25,8 @@ export function writeStored(key: string, value: string, which: StoredArea = "loc
         // A private window: the panel works, it just forgets.
     }
 }
+
+/** The open chat, kept across reloads and shared by every page of Polar. */
+export const THREAD_KEY = "polar.thread";
+/** Whether the conversation list is put away, on /polar and its settings alike. */
+export const SIDEBAR_KEY = "polar.sidebar";

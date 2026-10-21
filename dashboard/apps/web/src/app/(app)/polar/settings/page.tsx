@@ -9,6 +9,8 @@
  * they are here now, beside the switches for the same tools, and that address
  * sends here.
  *
+ * Polar's conversation list stays beside them, as on /polar.
+ *
  * The shell and every client section render at once; only the two lists the
  * server reads stream in behind skeletons shaped like them.
  */
@@ -18,13 +20,14 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { SettingsBack } from "./settings-back";
+import { SettingsWithSidebar } from "./settings-sidebar";
 import { Messages } from "@/components/i18n/messages";
 import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
 import { listGrants } from "@/lib/polar/tool-grants";
 import { PolarConnectors } from "./polar-connectors";
 import { PolarToolGrants } from "./polar-tool-grants";
-import { Card, CardBody, Skeleton } from "@polaris/ui";
+import { Card, CardBody, PAGE_BLEED, Skeleton, cn } from "@polaris/ui";
 import { homePathForUser, requireUser } from "@/lib/session";
 import { listConnectorViews } from "@/lib/polar/connectors/store";
 import { DisplaySettings } from "@/components/polar/polar-display";
@@ -97,70 +100,78 @@ export default async function PolarSettingsPage({
         { id: "data", label: t("settings.data.title") }
     ];
     return (
-        <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-6">
-            <div className="flex min-w-0 flex-col gap-1">
-                <SettingsBack label={t("settings.back")} />
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                    {t("settings.title")}
-                </h1>
-                <p className="text-sm text-muted-foreground">{t("settings.intro")}</p>
-                <nav
-                    aria-label={t("settings.title")}
-                    className="mt-2 flex flex-wrap gap-1 border-b border-border pb-2"
-                >
-                    {sections.map((section) => (
-                        <a
-                            key={section.id}
-                            href={`#${section.id}`}
-                            className="whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] text-muted-foreground hover:bg-card hover:text-foreground"
+        <div className={cn(PAGE_BLEED, "flex")}>
+            <SettingsWithSidebar>
+                <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-6">
+                    <div className="flex min-w-0 flex-col gap-1">
+                        <SettingsBack label={t("settings.back")} />
+                        <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                            {t("settings.title")}
+                        </h1>
+                        <p className="text-sm text-muted-foreground">{t("settings.intro")}</p>
+                        <nav
+                            aria-label={t("settings.title")}
+                            className="mt-2 flex flex-wrap gap-1 border-b border-border pb-2"
                         >
-                            {section.label}
-                        </a>
-                    ))}
-                </nav>
-            </div>
-            <div id="memory" className="scroll-mt-4">
-                <MemorySettings />
-            </div>
-            <div id="tools" className="scroll-mt-4">
-                <PolarToolSettings connectorsListed={access.connectors && !user.viewingAs} />
-            </div>
-            <section id="permissions" className="flex scroll-mt-4 flex-col gap-2">
-                <div className="min-w-0">
-                    <h2 className="text-sm font-medium text-foreground">
-                        {account("polarTools.title")}
-                    </h2>
-                    <p className="text-xs text-muted-foreground">{account("polarTools.intro")}</p>
-                    <p className="text-xs text-foreground-subtle">
-                        {account("polarTools.stillChecked")}
-                    </p>
+                            {sections.map((section) => (
+                                <a
+                                    key={section.id}
+                                    href={`#${section.id}`}
+                                    className="whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] text-muted-foreground hover:bg-card hover:text-foreground"
+                                >
+                                    {section.label}
+                                </a>
+                            ))}
+                        </nav>
+                    </div>
+                    <div id="memory" className="scroll-mt-4">
+                        <MemorySettings />
+                    </div>
+                    <div id="tools" className="scroll-mt-4">
+                        <PolarToolSettings
+                            connectorsListed={access.connectors && !user.viewingAs}
+                        />
+                    </div>
+                    <section id="permissions" className="flex scroll-mt-4 flex-col gap-2">
+                        <div className="min-w-0">
+                            <h2 className="text-sm font-medium text-foreground">
+                                {account("polarTools.title")}
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                {account("polarTools.intro")}
+                            </p>
+                            <p className="text-xs text-foreground-subtle">
+                                {account("polarTools.stillChecked")}
+                            </p>
+                        </div>
+                        {/* The two lists moved here from the account pages and still
+                            read their words from there. */}
+                        <Messages namespaces={["account"]}>
+                            <Suspense fallback={<ListSkeleton />}>
+                                <GrantsSection userId={user.id} />
+                            </Suspense>
+                        </Messages>
+                    </section>
+                    {access.connectors && !user.viewingAs ? (
+                        <div id="connectors" className="scroll-mt-4">
+                            <Messages namespaces={["account"]}>
+                                <Suspense fallback={<ListSkeleton />}>
+                                    <ConnectorsSection userId={user.id} returned={returned} />
+                                </Suspense>
+                            </Messages>
+                        </div>
+                    ) : null}
+                    <div id="display" className="scroll-mt-4">
+                        <DisplaySettings />
+                    </div>
+                    <div id="extras" className="scroll-mt-4">
+                        <PolarHelperSettings />
+                    </div>
+                    <div id="data" className="scroll-mt-4">
+                        <DataSettings />
+                    </div>
                 </div>
-                {/* The two lists moved here from the account pages and still
-                    read their words from there. */}
-                <Messages namespaces={["account"]}>
-                    <Suspense fallback={<ListSkeleton />}>
-                        <GrantsSection userId={user.id} />
-                    </Suspense>
-                </Messages>
-            </section>
-            {access.connectors && !user.viewingAs ? (
-                <div id="connectors" className="scroll-mt-4">
-                    <Messages namespaces={["account"]}>
-                        <Suspense fallback={<ListSkeleton />}>
-                            <ConnectorsSection userId={user.id} returned={returned} />
-                        </Suspense>
-                    </Messages>
-                </div>
-            ) : null}
-            <div id="display" className="scroll-mt-4">
-                <DisplaySettings />
-            </div>
-            <div id="extras" className="scroll-mt-4">
-                <PolarHelperSettings />
-            </div>
-            <div id="data" className="scroll-mt-4">
-                <DataSettings />
-            </div>
+            </SettingsWithSidebar>
         </div>
     );
 }
