@@ -8550,6 +8550,19 @@ model AgentSession {
     lastEventAt DateTime?
     startedAt   DateTime?
     finishedAt  DateTime?
+    // When the owner was told this session needs them, for the waiting episode
+    // it is in now. Cleared as soon as it stops waiting, so the next time it
+    // asks is a new notice and a chatty agent is still one.
+    waitingNotifiedAt DateTime?
+    // What happened to the work in its container when it ended: `pushed`,
+    // `clean`, `kept` (could not be pushed, so the container stays) or
+    // `discarded`. Null for a session that ended before this was recorded.
+    workState   String?
+    // How many commits went up, and to which branch.
+    workCommits Int?
+    workBranch  String?
+    // Why it could not be pushed, as a reason code the page words itself.
+    workError   String?
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 

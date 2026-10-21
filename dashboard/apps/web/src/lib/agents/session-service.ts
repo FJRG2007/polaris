@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { readSessionCursor } from "./session-cursor";
 import { GENERAL_SCOPE, getPlatformAgentDefaults, scopeOf } from "./agent-defaults-service";
+import { clearSessionWaiting, noticeSessionEnded, noticeSessionWaiting } from "./agent-notices";
 
 /**
  * A failure whose message is meant for whoever is reading the screen.
@@ -113,6 +114,49 @@ export interface SessionView {
     readonly startedAt: string | null;
     readonly finishedAt: string | null;
     readonly createdAt: string;
+    /** What became of the work in its container when it ended, or null for a
+     *  session still running or one that ended before this was recorded. */
+    readonly work: SessionWork | null;
+}
+
+/** The outcome of saving a session's work when it ended. */
+export interface SessionWork {
+    readonly state: SessionWorkState;
+    readonly commits: number;
+    readonly branch: string;
+    /** Why it could not be pushed, for a `kept` one. */
+    readonly reason: SessionWorkReason | null;
+}
+
+export const SESSION_WORK_STATES = ["pushed", "clean", "kept", "discarded"] as const;
+export type SessionWorkState = (typeof SESSION_WORK_STATES)[number];
+
+export const SESSION_WORK_REASONS = ["rejected", "policy", "auth", "unreachable", "other"] as const;
+export type SessionWorkReason = (typeof SESSION_WORK_REASONS)[number];
+
+/** A stored work outcome, read total: a value this build does not know is no
+ *  outcome rather than a word nobody can act on. */
+export function readWork(record: {
+    workState: string | null;
+    workCommits: number | null;
+    workBranch: string | null;
+    workError: string | null;
+}): SessionWork | null {
+    const state = (SESSION_WORK_STATES as readonly string[]).includes(record.workState ?? "")
+        ? (record.workState as SessionWorkState)
+        : null;
+    if (!state) return null;
+    const reason = (SESSION_WORK_REASONS as readonly string[]).includes(record.workError ?? "")
+        ? (record.workError as SessionWorkReason)
+        : state === "kept"
+          ? "other"
+          : null;
+    return {
+        state,
+        commits: Math.max(0, record.workCommits ?? 0),
+        branch: record.workBranch ?? "",
+        reason
+    };
 }
 
 const VIEW_SELECT = {
@@ -138,6 +182,10 @@ const VIEW_SELECT = {
     startedAt: true,
     finishedAt: true,
     createdAt: true,
+    workState: true,
+    workCommits: true,
+    workBranch: true,
+    workError: true,
     repo: { select: { repoFullName: true } },
     host: { select: { name: true } }
 } as const;
@@ -167,6 +215,10 @@ type SessionRecord = {
     startedAt: Date | null;
     finishedAt: Date | null;
     createdAt: Date;
+    workState: string | null;
+    workCommits: number | null;
+    workBranch: string | null;
+    workError: string | null;
     repo: { repoFullName: string } | null;
     host: { name: string } | null;
 };
@@ -205,7 +257,8 @@ function toView(record: SessionRecord): SessionView {
         lastEventAt: record.lastEventAt?.toISOString() ?? null,
         startedAt: record.startedAt?.toISOString() ?? null,
         finishedAt: record.finishedAt?.toISOString() ?? null,
-        createdAt: record.createdAt.toISOString()
+        createdAt: record.createdAt.toISOString(),
+        work: readWork(record)
     };
 }
 
@@ -389,7 +442,8 @@ export async function recordSessionEvents(
     });
     if (!current) return null;
 
-    const state = core.replaySessionState(events, readState(current.state));
+    const before = readState(current.state);
+    const state = core.replaySessionState(events, before);
     const spoken = [...events].reverse().find((event) => event.detail !== "");
 
     await prisma.$transaction([
@@ -411,7 +465,27 @@ export async function recordSessionEvents(
             }
         })
     ]);
+    await tellOwner(sessionId, before, state);
     return state;
+}
+
+/**
+ * What the owner hears about a change of state. Only transitions: a session
+ * that keeps reporting the same state has nothing new to say, and the waiting
+ * notice dedupes itself per episode on top of that.
+ */
+async function tellOwner(
+    sessionId: string,
+    before: core.AgentSessionState,
+    after: core.AgentSessionState
+): Promise<void> {
+    if (after === "waiting") {
+        await noticeSessionWaiting(sessionId);
+        return;
+    }
+    if (before === "waiting") await clearSessionWaiting(sessionId);
+    if (core.isSessionOver(before) || !core.isSessionOver(after)) return;
+    await noticeSessionEnded(sessionId, after === "failed" ? "failed" : "exited");
 }
 
 /** What a session has reported, oldest first. */

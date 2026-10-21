@@ -263,7 +263,26 @@
         "ended": "Esta sesión ha terminado. Su rama, {branch}, sigue ahí.",
         "answerHere": "Te está esperando. Respóndele aquí.",
         "sendNext": "Envíale lo siguiente.",
-        "send": "Enviar"
+        "send": "Enviar",
+        "work": {
+            "pushed": "{count, plural, one {Subido # commit a {branch}} other {Subidos # commits a {branch}}}",
+            "clean": "Nada que subir: todo estaba ya en GitHub.",
+            "kept": "No se subió: trabajo guardado",
+            "keptMore": "La máquina sigue con el trabajo dentro hasta que lo subas o descartes.",
+            "reasons": {
+                "rejected": "GitHub rechazó la subida; suele ser que la rama avanzó o está protegida.",
+                "policy": "El repositorio no deja a los agentes subir esta rama.",
+                "auth": "Polaris no pudo acceder al repositorio en GitHub. Revisa la conexión en ajustes de Agentes.",
+                "unreachable": "Polaris no alcanzó la máquina de la sesión.",
+                "other": "La subida no salió bien."
+            },
+            "retry": "Reintentar la subida",
+            "discard": "Descartar",
+            "discardTitle": "¿Descartar el trabajo?",
+            "discardDescription": "Se borran la máquina y todo cambio sin subir. No se puede deshacer.",
+            "discarded": "Trabajo descartado",
+            "retryFailed": "Sigue sin subirse. El trabajo se guarda."
+        }
     },
     "rules": {
         "noRepos": "Añade antes un repositorio. Las reglas son por repositorio.",

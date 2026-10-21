@@ -19,11 +19,14 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import * as polls from "../sessions-polls";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { bootProgress, type BootStep } from "@/lib/agents/boot-progress";
-import { Check, CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
+import { Check, CircleDot, GitBranch, Loader2, Send, Square, TriangleAlert } from "lucide-react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@polaris/ui";
 import {
     interruptSessionAction,
     promptSessionAction,
+    discardSessionWorkAction,
+    retrySessionPushAction,
     sessionScreenAction,
     stopSessionAction
 } from "../actions";
@@ -312,6 +315,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                     <span>{agentText(t, session.error)}</span>
                 </div>
             ) : null}
+            {session.work ? <WorkOutcome session={session} setError={setError} /> : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             {attached ? (
@@ -475,6 +479,94 @@ export function SessionDetail({ session, events, messages }: Props) {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+/**
+ * What became of the work in the session's container when it ended: pushed,
+ * nothing to push, or kept because the push did not go through - with the two
+ * things somebody can do about the last one.
+ */
+function WorkOutcome({
+    session,
+    setError
+}: {
+    session: SessionView;
+    setError: (error: string | null) => void;
+}) {
+    const t = useTranslations("agents");
+    const router = useRouter();
+    const [busy, startTransition] = useTransition();
+    const [confirm, confirmElement] = useConfirm();
+    const work = session.work;
+    if (!work) return null;
+
+    const retry = () => {
+        setError(null);
+        startTransition(() => {
+            void runAction(() => retrySessionPushAction(session.id), setError).then((result) => {
+                if (result?.error) setError(result.error);
+                router.refresh();
+            });
+        });
+    };
+
+    const discard = async () => {
+        const ok = await confirm({
+            title: t("session.work.discardTitle"),
+            description: t("session.work.discardDescription"),
+            confirmLabel: t("session.work.discard"),
+            danger: true
+        });
+        if (!ok) return;
+        setError(null);
+        startTransition(() => {
+            void runAction(() => discardSessionWorkAction(session.id), setError).then((result) => {
+                if (result?.error) setError(result.error);
+                else router.refresh();
+            });
+        });
+    };
+
+    if (work.state === "kept") {
+        return (
+            <div className="flex flex-wrap items-start gap-3 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1">
+                    <p className="font-medium">{t("session.work.kept")}</p>
+                    <p>{t(`session.work.reasons.${work.reason ?? "other"}`)}</p>
+                    <p className="text-xs">{t("session.work.keptMore")}</p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                    <Button size="sm" variant="secondary" onClick={retry} disabled={busy}>
+                        {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                        {t("session.work.retry")}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void discard()}
+                        disabled={busy}
+                    >
+                        {t("session.work.discard")}
+                    </Button>
+                </div>
+                {confirmElement}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+            <GitBranch className="size-4 shrink-0" />
+            <span className="min-w-0 truncate" title={work.branch}>
+                {work.state === "pushed"
+                    ? t("session.work.pushed", { count: work.commits, branch: work.branch })
+                    : work.state === "clean"
+                      ? t("session.work.clean")
+                      : t("session.work.discarded")}
+            </span>
         </div>
     );
 }

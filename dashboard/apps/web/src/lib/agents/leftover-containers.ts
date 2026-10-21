@@ -18,6 +18,7 @@
 import { prisma } from "@polaris/db";
 import { HostdClient } from "@polaris/hostd-client";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
+import { endContainerSession } from "./session-work";
 
 /** How long after its end a container is left alone: the teardown that ended it
  *  may still be running. A container with no row at all gets the same time from
@@ -96,27 +97,40 @@ async function listed(daemon: HostdClient, prefix: string): Promise<ListedContai
     }
 }
 
-async function endedAt(kind: Kind, ids: string[]): Promise<Map<string, Date | null>> {
-    if (ids.length === 0) return new Map();
+interface Ended {
+    readonly at: Map<string, Date | null>;
+    /** Sessions whose work was never looked at: one that ended through its own
+     *  events rather than Stop or the sweep. Saved before their container goes. */
+    readonly unsaved: Set<string>;
+}
+
+async function endedAt(kind: Kind, ids: string[]): Promise<Ended> {
+    if (ids.length === 0) return { at: new Map(), unsaved: new Set() };
     if (kind === "session") {
         const rows = await prisma.agentSession.findMany({
             where: { id: { in: ids } },
-            select: { id: true, state: true, finishedAt: true }
+            select: { id: true, state: true, finishedAt: true, workState: true, containerId: true }
         });
-        return new Map(
+        const unsaved = new Set(
+            rows.filter((row) => row.workState === null && row.containerId).map((row) => row.id)
+        );
+        const at = new Map(
             rows.map((row) => [
                 row.id,
-                row.state === "stopped" || row.state === "failed"
+                // Kept on purpose: its work could not be pushed, and the
+                // container is the only copy until somebody pushes or discards it.
+                (row.state === "stopped" || row.state === "failed") && row.workState !== "kept"
                     ? (row.finishedAt ?? new Date(0))
                     : null
             ])
         );
+        return { at, unsaved };
     }
     const rows = await prisma.agentSigninAttempt.findMany({
         where: { id: { in: ids } },
         select: { id: true, endedAt: true }
     });
-    return new Map(rows.map((row) => [row.id, row.endedAt]));
+    return { at: new Map(rows.map((row) => [row.id, row.endedAt])), unsaved: new Set() };
 }
 
 /** Take down every leftover container on this machine. Returns how many went. */
@@ -131,10 +145,19 @@ export async function reapLeftoverContainers(now = new Date()): Promise<number> 
             .map((container) => (container.project ?? container.name).slice(prefix.length))
             .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
         const ended = await endedAt(kind, ids);
-        for (const project of leftoverProjects(containers, prefix, ended, now)) {
+        for (const project of leftoverProjects(containers, prefix, ended.at, now)) {
             // Only an id-shaped name, so nothing else that happens to share the
             // prefix is ever taken down.
-            if (!/^[0-9a-f-]{36}$/i.test(project.slice(prefix.length))) continue;
+            const id = project.slice(prefix.length);
+            if (!/^[0-9a-f-]{36}$/i.test(id)) continue;
+            if (ended.unsaved.has(id)) {
+                const outcome = await endContainerSession(id).catch((error) => {
+                    console.error(`polaris: could not save the work of session ${id}:`, error);
+                    return null;
+                });
+                if (outcome && outcome.kind !== "kept") reaped += 1;
+                continue;
+            }
             await new HostdPorts()
                 .composeDown(project)
                 .then(() => (reaped += 1))

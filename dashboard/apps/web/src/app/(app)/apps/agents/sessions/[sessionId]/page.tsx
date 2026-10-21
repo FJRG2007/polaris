@@ -4,6 +4,7 @@ import { SessionDetail } from "./session-detail";
 import { requirePermission } from "@/lib/session";
 import { getSession, sessionEvents, sessionMessages } from "@/lib/agents/session-service";
 import { getTranslations } from "@/lib/i18n/request";
+import { readSessionWaiting } from "@/lib/agents/agent-notices";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,11 @@ export default async function AgentSessionPage({
     if (!session) notFound();
     const t = await getTranslations("agents");
 
+    // Opening the session is reading what the bell said about it.
     const [events, messages] = await Promise.all([
         sessionEvents(sessionId),
-        sessionMessages(sessionId)
+        sessionMessages(sessionId),
+        readSessionWaiting(sessionId, user.id)
     ]);
 
     return (
@@ -32,7 +35,10 @@ export default async function AgentSessionPage({
                 // header describing something that is not there.
                 description={
                     session.repoFullName
-                        ? t("pages.sessionOn", { repo: session.repoFullName, branch: session.branch })
+                        ? t("pages.sessionOn", {
+                              repo: session.repoFullName,
+                              branch: session.branch
+                          })
                         : t("pages.sessionWorkspace")
                 }
             />

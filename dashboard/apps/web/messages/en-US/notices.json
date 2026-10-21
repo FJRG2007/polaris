@@ -437,5 +437,19 @@
             "events": "Events",
             "noEvents": "Nothing happened in this period."
         }
+    },
+    "agents": {
+        "waitingTitle": "{session} needs you",
+        "waitingBody": "The agent stopped to ask something and is waiting for your answer.",
+        "runSucceededTitle": "Agent run on {repo} succeeded",
+        "runFailedTitle": "Agent run on {repo} has failed",
+        "runSucceededBody": "The run finished without errors. Open it to see what it did.",
+        "runFailedBody": "The run did not finish. Open it to see what went wrong.",
+        "endedTitle": "{session} has ended",
+        "failedBody": "The session failed. Open it to read the last thing it reported.",
+        "silentBody": "The machine running this session stopped reporting, so Polaris closed it.",
+        "exitedBody": "The agent exited on its own. Start a new session to carry on.",
+        "workKeptTitle": "The work in {session} was not pushed",
+        "workKeptBody": "Polaris could not push {branch}, so it kept the session's machine and its work. Open the session to try again or discard it."
     }
 }

@@ -437,5 +437,19 @@
             "events": "Eventos",
             "noEvents": "No pasó nada en este periodo."
         }
+    },
+    "agents": {
+        "waitingTitle": "{session} te necesita",
+        "waitingBody": "El agente se paró a preguntar algo y espera tu respuesta.",
+        "runSucceededTitle": "Ejecución en {repo} correcta",
+        "runFailedTitle": "Falló la ejecución en {repo}",
+        "runSucceededBody": "Terminó sin errores. Ábrela para ver qué hizo.",
+        "runFailedBody": "No terminó. Ábrela para ver qué salió mal.",
+        "endedTitle": "{session} terminó",
+        "failedBody": "La sesión falló. Ábrela para leer lo último que informó.",
+        "silentBody": "La máquina de esta sesión dejó de informar y Polaris la cerró.",
+        "exitedBody": "El agente salió por su cuenta. Abre otra sesión para seguir.",
+        "workKeptTitle": "No se subió el trabajo de {session}",
+        "workKeptBody": "Polaris no pudo subir {branch}, así que guardó la máquina de la sesión y su trabajo. Ábrela para reintentar o descartarlo."
     }
 }
