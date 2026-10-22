@@ -159,8 +159,33 @@ describe("the call's control bar", () => {
 
         const leave = screen.getByRole("button", { name: /leaveTheCall/ });
         expect(leave.closest('[role="group"]')).toBeNull();
-        // No third button for deafening: it is in the microphone's menu.
-        expect(screen.queryByRole("button", { name: /deafen/i })).toBeNull();
+        // Deafening has its own button beside the microphone, as well as its
+        // place in the microphone's menu.
+        expect(within(media).getByRole("button", { name: /callRoom\.deafen$/ })).toBeTruthy();
+    });
+
+    it("draws deafen beside the microphone, red and pressed while deafened", () => {
+        room();
+        const off = screen.getByRole("button", { name: /callRoom\.deafen$/ });
+        expect(off.getAttribute("aria-pressed")).toBe("false");
+        fireEvent.click(off);
+        expect(toggleDeafen).toHaveBeenCalledTimes(1);
+        cleanup();
+
+        room({ deafened: true });
+        const on = screen.getByRole("button", { name: /callRoom\.undeafen$/ });
+        expect(on.getAttribute("aria-pressed")).toBe("true");
+        expect(on.className).toContain("bg-danger-soft");
+        expect((on as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("locks deafen, with who did it, when a moderator deafened the seat", () => {
+        room({ deafened: true, moderation: { serverMuted: false, serverDeafened: true } });
+        const locked = screen.getByRole("button", {
+            name: /callRoom\.undeafen$/
+        }) as HTMLButtonElement;
+        expect(locked.disabled).toBe(true);
+        expect(locked.parentElement?.getAttribute("title")).toMatch(/aModeratorDeafenedYou/);
     });
 
     // One outline per group: the buttons inside draw none of their own (a

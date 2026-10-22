@@ -112,6 +112,7 @@ import {
     EyeOff,
     Hand,
     HeadphoneOff,
+    Headphones,
     ImagePlus,
     Link2,
     Loader2,
@@ -236,6 +237,11 @@ export function CallRoom({
     const deafenKey = useShortcutHint("chat.toggleDeafen");
     const withKey = (label: string) =>
         deafenKey ? ts("withKey", { action: label, keys: deafenKey }) : label;
+    const deafenTitle = call.moderation.serverDeafened
+        ? t("callRoom.aModeratorDeafenedYou")
+        : call.deafened
+          ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
+          : withKey(t("callRoom.silenceEverybodyAndYourselfWith"));
     // Said over the microphone only when somebody talks into it while it is
     // off - see `muted-speech`. Muted and deafened on their own are already the
     // buttons' red; a word standing over each read as a tooltip stuck open.
@@ -1208,9 +1214,7 @@ export function CallRoom({
                                   : undefined
                         }
                         icon={
-                            call.deafened ? (
-                                <HeadphoneOff className="size-4" />
-                            ) : call.micOn ? (
+                            call.micOn && !call.deafened ? (
                                 <Mic className="size-4" />
                             ) : (
                                 <MicOff className="size-4" />
@@ -1243,14 +1247,35 @@ export function CallRoom({
                         deafen={{
                             on: call.deafened,
                             toggle: call.toggleDeafen,
-                            title: call.moderation.serverDeafened
-                                ? t("callRoom.aModeratorDeafenedYou")
-                                : call.deafened
-                                  ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
-                                  : withKey(t("callRoom.silenceEverybodyAndYourselfWith"))
+                            title: deafenTitle
                         }}
                         voiceSettings={Boolean(viewerId)}
                     />
+
+                    {/* Deafening, beside the microphone where voice clients put
+                        it, rather than only in the microphone's menu and on a
+                        key nobody can find. A moderator's deafen is drawn locked,
+                        with who did it; the title is on a wrapper because a
+                        disabled button gets no hover. */}
+                    <span title={deafenTitle} className="inline-flex">
+                        <Button
+                            size="icon"
+                            variant="secondary"
+                            onClick={call.toggleDeafen}
+                            disabled={call.moderation.serverDeafened}
+                            aria-pressed={call.deafened}
+                            aria-label={
+                                call.deafened ? t("callRoom.undeafen") : t("callRoom.deafen")
+                            }
+                            className={cn(call.deafened && TINTS.danger)}
+                        >
+                            {call.deafened ? (
+                                <HeadphoneOff className="size-4" />
+                            ) : (
+                                <Headphones className="size-4" />
+                            )}
+                        </Button>
+                    </span>
 
                     <Split
                         label={call.cameraOn ? t("callRoom.stopVideo") : t("callRoom.startVideo")}
