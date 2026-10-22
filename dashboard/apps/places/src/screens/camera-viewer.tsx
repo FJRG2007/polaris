@@ -810,7 +810,12 @@ export function CameraViewer({
                         ) : null}
                     </div>
 
-                    {camera.ptz && canControl ? <PtzPad cameraId={camera.id} /> : null}
+                    {camera.ptz && canControl ? (
+                        <PtzPad
+                            cameraId={camera.id}
+                            privacyPreset={camera.privacyNative ? null : camera.privacyPreset}
+                        />
+                    ) : null}
                 </div>
             </DialogContent>
         </Dialog>

@@ -1061,6 +1061,26 @@ export async function ptzGoToAction(cameraId: string, preset: string): Promise<{
     return result.error ? { error: result.error } : {};
 }
 
+/** Where the camera points now becomes where it turns when it goes private.
+ *  For a camera that pans and has no privacy mode of its own. */
+export async function savePrivacyPositionAction(
+    cameraId: string
+): Promise<{ privacyPreset?: string; error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => ptz.savePrivacyPosition(install.id, String(cameraId)));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { privacyPreset: result.value };
+}
+
+export async function clearPrivacyPositionAction(cameraId: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => ptz.clearPrivacyPosition(install.id, String(cameraId)));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return {};
+}
+
 /**
  * Turn privacy on or off for a camera, a zone or a whole place.
  *

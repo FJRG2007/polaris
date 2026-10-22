@@ -24,7 +24,12 @@ else pointed at it keeps working. The screen says which kind each camera is.
 Optionally, a camera that pans can be sent to a stored ONVIF preset when it
 goes private (pointing at a wall or the ceiling), the same `GotoPreset` the PTZ
 pad uses. That is only ever sent by Polaris for cameras without a native
-privacy mode.
+privacy mode. It is set from the PTZ pad in the camera's viewer: the shield
+button saves where the camera points now as an ONVIF preset named "Polaris
+privacy" (`SetPreset`; pressed again it moves that same preset rather than
+making another) and stores its token; the crossed shield forgets it and removes
+the preset from the camera, best effort (`RemovePreset`). Both need
+`home.control`, and neither is offered on a camera with its own privacy mode.
 
 ## Research, per maker
 
