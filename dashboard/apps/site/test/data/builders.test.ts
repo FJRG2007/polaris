@@ -265,7 +265,9 @@ describe("site words", () => {
 
 describe("release files", () => {
     it("offers what is installed by hand, not the scripts the install lines fetch", () => {
-        expect(site.offeredFile("streamdeck", "io.github.fjrg2007.polaris.streamDeckPlugin")).toBe(true);
+        expect(site.offeredFile("streamdeck", "io.github.fjrg2007.polaris.streamDeckPlugin")).toBe(
+            true
+        );
         expect(site.offeredFile("extension", "polaris-extension-chrome.zip")).toBe(true);
         expect(site.offeredFile("streamdeck", "install.ps1")).toBe(false);
         expect(site.offeredFile("extension", "install.sh")).toBe(false);
@@ -283,4 +285,3 @@ describe("release files", () => {
         expect(site.fileMark("Polaris.AppImage")).toBe("App");
     });
 });
-

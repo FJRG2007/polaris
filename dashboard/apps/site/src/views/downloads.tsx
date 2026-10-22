@@ -57,15 +57,24 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                             <CommandRows
                                 lines={[
                                     { system: t.systems.unix, command: data.lines.extension.unix },
-                                    { system: t.systems.windows, command: data.lines.extension.windows }
+                                    {
+                                        system: t.systems.windows,
+                                        command: data.lines.extension.windows
+                                    }
                                 ]}
                                 hint={t.extensionHint}
                             />
                         ) : entry.product === "streamdeck" && entry.released ? (
                             <CommandRows
                                 lines={[
-                                    { system: t.systems.macos, command: data.lines.streamdeck.macos },
-                                    { system: t.systems.windows, command: data.lines.streamdeck.windows }
+                                    {
+                                        system: t.systems.macos,
+                                        command: data.lines.streamdeck.macos
+                                    },
+                                    {
+                                        system: t.systems.windows,
+                                        command: data.lines.streamdeck.windows
+                                    }
                                 ]}
                                 hint={t.lineHint}
                             />
@@ -82,29 +91,31 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                                 </p>
                                 {entry.product === "cli" ? null : (
                                     <DownloadRows>
-                                        {entry.files.filter((file) => offeredFile(entry.product, file.name)).map((file) => (
-                                            <DownloadRow
-                                                key={file.url}
-                                                mark={
-                                                    <span className="text-[10px] uppercase">
-                                                        {fileMark(file.name)}
-                                                    </span>
-                                                }
-                                                name={file.name}
-                                                action={
-                                                    <GuideFile
-                                                        item={guideItemFor(
-                                                            entry.product,
-                                                            file.name
-                                                        )}
-                                                        href={file.url}
-                                                        fileName={file.name}
-                                                        label={t.download}
-                                                        guide={guide}
-                                                    />
-                                                }
-                                            />
-                                        ))}
+                                        {entry.files
+                                            .filter((file) => offeredFile(entry.product, file.name))
+                                            .map((file) => (
+                                                <DownloadRow
+                                                    key={file.url}
+                                                    mark={
+                                                        <span className="text-[10px] uppercase">
+                                                            {fileMark(file.name)}
+                                                        </span>
+                                                    }
+                                                    name={file.name}
+                                                    action={
+                                                        <GuideFile
+                                                            item={guideItemFor(
+                                                                entry.product,
+                                                                file.name
+                                                            )}
+                                                            href={file.url}
+                                                            fileName={file.name}
+                                                            label={t.download}
+                                                            guide={guide}
+                                                        />
+                                                    }
+                                                />
+                                            ))}
                                     </DownloadRows>
                                 )}
                             </>
