@@ -71,6 +71,7 @@ import {
     type OverflowEntry
 } from "./store-card";
 import {
+    AppLogo,
     Badge,
     Button,
     Dialog,
@@ -494,9 +495,18 @@ function BuiltInSection({ query }: { query: string }) {
                             data-built-in={app.id}
                             className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
                         >
-                            <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md border">
-                                <Icon className="size-4" aria-hidden="true" />
-                            </div>
+                            {/* The app's own logo, the tile the launcher shows;
+                                the plain icon only for an app that has none. */}
+                            <AppLogo
+                                appId={app.id}
+                                size={36}
+                                className="shrink-0"
+                                fallback={
+                                    <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md border">
+                                        <Icon className="size-4" aria-hidden="true" />
+                                    </div>
+                                }
+                            />
                             <div className="min-w-0 flex-1">
                                 <Link
                                     href={app.href}

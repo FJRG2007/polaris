@@ -7,6 +7,7 @@
  * no way to remove it.
  */
 
+import { hasAppLogo } from "@polaris/ui";
 import { APP_SUBAPPS } from "@/lib/apps";
 import { MessagesWrapper } from "../setup/i18n";
 import { SERVICE_TEMPLATES } from "@polaris/core";
@@ -187,6 +188,20 @@ describe("the admin marketplace", () => {
             expect(within(row as HTMLElement).getByRole("link", { name: "Open" })).toBeTruthy();
         }
         expect(within(section).queryByText(/uninstall/i)).toBeNull();
+    });
+
+    it("draws each built-in app with its own logo, not the plain icon", () => {
+        render(<MarketplaceView scope="polaris" installed={[]} />, {
+            wrapper: MessagesWrapper
+        });
+        const section = screen.getByRole("region", { name: "Built in" });
+        const withLogo = builtInApps().filter((app) => hasAppLogo(app.id));
+        expect(withLogo.length).toBeGreaterThan(0);
+        for (const app of withLogo) {
+            const row = section.querySelector(`[data-built-in="${app.id}"]`);
+            // AppLogo is the only thing here drawn on its 32-unit grid.
+            expect(row?.querySelector('svg[viewBox="0 0 32 32"]'), app.id).not.toBeNull();
+        }
     });
 
     it("lists no Deploy template or wrapped app", () => {
