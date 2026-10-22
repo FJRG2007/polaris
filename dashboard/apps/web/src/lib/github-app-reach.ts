@@ -31,7 +31,11 @@
  */
 
 import { z } from "zod";
-import { githubAppInstallUrl } from "@/lib/github-service";
+import {
+    githubAppInstallUrl,
+    githubAppIsPublic,
+    githubAppVisibilityUrl
+} from "@/lib/github-service";
 import { CONNECTIONS_HUB } from "@/lib/connections/hub-href";
 import {
     credentialFor,
@@ -54,6 +58,9 @@ const CACHE_MOST = 500;
 export type GithubAppGap =
     | { kind: "no-account"; owner: string; url: string }
     | { kind: "app-missing"; owner: string; url: string | null }
+    /** The App is private, so it can only be installed on the account that
+     *  created it: whoever manages it has to make it public first. */
+    | { kind: "app-private"; owner: string; url: string | null }
     | { kind: "repo-not-selected"; owner: string; repository: string; url: string | null };
 
 const installationsPage = z.object({
@@ -214,6 +221,10 @@ async function askGithub(
     );
     if (!installation) {
         if (!(await accountExists(credential, owner))) return null;
+        // The App's own account is the one place a private App installs, and
+        // it is never the owner missing here once it has an installation.
+        if ((await githubAppIsPublic()) === false && installations.length > 0)
+            return { kind: "app-private", owner, url: await githubAppVisibilityUrl() };
         return { kind: "app-missing", owner, url: await githubAppInstallUrl() };
     }
     if (!fullName || installation.repository_selection === "all") return null;
@@ -247,8 +258,10 @@ export async function githubInstallGapForRepo(
 /** The sentence for an App gap, in the reader's words, from the `agents` catalog. */
 export function installGapKey(
     gap: GithubInstallGap
-): "errors.githubAppMissing" | "errors.githubRepoNotSelected" {
-    return gap.kind === "app-missing" ? "errors.githubAppMissing" : "errors.githubRepoNotSelected";
+): "errors.githubAppMissing" | "errors.githubAppPrivate" | "errors.githubRepoNotSelected" {
+    if (gap.kind === "app-missing") return "errors.githubAppMissing";
+    if (gap.kind === "app-private") return "errors.githubAppPrivate";
+    return "errors.githubRepoNotSelected";
 }
 
 /** The `agents` catalog key and its values for an App gap on `repoFullName`. */

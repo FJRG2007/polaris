@@ -29,21 +29,27 @@ export function GithubAppGapNotice({
     const title =
         gap.kind === "app-missing"
             ? t("githubAppGap.missingTitle", { owner: gap.owner })
-            : gap.kind === "repo-not-selected"
-              ? t("githubAppGap.notSelectedTitle", { repository: gap.repository })
-              : t("githubAppGap.noAccountTitle");
+            : gap.kind === "app-private"
+              ? t("githubAppGap.privateTitle", { owner: gap.owner })
+              : gap.kind === "repo-not-selected"
+                ? t("githubAppGap.notSelectedTitle", { repository: gap.repository })
+                : t("githubAppGap.noAccountTitle");
     const body =
         gap.kind === "app-missing"
             ? t("githubAppGap.missingBody", { owner: gap.owner })
-            : gap.kind === "repo-not-selected"
-              ? t("githubAppGap.notSelectedBody", { owner: gap.owner })
-              : t("githubAppGap.noAccountBody");
+            : gap.kind === "app-private"
+              ? t("githubAppGap.privateBody", { owner: gap.owner })
+              : gap.kind === "repo-not-selected"
+                ? t("githubAppGap.notSelectedBody", { owner: gap.owner })
+                : t("githubAppGap.noAccountBody");
     const action =
         gap.kind === "app-missing"
             ? t("githubAppGap.install", { owner: gap.owner })
-            : gap.kind === "repo-not-selected"
-              ? t("githubAppGap.choose")
-              : t("githubAppGap.connect");
+            : gap.kind === "app-private"
+              ? t("githubAppGap.makePublic")
+              : gap.kind === "repo-not-selected"
+                ? t("githubAppGap.choose")
+                : t("githubAppGap.connect");
     return (
         <div
             role="status"

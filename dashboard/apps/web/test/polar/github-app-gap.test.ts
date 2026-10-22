@@ -8,8 +8,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const INSTALL = "https://github.com/apps/polaris-agi/installations/new";
+const ADVANCED = "https://github.com/settings/apps/polaris-agi/advanced";
 
 const state = {
+    appPublic: true as boolean | null,
     credentials: [] as Array<{ connectionId: string; login: string; method: string; token: string }>
 };
 
@@ -22,7 +24,9 @@ vi.mock("@/lib/github-access", () => ({
     githubCredentialsForUser: async () => state.credentials
 }));
 vi.mock("@/lib/github-service", () => ({
-    githubAppInstallUrl: async () => INSTALL
+    githubAppInstallUrl: async () => INSTALL,
+    githubAppIsPublic: async () => state.appPublic,
+    githubAppVisibilityUrl: async () => ADVANCED
 }));
 
 const { polarRepoTools } = await import("@/lib/polar/code-host-tools");
@@ -34,6 +38,7 @@ let seen: string[] = [];
 
 beforeEach(() => {
     forgetGithubAppReach();
+    state.appPublic = true;
     state.credentials = [
         { connectionId: "c1", login: "FJRG2007", method: "oauth", token: "user-token" }
     ];
@@ -90,6 +95,28 @@ describe("a repository whose owner lacks the App", () => {
 
     it("is reported for the agents screens too, without a repository list", async () => {
         routes[INSTALLS] = { body: { installations: [] } };
+        expect(await githubInstallGapForRepo("user-1", "bytehide/Backend")).toEqual({
+            kind: "app-missing",
+            owner: "bytehide",
+            url: INSTALL
+        });
+    });
+});
+
+describe("a private App", () => {
+    it("says it has to be made public before it can be installed on another owner", async () => {
+        state.appPublic = false;
+        routes[INSTALLS] = { body: { installations: [installation("FJRG2007", 1, "all")] } };
+        const result = await read("https://github.com/bytehide/Backend/tree/main");
+        expect(result.ok).toBe(false);
+        expect(result.access).toEqual({ kind: "app-private", owner: "bytehide", url: ADVANCED });
+        expect(result.text).toContain("the app is private");
+        expect(result.text).toContain("Make public");
+    });
+
+    it("is still an install when GitHub could not say whether the App is public", async () => {
+        state.appPublic = null;
+        routes[INSTALLS] = { body: { installations: [installation("FJRG2007", 1, "all")] } };
         expect(await githubInstallGapForRepo("user-1", "bytehide/Backend")).toEqual({
             kind: "app-missing",
             owner: "bytehide",

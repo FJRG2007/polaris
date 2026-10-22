@@ -802,6 +802,52 @@ export async function githubAppInstallUrl(): Promise<string | null> {
     return page ? `${page}/installations/new` : null;
 }
 
+/** How long the App's visibility is kept: it changes only when its owner flips it. */
+const VISIBILITY_TTL_MS = 60_000;
+let visibility: { at: number; slug: string; public: boolean } | null = null;
+
+/**
+ * Whether the App may be installed on accounts other than the one that created
+ * it. A private App ("Only on this account") can only ever be installed there:
+ * GitHub's install page for anybody else jumps straight to the owner's existing
+ * installation, so "Install Polaris on <org>" leads nowhere until it is public.
+ *
+ * Asked anonymously, because that is the question: GitHub answers
+ * `GET /apps/<slug>` without credentials for a public App and 404 for a private
+ * one (docs.github.com, rest/apps/apps#get-an-app). Null when there is no App or
+ * GitHub could not be asked - an unknown is not reported as a step.
+ */
+export async function githubAppIsPublic(): Promise<boolean | null> {
+    const state = await getIntegrationState(PROVIDER);
+    const slug = typeof state?.config.appSlug === "string" ? state.config.appSlug : "";
+    if (!slug) return null;
+    if (visibility && visibility.slug === slug && Date.now() - visibility.at < VISIBILITY_TTL_MS)
+        return visibility.public;
+    try {
+        const response = await fetch(`https://api.github.com/apps/${encodeURIComponent(slug)}`, {
+            headers: {
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "polaris"
+            },
+            cache: "no-store",
+            signal: AbortSignal.timeout(10_000)
+        });
+        if (response.status !== 200 && response.status !== 404) return null;
+        visibility = { at: Date.now(), slug, public: response.status === 200 };
+        return visibility.public;
+    } catch {
+        return null;
+    }
+}
+
+/** Where the App's owner makes it public: its Advanced settings on GitHub. */
+export async function githubAppVisibilityUrl(): Promise<string | null> {
+    const state = await getIntegrationState(PROVIDER);
+    const slug = typeof state?.config.appSlug === "string" ? state.config.appSlug : "";
+    return slug ? `https://github.com/settings/apps/${slug}/advanced` : null;
+}
+
 /** Where the App's own requested permissions are edited. Built from the slug,
  *  because GitHub's address for an App is its name. */
 function appPermissionsUrl(config: Record<string, unknown>): string | null {

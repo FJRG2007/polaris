@@ -37,7 +37,9 @@ vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => `t:${key}`
 }));
 vi.mock("@/lib/github-service", () => ({
-    githubAppInstallUrl: async () => "https://github.com/apps/polaris-test/installations/new"
+    githubAppInstallUrl: async () => "https://github.com/apps/polaris-test/installations/new",
+    githubAppIsPublic: async () => true,
+    githubAppVisibilityUrl: async () => "https://github.com/settings/apps/polaris-test/advanced"
 }));
 vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
     listSessionsAction: async (limit?: number, page?: unknown) => {
