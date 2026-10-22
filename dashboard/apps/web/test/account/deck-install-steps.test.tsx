@@ -181,8 +181,8 @@ describe("the Elgato Marketplace row", () => {
         marketplace.url = "https://marketplace.example.test/polaris";
         render(<StreamDeckSection decks={[]} install={null} />, { wrapper: MessagesWrapper });
         expect(screen.queryByText("Not there yet")).toBeNull();
-        expect(
-            screen.getByRole("link", { name: "Open in Marketplace" }).getAttribute("href")
-        ).toBe("https://marketplace.example.test/polaris");
+        expect(screen.getByRole("link", { name: "Open in Marketplace" }).getAttribute("href")).toBe(
+            "https://marketplace.example.test/polaris"
+        );
     });
 });
