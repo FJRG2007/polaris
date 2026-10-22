@@ -5,12 +5,12 @@
 
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { updateCommand, updaterPath } from "../src/self-update";
+import { UPDATE_RUN_MS, updateCommand, updateState, updaterPath } from "../src/self-update";
 
 describe("updaterPath", () => {
     it("is where install.ps1 and install.sh keep their updater", () => {
-        expect(updaterPath("win32", { LOCALAPPDATA: "C:\Users\ada\AppData\Local" })).toBe(
-            join("C:\Users\ada\AppData\Local", "Polaris", "streamdeck", "update.ps1")
+        expect(updaterPath("win32", { LOCALAPPDATA: String.raw`C:\Users\ada\AppData\Local` })).toBe(
+            join(String.raw`C:\Users\ada\AppData\Local`, "Polaris", "streamdeck", "update.ps1")
         );
         expect(updaterPath("darwin", { HOME: "/Users/ada" })).toBe(
             join("/Users/ada", "Library", "Application Support", "Polaris", "streamdeck", "update.sh")
@@ -34,5 +34,14 @@ describe("updateCommand", () => {
             args: ["kickstart", "gui/501/polaris-streamdeck-update"]
         });
         expect(updateCommand("linux", 1000)).toBeNull();
+    });
+});
+
+describe("updateState", () => {
+    it("is under way until the job's time limit, then failed so Downloads shows again", () => {
+        expect(updateState(null, 0)).toBe("idle");
+        expect(updateState({ ok: false, at: 0 }, 0)).toBe("failed");
+        expect(updateState({ ok: true, at: 0 }, UPDATE_RUN_MS - 1)).toBe("started");
+        expect(updateState({ ok: true, at: 0 }, UPDATE_RUN_MS)).toBe("failed");
     });
 });

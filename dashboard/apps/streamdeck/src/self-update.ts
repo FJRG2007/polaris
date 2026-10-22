@@ -64,3 +64,17 @@ export function updateNow(): Promise<boolean> {
         );
     });
 }
+
+/** How long the job may run before it is stopped: install.ps1's ExecutionTimeLimit. */
+export const UPDATE_RUN_MS = 15 * 60_000;
+
+/** An "Update now" this copy started, and whether the scheduler took it. */
+export type UpdateRun = { ok: boolean; at: number } | null;
+
+/** Where that run stands: a job that outlives its time limit and has not swapped
+ *  the plugin (which would have closed this copy) did not update it. */
+export function updateState(run: UpdateRun, now: number = Date.now()): "idle" | "started" | "failed" {
+    if (!run) return "idle";
+    if (!run.ok || now - run.at >= UPDATE_RUN_MS) return "failed";
+    return "started";
+}
