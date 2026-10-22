@@ -1,16 +1,24 @@
 "use client";
 
 /**
- * Every camera the house has, as a table you can act on.
+ * Every camera the house has: live on the wall, or as a compact table, and
+ * managed from either.
  *
- * Each row says the four things somebody comes here to check: where it is, what
- * it notices, what it keeps, and whether it is on. The row actions are icons
- * rather than a menu of words, because there are three of them and they repeat
- * down the table.
+ * The wall is what somebody opens twenty times a day, so it is what the page
+ * shows first; each tile carries what managing that camera offers, so there is
+ * no second screen to go to when something is wrong. The table is there for a
+ * house with thirty cameras, and each row says the four things somebody comes to
+ * check: where it is, what it notices, what it keeps, and whether it is on.
+ *
+ * Which of the two is shown is the reader's own choice and remembered in this
+ * browser - a convenience, so it is never more than that.
  */
 
 import * as actions from "../actions";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { CameraGroups, Wall, WallSkeleton } from "../wall";
+import { CameraMenu, type CameraManagement } from "./camera-menu";
+import { useCameraPrivacy } from "../use-camera-privacy";
 import { BrandMark } from "./model-picker";
 import { CameraDialog } from "./camera-dialog";
 import { ZonesDialog } from "./zones-dialog";
@@ -22,7 +30,20 @@ import { filterCameras, zonesOf } from "../../lib/camera-filter";
 import { DiscoverDialog } from "./discover-dialog";
 import type { CameraView } from "../../lib/cameras";
 import type { DiscoveredCamera } from "../../lib/discovery";
-import { Cctv, Pencil, Plus, Radar, Search, Shapes, Share2, Trash2 } from "lucide-react";
+import {
+    Cctv,
+    Eye,
+    EyeOff,
+    LayoutGrid,
+    List,
+    Pencil,
+    Plus,
+    Radar,
+    Search,
+    Shapes,
+    Share2,
+    Trash2
+} from "lucide-react";
 import { focusAfterMove } from "../../lib/list-selection";
 import { quietSince } from "../../lib/availability";
 import {
@@ -33,6 +54,7 @@ import {
     Select,
     Skeleton,
     EmptyState,
+    SegmentedControl,
     ContextMenu,
     ContextMenuItem,
     ContextMenuLabel,
@@ -83,9 +105,39 @@ function Subtitle({ camera }: { camera: CameraView }) {
  */
 const ALL_AREAS = "*";
 
-export function CamerasView({ canManage, openId }: { canManage: boolean; openId: string | null }) {
+/** Where this browser remembers whether the wall or the list was last chosen. */
+export const CAMERAS_VIEW_KEY = "polaris.places.cameras.view";
+
+type CamerasLayout = "wall" | "list";
+
+function rememberedLayout(): CamerasLayout {
+    try {
+        return window.localStorage.getItem(CAMERAS_VIEW_KEY) === "list" ? "list" : "wall";
+    } catch {
+        return "wall";
+    }
+}
+
+export function CamerasView({
+    canManage,
+    canControl,
+    openId,
+    header,
+    switcher
+}: {
+    canManage: boolean;
+    canControl: boolean;
+    openId: string | null;
+    /** The page's title, drawn by the page. */
+    header: ReactNode;
+    /** The place picker, drawn by the page. */
+    switcher?: ReactNode;
+}) {
     const t = usePlacesT();
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
+    /** Which cameras the relay is serving, which only the wall reads. */
+    const [live, setLive] = useState<ReadonlySet<string>>(() => new Set());
+    const [layout, setLayout] = useState<CamerasLayout>("wall");
     const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
     const [storage, setStorage] = useState<{ id: string; label: string }[]>([]);
     const [defaults, setDefaults] = useState<{
@@ -118,6 +170,27 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
     // The list and what the dialogs need, read side by side rather than as one
     // batch: the list used to wait for the slowest of four reads, three of which
     // nothing on the page shows until a dialog opens.
+    // Read once mounted rather than while rendering: the server has no browser
+    // to ask, and the two must draw the same first frame.
+    useEffect(() => setLayout(rememberedLayout()), []);
+
+    const chooseLayout = (next: CamerasLayout) => {
+        setLayout(next);
+        try {
+            window.localStorage.setItem(CAMERAS_VIEW_KEY, next);
+        } catch {
+            // A browser that keeps nothing still switches; it just forgets.
+        }
+    };
+
+    const refreshLive = () =>
+        void actions.liveCamerasAction().then(
+            (status) => {
+                if (status.live) setLive(new Set(status.live));
+            },
+            () => undefined
+        );
+
     useEffect(() => {
         let cancelled = false;
         void actions.listCamerasAction().then(
@@ -125,17 +198,33 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 if (cancelled) return;
                 if (list.error) setError(list.error);
                 setCameras(list.cameras ?? []);
-                // A link from the wall names the camera to open, so pressing a name
-                // there lands on its settings rather than on a list to find it in.
-                if (openId) {
+                // A link that names a camera lands on its settings rather than on
+                // a list to find it in.
+                if (openId && canManage) {
                     const wanted = list.cameras?.find((camera) => camera.id === openId);
                     if (wanted) setEditing(wanted);
+                }
+                // Only worth asking once there is something to ask about.
+                if (list.cameras?.length) {
+                    void actions.liveCamerasAction().then(
+                        (status) => {
+                            if (!cancelled && status.live) setLive(new Set(status.live));
+                        },
+                        () => undefined
+                    );
                 }
             },
             () => {
                 if (!cancelled) setError(t("cameras.readFailed"));
             }
         );
+        // The machines, disks and defaults only the dialogs read, asked only of
+        // somebody who may open them.
+        if (!canManage) {
+            return () => {
+                cancelled = true;
+            };
+        }
         void Promise.all([
             actions.listServersAction(),
             actions.listStorageOptionsAction(),
@@ -156,7 +245,14 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
         return () => {
             cancelled = true;
         };
-    }, [openId]);
+    }, [openId, canManage]);
+
+    const privacy = useCameraPrivacy({
+        cameras,
+        setCameras,
+        canManage,
+        onPublicAgain: refreshLive
+    });
 
     /** A dialog opens once what it is built from has arrived. Pressed before
      *  that, it appears the moment it has, rather than opening on an empty
@@ -181,6 +277,43 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
             return;
         }
         setCameras((current) => (current ?? []).filter((item) => item.id !== camera.id));
+    };
+
+    /** On or off, or what it keeps: shown at once, put back if it did not take. */
+    const switchCamera: CameraManagement["switchCamera"] = async (camera, change) => {
+        setError(null);
+        setCameras((current) =>
+            (current ?? []).map((item) => (item.id === camera.id ? { ...item, ...change } : item))
+        );
+        const result = await runAction(
+            () => actions.switchCameraAction(camera.id, change),
+            setError
+        );
+        const settled = result?.camera;
+        if (!settled) {
+            setCameras((current) =>
+                (current ?? []).map((item) =>
+                    item.id === camera.id
+                        ? { ...item, enabled: camera.enabled, recording: camera.recording }
+                        : item
+                )
+            );
+            setError(result?.error ?? t("cameras.switchFailed"));
+            return;
+        }
+        setCameras((current) =>
+            (current ?? []).map((item) => (item.id === camera.id ? settled : item))
+        );
+        // Back on: the relay is picking it up, and the wall should know when.
+        if (change.enabled) refreshLive();
+    };
+
+    const manage: CameraManagement = {
+        edit: setEditing,
+        drawAreas: setDrawing,
+        share: setSharing,
+        remove: setRemoving,
+        switchCamera
     };
 
     /**
@@ -227,25 +360,46 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
 
     return (
         <div className="flex flex-col gap-4">
-            {canManage ? (
-                <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setAdding({ address: "", vendor: null })}>
-                        <Plus className="size-4 shrink-0" />
-                        {t("cameras.add")}
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => setDiscovering(true)}>
-                        <Radar className="size-4 shrink-0" />
-                        {t("cameras.discover")}
-                    </Button>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">{header}</div>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    {switcher}
+                    {canManage ? (
+                        <>
+                            <Button
+                                size="sm"
+                                className="min-w-0"
+                                onClick={() => setAdding({ address: "", vendor: null })}
+                            >
+                                <Plus className="size-4 shrink-0" />
+                                <span className="truncate">{t("cameras.add")}</span>
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                className="min-w-0"
+                                onClick={() => setDiscovering(true)}
+                            >
+                                <Radar className="size-4 shrink-0" />
+                                <span className="truncate">{t("cameras.discover")}</span>
+                            </Button>
+                        </>
+                    ) : null}
                 </div>
+            </div>
+
+            {error ? (
+                <p role="alert" className="text-[0.75rem] text-danger">
+                    {error}
+                </p>
             ) : null}
 
-            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
-
-            {/* A house of four cameras needs none of this and a house of thirty
-                needs all of it, so it appears when there is something to narrow. */}
-            {loaded.length > 0 && narrowing ? (
-                <div className="flex flex-wrap items-center gap-2">
+            {/* A house of four cameras needs none of the narrowing and a house
+                of thirty needs all of it, so it appears when there is something
+                to narrow. The wall or the list is always a choice. */}
+            <div className="flex flex-wrap items-center gap-2">
+                {loaded.length > 0 && narrowing ? (
+                    <>
                     <div className="relative min-w-0 flex-1 sm:max-w-xs">
                         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
                         <Input
@@ -277,22 +431,98 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                             ]}
                         />
                     ) : null}
-                </div>
+                    </>
+                ) : null}
+                <SegmentedControl
+                    size="sm"
+                    className="ml-auto"
+                    aria-label={t("cameras.layout.label")}
+                    value={layout}
+                    onValueChange={chooseLayout}
+                    options={[
+                        {
+                            value: "wall",
+                            title: t("cameras.layout.wall"),
+                            label: (
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                    <LayoutGrid className="size-4 shrink-0" />
+                                    <span className="truncate">{t("cameras.layout.wall")}</span>
+                                </span>
+                            )
+                        },
+                        {
+                            value: "list",
+                            title: t("cameras.layout.list"),
+                            label: (
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                    <List className="size-4 shrink-0" />
+                                    <span className="truncate">{t("cameras.layout.list")}</span>
+                                </span>
+                            )
+                        }
+                    ]}
+                />
+            </div>
+
+            {cameras && cameras.length > 0 ? (
+                <CameraGroups
+                    cameras={cameras}
+                    canManage={canManage}
+                    canControl={canControl}
+                    privacy={privacy}
+                />
             ) : null}
 
             {cameras === null ? (
-                <ListSkeleton />
+                layout === "wall" ? (
+                    <WallSkeleton />
+                ) : (
+                    <ListSkeleton />
+                )
             ) : cameras.length === 0 ? (
                 <EmptyState
                     icon={<Cctv />}
                     title={t("cameras.empty.title")}
                     description={canManage ? t("cameras.empty.manage") : t("cameras.empty.view")}
+                    action={
+                        canManage ? (
+                            <Button
+                                size="sm"
+                                onClick={() => setAdding({ address: "", vendor: null })}
+                            >
+                                <Plus className="size-4 shrink-0" />
+                                {t("cameras.add")}
+                            </Button>
+                        ) : undefined
+                    }
                 />
             ) : shown.length === 0 ? (
                 <EmptyState
                     icon={<Search />}
                     title={t("cameras.noMatch.title")}
                     description={t("cameras.noMatch.description")}
+                />
+            ) : layout === "wall" ? (
+                <Wall
+                    cameras={cameras}
+                    shown={shown}
+                    live={live}
+                    canControl={canControl}
+                    privacy={privacy}
+                    menuFor={
+                        canManage
+                            ? (camera) => <CameraMenu camera={camera} manage={manage} full />
+                            : undefined
+                    }
+                    onPrivacyPreset={(cameraId, preset) =>
+                        setCameras((current) =>
+                            (current ?? []).map((camera) =>
+                                camera.id === cameraId
+                                    ? { ...camera, privacyPreset: preset }
+                                    : camera
+                            )
+                        )
+                    }
                 />
             ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
@@ -308,7 +538,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                 <th className="whitespace-nowrap px-3 py-2 text-left">
                                     {t("cameras.columns.keeps")}
                                 </th>
-                                {canManage ? <th className="px-3 py-2" /> : null}
+                                {canManage || canControl ? <th className="px-3 py-2" /> : null}
                             </tr>
                         </thead>
                         <tbody
@@ -339,6 +569,11 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                     >
                                                         {camera.name}
                                                     </span>
+                                                    {camera.privacy ? (
+                                                        <Badge variant="neutral">
+                                                            {t("privacy.on")}
+                                                        </Badge>
+                                                    ) : null}
                                                     {!camera.enabled ? (
                                                         <Badge variant="neutral">
                                                             {t("cameras.off")}
@@ -372,9 +607,26 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                     </span>
                                                 ) : null}
                                             </td>
-                                            {canManage ? (
+                                            {canManage || canControl ? (
                                                 <td className="whitespace-nowrap px-3 py-2 text-right">
                                                     <div className="flex justify-end gap-1">
+                                                        {canControl ? (
+                                                            <PrivacyButton
+                                                                camera={camera}
+                                                                onSwitch={(wanted) =>
+                                                                    void privacy.switchPrivacy(
+                                                                        {
+                                                                            kind: "camera",
+                                                                            id: camera.id
+                                                                        },
+                                                                        [camera.id],
+                                                                        wanted
+                                                                    )
+                                                                }
+                                                            />
+                                                        ) : null}
+                                                        {canManage ? (
+                                                            <>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -419,6 +671,13 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                         >
                                                             <Trash2 className="size-4 shrink-0" />
                                                         </Button>
+                                                        <CameraMenu
+                                                            camera={camera}
+                                                            manage={manage}
+                                                            full={false}
+                                                        />
+                                                            </>
+                                                        ) : null}
                                                     </div>
                                                 </td>
                                             ) : null}
@@ -532,6 +791,34 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 />
             ) : null}
         </div>
+    );
+}
+
+/** Privacy on or off for one row, the same switch a tile carries. */
+function PrivacyButton({
+    camera,
+    onSwitch
+}: {
+    camera: CameraView;
+    onSwitch: (wanted: boolean) => void;
+}) {
+    const t = usePlacesT();
+    const words = camera.privacy ? t("privacy.turnOff") : t("privacy.turnOn");
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            aria-pressed={camera.privacy}
+            aria-label={words}
+            title={words}
+            onClick={() => onSwitch(!camera.privacy)}
+        >
+            {camera.privacy ? (
+                <Eye className="size-4 shrink-0" />
+            ) : (
+                <EyeOff className="size-4 shrink-0" />
+            )}
+        </Button>
     );
 }
 

@@ -561,7 +561,7 @@ export function summaryTiles(
             value: t("placeOverview.summary.cameraCount", { count: cameras }),
             icon: Cctv,
             tone: "muted",
-            href: "/places/live"
+            href: "/places/cameras"
         });
     }
     if (summary.total > 0) {
@@ -753,7 +753,7 @@ function CamerasCard({
         <OverviewCard
             title={t("placeOverview.cameras.title")}
             icon={Cctv}
-            href={cameras && cameras.length > 0 ? "/places/live" : undefined}
+            href={cameras && cameras.length > 0 ? "/places/cameras" : undefined}
         >
             {cameras === null ? (
                 <div className="grid grid-cols-2 gap-2 p-3" aria-busy="true">
@@ -785,7 +785,7 @@ function CamerasCard({
                     </div>
                     {more > 0 ? (
                         <Link
-                            href="/places/live"
+                            href="/places/cameras"
                             className="self-start text-xs text-muted-foreground hover:text-foreground"
                         >
                             {t("placeOverview.cameras.more", { count: more })}

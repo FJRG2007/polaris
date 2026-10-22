@@ -21,7 +21,6 @@ import {
     Building2,
     CalendarDays,
     CalendarRange,
-    Camera,
     Cctv,
     ChartColumn,
     CalendarClock,
@@ -1497,11 +1496,28 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Live", // i18n-ignore
-            href: "/places/live",
+            // The wall and the camera settings are one screen; /places/live
+            // redirects here.
+            label: "Cameras", // i18n-ignore
+            href: "/places/cameras",
             icon: Cctv,
             group: CAMERAS_GROUP,
-            keywords: ["cameras", "wall", "watch", "stream", "view", "rtsp"]
+            keywords: [
+                "live",
+                "wall",
+                "watch",
+                "stream",
+                "view",
+                "rtsp",
+                "add camera",
+                "tapo",
+                "tp-link",
+                "onvif",
+                "discover",
+                "credentials",
+                "detection",
+                "recording"
+            ]
         },
         {
             label: "Events", // i18n-ignore
@@ -1531,22 +1547,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/places/clips",
             icon: Video,
             keywords: ["recordings", "footage", "playback", "saved", "download"]
-        },
-        {
-            label: "Cameras", // i18n-ignore
-            group: CAMERAS_GROUP,
-            href: "/places/cameras",
-            icon: Camera,
-            keywords: [
-                "add camera",
-                "tapo",
-                "tp-link",
-                "onvif",
-                "discover",
-                "credentials",
-                "detection",
-                "recording"
-            ]
         },
         {
             label: "People", // i18n-ignore

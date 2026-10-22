@@ -35,7 +35,6 @@
  * did nothing.
  */
 
-import Link from "next/link";
 import { Badge, Button, cn } from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CameraView } from "../lib/cameras";
@@ -121,7 +120,8 @@ export function CameraTile({
     canControl,
     idle,
     onOpen,
-    onPrivacy
+    onPrivacy,
+    menu
 }: {
     camera: CameraView;
     /** Whether the relay is serving this camera at all. */
@@ -149,6 +149,9 @@ export function CameraTile({
     onPrivacy?: (wanted: boolean) => void;
     /** Open it big. */
     onOpen: () => void;
+    /** What managing it offers, drawn at the end of its footer. Absent for
+     *  somebody who may only watch. */
+    menu?: React.ReactNode;
 }) {
     const [visible, setVisible] = useState(false);
     const [stamp, setStamp] = useState(0);
@@ -583,19 +586,7 @@ export function CameraTile({
                             {t("camera.rec")}
                         </Badge>
                     ) : null}
-                    {canControl ? (
-                        <Button
-                            asChild
-                            variant="ghost"
-                            size="icon"
-                            aria-label={t("camera.settingsFor", { name: camera.name })}
-                            title={t("camera.settings")}
-                        >
-                            <Link href={`/places/cameras?open=${camera.id}`}>
-                                <Camera className="size-4 shrink-0" />
-                            </Link>
-                        </Button>
-                    ) : null}
+                    {menu}
                 </div>
             </div>
         </div>
