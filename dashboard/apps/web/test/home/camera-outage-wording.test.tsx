@@ -15,7 +15,10 @@
 import type { CameraView } from "@polaris-app/places/src/lib/cameras";
 import { OFFLINE_GRACE_MS } from "@polaris-app/places/src/lib/availability";
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { CamerasView } from "@polaris-app/places/src/screens/cameras/cameras-view";
+import {
+    CamerasView,
+    CAMERAS_VIEW_KEY
+} from "@polaris-app/places/src/screens/cameras/cameras-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The dashboard's pieces the screen takes, as the layout provides them.
 import "@/components/app-host/client";
@@ -34,6 +37,9 @@ vi.mock("@/app/(app)/access-actions", () => ({
 
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
     listCamerasAction: async () => ({ cameras }),
+    liveCamerasAction: async () => ({ live: [] }),
+    listCameraSetsAction: async () => ({ sets: [] }),
+    listRoomsAction: async () => ({ rooms: [] }),
     listServersAction: async () => ({ servers: [] }),
     listStorageOptionsAction: async () => ({ options: [] }),
     detectionDefaultsAction: async () => ({
@@ -78,8 +84,26 @@ async function painted(): Promise<void> {
     });
 }
 
+/** jsdom here has no working localStorage; an in-memory one stands in. */
+function memoryStorage(): Storage {
+    const items = new Map<string, string>();
+    return {
+        get length() {
+            return items.size;
+        },
+        clear: () => items.clear(),
+        getItem: (key) => items.get(key) ?? null,
+        key: (index) => [...items.keys()][index] ?? null,
+        removeItem: (key) => void items.delete(key),
+        setItem: (key, value) => void items.set(key, String(value))
+    };
+}
+
 beforeEach(() => {
     cameras = [];
+    // The rows under test are the compact list's.
+    Object.defineProperty(window, "localStorage", { value: memoryStorage(), configurable: true });
+    window.localStorage.setItem(CAMERAS_VIEW_KEY, "list");
 });
 
 afterEach(() => {
@@ -96,7 +120,7 @@ describe("a camera quiet longer than the grace window", () => {
             })
         ];
 
-        const { container } = render(<CamerasView canManage openId={null} />);
+        const { container } = render(<CamerasView canManage canControl openId={null} header={null} />);
         await painted();
 
         expect(screen.getByText(/Not answering since/)).toBeDefined();
@@ -119,7 +143,7 @@ describe("a camera still inside the grace window", () => {
             })
         ];
 
-        render(<CamerasView canManage openId={null} />);
+        render(<CamerasView canManage canControl openId={null} header={null} />);
         await painted();
 
         expect(screen.queryByText(/Not answering since/)).toBeNull();
@@ -139,7 +163,7 @@ describe("a camera that is switched off", () => {
             })
         ];
 
-        render(<CamerasView canManage openId={null} />);
+        render(<CamerasView canManage canControl openId={null} header={null} />);
         await painted();
 
         expect(screen.getByText("Off")).toBeDefined();
