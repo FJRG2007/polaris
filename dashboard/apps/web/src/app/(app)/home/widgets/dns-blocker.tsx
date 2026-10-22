@@ -18,9 +18,9 @@ import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
     pauseDnsBlockingAction,
     resumeDnsBlockingAction
-} from "@/app/(app)/apps/dns-blocker/actions";
+} from "@/app/(app)/apps/network-filter/actions";
 
-const APP_HREF = "/apps/dns-blocker";
+const APP_HREF = "/apps/network-filter";
 
 /** How long the card's pause lasts; the app's own screen offers the rest. */
 const QUICK_PAUSE_MINUTES = 15;

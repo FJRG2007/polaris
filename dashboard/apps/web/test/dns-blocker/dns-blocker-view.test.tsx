@@ -15,7 +15,7 @@ let answer: { error: string } | { status: DnsBlockerStatus };
 const turnOnDnsBlockerAction = vi.fn(async () => ({}));
 const dnsInsightsAction = vi.fn(async (..._args: unknown[]): Promise<unknown> => insights());
 
-vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
+vi.mock("../../src/app/(app)/apps/network-filter/actions", () => ({
     dnsBlockerStatusAction: async () => answer,
     saveDnsSettingsAction: async () => ({}),
     turnOffDnsBlockerAction: async () => ({}),
@@ -98,17 +98,18 @@ const push = vi.fn();
 let search = "";
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ replace, push }),
-    usePathname: () => "/apps/dns-blocker/log",
+    usePathname: () => "/apps/network-filter/log",
     useSearchParams: () => new URLSearchParams(search)
 }));
 
 const { DnsBlockerProvider } =
-    await import("../../src/app/(app)/apps/dns-blocker/dns-blocker-context");
+    await import("../../src/app/(app)/apps/network-filter/dns-blocker-context");
 const { DnsOverviewSection } =
-    await import("../../src/app/(app)/apps/dns-blocker/overview-section");
-const { DnsLogSection } = await import("../../src/app/(app)/apps/dns-blocker/log-section");
-const { DnsListsSection } = await import("../../src/app/(app)/apps/dns-blocker/lists-section");
-const { DnsDevicesSection } = await import("../../src/app/(app)/apps/dns-blocker/devices-section");
+    await import("../../src/app/(app)/apps/network-filter/overview-section");
+const { DnsLogSection } = await import("../../src/app/(app)/apps/network-filter/log-section");
+const { DnsListsSection } = await import("../../src/app/(app)/apps/network-filter/lists-section");
+const { DnsDevicesSection } =
+    await import("../../src/app/(app)/apps/network-filter/devices-section");
 
 /** One section of the screen, inside the provider its layout gives it. */
 function mount(
@@ -291,7 +292,7 @@ describe("DnsBlockerView query log", () => {
 
 describe("rowTime", () => {
     it("drops the date for today's rows and keeps it otherwise", async () => {
-        const { rowTime } = await import("../../src/app/(app)/apps/dns-blocker/dns-insights");
+        const { rowTime } = await import("../../src/app/(app)/apps/network-filter/dns-insights");
         const now = new Date(2026, 9, 20, 15, 0, 0);
         const today = new Date(2026, 9, 20, 9, 5, 7).getTime();
         const yesterday = new Date(2026, 9, 19, 9, 5, 7).getTime();
@@ -416,7 +417,7 @@ describe("Network filter sections", () => {
         await shown();
         const device = await screen.findAllByRole("button", { name: /10\.0\.0\.2/ });
         fireEvent.click(device[0]!);
-        expect(push).toHaveBeenCalledWith("/apps/dns-blocker/log?client=10.0.0.2");
+        expect(push).toHaveBeenCalledWith("/apps/network-filter/log?client=10.0.0.2");
     });
 
     it("reads the log's filter from a link and keeps it in the address", async () => {
@@ -432,7 +433,7 @@ describe("Network filter sections", () => {
         });
         await waitFor(() =>
             expect(replace).toHaveBeenCalledWith(
-                "/apps/dns-blocker/log?client=10.0.0.2&domain=example.com&outcome=blocked",
+                "/apps/network-filter/log?client=10.0.0.2&domain=example.com&outcome=blocked",
                 { scroll: false }
             )
         );
@@ -457,15 +458,15 @@ describe("Network filter sections", () => {
 describe("Network filter rail", () => {
     it("gives every section its own screen in the rail", async () => {
         const nav = await import("@/lib/apps");
-        const subapp = nav.resolveSubapp("/apps/dns-blocker/lists");
+        const subapp = nav.resolveSubapp("/apps/network-filter/lists");
         expect(subapp?.id).toBe("dns-blocker");
         expect(subapp?.sections.map((section) => section.href)).toEqual([
-            "/apps/dns-blocker",
-            "/apps/dns-blocker/log",
-            "/apps/dns-blocker/lists",
-            "/apps/dns-blocker/devices",
-            "/apps/dns-blocker/local-dns",
-            "/apps/dns-blocker/settings"
+            "/apps/network-filter",
+            "/apps/network-filter/log",
+            "/apps/network-filter/lists",
+            "/apps/network-filter/devices",
+            "/apps/network-filter/local-dns",
+            "/apps/network-filter/settings"
         ]);
         expect(subapp?.sections.every((section) => section.requiresApp === "dns-blocker")).toBe(
             true

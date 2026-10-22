@@ -1,4 +1,4 @@
-/** Network filter, Local DNS (/apps/dns-blocker/local-dns). The layout carries the settings. */
+/** Network filter, Local DNS (/apps/network-filter/local-dns). The layout carries the settings. */
 
 import { requireAdmin } from "@/lib/session";
 import { DnsLocalSection } from "../local-dns-section";

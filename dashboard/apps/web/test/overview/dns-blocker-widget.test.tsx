@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { OverviewDnsBlocker } from "@/lib/overview/overview-service";
 
-vi.mock("@/app/(app)/apps/dns-blocker/actions", () => ({
+vi.mock("@/app/(app)/apps/network-filter/actions", () => ({
     pauseDnsBlockingAction: async () => ({}),
     resumeDnsBlockingAction: async () => ({})
 }));
@@ -48,7 +48,7 @@ describe("the network filter card", () => {
     it("says blocking is off and links to the app when the DNS server is not running", () => {
         const markup = draw({ today: null });
         expect(markup).toContain("Blocking is off");
-        expect(markup).toContain('href="/apps/dns-blocker"');
+        expect(markup).toContain('href="/apps/network-filter"');
     });
 
     it("shows today's figures, the line, and a pause while blocking", () => {

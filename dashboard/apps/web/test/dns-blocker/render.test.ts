@@ -101,9 +101,9 @@ describe("blockyConfig", () => {
         for (const name of ["google", "notgoogle.com", "google-analytics.com", "google.a.b.c"])
             expect(pattern.test(name)).toBe(false);
         // A list whose rules all read the same way the operator typed them stays as it was.
-        expect(render.ruleFiles({ allow: ["ok.test"], deny: [] }).get(render.RULES_ALLOW_PATH)).toBe(
-            "# Polaris: your rules\nok.test\n"
-        );
+        expect(
+            render.ruleFiles({ allow: ["ok.test"], deny: [] }).get(render.RULES_ALLOW_PATH)
+        ).toBe("# Polaris: your rules\nok.test\n");
     });
 
     it("uses the preset's resolvers, and a fallback bootstrap only for encrypted custom ones", () => {

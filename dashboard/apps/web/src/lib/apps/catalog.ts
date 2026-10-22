@@ -416,7 +416,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Network filter",
         category: "Tools",
         icon: ShieldBan,
-        opensAt: "/apps/dns-blocker",
+        opensAt: "/apps/network-filter",
         summary: "Blocks ads, trackers and malware for every device on your network.",
         keywords: DNS_BLOCKER_KEYWORDS,
         description:

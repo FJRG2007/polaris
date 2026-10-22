@@ -17,7 +17,7 @@ const editDnsRuleAction = vi.fn(async (..._args: unknown[]): Promise<unknown> =>
     error: "Saving failed"
 }));
 
-vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
+vi.mock("../../src/app/(app)/apps/network-filter/actions", () => ({
     dnsBlockerStatusAction: async () => ({ error: "x" }),
     saveDnsSettingsAction: async () => ({}),
     editDnsRuleAction,
@@ -233,9 +233,9 @@ describe("reputation", () => {
 describe("the rules editor", () => {
     async function draw(settings: Partial<dns.DnsSettings>) {
         const { DnsBlockerProvider } =
-            await import("../../src/app/(app)/apps/dns-blocker/dns-blocker-context");
+            await import("../../src/app/(app)/apps/network-filter/dns-blocker-context");
         const { DnsRulesEditor } =
-            await import("../../src/app/(app)/apps/dns-blocker/rules-editor");
+            await import("../../src/app/(app)/apps/network-filter/rules-editor");
         render(
             <MessagesWrapper>
                 <DnsBlockerProvider initial={{ ...dns.DEFAULT_DNS_SETTINGS, ...settings }}>

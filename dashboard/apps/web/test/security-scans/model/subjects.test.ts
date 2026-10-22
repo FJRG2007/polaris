@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import * as subjects from "@polaris-app/security-scans/src/model/subjects";
 
 const MANIFESTS: Record<string, subjects.ManifestName> = {
-    "dns-blocker": { name: "Network filter", opensAt: "/apps/dns-blocker" },
+    "dns-blocker": { name: "Network filter", opensAt: "/apps/network-filter" },
     "dns-blocker-engine": {
         name: "Network filter DNS server",
         internal: true,
@@ -29,7 +29,7 @@ describe("currentApp", () => {
             },
             find
         );
-        expect(app).toEqual({ name: "Network filter DNS server", href: "/apps/dns-blocker" });
+        expect(app).toEqual({ name: "Network filter DNS server", href: "/apps/network-filter" });
     });
 
     it("keeps the name an operator gave their own install, and links to it", () => {

@@ -151,6 +151,16 @@ const nextConfig = {
         { source: "/apps/servers/ups", destination: "/places/ups", permanent: false },
         { source: "/apps/servers/ups/:path*", destination: "/places/ups/:path*", permanent: false },
         { source: "/house/:path*", destination: "/places/:path*", permanent: false },
+        // The Network filter's screens took its name; they were under the
+        // engine's id. Bookmarks, alerts and widgets saved before still land on
+        // the same screen, with the query kept. Kept for good, temporary for
+        // the reason above.
+        { source: "/apps/dns-blocker", destination: "/apps/network-filter", permanent: false },
+        {
+            source: "/apps/dns-blocker/:path*",
+            destination: "/apps/network-filter/:path*",
+            permanent: false
+        },
         // Management's screens were spread between /admin and the top level, so
         // the URL said nothing about which part of Polaris you were in. They are
         // all under /admin now, and Drive's two stray screens under /drive.

@@ -86,7 +86,7 @@ const EMPTY_FILTER: QueryFilter = {
 };
 
 /** Where the query log is, and what a link into it carries. */
-export const DNS_LOG_HREF = "/apps/dns-blocker/log";
+export const DNS_LOG_HREF = "/apps/network-filter/log";
 
 /** The log's filter as a link: `?client=`, `?domain=`, `?outcome=`, `?type=`, `?range=`. */
 export function logHref(patch: Partial<QueryFilter>): string {

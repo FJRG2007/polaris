@@ -67,8 +67,8 @@ vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
     )
 }));
 
-vi.mock("@/app/(app)/apps/dns-blocker/dns-blocker-polls", () => {
-    const actions = () => import("@/app/(app)/apps/dns-blocker/actions");
+vi.mock("@/app/(app)/apps/network-filter/dns-blocker-polls", () => {
+    const actions = () => import("@/app/(app)/apps/network-filter/actions");
     return {
         dnsInsights: forward(actions, "dnsInsightsAction", 2),
         dnsTail: forward(actions, "dnsTailAction", 1)

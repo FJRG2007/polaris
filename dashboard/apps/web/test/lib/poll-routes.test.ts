@@ -70,7 +70,7 @@ vi.mock("@/app/(app)/apps/servers/actions", () => ({
 vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
     sessionScreenAction: actions.sessionScreenAction
 }));
-vi.mock("@/app/(app)/apps/dns-blocker/actions", () => ({
+vi.mock("@/app/(app)/apps/network-filter/actions", () => ({
     dnsInsightsAction: actions.dnsInsightsAction,
     dnsTailAction: actions.dnsTailAction
 }));
@@ -146,8 +146,8 @@ const servers = () =>
         "@/app/(app)/apps/servers/servers-polls"
     );
 const dns = () =>
-    actual<typeof import("@/app/(app)/apps/dns-blocker/dns-blocker-polls")>(
-        "@/app/(app)/apps/dns-blocker/dns-blocker-polls"
+    actual<typeof import("@/app/(app)/apps/network-filter/dns-blocker-polls")>(
+        "@/app/(app)/apps/network-filter/dns-blocker-polls"
     );
 const inbox = () =>
     actual<typeof import("@/app/(app)/admin/inbox/inbox-polls")>(

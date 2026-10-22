@@ -1,4 +1,4 @@
-/** Network filter, Lists (/apps/dns-blocker/lists). The layout carries the settings. */
+/** Network filter, Lists (/apps/network-filter/lists). The layout carries the settings. */
 
 import { requireAdmin } from "@/lib/session";
 import { DnsListsSection } from "../lists-section";

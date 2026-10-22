@@ -88,10 +88,7 @@ export type DnsRuleEntry =
  * named with why, and the rest are what is added. Shared by the dialog's
  * preview and the server, which checks the same list again.
  */
-export function parseRuleEntries(
-    text: string,
-    existing: readonly string[] = []
-): DnsRuleEntry[] {
+export function parseRuleEntries(text: string, existing: readonly string[] = []): DnsRuleEntry[] {
     const seen = new Set<string>();
     const present = new Set(existing);
     return splitRuleEntries(text).map((entry): DnsRuleEntry => {
