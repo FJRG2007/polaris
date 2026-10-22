@@ -259,14 +259,15 @@ pasos de [Install](README.md#install).
 
 La interfaz está en español e inglés, y cada cuenta elige la suya.
 
-| Cliente                                                                                 | Estado                                                                             |
-| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| App web, instalable desde el navegador                                                  | Disponible                                                                         |
-| Extensión para Chrome y Firefox: rellena formularios de inicio de sesión desde tu vault | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=extension)) |
-| Servidor MCP para Claude, ChatGPT, Cursor, VS Code y otros clientes de IA               | Disponible ([configuración](docs/connecting-ai-assistants.md))                     |
-| CLI para desarrolladores (`plr`): despliegues, logs, reinicios                          | Próximamente: en el repositorio, sin versión publicada                             |
-| App de escritorio para Windows, macOS y Linux                                           | Próximamente: en el repositorio, sin versión publicada                             |
-| Apps para iOS y Android                                                                 | Próximamente                                                                       |
+| Cliente                                                                                 | Estado                                                                              |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| App web, instalable desde el navegador                                                  | Disponible                                                                          |
+| Extensión para Chrome y Firefox: rellena formularios de inicio de sesión desde tu vault | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=extension))  |
+| Servidor MCP para Claude, ChatGPT, Cursor, VS Code y otros clientes de IA               | Disponible ([configuración](docs/connecting-ai-assistants.md))                      |
+| CLI para desarrolladores (`plr`): despliegues, logs, reinicios                          | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=cli))        |
+| Plugin de Stream Deck (app de Stream Deck, OpenDeck) y módulo de Bitfocus Companion     | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=streamdeck)) |
+| App de escritorio para Windows, macOS y Linux                                           | Próximamente: en el repositorio, sin versión publicada                              |
+| Apps para iOS y Android                                                                 | Próximamente                                                                        |
 
 ## Todo se conecta
 

@@ -395,14 +395,15 @@ What is built versus in progress is tracked in
 
 The interface is in English and Spanish ([en español](README.es.md)), and each account picks its own.
 
-| Client                                                                        | Status                                                                           |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Web app, installable from the browser                                         | Available                                                                        |
-| Browser extension for Chrome and Firefox: fills sign-in forms from your vault | Available ([releases](https://github.com/FJRG2007/polaris/releases?q=extension)) |
-| MCP server for Claude, ChatGPT, Cursor, VS Code and other AI clients          | Available ([setup](docs/connecting-ai-assistants.md))                            |
-| Developer CLI (`plr`): deploy, logs, restarts                                 | Coming: in the repo, not released yet                                            |
-| Desktop app for Windows, macOS and Linux                                      | Coming: in the repo, not released yet                                            |
-| iOS and Android apps                                                          | Coming                                                                           |
+| Client                                                                        | Status                                                                            |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Web app, installable from the browser                                         | Available                                                                         |
+| Browser extension for Chrome and Firefox: fills sign-in forms from your vault | Available ([releases](https://github.com/FJRG2007/polaris/releases?q=extension))  |
+| MCP server for Claude, ChatGPT, Cursor, VS Code and other AI clients          | Available ([setup](docs/connecting-ai-assistants.md))                             |
+| Developer CLI (`plr`): deploy, logs, restarts                                 | Available ([releases](https://github.com/FJRG2007/polaris/releases?q=cli))        |
+| Stream Deck plugin (Stream Deck app, OpenDeck) and Bitfocus Companion module  | Available ([releases](https://github.com/FJRG2007/polaris/releases?q=streamdeck)) |
+| Desktop app for Windows, macOS and Linux                                      | Coming: in the repo, not released yet                                             |
+| iOS and Android apps                                                          | Coming                                                                            |
 
 ## Everything connects
 
