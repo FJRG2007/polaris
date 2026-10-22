@@ -14,12 +14,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ token: string }> }
 ): Promise<Response> {
     const t = await placesT();
     const ip = (await host.requestContext.clientIp()) ?? "unknown";
-    const opened = await openGuestWatch(String((await params).token), ip);
+    // A room's link says which of its cameras; a camera's link needs nothing.
+    const asked = new URL(request.url).searchParams.get("camera") ?? undefined;
+    const opened = await openGuestWatch(String((await params).token), ip, Date.now(), asked);
     if (opened.ok) return Response.json({ watch: opened.watch });
     return Response.json(
         {

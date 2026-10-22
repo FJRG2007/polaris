@@ -23,13 +23,15 @@ type Opened = { watch?: string; error?: string };
  *  does that in development) never spends two uses. */
 const opened = new Map<string, Promise<Opened>>();
 
-function openWatch(token: string): Promise<Opened> {
-    let pending = opened.get(token);
+function openWatch(token: string, cameraId?: string): Promise<Opened> {
+    const key = `${token}:${cameraId ?? ""}`;
+    let pending = opened.get(key);
     if (!pending) {
-        pending = fetch(`/api/home/keys/${token}/watch`, { method: "POST" })
+        const query = cameraId ? `?camera=${encodeURIComponent(cameraId)}` : "";
+        pending = fetch(`/api/home/keys/${token}/watch${query}`, { method: "POST" })
             .then((response) => response.json() as Promise<Opened>)
             .catch(() => ({}));
-        opened.set(token, pending);
+        opened.set(key, pending);
     }
     return pending;
 }
@@ -38,13 +40,21 @@ export function GuestCameraView({
     token,
     name,
     until,
-    note
+    note,
+    cameraId,
+    onPress = false
 }: {
     token: string;
     name: string;
     until: string | null;
     note: string;
+    /** Which camera, on a room's link. */
+    cameraId?: string;
+    /** Wait for a press before opening (and spending a use): a room shows
+     *  several cameras and the guest may want one of them. */
+    onPress?: boolean;
 }) {
+    const [started, setStarted] = useState(!onPress);
     const t = usePlacesT();
     const [watch, setWatch] = useState<string | null>(null);
     const [error, setError] = useState("");
@@ -52,10 +62,11 @@ export function GuestCameraView({
     const [failed, setFailed] = useState(false);
 
     useEffect(() => {
+        if (!started) return;
         let gone = false;
         setHls(prefersHls());
         void (async () => {
-            const body = await openWatch(token);
+            const body = await openWatch(token, cameraId);
             if (gone) return;
             if (body.watch) setWatch(body.watch);
             // The server's sentence is already in the reader's language; a
@@ -67,7 +78,7 @@ export function GuestCameraView({
         };
         // Once per page: every run is one use of the link, so this must not
         // depend on anything that changes while the page is open.
-    }, [token]);
+    }, [token, cameraId, started]);
 
     const base = watch ? `/api/home/keys/${token}/watch/${watch}` : null;
     const src = base ? (hls ? `${base}/hls/stream.m3u8?q=main` : `${base}/stream?q=main`) : null;
@@ -105,6 +116,14 @@ export function GuestCameraView({
                             ? t("guestCamera.closed")
                             : error || t("guestCamera.offline")}
                     </p>
+                ) : !started ? (
+                    <button
+                        type="button"
+                        className="absolute inset-0 flex items-center justify-center text-sm font-medium text-white hover:bg-white/10"
+                        onClick={() => setStarted(true)}
+                    >
+                        {t("guestCamera.watch")}
+                    </button>
                 ) : (
                     <span className="absolute inset-0 flex items-center justify-center text-white">
                         <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden />

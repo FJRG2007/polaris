@@ -24,8 +24,11 @@ export function GuestKeyView({
     allowed,
     nearbyMeters,
     until,
-    note
+    note,
+    deviceId
 }: {
+    /** Which device, on a room's link. */
+    deviceId?: string;
     token: string;
     initial: DeviceView;
     /** The grant's actions (open, close, operate) this link allows. */
@@ -46,7 +49,11 @@ export function GuestKeyView({
         const response = await fetch(`/api/home/keys/${token}`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action, ...(where ? { where } : {}) })
+            body: JSON.stringify({
+                action,
+                ...(deviceId ? { deviceId } : {}),
+                ...(where ? { where } : {})
+            })
         });
         return (await response.json().catch(() => ({ error: t("refusals.deviceCannot") }))) as {
             device?: DeviceView;

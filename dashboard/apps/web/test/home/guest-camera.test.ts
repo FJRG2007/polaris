@@ -13,12 +13,15 @@ let paid: unknown = null;
 let limited = { ok: true, retryAfterMs: 0 };
 const spendGrant = vi.fn(async () => true);
 const recordAudit = vi.fn(async () => undefined);
+const recordGrantUse = vi.fn(async (_use: Record<string, unknown>) => undefined);
+let roomCameras = new Map<string, string>();
 
 vi.mock("@polaris/app-host", () => ({
     host: {
         accessGrants: {
             linkReach: async () => reach,
             linkReachPaid: async () => paid,
+            recordGrantUse,
             spendGrant
         },
         rateLimitService: { rateLimit: async () => limited },
@@ -27,6 +30,9 @@ vi.mock("@polaris/app-host", () => ({
 }));
 vi.mock("@polaris-app/places/src/lib/access", () => ({
     homeInstall: async () => ({ id: "install-1" })
+}));
+vi.mock("@polaris-app/places/src/lib/sharing", () => ({
+    roomContents: async () => ({ devices: new Map(), cameras: roomCameras })
 }));
 vi.mock("@polaris-app/places/src/lib/cameras", () => ({
     getCamera: async (_install: string, id: string) =>
@@ -175,5 +181,31 @@ describe("a stream already flowing", () => {
         for (let i = 0; i < 50 && !done; i += 1) done = (await reader.read()).done;
         expect(done).toBe(true);
         vi.useRealTimers();
+    });
+});
+
+describe("the access log of a camera link", () => {
+    it("records a view opened, and one refused", async () => {
+        reach = live();
+        await openGuestWatch("t", "1.2.3.4");
+        expect(recordGrantUse).toHaveBeenCalledWith(
+            expect.objectContaining({ targetId: YARD, action: "watch", outcome: "done" })
+        );
+        reach = { ...live(), standing: "closed" };
+        await openGuestWatch("t", "1.2.3.4");
+        expect(recordGrantUse).toHaveBeenLastCalledWith(
+            expect.objectContaining({ outcome: "refused", reason: "closed" })
+        );
+    });
+
+    it("opens a camera in a room's link only when it is in the room", async () => {
+        reach = { ...live("place.room"), subjectId: "room-1" };
+        roomCameras = new Map();
+        expect(await openGuestWatch("t", "1.2.3.4", Date.now(), YARD)).toEqual({
+            ok: false,
+            error: "closed"
+        });
+        roomCameras = new Map([[YARD, "room-1"]]);
+        expect((await openGuestWatch("t", "1.2.3.4", Date.now(), YARD)).ok).toBe(true);
     });
 });

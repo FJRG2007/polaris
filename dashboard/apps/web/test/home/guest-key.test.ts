@@ -18,12 +18,14 @@ let limited = { ok: true, retryAfterMs: 0 };
 const actOnDevice = vi.fn(async () => ({ id: DOOR, name: "Front door", state: "unlocked" }));
 const spendGrant = vi.fn(async () => true);
 const recordAudit = vi.fn(async () => undefined);
+const recordGrantUse = vi.fn(async (_use: Record<string, unknown>) => undefined);
 
 vi.mock("@polaris/app-host", () => ({
     host: {
         session: { sessionCan: async () => false },
         accessGrants: {
             linkReach: async () => reach,
+            recordGrantUse,
             spendGrant,
             grantedActions: async () => new Map(),
             grantedSubjects: async () => new Map(),
@@ -144,5 +146,35 @@ describe("a link fenced to the place", () => {
         expect((refused as InstanceType<typeof NearbyRefusal>).verdict).toBe("far");
         expect(actOnDevice).not.toHaveBeenCalled();
         expect(JSON.stringify(recordAudit.mock.calls)).not.toContain("40.45");
+    });
+});
+
+describe("the access log of a link", () => {
+    it("records an open that worked, with the link's purpose", async () => {
+        reach = { ...live(["open"]), note: "Room 12 guest" };
+        await pressGuestKey("t", "unlock", null, "1.2.3.4");
+        expect(recordGrantUse).toHaveBeenCalledWith(
+            expect.objectContaining({
+                grantId: "g1",
+                targetId: DOOR,
+                userId: null,
+                linkNote: "Room 12 guest",
+                action: "unlock",
+                outcome: "done"
+            })
+        );
+    });
+
+    it("records a refusal and why", async () => {
+        reach = live(["open"]);
+        await expect(pressGuestKey("t", "lock", null, "1.2.3.4")).rejects.toThrow();
+        expect(recordGrantUse).toHaveBeenCalledWith(
+            expect.objectContaining({ outcome: "refused", reason: "notThat" })
+        );
+        reach = { ...live(["open"]), standing: "expired" };
+        await expect(pressGuestKey("t", "unlock", null, "1.2.3.4")).rejects.toThrow();
+        expect(recordGrantUse).toHaveBeenLastCalledWith(
+            expect.objectContaining({ outcome: "refused", reason: "expired", grantId: null })
+        );
     });
 });

@@ -24,6 +24,14 @@
  */
 
 import { getCamera } from "./cameras";
+import { roomContents } from "./sharing";
+
+/** Whether a link reaches a camera: its own, or one in the room it names. */
+async function linkCovers(subjectType: string, subjectId: string, cameraId: string) {
+    if (subjectType === "place.camera") return subjectId === cameraId;
+    if (subjectType !== "place.room") return false;
+    return (await roomContents([subjectId])).cameras.has(cameraId);
+}
 import { homeInstall } from "./access";
 import { host } from "@polaris/app-host";
 import { randomBytes } from "node:crypto";
@@ -86,10 +94,33 @@ export type OpenRefusal = "closed" | "tooMany";
 export async function openGuestWatch(
     token: string,
     ip: string,
-    now = Date.now()
+    now = Date.now(),
+    /** Which camera, for a room's link; a camera's link names its own. */
+    asked?: string
 ): Promise<{ ok: true; watch: string } | { ok: false; error: OpenRefusal }> {
     const reached = await host.accessGrants.linkReach(token);
-    if (!reached || reached.subjectType !== "place.camera" || reached.standing !== "live") {
+    if (!reached || (reached.subjectType !== "place.camera" && reached.subjectType !== "place.room")) {
+        return { ok: false, error: "closed" };
+    }
+    const cameraId = reached.subjectType === "place.camera" ? reached.subjectId : (asked ?? "");
+    const log = (outcome: "done" | "refused", reason = "") =>
+        host.accessGrants.recordGrantUse({
+            grantId: reached.standing === "live" ? reached.grant.id : null,
+            subjectType: reached.subjectType,
+            subjectId: reached.subjectId,
+            targetType: "camera",
+            targetId: cameraId,
+            userId: null,
+            linkNote: reached.note,
+            action: "watch",
+            outcome,
+            reason
+        });
+    if (reached.standing !== "live") {
+        if (cameraId) await log("refused", reached.standing);
+        return { ok: false, error: "closed" };
+    }
+    if (!cameraId || !(await linkCovers(reached.subjectType, reached.subjectId, cameraId))) {
         return { ok: false, error: "closed" };
     }
     const limited = await host.rateLimitService.rateLimit(
@@ -99,13 +130,14 @@ export async function openGuestWatch(
     );
     if (!limited.ok) return { ok: false, error: "tooMany" };
     const install = await homeInstall();
-    if (!install || !(await getCamera(install.id, reached.subjectId).catch(() => null))) {
+    if (!install || !(await getCamera(install.id, cameraId).catch(() => null))) {
         return { ok: false, error: "closed" };
     }
     // Spent before the picture is served, and refused if the last use went to
     // somebody else in between: a counted link is a count of views opened. An
     // uncounted one only has its last use stamped.
     if (!(await host.accessGrants.spendGrant(reached.grant))) {
+        await log("refused", "spent");
         return { ok: false, error: "closed" };
     }
     prune(now);
@@ -113,16 +145,17 @@ export async function openGuestWatch(
     const until = reached.grant.until?.getTime() ?? Infinity;
     watches.set(watch, {
         grantId: reached.grant.id,
-        cameraId: reached.subjectId,
+        cameraId,
         expires: Math.min(now + WATCH_TTL_MS, until)
     });
     await host.auditService.recordAudit({
         actorId: null,
         action: "places.camera.watch",
         targetType: "camera",
-        targetId: reached.subjectId,
+        targetId: cameraId,
         metadata: { lent: true, link: true }
     });
+    await log("done");
     return { ok: true, watch };
 }
 
@@ -154,10 +187,9 @@ export async function guestWatchCamera(
     const reached = await host.accessGrants.linkReachPaid(token, new Date(now));
     if (
         !reached ||
-        reached.subjectType !== "place.camera" ||
         reached.standing !== "live" ||
         reached.grant.id !== held.grantId ||
-        reached.subjectId !== held.cameraId
+        !(await linkCovers(reached.subjectType, reached.subjectId, held.cameraId))
     ) {
         return null;
     }

@@ -36,7 +36,11 @@ export default async function GuestLinkPage(props: AppPageProps) {
     if (reached.standing !== "live") {
         return <LinkUnavailable message={words(`guestLink.standing.${reached.standing}`)} />;
     }
-    if (reached.subjectType === "place.device" || reached.subjectType === "place.camera") {
+    if (
+        reached.subjectType === "place.device" ||
+        reached.subjectType === "place.camera" ||
+        reached.subjectType === "place.room"
+    ) {
         return (
             <PublicShell>
                 <Messages namespaces={["publicPages"]}>
