@@ -1329,7 +1329,16 @@
             "chatUse": "Send messages and see what is unread in Chat",
             "homeRead": "See your places and the state of their devices",
             "homeControl": "Switch and adjust the devices you can use",
-            "homeManage": "Run the routines in your places"
+            "homeManage": "Run the routines in your places",
+            "tasksRead": "See your tasks and their lists",
+            "tasksManage": "Create, complete and change your tasks",
+            "notesUse": "Read and write your notes",
+            "calendarUse": "See and change the events in your calendars",
+            "gamesRead": "See your game servers, their players and their logs",
+            "gamesModerate": "Kick, ban and message players on your game servers",
+            "gamesManage": "Start, stop, restart and back up your game servers",
+            "agentsRead": "See your agent sessions and what they are doing",
+            "agentsManage": "Start, answer and stop your agent sessions"
         },
         "consent": "Saying yes gives this computer a key that acts for your account for a year, limited to what is listed above. It is listed under API keys, where you can revoke it, and plr logout revokes it too.",
         "working": "Working",

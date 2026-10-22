@@ -141,7 +141,9 @@ describe("the settings screen", () => {
             })
         });
         const document = dom.window.document;
-        const double = document.querySelector('select[data-binding="double"]') as HTMLSelectElement;
+        const double = document.querySelector('select[data-binding="double"]') as InstanceType<
+            typeof dom.window.HTMLSelectElement
+        >;
         expect(double).not.toBeNull();
         expect(document.querySelector('select[data-binding="alternate"]')).not.toBeNull();
         expect(document.querySelector('input[data-window="doubleMs"]')).toBeNull();
@@ -152,7 +154,9 @@ describe("the settings screen", () => {
         double.dispatchEvent(new dom.window.Event("change"));
         const saved = sent.filter((message) => message.event === "setSettings").at(-1);
         expect(saved?.payload).toMatchObject({ action: "fan.on", double: { action: "fan.off" } });
-        const window = document.querySelector('input[data-window="doubleMs"]') as HTMLInputElement;
+        const window = document.querySelector('input[data-window="doubleMs"]') as InstanceType<
+            typeof dom.window.HTMLInputElement
+        >;
         expect(window.value).toBe("300");
 
         // A real toggle offers nothing to alternate.
