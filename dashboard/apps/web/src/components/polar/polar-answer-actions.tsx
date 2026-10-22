@@ -214,6 +214,7 @@ function BadAnswerDialog({
                     maxLength={POLAR_FEEDBACK_NOTE_MAX}
                     aria-label={t("feedback.note")}
                     placeholder={t("feedback.notePlaceholder")}
+                    className="mt-3"
                     onChange={(event) => setNote(event.target.value)}
                 />
                 <DialogFooter>
