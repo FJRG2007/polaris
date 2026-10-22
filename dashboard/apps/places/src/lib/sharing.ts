@@ -43,7 +43,7 @@ type LiveGrant = AppHostTypes["LiveGrant"];
 /** A grant as it was used, with what it was over - a device itself, or the
  *  room the device is in - so the access log can say which key opened it. */
 export type LentGrant = LiveGrant & {
-    readonly subjectType: "place.device" | "place.room";
+    readonly subjectType: "place.device" | "place.camera" | "place.room";
     readonly subjectId: string;
 };
 
@@ -278,6 +278,30 @@ export async function mayWatchCamera(user: SessionUser, cameraId: string): Promi
     if (await sessionCan(user, "home.read")) return true;
     if ((await liveGrants(user.id, "place.camera", cameraId)).length > 0) return true;
     return (await roomGrants(user.id, await roomsOfCamera(cameraId))).length > 0;
+}
+
+/**
+ * Log a visitor opening a camera's live view - once per view, from the routes
+ * that start one (the MP4 stream and the HLS master playlist), never per frame
+ * or segment. A resident is not a visitor and is not logged here.
+ */
+export async function logCameraWatch(user: SessionUser, cameraId: string): Promise<void> {
+    if (await sessionCan(user, "home.read")) return;
+    const direct = await liveGrants(user.id, "place.camera", cameraId);
+    const grant: LentGrant | undefined = direct[0]
+        ? { ...direct[0], subjectType: "place.camera", subjectId: cameraId }
+        : (await roomGrants(user.id, await roomsOfCamera(cameraId)))[0];
+    if (!grant) return;
+    await host.accessGrants.recordGrantUse({
+        grantId: grant.id,
+        subjectType: grant.subjectType,
+        subjectId: grant.subjectId,
+        targetType: "camera",
+        targetId: cameraId,
+        userId: user.id,
+        action: "watch",
+        outcome: "done"
+    });
 }
 
 /** Refused because this camera was not lent to them. The same sentence whether

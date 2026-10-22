@@ -160,3 +160,18 @@ describe("a stay typed in the share dialog", () => {
         expect(core.dayAt("2026-05-10", "25:00")).toBeNull();
     });
 });
+
+describe("a visitor watching a camera", () => {
+    it("is logged once, against the room's key", async () => {
+        await sharing.logCameraWatch(GUEST, "cam-hall");
+        expect(recordGrantUse).toHaveBeenCalledWith(
+            expect.objectContaining({
+                grantId: "g-room",
+                subjectType: "place.room",
+                targetId: "cam-hall",
+                action: "watch",
+                outcome: "done"
+            })
+        );
+    });
+});

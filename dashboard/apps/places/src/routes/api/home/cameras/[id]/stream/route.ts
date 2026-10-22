@@ -7,7 +7,7 @@
  */
 
 import { homeInstall } from "../../../../../../lib/access";
-import { mayWatchCamera } from "../../../../../../lib/sharing";
+import { logCameraWatch, mayWatchCamera } from "../../../../../../lib/sharing";
 import { cameraStream, CameraOfflineError } from "../../../../../../lib/live";
 import { host } from "@polaris/app-host";
 
@@ -29,6 +29,8 @@ export async function GET(
 
     const { id } = await context.params;
     if (!(await mayWatchCamera(user, id))) return new Response("Forbidden", { status: 403 });
+    // One row per view opened, never per segment.
+    void logCameraWatch(user, id).catch(() => undefined);
     const quality = new URL(request.url).searchParams.get("q") === "sub" ? "sub" : "main";
     try {
         return await cameraStream(install.id, id, quality, request.signal);
