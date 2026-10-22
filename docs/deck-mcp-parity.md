@@ -106,7 +106,7 @@ the model and have no translations.
 | `notes_list` | web | notes.use | [x] n/a: read-only, nothing to press |
 | `notes_update` | web | notes.use | [x] key: tool.notes_update (asks for a second press) |
 | `places_camera_snapshot` | places | places.cameras | [x] n/a: read-only, and its scope is off the deck |
-| `places_device_control` | places | places.control | [x] key: tool.places_device_control (asks for a second press); dedicated: places.device-toggle, places.device-command, places.door, places.brightness (dial), places.climate (dial), places.temperature-step, places.temperature-set |
+| `places_device_control` | places | places.control | [x] key: tool.places_device_control (asks for a second press); dedicated: places.device (does what the device's kind means: on/off, open, lock/unlock), places.device-toggle, places.device-command, places.door, places.brightness (dial), places.climate (dial), places.temperature-step, places.temperature-set |
 | `places_devices` | places | places.read | [x] n/a: read-only - used by state of every Places key |
 | `places_routine_run` | places | places.routines | [x] key: tool.places_routine_run; dedicated: places.routine-run |
 | `places_routines` | places | places.routines | [x] n/a: read-only - used by picker for places.routine-run |
@@ -125,3 +125,24 @@ the model and have no translations.
 | `watch_alarm_change` | web | deploy.manage | [x] key: tool.watch_alarm_change (asks for a second press) |
 | `watch_alarm_create` | web | deploy.manage | [x] key: tool.watch_alarm_create |
 | `watch_alarms` | web | deploy.read | [x] n/a: read-only - used by watch.alarms (state) |
+
+## Keys with no MCP tool
+
+The call keys work the call the person is on, in the browser tab that holds
+it (`lib/deck/call-actions.ts`, `lib/chat/call-remote-service.ts`). The
+microphone, camera and recorder are that tab's, so there is no tool an
+assistant could call for them: a press finds the person's own admitted seat
+and asks that tab on the call's stream, and the key reads back what the tab
+last said on its seat. Out of a call, every key shows "No call" and a press is
+refused with "You are not in a call right now." Scope `chat.use`; on Companion
+each is an action, a feedback and a variable, and the toggles also an "is on"
+feedback.
+
+| Key | Kind | Scope | Deck |
+| --- | --- | --- | --- |
+| `call.mic` | toggle | chat.use | [x] dedicated: lit and crossed out while muted |
+| `call.deafen` | toggle | chat.use | [x] dedicated: lit while deafened |
+| `call.camera` | toggle | chat.use | [x] dedicated: on or off, as the tab reports it |
+| `call.record` | toggle | chat.use | [x] dedicated: the call screen's rule - the host, or anybody in a direct message or a group; refused otherwise |
+| `call.hangup` | run | chat.use | [x] dedicated: leaves the call in the tab that is on it |
+| `call.sound` | run | chat.use | [x] dedicated: plays a picked sound through the soundboard's own checks |
