@@ -55,6 +55,10 @@ const MAX_ZOOM = 4;
 /** What one notch of the wheel does. */
 const WHEEL_STEP = 0.0015;
 
+/** How the next picture arrives: from this far to the side, over this long. */
+const SLIDE_PX = 48;
+const SLIDE_MS = 200;
+
 /** How far a pointer may wander and still count as a press rather than a drag.
  *  A hand on a trackpad or a thumb on glass never lands on exactly one pixel. */
 const DRAG_SLOP = 4;
@@ -130,12 +134,42 @@ export function ImageViewer({
     const closing = useRef(false);
     const shown = image !== null;
 
+    /** Which way the last arrow went, so the next picture slides in from there. */
+    const sliding = useRef<-1 | 1 | null>(null);
+
     useLayoutEffect(() => {
         if (!shown) return;
         flown.current = false;
         closing.current = false;
         if (!flying.reducedMotion()) fadeChrome(root.current, 0, 1, flying.OPEN_MS);
+        // The viewer takes the keys while it is open. Left where it was, focus
+        // stays on the thumbnail that opened it, and a strip of thumbnails that
+        // pages on the arrow keys answers them first - the picture behind the
+        // viewer moved and the one in it did not. Given back on close.
+        const before = document.activeElement;
+        root.current?.focus({ preventScroll: true });
+        return () => {
+            if (before instanceof HTMLElement && before.isConnected) {
+                before.focus({ preventScroll: true });
+            }
+        };
     }, [shown]);
+
+    /** The next picture comes in from the side it was asked for. */
+    const slideIn = useCallback(() => {
+        const element = picture.current;
+        const from = sliding.current;
+        sliding.current = null;
+        if (!from || !element || typeof element.animate !== "function") return;
+        if (flying.reducedMotion()) return;
+        element.animate(
+            [
+                { opacity: 0, translate: `${from * SLIDE_PX}px 0` },
+                { opacity: 1, translate: "0 0" }
+            ],
+            { duration: SLIDE_MS, easing: flying.EASE }
+        );
+    }, []);
 
     /** Grow the picture out of its thumbnail, once it has a size to grow to. */
     const flyIn = useCallback(() => {
@@ -202,6 +236,7 @@ export function ImageViewer({
     const go = useCallback(
         (by: -1 | 1) => {
             if (!browsable || !gallery || !onNavigate) return;
+            sliding.current = by;
             // Round the ends, the way every gallery does: past the last is the first.
             onNavigate(gallery[(position + by + gallery.length) % gallery.length]!);
         },
@@ -251,7 +286,8 @@ export function ImageViewer({
             aria-label={image.name}
             data-image-viewer=""
             ref={root}
-            className="fixed inset-0 z-50 flex flex-col"
+            tabIndex={-1}
+            className="fixed inset-0 z-50 flex flex-col outline-none"
         >
             {/* Its own layer, so it fades while the picture flies. */}
             <div
@@ -368,7 +404,10 @@ export function ImageViewer({
                         {/* eslint-disable-next-line @next/next/no-img-element -- one picture, sized by the viewer */}
                         <img
                             ref={picture}
-                            onLoad={flyIn}
+                            onLoad={() => {
+                                flyIn();
+                                slideIn();
+                            }}
                             src={image.url}
                             alt={image.name}
                             draggable={false}
