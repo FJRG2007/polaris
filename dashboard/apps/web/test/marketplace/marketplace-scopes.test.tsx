@@ -199,8 +199,10 @@ describe("the admin marketplace", () => {
         expect(withLogo.length).toBeGreaterThan(0);
         for (const app of withLogo) {
             const row = section.querySelector(`[data-built-in="${app.id}"]`);
-            // AppLogo is the only thing here drawn on its 32-unit grid.
-            expect(row?.querySelector('svg[viewBox="0 0 32 32"]'), app.id).not.toBeNull();
+            expect(row, app.id).not.toBeNull();
+            // jsdom does not match a camelCase SVG attribute such as viewBox in
+            // a selector, so look for the mark AppLogo puts on its own svg.
+            expect(row!.querySelector(`svg[data-app-logo="${app.id}"]`), app.id).not.toBeNull();
         }
     });
 
