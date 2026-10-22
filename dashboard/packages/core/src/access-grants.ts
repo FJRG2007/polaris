@@ -75,7 +75,8 @@ export const GRANT_SUBJECTS = [
     "place.ups",
     "place.nas",
     "place.server",
-    "place.domain"
+    "place.domain",
+    "place.room"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -138,7 +139,14 @@ export const GRANT_CAPABILITIES = {
     // its alarm history. Watching only - its shell, files, containers and
     // settings stay with whoever owns it.
     "place.server": ["view"],
-    "place.domain": ["view"]
+    "place.domain": ["view"],
+    // A room: every door, switch and camera in it, as one key. What a hotel
+    // hands a guest at check-in and an office hands a team - the room-level
+    // key Salto and Kisi issue rather than one credential per lock
+    // (https://saltosystems.com/en/solutions/hospitality/,
+    // https://docs.getkisi.com/docs/groups). Devices put in the room later are
+    // covered; ones taken out are not.
+    "place.room": ["view", "control"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -176,7 +184,8 @@ export const GRANT_ACTIONS = {
     "place.ups": ["watch", "control"],
     "place.nas": ["watch", "fan", "backup"],
     "place.server": ["watch"],
-    "place.domain": ["watch"]
+    "place.domain": ["watch"],
+    "place.room": ["watch", "open", "close", "operate"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**
@@ -550,7 +559,8 @@ export const GRANT_LINK_SUBJECTS = [
     "place.ups",
     "place.nas",
     "place.server",
-    "place.domain"
+    "place.domain",
+    "place.room"
 ] as const satisfies readonly GrantSubject[];
 
 export type GrantLinkSubject = (typeof GRANT_LINK_SUBJECTS)[number];
