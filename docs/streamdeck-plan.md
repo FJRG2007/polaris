@@ -20,7 +20,7 @@ credential and draws what it is told.
   `CodePath`, `Nodejs.Version` (20, 24 or 26), `SDKVersion` (2 or 3),
   `Software.MinimumVersion` and `OS` (mac, windows). Settings screens are HTML
   property inspectors. `streamdeck pack <dir>.sdPlugin --output dist/ --version x
-  --no-update-check` produces the `.streamDeckPlugin` installer.
+--no-update-check` produces the `.streamDeckPlugin` installer.
 - **OpenDeck** (github.com/nekename/OpenDeck): Linux, Windows and macOS host that
   runs plugins written for the Elgato SDK and the OpenAction API. A Node.js plugin
   needs a native Node.js there (not the Flatpak one). One plugin serves both.
@@ -59,16 +59,16 @@ The key is stored in the plugin's global settings, never in a key's own settings
 
 ### First actions
 
-| Area | Keys | Dials |
-| --- | --- | --- |
-| Chat | send a saved message to a channel or DM; unread count on the key; open Polaris on a channel | - |
-| Calls | join a room, leave, mute/unmute (state on the key), camera, raise hand | volume |
-| Status | set a status / Do not disturb (state on the key) | - |
-| Watch | a monitor's up/down and latency on the key; acknowledge an alarm | - |
-| Deploy | redeploy a service; its last deployment state on the key | - |
-| Places | toggle a device; its state on the key; run a scene/automation | brightness, temperature |
-| Timers | start/pause/reset a countdown or stopwatch kept in the plugin, or one of the account's Calendar timers or the focus cycle kept in Polaris (+1 min, skip the phase; live from Calendar) | set the time, or move a Polaris timer by minutes |
-| Polaris | notification count; open a Polaris page | - |
+| Area    | Keys                                                                                                                                                                                   | Dials                                            |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Chat    | send a saved message to a channel or DM; unread count on the key; open Polaris on a channel                                                                                            | -                                                |
+| Calls   | join a room, leave, mute/unmute (state on the key), camera, raise hand                                                                                                                 | volume                                           |
+| Status  | set a status / Do not disturb (state on the key)                                                                                                                                       | -                                                |
+| Watch   | a monitor's up/down and latency on the key; acknowledge an alarm                                                                                                                       | -                                                |
+| Deploy  | redeploy a service; its last deployment state on the key                                                                                                                               | -                                                |
+| Places  | toggle a device; its state on the key; run a scene/automation                                                                                                                          | brightness, temperature                          |
+| Timers  | start/pause/reset a countdown or stopwatch kept in the plugin, or one of the account's Calendar timers or the focus cycle kept in Polaris (+1 min, skip the phase; live from Calendar) | set the time, or move a Polaris timer by minutes |
+| Polaris | notification count; open a Polaris page                                                                                                                                                | -                                                |
 
 Each key draws a rendered SVG (state colour, icon, short value) so the look does
 not depend on bundled per-state images.

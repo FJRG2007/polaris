@@ -332,7 +332,8 @@ describe("the Time area on the server", () => {
         });
 
         it("tells the owner's decks of every change, and only of a real one", async () => {
-            const told = () => fake.deckChanges.filter((change) => change.userId === alice.id).length;
+            const told = () =>
+                fake.deckChanges.filter((change) => change.userId === alice.id).length;
             const id = await clock.createTimer(
                 alice.id,
                 { label: "", durationMs: 5 * 60_000, sound: "chime", start: true },

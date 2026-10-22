@@ -278,7 +278,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         }
         const before = this.#timerOf.get(user);
         const known = this.#timers.get(id);
-        if (before === id && known && JSON.stringify(known.ref) === JSON.stringify(ref)) return known;
+        if (before === id && known && JSON.stringify(known.ref) === JSON.stringify(ref))
+            return known;
         if (before !== undefined && before !== id) this.#dropTimer(user, false);
         const used = this.#describe(ref, new Set([...(known?.users ?? []), user]));
         this.#timers.set(id, used);
@@ -621,7 +622,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         this.setActionDefinitions(actions);
         this.setFeedbackDefinitions(feedbacks);
         // A picked timer's variables are named after it once the catalogue says what it is.
-        for (const [id, used] of this.#timers) this.#timers.set(id, this.#describe(used.ref, used.users));
+        for (const [id, used] of this.#timers)
+            this.#timers.set(id, this.#describe(used.ref, used.users));
         this.#defineVariables();
         this.setPresetDefinitions(structure, presets);
         // Variables Polaris has not sent yet read as empty, not as missing.

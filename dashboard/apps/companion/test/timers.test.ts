@@ -87,14 +87,18 @@ describe("which timer a button is set to", () => {
 
 describe("variables", () => {
     it("are named after the timer", () => {
-        expect(timers.variablePrefix(timers.refOf({ name: "Té verde" }))).toBe("local_timer_te_verde");
+        expect(timers.variablePrefix(timers.refOf({ name: "Té verde" }))).toBe(
+            "local_timer_te_verde"
+        );
         expect(timers.variablePrefix(timers.refOf({ source: "polaris", timer: "focus" }))).toBe(
             "timer_focus"
         );
-        expect(timers.variablePrefix(timers.refOf({ source: "polaris", name: "Tea" }))).toBe("timer_tea");
-        expect(timers.variablePrefix(timers.refOf({ source: "polaris", timer: "t1" }), "Pasta 2")).toBe(
-            "timer_pasta_2"
+        expect(timers.variablePrefix(timers.refOf({ source: "polaris", name: "Tea" }))).toBe(
+            "timer_tea"
         );
+        expect(
+            timers.variablePrefix(timers.refOf({ source: "polaris", timer: "t1" }), "Pasta 2")
+        ).toBe("timer_pasta_2");
         expect(timers.variableDefinitions("timer_tea", "Tea").map((row) => row.id)).toEqual([
             "timer_tea_remaining",
             "timer_tea_state",
@@ -145,7 +149,9 @@ describe("a timer kept on this machine", () => {
             remaining: "1:00"
         });
         // A reset still goes back to its whole length.
-        expect(timers.localView(timers.applyLocal(rung, "reset", T0), "", T0).remaining).toBe("5:00");
+        expect(timers.localView(timers.applyLocal(rung, "reset", T0), "", T0).remaining).toBe(
+            "5:00"
+        );
     });
 
     it("has no phase to skip, and takes a new length only while stopped", () => {
@@ -245,12 +251,18 @@ describe("timer buttons", () => {
     });
 
     it("pick from the timers the catalogue listed", () => {
-        expect(timers.timerChoices(TIMER).map((choice) => choice.id)).toEqual(["new", "focus", "t1"]);
+        expect(timers.timerChoices(TIMER).map((choice) => choice.id)).toEqual([
+            "new",
+            "focus",
+            "t1"
+        ]);
         expect(timers.timerChoices(undefined)).toEqual([{ id: "new", label: "A new timer" }]);
     });
 
     it("are coloured by where the timer is, with its name and time", () => {
-        expect(timers.timerStyle({ status: "running", remaining: "1:00", name: "Tea" }, true)).toEqual({
+        expect(
+            timers.timerStyle({ status: "running", remaining: "1:00", name: "Tea" }, true)
+        ).toEqual({
             bgcolor: mapping.COLORS.ok,
             color: mapping.COLORS.white,
             text: "Tea\n1:00"
@@ -266,6 +278,9 @@ describe("timer buttons", () => {
         expect(mapping.watchable([TIMER])).toEqual([]);
         expect(mapping.presetSpecs([TIMER])).toEqual([]);
         expect(timers.timerPresets(false).map((preset) => preset.id)).toEqual(["timer_local"]);
-        expect(timers.timerPresets(true).map((preset) => preset.id)).toEqual(["timer_local", "timer_focus"]);
+        expect(timers.timerPresets(true).map((preset) => preset.id)).toEqual([
+            "timer_local",
+            "timer_focus"
+        ]);
     });
 });

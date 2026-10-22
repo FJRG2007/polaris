@@ -597,8 +597,13 @@ export class TimerAction extends SingletonAction<TimerSettings> {
             const guess = polarisTimers.predictTimer(state, "shift", now, skew, ev.payload.ticks);
             if (guess && !hub.inFlight.busy(id)) {
                 const turned = this.#turned.get(id);
-                const kept = turned && turned.shown === state ? turned : { before: state, beforeAt: at };
-                this.#turned.set(id, { before: kept.before, beforeAt: kept.beforeAt, shown: guess });
+                const kept =
+                    turned && turned.shown === state ? turned : { before: state, beforeAt: at };
+                this.#turned.set(id, {
+                    before: kept.before,
+                    beforeAt: kept.beforeAt,
+                    shown: guess
+                });
                 hub.setState(id, guess);
             }
             this.#burst.turn(id, 0);

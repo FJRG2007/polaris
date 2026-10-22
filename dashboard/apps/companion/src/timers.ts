@@ -110,10 +110,7 @@ export function variablePrefix(ref: TimerRef, choiceLabel?: string): string {
 }
 
 /** A timer's three variables. */
-export function variableDefinitions(
-    prefix: string,
-    title: string
-): { id: string; name: string }[] {
+export function variableDefinitions(prefix: string, title: string): { id: string; name: string }[] {
     return [
         { id: `${prefix}_remaining`, name: `${title}: time left` },
         { id: `${prefix}_state`, name: `${title}: running, paused, done or idle` },
@@ -220,7 +217,10 @@ export function timerEntry(catalogue: readonly DeckAction[]): DeckAction | undef
  *  account's own, as the catalogue last listed them. */
 export function timerChoices(entry: DeckAction | undefined): { id: string; label: string }[] {
     const field = entry?.options.find((option) => option.name === TIMER_OPTION);
-    const listed = (field?.choices ?? []).map((choice) => ({ id: choice.value, label: choice.label }));
+    const listed = (field?.choices ?? []).map((choice) => ({
+        id: choice.value,
+        label: choice.label
+    }));
     return listed.length > 0 ? listed : [{ id: "new", label: "A new timer" }];
 }
 
