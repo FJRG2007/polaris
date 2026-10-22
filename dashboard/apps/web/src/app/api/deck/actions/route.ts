@@ -14,7 +14,7 @@
 import { loadEnv } from "@polaris/config";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { deckReleases } from "@/lib/deck/releases";
-import { deckCatalogue } from "@/lib/deck/deck-service";
+import { deckCatalogue, lockedActions } from "@/lib/deck/deck-service";
 import { deckCaller, deckWords } from "@/lib/deck/auth";
 
 export const runtime = "nodejs";
@@ -23,9 +23,10 @@ export const dynamic = "force-dynamic";
 export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     const caller = await deckCaller(request, "call");
     if (caller instanceof Response) return caller;
-    const [actions, latest] = await Promise.all([
+    const [actions, locked, latest] = await Promise.all([
         deckCatalogue(caller, deckWords(caller)),
+        lockedActions(caller, deckWords(caller)),
         deckReleases(loadEnv().POLARIS_REPO)
     ]);
-    return Response.json({ actions, latest }, { headers: { "cache-control": "no-store" } });
+    return Response.json({ actions, locked, latest }, { headers: { "cache-control": "no-store" } });
 });

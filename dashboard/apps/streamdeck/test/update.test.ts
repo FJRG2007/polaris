@@ -72,11 +72,13 @@ describe("the catalogue's releases", () => {
         const credentials = { address: ADDRESS, token: "plk_x" };
         expect(await answer({ actions: [], latest: LATEST }).listing(credentials)).toEqual({
             actions: [],
-            latest: LATEST
+            latest: LATEST,
+            locked: []
         });
         expect(await answer({ actions: [{ id: "chat.unread" }] }).listing(credentials)).toEqual({
             actions: [{ id: "chat.unread" }],
-            latest: null
+            latest: null,
+            locked: []
         });
     });
 });

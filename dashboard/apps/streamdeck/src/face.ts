@@ -71,18 +71,32 @@ export function bindingFor(
     return null;
 }
 
+/** Whether a gesture's run is what the key's state is read for: the key's own
+ *  action with the same options. A lock key held to unlock is not. */
+export function drawsOwnState(settings: KeySettings, binding: Binding | null): boolean {
+    if (!binding) return true;
+    if (binding.action !== settings.action) return false;
+    const sorted = (options: Record<string, unknown>) =>
+        JSON.stringify(Object.entries(options).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    return sorted(runOptions(binding)) === sorted(watchOptions(settings, "key"));
+}
+
 export function faceFor(
     link: Link,
     settings: KeySettings,
     entry: DeckAction | undefined,
     state: DeckState | undefined,
-    words: Readonly<Record<WordKey, string>>
+    words: Readonly<Record<WordKey, string>>,
+    locked = false
 ): KeyFace {
     if (link === "unset") return { icon: "plug", tone: "off", label: words.connect };
     if (link === "unauthorized") return { icon: "lock", tone: "bad", label: words.signIn };
     if (!settings.action) return { icon: "circle-help", tone: "off", label: words.pick };
     // Set to something this deck may no longer use, or that is gone.
     if (!entry) {
+        // Its owner may use it, the deck's key may not: connecting again does.
+        if (locked && link === "online")
+            return { icon: "lock", tone: "bad", label: words.reconnect };
         return link === "online"
             ? { icon: "circle-alert", tone: "off", label: words.pick }
             : { icon: "wifi-off", tone: "off", label: words.offline };

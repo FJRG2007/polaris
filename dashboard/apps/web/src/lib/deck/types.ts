@@ -71,6 +71,32 @@ export interface DeckState {
      *  than a bulb - drawn instead of the action's. A name the plugin does not
      *  know falls back to the action's own. */
     readonly icon?: string;
+    /** What pressing the key does from here, for a plugin that shows it before
+     *  Polaris answers. Absent when the key cannot know ahead. */
+    readonly press?: DeckPress;
+}
+
+/** A key's face without what a press would do. */
+export type DeckFace = Omit<DeckState, "press">;
+
+/**
+ * What a press would do from the state a key shows: the face it shows at once,
+ * while the command is on its way, or that the device already is where the
+ * press would put it - a lock pressed to lock while locked - so nothing is
+ * sent. The plugin puts the face back if Polaris refuses or does not answer.
+ */
+export interface DeckPress {
+    readonly face?: DeckFace;
+    readonly noop?: true;
+}
+
+/** An action the deck's key does not carry the permission for, though its
+ *  owner holds it: connecting the deck again would allow it. */
+export interface DeckLockedAction {
+    readonly id: string;
+    readonly label: string;
+    /** "Reconnect this deck to allow ...", in its owner's words. */
+    readonly message: string;
 }
 
 /** What a run answers. `message` is a refusal written for a person. */
@@ -163,5 +189,13 @@ export interface AppDeckAction {
         readonly tool: string;
         readonly input: (options: Record<string, unknown>) => unknown;
         readonly pick: (structured: unknown, locale: Locale) => DeckState;
+        /** What a press does from the state just picked, with the key's
+         *  settings and what the tool answered. */
+        readonly press?: (
+            state: DeckState,
+            options: Record<string, unknown>,
+            structured: unknown,
+            locale: Locale
+        ) => DeckPress | undefined;
     };
 }

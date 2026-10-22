@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-const { placesDeckActions, clampTarget, naturalAction, naturalState } =
+const { placesDeckActions, clampTarget, commandPress, naturalAction, naturalState, targetPress } =
     await import("@polaris-app/places/src/lib/deck-actions");
 
 const toggle = placesDeckActions().find((action) => action.id === "places.device-toggle")!;
@@ -202,5 +202,172 @@ describe("a device on its own key", () => {
             naturalState(one({ kind: "air", state: "on", online: false, actions: [] }), "es-ES")
         ).toEqual({ tone: "bad", icon: "fan", detail: "Sin conexión" });
         expect(naturalState({ devices: [] }, "en-US")).toEqual({ tone: "idle" });
+    });
+});
+
+describe("every device kind has a key", () => {
+    // What places_devices lists for each kind, by the actions' spoken names.
+    const KINDS: Record<string, string[]> = {
+        lock: ["lock", "unlock", "open"],
+        opener: ["open"],
+        climate: ["turn-on", "turn-off", "set-mode", "set-temperature", "set-fan", "set-option"],
+        air: ["turn-on", "turn-off", "set-mode", "set-fan", "set-option", "set-humidity"],
+        switch: ["turn-on", "turn-off"],
+        outlet: ["turn-on", "turn-off"],
+        light: ["turn-on", "turn-off", "set-brightness", "set-color-temp", "set-color"],
+        appliance: ["stop"],
+        litter: ["clean", "pause", "resume", "dump", "reset-deodorizer", "set-option"]
+    };
+    const listing = {
+        devices: [
+            ...Object.entries(KINDS).map(([kind, actions]) => ({
+                id: kind,
+                name: kind,
+                kind,
+                online: true,
+                operable: true,
+                actions
+            })),
+            {
+                id: "sensor",
+                name: "sensor",
+                kind: "sensor",
+                online: true,
+                operable: false,
+                actions: [],
+                reading: { value: "21.5", unit: "°C" }
+            }
+        ]
+    };
+    const listed = (id: string, field = 0) =>
+        action(id)
+            .fields[field]!.choices!.pick(listing)
+            .map((choice) => choice.value);
+
+    it("lists each kind in the pickers of the keys that work it", () => {
+        expect(listed("places.door")).toEqual(["lock", "opener"]);
+        expect(listed("places.device")).toEqual(Object.keys(KINDS));
+        expect(listed("places.device-toggle")).toEqual([
+            "climate",
+            "air",
+            "switch",
+            "outlet",
+            "light"
+        ]);
+        expect(listed("places.brightness")).toEqual(["light"]);
+        expect(listed("places.light-white")).toEqual(["light"]);
+        expect(listed("places.light-color")).toEqual(["light"]);
+        expect(listed("places.climate")).toEqual(["climate"]);
+        expect(listed("places.device-setting")).toEqual(["climate", "air"]);
+        expect(listed("places.reading")).toEqual(["sensor"]);
+    });
+
+    it("opens an opener with the one command it takes", () => {
+        expect(action("places.door").run.input({ deviceId: DEVICE, command: "open" }, {})).toEqual({
+            deviceId: DEVICE,
+            action: "open"
+        });
+    });
+
+    it("sends a light's warmth and colour, and a mode or fan by name", () => {
+        expect(
+            action("places.light-white").run.input({ deviceId: DEVICE, kelvin: 2700 }, {})
+        ).toEqual({
+            deviceId: DEVICE,
+            action: "set-color-temp",
+            kelvin: 2700
+        });
+        expect(
+            action("places.light-color").run.input(
+                { deviceId: DEVICE, hue: 120, saturation: 80 },
+                {}
+            )
+        ).toEqual({ deviceId: DEVICE, action: "set-color", hue: 120, saturation: 80 });
+        const setting = action("places.device-setting");
+        expect(
+            setting.run.input({ deviceId: DEVICE, command: "set-fan", value: "high" }, {})
+        ).toEqual({ deviceId: DEVICE, action: "set-fan", fan: "high" });
+        expect(
+            setting.run.input({ deviceId: DEVICE, command: "set-mode", value: "cool" }, {})
+        ).toEqual({ deviceId: DEVICE, action: "set-mode", mode: "cool" });
+        expect(
+            setting.options.safeParse({ deviceId: DEVICE, command: "dump", value: "x" }).success
+        ).toBe(false);
+    });
+
+    it("shows a sensor's reading, only shown", () => {
+        const reading = action("places.reading");
+        expect(reading.kind).toBe("state");
+        expect(reading.scope).toBe("home.read");
+        expect(reading.read!.pick({ devices: [listing.devices.at(-1)] }, "en-US")).toEqual({
+            tone: "ok",
+            value: "21.5°C"
+        });
+    });
+});
+
+describe("what a press shows before Polaris answers", () => {
+    const locked = { tone: "ok" as const, on: true, detail: "Locked" };
+    const unlocked = { tone: "warn" as const, on: false, detail: "Unlocked" };
+
+    it("says a door is locking, opening or unlocking", () => {
+        expect(commandPress(unlocked, "lock", "en-US")).toEqual({
+            face: { tone: "warn", on: true, icon: "lock", detail: "Locking" }
+        });
+        expect(commandPress(locked, "open", "es-ES")?.face?.detail).toBe("Abriendo");
+        expect(commandPress(locked, "unlock", "en-US")?.face?.icon).toBe("lock-open");
+    });
+
+    it("skips a lock pressed to lock while locked, never an open", () => {
+        expect(commandPress(locked, "lock", "en-US")).toEqual({ noop: true });
+        expect(commandPress(unlocked, "unlock", "en-US")).toEqual({ noop: true });
+        expect(commandPress(locked, "open", "en-US")?.noop).toBeUndefined();
+    });
+
+    it("flips a switch, and skips one already there", () => {
+        expect(commandPress({ tone: "idle", on: false }, "turn-on", "en-US")).toEqual({
+            face: { tone: "ok", on: true }
+        });
+        expect(commandPress({ tone: "ok", on: true }, "turn-on", "en-US")).toEqual({ noop: true });
+    });
+
+    it("never skips turning off a device whose state is not known", () => {
+        const command = action("places.device-command");
+        for (const state of ["unknown", "moving"]) {
+            const shown = command.read!.pick(device(true, state), "en-US");
+            expect(shown.on).toBeUndefined();
+            expect(commandPress(shown, "turn-off", "en-US")?.noop).toBeUndefined();
+        }
+    });
+
+    it("draws nothing ahead for an offline device or a command it cannot draw", () => {
+        expect(commandPress({ tone: "bad", detail: "Offline" }, "lock", "en-US")).toBeUndefined();
+        expect(commandPress({ tone: "ok", on: true }, "clean", "en-US")).toBeUndefined();
+    });
+
+    it("shows a new set point at once, and skips the one already set", () => {
+        expect(targetPress({ tone: "ok", on: true, value: "22°" }, 23)).toEqual({
+            face: { tone: "ok", on: true, value: "23°" }
+        });
+        expect(targetPress({ tone: "ok", on: true, value: "22°" }, 22)).toEqual({ noop: true });
+    });
+
+    it("reads the press from the device for its own key, and from the door's command", () => {
+        const own = action("places.device");
+        const light = {
+            devices: [
+                { kind: "light", state: "on", online: true, actions: ["turn-on", "turn-off"] }
+            ]
+        };
+        const state = own.read!.pick(light, "en-US");
+        expect(own.read!.press!(state, { deviceId: DEVICE }, light, "en-US")).toEqual({
+            face: { tone: "idle", on: false, icon: "lightbulb" }
+        });
+        const door = action("places.door");
+        expect(
+            door.read!.press!(locked, { deviceId: DEVICE, command: "lock" }, {}, "en-US")
+        ).toEqual({
+            noop: true
+        });
     });
 });

@@ -29,6 +29,7 @@ import { phaseStatus, phaseText, type Update } from "./status";
 import { VERSION } from "./version";
 import { Connection, type Phase } from "./connection";
 import * as mapping from "./mapping";
+import { InFlight, predict } from "../../streamdeck/src/optimistic";
 import {
     PolarisClient,
     readCredentials,
@@ -60,6 +61,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
     readonly #states = new Map<string, DeckState>();
     /** What each feedback on a button watches, by the feedback's id. */
     readonly #feedbacks = new Map<string, mapping.Watched>();
+    /** Stream keys with a press on its way: their readings wait for it. */
+    readonly #inFlight = new InFlight();
 
     async init(config: Config, _isFirstInit: boolean, secrets: Secrets): Promise<void> {
         this.config = config;
@@ -135,6 +138,53 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         const values: CompanionVariableValues = {};
         const changed: string[] = [];
         for (const { key, state } of readings) {
+            if (this.#inFlight.hold(key, state)) continue;
+            this.#states.set(key, state);
+            if (key.startsWith("var:")) values[key.slice(4)] = mapping.stateValue(state);
+            else changed.push(key);
+        }
+        if (Object.keys(values).length > 0) this.setVariableValues(values);
+        if (changed.length > 0) this.checkFeedbacksById(...changed);
+    }
+
+    /**
+     * A button pressed: what it does shows at once on every feedback and
+     * variable watching the same thing, the command goes out, and what Polaris
+     * answers wins - its state, or the faces from before when it refuses or
+     * does not answer. Already done, it is still sent: Polaris reads it again
+     * and does nothing.
+     */
+    async #press(entry: DeckAction, options: Record<string, unknown>): Promise<void> {
+        const keys = mapping.keysShowing(
+            entry,
+            options,
+            mapping.watchList(this.#connection.catalogue, this.#feedbacks)
+        );
+        const guess = predict(entry, keys.length ? this.#states.get(keys[0]!) : undefined);
+        for (const key of keys) this.#inFlight.begin(key, this.#states.get(key));
+        if (guess && "face" in guess) this.#show(keys.map((key) => ({ key, state: guess.face })));
+        const result = await this.#connection.run(entry.id, options);
+        const ok = result?.ok === true;
+        const returned = result?.ok ? result.state : undefined;
+        const settled: { key: string; state: DeckState }[] = [];
+        for (const key of keys) {
+            const state = this.#inFlight.settle(key, ok, returned);
+            if (state) settled.push({ key, state });
+            else if (!ok) this.#states.delete(key);
+        }
+        this.#show(settled);
+        if (!ok) {
+            this.log("warn", `${entry.label}: ${result?.message ?? "Polaris did not answer"}`);
+            if (keys.length)
+                this.checkFeedbacksById(...keys.filter((key) => !key.startsWith("var:")));
+        }
+    }
+
+    /** Draw states without going through the stream's hold. */
+    #show(readings: readonly { key: string; state: DeckState }[]): void {
+        const values: CompanionVariableValues = {};
+        const changed: string[] = [];
+        for (const { key, state } of readings) {
             this.#states.set(key, state);
             if (key.startsWith("var:")) values[key.slice(4)] = mapping.stateValue(state);
             else changed.push(key);
@@ -183,11 +233,7 @@ export default class PolarisInstance extends InstanceBase<Schema> {
                 name: `${entry.area}: ${entry.label}`,
                 options: mapping.actionOptions(entry),
                 callback: async (event) => {
-                    const result = await this.#connection.run(
-                        entry.id,
-                        mapping.deckOptions(entry, event.options)
-                    );
-                    if (result?.ok === false) this.log("warn", `${entry.label}: ${result.message}`);
+                    await this.#press(entry, mapping.deckOptions(entry, event.options));
                 }
             };
         }

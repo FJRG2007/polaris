@@ -29,10 +29,12 @@ import { keyImage } from "./render";
 import { fromInspector, tellInspector } from "./inspector";
 import { DIAL_UUID, KEY_UUID, TIMER_UUID, surfaceOf, type Surface } from "./surfaces";
 import { CONFIRM_MS, Confirmations, PressTimer, type Gesture } from "./presses";
+import { DialBurst, predict } from "./optimistic";
 import {
     alternates,
     bindingFor,
     gesturesOf,
+    drawsOwnState,
     runOptions,
     turnLevel,
     type KeySettings
@@ -111,11 +113,21 @@ export class PolarisKey extends SingletonAction<KeySettings> {
             if (!(await hub.open(path))) await action.showAlert();
             return;
         }
-        // The key's own toggle flips at once and is put back if Polaris refuses.
-        const ownToggle = !binding && entry.kind === "toggle";
+        // The key shows what the press does at once, and is put back if
+        // Polaris refuses or does not answer. Only its own action's: another
+        // gesture's state is not what this key draws. One already done is
+        // still sent: Polaris reads it again, and this reading may be old.
         const before = hub.state(id);
-        if (ownToggle && before) hub.setState(id, { ...before, on: !before.on });
+        const guess = drawsOwnState(settings, binding) ? predict(entry, before) : null;
+        hub.inFlight.begin(id, before);
+        if (guess && "face" in guess) hub.setState(id, guess.face);
         const result = await hub.run(id, undefined, binding);
+        const settled = hub.inFlight.settle(
+            id,
+            result?.ok === true,
+            result?.ok ? result.state : undefined
+        );
+        if (settled) hub.setState(id, settled);
         if (result?.ok) {
             if (gesture === "press" && alternates(settings, main)) {
                 const next: KeySettings = { ...settings, side: settings.side === "b" ? "a" : "b" };
@@ -125,7 +137,6 @@ export class PolarisKey extends SingletonAction<KeySettings> {
             } else if (entry.kind === "run") await action.showOk();
             return;
         }
-        if (ownToggle && before) hub.setState(id, before);
         await action.showAlert();
     }
 
@@ -162,7 +173,9 @@ export class PolarisKey extends SingletonAction<KeySettings> {
 export class PolarisDial extends SingletonAction<KeySettings> {
     override readonly manifestId: string;
     readonly #surface: Surface;
-    readonly #settle = new Map<string, ReturnType<typeof setTimeout>>();
+    /** Ticks gathered into one command: the face follows each, the level is
+     *  sent once the dial settles, and a refused one goes back. */
+    readonly #burst = new DialBurst(DIAL_SETTLE_MS, (id, from) => void this.#land(id, from));
 
     /** `manifestId` is the general dial, or the one offering only Places. */
     constructor(manifestId: string = DIAL_UUID) {
@@ -194,6 +207,7 @@ export class PolarisDial extends SingletonAction<KeySettings> {
     }
 
     override onWillDisappear(ev: WillDisappearEvent<KeySettings>): void {
+        this.#burst.forget(ev.action.id);
         hub.detach(ev.action.id);
     }
 
@@ -204,25 +218,34 @@ export class PolarisDial extends SingletonAction<KeySettings> {
 
     override async onDialRotate(ev: DialRotateEvent<KeySettings>): Promise<void> {
         const settings = ev.payload.settings;
-        const level = turnLevel(
-            runOptions(settings).level,
-            ev.payload.ticks,
-            hub.entry(settings)?.dial
-        );
+        const range = hub.entry(settings)?.dial;
+        const from = turnLevel(runOptions(settings).level, 0, range);
+        const level = turnLevel(runOptions(settings).level, ev.payload.ticks, range);
         const next: KeySettings = { ...settings, options: { ...settings.options, level } };
         hub.update(ev.action.id, next);
         this.#draw(ev.action.id, next);
         await ev.action.setSettings(next);
         // Sent once the dial settles: a quick turn is one command, not twenty.
-        const id = ev.action.id;
-        clearTimeout(this.#settle.get(id));
-        this.#settle.set(
-            id,
-            setTimeout(() => {
-                this.#settle.delete(id);
-                void this.#send(id);
-            }, DIAL_SETTLE_MS)
-        );
+        this.#burst.turn(ev.action.id, from);
+    }
+
+    /** A burst of turns is over: send where it landed, unless that is where
+     *  it began, and go back there if Polaris refuses. */
+    async #land(id: string, from: number): Promise<void> {
+        const action = streamDeck.actions.getActionById(id);
+        if (!action?.isDial()) return;
+        const settings = (await action.getSettings()) as KeySettings;
+        const level = turnLevel(runOptions(settings).level, 0, hub.entry(settings)?.dial);
+        if (level === from) return;
+        const result = await hub.run(id, undefined, null);
+        if (result?.ok) return;
+        // Turned again meanwhile: the newer burst decides.
+        if (this.#burst.turning(id)) return;
+        const back: KeySettings = { ...settings, options: { ...settings.options, level: from } };
+        hub.update(id, back);
+        this.#draw(id, back);
+        await action.setSettings(back);
+        await action.showAlert();
     }
 
     async #send(id: string, push = false): Promise<void> {

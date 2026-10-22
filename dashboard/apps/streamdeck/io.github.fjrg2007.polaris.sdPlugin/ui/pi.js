@@ -212,8 +212,17 @@
     function actionSection() {
         const box = el("section", {}, [el("h2", { text: words.action })]);
         const catalogue = status?.catalogue ?? [];
+        // What connecting the deck again would allow, in Polaris's words.
+        const locked = status?.locked ?? [];
+        const blocked = locked.find((item) => item.id === settings.action);
+        const reconnect = () =>
+            blocked
+                ? [el("p", { class: "notice", text: blocked.message })]
+                : [...new Set(locked.map((item) => item.message))]
+                      .slice(0, 3)
+                      .map((message) => el("p", { class: "hint", text: message }));
         if (catalogue.length === 0) {
-            box.append(el("p", { class: "hint", text: words.noActions }));
+            box.append(el("p", { class: "hint", text: words.noActions }), ...reconnect());
             return box;
         }
 
@@ -222,7 +231,7 @@
             save({ ...settings, action: select.value || undefined, options: {} }, true);
             render();
         });
-        box.append(row(words.action, select, null, true));
+        box.append(row(words.action, select, null, true), ...reconnect());
 
         const entry = catalogue.find((candidate) => candidate.id === settings.action);
         for (const field of entry?.options ?? []) {

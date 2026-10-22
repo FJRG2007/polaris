@@ -376,3 +376,27 @@ describe("the version", () => {
         expect(VERSION).toBe(pkg.version);
     });
 });
+
+describe("keysShowing", () => {
+    const entry = {
+        id: "places.door",
+        kind: "run",
+        area: "places",
+        label: "Door",
+        icon: "lock",
+        options: [],
+        live: true
+    } as DeckAction;
+
+    it("finds every feedback and the variable set to the same thing a press changes", () => {
+        const options = { deviceId: "d1", command: "lock" };
+        expect(
+            mapping.keysShowing(entry, options, [
+                { key: "f1", action: "places.door", options },
+                { key: "f2", action: "places.door", options: { deviceId: "d2", command: "lock" } },
+                { key: "var:places_door", action: "places.door", options },
+                { key: "f3", action: "places.device", options }
+            ])
+        ).toEqual(["f1", "var:places_door"]);
+    });
+});

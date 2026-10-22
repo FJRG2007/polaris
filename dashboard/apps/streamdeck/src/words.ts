@@ -12,7 +12,8 @@ const WORDS = {
         signIn: "Sign in",
         pick: "Pick one",
         done: "Done",
-        again: "Again?"
+        again: "Again?",
+        reconnect: "Reconnect"
     },
     es: {
         connect: "Conectar",
@@ -20,7 +21,8 @@ const WORDS = {
         signIn: "Entrar",
         pick: "Elegir",
         done: "Hecho",
-        again: "¿Otra?"
+        again: "¿Otra?",
+        reconnect: "Reconectar"
     }
 } as const;
 

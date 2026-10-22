@@ -6,7 +6,7 @@
 import { wordsFor } from "../src/words";
 import { describe, expect, it } from "vitest";
 import type { DeckAction } from "../src/polaris";
-import { faceFor, runOptions, turnLevel, watchOptions } from "../src/face";
+import { drawsOwnState, faceFor, runOptions, turnLevel, watchOptions } from "../src/face";
 import { clip, escapeXml, keyImage, renderKey } from "../src/render";
 
 const words = wordsFor("en");
@@ -142,5 +142,31 @@ describe("renderKey", () => {
         expect(keyImage({ icon: "bell", tone: "ok" })).toMatch(
             /^data:image\/svg\+xml;charset=utf8,%3Csvg/
         );
+    });
+});
+
+describe("drawsOwnState", () => {
+    const lock = { action: "places.door", options: { deviceId: "d1", command: "lock" } };
+
+    it("is the key's own run with no binding, or the same action and options", () => {
+        expect(drawsOwnState(lock, null)).toBe(true);
+        expect(
+            drawsOwnState(lock, {
+                action: "places.door",
+                options: { command: "lock", deviceId: "d1" }
+            })
+        ).toBe(true);
+    });
+
+    it("is not a gesture bound to the same action with other options", () => {
+        expect(
+            drawsOwnState(lock, {
+                action: "places.door",
+                options: { deviceId: "d1", command: "unlock" }
+            })
+        ).toBe(false);
+        expect(
+            drawsOwnState(lock, { action: "places.device-toggle", options: { deviceId: "d1" } })
+        ).toBe(false);
     });
 });

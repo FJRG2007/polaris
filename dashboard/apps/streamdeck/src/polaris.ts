@@ -42,7 +42,36 @@ export interface DeckReleases {
 export interface DeckListing {
     readonly actions: DeckAction[];
     readonly latest: DeckReleases | null;
+    /** Actions this deck's key lacks the permission for though its owner holds
+     *  it; empty from a Polaris older than the field. */
+    readonly locked: readonly DeckLocked[];
 }
+
+/** An action connecting the deck again would allow, and the sentence that
+ *  says so, in the account's language. */
+export interface DeckLocked {
+    readonly id: string;
+    readonly label: string;
+    readonly message: string;
+}
+
+/** `locked` as it arrived, keeping only well-formed rows. */
+export function readLocked(raw: unknown): DeckLocked[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+        (row): row is DeckLocked =>
+            typeof row?.id === "string" &&
+            typeof row?.label === "string" &&
+            typeof row?.message === "string"
+    );
+}
+
+/** How long a press waits for Polaris before its key is put back. Polaris
+ *  waits up to 8 s for a device to confirm a command. */
+export const RUN_TIMEOUT_MS = 15_000;
+
+/** A press Polaris did not answer within `RUN_TIMEOUT_MS`. */
+export class TimedOut extends Error {}
 
 /** `latest` as it arrived, kept only when every part has the expected type. */
 export function readReleases(raw: unknown): DeckReleases | null {
@@ -74,6 +103,12 @@ export interface DeckState {
     /** What it is now - a crossed-out microphone, a fan rather than a bulb -
      *  drawn instead of the action's icon when the plugin knows the name. */
     readonly icon?: string;
+    /** What a press does from here: the face to show at once, or that it is
+     *  already done. From a Polaris that knows; absent otherwise. */
+    readonly press?: {
+        readonly face?: DeckState;
+        readonly noop?: boolean;
+    };
 }
 
 export type RunResult =
@@ -213,8 +248,16 @@ export class PolarisClient {
         const response = await this.fetcher(`${credentials.address}/api/deck/actions`, {
             headers: this.#headers(credentials.token)
         });
-        const body = await this.#json<{ actions: DeckAction[]; latest?: unknown }>(response);
-        return { actions: body.actions, latest: readReleases(body.latest) };
+        const body = await this.#json<{
+            actions: DeckAction[];
+            latest?: unknown;
+            locked?: unknown;
+        }>(response);
+        return {
+            actions: body.actions,
+            latest: readReleases(body.latest),
+            locked: readLocked(body.locked)
+        };
     }
 
     async run(
@@ -224,16 +267,23 @@ export class PolarisClient {
         step?: number,
         push?: boolean
     ): Promise<RunResult> {
-        const response = await this.fetcher(`${credentials.address}/api/deck/run`, {
-            method: "POST",
-            headers: this.#headers(credentials.token),
-            body: JSON.stringify({
-                action,
-                options,
-                ...(step === undefined ? {} : { step }),
-                ...(push ? { push: true } : {})
-            })
-        });
+        let response: Response;
+        try {
+            response = await this.fetcher(`${credentials.address}/api/deck/run`, {
+                method: "POST",
+                headers: this.#headers(credentials.token),
+                body: JSON.stringify({
+                    action,
+                    options,
+                    ...(step === undefined ? {} : { step }),
+                    ...(push ? { push: true } : {})
+                }),
+                signal: AbortSignal.timeout(RUN_TIMEOUT_MS)
+            });
+        } catch (caught) {
+            if ((caught as { name?: string } | null)?.name === "TimeoutError") throw new TimedOut();
+            throw caught;
+        }
         return this.#json<RunResult>(response);
     }
 
