@@ -290,12 +290,43 @@ async function renewed(
         throw caught;
     }
     if (!next) return credentials;
-    next = { ...optionsOf(connection, credentials), ...next };
-    await prisma.placeDeviceAccount.updateMany({
-        where: { id },
-        data: { secret: sealCredentials(next) }
-    });
-    return next;
+    const renewal = next;
+    const written = await rewriteSecret({ id }, (current) => ({
+        ...optionsOf(connection, current),
+        ...renewal
+    }));
+    return written ?? { ...optionsOf(connection, credentials), ...renewal };
+}
+
+/**
+ * Change an account's sealed fields from what is stored at the moment of the
+ * write, not from a copy read earlier: a renewal and a switch flipped during
+ * it would otherwise each put back what the other wrote.
+ *
+ * The write only lands on the secret it was worked out from, and is worked
+ * out again when something else wrote first. Null when the account is gone
+ * or its fields cannot be read.
+ */
+async function rewriteSecret(
+    where: { id: string; installedAppId?: string },
+    change: (fields: Record<string, string>) => Record<string, string>,
+    data: { status?: string; statusNote?: string | null } = {}
+): Promise<Record<string, string> | null> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const row = await prisma.placeDeviceAccount.findFirst({
+            where,
+            select: { secret: true }
+        });
+        const fields = row ? readCredentials(row.secret) : null;
+        if (!row || !fields) return null;
+        const next = change(fields);
+        const { count } = await prisma.placeDeviceAccount.updateMany({
+            where: { ...where, secret: row.secret },
+            data: { ...data, secret: sealCredentials(next) }
+        });
+        if (count === 1) return next;
+    }
+    throw new Error("places: an account kept changing while its fields were written");
 }
 
 // ---------------------------------------------------------------------------
@@ -420,13 +451,20 @@ export async function setAccountOption(
     const connection = registry.deviceConnection(row.connection);
     if (!connection?.options?.some((option) => option.key === key))
         throw new HomeError("That connection has no such setting");
-    const fields = readCredentials(row.secret);
-    if (!fields) throw new HomeError(`${row.label} has to be connected again`);
-    const updated = await prisma.placeDeviceAccount.update({
-        where: { id: row.id },
-        data: { secret: sealCredentials({ ...fields, [key]: on ? "1" : "0" }) },
+    // Turning a switch on is what an account refused for having it off was
+    // asked to do; the next use says whether anything else is still wrong.
+    const cleared = on && row.status === "unauthorized" ? { status: "ok", statusNote: null } : {};
+    const written = await rewriteSecret(
+        { id: row.id, installedAppId },
+        (fields) => ({ ...fields, [key]: on ? "1" : "0" }),
+        cleared
+    );
+    if (!written) throw new HomeError(`${row.label} has to be connected again`);
+    const updated = await prisma.placeDeviceAccount.findFirst({
+        where: { id: row.id, installedAppId },
         select: { ...ACCOUNT_FIELDS, _count: { select: { devices: true } } }
     });
+    if (!updated) throw new HomeError("That connection is not here");
     return toView(updated);
 }
 
@@ -450,18 +488,14 @@ export async function linkLocal(
 ): Promise<void> {
     const row = await prisma.placeDeviceAccount.findFirst({
         where: { id, installedAppId },
-        select: { secret: true }
+        select: { id: true }
     });
     if (!row) throw new HomeError("That connection is not here");
-    const fields = readCredentials(row.secret);
-    if (!fields) throw new HomeError("That connection has to be connected again");
-    const kept = Object.fromEntries(
-        Object.entries(fields).filter(([key]) => !key.startsWith("local"))
-    );
-    await prisma.placeDeviceAccount.updateMany({
-        where: { id, installedAppId },
-        data: { secret: sealCredentials({ ...kept, ...(broker ?? {}) }) }
-    });
+    const written = await rewriteSecret({ id, installedAppId }, (fields) => ({
+        ...Object.fromEntries(Object.entries(fields).filter(([key]) => !key.startsWith("local"))),
+        ...(broker ?? {})
+    }));
+    if (!written) throw new HomeError("That connection has to be connected again");
 }
 
 /**

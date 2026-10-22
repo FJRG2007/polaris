@@ -389,6 +389,10 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "PETKIT signed Polaris out because this account signed in somewhere else",
         "refusals.petkitTakenOver"
     ],
+    [
+        "The PETKIT sign-in has ended and Polaris is not to take the session back",
+        "refusals.petkitEndedWaiting"
+    ],
     ["There is nothing running on it to pause or resume", "refusals.litterNothingRunning"],
     ["This box's deodorizer cannot be reset from here", "refusals.litterNoDeodorizerReset"],
     ["That device is not on this account", "refusals.notOnAccount"]

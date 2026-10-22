@@ -376,6 +376,51 @@ describe("PETKIT litter boxes", () => {
         expect(await driver.list(again)).toHaveLength(1);
     });
 
+    it("never signs in early or on a lapsed session while taking it back is off", async () => {
+        const stored = { ...(await driver.verify(typed))!, takeBack: "0" };
+        usePetkitFetch(null);
+        calls = [];
+        respond = defaultCloud();
+        usePetkitFetch(async (input, init) => {
+            const call: Call = {
+                url: new URL(String(input)),
+                method: init?.method ?? "GET",
+                headers: (init?.headers ?? {}) as Record<string, string>,
+                form: new URLSearchParams(typeof init?.body === "string" ? init.body : "")
+            };
+            calls.push(call);
+            const answer = respond(call);
+            return answer instanceof Response ? answer : json(answer);
+        });
+        const logins = () =>
+            calls.filter((call) => call.url.pathname.endsWith("/user/login")).length;
+
+        // In its last day it is used to its end rather than replaced.
+        const ending = { ...stored, sessionUntil: String(Date.now() + 60 * 60_000) };
+        expect(await driver.renew!(ending)).toBeNull();
+        expect(await driver.list(ending)).toHaveLength(1);
+
+        // Once it has run out it waits, saying why.
+        await driver.probe!(ending);
+        const lapsed = { ...stored, sessionUntil: String(Date.now() - 1_000) };
+        expect(await driver.renew!(lapsed)).toBeNull();
+        const failure = await driver.list(lapsed).catch((caught) => caught);
+        expect(failure).toBeInstanceOf(DriverError);
+        expect((failure as DriverError).kind).toBe("unauthorized");
+        expect((failure as DriverError).message).toBe(
+            "The PETKIT sign-in has ended and Polaris is not to take the session back"
+        );
+        expect(logins()).toBe(0);
+
+        // Switched on, it signs in; switched off again, that session is used.
+        await driver.probe!(lapsed);
+        expect(await driver.list({ ...lapsed, takeBack: "1" })).toHaveLength(1);
+        expect(logins()).toBe(1);
+        await driver.probe!(lapsed);
+        expect(await driver.list(lapsed)).toHaveLength(1);
+        expect(logins()).toBe(1);
+    });
+
     it("says to check the region when PETKIT does not know the email", async () => {
         respond = (call) =>
             call.url.pathname.endsWith("/v1/regionservers")

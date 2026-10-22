@@ -684,6 +684,7 @@
         "petkitNoAccount": "PETKIT has no account with that email in that country. In the PETKIT app open Settings > Account management > Change the region, check the country (it may have been set wrong when the account was made) and pick the same one here.",
         "noSuchSetting": "That connection has no such setting",
         "petkitTakenOver": "PETKIT signed Polaris out because this account signed in somewhere else, most likely the PETKIT app: PETKIT allows one sign-in per account. Turn \"Take the session back\" on in this connection's settings, or connect it again.",
+        "petkitEndedWaiting": "Polaris's PETKIT sign-in has ended, and \"Take the session back\" is off, so Polaris did not sign in again and sign the PETKIT app out. Turn it on in this connection's settings, or connect it again.",
         "litterNothingRunning": "There is nothing running on it to pause or resume",
         "litterNoDeodorizerReset": "This box's deodorizer cannot be reset from here",
         "notOnAccount": "That device is not on this account",

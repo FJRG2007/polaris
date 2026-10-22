@@ -254,6 +254,7 @@
         "places/src/screens/clips/clips-view.tsx",
         "places/src/screens/detection-box.tsx",
         "places/src/screens/detection-label.ts",
+        "places/src/screens/devices/account-options-dialog.tsx",
         "places/src/screens/devices/address-input.tsx",
         "places/src/screens/devices/appliance-controls.tsx",
         "places/src/screens/devices/climate-controls.tsx",

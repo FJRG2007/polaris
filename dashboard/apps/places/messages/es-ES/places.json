@@ -684,6 +684,7 @@
         "petkitNoAccount": "PETKIT no tiene una cuenta con ese correo en ese país. En la app de PETKIT abre Settings > Account management > Change the region, revisa el país (puede que se eligiera mal al crear la cuenta) y elige aquí el mismo.",
         "noSuchSetting": "Esa conexión no tiene ese ajuste",
         "petkitTakenOver": "PETKIT cerró la sesión de Polaris porque esta cuenta inició sesión en otro sitio, casi seguro la app de PETKIT: solo permite una sesión por cuenta. Activa \"Recuperar la sesión\" en los ajustes de esta conexión o vuelve a conectarla.",
+        "petkitEndedWaiting": "La sesión de Polaris en PETKIT ha terminado y \"Recuperar la sesión\" está desactivado, así que Polaris no ha vuelto a entrar para no cerrar la sesión de la app de PETKIT. Actívalo en los ajustes de esta conexión o vuelve a conectarla.",
         "litterNothingRunning": "No tiene nada en marcha que pausar o reanudar",
         "litterNoDeodorizerReset": "El ambientador de este arenero no se reinicia desde aquí",
         "notOnAccount": "Ese dispositivo no está en esta cuenta",

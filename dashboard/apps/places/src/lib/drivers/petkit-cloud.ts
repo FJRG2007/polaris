@@ -68,6 +68,7 @@ function takesBack(credentials: Credentials): boolean {
 }
 
 const TAKEN_OVER = "PETKIT signed Polaris out because this account signed in somewhere else";
+const ENDED_WAITING = "The PETKIT sign-in has ended and Polaris is not to take the session back";
 const lists = new Map<string, { at: number; value: Promise<DeviceSnapshot[]> }>();
 const records = new Map<string, { at: number; uses: unknown[] }>();
 const commands = new Map<string, number[]>();
@@ -120,6 +121,7 @@ function asDriverError(caught: unknown): unknown {
 async function signIn(account: petkit.PetkitAccount): Promise<petkit.PetkitSession> {
     const session = await petkit.login(fetcher, account);
     sessions.set(keyOf(account), session);
+    takenOver.delete(keyOf(account));
     return session;
 }
 
@@ -134,7 +136,11 @@ async function withSession<T>(
         if (takenOver.has(key) && !takesBack(credentials))
             throw new DriverError(TAKEN_OVER, "unauthorized");
         let session = sessions.get(key) ?? storedSession(credentials);
-        if (!session || session.until <= Date.now()) session = await signIn(account);
+        if (!session || session.until <= Date.now()) {
+            // Whoever holds the account now would be signed out by this one.
+            if (!takesBack(credentials)) throw new DriverError(ENDED_WAITING, "unauthorized");
+            session = await signIn(account);
+        }
         try {
             return await run(session, account);
         } catch (caught) {
@@ -377,7 +383,6 @@ export const petkitCloudDriver: DeviceDriver = {
         try {
             const session = await signIn(account);
             await petkit.listDevices(fetcher, session, account.timezone);
-            takenOver.delete(keyOf(account));
             return storable(account, session);
         } catch (caught) {
             throw asDriverError(caught);
@@ -397,6 +402,12 @@ export const petkitCloudDriver: DeviceDriver = {
         if (held && held.id !== stored?.id && held.until - Date.now() > RENEW_BEFORE_MS)
             return storable(account, held);
         if (stored && stored.until - Date.now() > RENEW_BEFORE_MS) return null;
+        // Off, a session is used to its end rather than replaced early, and
+        // one that has ended is not replaced at all (`withSession` says why).
+        if (!takesBack(credentials))
+            return held && held.id !== stored?.id && held.until > Date.now()
+                ? storable(account, held)
+                : null;
         try {
             return storable(account, await signIn(account));
         } catch (caught) {

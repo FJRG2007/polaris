@@ -24,6 +24,7 @@ let stored: {
     statusNote: string | null;
 };
 const writes: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
+let beforeWrite: (() => void) | null = null;
 let renew: (credentials: Record<string, string>) => Promise<Record<string, string> | null>;
 
 const seal = (fields: Record<string, string>) =>
@@ -67,6 +68,9 @@ vi.mock("@polaris/db", () => ({
                 data: Record<string, unknown>;
             }) => {
                 writes.push(args);
+                beforeWrite?.();
+                if (typeof args.where.secret === "string" && args.where.secret !== stored.secret)
+                    return { count: 0 };
                 if (typeof args.data.secret === "string") stored.secret = args.data.secret;
                 if (typeof args.data.status === "string") stored.status = args.data.status;
                 return { count: 1 };
@@ -79,6 +83,7 @@ const { accountWithCredentials } = await import("@polaris-app/places/src/lib/dev
 
 beforeEach(() => {
     writes.length = 0;
+    beforeWrite = null;
     stored = {
         id: "account-1",
         installedAppId: "install-1",
@@ -103,6 +108,7 @@ describe("credentials that age", () => {
             accessToken: "new",
             refreshToken: "r-new"
         });
+        const before = stored.secret;
         const { credentials } = await accountWithCredentials("install-1", "account-1");
         expect(credentials.accessToken).toBe("new");
         const saved = JSON.parse(
@@ -113,7 +119,22 @@ describe("credentials that age", () => {
             refreshToken: "r-new",
             userCode: "code"
         });
-        expect(writes[0]?.where).toEqual({ id: "account-1" });
+        expect(writes[0]?.where).toEqual({ id: "account-1", secret: before });
+    });
+
+    it("are written again over a change that landed during the renewal", async () => {
+        renew = async (credentials) => ({ ...credentials, accessToken: "new" });
+        let meanwhile = "";
+        beforeWrite = () => {
+            meanwhile = seal({ userCode: "code", accessToken: "old", refreshToken: "r-meanwhile" });
+            stored.secret = meanwhile;
+            beforeWrite = null;
+        };
+        const before = stored.secret;
+        const { credentials } = await accountWithCredentials("install-1", "account-1");
+        expect(credentials.accessToken).toBe("new");
+        expect(writes.map((write) => write.where.secret)).toEqual([before, meanwhile]);
+        expect(stored.secret).toBe(writes[1]?.data.secret);
     });
 
     it("mark the account signed out when the renewal is refused", async () => {
