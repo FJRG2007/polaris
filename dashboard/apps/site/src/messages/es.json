@@ -12,19 +12,34 @@
         "description": "Plataforma autoalojada para llevar tus servidores y tu equipo desde un sitio."
     },
     "home": {
-        "title": "Tus servidores y tu equipo, en un sitio",
-        "intro": "Despliega apps y bases de datos en tus máquinas, gestiona archivos de cada NAS y nube, aloja servidores de juegos y trabaja en equipo con chat, llamadas, tareas, calendario, correo y documentos.",
-        "install": "Instalar",
-        "installHint": "Ejecuta una línea en la máquina que lo alojará. Después, las actualizaciones y ajustes se hacen desde la web.",
+        "eyebrow": "Código abierto. En tu servidor. Una instalación.",
+        "title": "Dirige tu equipo y tus servidores desde un sitio que es tuyo",
+        "intro": "Despliegues, archivos, chat, llamadas, correo, tareas y servidores de juegos en tus máquinas. Se instala con una línea y lo demás se hace desde el navegador.",
+        "installHint": "Ejecútala en la máquina que alojará Polaris. Después se actualiza desde Ajustes.",
         "unix": "macOS y Linux",
         "windows": "Windows",
-        "replacesTitle": "Si ya pagas por estas",
-        "replacesIntro": "Lo que Polaris sustituye, en tu propio hardware y con una sola cuenta.",
-        "today": "Lo que usas hoy",
-        "instead": "Lo que Polaris ejecuta",
-        "lookTitle": "Un vistazo",
-        "lookIntro": "Capturas de la interfaz real con datos de ejemplo.",
-        "seeApps": "Ver todas las apps"
+        "system": "Sistema donde instalar",
+        "copy": "Copiar el comando de instalación",
+        "readDocs": "Leer la documentación",
+        "github": "Ver en GitHub",
+        "replacesEyebrow": "Lo que sustituye",
+        "replacesTitle": "Cancela las suscripciones",
+        "replacesIntro": "Cada tarjeta es algo que pagas hoy y lo que Polaris ejecuta en su lugar, en tu hardware y con una sola cuenta.",
+        "stepsEyebrow": "Cómo funciona",
+        "stepsTitle": "En marcha en tres pasos",
+        "stepsIntro": "La terminal solo se usa para instalar. Todo lo demás se hace en el navegador.",
+        "step1Title": "Instala",
+        "step1Body": "Pega la línea de arriba en una máquina Linux, macOS o Windows. Instala lo que Polaris necesita y lo arranca.",
+        "step2Title": "Ábrelo",
+        "step2Body": "Abre Polaris en un navegador desde esa máquina o tu red y crea la primera cuenta.",
+        "step3Title": "El resto, desde el navegador",
+        "step3Body": "Añade apps, conecta más máquinas, invita a gente y actualiza Polaris desde Ajustes.",
+        "lookEyebrow": "El producto",
+        "lookTitle": "Un vistazo por dentro",
+        "lookIntro": "Capturas de la interfaz real con datos de ejemplo. Elige una para ampliarla.",
+        "seeApps": "Ver todas las apps",
+        "ctaTitle": "Tu propio Polaris está a una línea",
+        "ctaBody": "Gratis y de código abierto con licencia AGPL-3.0."
     },
     "market": {
         "title": "Tienda",
@@ -81,5 +96,15 @@
     "footer": {
         "license": "Código abierto con licencia AGPL-3.0.",
         "source": "Código fuente"
+    },
+    "viewer": {
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "more": "Más opciones de la imagen",
+        "close": "Cerrar",
+        "previous": "Imagen anterior",
+        "next": "Imagen siguiente",
+        "position": "{index} de {count}",
+        "open": "Ampliar"
     }
 }

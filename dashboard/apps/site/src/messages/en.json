@@ -12,19 +12,34 @@
         "description": "Self-hosted platform to run your servers and your team from one place."
     },
     "home": {
-        "title": "Your servers and your team, in one place",
-        "intro": "Deploy apps and databases to your own machines, manage files across every NAS and cloud drive, host game servers, and work together with chat, calls, tasks, calendar, mail and documents.",
-        "install": "Install",
-        "installHint": "Run one line on the machine that will host it. Updates and settings are handled from the web interface afterwards.",
+        "eyebrow": "Open source. Self-hosted. One install.",
+        "title": "Run your team and your servers from one place you own",
+        "intro": "Deploys, files, chat, calls, mail, tasks and game servers on your own machines. Install it with one line, then do everything else from the browser.",
+        "installHint": "Run it on the machine that will host Polaris. Updates come from Settings afterwards.",
         "unix": "macOS and Linux",
         "windows": "Windows",
-        "replacesTitle": "If you already pay for these",
-        "replacesIntro": "What Polaris replaces, on your own hardware and with one account.",
-        "today": "What you use today",
-        "instead": "What Polaris runs instead",
+        "system": "System to install on",
+        "copy": "Copy the install command",
+        "readDocs": "Read the docs",
+        "github": "View on GitHub",
+        "replacesEyebrow": "What it replaces",
+        "replacesTitle": "Cancel the subscriptions",
+        "replacesIntro": "Each card is something you pay for today and what Polaris runs in its place, on your hardware and under one account.",
+        "stepsEyebrow": "How it works",
+        "stepsTitle": "Up and running in three steps",
+        "stepsIntro": "The command line is for the install only. Everything after it happens in the browser.",
+        "step1Title": "Install",
+        "step1Body": "Paste the line above on a Linux, macOS or Windows machine. It installs what Polaris needs and starts it.",
+        "step2Title": "Open it",
+        "step2Body": "Open Polaris in a browser on that machine or your network and create the first account.",
+        "step3Title": "Do the rest from the browser",
+        "step3Body": "Add apps, connect more machines, invite people and update Polaris from Settings.",
+        "lookEyebrow": "The product",
         "lookTitle": "A look inside",
-        "lookIntro": "Screenshots of the real interface with sample data.",
-        "seeApps": "See every app"
+        "lookIntro": "Screenshots of the real interface with sample data. Select one to enlarge it.",
+        "seeApps": "See every app",
+        "ctaTitle": "Your own Polaris is one line away",
+        "ctaBody": "Free and open source under the AGPL-3.0 license."
     },
     "market": {
         "title": "Marketplace",
@@ -81,5 +96,15 @@
     "footer": {
         "license": "Open source under the AGPL-3.0 license.",
         "source": "Source code"
+    },
+    "viewer": {
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "more": "More for this picture",
+        "close": "Close",
+        "previous": "Previous picture",
+        "next": "Next picture",
+        "position": "{index} of {count}",
+        "open": "Enlarge"
     }
 }
