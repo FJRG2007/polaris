@@ -125,7 +125,7 @@ beforeEach(() => {
                     ? Response.json({ error: "x" }, { status: 500 })
                     : Response.json({ mark: {} });
             }
-            if (url === "/api/polar/speak") return new Response(new Blob(["a"]));
+            if (url === "/api/polar/speak") return new Response("a");
             if (url.endsWith("/share") && method === "GET") return Response.json({ link: null });
             if (url.endsWith("/share") && method === "POST") {
                 return Response.json({

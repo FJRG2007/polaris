@@ -56,7 +56,7 @@ beforeEach(async () => {
     vi.stubGlobal("Audio", FakeAudio);
     vi.stubGlobal(
         "fetch",
-        vi.fn(async () => new Response(new Blob(["RIFF"]), { status: 200 }))
+        vi.fn(async () => new Response("RIFF", { status: 200 }))
     );
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:clip" }));
     player = await import("@/app/(app)/chat/soundboard-player");
