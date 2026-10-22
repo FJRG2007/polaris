@@ -1712,6 +1712,31 @@ export async function disconnectDeviceAccountAction(accountId: string): Promise<
     return { devices: result.value?.list, accounts: result.value?.connected };
 }
 
+/** Turn one of a connected account's switches on or off, without signing in. */
+export async function setDeviceAccountOptionAction(input: unknown): Promise<{
+    account?: deviceAccounts.DeviceAccountView;
+    error?: string;
+}> {
+    const { user, install } = await requireHome("home.manage");
+    const parsed = schemas.deviceAccountOptionSchema.safeParse(input ?? {});
+    if (!parsed.success) {
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.someWrong") };
+    }
+    const { accountId, key, on } = parsed.data;
+    const result = await guard(() =>
+        deviceAccounts.setAccountOption(install.id, accountId, key, on)
+    );
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.deviceAccount.option",
+        targetType: "installedApp",
+        targetId: install.id,
+        metadata: { accountId, key, on }
+    });
+    return { account: result.value };
+}
+
 /**
  * Link a Nuki account to the broker on this machine, starting the broker the
  * first time. Answers what to type into the Nuki app.

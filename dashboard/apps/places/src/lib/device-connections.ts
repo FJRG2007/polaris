@@ -111,6 +111,29 @@ export interface ConnectionField {
     readonly countries?: true;
 }
 
+/**
+ * A switch on a connection, changed after it is made without signing in again.
+ *
+ * Stored with its credentials as "1" or "0" under `key`, and kept when the
+ * credentials are renewed or typed again. Its words are the catalog's
+ * `connections.<id>.options.<key>.label` and `.hint`.
+ */
+export interface ConnectionOption {
+    readonly key: string;
+    /** What it is until somebody changes it - also for an account made before
+     *  the option existed. */
+    readonly defaultOn: boolean;
+}
+
+/** Whether an option is on for a connection's stored fields. */
+export function optionOn(
+    option: ConnectionOption,
+    fields: Readonly<Record<string, string>> | null
+): boolean {
+    const stored = fields?.[option.key];
+    return stored === undefined ? option.defaultOn : stored === "1";
+}
+
 /** Where a connection reaches from, which is the first thing anybody wants to
  *  know and the thing that decides whether it is any use to them. */
 export type ConnectionReach = "anywhere" | "same-network";
@@ -182,6 +205,8 @@ export interface DeviceConnection {
     readonly steps?: readonly string[];
     readonly link?: { readonly label: string; readonly href: string };
     readonly fields: readonly ConnectionField[];
+    /** Switches it can be changed by once it is connected. */
+    readonly options?: readonly ConnectionOption[];
     /** Present when the connection is made by scanning or pressing something
      *  once the fields are in, rather than by the fields alone. */
     readonly pairing?: ConnectionPairing;
@@ -1006,6 +1031,10 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         summary: en("connections.petkit-cloud.summary"),
         note: en("connections.petkit-cloud.note"),
         steps: [en("connections.petkit-cloud.steps.s0"), en("connections.petkit-cloud.steps.s1")],
+        // On by default: the house stays connected. Off while somebody needs the
+        // PETKIT app on the same account, which PETKIT signs out whenever
+        // Polaris signs in.
+        options: [{ key: "takeBack", defaultOn: true }],
         fields: [
             {
                 key: "country",

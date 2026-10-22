@@ -39,7 +39,8 @@
  *   deviceType, deviceName, typeCode, ... }] }]`.
  * - `POST {type}/device_detail?id=` -> the unit, with `state` and `settings`.
  * - An error is `{ error: { code, msg } }`: 5 a session that has ended, 122 a
- *   refused password, 125 an address nobody registered, 1 a busy server.
+ *   refused password, 125 an address nobody registered on that country's
+ *   server, 1 a busy server.
  *
  * Their sign-in is one session per account: signing in here signs the phone
  * app out of the same account, which is why their own guidance is a second
@@ -224,8 +225,14 @@ export function unwrap(body: unknown): unknown {
         if (code === 5) throw new PetkitError("The PETKIT sign-in has ended", "expired", code);
         if (code === 122)
             throw new PetkitError("PETKIT refused that email and password", "unauthorized", code);
+        // Each country is its own server, so an account made under another
+        // country - often a wrong pick at sign-up - answers as unknown here.
         if (code === 125)
-            throw new PetkitError("PETKIT has no account with that email", "unauthorized", code);
+            throw new PetkitError(
+                "PETKIT has no account with that email in that country",
+                "unauthorized",
+                code
+            );
         if (code === 1) throw new PetkitError("PETKIT's servers are busy", "busy", code);
         throw new PetkitError(
             said ? `PETKIT refused it: ${said}` : `PETKIT refused it (code ${code})`,

@@ -29,12 +29,13 @@ import { DeviceDialog } from "./device-dialog";
 import { ConnectDialog, type Connected } from "./connect-dialog";
 import { NukiLocalDialog } from "./nuki-local-dialog";
 import { RoomsDialog } from "./rooms-dialog";
+import { AccountOptionsDialog } from "./account-options-dialog";
 import * as kinds from "../../lib/device-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceAccountView } from "../../lib/device-accounts";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as registry from "../../lib/device-connections";
-import { BatteryLow, DoorOpen, Plus, Radio, RefreshCw, Unplug } from "lucide-react";
+import { BatteryLow, DoorOpen, Plus, Radio, RefreshCw, Settings2, Unplug } from "lucide-react";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 import { useDeviceAct } from "./use-device-act";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
@@ -114,6 +115,9 @@ export function DevicesView({
     const [editing, setEditing] = useState<DeviceView | null>(null);
     const [opened, setOpened] = useState<DeviceView | null>(null);
     const [disconnecting, setDisconnecting] = useState<DeviceAccountView | null>(null);
+    /** The account whose switches are open, by id: read from the list so a
+     *  switch flipped there is the switch drawn here. */
+    const [adjusting, setAdjusting] = useState<string | null>(null);
     const [linking, setLinking] = useState<DeviceAccountView | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
@@ -420,6 +424,24 @@ export function DevicesView({
                                 <Radio className="size-3.5 shrink-0" />
                             </Button>
                         )}
+                        {canManage &&
+                            (registry.deviceConnection(account.connection)?.options?.length ?? 0) >
+                                0 && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="size-6 p-0"
+                                    aria-label={t("devicesView.accountSettings", {
+                                        name: account.label
+                                    })}
+                                    title={t("devicesView.accountSettings", {
+                                        name: account.label
+                                    })}
+                                    onClick={() => setAdjusting(account.id)}
+                                >
+                                    <Settings2 className="size-3.5 shrink-0" />
+                                </Button>
+                            )}
                         {canManage && (
                             <Button
                                 size="sm"
@@ -556,6 +578,15 @@ export function DevicesView({
                 placeId={placeId}
                 onClose={() => setArranging(false)}
                 onChanged={() => void sync()}
+            />
+            <AccountOptionsDialog
+                account={accounts.find((account) => account.id === adjusting) ?? null}
+                onClose={() => setAdjusting(null)}
+                onChanged={(changed) =>
+                    setAccounts((current) =>
+                        current.map((account) => (account.id === changed.id ? changed : account))
+                    )
+                }
             />
             <ConfirmDeleteDialog
                 open={disconnecting !== null}

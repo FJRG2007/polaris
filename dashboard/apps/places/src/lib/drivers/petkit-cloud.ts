@@ -11,8 +11,15 @@
  *
  * - The session is kept rather than signed in for on every read. It rides on
  *   the stored credentials (`renew` replaces it a day before it lapses) and in
- *   memory, and a call answered "session ended" signs in once more and is
- *   tried again, once.
+ *   memory. A call answered "session ended" signs in once more and is tried
+ *   again, once. A session that ends before its time was taken by another
+ *   sign-in to the same account (PETKIT keeps one per account), almost always
+ *   their phone app, and signing back in signs that app out. That is what
+ *   keeps the house connected, so it is what happens unless the account's
+ *   owner turned "take the session back" off (`takeBack`, see the PETKIT
+ *   connection's options) - for a while they need the app, say. Then the
+ *   account waits, saying why, until the switch is on again or it is
+ *   connected again.
  * - The password is never stored: what is kept is its MD5, which is what their
  *   sign-in takes.
  * - Reads are held for a short while per account, so a screen opened in three
@@ -43,12 +50,24 @@ let fetcher: petkit.Fetcher = (input, init) => fetch(input, init);
 export function usePetkitFetch(next: petkit.Fetcher | null): void {
     fetcher = next ?? ((input, init) => fetch(input, init));
     sessions.clear();
+    takenOver.clear();
     lists.clear();
     records.clear();
     commands.clear();
 }
 
 const sessions = new Map<string, petkit.PetkitSession>();
+/** Accounts whose session another sign-in took while they were not to take it
+ *  back, until they are connected again or the switch is turned on. */
+const takenOver = new Set<string>();
+
+/** Whether this account signs in again when another sign-in took its session.
+ *  On unless its owner turned it off. */
+function takesBack(credentials: Credentials): boolean {
+    return credentials.takeBack !== "0";
+}
+
+const TAKEN_OVER = "PETKIT signed Polaris out because this account signed in somewhere else";
 const lists = new Map<string, { at: number; value: Promise<DeviceSnapshot[]> }>();
 const records = new Map<string, { at: number; uses: unknown[] }>();
 const commands = new Map<string, number[]>();
@@ -112,6 +131,8 @@ async function withSession<T>(
     const account = accountOf(credentials);
     const key = keyOf(account);
     try {
+        if (takenOver.has(key) && !takesBack(credentials))
+            throw new DriverError(TAKEN_OVER, "unauthorized");
         let session = sessions.get(key) ?? storedSession(credentials);
         if (!session || session.until <= Date.now()) session = await signIn(account);
         try {
@@ -120,6 +141,10 @@ async function withSession<T>(
             if (!(caught instanceof petkit.PetkitError) || caught.failure !== "expired")
                 throw caught;
             sessions.delete(key);
+            if (session.until > Date.now() && !takesBack(credentials)) {
+                takenOver.add(key);
+                throw new DriverError(TAKEN_OVER, "unauthorized");
+            }
             return await run(await signIn(account), account);
         }
     } catch (caught) {
@@ -352,6 +377,7 @@ export const petkitCloudDriver: DeviceDriver = {
         try {
             const session = await signIn(account);
             await petkit.listDevices(fetcher, session, account.timezone);
+            takenOver.delete(keyOf(account));
             return storable(account, session);
         } catch (caught) {
             throw asDriverError(caught);
@@ -360,6 +386,10 @@ export const petkitCloudDriver: DeviceDriver = {
 
     async renew(credentials) {
         const account = accountOf(credentials);
+        // Renewing is signing in, which would take the session back from
+        // whoever took it.
+        if (takenOver.has(keyOf(account)) && !takesBack(credentials))
+            throw new DriverError(TAKEN_OVER, "unauthorized");
         const held = sessions.get(keyOf(account));
         const stored = storedSession(credentials);
         // A sign-in made in memory after an ended session is written back, so

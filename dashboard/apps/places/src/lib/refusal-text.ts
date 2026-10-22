@@ -383,6 +383,12 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["That step took too long and has run out. Start connecting again.", "refusals.pairingRanOut"],
     ["Upload the Philips Air+ app file to go on", "refusals.uploadToGoOn"],
     ["Too many commands to PETKIT in a minute; try again shortly", "refusals.petkitTooMany"],
+    ["PETKIT has no account with that email in that country", "refusals.petkitNoAccount"],
+    ["That connection has no such setting", "refusals.noSuchSetting"],
+    [
+        "PETKIT signed Polaris out because this account signed in somewhere else",
+        "refusals.petkitTakenOver"
+    ],
     ["There is nothing running on it to pause or resume", "refusals.litterNothingRunning"],
     ["This box's deodorizer cannot be reset from here", "refusals.litterNoDeodorizerReset"],
     ["That device is not on this account", "refusals.notOnAccount"]
