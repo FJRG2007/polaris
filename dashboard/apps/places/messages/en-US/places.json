@@ -2701,7 +2701,7 @@
         "password": "Needs the Tapo app password on a Tapo camera.",
         "account": "Use the Tapo app password, not the camera account.",
         "locked": "Too many tries. Wait {seconds} s.",
-        "unsupported": "This firmware's privacy switch is not supported yet.",
+        "unsupported": "This firmware asks for a sign-in step Polaris lacks.",
         "certificate": "A different device answered at this address.",
         "unreachable": "The camera did not answer.",
         "failed": "The camera refused the change.",

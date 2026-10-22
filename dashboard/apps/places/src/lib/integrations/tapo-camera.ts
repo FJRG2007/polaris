@@ -6,7 +6,10 @@
  * Each call signs in, does its work and is done - nothing is held between
  * presses, because a session the camera dropped is a second failure to explain.
  * A failed sign-in counts towards the camera's lockout, so there is exactly one
- * per call and a lockout the camera reports is passed on with its wait.
+ * per call and a lockout the camera reports is passed on with its wait. The one
+ * exception is the newest firmware (TPAP), which hashes the password one of two
+ * ways and says which only by refusing the other - the Tapo app tries MD5 and
+ * then SHA-256, and so does this.
  *
  * The camera's certificate is its own, so it is pinned: the first successful
  * call records its fingerprint and every later one must present the same.
@@ -19,6 +22,7 @@
 
 import { randomBytes } from "node:crypto";
 import * as crypto from "./tapo-camera-crypto";
+import * as tpap from "./tapo-tpap-crypto";
 import { lanRequest, jsonOf } from "./lan-http";
 import { DriverError } from "../drivers/contract";
 
@@ -31,7 +35,8 @@ export type TapoFailure =
     | "account"
     /** Too many failed sign-ins; `waitSeconds` says for how long. */
     | "locked"
-    /** Firmware with the newest sign-in, which Polaris does not speak yet. */
+    /** A sign-in step nobody has documented (an unknown password transform
+     *  on the newest firmware). */
     | "unsupported"
     /** A different certificate than the one recorded for this camera. */
     | "certificate"
@@ -51,13 +56,15 @@ export class TapoError extends Error {
 export interface TapoAnswer {
     readonly status: number;
     readonly json: unknown;
+    /** The body as it came, for the newest firmware's sealed answers. */
+    readonly raw?: Buffer;
     /** The certificate's SHA-256 fingerprint, for the pin. */
     readonly fingerprint: string | null;
 }
 
 export type TapoTransport = (request: {
     readonly url: string;
-    readonly body: string;
+    readonly body: string | Buffer;
     readonly headers: Readonly<Record<string, string>>;
     readonly pin: string | null;
 }) => Promise<TapoAnswer>;
@@ -94,6 +101,7 @@ export const lanTransport: TapoTransport = async ({ url, body, headers, pin }) =
         return {
             status: response.status,
             json: jsonOf(response),
+            raw: response.body,
             fingerprint: response.certificate?.fingerprint ?? null
         };
     } catch (caught) {
@@ -128,6 +136,8 @@ export function lockoutSeconds(answer: unknown): number {
 interface Session {
     readonly url: string;
     readonly secure: crypto.SecureSession | null;
+    /** The newest firmware's sealed channel, instead of `secure`. */
+    readonly tpap?: tpap.TpapChannel;
     seq: number;
     readonly pin: string | null;
 }
@@ -144,7 +154,8 @@ function cnonceNow(): string {
 export async function signIn(
     camera: TapoCamera,
     send: TapoTransport = lanTransport,
-    cnonce: string = cnonceNow()
+    cnonce: string = cnonceNow(),
+    bytes: (size: number) => Buffer = randomBytes
 ): Promise<{ session: Session; pin: string | null }> {
     const origin = `https://${camera.address}:${camera.port ?? 443}`;
     const headers = { ...HEADERS, Referer: origin };
@@ -159,7 +170,7 @@ export async function signIn(
     );
     const pin = camera.pin ?? first.fingerprint;
     const firstCode = errorCode(first.json);
-    if (firstCode === -40211) throw new TapoError("unsupported");
+    if (firstCode === -40211) return { pin, session: await tpapSignIn(origin, camera, pin, post, bytes) };
     const wait = lockoutSeconds(first.json);
     const data = record(record(record(first.json).result).data);
     const offered = Array.isArray(data.encrypt_type) ? data.encrypt_type.map(String) : [];
@@ -222,6 +233,139 @@ export async function signIn(
     return { pin, session: { url: `${origin}/stok=${stok}/ds`, secure: null, seq: 0, pin } };
 }
 
+/** The literal user every TPAP sign-in names, hashed the way the camera's
+ *  discover answer says. */
+const TPAP_USER = "admin";
+
+/** A refused passcode on `pake_share`; anything else is not worth a retry. */
+const TPAP_WRONG_PASSCODE = -40401;
+
+function tpapOffer(json: unknown): tpap.PakeRegister & { extra: tpap.ExtraCrypt } {
+    const offer = record(record(json).result);
+    const iterations = Number(offer.iterations);
+    if (
+        typeof offer.dev_salt !== "string" ||
+        typeof offer.dev_share !== "string" ||
+        typeof offer.dev_random !== "string" ||
+        !Number.isInteger(iterations) ||
+        iterations < 1 ||
+        iterations > 10_000_000
+    )
+        throw new TapoError("failed");
+    return {
+        dev_salt: offer.dev_salt,
+        dev_share: offer.dev_share,
+        dev_random: offer.dev_random,
+        iterations,
+        extra: record(offer.extra_crypt)
+    };
+}
+
+/**
+ * The newest firmware's sign-in (SPAKE2+, see tapo-tpap-crypto.ts). It takes
+ * the Tapo app account's password only - the camera account made for RTSP is
+ * never accepted here, so that one is refused without spending an attempt.
+ */
+async function tpapSignIn(
+    origin: string,
+    camera: TapoCamera,
+    pin: string | null,
+    post: (body: Json, pin: string | null) => Promise<TapoAnswer>,
+    bytes: (size: number) => Buffer
+): Promise<Session> {
+    if (camera.username !== TPAP_USER || !camera.password) throw new TapoError("account");
+    const discovered = await post({ method: "login", params: { sub_method: "discover" } }, pin);
+    const info = record(record(record(discovered.json).result).tpap);
+    if (Array.isArray(info.pake) && !info.pake.includes(2)) throw new TapoError("unsupported");
+    const username = info.user_hash_type === 1 ? tpap.sha256HexUpper(TPAP_USER) : tpap.md5Hex(TPAP_USER);
+
+    for (const passcode of [tpap.md5Hex(camera.password), tpap.sha256HexUpper(camera.password)]) {
+        const userRandom = bytes(32);
+        const register = await post(
+            {
+                method: "login",
+                params: {
+                    sub_method: "pake_register",
+                    username,
+                    user_random: userRandom.toString("base64"),
+                    cipher_suites: [1],
+                    encryption: ["aes_128_ccm"],
+                    passcode_type: "userpw"
+                }
+            },
+            pin
+        );
+        const registerWait = lockoutSeconds(register.json);
+        if (registerWait > 0) throw new TapoError("locked", registerWait);
+        const offer = tpapOffer(register.json);
+        const credential = tpap.applyExtraCrypt(passcode, offer.extra);
+        if (credential === null) throw new TapoError("unsupported");
+        let client: tpap.PakeClient;
+        try {
+            client = tpap.pakeClient(offer, userRandom, credential, bytes(32));
+        } catch {
+            throw new TapoError("failed");
+        }
+        const share = await post(
+            {
+                method: "login",
+                params: {
+                    sub_method: "pake_share",
+                    user_share: client.userShare.toString("base64"),
+                    user_confirm: client.userConfirm.toString("base64")
+                }
+            },
+            pin
+        );
+        const shareWait = lockoutSeconds(share.json);
+        if (shareWait > 0) throw new TapoError("locked", shareWait);
+        const done = record(record(share.json).result);
+        if (typeof done.stok !== "string" || typeof done.dev_confirm !== "string") {
+            if (errorCode(share.json) === TPAP_WRONG_PASSCODE) continue;
+            throw new TapoError("failed");
+        }
+        // Only the camera that holds the password can confirm the key; an
+        // answer that does not is not from the camera this row names.
+        if (!client.deviceConfirms(Buffer.from(done.dev_confirm, "base64"))) throw new TapoError("failed");
+        const seq = Number(done.start_seq);
+        if (!Number.isInteger(seq)) throw new TapoError("failed");
+        return {
+            url: `${origin}/stok=${done.stok}/ds`,
+            secure: null,
+            tpap: { key: client.key, nonce: client.nonce },
+            seq,
+            pin
+        };
+    }
+    throw new TapoError("password");
+}
+
+/** A `/ds` request on the newest firmware: sealed, and the answer opened.
+ *  A plain JSON answer is the camera refusing before it decrypted anything. */
+async function tpapRoundTrip(
+    session: Session,
+    channel: tpap.TpapChannel,
+    inner: string,
+    send: TapoTransport,
+    headers: Record<string, string>
+): Promise<Json> {
+    const body = tpap.sealRequest(channel, session.seq, inner);
+    session.seq += 1;
+    const answer = await send({
+        url: session.url,
+        body,
+        headers: { ...headers, "Content-Type": "application/octet-stream", Accept: "application/octet-stream" },
+        pin: session.pin
+    });
+    const raw = answer.raw ?? Buffer.alloc(0);
+    if (raw[0] === 0x7b) throw new TapoError("failed");
+    try {
+        return record(JSON.parse(tpap.openReply(channel, raw)));
+    } catch {
+        throw new TapoError("failed");
+    }
+}
+
 /** One method inside `multipleRequest`, wrapped when the session is secure.
  *  Answers that method's own `result`. */
 async function call(
@@ -232,6 +376,7 @@ async function call(
     headers: Record<string, string>
 ): Promise<Json> {
     const inner = JSON.stringify({ method: "multipleRequest", params: { requests: [{ method, params }] } });
+    if (session.tpap) return firstResult(await tpapRoundTrip(session, session.tpap, inner, send, headers));
     let body = inner;
     const extra: Record<string, string> = {};
     if (session.secure) {
@@ -253,6 +398,11 @@ async function call(
             throw new TapoError("failed");
         }
     }
+    return firstResult(json);
+}
+
+/** The single method's own answer inside a `multipleRequest` reply. */
+function firstResult(json: Json): Json {
     if (errorCode(json) !== 0) throw new TapoError("failed");
     const responses = record(json.result).responses;
     const first = record(Array.isArray(responses) ? responses[0] : undefined);
@@ -278,9 +428,10 @@ export async function lensMask(
     camera: TapoCamera,
     wanted: boolean | null,
     send: TapoTransport = lanTransport,
-    cnonce?: string
+    cnonce?: string,
+    bytes?: (size: number) => Buffer
 ): Promise<{ private: boolean; pin: string | null }> {
-    const { session, pin } = await signIn(camera, send, cnonce);
+    const { session, pin } = await signIn(camera, send, cnonce, bytes);
     const origin = `https://${camera.address}:${camera.port ?? 443}`;
     const headers = { ...HEADERS, Referer: origin };
     if (wanted !== null) {

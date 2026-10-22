@@ -60,7 +60,29 @@ privacy mode.
      `-40211` and advertises `{"tpap": {"pake": [2]}}` in `login` /
      `sub_method: discover`. It uses a SPAKE2+ (P-256) login and an AES-CCM
      channel (write-up: https://github.com/freeKC/tapo-v4-protocol). pytapo
-     notes a C200 on firmware 1.4.6 using it.
+     notes a C200 on firmware 1.4.6 using it. In detail, as pytapo's
+     `transport/tpap/spake2p.py` and `tpap.py` run it:
+     - `discover` answers `user_hash_type`; the user is always the literal
+       `admin`, sent as MD5 hex (or SHA-256 upper hex when that is 1).
+     - `pake_register` (with a random `user_random`, `cipher_suites: [1]`,
+       `encryption: ["aes_128_ccm"]`) answers `dev_salt`, `iterations`,
+       `dev_share`, `dev_random` and optionally `extra_crypt`. The passcode is
+       MD5 hex of the app password, then SHA-256 upper hex if that is refused
+       with `-40401`. `extra_crypt` `password_shadow` turns it into a
+       SHA-256-crypt string (`passwd_id` 5, salt from `passwd_prefix`) or a
+       SHA-1 hex (`passwd_id` 2).
+     - PBKDF2-SHA256 of that credential gives 80 bytes: `w0`, `w1` (40 each,
+       mod the curve order). `X = x*G + w0*M`; the transcript (8-byte
+       little-endian length before each part) is `SHA256("PAKE V1" +
+       user_random + dev_random)`, two empty ids, `M`, `N`, `X`, `Y`,
+       `x*(Y - w0*N)`, `w1*(Y - w0*N)`, `w0`; HKDF-SHA256 of its hash gives
+       `ConfirmationKeys` (64) and `SharedKey` (32). `pake_share` sends `X` and
+       `HMAC(KcA, Y)` and answers `dev_confirm` = `HMAC(KcB, X)` (checked
+       before anything is sent), `stok` and `start_seq`.
+     - Requests go to `/stok=<stok>/ds` as `seq` (4 bytes big-endian) +
+       AES-128-CCM ciphertext + 16-byte tag, key and nonce from HKDF of the
+       shared key (`tp-kdf-salt-aes128-key` / `-iv`), the nonce's last 4
+       bytes replaced by `seq`. A plain JSON answer is a refusal.
 - **Which password.** Encrypted control is only accepted for `user_group:
   "root"`, which is the user `admin` with the **TP-Link (Tapo app) account
   password**. The camera account made in the app for RTSP signs in as a third
@@ -84,9 +106,10 @@ privacy mode.
   camera row) and refuses a different one after; the encrypt_type 3 handshake
   also proves the camera knows the password before any command is sent.
 
-**Implemented:** generations 1 and 2. **Not implemented:** generation 3
-(TPAP / SPAKE2+). A camera on that firmware is detected from its answer and the
-screen says Polaris cannot switch it yet; it still goes private in Polaris.
+**Implemented:** all three generations. TPAP takes only the Tapo app
+password; the camera account is refused without spending an attempt. An
+`extra_crypt` transform other than the two above is reported as a sign-in step
+Polaris does not know, and the camera still goes private in Polaris.
 
 ### ONVIF, generic (fallback, implemented)
 
@@ -132,5 +155,9 @@ exactly what its owner does.
 
 Nothing here has been run against a camera from the development machine. The
 Tapo request building and handshake are checked against values computed with
-pytapo's own formulas (`test/home/tapo-privacy.test.ts`); the TLS pin, the
-camera's real answers, and the lens movement have not been observed.
+pytapo's own formulas (`test/home/tapo-privacy.test.ts`), and the TPAP
+sign-in against pytapo's `spake2p.py` run with fixed randoms plus AES-CCM from
+the Python `cryptography` package (`test/home/tapo-tpap.test.ts`); the TLS pin,
+the camera's real answers (including whether a C200 on 1.4.6 accepts the
+sign-in and which passcode it takes), and the lens movement have not been
+observed.

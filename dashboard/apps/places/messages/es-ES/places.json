@@ -2701,7 +2701,7 @@
         "password": "Falta la clave de la app Tapo en una Tapo.",
         "account": "Usa la clave de la app Tapo, no la de cámara.",
         "locked": "Muchos intentos. Espera {seconds} s.",
-        "unsupported": "Este firmware aún no admite el modo privado.",
+        "unsupported": "Este firmware pide un acceso que Polaris aún no conoce.",
         "certificate": "Respondió otro aparato en esta dirección.",
         "unreachable": "La cámara no respondió.",
         "failed": "La cámara rechazó el cambio.",

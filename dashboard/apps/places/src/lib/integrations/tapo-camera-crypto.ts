@@ -13,8 +13,7 @@
  *   request after it is AES-128-CBC inside `securePassthrough`, signed with a
  *   `Tapo_tag` over the body and a sequence number.
  *
- * The newest firmware (TPAP, a SPAKE2+ login) is not here; `tapo-camera.ts`
- * recognises it and says so.
+ * The newest firmware (TPAP, a SPAKE2+ login) is in `tapo-tpap-crypto.ts`.
  *
  * Server-only.
  */

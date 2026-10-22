@@ -1,0 +1,48 @@
+{
+    "source": "pytapo transport/tpap/spake2p.py run with fixed randoms; AES-CCM from the Python cryptography package",
+    "password": "fixture-password",
+    "usernameMd5": "21232f297a57a5a743894a0e4a801fc3",
+    "usernameSha256": "8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918",
+    "passcodeMd5": "c8bb92c7cea0c507b569cf2ddc73896c",
+    "passcodeSha256": "66C76B446BCB3002F4BEBE35B74F7F7D4A3245190777E84273F02123A310D995",
+    "shadowPrefix": "$5$fixturesaltabc$",
+    "credential": "$5$fixturesaltabc$xiUKkpWyAKCCII6YWQzAw9Kpmy4vcX0CP76dwjdL.kD",
+    "sha1Credential": "5ad55190eef7b01a9b2ace680888160a97b75459",
+    "cryptVectors": [
+        {
+            "key": "Hello world!",
+            "prefix": "$5$saltstring",
+            "hash": "$5$saltstring$5B8vYYiY.CVt1RlTTf8KbXBH3hsxY/GNooZaBBGWEc5"
+        },
+        {
+            "key": "Hello world!",
+            "prefix": "$5$rounds=10000$saltstringsaltstring",
+            "hash": "$5$rounds=10000$saltstringsaltst$3xv.VbSHBb41AL9AvLeujZkZRBAwqFMz2.opqey6IcA"
+        }
+    ],
+    "userRandom": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+    "scalar": "0707070707070707070707070707070707070707070707070707070707070707",
+    "register": {
+        "dev_salt": "QEFCQ0RFRkdISUpLTE1OTw==",
+        "iterations": 1000,
+        "dev_share": "BIK9kLirrL92m8S5tWrWjBZkpREYRHY3nVISvmWu9j8RZrQPgJ+TltqBr2u0EauiUnicDb87KNYKWYlCxv46WwU=",
+        "dev_random": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+        "extra_crypt": {
+            "type": "password_shadow",
+            "params": {
+                "passwd_id": 5,
+                "passwd_prefix": "$5$fixturesaltabc$"
+            }
+        }
+    },
+    "userShare": "BHnjkPbyGsvCJ0hGRLLL1WPXsB32cLj6u7LC6VmzdQ6Glht9wMwpedyZcViMH/xcRTgrl/fp/a7A1RMmGtlyr1A=",
+    "userConfirm": "1+QuVcTAORr4q/oZeHicuDnKJy2f2YiQb4mpLkAmlrU=",
+    "devConfirm": "0e4HRoR4li7dG40ZC4/jipd0XNaV0XVtaWT1W5VX2Pg=",
+    "key": "87f48e16c31c85fcbda03d36323fc2a3",
+    "nonce": "9aefcd1277a8ea202f1d9c7c",
+    "seq": 41,
+    "request": "{\"method\":\"multipleRequest\",\"params\":{\"requests\":[{\"method\":\"getLensMaskConfig\",\"params\":{\"lens_mask\":{\"name\":[\"lens_mask_info\"]}}}]}}",
+    "requestSealed": "00000029aed6c181d72f7c69b732ee60165186c61b1899422076f87986820add8a04932d954ff5905f0eff68f4f72412ec7790a06ae2992af607cc4ca7cd707ec9c3b8831dd4cf07019b60d710f07953952d201699056058910b6fe614b4ade25da887bdf51b20b10734c380c237ee8b684d25f414d4336a0cc4ed030da3d301fd904a8d74b6912409d83496024f90af210b1e02847a8f441a0a",
+    "reply": "{\"error_code\": 0, \"result\": {\"responses\": [{\"method\": \"getLensMaskConfig\", \"result\": {\"lens_mask\": {\"lens_mask_info\": {\"enabled\": \"on\"}}}, \"error_code\": 0}]}}",
+    "replySealed": "00000029aed6c996d1286152f667a8684107d29f4754de622074f87081d412d1d356803a8752e9dc1610ae38aba60a0cbd6e86f638d6862aa1429a43addd1e2185d7909622dae21b229c7adb71b337178e2f714fd7012310d01d3ea84ba1fcd155a78789ba4073a10762ddccdf09ee8f391c21bf16d7323b6989f7520392db0df79a0cf233ebce161a870b7d0b8e2422ce2ae743e615d18d313b0d7fd84bee838edb908bf8bfb2e96cf64817cf33106ad4f1"
+}

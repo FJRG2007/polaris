@@ -163,15 +163,15 @@ describe("lensMask", () => {
         });
     });
 
-    it("recognises the newest firmware instead of guessing a password", async () => {
-        const send: TapoTransport = async () => ({
-            status: 200,
-            fingerprint: null,
-            json: { error_code: -40211 }
-        });
-        await expect(lensMask(camera, true, send, cnonce)).rejects.toMatchObject({
-            failure: "unsupported"
-        });
+    it("takes the newest firmware to its own sign-in instead of guessing a password", async () => {
+        const bodies: string[] = [];
+        const send: TapoTransport = async ({ body }) => {
+            bodies.push(String(body));
+            return { status: 200, fingerprint: null, json: { error_code: -40211 } };
+        };
+        await expect(lensMask(camera, true, send, cnonce)).rejects.toMatchObject({ failure: "failed" });
+        expect(JSON.parse(bodies[1]!)).toEqual({ method: "login", params: { sub_method: "discover" } });
+        expect(bodies.some((body) => body.includes("digest_passwd") || body.includes("hashed"))).toBe(false);
     });
 
     it("passes a lockout on with its wait", async () => {
