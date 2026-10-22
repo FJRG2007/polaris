@@ -122,3 +122,53 @@ export function nextStep(verdict: Verdict): NextStep {
     if (verdict.fixable === 0) return "wait";
     return verdict.fixable >= serious ? "update" : "updateSome";
 }
+
+/** An image reference without its tag or digest: what stays the same across versions. */
+export function repositoryOf(ref: string): string {
+    const name = ref.split("@")[0]!;
+    const colon = name.lastIndexOf(":");
+    return colon > name.lastIndexOf("/") ? name.slice(0, colon) : name;
+}
+
+export interface ScanSubjectRow {
+    readonly id: string;
+    readonly targetId: string;
+    readonly kind: string;
+    readonly imageId: string | null;
+    readonly input: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * What a vulnerability scan was of, across versions: the app on that server,
+ * else the image's repository, else the image itself. A newer scan with the
+ * same key supersedes an older one.
+ */
+export function subjectKey(row: ScanSubjectRow): string {
+    const appId = applicationIdOf(row.input);
+    const subject = appId
+        ? `app:${appId}`
+        : typeof row.input.ref === "string" && row.input.ref
+          ? `repo:${repositoryOf(row.input.ref)}`
+          : row.imageId
+            ? `image:${row.imageId}`
+            : `scan:${row.id}`;
+    return `${row.targetId}/${row.kind}/${subject}`;
+}
+
+/**
+ * The newest scan that still needs attention: serious, and not followed by a
+ * newer scan of the same subject. Rows newest first; null when none is.
+ */
+export function newestUnresolved(
+    rows: readonly ScanSubjectRow[],
+    serious: ReadonlySet<string>
+): string | null {
+    const seen = new Set<string>();
+    for (const row of rows) {
+        const key = subjectKey(row);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (serious.has(row.id)) return row.id;
+    }
+    return null;
+}

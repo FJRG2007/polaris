@@ -123,8 +123,17 @@ vi.mock("@polaris/db", () => {
                 db.queueFails.has(where.id)
                     ? null
                     : (db.apps.find((a) => a.id === where.id && a.targetId === where.targetId) ??
-                      null)
+                      null),
+            findMany: async ({ where }: { where: { id?: { in: string[] }; targetId?: string } }) =>
+                db.apps
+                    .filter(
+                        (a) =>
+                            (where.id === undefined || where.id.in.includes(a.id)) &&
+                            (where.targetId === undefined || a.targetId === where.targetId)
+                    )
+                    .map((a) => ({ id: a.id, name: a.name, environment: null }))
         },
+        installedApp: { findMany: async () => [] },
         $transaction: (ops: Promise<unknown>[]) => Promise.all(ops)
     };
     return { prisma };

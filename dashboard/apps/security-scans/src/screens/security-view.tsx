@@ -205,9 +205,7 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
                 <FocusCard
                     t={t}
                     landing={landing}
-                    onTarget={(id) => {
-                        if (!landing.target || landing.target === id) setServerId(id);
-                    }}
+                    onTarget={(id) => setServerId((chosen) => chosen ?? id)}
                     onClose={() => {
                         setFocusOpen(false);
                         // The link has been read: a reload opens the plain page.

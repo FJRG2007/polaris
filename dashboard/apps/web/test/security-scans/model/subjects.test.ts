@@ -133,3 +133,49 @@ describe("verdictOf and nextStep", () => {
         });
     });
 });
+
+describe("newestUnresolved", () => {
+    const row = (id: string, input: Record<string, unknown>, imageId: string | null = null) => ({
+        id,
+        targetId: "t1",
+        kind: "image",
+        imageId,
+        input
+    });
+
+    it("skips a serious scan a newer scan of the same app came back clean from", () => {
+        const rows = [
+            row("clean", { applicationId: "a1" }),
+            row("old", { applicationId: "a1" }),
+            row("other", { applicationId: "a2" })
+        ];
+        expect(subjects.newestUnresolved(rows, new Set(["old", "other"]))).toBe("other");
+    });
+
+    it("treats a newer tag of the same image as the same subject", () => {
+        const rows = [
+            row("new", { ref: "ghcr.io/acme/web:2.0" }, "sha-b"),
+            row("old", { ref: "ghcr.io/acme/web:1.0" }, "sha-a")
+        ];
+        expect(subjects.newestUnresolved(rows, new Set(["old"]))).toBeNull();
+        expect(subjects.newestUnresolved(rows, new Set(["new", "old"]))).toBe("new");
+    });
+
+    it("keeps servers and kinds apart", () => {
+        const rows = [
+            { ...row("deps", { applicationId: "a1" }), kind: "deps" },
+            { ...row("elsewhere", { applicationId: "a1" }), targetId: "t2" },
+            row("image", { applicationId: "a1" })
+        ];
+        expect(subjects.newestUnresolved(rows, new Set(["image"]))).toBe("image");
+    });
+});
+
+describe("repositoryOf", () => {
+    it("drops the tag and digest, never a registry port", () => {
+        expect(subjects.repositoryOf("ghcr.io/acme/web:1.0")).toBe("ghcr.io/acme/web");
+        expect(subjects.repositoryOf("registry:5000/web@sha256:abc")).toBe("registry:5000/web");
+        expect(subjects.repositoryOf("registry:5000/web")).toBe("registry:5000/web");
+        expect(subjects.repositoryOf("nginx")).toBe("nginx");
+    });
+});

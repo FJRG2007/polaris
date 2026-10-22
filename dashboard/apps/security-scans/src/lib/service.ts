@@ -268,6 +268,32 @@ export async function scanFindings(scanId: string) {
 const VULN_KINDS = ["image", "deps"];
 
 /**
+ * The newest finished scan with a critical or high finding that no newer scan
+ * of the same app or image has since replaced (see `subjects.newestUnresolved`).
+ */
+async function unresolvedScan(): Promise<string | null> {
+    const rows = await prisma.securityScan.findMany({
+        where: { kind: { in: VULN_KINDS }, state: "done" },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, targetId: true, kind: true, imageId: true, input: true },
+        take: 200
+    });
+    if (rows.length === 0) return null;
+    const serious = await prisma.securityFinding.findMany({
+        where: {
+            scanId: { in: rows.map((row) => row.id) },
+            severity: { in: ["critical", "high"] }
+        },
+        distinct: ["scanId"],
+        select: { scanId: true }
+    });
+    return subjects.newestUnresolved(
+        rows.map((row) => ({ ...row, input: safeJson(row.input) })),
+        new Set(serious.map((row) => row.scanId))
+    );
+}
+
+/**
  * One vulnerability scan as an alert opens it: what was scanned and where,
  * under today's names, with what the screen needs to act on it. Without a
  * scan id - an alert from before links named one, or the bare page - the
@@ -290,20 +316,12 @@ export async function focusScan(scanId: string | null) {
         finishedAt: true,
         target: { select: { name: true, kind: true } }
     } as const;
-    const scan = scanId
-        ? await prisma.securityScan.findFirst({
-              where: { id: scanId, kind: { in: VULN_KINDS } },
-              select
-          })
-        : await prisma.securityScan.findFirst({
-              where: {
-                  kind: { in: VULN_KINDS },
-                  state: "done",
-                  findings: { some: { severity: { in: ["critical", "high"] } } }
-              },
-              orderBy: { createdAt: "desc" },
-              select
-          });
+    const id = scanId ?? (await unresolvedScan());
+    if (!id) return null;
+    const scan = await prisma.securityScan.findFirst({
+        where: { id, kind: { in: VULN_KINDS } },
+        select
+    });
     if (!scan) return null;
     const input = safeJson(scan.input);
     const appId = subjects.applicationIdOf(input);

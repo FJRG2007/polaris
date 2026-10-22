@@ -8,10 +8,11 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const focus = vi.fn();
 const findings = vi.fn();
+const rescan = vi.fn();
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: { i18nProvider: { useLocale: () => "en-US" } }
@@ -19,7 +20,7 @@ vi.mock("@polaris/app-host/client", () => ({
 vi.mock("@polaris-app/security-scans/src/actions/security", () => ({
     focusAction: (input: unknown) => focus(input),
     findingsAction: (input: unknown) => findings(input),
-    scanImageAction: async () => ({ ok: true }),
+    scanImageAction: (input: unknown) => rescan(input),
     scanServerImageAction: async () => ({ ok: true })
 }));
 
@@ -86,6 +87,7 @@ afterEach(() => {
     cleanup();
     focus.mockReset();
     findings.mockReset();
+    rescan.mockReset();
 });
 
 function show(landing: { target: string | null; scan: string | null; ids: string[] }) {
@@ -96,7 +98,7 @@ function show(landing: { target: string | null; scan: string | null; ids: string
             landing={landing}
             onTarget={onTarget}
             onClose={() => undefined}
-            submit={async () => undefined}
+            submit={async (work) => void (await work())}
         />
     );
     return onTarget;
@@ -128,6 +130,30 @@ describe("FocusCard", () => {
         const rows = [...document.querySelectorAll("tbody tr")].map((row) => row.textContent ?? "");
         expect(rows[0]).toContain("GO-2026-6612");
         expect(rows.join(" ")).not.toContain("CVE-2020-1");
+        expect(screen.getAllByText(t("focus.newBadge")).length).toBe(2);
+        // The rest of the scan is one switch away.
+        fireEvent.click(screen.getByRole("switch", { name: t("focus.onlyNew") }));
+        await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3));
+    });
+
+    it("follows the scan it queued after Scan again, until it finishes", async () => {
+        const QUEUED = "01a1639f-0000-7000-8000-000000000009";
+        focus.mockImplementation(async ({ scanId }: { scanId: string }) => ({
+            ok: true,
+            data:
+                scanId === QUEUED
+                    ? { ...SCANNED, id: QUEUED, state: "queued", finishedAt: null }
+                    : SCANNED
+        }));
+        findings.mockResolvedValue({ ok: true, data: FINDINGS });
+        rescan.mockResolvedValue({ ok: true, data: QUEUED });
+        show({ target: TARGET, scan: SCAN, ids: [] });
+        fireEvent.click(await screen.findByRole("button", { name: t("focus.rescan") }));
+        expect(await screen.findByText(t("focus.running"))).toBeTruthy();
+        expect(focus).toHaveBeenLastCalledWith({ scanId: QUEUED });
+        expect(
+            (screen.getByRole("button", { name: t("focus.rescan") }) as HTMLButtonElement).disabled
+        ).toBe(true);
     });
 
     it("says the scan is gone instead of drawing nothing", async () => {

@@ -3,10 +3,11 @@
 /**
  * The scan an alert is about, opened on its own above the tabs: what was
  * scanned and on which server, the outcome in one line, what to do about it,
- * and its findings with the advisories the alert announced marked new and
- * shown first. With no scan in the link it shows the newest scan that has a
- * critical or high finding, folded, so the bare page - and every alert from
- * before links named a scan - still opens on what needs attention.
+ * and its findings opened on the advisories the alert announced, marked new,
+ * with a switch to show the rest. With no scan in the link it shows the newest
+ * scan that has a critical or high finding no newer scan of the same app or
+ * image has replaced, folded, so the bare page - and every alert from before
+ * links named a scan - still opens on what needs attention.
  */
 
 import { X } from "lucide-react";
@@ -79,13 +80,15 @@ export function FocusCard({
     const [open, setOpen] = useState(fromAlert);
     const [findings, setFindings] = useState<ImageFinding[] | null>(null);
     const [findingsFailed, setFindingsFailed] = useState(false);
+    // The scan shown: the alert's, until "Scan again" queues a newer one.
+    const [shown, setShown] = useState(landing.scan);
 
     const load = useCallback(async () => {
-        const result = await actions.focusAction({ scanId: landing.scan });
+        const result = await actions.focusAction({ scanId: shown });
         if (!result.ok) return setFailed(true);
         setFailed(false);
         setFocus(result.data);
-    }, [landing.scan]);
+    }, [shown]);
     useEffect(() => {
         void load();
     }, [load]);
@@ -153,7 +156,7 @@ export function FocusCard({
 
     const verdict = subjects.verdictOf(focus.summary, findings);
     const next = done ? nextLine(t, focus, subjects.nextStep(verdict)) : null;
-    const rescan =
+    const queue =
         focus.imageId !== null
             ? () =>
                   actions.scanServerImageAction({
@@ -167,6 +170,13 @@ export function FocusCard({
                         applicationId: focus.applicationId
                     })
               : null;
+    const rescan = queue
+        ? async () => {
+              const result = await queue();
+              if (result.ok) setShown(result.data);
+              return result;
+          }
+        : null;
 
     return (
         <Card>
@@ -232,7 +242,7 @@ export function FocusCard({
                             size="sm"
                             variant="outline"
                             disabled={busy}
-                            onClick={() => void submit(rescan, t("queued")).then(load)}
+                            onClick={() => void submit(rescan, t("queued"))}
                         >
                             {t("focus.rescan")}
                         </Button>

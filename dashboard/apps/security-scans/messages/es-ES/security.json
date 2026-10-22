@@ -160,7 +160,7 @@
         "onServer": "En {server}",
         "scannedAt": "Analizado {when}",
         "kind": {
-            "appImage": "Imagen de app",
+            "appImage": "Imagen app",
             "image": "Imagen",
             "deps": "Dependencias"
         },
