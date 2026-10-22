@@ -21,6 +21,8 @@ import { Badge, Button } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { pickFile, type AppDownload, type AppFile } from "@/lib/app-releases";
 import type { NamespaceKey } from "@/lib/i18n/types";
+import { DownloadWithGuide } from "@/components/download-guide";
+import type { GuideItem } from "@polaris/ui/install-guide-steps";
 
 /** The desktop app's download, or the fact that there is not one yet. */
 export function DesktopDownloadOffer({ download }: { download: AppDownload | null }) {
@@ -103,22 +105,24 @@ interface PlatformRow {
     readonly note?: string;
     readonly has: readonly string[];
     readonly not?: readonly string[];
+    /** The install guide its download opens. */
+    readonly guide: GuideItem;
 }
 
 const DESKTOP_ROWS: readonly PlatformRow[] = [
-    { platform: "windows", note: "installer", has: [".exe"] },
-    { platform: "macArm", note: "diskImage", has: [".dmg", "arm64"] },
-    { platform: "macIntel", note: "diskImage", has: [".dmg", "x64"] },
-    { platform: "linux", note: "debian", has: [".deb"] },
-    { platform: "linux", note: "appImage", has: [".appimage"] }
+    { platform: "windows", note: "installer", has: [".exe"], guide: "desktop" },
+    { platform: "macArm", note: "diskImage", has: [".dmg", "arm64"], guide: "desktop" },
+    { platform: "macIntel", note: "diskImage", has: [".dmg", "x64"], guide: "desktop" },
+    { platform: "linux", note: "debian", has: [".deb"], guide: "desktop" },
+    { platform: "linux", note: "appImage", has: [".appimage"], guide: "desktop" }
 ];
 
 const EXTENSION_ROWS: readonly PlatformRow[] = [
     // The sources archive WXT writes beside the Firefox package is a zip with
     // "firefox" nowhere in it, but the add-on and the sources both sit on the same
     // release - so the add-on is the one that is not the sources.
-    { platform: "chromium", has: [".zip", "chrome"], not: ["sources"] },
-    { platform: "firefox", has: [".zip", "firefox"], not: ["sources"] }
+    { platform: "chromium", has: [".zip", "chrome"], not: ["sources"], guide: "extension-chromium" },
+    { platform: "firefox", has: [".zip", "firefox"], not: ["sources"], guide: "extension-firefox" }
 ];
 
 /** One row: the file to fetch, or the fact that this release has not got one. */
@@ -135,11 +139,9 @@ function PlatformFile({ row, file }: { row: PlatformRow; file: AppFile | null })
                 ) : null}
             </div>
             {file ? (
-                <Button asChild size="sm" variant="secondary">
-                    <a href={file.url} download title={file.name}>
-                        <Download className="size-4" /> {t("downloads.download")}
-                    </a>
-                </Button>
+                <DownloadWithGuide item={row.guide} href={file.url} fileName={file.name} size="sm">
+                    <Download className="size-4" /> {t("downloads.download")}
+                </DownloadWithGuide>
             ) : (
                 // Named rather than hidden: a build missing from a release that has
                 // the others is something to notice, not something to smooth over.

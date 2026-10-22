@@ -14,7 +14,7 @@ import { AssistantPreview } from "./download-previews";
 import { CLIENT_GUIDES } from "@/lib/mcp/client-guides";
 import { LogoTile } from "@/components/client-logo-tile";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { DownloadCard, DownloadRow, DownloadRows } from "./download-card";
+import { DownloadCard, DownloadRow, DownloadRows } from "@polaris/ui/download-card";
 
 /** The clients shown here, in this order; the rest are one link away. */
 export const FEATURED_ASSISTANTS = ["claude", "chatgpt", "cursor", "vscode"] as const;

@@ -15,14 +15,14 @@ import Link from "next/link";
 import { Badge } from "@polaris/ui";
 import { Puzzle } from "lucide-react";
 import type { ReactNode } from "react";
-import { StepsDialog } from "./steps-dialog";
+import { StepsDialog } from "@polaris/ui/steps-dialog";
 import { ExtensionSteps } from "./extension-steps";
 import { BROWSER_GUIDES } from "@/lib/browser-guide";
 import { ExtensionCommand } from "./extension-command";
 import { ExtensionPreview } from "./download-previews";
 import { BrowserMark } from "@/components/client-marks";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { DownloadCard, DownloadRow, DownloadRows } from "./download-card";
+import { DownloadCard, DownloadRow, DownloadRows } from "@polaris/ui/download-card";
 
 export function ExtensionCard({
     repo,

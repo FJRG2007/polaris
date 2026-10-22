@@ -38,7 +38,7 @@ import { InstallAppOffer, NativeAppOffer } from "@/components/installed-app";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
 import { companionDownload, streamDeckDownload } from "@/lib/app-releases";
 import { DeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
-import { DownloadCard, DownloadRow, DownloadRows } from "./download-card";
+import { DownloadCard, DownloadRow, DownloadRows } from "@polaris/ui/download-card";
 import { DesktopPreview, PhonePreview, WebAppPreview } from "./download-previews";
 
 export const dynamic = "force-dynamic";

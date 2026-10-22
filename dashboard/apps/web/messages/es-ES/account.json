@@ -1342,6 +1342,44 @@
             "running": "activo",
             "ask": "Reinicia la app shop",
             "answer": "Hecho. shop vuelve a funcionar."
+        },
+        "guide": {
+            "title": "Instálalo y ábrelo",
+            "description": "La descarga ya debería haber empezado. Si no, <link>vuelve a bajarla</link>.",
+            "step": "Paso {n}",
+            "done": "Listo",
+            "steps": {
+                "open": "Abrir",
+                "install": "Instalar",
+                "use": "Usar"
+            },
+            "items": {
+                "streamdeck": {
+                    "open": "Abre {file} desde la lista de descargas.",
+                    "install": "La app de Stream Deck se abre e instala Polaris.",
+                    "use": "Busca Polaris en las acciones, llévalo a una tecla."
+                },
+                "companion": {
+                    "open": "Guarda {file} tal cual; Companion lo lee así.",
+                    "install": "En Companion, abre Modules e importa el paquete.",
+                    "use": "Añade una conexión Polaris con la dirección del servidor."
+                },
+                "extension-chromium": {
+                    "open": "Descomprime {file} en una carpeta que conserves.",
+                    "install": "En extensiones, activa el modo desarrollador y pulsa Cargar descomprimida.",
+                    "use": "Fija Polaris desde el icono de pieza, siempre a mano."
+                },
+                "extension-firefox": {
+                    "open": "Deja {file} comprimido; Firefox lo carga así.",
+                    "install": "En about:debugging, abre Este Firefox, pulsa Cargar complemento temporal.",
+                    "use": "Fija Polaris desde el botón de extensiones de la barra."
+                },
+                "desktop": {
+                    "open": "Abre {file} desde la lista de descargas.",
+                    "install": "Sigue el instalador hasta que diga que ha acabado.",
+                    "use": "Abre Polaris e inicia sesión en tu servidor."
+                }
+            }
         }
     },
     "cli": {

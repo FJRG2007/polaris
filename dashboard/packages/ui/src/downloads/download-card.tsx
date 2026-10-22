@@ -8,7 +8,7 @@
  * not status, and so is drawn from the palette rather than the status tokens.
  */
 
-import { cn } from "@polaris/ui";
+import { cn } from "../lib/cn";
 import type { ReactNode } from "react";
 
 /** The colour each card is washed with, from its top edge down. */

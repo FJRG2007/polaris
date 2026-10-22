@@ -46,6 +46,22 @@
         "./automation-canvas": {
             "types": "./src/automation/canvas.tsx",
             "import": "./src/automation/canvas.tsx"
+        },
+        "./download-card": {
+            "types": "./src/downloads/download-card.tsx",
+            "import": "./src/downloads/download-card.tsx"
+        },
+        "./steps-dialog": {
+            "types": "./src/downloads/steps-dialog.tsx",
+            "import": "./src/downloads/steps-dialog.tsx"
+        },
+        "./install-guide": {
+            "types": "./src/downloads/install-guide.tsx",
+            "import": "./src/downloads/install-guide.tsx"
+        },
+        "./install-guide-steps": {
+            "types": "./src/downloads/install-guide-steps.ts",
+            "import": "./src/downloads/install-guide-steps.ts"
         }
     },
     "scripts": {

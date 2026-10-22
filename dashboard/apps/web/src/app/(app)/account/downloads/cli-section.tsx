@@ -22,7 +22,7 @@ import { TerminalPreview } from "./download-previews";
 import { CopyButton } from "@/components/copy-button";
 import { SystemMark } from "@/components/client-marks";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { DownloadCard, DownloadRow, DownloadRows } from "./download-card";
+import { DownloadCard, DownloadRow, DownloadRows } from "@polaris/ui/download-card";
 import { cliInstallLine, cliLoginLine } from "@/lib/cli/install-line";
 import { detectPlatform, PLATFORM_LABELS, type InstallPlatform } from "@/lib/install-platform";
 

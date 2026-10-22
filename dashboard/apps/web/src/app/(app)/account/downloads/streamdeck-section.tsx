@@ -16,13 +16,14 @@ import type { AppDownload } from "@/lib/app-releases";
 import { Download, ExternalLink, Grid3x3, Unplug } from "lucide-react";
 import { STREAMDECK_MARKETPLACE_URL } from "@/lib/deck/marketplace";
 import { useConfirm } from "@/components/confirm-dialog";
+import { DownloadWithGuide } from "@/components/download-guide";
 import { revokeApiKeyAction } from "../api-keys/actions";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button } from "@polaris/ui";
-import { StepsDialog } from "./steps-dialog";
+import { StepsDialog } from "@polaris/ui/steps-dialog";
 import { DeckPreview } from "./download-previews";
-import { DownloadCard, DownloadRow, DownloadRows } from "./download-card";
+import { DownloadCard, DownloadRow, DownloadRows } from "@polaris/ui/download-card";
 import { DECK_HOSTS, DeckHostMark, DeckInstallSteps, HOST_LABELS } from "./deck-install-steps";
 
 /** One connected deck, in the fields the list draws. */
@@ -42,13 +43,15 @@ export function DeckFile({ download, suffix }: { download: AppDownload | null; s
     if (download && file) {
         return (
             <div>
-                <Button asChild variant="secondary">
-                    {/* A plain link: a router link would prefetch the file. */}
-                    <a href={file.url} rel="noreferrer">
-                        <Download className="size-4" />
-                        {t("downloads.streamdeck.download", { version: download.version })}
-                    </a>
-                </Button>
+                {/* Opens the install guide for the file as its download starts. */}
+                <DownloadWithGuide
+                    item={suffix === ".tgz" ? "companion" : "streamdeck"}
+                    href={file.url}
+                    fileName={file.name}
+                >
+                    <Download className="size-4" />
+                    {t("downloads.streamdeck.download", { version: download.version })}
+                </DownloadWithGuide>
             </div>
         );
     }

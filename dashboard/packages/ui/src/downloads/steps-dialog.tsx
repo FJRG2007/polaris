@@ -10,15 +10,15 @@
 
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { Button } from "../components/button";
 import {
-    Button,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger
-} from "@polaris/ui";
+} from "../components/dialog";
 
 export function StepsDialog({
     label,

@@ -519,3 +519,13 @@ html:has(.page-bleed) {
         scroll-behavior: auto !important;
     }
 }
+
+/* The bar of the install guide's "install" picture, filling and starting over. */
+@keyframes guide-fill {
+    from {
+        width: 8%;
+    }
+    to {
+        width: 100%;
+    }
+}
