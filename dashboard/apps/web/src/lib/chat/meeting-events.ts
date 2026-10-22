@@ -15,6 +15,7 @@
  */
 
 import type { CallModeration } from "./voice-moderation";
+import type { CallRemoteCommand } from "./call-remote";
 
 /** Something about the call itself, sent to everybody in it. */
 export interface MeetingEvent {
@@ -23,8 +24,12 @@ export interface MeetingEvent {
      *  claimed - a device took the call over, and every other one of that
      *  account's browsers is now out of it; said - somebody typed something into
      *  the room's own chat; moderated - a moderator muted, deafened or
-     *  disconnected one seat, and only that seat is told. */
-    readonly kind: "roster" | "ended" | "claimed" | "said" | "moderated";
+     *  disconnected one seat, and only that seat is told; remote - the person in
+ *  that seat asked for one of their own controls from somewhere else, a deck
+ *  key, and only that seat is told (`call-remote`). */
+    readonly kind: "roster" | "ended" | "claimed" | "said" | "moderated" | "remote";
+    /** What to do, for `remote`. */
+    readonly remote?: CallRemoteCommand;
     /** What was done, for `moderated`. */
     readonly action?: CallModeration;
     /**

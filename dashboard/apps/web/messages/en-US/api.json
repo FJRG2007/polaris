@@ -256,7 +256,8 @@
             "deviceId": "Device",
             "routineId": "Routine",
             "calendarId": "Calendar",
-            "sessionId": "Session"
+            "sessionId": "Session",
+            "sound": "Sound"
         },
         "choice": {
             "busy": "Do not disturb",
@@ -275,7 +276,13 @@
             "deploy_restart": "Restart a service",
             "polaris_notifications": "Notifications",
             "polaris_open": "Open a Polaris page",
-            "deploy_status": "Last deployment"
+            "deploy_status": "Last deployment",
+            "call_mic": "Mute your microphone",
+            "call_deafen": "Deafen yourself",
+            "call_camera": "Camera on or off",
+            "call_record": "Record the call",
+            "call_hangup": "Hang up",
+            "call_sound": "Play a sound"
         },
         "status": {
             "queued": "Queued",
@@ -288,6 +295,30 @@
             "rolled_back": "Rolled back",
             "stopped": "Stopped",
             "removed": "Removed"
+        },
+        "call": {
+            "none": "No call",
+            "inCall": "In a call",
+            "mic": {
+                "on": "Muted",
+                "off": "Mic on"
+            },
+            "deafen": {
+                "on": "Deafened",
+                "off": "Hearing"
+            },
+            "camera": {
+                "on": "Camera on",
+                "off": "Camera off"
+            },
+            "record": {
+                "on": "Recording",
+                "off": "Record"
+            },
+            "errors": {
+                "notInCall": "You are not in a call right now.",
+                "mayNotRecord": "Only the host can record this call."
+            }
         }
     }
 }

@@ -256,7 +256,8 @@
             "deviceId": "Aparato",
             "routineId": "Rutina",
             "calendarId": "Calendario",
-            "sessionId": "Sesión"
+            "sessionId": "Sesión",
+            "sound": "Sonido"
         },
         "choice": {
             "busy": "No molestar",
@@ -275,7 +276,13 @@
             "deploy_restart": "Reiniciar servicio",
             "polaris_notifications": "Avisos",
             "polaris_open": "Abrir una página",
-            "deploy_status": "Último despliegue"
+            "deploy_status": "Último despliegue",
+            "call_mic": "Silenciar tu micrófono",
+            "call_deafen": "Ensordecerte",
+            "call_camera": "Cámara sí o no",
+            "call_record": "Grabar la llamada",
+            "call_hangup": "Colgar",
+            "call_sound": "Poner un sonido"
         },
         "status": {
             "queued": "En cola",
@@ -288,6 +295,30 @@
             "rolled_back": "Revertido",
             "stopped": "Parado",
             "removed": "Eliminado"
+        },
+        "call": {
+            "none": "Sin llamada",
+            "inCall": "En llamada",
+            "mic": {
+                "on": "Silencio",
+                "off": "Mic sí"
+            },
+            "deafen": {
+                "on": "Sordo",
+                "off": "Oyendo"
+            },
+            "camera": {
+                "on": "Cámara sí",
+                "off": "Cámara no"
+            },
+            "record": {
+                "on": "Grabando",
+                "off": "Grabar"
+            },
+            "errors": {
+                "notInCall": "Ahora mismo no estás en una llamada.",
+                "mayNotRecord": "Solo el anfitrión graba esta llamada."
+            }
         }
     }
 }

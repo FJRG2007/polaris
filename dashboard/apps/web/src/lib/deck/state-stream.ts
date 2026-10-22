@@ -18,6 +18,7 @@
 import type { DeckCaller, DeckState } from "./types";
 import { reachableChannelIds } from "@/lib/chat/access";
 import { subscribeChatChanges, type ChatChange } from "@/lib/chat/live";
+import { onControlsChanged } from "@/lib/chat/call-remote-service";
 import { readDeckStates, type DeckWatch, type DeckWords } from "./deck-service";
 
 export const DECK_STREAM = {
@@ -63,6 +64,7 @@ export function deckStateStream(
     const timers: ReturnType<typeof setTimeout>[] = [];
     let pending: ReturnType<typeof setTimeout> | null = null;
     let unsubscribe: (() => void) | null = null;
+    let offCalls: (() => void) | null = null;
 
     return new ReadableStream<Uint8Array>({
         async start(controller) {
@@ -81,6 +83,7 @@ export function deckStateStream(
                 for (const timer of timers) clearInterval(timer);
                 if (pending) clearTimeout(pending);
                 unsubscribe?.();
+                offCalls?.();
                 try {
                     controller.close();
                 } catch {
@@ -97,7 +100,7 @@ export function deckStateStream(
                 }
                 reading = true;
                 try {
-                    const { readings, chat } = await readDeckStates(caller, watched, words);
+                    const { readings, chat, call } = await readDeckStates(caller, watched, words);
                     const changed = readings.filter((entry) => {
                         const text = JSON.stringify(entry.state);
                         if (last.get(entry.key) === text) return false;
@@ -106,6 +109,17 @@ export function deckStateStream(
                     });
                     if (changed.length > 0 || first) write(stateFrame(changed));
                     first = false;
+                    // A call key follows the tab on the call: its mute is on the
+                    // key a moment after it is pressed, wherever it was pressed.
+                    if (call && !offCalls) {
+                        offCalls = onControlsChanged((userId) => {
+                            if (userId !== caller.userId || pending || closed) return;
+                            pending = setTimeout(() => {
+                                pending = null;
+                                void read();
+                            }, DECK_STREAM.coalesceMs);
+                        });
+                    }
                     if (chat && !unsubscribe) {
                         reachable = await reachableChannelIds({ id: caller.userId });
                         unsubscribe = subscribeChatChanges((change) => {
@@ -149,6 +163,7 @@ export function deckStateStream(
             for (const timer of timers) clearInterval(timer);
             if (pending) clearTimeout(pending);
             unsubscribe?.();
+            offCalls?.();
         }
     });
 }

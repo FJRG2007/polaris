@@ -22,6 +22,7 @@ import { resolveSeat } from "@/lib/chat/meeting-seat";
 import * as meetings from "@/lib/chat/meetings";
 import { backgroundUser, sessionCan } from "@/lib/session";
 import { callsUnavailable } from "@/lib/chat/call-server";
+import { noteControls } from "@/lib/chat/call-remote-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,10 @@ const voiceSchema = z
         muted: z.boolean(),
         deafened: z.boolean(),
         streaming: z.boolean().optional(),
+        // Whether the camera is on and this browser is recording, for a deck
+        // key that shows them. Optional for the same reason as `streaming`.
+        camera: z.boolean().optional(),
+        recording: z.boolean().optional(),
         rejoin: z.boolean().optional()
     })
     .strict();
@@ -67,7 +72,7 @@ async function reseat(meetingId: string): Promise<meetings.MeetingSeat | null> {
     }
 }
 
-type Beat = meetings.VoiceState & { rejoin?: boolean };
+type Beat = meetings.VoiceState & { camera?: boolean; recording?: boolean; rejoin?: boolean };
 
 /** What the beat says about the person's controls, or undefined when it says
  *  nothing. Anything that is not the expected shape is refused rather than
@@ -90,7 +95,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     const beat = await voiceFrom(request);
     // i18n-ignore: a protocol answer the call client never shows
     if (beat === null) return Response.json({ error: "Malformed call state" }, { status: 400 });
-    const { rejoin, ...voice } = beat ?? {};
+    const { rejoin, camera, recording, ...voice } = beat ?? {};
     let seat = await seatFor(params);
     if (!seat && rejoin) {
         const parsed = meetingIdSchema.safeParse((await params).meetingId);
@@ -104,6 +109,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
             { status: 410 }
         );
     await meetings.keepSeat(seat, beat ? (voice as meetings.VoiceState) : undefined);
+    if (beat) await noteControls(seat.participantId, { ...voice, camera, recording });
     return new Response(null, { status: 204 });
 }
 

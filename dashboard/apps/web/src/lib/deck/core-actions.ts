@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { callTool } from "./tool-call";
+import { callDeckActions } from "./call-actions";
 import { unreadTotal } from "@/lib/chat/chat-service";
 import { translatorFor } from "@/lib/i18n/translate";
 import { PRESENCE_CHOICES, type Locale, type Permission } from "@polaris/core";
@@ -54,8 +55,9 @@ export interface CoreDeckAction {
     readonly path?: string;
     readonly run?: (options: Record<string, unknown>, caller: DeckCaller) => Promise<DeckRunResult>;
     readonly read?: (options: Record<string, unknown>, caller: DeckCaller) => Promise<DeckState>;
-    /** What wakes its state: the chat bus, or the stream's own clock. */
-    readonly wakes?: "chat" | "clock";
+    /** What wakes its state: the chat bus, a call's controls moving, or the
+     *  stream's own clock. */
+    readonly wakes?: "chat" | "call" | "clock";
 }
 
 /** A tool's outcome as a run's; `refused` stands in for a refusal the tool did
@@ -308,6 +310,7 @@ export function coreDeckActions(refused: string): readonly CoreDeckAction[] {
             }),
             fields: [{ name: "path", type: "text", required: true }],
             path: "/home"
-        }
+        },
+        ...callDeckActions()
     ];
 }

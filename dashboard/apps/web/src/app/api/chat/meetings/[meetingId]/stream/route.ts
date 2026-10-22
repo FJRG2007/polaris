@@ -87,10 +87,15 @@ export async function GET(
                 // What a moderator did to one seat is that seat's business. The
                 // rest of the room sees it on the roster.
                 if (event.kind === "moderated" && event.participantId !== participantId) return;
+                // The person's own controls, asked for from a deck: theirs
+                // alone, and never for a seat still at the door.
+                if (event.kind === "remote" && (event.participantId !== participantId || !admitted))
+                    return;
                 send({
                     kind: event.kind,
                     ...(event.deviceId ? { deviceId: event.deviceId } : {}),
-                    ...(event.action ? { action: event.action } : {})
+                    ...(event.action ? { action: event.action } : {}),
+                    ...(event.remote ? { remote: event.remote } : {})
                 });
                 // The roster moving is the only thing that can admit somebody,
                 // and only a stream that is still waiting has to ask.

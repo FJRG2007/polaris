@@ -19,6 +19,11 @@ export interface VoiceState {
     readonly muted: boolean;
     readonly deafened: boolean;
     readonly streaming: boolean;
+    /** Whether the camera is on and this browser is recording. Sent only by the
+     *  provider, for a deck key that shows them; the beat leaves them out and
+     *  the seat keeps what was said last. */
+    readonly camera?: boolean;
+    readonly recording?: boolean;
 }
 
 /**
