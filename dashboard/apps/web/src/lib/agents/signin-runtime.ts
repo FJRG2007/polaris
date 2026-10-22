@@ -31,6 +31,7 @@ import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { shellQuote } from "./session-hooks";
 import * as commands from "./session-commands";
+import { upWithFreshImage } from "./session-image";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { agentSignins, type AgentSignin } from "./agent-signins";
 
@@ -202,46 +203,49 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
     });
     try {
         const name = containerName(attempt.id);
-        await new HostdPorts().composeUp({
-            project: name,
-            services: [
-                {
-                    name,
-                    image: commands.SESSION_IMAGE,
-                    env: {
-                        POLARIS_TMUX: TMUX,
-                        POLARIS_COLS: String(commands.SIGNIN_COLS),
-                        POLARIS_ROWS: String(commands.SIGNIN_ROWS),
-                        POLARIS_INSTALL: login.install,
-                        POLARIS_FIRST_RUN: firstRunFor(attempt.env),
-                        POLARIS_LOGIN: login.command,
-                        POLARIS_RUNAS: commands.CONTAINER_USER,
-                        POLARIS_HOME: commands.AGENT_HOME
-                    },
-                    ports: [],
-                    // This person's own home, the one their sessions run in.
-                    // Nothing else is mounted and no credential is carried in:
-                    // what the login writes is the only thing that leaves here,
-                    // and it leaves by already being in the home.
-                    volumes: [
-                        {
-                            source: commands.agentHomeSource(userId),
-                            target: commands.AGENT_HOME,
-                            kind: "bind" as const
-                        }
-                    ],
-                    labels: { [LABEL_KEY]: attempt.id },
-                    command: commands.bootArgv(SIGNIN_BOOT),
-                    networks: [],
-                    // Never restarted. A login that died is a login to start
-                    // again, not one to resume half way through an OAuth round
-                    // trip that has since expired.
-                    restart: "no"
-                }
-            ],
-            volumes: [],
-            networks: []
-        });
+        await upWithFreshImage((pullPolicy) =>
+            new HostdPorts().composeUp({
+                project: name,
+                services: [
+                    {
+                        name,
+                        image: commands.SESSION_IMAGE,
+                        pullPolicy,
+                        env: {
+                            POLARIS_TMUX: TMUX,
+                            POLARIS_COLS: String(commands.SIGNIN_COLS),
+                            POLARIS_ROWS: String(commands.SIGNIN_ROWS),
+                            POLARIS_INSTALL: login.install,
+                            POLARIS_FIRST_RUN: firstRunFor(attempt.env),
+                            POLARIS_LOGIN: login.command,
+                            POLARIS_RUNAS: commands.CONTAINER_USER,
+                            POLARIS_HOME: commands.AGENT_HOME
+                        },
+                        ports: [],
+                        // This person's own home, the one their sessions run in.
+                        // Nothing else is mounted and no credential is carried in:
+                        // what the login writes is the only thing that leaves here,
+                        // and it leaves by already being in the home.
+                        volumes: [
+                            {
+                                source: commands.agentHomeSource(userId),
+                                target: commands.AGENT_HOME,
+                                kind: "bind" as const
+                            }
+                        ],
+                        labels: { [LABEL_KEY]: attempt.id },
+                        command: commands.bootArgv(SIGNIN_BOOT),
+                        networks: [],
+                        // Never restarted. A login that died is a login to start
+                        // again, not one to resume half way through an OAuth round
+                        // trip that has since expired.
+                        restart: "no"
+                    }
+                ],
+                volumes: [],
+                networks: []
+            })
+        );
         return attempt;
     } catch (error) {
         // The row exists and the container does not, so the row goes: an attempt
