@@ -13,6 +13,8 @@ export const PLUGIN_UUID = "io.github.fjrg2007.polaris";
 export const KEY_UUID = `${PLUGIN_UUID}.key`;
 export const DIAL_UUID = `${PLUGIN_UUID}.dial`;
 export const TIMER_UUID = `${PLUGIN_UUID}.timer`;
+/** The Polaris folder key (`folder.ts`), which opens the bundled profile. */
+export const FOLDER_UUID = `${PLUGIN_UUID}.folder`;
 /** The same key and dial, offering only one part of the catalogue. */
 export const CALL_UUID = `${PLUGIN_UUID}.call`;
 export const SOUND_UUID = `${PLUGIN_UUID}.sound`;

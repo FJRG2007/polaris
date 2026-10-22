@@ -30,7 +30,9 @@ import * as polarisTimers from "./polaris-timer";
 import { keyImage } from "./render";
 import type { DeckState } from "./polaris";
 import { fromInspector, tellInspector } from "./inspector";
-import { DIAL_UUID, KEY_UUID, TIMER_UUID, surfaceOf, type Surface } from "./surfaces";
+import { wordsFor } from "./words";
+import { folderTarget, type FolderSettings } from "./folder";
+import { DIAL_UUID, FOLDER_UUID, KEY_UUID, TIMER_UUID, surfaceOf, type Surface } from "./surfaces";
 import { CONFIRM_MS, Confirmations, DOUBLE_MS, PressTimer, type Gesture } from "./presses";
 import { DialBurst, predict } from "./optimistic";
 import {
@@ -635,5 +637,27 @@ export class TimerAction extends SingletonAction<TimerSettings> {
 
     override async onSendToPlugin(ev: SendToPluginEvent<never, TimerSettings>): Promise<void> {
         await fromInspector(ev.payload, "timer");
+    }
+}
+
+/**
+ * The Polaris folder: opens the profile bundled for this deck, and on that
+ * profile (where its settings carry `back`) returns to the one before.
+ */
+export class FolderKey extends SingletonAction<FolderSettings> {
+    override readonly manifestId = FOLDER_UUID;
+
+    override async onWillAppear(ev: WillAppearEvent<FolderSettings>): Promise<void> {
+        if (ev.payload.settings.back === true && ev.action.isKey())
+            await ev.action.setTitle(wordsFor(streamDeck.info.application.language).back);
+    }
+
+    override async onKeyDown(ev: KeyDownEvent<FolderSettings>): Promise<void> {
+        const device = ev.action.device;
+        const target = folderTarget(ev.payload.settings, device.type);
+        if (target.to === "back") await streamDeck.profiles.switchToProfile(device.id);
+        else if (target.to === "profile")
+            await streamDeck.profiles.switchToProfile(device.id, target.profile);
+        else await ev.action.showAlert();
     }
 }

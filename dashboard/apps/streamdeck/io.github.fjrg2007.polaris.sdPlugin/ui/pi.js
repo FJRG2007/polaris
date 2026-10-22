@@ -13,7 +13,7 @@
 
 (() => {
     const { fill, wordsFor } = window.PolarisWords;
-    const screen = document.body.dataset.screen; // "key" | "dial" | "timer"
+    const screen = document.body.dataset.screen; // "key" | "dial" | "timer" | "folder"
     let socket = null;
     // The action's own id, to tell its settings apart from another key's.
     let context = "";
@@ -469,6 +469,10 @@
 
     function render() {
         const root = document.getElementById("root");
+        if (screen === "folder") {
+            root.replaceChildren(el("p", { class: "hint", text: words.folderHint }));
+            return;
+        }
         if (screen === "timer") {
             root.replaceChildren(timerSection());
             return;

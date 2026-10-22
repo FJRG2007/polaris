@@ -26,7 +26,60 @@
         "Version": "24"
     },
     "UUID": "io.github.fjrg2007.polaris",
+    "Profiles": [
+        {
+            "Name": "profiles/polaris",
+            "DeviceType": 0,
+            "AutoInstall": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "Name": "profiles/polaris-mini",
+            "DeviceType": 1,
+            "AutoInstall": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "Name": "profiles/polaris-xl",
+            "DeviceType": 2,
+            "AutoInstall": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "Name": "profiles/polaris-plus",
+            "DeviceType": 7,
+            "AutoInstall": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "Name": "profiles/polaris-neo",
+            "DeviceType": 9,
+            "AutoInstall": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "Name": "profiles/polaris-plus-xl",
+            "DeviceType": 13,
+            "AutoInstall": false,
+            "DontAutoSwitchWhenInstalled": true
+        }
+    ],
     "Actions": [
+        {
+            "Name": "Folder",
+            "UUID": "io.github.fjrg2007.polaris.folder",
+            "Icon": "imgs/actions/folder/icon",
+            "Tooltip": "Opens a page of Polaris keys made for your deck; the same key there brings you back.",
+            "PropertyInspectorPath": "ui/folder.html",
+            "Controllers": ["Keypad"],
+            "States": [
+                {
+                    "Image": "imgs/actions/folder/key",
+                    "ShowTitle": false,
+                    "TitleAlignment": "bottom"
+                }
+            ]
+        },
         {
             "Name": "Action",
             "UUID": "io.github.fjrg2007.polaris.key",

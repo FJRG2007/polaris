@@ -2,6 +2,10 @@
     "Name": "Polaris",
     "Description": "Keys and dials for your Polaris: send a message, set your status, mute or hang up your call, play a sound, see unread messages, alarms and deployments, and switch the devices in your places.",
     "Category": "Polaris",
+    "io.github.fjrg2007.polaris.folder": {
+        "Name": "Folder",
+        "Tooltip": "Opens a page of Polaris keys made for your deck; the same key there brings you back."
+    },
     "io.github.fjrg2007.polaris.key": {
         "Name": "Action",
         "Tooltip": "Runs a Polaris action or shows its live state."
