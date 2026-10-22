@@ -657,7 +657,30 @@
         "linkName": "Link",
         "needAction": "Allow at least one thing.",
         "linkChoice": "A link (no account)",
-        "linkSeeOnly": "A link can only see this. Control needs an account."
+        "linkSeeOnly": "A link can only see this. Control needs an account.",
+        "log": {
+            "title": "Access log",
+            "filter": "Show",
+            "all": "All",
+            "done": "Done",
+            "refused": "Refused",
+            "refusedWhy": "Refused: {why}",
+            "export": "Export as CSV",
+            "none": "Nobody has used it yet.",
+            "unreadable": "The log could not be read.",
+            "someone": "Someone",
+            "linkFor": "Link: {note}",
+            "onlyKey": "Only uses of {name}.",
+            "everyKey": "Show all",
+            "ofKey": "Uses of {name}",
+            "actions": {
+                "open": "opened",
+                "close": "closed",
+                "operate": "operated",
+                "watch": "watched",
+                "command": "sent a command"
+            }
+        }
     },
     "environments": {
         "homeNat": {

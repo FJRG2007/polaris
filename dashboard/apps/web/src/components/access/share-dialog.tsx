@@ -23,9 +23,11 @@ import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { GrantCandidate } from "@/lib/access/sharing-service";
+import { AccessLog } from "@/components/access/access-log";
 import {
     CalendarClock,
     Copy,
+    History,
     Link2,
     Loader2,
     MapPin,
@@ -151,7 +153,8 @@ export function ShareDialog({
     const [maxUses, setMaxUses] = useState("");
     // Only near the place, and how near. Offered where an act happens at a
     // place - a door, a UPS - and nowhere else.
-    const fenceable = subject === "place.device" || subject === "place.ups";
+    const fenceable =
+        subject === "place.device" || subject === "place.ups" || subject === "place.room";
     const linkable = core.isGrantLinkSubject(subject);
     // What a link may carry here: a NAS, a server or a domain is only ever seen
     // through one, whatever a person could be given.
@@ -160,6 +163,8 @@ export function ShareDialog({
     const [nearby, setNearby] = useState(false);
     const [nearbyMeters, setNearbyMeters] = useState("100");
     const [located, setLocated] = useState<boolean | null>(null);
+    /** The key whose uses the log below is narrowed to, if any. */
+    const [logGrant, setLogGrant] = useState<GrantView | null>(null);
     /** A link just made: shown once, since only its hash is kept. */
     const [madeLink, setMadeLink] = useState<string | null>(null);
 
@@ -388,6 +393,22 @@ export function ShareDialog({
                                             </p>
                                         ) : null}
                                     </div>
+                                    {bounded ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label={t("share.log.ofKey", { name: who(grant) })}
+                                            title={t("share.log.ofKey", { name: who(grant) })}
+                                            aria-pressed={logGrant?.id === grant.id}
+                                            onClick={() =>
+                                                setLogGrant((now) =>
+                                                    now?.id === grant.id ? null : grant
+                                                )
+                                            }
+                                        >
+                                            <History className="size-4 shrink-0" aria-hidden />
+                                        </Button>
+                                    ) : null}
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -775,6 +796,15 @@ export function ShareDialog({
                     </div>
 
                 </section>
+                {bounded && open ? (
+                    <AccessLog
+                        subject={subject}
+                        subjectId={subjectId}
+                        grantId={logGrant?.id ?? null}
+                        grantLabel={logGrant ? who(logGrant) : ""}
+                        onClearGrant={() => setLogGrant(null)}
+                    />
+                ) : null}
                 {extra}
                 {confirmDialog}
             </DialogContent>

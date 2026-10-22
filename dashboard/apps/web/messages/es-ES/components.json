@@ -657,7 +657,30 @@
         "linkName": "Enlace",
         "needAction": "Permite al menos una cosa.",
         "linkChoice": "Un enlace (sin cuenta)",
-        "linkSeeOnly": "Un enlace solo puede verlo. Controlar exige cuenta."
+        "linkSeeOnly": "Un enlace solo puede verlo. Controlar exige cuenta.",
+        "log": {
+            "title": "Registro",
+            "filter": "Ver",
+            "all": "Todo",
+            "done": "Hecho",
+            "refused": "Negado",
+            "refusedWhy": "Negado: {why}",
+            "export": "Exportar CSV",
+            "none": "Nadie lo ha usado aún.",
+            "unreadable": "No se pudo leer el registro.",
+            "someone": "Alguien",
+            "linkFor": "Enlace: {note}",
+            "onlyKey": "Solo usos de {name}.",
+            "everyKey": "Ver todo",
+            "ofKey": "Usos de {name}",
+            "actions": {
+                "open": "abrió",
+                "close": "cerró",
+                "operate": "accionó",
+                "watch": "vio",
+                "command": "envió una orden"
+            }
+        }
     },
     "environments": {
         "homeNat": {
