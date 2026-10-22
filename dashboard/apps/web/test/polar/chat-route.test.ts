@@ -789,7 +789,9 @@ describe("answers that outlive their screen", () => {
         expect(replayed).toContain("Done.");
         expect(replayed).toContain(/"messageId":"([^"]+)"/.exec(live)?.[1]);
         await vi.waitFor(async () =>
-            expect((await stream.GET(new Request("https://polaris.test/x"), params)).status).toBe(204)
+            expect((await stream.GET(new Request("https://polaris.test/x"), params)).status).toBe(
+                204
+            )
         );
     });
 });

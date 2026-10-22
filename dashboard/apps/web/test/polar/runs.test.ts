@@ -82,7 +82,10 @@ describe("polar runs", () => {
         started();
         expect(beginPolarRun(USER, THREAD)).toBe("busy");
         for (let index = 1; index < POLAR_RUNS_MAX; index += 1)
-            started(undefined, `00000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`);
+            started(
+                undefined,
+                `00000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`
+            );
         expect(beginPolarRun(USER, "00000000-0000-4000-8000-0000000002ff")).toBe("too_many");
         // Somebody else is not counted against this person.
         expect(typeof beginPolarRun(OTHER, "00000000-0000-4000-8000-0000000003ff")).toBe("object");
@@ -100,7 +103,9 @@ describe("polar runs", () => {
             state: "done",
             watched: false
         });
-        expect(listPolarRuns(USER)).toMatchObject([{ threadId: THREAD, state: "done", unread: true }]);
+        expect(listPolarRuns(USER)).toMatchObject([
+            { threadId: THREAD, state: "done", unread: true }
+        ]);
         expect(replayPolarRun(USER, THREAD)).toBeNull();
         expect(listPolarRuns(USER)).toEqual([]);
     });
@@ -110,10 +115,14 @@ describe("polar runs", () => {
         const { run, controller } = started(onEnd);
         const screen = new AbortController();
         run.watch(screen.signal);
-        controller.enqueue(sse({ type: "tool-approval-request", approvalId: "a", toolCallId: "c" }));
+        controller.enqueue(
+            sse({ type: "tool-approval-request", approvalId: "a", toolCallId: "c" })
+        );
         controller.close();
         await settle();
-        expect(onEnd).toHaveBeenCalledWith(expect.objectContaining({ state: "approval", watched: true }));
+        expect(onEnd).toHaveBeenCalledWith(
+            expect.objectContaining({ state: "approval", watched: true })
+        );
         expect(listPolarRuns(USER)).toMatchObject([{ state: "approval", unread: false }]);
     });
 

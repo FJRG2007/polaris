@@ -627,7 +627,12 @@ function RunMark({ run, active }: { run: PolarRunView | null; active: boolean })
                 : null;
     if (!label) return null;
     return (
-        <span role="img" aria-label={label} title={label} className="flex shrink-0 items-center px-1">
+        <span
+            role="img"
+            aria-label={label}
+            title={label}
+            className="flex shrink-0 items-center px-1"
+        >
             {run.state === "running" ? (
                 <Loader2 aria-hidden className="size-3.5 text-primary motion-safe:animate-spin" />
             ) : (
