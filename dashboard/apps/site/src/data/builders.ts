@@ -475,6 +475,24 @@ export function guideItemFor(product: ProductId, fileName: string): GuideItemId 
     return null;
 }
 
+/**
+ * Whether a release file is offered as a download. The install scripts are what
+ * the one-line installs fetch, not something to save and run by hand, and the
+ * extension's source archive is for store review.
+ */
+export function offeredFile(product: ProductId, fileName: string): boolean {
+    const name = fileName.toLowerCase();
+    if (name === "install.ps1" || name === "install.sh") return false;
+    return !(product === "extension" && name.endsWith("-sources.zip"));
+}
+
+/** The short type shown in a file's square: its extension, or a fixed word for one too long to fit. */
+export function fileMark(fileName: string): string {
+    const extension = fileName.split(".").pop() ?? "";
+    if (extension.toLowerCase() === "streamdeckplugin") return "SD";
+    return extension.length <= 4 ? extension : extension.slice(0, 3);
+}
+
 /** The guide items, as `@polaris/ui/install-guide-steps` names them. */
 export type GuideItemId =
     "streamdeck" | "companion" | "extension-chromium" | "extension-firefox" | "desktop";
@@ -493,6 +511,11 @@ export interface SiteData {
     readonly repo: string;
     readonly install: { unix: string | null; windows: string | null };
     readonly cli: { unix: string; windows: string };
+    /** The one-line installs the dashboard's Downloads offers, built by the same code. */
+    readonly lines: {
+        readonly extension: { unix: string; windows: string };
+        readonly streamdeck: { macos: string; windows: string };
+    };
     readonly locales: Readonly<Record<SiteLocale, LocaleData>>;
     readonly downloads: readonly DownloadEntry[];
     readonly api: { title: string; description: string; groups: ReturnType<typeof apiOperations> };

@@ -47,6 +47,13 @@
         "noneHint": "Aún no se ha publicado nada. La página de versiones lo mostrará cuando salga.",
         "releases": "Ver versiones",
         "cliHint": "Instala el comando plr; entra con plr login --url y la dirección de tu servidor.",
+        "lineHint": "Lo instala y lo mantiene al día. Los archivos de abajo son para instalar a mano.",
+        "extensionHint": "Lo instala en Chrome, Edge o Brave y lo mantiene al día. Para Firefox, usa los archivos de abajo.",
+        "systems": {
+            "unix": "macOS y Linux",
+            "macos": "macOS",
+            "windows": "Windows"
+        },
         "products": {
             "extension": "Extensión del navegador",
             "streamdeck": "Plugin de Stream Deck",

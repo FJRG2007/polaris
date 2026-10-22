@@ -262,3 +262,26 @@ describe("site words", () => {
         expect(keys(es).sort()).toEqual(keys(en).sort());
     });
 });
+
+describe("release files", () => {
+    it("offers what is installed by hand, not the scripts the install lines fetch", () => {
+        expect(site.offeredFile("streamdeck", "io.github.fjrg2007.polaris.streamDeckPlugin")).toBe(
+            true
+        );
+        expect(site.offeredFile("extension", "polaris-extension-chrome.zip")).toBe(true);
+        expect(site.offeredFile("streamdeck", "install.ps1")).toBe(false);
+        expect(site.offeredFile("extension", "install.sh")).toBe(false);
+        expect(site.offeredFile("extension", "polaris-extension-sources.zip")).toBe(false);
+    });
+
+    it("hides a sources archive only for the extension", () => {
+        expect(site.offeredFile("desktop", "polaris-sources.zip")).toBe(true);
+        expect(site.offeredFile("extension", "polaris-extension-sources-notes.txt")).toBe(true);
+    });
+
+    it("marks a file with a type short enough for its square", () => {
+        expect(site.fileMark("io.github.fjrg2007.polaris.streamDeckPlugin")).toBe("SD");
+        expect(site.fileMark("polaris-0.1.3.tgz")).toBe("tgz");
+        expect(site.fileMark("Polaris.AppImage")).toBe("App");
+    });
+});

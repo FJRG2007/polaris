@@ -47,6 +47,13 @@
         "noneHint": "Nothing has been published for this one. The release page lists it once it is.",
         "releases": "Open releases",
         "cliHint": "Installs the plr command; sign in with plr login --url and your server's address.",
+        "lineHint": "Installs it and keeps it up to date. The files below are for installing by hand.",
+        "extensionHint": "Installs it in Chrome, Edge or Brave and keeps it up to date. For Firefox, use the files below.",
+        "systems": {
+            "unix": "macOS and Linux",
+            "macos": "macOS",
+            "windows": "Windows"
+        },
         "products": {
             "extension": "Browser extension",
             "streamdeck": "Stream Deck plugin",

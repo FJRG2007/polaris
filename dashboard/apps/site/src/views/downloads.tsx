@@ -9,7 +9,14 @@ import { GuideFile } from "@/views/guide-file";
 import type { CardTint } from "@polaris/ui/download-card";
 import { Badge, CopyButton, buttonVariants } from "@polaris/ui";
 import { DownloadCard, DownloadRow, DownloadRows } from "@polaris/ui/download-card";
-import { fill, guideItemFor, type ProductId, type SiteLocale } from "@/data/builders";
+import {
+    fill,
+    fileMark,
+    guideItemFor,
+    offeredFile,
+    type ProductId,
+    type SiteLocale
+} from "@/data/builders";
 
 const TINTS: Readonly<Record<ProductId, CardTint>> = {
     extension: "sky",
@@ -39,23 +46,38 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                         description={t.about[entry.product]}
                     >
                         {entry.product === "cli" ? (
-                            <DownloadRows>
-                                {[data.cli.unix, data.cli.windows].map((command) => (
-                                    <DownloadRow
-                                        key={command}
-                                        mark={<span className="text-xs">$</span>}
-                                        name={command.startsWith("irm") ? "PowerShell" : "Terminal"}
-                                    >
-                                        <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-                                            <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs">
-                                                {command}
-                                            </code>
-                                            <CopyButton value={command} />
-                                        </div>
-                                    </DownloadRow>
-                                ))}
-                                <p className="pt-2 text-xs text-muted-foreground">{t.cliHint}</p>
-                            </DownloadRows>
+                            <CommandRows
+                                lines={[
+                                    { system: t.systems.unix, command: data.cli.unix },
+                                    { system: t.systems.windows, command: data.cli.windows }
+                                ]}
+                                hint={t.cliHint}
+                            />
+                        ) : entry.product === "extension" && entry.released ? (
+                            <CommandRows
+                                lines={[
+                                    { system: t.systems.unix, command: data.lines.extension.unix },
+                                    {
+                                        system: t.systems.windows,
+                                        command: data.lines.extension.windows
+                                    }
+                                ]}
+                                hint={t.extensionHint}
+                            />
+                        ) : entry.product === "streamdeck" && entry.released ? (
+                            <CommandRows
+                                lines={[
+                                    {
+                                        system: t.systems.macos,
+                                        command: data.lines.streamdeck.macos
+                                    },
+                                    {
+                                        system: t.systems.windows,
+                                        command: data.lines.streamdeck.windows
+                                    }
+                                ]}
+                                hint={t.lineHint}
+                            />
                         ) : null}
                         {entry.released ? (
                             <>
@@ -69,29 +91,31 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                                 </p>
                                 {entry.product === "cli" ? null : (
                                     <DownloadRows>
-                                        {entry.files.map((file) => (
-                                            <DownloadRow
-                                                key={file.url}
-                                                mark={
-                                                    <span className="text-[10px] uppercase">
-                                                        {file.name.split(".").pop()}
-                                                    </span>
-                                                }
-                                                name={file.name}
-                                                action={
-                                                    <GuideFile
-                                                        item={guideItemFor(
-                                                            entry.product,
-                                                            file.name
-                                                        )}
-                                                        href={file.url}
-                                                        fileName={file.name}
-                                                        label={t.download}
-                                                        guide={guide}
-                                                    />
-                                                }
-                                            />
-                                        ))}
+                                        {entry.files
+                                            .filter((file) => offeredFile(entry.product, file.name))
+                                            .map((file) => (
+                                                <DownloadRow
+                                                    key={file.url}
+                                                    mark={
+                                                        <span className="text-[10px] uppercase">
+                                                            {fileMark(file.name)}
+                                                        </span>
+                                                    }
+                                                    name={file.name}
+                                                    action={
+                                                        <GuideFile
+                                                            item={guideItemFor(
+                                                                entry.product,
+                                                                file.name
+                                                            )}
+                                                            href={file.url}
+                                                            fileName={file.name}
+                                                            label={t.download}
+                                                            guide={guide}
+                                                        />
+                                                    }
+                                                />
+                                            ))}
                                     </DownloadRows>
                                 )}
                             </>
@@ -112,5 +136,31 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                 ))}
             </div>
         </>
+    );
+}
+
+/** One-line installs, each with its copy button: the way the dashboard's
+ *  Downloads offers them, since the line also keeps the install up to date. */
+function CommandRows({
+    lines,
+    hint
+}: {
+    lines: readonly { system: string; command: string }[];
+    hint: string;
+}) {
+    return (
+        <DownloadRows>
+            {lines.map(({ system, command }) => (
+                <DownloadRow key={command} mark={<span className="text-xs">$</span>} name={system}>
+                    <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
+                        <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs">
+                            {command}
+                        </code>
+                        <CopyButton value={command} />
+                    </div>
+                </DownloadRow>
+            ))}
+            <p className="pt-2 text-xs text-muted-foreground">{hint}</p>
+        </DownloadRows>
     );
 }
