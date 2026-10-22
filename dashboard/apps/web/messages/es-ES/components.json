@@ -691,8 +691,8 @@
                 "command": "envió una orden"
             }
         },
-        "checkIn": "Hora de entrada",
-        "checkOut": "Hora de salida"
+        "checkIn": "Acceso desde",
+        "checkOut": "Acceso hasta"
     },
     "environments": {
         "homeNat": {

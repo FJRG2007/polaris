@@ -691,8 +691,8 @@
                 "command": "sent a command"
             }
         },
-        "checkIn": "Check-in time",
-        "checkOut": "Check-out time"
+        "checkIn": "Access from",
+        "checkOut": "Access until"
     },
     "environments": {
         "homeNat": {
