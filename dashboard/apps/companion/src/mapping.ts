@@ -66,9 +66,13 @@ export function companionId(deckId: string): string {
     return deckId.replace(/[^A-Za-z0-9_]/g, "_");
 }
 
-/** The entries a Companion button can run. */
+/** The entries a Companion button can run. One that cannot be undone is not
+ *  among them: a Companion button has no second press to ask for, and a
+ *  trigger or a page change would run it unseen. */
 export function runnable(catalogue: readonly DeckAction[]): DeckAction[] {
-    return catalogue.filter((entry) => entry.kind !== "open" && entry.kind !== "state");
+    return catalogue.filter(
+        (entry) => entry.kind !== "open" && entry.kind !== "state" && !entry.confirm
+    );
 }
 
 /** The entries Polaris streams a state for. */
@@ -127,13 +131,15 @@ export function optionField(field: DeckField): OptionField {
 export function actionOptions(entry: DeckAction): OptionField[] {
     const fields = entry.options.map(optionField);
     if (entry.kind === "dial" && !fields.some((field) => field.id === LEVEL_OPTION)) {
+        // A range Polaris sent - a temperature - rather than a 1 to 100 level.
+        const range = entry.dial;
         fields.push({
             type: "number",
             id: LEVEL_OPTION,
-            label: "Level",
-            default: 50,
-            min: 1,
-            max: 100
+            label: range ? "Value" : "Level",
+            default: range ? (range.min + range.max) / 2 : 50,
+            min: range?.min ?? 1,
+            max: range?.max ?? 100
         });
     }
     return fields;

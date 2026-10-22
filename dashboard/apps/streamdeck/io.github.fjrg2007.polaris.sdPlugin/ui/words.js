@@ -60,7 +60,8 @@
                 watch: "Watch",
                 deploy: "Deploy",
                 places: "Places",
-                polaris: "Polaris"
+                polaris: "Polaris",
+                tools: "Everything else"
             }
         },
         es: {
@@ -117,7 +118,8 @@
                 watch: "Watch",
                 deploy: "Deploy",
                 places: "Lugares",
-                polaris: "Polaris"
+                polaris: "Polaris",
+                tools: "Todo lo demás"
             }
         }
     };

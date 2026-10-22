@@ -1,5 +1,6 @@
 /**
- * Places on a Stream Deck: switch a device, run a routine, dim a light.
+ * Places on a Stream Deck: switch a device, open or lock a door, set an air
+ * conditioner, run a routine, dim a light.
  *
  * Each one is bound to the Places MCP tool an assistant would call for it, so a
  * deck reaches exactly the devices and routines its owner does - a device that
@@ -61,6 +62,124 @@ function deviceState(structured: unknown, locale: Locale) {
     return { tone: on ? ("ok" as const) : ("idle" as const), on };
 }
 
+/** What a lock's bolt is, in the reader's language. */
+const BOLT: Readonly<Record<"locked" | "unlocked", Readonly<Record<Locale, string>>>> = {
+    locked: { "en-US": "Locked", "es-ES": "Cerrada" },
+    unlocked: { "en-US": "Unlocked", "es-ES": "Abierta" }
+};
+
+/** A lock's state as a key draws it: the bolt, never whether the door is open,
+ *  which only a door sensor knows. */
+export function lockState(structured: unknown, locale: Locale) {
+    const parsed = deviceRows.safeParse(structured);
+    const device = parsed.success ? parsed.data.devices[0] : undefined;
+    if (!device) return { tone: "idle" as const };
+    if (!device.online) return { tone: "bad" as const, detail: OFFLINE[locale] };
+    if (device.state === "locked")
+        return { tone: "ok" as const, on: true, detail: BOLT.locked[locale] };
+    if (device.state === "unlocked")
+        return { tone: "warn" as const, on: false, detail: BOLT.unlocked[locale] };
+    return { tone: "idle" as const };
+}
+
+const climateRows = z.object({
+    devices: z.array(
+        z
+            .object({
+                state: z.string().nullish(),
+                online: z.boolean(),
+                climate: z
+                    .object({
+                        target: z.number().nullable(),
+                        min: z.number(),
+                        max: z.number(),
+                        step: z.number().positive()
+                    })
+                    .passthrough()
+                    .nullish()
+            })
+            .passthrough()
+    )
+});
+
+function climateOf(structured: unknown) {
+    const parsed = climateRows.safeParse(structured);
+    return parsed.success ? parsed.data.devices[0] : undefined;
+}
+
+/** An air conditioner as a key draws it: on or off, and the temperature it is
+ *  set to. */
+export function climateState(structured: unknown, locale: Locale) {
+    const device = climateOf(structured);
+    if (!device) return { tone: "idle" as const };
+    if (!device.online) return { tone: "bad" as const, detail: OFFLINE[locale] };
+    const on = device.state === "on";
+    const target = device.climate?.target;
+    return {
+        tone: on ? ("ok" as const) : ("idle" as const),
+        on,
+        ...(typeof target === "number" ? { value: `${target}°` } : {})
+    };
+}
+
+/** A temperature held inside the device's own range, on its own step. */
+export function clampTarget(
+    value: number,
+    climate: { min: number; max: number; step: number } | null | undefined
+): number {
+    if (!climate) return value;
+    const stepped = Math.round(value / climate.step) * climate.step;
+    return Number(Math.min(climate.max, Math.max(climate.min, stepped)).toFixed(1));
+}
+
+/** The plain commands a device takes with nothing more to say. `dump` - all
+ *  the litter out of a litter box - is not one: it is the device's own button
+ *  or an assistant's, not something to be bumped on a deck. */
+const PLAIN_COMMANDS = [
+    "turn-on",
+    "turn-off",
+    "open",
+    "unlock",
+    "lock",
+    "stop",
+    "clean",
+    "pause",
+    "resume"
+] as const;
+
+const COMMAND_WORDS: Readonly<
+    Record<(typeof PLAIN_COMMANDS)[number], Readonly<Record<Locale, string>>>
+> = {
+    "turn-on": { "en-US": "Turn on", "es-ES": "Encender" },
+    "turn-off": { "en-US": "Turn off", "es-ES": "Apagar" },
+    open: { "en-US": "Open", "es-ES": "Abrir" },
+    unlock: { "en-US": "Unlock", "es-ES": "Desbloquear" },
+    lock: { "en-US": "Lock", "es-ES": "Bloquear" },
+    stop: { "en-US": "Stop", "es-ES": "Parar" },
+    clean: { "en-US": "Clean now", "es-ES": "Limpiar ya" },
+    pause: { "en-US": "Pause", "es-ES": "Pausar" },
+    resume: { "en-US": "Resume", "es-ES": "Reanudar" }
+};
+
+const DOOR_COMMANDS = ["open", "unlock", "lock"] as const;
+
+const commandField = (commands: readonly (typeof PLAIN_COMMANDS)[number][]) => ({
+    name: "command",
+    type: "choice" as const,
+    label: { "en-US": "Command", "es-ES": "Orden" },
+    required: true,
+    fixed: commands.map((value) => ({ value, label: COMMAND_WORDS[value] }))
+});
+
+/** Any device that takes a command at all. */
+function operableDevices(structured: unknown) {
+    const parsed = deviceRows.safeParse(structured);
+    if (!parsed.success) return [];
+    return parsed.data.devices
+        .filter((device) => device.actions.length > 0)
+        .map((device) => ({ value: device.id, label: device.name }));
+}
+
 const deviceField = (action: string) => ({
     name: "deviceId",
     type: "choice" as const,
@@ -69,8 +188,163 @@ const deviceField = (action: string) => ({
     choices: { tool: "places_devices", input: {}, pick: devicesTaking(action) }
 });
 
+const readDevice = {
+    tool: "places_devices",
+    input: (options: Record<string, unknown>) => ({ deviceId: options.deviceId })
+};
+
 export function placesDeckActions(): readonly AppDeckAction[] {
     return [
+        {
+            id: "places.door",
+            kind: "run",
+            area: "places",
+            icon: "door-open",
+            label: { "en-US": "Open or lock a door", "es-ES": "Abrir o cerrar puerta" },
+            scope: "home.control",
+            options: z.object({
+                deviceId: z.string().uuid(),
+                command: z.enum(DOOR_COMMANDS).default("open")
+            }),
+            // The doors this person may work: the tool checks it again, as the
+            // device panel does, on every press.
+            fields: [deviceField("lock"), commandField(DOOR_COMMANDS)],
+            run: {
+                tool: "places_device_control",
+                input: (options) => ({ deviceId: options.deviceId, action: options.command })
+            },
+            read: { ...readDevice, pick: lockState }
+        },
+        {
+            id: "places.device-command",
+            kind: "run",
+            area: "places",
+            icon: "power",
+            label: { "en-US": "Send a device command", "es-ES": "Dar orden a un aparato" },
+            scope: "home.control",
+            options: z.object({
+                deviceId: z.string().uuid(),
+                command: z.enum(PLAIN_COMMANDS)
+            }),
+            fields: [
+                {
+                    name: "deviceId",
+                    type: "choice",
+                    label: { "en-US": "Device", "es-ES": "Dispositivo" },
+                    required: true,
+                    choices: { tool: "places_devices", input: {}, pick: operableDevices }
+                },
+                commandField(PLAIN_COMMANDS)
+            ],
+            run: {
+                tool: "places_device_control",
+                input: (options) => ({ deviceId: options.deviceId, action: options.command })
+            },
+            read: { ...readDevice, pick: deviceState }
+        },
+        {
+            id: "places.temperature-step",
+            kind: "run",
+            area: "places",
+            icon: "thermometer",
+            label: { "en-US": "Temperature up or down", "es-ES": "Subir o bajar grados" },
+            scope: "home.control",
+            options: z.object({
+                deviceId: z.string().uuid(),
+                change: z.number().min(-10).max(10).default(1)
+            }),
+            fields: [
+                deviceField("set-temperature"),
+                {
+                    name: "change",
+                    type: "number",
+                    label: { "en-US": "Degrees (+/-)", "es-ES": "Grados (+/-)" },
+                    required: true,
+                    min: -10,
+                    max: 10
+                }
+            ],
+            // From the temperature it is set to now, which the press reads
+            // first; one that has never reported one has nothing to move from.
+            run: {
+                tool: "places_device_control",
+                input: (options, press) => {
+                    const climate = climateOf(press.read)?.climate;
+                    if (typeof climate?.target !== "number") return null;
+                    return {
+                        deviceId: options.deviceId,
+                        action: "set-temperature",
+                        target: clampTarget(climate.target + Number(options.change), climate)
+                    };
+                }
+            },
+            read: { ...readDevice, pick: climateState }
+        },
+        {
+            id: "places.temperature-set",
+            kind: "run",
+            area: "places",
+            icon: "thermometer",
+            label: { "en-US": "Set a temperature", "es-ES": "Fijar temperatura" },
+            scope: "home.control",
+            options: z.object({
+                deviceId: z.string().uuid(),
+                target: z.number().min(-50).max(150)
+            }),
+            fields: [
+                deviceField("set-temperature"),
+                {
+                    name: "target",
+                    type: "number",
+                    label: { "en-US": "Temperature", "es-ES": "Temperatura" },
+                    required: true,
+                    min: -50,
+                    max: 150
+                }
+            ],
+            run: {
+                tool: "places_device_control",
+                input: (options, press) => ({
+                    deviceId: options.deviceId,
+                    action: "set-temperature",
+                    target: clampTarget(Number(options.target), climateOf(press.read)?.climate)
+                })
+            },
+            read: { ...readDevice, pick: climateState }
+        },
+        {
+            id: "places.climate",
+            kind: "dial",
+            area: "places",
+            icon: "thermometer",
+            label: { "en-US": "Air conditioner", "es-ES": "Aire acondicionado" },
+            scope: "home.control",
+            // Turned, the temperature, half a degree a tick; pushed, on or off.
+            dial: { min: 16, max: 30, step: 0.5 },
+            options: z.object({
+                deviceId: z.string().uuid(),
+                level: z.number().min(-50).max(150).default(22)
+            }),
+            fields: [deviceField("set-temperature")],
+            run: {
+                tool: "places_device_control",
+                input: (options, press) =>
+                    press.push
+                        ? {
+                              deviceId: options.deviceId,
+                              action: press.current?.on ? "turn-off" : "turn-on"
+                          }
+                        : {
+                              deviceId: options.deviceId,
+                              action: "set-temperature",
+                              target: clampTarget(
+                                  Number(options.level),
+                                  climateOf(press.read)?.climate
+                              )
+                          }
+            },
+            read: { ...readDevice, pick: climateState }
+        },
         {
             id: "places.device-toggle",
             kind: "toggle",

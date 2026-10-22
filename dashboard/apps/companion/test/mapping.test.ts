@@ -133,6 +133,26 @@ describe("the catalogue as Companion's lists", () => {
         expect(mapping.deckOptions(LIGHT, values, false)).toEqual({ deviceId: "lamp" });
     });
 
+    it("gives a dial with a range Polaris sent that range instead of a level", () => {
+        const climate: DeckAction = {
+            ...LIGHT,
+            id: "places.climate",
+            dial: { min: 16, max: 30, step: 0.5 }
+        };
+        expect(mapping.actionOptions(climate).at(-1)).toMatchObject({
+            id: "level",
+            label: "Value",
+            default: 23,
+            min: 16,
+            max: 30
+        });
+    });
+
+    it("leaves out what cannot be undone: a button has no second press to ask", () => {
+        const wipe: DeckAction = { ...SEND, id: "tool.games_backup_restore", confirm: true };
+        expect(mapping.runnable([SEND, wipe]).map((entry) => entry.id)).toEqual([SEND.id]);
+    });
+
     it("sends Polaris only the entry's own fields, and leaves empty text out", () => {
         expect(mapping.deckOptions(SEND, { conversationId: "c1", body: "", stray: "x" })).toEqual({
             conversationId: "c1"
