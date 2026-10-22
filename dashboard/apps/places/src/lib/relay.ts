@@ -19,6 +19,7 @@
 
 import { cameraVendor, redactSource, relaySource } from "./vendors";
 import { drawsFromBattery } from "./camera-models";
+import { streamPathOf } from "./stream-path";
 import { RELAY_LOG_TAIL, UNEXPLAINED, explainRelayFailure, relaySaid } from "./relay-failure";
 import { HomeError } from "./home-error";
 import type { CameraTarget } from "./cameras";
@@ -668,18 +669,9 @@ export async function relayStream(
  *  target holds full URLs because that is what everything else needs; the relay
  *  wants the pieces so it can build a source of its own kind. */
 function mainPathOf(camera: CameraTarget): string {
-    return pathOf(camera.mainUrl);
+    return streamPathOf(camera.mainUrl);
 }
 
 function subPathOf(camera: CameraTarget): string {
-    return pathOf(camera.subUrl);
-}
-
-function pathOf(url: string): string {
-    try {
-        const parsed = new URL(url);
-        return `${parsed.pathname}${parsed.search}`;
-    } catch {
-        return "";
-    }
+    return streamPathOf(camera.subUrl);
 }

@@ -138,6 +138,15 @@ describe("cameras saved reading the stills", () => {
         expect(updates).toEqual([]);
     });
 
+    it("are left for the next pass once the time for this one has run out", async () => {
+        const spent = Date.now() - 1;
+        expect(await repairStillStreams(relay, [camera("c7", "/stream8")], () => true, spent)).toBe(0);
+        expect(updates).toEqual([]);
+
+        expect(await repairStillStreams(relay, [camera("c7", "/stream8")], () => true)).toBe(1);
+        expect(updates).toEqual([{ id: "c7", subPath: "/stream2" }]);
+    });
+
     it("fall back to the main stream when there is no other video profile", async () => {
         profilesXml = `${profile("profile_1", "main", "H264", 1920)}${profile("profile_3", "jpeg", "JPEG", 640)}`;
         await repairStillStreams(relay, [camera("c5", "/stream8")], () => true);

@@ -63,11 +63,17 @@ async function recoverStalled(server: string, endpoint: RelayEndpoint): Promise<
     return restartRelay(endpoint);
 }
 
+/** How long one sweep may spend moving cameras off their still stream. One
+ *  camera can take three ONVIF answers' worth of timeouts, so the sweep stays
+ *  well inside its lease and a minute of cadence even with that last one. */
+const STILL_REPAIR_BUDGET_MS = 30_000;
+
 export async function sweepWarmCameras(): Promise<{
     warmed: number;
     released: number;
     restarted: number;
 }> {
+    const repairUntil = Date.now() + STILL_REPAIR_BUDGET_MS;
     const cameras = await prisma.camera.findMany({
         select: {
             id: true,
@@ -108,7 +114,7 @@ export async function sweepWarmCameras(): Promise<{
         const plan = warmPlan(onServer, published, warm);
         for (const name of plan.add) if (await warmStream(endpoint, name, true)) warmed += 1;
         for (const name of plan.drop) if (await warmStream(endpoint, name, false)) released += 1;
-        await repairStillStreams(endpoint, onServer, keepsWarm);
+        await repairStillStreams(endpoint, onServer, keepsWarm, repairUntil);
     }
     return { warmed, released, restarted };
 }

@@ -17,19 +17,9 @@
 import { prisma } from "@polaris/db";
 import { cameraTarget } from "./cameras";
 import { cameraVendor } from "./vendors";
+import { streamPathOf } from "./stream-path";
 import { publishCamera, type RelayEndpoint } from "./relay";
 import { getProfiles, getStreamUri, pickProfiles, type OnvifEndpoint } from "./onvif";
-
-/** The path and query of a stream URL, which is what a camera row stores. */
-export function streamPathOf(url: string | null): string {
-    if (!url) return "";
-    try {
-        const parsed = new URL(url);
-        return `${parsed.pathname}${parsed.search}`;
-    } catch {
-        return "";
-    }
-}
 
 /** Cameras already asked since this process started, by id. One ONVIF round
  *  per camera per start is the whole cost: a camera that answers one request at
@@ -62,14 +52,20 @@ async function replacementFor(endpoint: OnvifEndpoint, subPath: string): Promise
 /**
  * Check the cameras on one relay, once each, and move any that read a still
  * stream. Returns how many were moved. Never throws.
+ *
+ * No camera is started once `until` (epoch ms) has passed: the rest are left
+ * unasked for the next pass, so a house of slow or offline cameras cannot hold
+ * the sweep that calls this past its lease.
  */
 export async function repairStillStreams(
     relay: RelayEndpoint,
     cameras: readonly StillCandidate[],
-    warm: (camera: StillCandidate) => boolean
+    warm: (camera: StillCandidate) => boolean,
+    until = Number.POSITIVE_INFINITY
 ): Promise<number> {
     let moved = 0;
     for (const camera of cameras) {
+        if (Date.now() >= until) break;
         if (asked.has(camera.id) || !camera.enabled || !camera.subPath) continue;
         // A make with nothing to ask, or one reached over its maker's own
         // protocol, which picks the stream by quality and never reads the path.
