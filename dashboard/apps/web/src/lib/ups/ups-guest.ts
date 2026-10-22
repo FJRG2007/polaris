@@ -22,7 +22,7 @@ import * as upsService from "@/lib/ups/ups-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import type * as upsReading from "@/lib/ups/ups-reading";
 import { isDangerousCommand } from "@/app/(app)/places/ups/ups-words";
-import { linkReach, spendGrant, type LiveGrant } from "@/lib/access/grants";
+import { linkReach, recordGrantUse, spendGrant, type LiveGrant } from "@/lib/access/grants";
 
 /** Commands per link and address, a minute. */
 const COMMANDS_PER_MINUTE = 6;
@@ -53,11 +53,35 @@ export type UpsGuestRefusal =
     "closed" | "notThat" | "tooMany" | `nearby${Capitalize<Exclude<core.NearbyVerdict, "near">>}`;
 
 /** The live grant and row behind a UPS link, or null when it opens nothing. */
-async function reached(token: string): Promise<{ grant: LiveGrant; row: UpsRow } | null> {
+async function reached(
+    token: string
+): Promise<{ grant: LiveGrant; row: UpsRow; note: string } | null> {
     const link = await linkReach(token);
     if (!link || link.subjectType !== "place.ups" || link.standing !== "live") return null;
     const row = await upsService.getUps(link.subjectId);
-    return row ? { grant: link.grant, row } : null;
+    return row ? { grant: link.grant, row, note: link.note } : null;
+}
+
+/** One row of the access log for a UPS link's command. */
+function logCommand(
+    grant: LiveGrant,
+    row: UpsRow,
+    note: string,
+    outcome: "done" | "refused",
+    reason = ""
+): Promise<void> {
+    return recordGrantUse({
+        grantId: grant.id,
+        subjectType: "place.ups",
+        subjectId: row.id,
+        targetType: "ups",
+        targetId: row.id,
+        userId: null,
+        linkNote: note,
+        action: "command",
+        outcome,
+        reason
+    });
 }
 
 /** The UPS's reading, asked of it at most once per `READ_TTL_MS` however many
@@ -118,19 +142,23 @@ export async function pressUpsGuest(
 > {
     const found = await reached(token);
     if (!found) return { ok: false, error: "closed" };
-    const { grant, row } = found;
-    if (!grant.actions.includes("control") || isDangerousCommand(command))
+    const { grant, row, note } = found;
+    if (!grant.actions.includes("control") || isDangerousCommand(command)) {
+        await logCommand(grant, row, note, "refused", "notThat");
         return { ok: false, error: "notThat" };
+    }
     const limited = await rateLimit(`guest-ups:${grant.id}:${ip}`, COMMANDS_PER_MINUTE, 60_000);
     if (!limited.ok) return { ok: false, error: "tooMany" };
     const verdict = await upsNearby(grant, row.placeId, where);
     if (verdict) {
+        await logCommand(grant, row, note, "refused", "notNearby");
         return {
             ok: false,
             error: `nearby${verdict[0]!.toUpperCase()}${verdict.slice(1)}` as UpsGuestRefusal
         };
     }
     const outcome = await upsService.runUpsCommand(row, command);
+    await logCommand(grant, row, note, outcome === "ok" ? "done" : "refused", outcome === "ok" ? "" : "failed");
     if (outcome === "ok") {
         await spendGrant(grant).catch((caught: unknown) =>
             console.error("polaris: a UPS link use could not be counted:", caught)

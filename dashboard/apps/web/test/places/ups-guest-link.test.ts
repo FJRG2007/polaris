@@ -27,6 +27,7 @@ const spendGrant = vi.fn(async () => true);
 
 vi.mock("@/lib/access/grants", () => ({
     linkReach: async () => reach,
+    recordGrantUse: async () => undefined,
     spendGrant,
     liveGrants: async () => []
 }));
