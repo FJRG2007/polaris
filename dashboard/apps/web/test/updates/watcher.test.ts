@@ -215,6 +215,24 @@ beforeEach(() => {
     status = available();
 });
 
+describe("an update waiting stays off the bell", () => {
+    it("clears the rows older builds left on the bell, once per container", async () => {
+        vi.resetModules();
+        const fresh = await import("../../src/lib/update-watcher");
+        const deploymentWide = () =>
+            notificationDeleteMany.mock.calls
+                .map(([input]) => input as unknown as MarkRead)
+                .filter(
+                    (call) => call.where.type.in.includes("system.update") && !call.where.userId
+                );
+        await fresh.checkForUpdate();
+        expect(deploymentWide()).toHaveLength(1);
+        await fresh.checkForUpdate();
+        await fresh.checkForUpdate();
+        expect(deploymentWide()).toHaveLength(1);
+    });
+});
+
 describe("announcing a build", () => {
     it("tells everyone who can install it, once, however many passes run", async () => {
         await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });

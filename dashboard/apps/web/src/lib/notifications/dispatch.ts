@@ -354,7 +354,7 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
         rule = resolveRule(await getNotificationPreferences(input.userId), input.event);
     } catch (error) {
         console.error("polaris: could not resolve notification rules:", error);
-        rule = { inapp: true, email: false, destinations: [] };
+        rule = { inapp: event.offBell !== true, email: false, destinations: [] };
     }
 
     let watching = false;

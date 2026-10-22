@@ -761,8 +761,14 @@ export function BoardView(props: ViewProps) {
         <>
             {/* On a phone one column fills the screen with the next one showing
                 at the edge, and a swipe settles on a column rather than between
-                two - a board is read one stage at a time there. */}
-            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 sm:snap-none">
+                two - a board is read one stage at a time there.
+
+                From a tablet up the board is no taller than the screen and each
+                column scrolls its own cards: a board as tall as its longest
+                column put its horizontal scrollbar below the fold, so the
+                columns past the right edge had nothing on screen to reach them
+                with. */}
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-4 sm:max-h-[calc(100dvh-19rem-var(--notice-height))] sm:min-h-[16rem] sm:snap-none">
                 {shown.map((group) => {
                     // The pile of work with no status is not a column of the space:
                     // there is nothing there to rename, remove or move.
@@ -807,7 +813,7 @@ export function BoardView(props: ViewProps) {
                         >
                             <section
                                 className={cn(
-                                    "group/column flex w-[85vw] shrink-0 snap-start flex-col rounded-lg bg-muted/40 transition-[box-shadow,background-color,opacity] duration-fast sm:w-72",
+                                    "group/column flex w-[85vw] shrink-0 snap-start flex-col rounded-lg bg-muted/40 sm:min-h-0 transition-[box-shadow,background-color,opacity] duration-fast sm:w-72",
                                     draggingColumn === group.key && "opacity-60",
                                     columnOver === group.key && "ring-2 ring-primary",
                                     cardOver === group.key && "bg-muted/70 ring-1 ring-primary/50"
@@ -986,7 +992,7 @@ export function BoardView(props: ViewProps) {
                                     </header>
                                 )}
 
-                                <ul className="flex min-h-24 flex-col gap-2 px-2 pb-2">
+                                <ul className="flex min-h-24 flex-col gap-2 px-2 pb-2 sm:overflow-y-auto sm:overscroll-contain">
                                     {addingTo === group.key && (
                                         <li>
                                             <input

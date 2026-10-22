@@ -137,6 +137,7 @@
         "muted": "Silencio",
         "inApp": "En la app",
         "securityAlways": "Los avisos de seguridad siempre aparecen en Polaris",
+        "shownOnItsScreen": "Se muestra en Apps, no en la campana",
         "email": "Correo",
         "destinationOff": "Este destino está desactivado"
     },

@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { CodeView } from "@/components/json-view";
 import { CopyButton } from "@/components/copy-button";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, ExternalLink, Search, Plug } from "lucide-react";
@@ -42,7 +43,14 @@ import {
 const OTHER = "other";
 const HASH_PREFIX = "#connect-";
 
-/** A value somebody copies: one line or a block, with its copy button. */
+/** The grammar a whole-step value is painted in. A name, an address or a
+ *  transport is a short value typed into a form, not code, and stays plain. */
+const CODE_LANGUAGE: Partial<Record<CopyField["kind"], string>> = {
+    command: "bash",
+    config: "json"
+};
+
+/** A short value somebody copies, with its copy button. */
 function Copyable({ value, label }: { value: string; label: string }) {
     return (
         <div className="flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2">
@@ -135,7 +143,17 @@ function OfficialLink({ href }: { href: string }) {
  *  it has one. */
 function Field({ field, urls }: { field: CopyField; urls: ServerUrls }) {
     const t = useTranslations("mcpConnect");
-    const copyable = <Copyable value={field.value(urls)} label={t(`copy.${field.kind}`)} />;
+    const language = CODE_LANGUAGE[field.kind];
+    const copyable = language ? (
+        <CodeView
+            value={field.value(urls)}
+            language={language}
+            label={t(`copy.${field.kind}`)}
+            className="text-xs"
+        />
+    ) : (
+        <Copyable value={field.value(urls)} label={t(`copy.${field.kind}`)} />
+    );
     if (!LABELLED_KINDS.has(field.kind)) return copyable;
     return (
         <div className="flex min-w-0 flex-col gap-1">
@@ -222,7 +240,12 @@ function OtherSteps({ urls }: { urls: ServerUrls }) {
                     <p className="text-xs text-muted-foreground">{t(`other.types.${type}.hint`)}</p>
                 </Step>
                 <Step number={3} text={t("other.step3")}>
-                    <Copyable value={chosen.value(urls)} label={t("copy.config")} />
+                    <CodeView
+                        value={chosen.value(urls)}
+                        language="json"
+                        label={t("copy.config")}
+                        className="text-xs"
+                    />
                 </Step>
                 <Step number={4} text={t("other.step4")} />
             </Steps>

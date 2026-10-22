@@ -25,8 +25,6 @@ import {
     CalendarClock,
     Check,
     Compass,
-    Gamepad2,
-    Link2,
     LogOut,
     MessageSquareText,
     UserCog,
@@ -622,14 +620,6 @@ export function AccountMenu({
                             {t("account.notifications")}
                         </Link>
                     </DropdownMenuItem>
-                    {/* What is shown beside your name while you play or listen,
-                        one press from the face it is shown on. */}
-                    <DropdownMenuItem asChild>
-                        <Link href="/account/privacy/activity">
-                            <Gamepad2 className="size-4" />
-                            {t("account.activitySharing")}
-                        </Link>
-                    </DropdownMenuItem>
                     {/* Where the apps are. It existed and was reachable from
                         Preferences and from the vault's own client screen, which
                         are two places somebody looking for "the Polaris apps"
@@ -638,12 +628,6 @@ export function AccountMenu({
                         <Link href="/account/downloads">
                             <Download className="size-4" />
                             {t("account.getApps")}
-                        </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                        <Link href="/drive/shared-links">
-                            <Link2 className="size-4" />
-                            {t("account.sharedLinks")}
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={openTourList}>

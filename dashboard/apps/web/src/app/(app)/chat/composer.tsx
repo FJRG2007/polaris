@@ -1108,6 +1108,7 @@ export function Composer({
                 <div className="px-3 pt-2">
                     <RichTextEditor
                         key={generation}
+                        framed
                         value={body}
                         insert={handed}
                         focusAt={focusAt}

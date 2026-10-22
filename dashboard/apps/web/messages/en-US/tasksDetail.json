@@ -14,7 +14,6 @@
     "files": {
         "uploadFailed": "Could not upload that file",
         "title": "Files",
-        "attach": "Attach",
         "attachTitle": "Attach to this task",
         "drop": "Drop a screenshot, a recording or a document here",
         "removeNamed": "Remove {name}",

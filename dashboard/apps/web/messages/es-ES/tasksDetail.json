@@ -14,7 +14,6 @@
     "files": {
         "uploadFailed": "No se pudo subir ese archivo",
         "title": "Archivos",
-        "attach": "Adjuntar",
         "attachTitle": "Adjuntar a esta tarea",
         "drop": "Suelta aquí una captura, una grabación o un documento",
         "removeNamed": "Quitar {name}",

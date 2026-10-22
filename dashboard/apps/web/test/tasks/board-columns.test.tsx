@@ -62,11 +62,13 @@ function props(overrides: Partial<ViewProps> = {}): ViewProps {
 }
 
 function render(overrides: Partial<ViewProps> = {}): string {
-    return renderToStaticMarkup(withMessages(
-        <DisplayFormatProvider preferences={DISPLAY_DEFAULTS}>
-            <BoardView {...props(overrides)} />
-        </DisplayFormatProvider>
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <DisplayFormatProvider preferences={DISPLAY_DEFAULTS}>
+                <BoardView {...props(overrides)} />
+            </DisplayFormatProvider>
+        )
+    );
 }
 
 /** A board whose columns may be reshaped, removed and reordered. */
@@ -146,5 +148,16 @@ describe("a column standing for more than one status", () => {
     it("falls back to the key for a pile that is no column at all", () => {
         // The "no status" group, which the space does not define.
         expect(columnStatusIds(merged, "")).toEqual([""]);
+    });
+});
+
+describe("reaching the columns past the right edge", () => {
+    // A board as tall as its longest column put its horizontal scrollbar below
+    // the fold. From a tablet up the board stops at the screen's height and each
+    // column scrolls its own cards, so the bar stays on screen.
+    it("scrolls sideways within the screen's height, each column scrolling its own cards", () => {
+        const markup = render(MANAGED);
+        expect(markup).toMatch(/class="[^"]*overflow-x-auto[^"]*sm:max-h-\[calc\(100dvh/);
+        expect(markup).toContain("sm:overflow-y-auto");
     });
 });

@@ -307,6 +307,7 @@ function TemplateEditor({
                         <div className="rounded-md border border-border px-2 py-1.5">
                             <RichTextEditor
                                 value={draft.body}
+                                framed
                                 onChange={(body) => setDraft((held) => ({ ...held, body }))}
                                 placeholder={t("templates.bodyPlaceholder")}
                                 className="min-h-[10rem]"

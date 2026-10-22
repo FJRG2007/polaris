@@ -694,6 +694,7 @@ function EventGroup({
                                     eventId={entry.id}
                                     rule={rule}
                                     critical={entry.critical === true}
+                                    offBell={entry.offBell === true}
                                     destinations={destinations}
                                     onChange={onChange}
                                 />
@@ -711,12 +712,14 @@ function RuleChips({
     eventId,
     rule,
     critical,
+    offBell,
     destinations,
     onChange
 }: {
     eventId: string;
     rule: NotificationRule;
     critical: boolean;
+    offBell: boolean;
     destinations: DestinationView[];
     onChange: (event: string, rule: NotificationRule) => void;
 }) {
@@ -740,8 +743,15 @@ function RuleChips({
                 on={rule.inapp}
                 // A security alert always leaves a record; only where else it goes
                 // is negotiable.
-                disabled={critical}
-                title={critical ? t("rules.securityAlways") : undefined}
+                // And one whose own screen already carries it never does.
+                disabled={critical || offBell}
+                title={
+                    critical
+                        ? t("rules.securityAlways")
+                        : offBell
+                          ? t("rules.shownOnItsScreen")
+                          : undefined
+                }
                 onClick={() => onChange(eventId, { ...rule, inapp: !rule.inapp })}
             />
             <Chip

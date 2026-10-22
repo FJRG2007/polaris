@@ -173,36 +173,40 @@ export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
     if (data.length === 0) return <WidgetEmpty>{t("usage.empty")}</WidgetEmpty>;
 
     return (
-        <ul className="flex flex-col gap-3">
+        <ul className="-mx-2 flex flex-col gap-1">
             {data.map((server) => (
-                <li key={server.id} className="flex flex-col gap-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                        <Link
-                            href={server.href}
-                            className="min-w-0 truncate text-sm hover:underline"
-                        >
-                            {server.name}
-                        </Link>
-                        <span
-                            className={cn(
-                                "shrink-0 text-sm font-semibold tabular-nums",
-                                loadTone(server.cpuPercent)
-                            )}
-                        >
-                            {server.cpuPercent == null ? "-" : `${Math.round(server.cpuPercent)}%`}
-                        </span>
-                    </div>
-                    <Sparkline values={server.spark} tone={loadTone(server.cpuPercent)} />
-                    <p className="text-xs text-muted-foreground">
-                        {server.memUsedBytes == null
-                            ? t("usage.memoryUnknown")
-                            : server.memTotalBytes == null
-                              ? t("usage.memory", { used: formatBytes(server.memUsedBytes) })
-                              : t("usage.memoryOf", {
-                                    used: formatBytes(server.memUsedBytes),
-                                    total: formatBytes(server.memTotalBytes)
-                                })}
-                    </p>
+                <li key={server.id}>
+                    <Link
+                        href={server.href}
+                        className="flex flex-col gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <div className="flex items-baseline justify-between gap-2">
+                            <span className="min-w-0 truncate text-sm" title={server.name}>
+                                {server.name}
+                            </span>
+                            <span
+                                className={cn(
+                                    "shrink-0 text-sm font-semibold tabular-nums",
+                                    loadTone(server.cpuPercent)
+                                )}
+                            >
+                                {server.cpuPercent == null
+                                    ? "-"
+                                    : `${Math.round(server.cpuPercent)}%`}
+                            </span>
+                        </div>
+                        <Sparkline values={server.spark} tone={loadTone(server.cpuPercent)} />
+                        <p className="text-xs text-muted-foreground">
+                            {server.memUsedBytes == null
+                                ? t("usage.memoryUnknown")
+                                : server.memTotalBytes == null
+                                  ? t("usage.memory", { used: formatBytes(server.memUsedBytes) })
+                                  : t("usage.memoryOf", {
+                                        used: formatBytes(server.memUsedBytes),
+                                        total: formatBytes(server.memTotalBytes)
+                                    })}
+                        </p>
+                    </Link>
                 </li>
             ))}
         </ul>
@@ -307,48 +311,50 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
     }
 
     return (
-        <ul className="flex flex-col gap-3">
+        <ul className="-mx-2 flex flex-col gap-1">
             {data.map((device) => {
                 const percent =
                     device.usedBytes == null || !device.totalBytes
                         ? null
                         : Math.min(100, Math.round((device.usedBytes / device.totalBytes) * 100));
                 return (
-                    <li key={device.id} className="flex flex-col gap-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                            <Link
-                                href={device.href}
-                                className="min-w-0 truncate text-sm hover:underline"
-                            >
-                                {device.name}
-                            </Link>
-                            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                {percent == null ? "-" : `${percent}%`}
-                            </span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                            <div
-                                className={cn(
-                                    "h-full rounded-full transition-all",
-                                    barTone(percent)
-                                )}
-                                style={{ width: `${percent ?? 0}%` }}
-                            />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            {device.usedBytes == null
-                                ? device.totalBytes == null
-                                    ? t("storage.usageUnknown")
-                                    : t("storage.usageUnknownOf", {
-                                          total: formatBytes(device.totalBytes)
-                                      })
-                                : device.totalBytes == null
-                                  ? formatBytes(device.usedBytes)
-                                  : t("storage.usedOf", {
-                                        used: formatBytes(device.usedBytes),
-                                        total: formatBytes(device.totalBytes)
-                                    })}
-                        </p>
+                    <li key={device.id}>
+                        <Link
+                            href={device.href}
+                            className="flex flex-col gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <div className="flex items-baseline justify-between gap-2">
+                                <span className="min-w-0 truncate text-sm" title={device.name}>
+                                    {device.name}
+                                </span>
+                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                    {percent == null ? "-" : `${percent}%`}
+                                </span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                <div
+                                    className={cn(
+                                        "h-full rounded-full transition-all",
+                                        barTone(percent)
+                                    )}
+                                    style={{ width: `${percent ?? 0}%` }}
+                                />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                {device.usedBytes == null
+                                    ? device.totalBytes == null
+                                        ? t("storage.usageUnknown")
+                                        : t("storage.usageUnknownOf", {
+                                              total: formatBytes(device.totalBytes)
+                                          })
+                                    : device.totalBytes == null
+                                      ? formatBytes(device.usedBytes)
+                                      : t("storage.usedOf", {
+                                            used: formatBytes(device.usedBytes),
+                                            total: formatBytes(device.totalBytes)
+                                        })}
+                            </p>
+                        </Link>
                     </li>
                 );
             })}

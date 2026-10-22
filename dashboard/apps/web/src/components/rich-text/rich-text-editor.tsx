@@ -179,6 +179,11 @@ export interface RichTextEditorProps {
     /** Draw the border and background of a form field. Off by default: a
      *  description should read as part of the panel, not as an input. */
     bordered?: boolean;
+    /** The caller already draws the field around it - a message composer, a
+     *  mail body - so the surface takes no tint of its own on hover. A tint over
+     *  part of a box somebody is about to type in reads as a second control;
+     *  chat clients draw none. */
+    framed?: boolean;
     className?: string;
 }
 
@@ -236,6 +241,7 @@ export function RichTextEditor({
     listAction,
     emoji = null,
     bordered = false,
+    framed = false,
     className
 }: RichTextEditorProps) {
     // Held in a ref rather than in the dependency list: the editor is built once
@@ -531,14 +537,18 @@ export function RichTextEditor({
 
     if (!editor) {
         // The same box, before the view exists, so nothing jumps when it does.
-        return <div className={cn(surfaceClass(bordered, disabled), "min-h-[3rem]", className)} />;
+        return (
+            <div
+                className={cn(surfaceClass(bordered, framed, disabled), "min-h-[3rem]", className)}
+            />
+        );
     }
 
     // A surface nobody may write in keeps the browser's menu: every item this
     // one carries changes the document.
     if (disabled) {
         return (
-            <div className={cn(surfaceClass(bordered, disabled), className)}>
+            <div className={cn(surfaceClass(bordered, framed, disabled), className)}>
                 <EditorContent editor={editor} />
             </div>
         );
@@ -546,7 +556,7 @@ export function RichTextEditor({
 
     return (
         <div
-            className={cn(surfaceClass(bordered, disabled), className)}
+            className={cn(surfaceClass(bordered, framed, disabled), className)}
             /**
              * Anywhere in the box starts writing.
              *
@@ -586,18 +596,21 @@ export function RichTextEditor({
 }
 
 /** Camouflaged by default, and only a field when a caller says so. */
-function surfaceClass(bordered: boolean, disabled: boolean): string {
+function surfaceClass(bordered: boolean, framed: boolean, disabled: boolean): string {
     return cn(
         "w-full",
         bordered
             ? "rounded-md border border-border bg-field px-3 py-2 focus-within:border-border-strong"
-            : // Camouflaged until you point at it, and plain again once the caret
-              // is in: the tint says "this is editable", and once you are editing
-              // it is only a box around what you are writing. Written as one
-              // selector rather than hover plus focus-within, which are the same
-              // specificity and would resolve by stylesheet order.
-              "-mx-2 rounded-md px-2 py-1 transition-colors [&:not(:focus-within):hover]:bg-muted/40",
-        disabled && "cursor-default opacity-70 [&:not(:focus-within):hover]:bg-transparent"
+            : framed
+              ? ""
+              : // Camouflaged until you point at it, and plain again once the caret
+                // is in: the tint says "this is editable", and once you are editing
+                // it is only a box around what you are writing. Written as one
+                // selector rather than hover plus focus-within, which are the same
+                // specificity and would resolve by stylesheet order.
+                "-mx-2 rounded-md px-2 py-1 transition-colors [&:not(:focus-within):hover]:bg-muted/40",
+        disabled && "cursor-default opacity-70",
+        disabled && !framed && "[&:not(:focus-within):hover]:bg-transparent"
     );
 }
 

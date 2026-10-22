@@ -16,6 +16,7 @@
  */
 
 import type { PickedFile } from "./picked-file";
+import { DropZone } from "@/components/drop-zone";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn, Button, Dialog, DialogContent, EmptyState, Input, Select } from "@polaris/ui";
@@ -125,7 +126,6 @@ export function FilePickerDialog({
     const [kind, setKind] = useState("");
     const [chosen, setChosen] = useState<Record<string, Entry>>({});
     const [address, setAddress] = useState("");
-    const [dragging, setDragging] = useState(false);
     const file = useRef<HTMLInputElement | null>(null);
 
     // Which answer belongs to the listing on screen. A slow folder must not
@@ -448,29 +448,26 @@ export function FilePickerDialog({
                                     </ul>
                                 </>
                             ) : tab === "upload" ? (
-                                <div
-                                    className={cn(
-                                        "m-3 flex flex-1 flex-col items-center justify-center rounded-md border border-dashed p-6 text-center",
-                                        dragging ? "border-primary bg-card" : "border-border"
-                                    )}
-                                    onDragOver={(event) => {
-                                        event.preventDefault();
-                                        setDragging(true);
-                                    }}
-                                    onDragLeave={() => setDragging(false)}
-                                    onDrop={(event) => {
-                                        event.preventDefault();
-                                        setDragging(false);
-                                        fromComputer(event.dataTransfer.files);
-                                    }}
-                                >
-                                    <Upload
-                                        className="size-6 shrink-0 text-foreground-subtle"
-                                        aria-hidden
-                                    />
-                                    <p className="mt-2 text-[13px] text-muted-foreground">
-                                        {t("files.drop")}
-                                    </p>
+                                // One control: the zone opens the file chooser when
+                                // pressed and takes the files dropped on it.
+                                <>
+                                    <DropZone
+                                        onChoose={() => file.current?.click()}
+                                        onFiles={(files) => fromComputer(files)}
+                                        activeClassName="border-primary bg-card"
+                                        className="m-3 flex flex-1 flex-col items-center justify-center p-6 text-center"
+                                    >
+                                        <Upload
+                                            className="size-6 shrink-0 text-foreground-subtle"
+                                            aria-hidden
+                                        />
+                                        <span className="mt-2 block text-[13px] text-muted-foreground">
+                                            {t("files.drop")}
+                                        </span>
+                                        <span className="mt-3 block text-[13px] font-medium text-primary">
+                                            {t("files.choose")}
+                                        </span>
+                                    </DropZone>
                                     <input
                                         ref={file}
                                         type="file"
@@ -479,10 +476,7 @@ export function FilePickerDialog({
                                         className="hidden"
                                         onChange={(event) => fromComputer(event.target.files)}
                                     />
-                                    <Button className="mt-3" onClick={() => file.current?.click()}>
-                                        {t("files.choose")}
-                                    </Button>
-                                </div>
+                                </>
                             ) : (
                                 <div className="m-3 flex-1">
                                     <label className="block">
