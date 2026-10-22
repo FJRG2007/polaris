@@ -1,0 +1,19 @@
+{
+    "password": "fixture-app-password",
+    "cnonce": "0A1B2C3D4E5F6071",
+    "nonce": "FEDCBA9876543210",
+    "md5": "E69404350115818AC91328EE43A89C95",
+    "sha256": "204ABFD6ECD48CD7F47C207FF040144FCC82F4EC4539FD2CEA9BE9826AEED77E",
+    "deviceConfirmSha256": "9BE164D235EC918981286FF2C3745AF65EBDAC3894EF9484BEA739466467A9CEFEDCBA98765432100A1B2C3D4E5F6071",
+    "deviceConfirmMd5": "134E46C0EA6730A7AD7D8E14F5ACCDA49A357ED1E832D5F6F7E89B561315A1D3FEDCBA98765432100A1B2C3D4E5F6071",
+    "digest": "98A77608892F58C5959BBA1CE356356FA1A19C953895E748E9CAA68E82BB54C30A1B2C3D4E5F6071FEDCBA9876543210",
+    "lsk": "254f8f1ed88483b0fdaab59bc3d2f9dc",
+    "ivb": "1a9af93bb8d33ded9b4295dfdb90ceea",
+    "inner": "{\"method\":\"multipleRequest\",\"params\":{\"requests\":[{\"method\":\"getLensMaskConfig\",\"params\":{\"lens_mask\":{\"name\":[\"lens_mask_info\"]}}}]}}",
+    "encrypted": "OmbLqIL9REeCjLMaXFhdxMRsPrYl24Nz4CRwzm3xEx7hoMsQf6yiUZXdF/1AJcsuqrIMk62ozCAYir0cNqxFIO7VxQdapx8HrH2B1Tj+atyTCa81iXtxv1hCMPrmWPlfSMkbDBbTnp/O6r9py+4/MLkZxAkPPd/yBo3zp9oE8jI3spFAJ1Jguf26IYCVexVu",
+    "body": "{\"method\":\"securePassthrough\",\"params\":{\"request\":\"OmbLqIL9REeCjLMaXFhdxMRsPrYl24Nz4CRwzm3xEx7hoMsQf6yiUZXdF/1AJcsuqrIMk62ozCAYir0cNqxFIO7VxQdapx8HrH2B1Tj+atyTCa81iXtxv1hCMPrmWPlfSMkbDBbTnp/O6r9py+4/MLkZxAkPPd/yBo3zp9oE8jI3spFAJ1Jguf26IYCVexVu\"}}",
+    "seq": 7,
+    "tag": "B4484067B43CFF1061CE536830CCFEDE2F6B6BF407E80417116D01F27D9B8EC3",
+    "answer": "{\"error_code\": 0, \"result\": {\"responses\": [{\"method\": \"getLensMaskConfig\", \"result\": {\"lens_mask\": {\"lens_mask_info\": {\"enabled\": \"on\"}}}, \"error_code\": 0}]}}",
+    "answerEncrypted": "FCnLcAZkbQ8h38IawseXJyFJaZD8Y4iIK5p3sC8i2wrueRFgMMHmC3v6guNQUwU/ZSp3vTdeZP7rCfWtce3LsbQumZRTgdfeN9YQchnVol9xz28xQos2HV4teses3F0ZAWze3xx5nBQjtgsn5VLQ0MYWryP8RQmV7PUYDULvdNE1fuCmW6BZKscwdWTrH++CII3XCyLUuySfEY3p9qmQsw=="
+}
