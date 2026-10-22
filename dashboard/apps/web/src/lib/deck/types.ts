@@ -74,6 +74,26 @@ export interface DeckState {
     /** What pressing the key does from here, for a plugin that shows it before
      *  Polaris answers. Absent when the key cannot know ahead. */
     readonly press?: DeckPress;
+    /** For a timer kept in Polaris: what the key counts down from, so it ticks
+     *  every second between readings and agrees with every other screen. */
+    readonly countdown?: DeckCountdown;
+}
+
+/**
+ * A countdown as Polaris has it. `endsAt` is when a running one reaches zero,
+ * on Polaris's clock; `serverNow` is that clock when it was read, so a deck
+ * whose own clock is off counts to the same second (the skew Calendar's
+ * screens apply). A stopped one carries only what is left.
+ */
+export interface DeckCountdown {
+    readonly state: "running" | "paused" | "rung" | "idle";
+    readonly remainingMs: number;
+    /** Its full length, for a reset or a progress ring. */
+    readonly durationMs: number;
+    readonly endsAt?: number;
+    readonly serverNow?: number;
+    /** A focus cycle: the phase it is on. */
+    readonly phase?: "focus" | "short" | "long";
 }
 
 /** A key's face without what a press would do. */
@@ -155,7 +175,8 @@ export interface AppDeckAction {
             readonly value: string;
             readonly label: Readonly<Record<Locale, string>>;
         }[];
-        /** For `choice`: the tool that lists them and how to read its answer. */
+        /** For `choice`: the tool that lists them and how to read its answer,
+         *  after any `fixed` ones. */
         readonly choices?: {
             readonly tool: string;
             readonly input: Record<string, unknown>;
@@ -171,7 +192,14 @@ export interface AppDeckAction {
      *  the state last read, for a toggle. A null input is a press that has
      *  nothing to send (a step from a value the device has not reported). */
     readonly run: {
-        readonly tool: string;
+        /** One tool, or the one this press needs - creating a timer the
+         *  first time, changing it after - chosen from what the read answered. */
+        readonly tool:
+            | string
+            | ((
+                  options: Record<string, unknown>,
+                  press: { readonly step?: number; readonly read?: unknown }
+              ) => string);
         readonly input: (
             options: Record<string, unknown>,
             press: {
@@ -188,7 +216,12 @@ export interface AppDeckAction {
     readonly read?: {
         readonly tool: string;
         readonly input: (options: Record<string, unknown>) => unknown;
-        readonly pick: (structured: unknown, locale: Locale) => DeckState;
+        readonly pick: (
+            structured: unknown,
+            locale: Locale,
+            /** The key's settings, for a read shared by many keys. */
+            options?: Record<string, unknown>
+        ) => DeckState;
         /** What a press does from the state just picked, with the key's
          *  settings and what the tool answered. */
         readonly press?: (

@@ -297,6 +297,80 @@ describe("runDeckAction", () => {
     });
 });
 
+describe("an app action that creates what it works the first time", () => {
+    // Calendar's timer key: the picker lists fixed choices before the read
+    // ones, and the read decides which tool a press calls.
+    const maker: AppDeckAction = {
+        ...lamp,
+        id: "places.maker",
+        fields: [
+            {
+                name: "deviceId",
+                type: "choice",
+                label: { "en-US": "Device", "es-ES": "Aparato" },
+                required: true,
+                fixed: [{ value: "new", label: { "en-US": "A new one", "es-ES": "Uno nuevo" } }],
+                choices: {
+                    tool: "places_devices",
+                    input: {},
+                    pick: (structured) =>
+                        (structured as { devices: { id: string; name: string }[] }).devices.map(
+                            (device) => ({ value: device.id, label: device.name })
+                        )
+                }
+            }
+        ],
+        run: {
+            tool: (options, press) =>
+                (press.read as { devices: { id: string }[] }).devices.some(
+                    (device) => device.id === options.deviceId
+                )
+                    ? "places_device_control"
+                    : "places_devices",
+            input: (options) => ({ deviceId: options.deviceId })
+        },
+        read: {
+            ...lamp.read!,
+            pick: (_structured, _locale, options) => ({
+                tone: "ok",
+                detail: String(options?.deviceId)
+            })
+        }
+    };
+
+    it("lists the fixed choices first, then the read ones", async () => {
+        appActions = [maker];
+        const listed = await service.deckCatalogue(caller(["home.read", "home.control"]), words);
+        expect(listed.find((action) => action.id === maker.id)?.options[0]?.choices).toEqual([
+            { value: "new", label: "A new one" },
+            { value: "d1", label: "Lamp" }
+        ]);
+    });
+
+    it("picks the tool from what the read answered, and the state from the key's settings", async () => {
+        appActions = [maker];
+        const known = await service.runDeckAction(
+            caller(["home.read", "home.control"]),
+            { action: maker.id, options: { deviceId: "d1" } },
+            words
+        );
+        expect(known).toEqual({ ok: true, state: { tone: "ok", detail: "d1" } });
+        expect(calls.map((call) => call.name)).toContain("places_device_control");
+        calls.length = 0;
+        await service.runDeckAction(
+            caller(["home.read", "home.control"]),
+            { action: maker.id, options: { deviceId: "new" } },
+            words
+        );
+        // Read once, then the other tool: nothing was sent to the device.
+        expect(calls.map((call) => call.name)).toEqual([
+            "places_devices",
+            "places_devices",
+            "places_devices"
+        ]);
+    });
+});
+
 describe("readDeckStates", () => {
     it("reads each watched key and reads a gone or forbidden one as idle", async () => {
         const { readings, chat } = await service.readDeckStates(

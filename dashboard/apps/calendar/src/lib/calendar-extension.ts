@@ -85,5 +85,8 @@ export const calendarExtension: AppExtension = {
         (await import("../../messages")).calendarCatalogs.catalogs[locale].mcpTools,
 
     // How `polaris_search` finds its calendars and events, by the same rules.
-    mcpSearch: async () => (await import("./mcp-tools")).calendarMcpSearch()
+    mcpSearch: async () => (await import("./mcp-tools")).calendarMcpSearch(),
+
+    // Its timers on a Stream Deck or in Companion, through the clock tools.
+    deckActions: async () => (await import("./deck-actions")).calendarDeckActions()
 };
