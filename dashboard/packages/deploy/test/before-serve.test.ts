@@ -13,14 +13,16 @@ import type { AppDeployPlan, RuntimeContext } from "../src/runtime/driver.js";
 const DEPLOYMENT = "0190f7a2-5b1c-7d3e-8f00-1234567890ab";
 const PINNED = releaseImage("shop-web-1a2b", DEPLOYMENT);
 
-function plan(): AppDeployPlan {
+const DIGEST = `nginx@sha256:${"0".repeat(64)}`;
+
+function plan(imageRef = "nginx:alpine"): AppDeployPlan {
     return {
         ref: { name: "shop-web-1a2b", project: "polaris-1a2b" },
         build: {
             method: "image",
             name: "web",
             contextPath: ".",
-            imageRef: "nginx:alpine",
+            imageRef,
             release: { image: PINNED, deploymentId: DEPLOYMENT }
         },
         env: {},
@@ -56,14 +58,21 @@ describe.each([
     ["compose", () => new ComposeRuntime(), "composeUp"],
     ["swarm", () => new SwarmRuntime(), "stackUp"]
 ] as const)("the %s runtime", (_name, runtime, up) => {
-    it("asks with the pinned release and the reference it was pulled by", async () => {
+    it("asks with the pinned release, never a tag that can move", async () => {
         const ask = vi.fn(async () => null);
         const { ctx, ports } = context(ask);
         const result = await runtime().deployApplication(plan(), ctx);
         expect(result.ok).toBe(true);
         expect(ask).toHaveBeenCalledTimes(1);
-        expect(ask).toHaveBeenCalledWith([PINNED, "nginx:alpine"]);
+        expect(ask).toHaveBeenCalledWith([PINNED]);
         expect(ports[up]).toHaveBeenCalledTimes(1);
+    });
+
+    it("also asks with the digest it was pulled by", async () => {
+        const ask = vi.fn(async () => null);
+        const { ctx } = context(ask);
+        await runtime().deployApplication(plan(DIGEST), ctx);
+        expect(ask).toHaveBeenCalledWith([PINNED, DIGEST]);
     });
 
     it("starts nothing when the release is refused, and says why", async () => {

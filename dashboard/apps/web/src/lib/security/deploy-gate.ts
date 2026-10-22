@@ -8,8 +8,10 @@
  * before the new containers start and the edge is moved onto them. A scan takes
  * minutes (the image is exported and matched), and a deploy must not stall on
  * it, so the check never waits for one: it reads a finished scan of the same
- * image reference on the same server from the last week - a redeploy, a
- * rollback, an image pulled by a tag that was already running there. A release
+ * image reference on the same server from the last week - a rollback to a kept
+ * release, an image pulled by a digest that was already running there. Only
+ * references that cannot move are matched (see `askBeforeServe`): a tag may
+ * name a newer image than the one its scan read. A release
  * nobody scanned yet goes live, and the scan that runs once it is live (see
  * the security scans' new-release path) is what reports it, in the bell.
  *

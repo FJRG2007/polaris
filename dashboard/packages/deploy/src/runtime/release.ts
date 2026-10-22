@@ -6,7 +6,7 @@
 
 import { Readable } from "node:stream";
 import type { AppDeployPlan, RuntimeContext } from "./driver.js";
-import { pinDockerfile, singleFileTar } from "../release-image.js";
+import { isReleaseImage, pinDockerfile, singleFileTar } from "../release-image.js";
 
 /** What a rollback says when the image it needs has gone from the machine. */
 export const RELEASE_IMAGE_GONE =
@@ -70,15 +70,24 @@ export async function pinRelease(image: string, plan: AppDeployPlan, ctx: Runtim
     return release.image;
 }
 
+/** A reference that always names the same image: a kept release, or a digest. */
+export function isImmutableRef(reference: string | null | undefined): reference is string {
+    return isReleaseImage(reference) || /@sha256:[0-9a-f]{64}$/.test(reference ?? "");
+}
+
 /**
  * Ask the context's `beforeServe` about a release whose image is ready, once,
  * in both runtimes at the same point: after the image is built or pulled and
  * pinned, and before anything of it starts. Answers the sentence it was refused
  * with, or null to go on (also when nothing asks).
+ *
+ * Only references that cannot move are asked about: a tag like `app:latest`
+ * may name a newer image than the one a past scan read, and judging the fixed
+ * image by the old one's findings would refuse the very release that fixes them.
  */
 export async function askBeforeServe(image: string, plan: AppDeployPlan, ctx: RuntimeContext): Promise<string | null> {
     if (!ctx.beforeServe) return null;
     const pulledBy = plan.build.method === "image" ? plan.build.imageRef : undefined;
-    const refs = [image, pulledBy].filter((ref): ref is string => typeof ref === "string" && ref.length > 0);
+    const refs = [...new Set([image, pulledBy].filter(isImmutableRef))];
     return ctx.beforeServe(refs);
 }

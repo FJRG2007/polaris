@@ -12,6 +12,7 @@ import { promisify } from "node:util";
 import * as parse from "../model/parse";
 import * as specs from "../model/specs";
 import * as images from "../model/images";
+import * as history from "../model/history";
 import { gunzip, gzip } from "node:zlib";
 import { Readable } from "node:stream";
 import { decodeLockfiles, dependencyContext, shortHash } from "@polaris/deploy";
@@ -36,7 +37,6 @@ const unzip = promisify(gunzip);
 export type ScanKind = "malware" | "files" | "audit" | "image" | "deps";
 
 const MAX_FINDINGS = 500;
-const KEEP_PER_KIND = 30;
 const HISTORY_MS = 90 * 24 * 60 * 60_000;
 /** Past every deadline a scan runs under (one-shots share `TIMEOUT_MS`, the
  *  daemon stops an export within the hour), so only a scan nothing is running
@@ -1054,7 +1054,8 @@ async function planServerImages(now: Date): Promise<void> {
     }
 }
 
-/** Keep the newest scans per server and kind, and nothing older than the window. */
+/** Keep the newest scans per server and kind (per image or app for the kinds
+ *  that have one, see `history`), and nothing older than the window. */
 async function prune(now: Date): Promise<void> {
     await prisma.securityScan.deleteMany({
         where: {
@@ -1065,21 +1066,21 @@ async function prune(now: Date): Promise<void> {
     const groups = await prisma.securityScan.groupBy({
         by: ["targetId", "kind"],
         _count: { _all: true },
-        having: { id: { _count: { gt: KEEP_PER_KIND } } }
+        having: { id: { _count: { gt: history.KEEP_PER_SUBJECT } } }
     });
     for (const group of groups) {
-        const old = await prisma.securityScan.findMany({
+        const rows = await prisma.securityScan.findMany({
             where: {
                 targetId: group.targetId,
                 kind: group.kind,
                 state: { in: ["done", "failed"] }
             },
             orderBy: { createdAt: "desc" },
-            skip: KEEP_PER_KIND,
-            select: { id: true },
-            take: 500
+            select: { id: true, kind: true, imageId: true, input: true },
+            take: 5000
         });
-        await prisma.securityScan.deleteMany({ where: { id: { in: old.map((row) => row.id) } } });
+        const victims = history.pruneVictims(rows).slice(0, 500);
+        if (victims.length > 0) await prisma.securityScan.deleteMany({ where: { id: { in: victims } } });
     }
     await prisma.securityQuarantine.deleteMany({
         where: {

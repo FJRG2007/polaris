@@ -25,19 +25,34 @@ export function DependenciesPanel({ applicationId }: { applicationId: string }) 
     const format = useDisplayFormat();
     const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
 
-    const read = useCallback(async () => {
-        setLoaded({ status: "loading" });
-        const result = await serviceDependenciesAction(applicationId).catch(() => ({
-            error: "failed"
-        }));
-        if ("error" in result && result.error) return setLoaded({ status: "failed" });
-        const ok = result as { scan?: DependencyScanView | null; findings?: DependencyFinding[] };
-        setLoaded({ status: "ready", scan: ok.scan ?? null, findings: ok.findings ?? [] });
-    }, [applicationId]);
+    const read = useCallback(
+        async (quiet = false) => {
+            if (!quiet) setLoaded({ status: "loading" });
+            const result = await serviceDependenciesAction(applicationId).catch(() => ({
+                error: "failed"
+            }));
+            if ("error" in result && result.error) {
+                if (!quiet) setLoaded({ status: "failed" });
+                return;
+            }
+            const ok = result as { scan?: DependencyScanView | null; findings?: DependencyFinding[] };
+            setLoaded({ status: "ready", scan: ok.scan ?? null, findings: ok.findings ?? [] });
+        },
+        [applicationId]
+    );
 
     useEffect(() => {
         void read();
     }, [read]);
+
+    const busy =
+        loaded.status === "ready" &&
+        (loaded.scan?.state === "queued" || loaded.scan?.state === "running");
+    useEffect(() => {
+        if (!busy) return;
+        const timer = setInterval(() => void read(true), 8000);
+        return () => clearInterval(timer);
+    }, [busy, read]);
 
     const labels: VulnerabilityTableLabels = {
         failed: t("dependencies.failed"),

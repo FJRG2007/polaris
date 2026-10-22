@@ -7,6 +7,7 @@
  */
 
 import { canDeployAnyway, checkReleaseImage, parseStoredWarning } from "@/lib/security/deploy-gate";
+import { queueDependencyScan } from "@/lib/security/lockfiles";
 import {
     parsePrivateAccess,
     storePrivateAccess,
@@ -3968,10 +3969,12 @@ export async function restartFromKeptImage(
     reason: "variables" | "settings" | "scale" = "variables",
     /** More to say on the deploy's audit entry, such as the API key that asked. */
     audit?: Record<string, unknown>,
-    /** Close the service's host port with this release (see `buildAppPlan`). */
-    options?: { readonly closePort?: boolean }
+    /** Close the service's host port with this release (see `buildAppPlan`),
+     *  and let it through a service that blocks vulnerable ones (`deployAnyway`). */
+    options?: { readonly closePort?: boolean; readonly securityOverride?: boolean }
 ): Promise<string> {
     const closePort = options?.closePort === true;
+    const override = options?.securityOverride ? { securityOverride: true } : {};
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { currentDeploymentId: true }
@@ -3995,14 +3998,15 @@ export async function restartFromKeptImage(
         return deployApplication(applicationId, ownerId, userId, {
             trigger: reason,
             audit,
-            closePort
+            closePort,
+            ...override
         });
     }
     return deployApplication(
         applicationId,
         ownerId,
         userId,
-        { audit, closePort },
+        { audit, closePort, ...override },
         {
             deploymentId: live.id,
             imageTag: live.imageTag,
@@ -4523,6 +4527,8 @@ export async function deployAnyway(
             status: true,
             securityWarning: true,
             securityOverrideAt: true,
+            trigger: true,
+            rollbackOfId: true,
             commitSha: true,
             commitMessage: true,
             authorName: true,
@@ -4535,6 +4541,62 @@ export async function deployAnyway(
     if (!canDeployAnyway(refused)) {
         throw new Error("This release was not held back by the vulnerability check.");
     }
+    const audit = { securityOverrideOf: deploymentId };
+    // A held-back rollback puts the kept release back, as it would have; a
+    // fresh build of its commit could be different code.
+    if (refused.rollbackOfId) {
+        const source = await prisma.deployment.findFirst({
+            where: {
+                id: refused.rollbackOfId,
+                deployableType: "application",
+                deployableId: refused.deployableId
+            },
+            select: {
+                id: true,
+                imageTag: true,
+                imageKept: true,
+                commitSha: true,
+                commitMessage: true,
+                authorName: true,
+                authorAvatarUrl: true
+            }
+        });
+        if (!source?.imageKept || !isReleaseImage(source.imageTag)) {
+            throw new Error(
+                "That release's image is no longer kept on the server, so it cannot be rolled back to instantly. Deploy its commit again instead."
+            );
+        }
+        const started = await deployApplication(
+            refused.deployableId,
+            ownerId,
+            userId,
+            { securityOverride: true, audit },
+            {
+                deploymentId: source.id,
+                imageTag: source.imageTag,
+                commitSha: source.commitSha,
+                commitMessage: source.commitMessage,
+                authorName: source.authorName,
+                authorAvatarUrl: source.authorAvatarUrl
+            }
+        );
+        return { deploymentId: started, applicationId: refused.deployableId };
+    }
+    if (
+        refused.trigger === "variables" ||
+        refused.trigger === "settings" ||
+        refused.trigger === "scale"
+    ) {
+        const started = await restartFromKeptImage(
+            refused.deployableId,
+            ownerId,
+            userId,
+            refused.trigger,
+            audit,
+            { securityOverride: true }
+        );
+        return { deploymentId: started, applicationId: refused.deployableId };
+    }
     const started = await deployApplication(refused.deployableId, ownerId, userId, {
         ...(refused.commitSha ? { commitSha: refused.commitSha } : {}),
         ...(refused.commitMessage ? { commitMessage: refused.commitMessage } : {}),
@@ -4542,7 +4604,7 @@ export async function deployAnyway(
         ...(refused.authorAvatarUrl ? { authorAvatarUrl: refused.authorAvatarUrl } : {}),
         trigger: "manual",
         securityOverride: true,
-        audit: { securityOverrideOf: deploymentId }
+        audit
     });
     return { deploymentId: started, applicationId: refused.deployableId };
 }
