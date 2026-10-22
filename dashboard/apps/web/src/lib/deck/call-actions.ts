@@ -27,12 +27,18 @@ import type { DeckCaller, DeckRunResult, DeckState } from "./types";
 const LOOKS: Readonly<
     Record<
         CallSwitch,
-        { on: { icon: string; tone: DeckState["tone"] }; off: { icon: string; tone: DeckState["tone"] } }
+        {
+            on: { icon: string; tone: DeckState["tone"] };
+            off: { icon: string; tone: DeckState["tone"] };
+        }
     >
 > = {
     // On is muted: the key lights up when nobody can hear you, as Discord's does.
     mic: { on: { icon: "mic-off", tone: "warn" }, off: { icon: "mic", tone: "idle" } },
-    deafen: { on: { icon: "headphone-off", tone: "warn" }, off: { icon: "headphones", tone: "idle" } },
+    deafen: {
+        on: { icon: "headphone-off", tone: "warn" },
+        off: { icon: "headphones", tone: "idle" }
+    },
     camera: { on: { icon: "video", tone: "ok" }, off: { icon: "video-off", tone: "idle" } },
     record: { on: { icon: "circle-dot", tone: "bad" }, off: { icon: "circle-dot", tone: "idle" } }
 };
@@ -56,7 +62,11 @@ export function switchOn(which: CallSwitch, controls: remote.SeatControls): bool
 }
 
 /** A switch's key, on or off, in its reader's words. */
-export function switchState(which: CallSwitch, on: boolean, locale: DeckCaller["locale"]): DeckState {
+export function switchState(
+    which: CallSwitch,
+    on: boolean,
+    locale: DeckCaller["locale"]
+): DeckState {
     const look = on ? LOOKS[which].on : LOOKS[which].off;
     return {
         tone: look.tone,
@@ -117,7 +127,9 @@ export function callDeckActions(): readonly CoreDeckAction[] {
             fields: [],
             run: async (_options, caller) => {
                 const sent = await remote.hangUpCall(caller.userId);
-                return sent.ok ? { ok: true, state: noCallState(caller.locale) } : refusal(caller, sent.refusal);
+                return sent.ok
+                    ? { ok: true, state: noCallState(caller.locale) }
+                    : refusal(caller, sent.refusal);
             },
             read: async (_options, caller) =>
                 (await remote.liveCallOf(caller.userId))
@@ -151,7 +163,10 @@ export function callDeckActions(): readonly CoreDeckAction[] {
                     remote.playCallSound(caller.userId, String(options.sound))
                 );
                 if (result.error || !result.value)
-                    return { ok: false, message: result.error ?? api(caller)("deck.errors.refused") };
+                    return {
+                        ok: false,
+                        message: result.error ?? api(caller)("deck.errors.refused")
+                    };
                 return result.value.ok ? { ok: true } : refusal(caller, result.value.refusal);
             },
             read: async (_options, caller) =>

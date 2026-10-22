@@ -33,7 +33,11 @@ export async function GET(
     const seat = await resolveSeat(meetingId);
     // A non-200 makes EventSource give up rather than reconnect forever against
     // a call it is not in.
-    if (!seat) return Response.json({ error: (await readerWords("chat"))("errors.notInThatCall") }, { status: 403 });
+    if (!seat)
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.notInThatCall") },
+            { status: 403 }
+        );
 
     /** Settled by the request that proved the seat, and what everything below
      *  is about. Held on its own so the long-lived callbacks below do not each

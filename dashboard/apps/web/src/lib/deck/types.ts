@@ -13,7 +13,8 @@ import type { Locale } from "@polaris/core";
 export type DeckActionKind = "run" | "toggle" | "state" | "dial" | "open";
 
 /** The heading the plugin's picker groups actions under. */
-export type DeckArea = "chat" | "call" | "status" | "watch" | "deploy" | "places" | "polaris" | "tools";
+export type DeckArea =
+    "chat" | "call" | "status" | "watch" | "deploy" | "places" | "polaris" | "tools";
 
 /** One setting an action takes, as the plugin's settings screen draws it. */
 export interface DeckOptionField {

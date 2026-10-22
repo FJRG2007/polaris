@@ -4,9 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 
-const { placesDeckActions, clampTarget, naturalAction, naturalState } = await import(
-    "@polaris-app/places/src/lib/deck-actions"
-);
+const { placesDeckActions, clampTarget, naturalAction, naturalState } =
+    await import("@polaris-app/places/src/lib/deck-actions");
 
 const toggle = placesDeckActions().find((action) => action.id === "places.device-toggle")!;
 const device = (online: boolean, state = "on") => ({

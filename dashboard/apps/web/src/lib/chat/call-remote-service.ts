@@ -23,8 +23,8 @@ import { reachableSpaceIds } from "./access";
 import * as soundboard from "./soundboard-service";
 import { publishMeetingEvent } from "./meeting-events";
 import { PARTICIPANT_TTL_MS, type MeetingSeat } from "./meetings";
-import { DEFAULT_SOUNDS, SOUNDBOARD_SLOTS, defaultRef } from "./soundboard";
 import { mayRecordCall, type CallRemoteCommand, type CallSwitch } from "./call-remote";
+import { DEFAULT_SOUNDS, SOUNDBOARD_SLOTS, defaultRef, type DefaultSoundId } from "./soundboard";
 
 /** What one seat's tab last said about its controls. */
 export interface SeatControls {
@@ -280,7 +280,7 @@ const PICKER_LIMIT = 100;
  */
 export async function deckSounds(
     userId: string,
-    defaultName: (id: string) => string
+    defaultName: (id: DefaultSoundId) => string
 ): Promise<{ value: string; label: string }[]> {
     const own = DEFAULT_SOUNDS.map((sound) => ({
         value: defaultRef(sound.id),

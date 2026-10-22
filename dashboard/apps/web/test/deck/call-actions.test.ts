@@ -25,9 +25,8 @@ vi.mock("@/lib/chat/call-remote-service", () => ({
     deckSounds: async () => []
 }));
 
-const { callDeckActions, noCallState, switchOn, switchState } = await import(
-    "../../src/lib/deck/call-actions"
-);
+const { callDeckActions, noCallState, switchOn, switchState } =
+    await import("../../src/lib/deck/call-actions");
 
 const { defaultRef } = await import("../../src/lib/chat/soundboard");
 const SOUND = defaultRef("applause");

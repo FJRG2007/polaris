@@ -230,7 +230,8 @@ export function naturalAction(device: {
     readonly actions: readonly string[];
 }): string | null {
     const takes = (action: string) => device.actions.includes(action);
-    if (takes("turn-on") && takes("turn-off")) return device.state === "on" ? "turn-off" : "turn-on";
+    if (takes("turn-on") && takes("turn-off"))
+        return device.state === "on" ? "turn-off" : "turn-on";
     if (takes("open")) return "open";
     if (takes("lock") && takes("unlock")) return device.state === "locked" ? "unlock" : "lock";
     return null;
