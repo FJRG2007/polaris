@@ -11037,6 +11037,19 @@ model Camera {
     /// passes the grace window, and the event is closed when it clears.
     offlineSince DateTime?
 
+    /// Privacy: nothing Polaris runs reads a frame from it while this is on -
+    /// relay, recording, watcher, detection and stills all leave it alone. On a
+    /// camera with a privacy mode of its own (Tapo) it is read back from the
+    /// camera rather than assumed.
+    privacy          Boolean   @default(false)
+    privacyChangedAt DateTime?
+    /// An ONVIF preset to point a pan-tilt camera at when it goes private, for
+    /// cameras with no privacy mode of their own. Null sends nothing.
+    privacyPreset    String?
+    /// SHA-256 fingerprint of the certificate the camera's own control API
+    /// presented on the first privacy call; later calls must present the same.
+    controlPin       String?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
