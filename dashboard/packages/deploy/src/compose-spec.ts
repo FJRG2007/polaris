@@ -538,7 +538,12 @@ export function serviceNetworkLines(
 export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec {
     const ports: ComposeSpecPort[] =
         plan.exposePort !== undefined
-            ? [{ host: plan.exposePort, container: defaultDbPort(plan.image) }]
+            ? [
+                  {
+                      host: plan.exposePort,
+                      container: plan.containerPort ?? defaultDbPort(plan.image)
+                  }
+              ]
             : [];
     const networks = joinedNetworks(plan.networks, network);
     // Its private names go on the container that carries the database's own name.
@@ -597,7 +602,17 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
                 networks,
                 extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped",
-                ...limitFields(plan.limits)
+                ...limitFields(plan.limits),
+                ...(plan.healthcheck
+                    ? {
+                          healthcheck: {
+                              test: [...plan.healthcheck.test],
+                              interval: plan.healthcheck.intervalSeconds,
+                              retries: plan.healthcheck.retries,
+                              startPeriod: plan.healthcheck.startPeriodSeconds
+                          }
+                      }
+                    : {})
             }
         ],
         volumes: [

@@ -148,6 +148,32 @@
             "engineAccount": "Esa cuenta pertenece al motor.",
             "generatedPassword": "La contraseña tiene que ser una que haya generado Polaris.",
             "connectionId": "Ese no es un id de conexión."
+        },
+        "cloud": {
+            "nothingAnswered": "Nada respondió en esa dirección",
+            "httpStatus": "El servidor respondió HTTP {status}",
+            "noResolve": "Ese nombre de host no se resuelve",
+            "privateAddress": "Esa dirección no se puede alcanzar desde aquí.",
+            "keysRefused": "Las claves se rechazaron o no llegan a ese bucket",
+            "keyRefused": "Se rechazó la clave de API",
+            "userRefused": "Se rechazó el usuario o la contraseña",
+            "tokenRefused": "Se rechazó el token",
+            "noBucket": "Esa organización no tiene un bucket con ese nombre",
+            "environmentNotFound": "No se encontró el entorno",
+            "nameEmpty": "El nombre de la base de datos debe tener letras o números",
+            "nameTaken": "Este entorno ya tiene una base de datos llamada {name}",
+            "notReady": "Esta instancia aún no tiene dirección. Abre Gestionar para ver cómo va su creación.",
+            "amqpKeyRefused": "CloudAMQP rechazó la clave de API",
+            "amqpListFailed": "CloudAMQP no pudo listar tus instancias (HTTP {status})",
+            "amqpCreateFailed": "CloudAMQP no pudo crear la instancia (HTTP {status})",
+            "amqpReadFailed": "CloudAMQP no pudo leer la instancia (HTTP {status})",
+            "amqpDeleteFailed": "CloudAMQP no pudo borrar la instancia (HTTP {status})",
+            "failed": {
+                "lost": "Polaris perdió lo que necesitaba para crear esta instancia. Créala de nuevo.",
+                "timeout": "CloudAMQP no terminó de crear esta instancia en 30 minutos.",
+                "keyRefused": "CloudAMQP rechazó la clave de API. Revísala y envía el formulario otra vez.",
+                "createRefused": "CloudAMQP no quiso crearla con ese plan y región. Revísalos y envía el formulario otra vez."
+            }
         }
     },
     "registry": {

@@ -52,6 +52,8 @@ import {
 } from "lucide-react";
 import * as geometry from "./canvas-geometry";
 import { dbTone, StatusPill } from "./status-pill";
+import { useProjectCan } from "./access-context";
+import { offeredServiceTypes } from "./service-type-access";
 import {
     NewServiceDialog,
     SERVICE_TYPES,
@@ -139,42 +141,38 @@ function nodesFromEnvironment(
     environment: ProjectSummary["environments"][number],
     t: NamespaceTranslator<"deploy">
 ): CanvasNode[] {
-    const apps = environment.applications.map(
-        (app): CanvasNode => ({
-            id: app.id,
-            name: app.name,
-            kind: serviceKindOf(app.sourceType),
-            // The production copy's domain first when the service also runs on another
-            // provider - that is where it answers people - then its own best address.
-            subtitle:
-                app.elsewhere.find((entry) => entry.domains.length > 0)?.domains[0] ??
-                primaryDomain(app.domains)?.hostname ??
-                (app.sourceType === "image" ? t("canvas.dockerImage") : t("canvas.gitRepository")),
-            elsewhere: app.elsewhere[0]
-                ? { provider: app.elsewhere[0].provider, status: app.elsewhere[0].status }
-                : undefined,
-            tone: runStateLabel(app, t).tone,
-            statusLabel: runStateLabel(app, t).label,
-            volumes: app.volumes
-        })
-    );
-    const databases = environment.databases.map(
-        (database): CanvasNode => ({
-            id: database.id,
-            name: database.name,
-            kind: "database",
-            engine: database.engine,
-            subtitle: dbEngineLabel(database.engine),
-            tone: dbTone(database.status),
-            statusLabel: database.status,
-            hostedCount: database.hostedCount ?? 0,
-            // A database living inside another instance has no volume of its own; the
-            // strip under the card would name one that does not exist.
-            volume: database.hostedOnInstance
-                ? undefined
-                : `${database.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-volume`
-        })
-    );
+    const apps = environment.applications.map((app): CanvasNode => ({
+        id: app.id,
+        name: app.name,
+        kind: serviceKindOf(app.sourceType),
+        // The production copy's domain first when the service also runs on another
+        // provider - that is where it answers people - then its own best address.
+        subtitle:
+            app.elsewhere.find((entry) => entry.domains.length > 0)?.domains[0] ??
+            primaryDomain(app.domains)?.hostname ??
+            (app.sourceType === "image" ? t("canvas.dockerImage") : t("canvas.gitRepository")),
+        elsewhere: app.elsewhere[0]
+            ? { provider: app.elsewhere[0].provider, status: app.elsewhere[0].status }
+            : undefined,
+        tone: runStateLabel(app, t).tone,
+        statusLabel: runStateLabel(app, t).label,
+        volumes: app.volumes
+    }));
+    const databases = environment.databases.map((database): CanvasNode => ({
+        id: database.id,
+        name: database.name,
+        kind: "database",
+        engine: database.engine,
+        subtitle: dbEngineLabel(database.engine),
+        tone: dbTone(database.status),
+        statusLabel: database.status,
+        hostedCount: database.hostedCount ?? 0,
+        // A database living inside another instance has no volume of its own; the
+        // strip under the card would name one that does not exist.
+        volume: database.hostedOnInstance
+            ? undefined
+            : `${database.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-volume`
+    }));
     return [...apps, ...databases];
 }
 
@@ -308,6 +306,7 @@ export function DeployCanvas({
         null
     );
     const [acting, setActing] = useState(false);
+    const can = useProjectCan();
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({
         open: false,
         view: "list"
@@ -765,7 +764,7 @@ export function DeployCanvas({
                             <Plus className="size-4" /> {t("view.newService")}
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent>
-                            {SERVICE_TYPES.map((type) => (
+                            {offeredServiceTypes(SERVICE_TYPES, can).map((type) => (
                                 <ContextMenuItem
                                     key={type.id}
                                     onSelect={() => openNewService(type.id)}

@@ -364,7 +364,7 @@ export async function deployEnvironment(
 ): Promise<{ started: number; failed: string[] }> {
     const [databases, applications] = await Promise.all([
         prisma.managedDatabase.findMany({
-            where: { environmentId },
+            where: { environmentId, provider: "" },
             orderBy: [{ parentId: "asc" }, { createdAt: "asc" }],
             select: { id: true, name: true, parentId: true }
         }),

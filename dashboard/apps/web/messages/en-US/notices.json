@@ -451,5 +451,9 @@
         "exitedBody": "The agent exited on its own. Start a new session to carry on.",
         "workKeptTitle": "The work in {session} was not pushed",
         "workKeptBody": "Polaris could not push {branch}, so it kept the session's machine and its work. Open the session to try again or discard it."
+    },
+    "cloudLeft": {
+        "title": "{name} may still be running in CloudAMQP",
+        "body": "CloudAMQP refused the stored API key, so the instance {name} could not be removed there. Delete it in the CloudAMQP console so it stops billing."
     }
 }

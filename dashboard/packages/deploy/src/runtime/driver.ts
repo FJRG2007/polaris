@@ -224,6 +224,16 @@ export interface DbDeployPlan {
     /** The most CPU (cores) and memory (MB) the container may use. Absent is no
      *  limit. */
     readonly limits?: ResourceLimits;
+    /** The port a published `exposePort` maps to, for an engine whose image the
+     *  port cannot be told from (see `defaultDbPort`). */
+    readonly containerPort?: number;
+    /** A healthcheck for the single container, for the engines that ship one. */
+    readonly healthcheck?: {
+        readonly test: readonly string[];
+        readonly intervalSeconds: number;
+        readonly retries: number;
+        readonly startPeriodSeconds: number;
+    };
     /**
      * A Redis Cluster: one container per node in place of the single one, each
      * with its own command and data volume, on the same networks, and none

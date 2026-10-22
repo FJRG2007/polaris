@@ -377,9 +377,9 @@ async function restoreDatabaseRow(
     const db = await prisma.managedDatabase.update({
         where: { id: databaseId },
         data: { binnedAt: null, binnedById: null },
-        select: { parentId: true }
+        select: { parentId: true, provider: true }
     });
-    if (db.parentId) return;
+    if (db.parentId || db.provider) return;
     const { deployDatabase } = await import("@/lib/database-service");
     await deployDatabase(databaseId, ownerId, actorId).catch((error: unknown) => {
         console.error(`recycle-bin: restored database ${databaseId} did not redeploy:`, error);
