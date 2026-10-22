@@ -26,7 +26,8 @@ import streamDeck, {
 import { hub } from "./hub";
 import * as timers from "./timer";
 import { keyImage } from "./render";
-import { fromInspector, surfaceOf, tellInspector, type Surface } from "./inspector";
+import { fromInspector, tellInspector } from "./inspector";
+import { DIAL_UUID, KEY_UUID, TIMER_UUID, surfaceOf, type Surface } from "./surfaces";
 import { CONFIRM_MS, Confirmations, PressTimer, type Gesture } from "./presses";
 import {
     alternates,
@@ -36,16 +37,6 @@ import {
     turnLevel,
     type KeySettings
 } from "./face";
-
-export const PLUGIN_UUID = "io.github.fjrg2007.polaris";
-export const KEY_UUID = `${PLUGIN_UUID}.key`;
-export const DIAL_UUID = `${PLUGIN_UUID}.dial`;
-export const TIMER_UUID = `${PLUGIN_UUID}.timer`;
-/** The same key and dial, offering only one part of the catalogue. */
-export const CALL_UUID = `${PLUGIN_UUID}.call`;
-export const SOUND_UUID = `${PLUGIN_UUID}.sound`;
-export const PLACES_UUID = `${PLUGIN_UUID}.places`;
-export const PLACES_DIAL_UUID = `${PLUGIN_UUID}.places-dial`;
 
 /** How long the timer's key is held before letting go resets it. */
 const LONG_PRESS_MS = 600;

@@ -7,16 +7,9 @@
 
 import { hub } from "./hub";
 import streamDeck from "@elgato/streamdeck";
-import { surfaceOf, tellInspector } from "./inspector";
-import {
-    CALL_UUID,
-    PLACES_DIAL_UUID,
-    PLACES_UUID,
-    PolarisDial,
-    PolarisKey,
-    SOUND_UUID,
-    TimerAction
-} from "./actions";
+import { tellInspector } from "./inspector";
+import { PolarisDial, PolarisKey, TimerAction } from "./actions";
+import { CALL_UUID, PLACES_DIAL_UUID, PLACES_UUID, SOUND_UUID, surfaceOf } from "./surfaces";
 
 // Never "trace": the log would carry every message, the deck's key among them.
 streamDeck.logger.setLevel("info");
