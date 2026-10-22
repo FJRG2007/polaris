@@ -110,7 +110,11 @@ describe("the CLI card", () => {
     });
 
     it("is on the downloads page, and the CLI is no longer listed as coming later", async () => {
-        const page = await readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8");
+        const page = await // The page and the shared layout it renders, which the public site draws too.
+        Promise.all([
+            readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8"),
+            readFile(`${SRC}../../../packages/ui/src/downloads/account/downloads-page.tsx`, "utf8")
+        ]).then((parts) => parts.join(" "));
         expect(page).toContain("<CliSection repo={repo} serverUrl={serverUrl} />");
         expect(page).not.toContain("downloads.later.cli");
     });

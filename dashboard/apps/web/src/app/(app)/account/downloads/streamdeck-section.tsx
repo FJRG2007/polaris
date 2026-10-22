@@ -12,19 +12,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import type { AppDownload } from "@/lib/app-releases";
-import { Download, ExternalLink, Grid3x3, Unplug } from "lucide-react";
+import { Unplug } from "lucide-react";
 import { STREAMDECK_MARKETPLACE_URL } from "@/lib/deck/marketplace";
 import { useConfirm } from "@/components/confirm-dialog";
-import { DownloadWithGuide } from "@/components/download-guide";
 import { revokeApiKeyAction } from "../api-keys/actions";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button } from "@polaris/ui";
-import { StepsDialog } from "@polaris/ui/steps-dialog";
-import { DeckPreview } from "./download-previews";
-import { DownloadCard, DownloadRow, DownloadRows } from "@polaris/ui/download-card";
-import { DECK_HOSTS, DeckHostMark, DeckInstallSteps, HOST_LABELS } from "./deck-install-steps";
+import { Button } from "@polaris/ui";
+import { DeckCard, DeckFile } from "@polaris/ui/account-downloads/deck-card";
 
 /** One connected deck, in the fields the list draws. */
 export interface ConnectedDeck {
@@ -34,38 +29,7 @@ export interface ConnectedDeck {
     readonly lastUsedAt: string | null;
 }
 
-/** A release's file ending in `suffix`, or the fact that none has been
- *  published: the plugin's `.streamDeckPlugin` and the Companion module's `.tgz`
- *  share it. */
-export function DeckFile({ download, suffix }: { download: AppDownload | null; suffix: string }) {
-    const t = useTranslations("account");
-    const file = download?.files.find((entry) => entry.name.endsWith(suffix));
-    if (download && file) {
-        return (
-            <div>
-                {/* Opens the install guide for the file as its download starts. */}
-                <DownloadWithGuide
-                    item={suffix === ".tgz" ? "companion" : "streamdeck"}
-                    href={file.url}
-                    fileName={file.name}
-                >
-                    <Download className="size-4" />
-                    {t("downloads.streamdeck.download", { version: download.version })}
-                </DownloadWithGuide>
-            </div>
-        );
-    }
-    return (
-        <>
-            <div>
-                <Button variant="secondary" disabled>
-                    <Download className="size-4" /> {t("downloads.streamdeck.downloadNone")}
-                </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">{t("downloads.streamdeck.notReleased")}</p>
-        </>
-    );
-}
+export { DeckFile };
 
 export function StreamDeckSection({
     decks,
@@ -112,67 +76,13 @@ export function StreamDeckSection({
     };
 
     return (
-        <DownloadCard
-            id="streamdeck"
-            tint="amber"
-            icon={<Grid3x3 className="size-4 shrink-0" />}
-            title={t("downloads.streamdeck.title")}
-            description={t("downloads.streamdeck.description")}
-            preview={<DeckPreview />}
+        <DeckCard
+            address={address}
+            repo={repo}
+            storeUrl={STREAMDECK_MARKETPLACE_URL || null}
+            pluginFile={pluginFile}
+            moduleFile={moduleFile}
         >
-            {/* The store first, and plainly not there yet until Elgato
-                approves the listing - the same row the extension has. */}
-            <DownloadRows>
-                <DownloadRow
-                    mark={<DeckHostMark host="streamdeck" />}
-                    name={t("downloads.streamdeck.store")}
-                    detail={
-                        STREAMDECK_MARKETPLACE_URL ? undefined : t("downloads.streamdeck.storeHint")
-                    }
-                    action={
-                        STREAMDECK_MARKETPLACE_URL ? (
-                            <Button asChild variant="secondary" size="sm">
-                                <a
-                                    href={STREAMDECK_MARKETPLACE_URL}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                >
-                                    <ExternalLink className="size-4" />
-                                    {t("downloads.streamdeck.openStore")}
-                                </a>
-                            </Button>
-                        ) : (
-                            <Badge variant="neutral">{t("downloads.extension.notYet")}</Badge>
-                        )
-                    }
-                />
-            </DownloadRows>
-
-            <DownloadRows label={t("downloads.streamdeck.installYourself")}>
-                {DECK_HOSTS.map((host) => (
-                    <DownloadRow
-                        key={host}
-                        mark={<DeckHostMark host={host} />}
-                        name={HOST_LABELS[host]}
-                        detail={t(`downloads.streamdeck.hosts.${host}`)}
-                        action={
-                            <StepsDialog
-                                label={t("downloads.cards.install")}
-                                title={t("downloads.cards.installIn", { name: HOST_LABELS[host] })}
-                            >
-                                <DeckInstallSteps
-                                    initial={host}
-                                    address={address}
-                                    repo={repo}
-                                    pluginFile={pluginFile}
-                                    moduleFile={moduleFile}
-                                />
-                            </StepsDialog>
-                        }
-                    />
-                ))}
-            </DownloadRows>
-
             <div className="flex min-w-0 flex-col gap-1">
                 <p className="text-xs font-medium text-muted-foreground">
                     {t("downloads.streamdeck.connected")}
@@ -222,6 +132,6 @@ export function StreamDeckSection({
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
             </div>
             {confirmElement}
-        </DownloadCard>
+        </DeckCard>
     );
 }

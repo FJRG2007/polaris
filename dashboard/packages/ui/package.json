@@ -74,6 +74,118 @@
         "./image-flight": {
             "types": "./src/image-viewer/flight.ts",
             "import": "./src/image-viewer/flight.ts"
+        },
+        "./account-downloads/assistants-card": {
+            "types": "./src/downloads/account/assistants-card.tsx",
+            "import": "./src/downloads/account/assistants-card.tsx"
+        },
+        "./account-downloads/cli-section": {
+            "types": "./src/downloads/account/cli-section.tsx",
+            "import": "./src/downloads/account/cli-section.tsx"
+        },
+        "./account-downloads/deck-install-steps": {
+            "types": "./src/downloads/account/deck-install-steps.tsx",
+            "import": "./src/downloads/account/deck-install-steps.tsx"
+        },
+        "./account-downloads/extension-card": {
+            "types": "./src/downloads/account/extension-card.tsx",
+            "import": "./src/downloads/account/extension-card.tsx"
+        },
+        "./account-downloads/download-previews": {
+            "types": "./src/downloads/account/download-previews.tsx",
+            "import": "./src/downloads/account/download-previews.tsx"
+        },
+        "./account-downloads/deck-command": {
+            "types": "./src/downloads/account/deck-command.tsx",
+            "import": "./src/downloads/account/deck-command.tsx"
+        },
+        "./account-downloads/extension-steps": {
+            "types": "./src/downloads/account/extension-steps.tsx",
+            "import": "./src/downloads/account/extension-steps.tsx"
+        },
+        "./account-downloads/extension-command": {
+            "types": "./src/downloads/account/extension-command.tsx",
+            "import": "./src/downloads/account/extension-command.tsx"
+        },
+        "./account-downloads/install-line": {
+            "types": "./src/downloads/account/install-line.tsx",
+            "import": "./src/downloads/account/install-line.tsx"
+        },
+        "./account-downloads/client-guides": {
+            "types": "./src/downloads/account/client-guides.ts",
+            "import": "./src/downloads/account/client-guides.ts"
+        },
+        "./account-downloads/client-setup": {
+            "types": "./src/downloads/account/client-setup.ts",
+            "import": "./src/downloads/account/client-setup.ts"
+        },
+        "./account-downloads/client-logo-tile": {
+            "types": "./src/downloads/account/client-logo-tile.tsx",
+            "import": "./src/downloads/account/client-logo-tile.tsx"
+        },
+        "./account-downloads/client-marks": {
+            "types": "./src/downloads/account/client-marks.tsx",
+            "import": "./src/downloads/account/client-marks.tsx"
+        },
+        "./account-downloads/model-marks": {
+            "types": "./src/downloads/account/model-marks.tsx",
+            "import": "./src/downloads/account/model-marks.tsx"
+        },
+        "./account-downloads/brand-icons": {
+            "types": "./src/downloads/account/brand-icons.tsx",
+            "import": "./src/downloads/account/brand-icons.tsx"
+        },
+        "./account-downloads/platform-select": {
+            "types": "./src/downloads/account/platform-select.tsx",
+            "import": "./src/downloads/account/platform-select.tsx"
+        },
+        "./account-downloads/cli-install-line": {
+            "types": "./src/downloads/account/cli-install-line.ts",
+            "import": "./src/downloads/account/cli-install-line.ts"
+        },
+        "./account-downloads/install-platform": {
+            "types": "./src/downloads/account/install-platform.ts",
+            "import": "./src/downloads/account/install-platform.ts"
+        },
+        "./account-downloads/install-command": {
+            "types": "./src/downloads/account/install-command.ts",
+            "import": "./src/downloads/account/install-command.ts"
+        },
+        "./account-downloads/deck-install-command": {
+            "types": "./src/downloads/account/deck-install-command.ts",
+            "import": "./src/downloads/account/deck-install-command.ts"
+        },
+        "./account-downloads/browser-guide": {
+            "types": "./src/downloads/account/browser-guide.ts",
+            "import": "./src/downloads/account/browser-guide.ts"
+        },
+        "./i18n": {
+            "types": "./src/i18n.tsx",
+            "import": "./src/i18n.tsx"
+        },
+        "./account-downloads/app-download-offers": {
+            "types": "./src/downloads/account/app-download-offers.tsx",
+            "import": "./src/downloads/account/app-download-offers.tsx"
+        },
+        "./account-downloads/download-guide": {
+            "types": "./src/downloads/account/download-guide.tsx",
+            "import": "./src/downloads/account/download-guide.tsx"
+        },
+        "./account-downloads/app-releases": {
+            "types": "./src/downloads/account/app-releases.ts",
+            "import": "./src/downloads/account/app-releases.ts"
+        },
+        "./account-downloads/app-link": {
+            "types": "./src/downloads/account/app-link.tsx",
+            "import": "./src/downloads/account/app-link.tsx"
+        },
+        "./account-downloads/deck-card": {
+            "types": "./src/downloads/account/deck-card.tsx",
+            "import": "./src/downloads/account/deck-card.tsx"
+        },
+        "./account-downloads/downloads-page": {
+            "types": "./src/downloads/account/downloads-page.tsx",
+            "import": "./src/downloads/account/downloads-page.tsx"
         }
     },
     "scripts": {
