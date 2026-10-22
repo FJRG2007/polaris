@@ -15,6 +15,19 @@ export {
     singleFileTar
 } from "./release-image.js";
 export { RELEASE_IMAGE_GONE } from "./runtime/release.js";
+export {
+    COMPOSE_PROJECT_LABEL,
+    CONTAINER_ID,
+    RELEASE_PS_FORMAT,
+    STACK_NAMESPACE_LABEL,
+    orphanedReleaseContainers,
+    releaseBase,
+    releaseContainersFromPs,
+    releaseContainersIn,
+    removalPlan,
+    supersededContainers,
+    type ReleaseContainer
+} from "./release-containers.js";
 export { MAX_SHIPPED_BYTES, shipImage } from "./runtime/ship.js";
 export { archiveImageTags, manifestTags } from "./image-archive.js";
 export { magicDomain, releaseDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";

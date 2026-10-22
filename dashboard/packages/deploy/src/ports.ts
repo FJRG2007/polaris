@@ -11,6 +11,7 @@
 
 import type { Duplex } from "node:stream";
 import type { ComposeSpec } from "./compose-spec.js";
+import type { ReleaseContainer } from "./release-containers.js";
 import type { MountTarget } from "./runtime/driver.js";
 
 export type OutputSink = (chunk: Buffer) => void;
@@ -189,6 +190,19 @@ export interface RuntimePorts {
      * is missing, or answers nothing, the service's own container name is used.
      */
     listContainers?(project: string): Promise<string[]>;
+    /**
+     * Every container on the machine, running or stopped, whose compose project or
+     * swarm stack is the shape of a service release (`release-containers.ts`) - read
+     * from the engine's own labels, so a release is found whatever its project was
+     * named when it was created. Optional: where it is missing, a teardown falls back
+     * to the project names alone.
+     */
+    releaseContainers?(): Promise<ReleaseContainer[]>;
+    /**
+     * Remove one release container, stopping it first. Never its volumes, named or
+     * anonymous. Only ever handed an id `releaseContainers` answered.
+     */
+    removeContainer?(id: string): Promise<void>;
     /** Bytes in use under a path inside a running container, for volume usage
      *  history. Resolves null rather than throwing when it cannot be measured -
      *  a stopped container is the ordinary case, not an error worth a stack. */

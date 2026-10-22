@@ -8,7 +8,7 @@
 import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
-import { forCompose, isReleaseImage } from "@polaris/deploy";
+import { CONTAINER_ID, forCompose, isReleaseImage, releaseContainersIn } from "@polaris/deploy";
 import { ImageStoreBusy, LOCAL_MACHINE, withImageUse } from "@/lib/deploy/image-store-lock";
 import type {
     BuildRequest,
@@ -19,6 +19,7 @@ import type {
     LogOptions,
     MountTarget,
     OutputSink,
+    ReleaseContainer,
     RuntimePorts,
     WorldTrimOptions
 } from "@polaris/deploy";
@@ -252,6 +253,26 @@ export class HostdPorts implements RuntimePorts {
             for (const name of containerNames(response.body)) names.add(name);
         }
         return [...names].sort();
+    }
+
+    public async releaseContainers(): Promise<ReleaseContainer[]> {
+        const response = await this.client.dockerRequest("GET", "/containers/json?all=1");
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(`the containers could not be listed (${response.status})`);
+        }
+        const listing: unknown = JSON.parse(response.body);
+        if (!Array.isArray(listing)) throw new Error("the container listing was not a list");
+        return releaseContainersIn(listing);
+    }
+
+    /** Forced so a running one is stopped first; `v=0` so no volume goes with it. */
+    public async removeContainer(id: string): Promise<void> {
+        if (!CONTAINER_ID.test(id)) throw new Error("not a container id");
+        const response = await this.client.dockerRequest("DELETE", `/containers/${id}?force=1&v=0`);
+        if (response.status === 404) return;
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(`the container could not be removed (${response.status})`);
+        }
     }
 
     public async diskUsage(ref: string, path: string): Promise<number | null> {

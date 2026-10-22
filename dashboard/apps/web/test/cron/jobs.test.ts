@@ -190,6 +190,9 @@ describe("the work Polaris runs on a schedule", () => {
             // had already destroyed.
             "mail-trash",
             "object-replication",
+            // Two passes would list the same machine and race to remove the same
+            // superseded release containers.
+            "orphan-releases",
             // Two passes would race for the same due rows; each row is claimed on
             // its own, so this saves the time, not a duplicate.
             "outbound-webhooks",

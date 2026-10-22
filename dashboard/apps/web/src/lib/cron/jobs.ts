@@ -687,6 +687,20 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: watchDisks
     },
     {
+        key: "orphan-releases",
+        // Hourly, and first a minute or so after boot. A release left running
+        // beside the one serving is still claiming the service's address on the
+        // edge, so this is not housekeeping that can wait for a day.
+        everyMs: Number(process.env.POLARIS_ORPHAN_RELEASES_MS) || HOUR,
+        // Leased: two runners would list the same machine and race to remove the
+        // same containers, and one of them would log a failure for nothing.
+        leaseMs: 2 * HOUR,
+        run: async () => {
+            const swept = await (await import("@/lib/deploy/release-sweep")).sweepOrphanReleases();
+            return swept.reduce((total, one) => total + one.removed.length, 0);
+        }
+    },
+    {
         key: "leftover-volumes",
         // A week is the grace, so a day is plenty: nothing here is urgent, and a
         // pass lists every volume and measures them.
