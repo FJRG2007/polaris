@@ -480,9 +480,10 @@ export function guideItemFor(product: ProductId, fileName: string): GuideItemId 
  * the one-line installs fetch, not something to save and run by hand, and the
  * extension's source archive is for store review.
  */
-export function offeredFile(fileName: string): boolean {
+export function offeredFile(product: ProductId, fileName: string): boolean {
     const name = fileName.toLowerCase();
-    return name !== "install.ps1" && name !== "install.sh" && !name.includes("sources");
+    if (name === "install.ps1" || name === "install.sh") return false;
+    return !(product === "extension" && name.endsWith("-sources.zip"));
 }
 
 /** The short type shown in a file's square: its extension, or a fixed word for one too long to fit. */

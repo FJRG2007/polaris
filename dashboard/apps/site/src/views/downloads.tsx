@@ -47,17 +47,26 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                     >
                         {entry.product === "cli" ? (
                             <CommandRows
-                                commands={[data.cli.unix, data.cli.windows]}
+                                lines={[
+                                    { system: t.systems.unix, command: data.cli.unix },
+                                    { system: t.systems.windows, command: data.cli.windows }
+                                ]}
                                 hint={t.cliHint}
                             />
                         ) : entry.product === "extension" && entry.released ? (
                             <CommandRows
-                                commands={[data.lines.extension.unix, data.lines.extension.windows]}
-                                hint={t.lineHint}
+                                lines={[
+                                    { system: t.systems.unix, command: data.lines.extension.unix },
+                                    { system: t.systems.windows, command: data.lines.extension.windows }
+                                ]}
+                                hint={t.extensionHint}
                             />
                         ) : entry.product === "streamdeck" && entry.released ? (
                             <CommandRows
-                                commands={[data.lines.streamdeck.macos, data.lines.streamdeck.windows]}
+                                lines={[
+                                    { system: t.systems.macos, command: data.lines.streamdeck.macos },
+                                    { system: t.systems.windows, command: data.lines.streamdeck.windows }
+                                ]}
                                 hint={t.lineHint}
                             />
                         ) : null}
@@ -73,7 +82,7 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                                 </p>
                                 {entry.product === "cli" ? null : (
                                     <DownloadRows>
-                                        {entry.files.filter((file) => offeredFile(file.name)).map((file) => (
+                                        {entry.files.filter((file) => offeredFile(entry.product, file.name)).map((file) => (
                                             <DownloadRow
                                                 key={file.url}
                                                 mark={
@@ -121,15 +130,17 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
 
 /** One-line installs, each with its copy button: the way the dashboard's
  *  Downloads offers them, since the line also keeps the install up to date. */
-function CommandRows({ commands, hint }: { commands: readonly string[]; hint: string }) {
+function CommandRows({
+    lines,
+    hint
+}: {
+    lines: readonly { system: string; command: string }[];
+    hint: string;
+}) {
     return (
         <DownloadRows>
-            {commands.map((command) => (
-                <DownloadRow
-                    key={command}
-                    mark={<span className="text-xs">$</span>}
-                    name={command.startsWith("irm") ? "PowerShell" : "Terminal"}
-                >
+            {lines.map(({ system, command }) => (
+                <DownloadRow key={command} mark={<span className="text-xs">$</span>} name={system}>
                     <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
                         <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs">
                             {command}
