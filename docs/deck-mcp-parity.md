@@ -106,7 +106,7 @@ the model and have no translations.
 | `notes_list`                         | web          | notes.use                                | [x] n/a: read-only, nothing to press                                                                                                                                                                                                                                                                               |
 | `notes_update`                       | web          | notes.use                                | [x] key: tool.notes_update (asks for a second press)                                                                                                                                                                                                                                                               |
 | `places_camera_snapshot`             | places       | places.cameras                           | [x] n/a: read-only, and its scope is off the deck                                                                                                                                                                                                                                                                  |
-| `places_device_control`              | places       | places.control                           | [x] key: tool.places_device_control (asks for a second press); dedicated: places.device (does what the device's kind means: on/off, open, lock/unlock), places.device-toggle, places.device-command, places.door, places.brightness (dial), places.climate (dial), places.temperature-step, places.temperature-set |
+| `places_device_control`              | places       | places.control                           | [x] key: tool.places_device_control (asks for a second press); dedicated: places.device (does what the device's kind means: on/off, open, lock/unlock), places.device-toggle, places.device-command, places.door, places.brightness (dial), places.climate (dial), places.temperature-step, places.temperature-set, places.light-white, places.light-color, places.device-setting; places.reading (state) |
 | `places_devices`                     | places       | places.read                              | [x] n/a: read-only - used by state of every Places key                                                                                                                                                                                                                                                             |
 | `places_routine_run`                 | places       | places.routines                          | [x] key: tool.places_routine_run; dedicated: places.routine-run                                                                                                                                                                                                                                                    |
 | `places_routines`                    | places       | places.routines                          | [x] n/a: read-only - used by picker for places.routine-run                                                                                                                                                                                                                                                         |
@@ -146,3 +146,46 @@ feedback.
 | `call.record` | toggle | chat.use | [x] dedicated: the call screen's rule - the host, or anybody in a direct message or a group; refused otherwise |
 | `call.hangup` | run    | chat.use | [x] dedicated: leaves the call in the tab that is on it                                                        |
 | `call.sound`  | run    | chat.use | [x] dedicated: plays a picked sound through the soundboard's own checks                                        |
+
+## Places devices on the deck
+
+Every kind of device Places has (`apps/places/src/lib/device-kinds.ts`), and
+the keys that work it. Pickers read `places_devices`, which lists each
+device's actions by their spoken names (`open` is the panel's Open button),
+and only devices this person may work. Places has no blinds, vacuums or
+camera movement: a cover, a robot or a PTZ preset is nothing a device here
+can be. The cameras' scope stays off the deck.
+
+| Kind      | What it does                                                        | Keys                                                                                              |
+| --------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| lock      | lock, unlock, open (unlatch)                                        | places.door, places.device (opens), places.device-command                                         |
+| opener    | open                                                                | places.door (open), places.device (opens), places.device-command                                  |
+| light     | on/off, brightness, warmth, colour                                  | places.device-toggle, places.device, places.brightness (dial), places.light-white, places.light-color |
+| switch    | on/off                                                              | places.device-toggle, places.device, places.device-command                                        |
+| outlet    | on/off                                                              | places.device-toggle, places.device, places.device-command                                        |
+| climate   | on/off, temperature, mode, fan, options                             | places.climate (dial), places.temperature-step, places.temperature-set, places.device-setting, places.device-toggle |
+| air       | on/off, mode, fan, humidity, options                                | places.device-toggle, places.device-setting; humidity and options through tool.places_device_control |
+| appliance | stop                                                                | places.device-command (stop)                                                                      |
+| litter    | clean, pause, resume, (dump, deodorizer reset, options)             | places.device-command; dump stays off a key, the rest through tool.places_device_control          |
+| sensor    | read only                                                           | places.reading (shows the reading)                                                                |
+| routines  | run                                                                 | places.routine-run (home.manage)                                                                  |
+
+Why a door could not be worked before: `places.door` listed only devices
+that take `lock`, so an opener (a building door, which takes only `open`)
+never appeared in its picker.
+
+A press shows its result at once. Each Places state carries `press`: the face
+a press shows while the command is on its way ("Locking", the switch flipped,
+the new set point) or `noop` when the device already is there, in which case
+neither the plugin nor Polaris sends anything. The plugin and Companion put
+the previous face back, with the alert, when Polaris refuses or does not
+answer in 15 s; a dial's ticks move its face and land as one command, and a
+burst that ends where it began sends nothing.
+
+A deck whose key lacks a permission its owner holds - connected before it was
+offered, or approved with it unticked - is told so: the catalogue lists those
+actions under `locked`, the settings screen says "Reconnect this deck to
+allow: ...", a key set to one draws "Reconnect", and a press is refused in
+the same words. A visitor who was lent a door holds no `home.control`, and
+the device tool's scope stands on it, so a deck cannot work a lent device;
+the Places screen can.

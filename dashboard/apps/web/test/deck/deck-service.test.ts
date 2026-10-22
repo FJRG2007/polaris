@@ -122,6 +122,9 @@ vi.mock("@/lib/mcp/catalog", () => {
     };
 });
 
+let accountScopes: string[] = [];
+vi.mock("@polaris/auth", () => ({ scopesAvailableTo: async () => accountScopes }));
+
 const service = await import("@/lib/deck/deck-service");
 const core = await import("@/lib/deck/core-actions");
 const tools = await import("@/lib/deck/tool-call");
@@ -160,6 +163,7 @@ const lamp: AppDeckAction = {
 };
 
 beforeEach(() => {
+    accountScopes = [];
     calls.length = 0;
     buckets.length = 0;
     audits.length = 0;
@@ -522,5 +526,49 @@ describe("MCP tools as deck actions", () => {
             deviceId: "d",
             on: false
         });
+    });
+});
+
+describe("a deck connected without a permission its owner holds", () => {
+    beforeEach(() => {
+        accountScopes = ["home.control", "chat.use"];
+        appActions = [lamp];
+    });
+
+    it("lists what connecting again would allow, and nothing the owner lacks", async () => {
+        const locked = await service.lockedActions(caller(["chat.use"]), words);
+        expect(locked).toContainEqual({
+            id: lamp.id,
+            label: lamp.label["en-US"],
+            message: "deck.errors.reconnect"
+        });
+        expect(locked.some((row) => row.id === "deploy.restart")).toBe(false);
+        expect(locked.some((row) => row.id === "chat.send")).toBe(false);
+    });
+
+    it("refuses a press with the sentence that says to reconnect", async () => {
+        const result = await service.runDeckAction(
+            caller(["chat.use"]),
+            { action: lamp.id, options: { deviceId: "22222222-2222-4222-8222-222222222222" } },
+            words
+        );
+        expect(result).toEqual({ ok: false, message: "deck.errors.reconnect" });
+        expect(calls).toHaveLength(0);
+    });
+
+    it("draws the key as Reconnect, and an action the owner lacks as idle", async () => {
+        accountScopes = ["home.control"];
+        const { readings } = await service.readDeckStates(
+            caller([]),
+            [
+                { key: "a", action: lamp.id, options: { deviceId: "22222222-2222-4222-8222-222222222222" } },
+                { key: "b", action: "chat.unread", options: {} }
+            ],
+            words
+        );
+        expect(readings).toEqual([
+            { key: "a", state: { tone: "bad", detail: "deck.status.reconnect" } },
+            { key: "b", state: { tone: "idle" } }
+        ]);
     });
 });
