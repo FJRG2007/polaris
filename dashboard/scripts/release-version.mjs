@@ -1,16 +1,18 @@
 /**
  * The version a release cut from `main` gets, and stamping it into the build.
  *
- * The Stream Deck plugin releases itself on every push to `main` that changes
- * what it ships (the Companion module will too, once it exists), so nobody bumps
- * a version by hand and no bump commit is ever written. The next version is the newest released
+ * The Stream Deck plugin and the Companion module release themselves on every
+ * push to `main` that changes what they ship, so nobody bumps a version by hand
+ * and no bump commit is ever written. The next version is the newest released
  * tag with its patch moved on, or the version in the package's `package.json`
  * when somebody raised that past every release (which is how a minor or major
  * release is asked for). The answer is stamped into `package.json`, and into the
- * Stream Deck manifest as `<version>.0`, only in the checkout CI builds from.
+ * Stream Deck manifest as `<version>.0`, and into a source file's
+ * `export const VERSION = "..."` (the Companion module's user-agent), only in
+ * the checkout CI builds from.
  *
  *   git tag -l "streamdeck-v*" | node scripts/release-version.mjs next --prefix streamdeck-v --package apps/streamdeck/package.json
- *   node scripts/release-version.mjs stamp --version 0.1.4 --package apps/streamdeck/package.json [--manifest <dir>.sdPlugin/manifest.json]
+ *   node scripts/release-version.mjs stamp --version 0.1.4 --package apps/streamdeck/package.json [--manifest <dir>.sdPlugin/manifest.json] [--constant src/version.ts]
  */
 
 import { resolve } from "node:path";
@@ -61,6 +63,17 @@ export function manifestVersion(version) {
     return `${version}.0`;
 }
 
+const CONSTANT = /export const VERSION = "[^"]*";/;
+
+/** `source` with its `export const VERSION = "..."` set to `version`; throws
+ *  when there is none, so a renamed constant fails the build instead of
+ *  shipping the old number. */
+export function stampConstant(source, version) {
+    if (!parseVersion(version)) throw new Error(`"${version}" is not x.y.z`);
+    if (!CONSTANT.test(source)) throw new Error('no `export const VERSION = "..."` to stamp');
+    return source.replace(CONSTANT, `export const VERSION = "${version}";`);
+}
+
 function option(args, name) {
     const at = args.indexOf(`--${name}`);
     return at >= 0 ? args[at + 1] : undefined;
@@ -90,6 +103,9 @@ function main(args) {
         rewrite(pkg, (json) => (json.version = version));
         const manifest = option(args, "manifest");
         if (manifest) rewrite(manifest, (json) => (json.Version = manifestVersion(version)));
+        const constant = option(args, "constant");
+        if (constant)
+            writeFileSync(constant, stampConstant(readFileSync(constant, "utf8"), version));
         return;
     }
     throw new Error("usage: release-version.mjs next|stamp ...");

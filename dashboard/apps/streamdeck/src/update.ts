@@ -6,6 +6,9 @@
  * settings screen. The running version is the manifest's four-part one
  * (`0.1.4.0`); a release is `x.y.z`. Anything that does not read as numbers is
  * no update, rather than a notice that cannot be acted on. Pure.
+ *
+ * The Companion module asks the same question of the same answer, for its own
+ * release rather than the plugin's.
  */
 
 import { joinPath } from "./address";
@@ -30,14 +33,19 @@ export function isNewer(latest: string | null | undefined, current: string): boo
     return false;
 }
 
-/** A newer plugin than this one, and the Downloads page offering it; null when
+/** What a release is asked for: the plugin's or the Companion module's. */
+export type DeckProduct = "streamdeck" | "companion";
+
+/** A newer copy than this one, and the Downloads page offering it; null when
  *  this is the newest or nothing is known. */
 export function updateFor(
     latest: DeckReleases | null,
     running: string,
-    address: string | null
+    address: string | null,
+    product: DeckProduct = "streamdeck"
 ): { version: string; url: string } | null {
-    if (!latest?.streamdeck || !address || !isNewer(latest.streamdeck, running)) return null;
+    const newest = latest?.[product];
+    if (!newest || !address || !isNewer(newest, running)) return null;
     const url = joinPath(address, latest.downloadsPath);
-    return url ? { version: latest.streamdeck, url } : null;
+    return url ? { version: newest, url } : null;
 }

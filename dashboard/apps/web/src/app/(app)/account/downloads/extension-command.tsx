@@ -15,9 +15,8 @@
  */
 
 import { useEffect, useState } from "react";
+import { InstallLine } from "./install-line";
 import { installCommand } from "@/lib/install-command";
-import { CopyButton } from "@/components/copy-button";
-import { PlatformSelect } from "@/components/platform-select";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { detectPlatform, platformShell, type InstallPlatform } from "@/lib/install-platform";
 
@@ -35,27 +34,13 @@ export function ExtensionCommand({ repo }: { repo: string }) {
     const chosen = installCommand(platformShell(platform), repo);
 
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium">{t("downloads.command.title")}</p>
-                <PlatformSelect
-                    className="w-44"
-                    value={platform}
-                    label={t("downloads.command.system")}
-                    onChange={setPlatform}
-                />
-            </div>
-
-            <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-                <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs text-foreground">
-                    {chosen.command}
-                </code>
-                <CopyButton value={chosen.command} />
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-                {t("downloads.command.hint", { shell: chosen.shell })}
-            </p>
-        </div>
+        <InstallLine
+            title={t("downloads.command.title")}
+            systemLabel={t("downloads.command.system")}
+            platform={platform}
+            onPlatformChange={setPlatform}
+            command={chosen.command}
+            hint={t("downloads.command.hint", { shell: chosen.shell })}
+        />
     );
 }

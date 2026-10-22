@@ -25,6 +25,12 @@ name: Stream Deck plugin
 # re-run finds the tag already on its commit and repeats that release instead of
 # cutting another. A run for a commit an existing release already contains does
 # nothing.
+#
+# The install scripts are not the plugin: a new version closes and reopens the
+# Stream Deck app on every machine the one-line install keeps current, so a
+# change to nothing but `scripts/` cuts no version. Its scripts replace the ones
+# attached to the newest release instead, which is where those machines fetch
+# their updater from.
 
 on:
   push:
@@ -68,6 +74,7 @@ jobs:
       version: ${{ steps.plan.outputs.version }}
       release: ${{ steps.plan.outputs.release }}
       notes: ${{ steps.plan.outputs.notes }}
+      scripts: ${{ steps.plan.outputs.scripts }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -91,6 +98,7 @@ jobs:
         run: |
           pkg=apps/streamdeck/package.json
           release=false
+          scripts=false
           if [ "${REF#refs/tags/$PREFIX}" != "$REF" ]; then
             version="${GITHUB_REF_NAME#"$PREFIX"}"
             release=true
@@ -107,9 +115,14 @@ jobs:
             elif [ -n "$newest" ] && git diff --quiet "$newest" HEAD -- apps/streamdeck \
                 ':(exclude)apps/streamdeck/test' \
                 ':(exclude)apps/streamdeck/vitest.config.ts' \
-                ':(exclude)apps/streamdeck/*.md'; then
-              echo "Nothing the plugin ships changed since $newest; nothing to release."
+                ':(exclude)apps/streamdeck/*.md'                 ':(exclude)apps/streamdeck/scripts'; then
               version="${newest#"$PREFIX"}"
+              if git diff --quiet "$newest" HEAD -- apps/streamdeck/scripts; then
+                echo "Nothing the plugin ships changed since $newest; nothing to release."
+              else
+                echo "Only the install scripts changed since $newest; attaching them to it."
+                scripts=true
+              fi
             else
               version="$(git tag -l "$PREFIX*" | node scripts/release-version.mjs next --prefix "$PREFIX" --package "$pkg")"
               release=true
@@ -120,6 +133,7 @@ jobs:
           node -e 'if (!/^\d+\.\d+\.\d+$/.test(process.argv[1])) { console.error(`"${process.argv[1]}" is not x.y.z`); process.exit(1); }' "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "scripts=$scripts" >> "$GITHUB_OUTPUT"
 
           # What changed in the plugin since the release before this one, as the
           # release's notes (and the Marketplace version's, pasted from there).
@@ -165,7 +179,12 @@ jobs:
           name: polaris-streamdeck
           # Repo-relative: `defaults.run.working-directory` applies to `run` steps
           # and to nothing else.
-          path: dashboard/apps/streamdeck/dist/*.streamDeckPlugin
+          # The install scripts ride along: the job the one-line install sets
+          # up runs the copy attached to the release it installed.
+          path: |
+            dashboard/apps/streamdeck/dist/*.streamDeckPlugin
+            dashboard/apps/streamdeck/scripts/install.ps1
+            dashboard/apps/streamdeck/scripts/install.sh
           if-no-files-found: error
 
   release:
@@ -194,4 +213,23 @@ jobs:
           # This repository releases the dashboard too, and that is what "latest"
           # should keep meaning.
           make_latest: "false"
-          files: package/*.streamDeckPlugin
+          files: |
+            package/dist/*.streamDeckPlugin
+            package/scripts/install.ps1
+            package/scripts/install.sh
+
+  scripts:
+    if: needs.plan.outputs.scripts == 'true'
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Replace the install scripts on the newest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ env.PREFIX }}${{ needs.plan.outputs.version }}
+        run: gh release upload "$TAG" apps/streamdeck/scripts/install.ps1 apps/streamdeck/scripts/install.sh --clobber

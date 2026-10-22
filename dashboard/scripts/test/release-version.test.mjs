@@ -5,7 +5,13 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { latestTagged, manifestVersion, nextVersion, parseVersion } from "../release-version.mjs";
+import {
+    latestTagged,
+    manifestVersion,
+    nextVersion,
+    parseVersion,
+    stampConstant
+} from "../release-version.mjs";
 
 const SCRIPT = fileURLToPath(new URL("../release-version.mjs", import.meta.url));
 const PREFIX = "streamdeck-v";
@@ -84,4 +90,32 @@ test("the script reads tags on stdin and stamps package.json and the manifest", 
     ]);
     assert.equal(JSON.parse(readFileSync(pkg, "utf8")).version, "0.1.2");
     assert.equal(JSON.parse(readFileSync(manifest, "utf8")).Version, "0.1.2.0");
+});
+
+test("the Companion module's version constant is stamped, and a missing one fails", () => {
+    const source = '/** doc */\nexport const VERSION = "0.1.0";\n';
+    assert.equal(stampConstant(source, "0.2.3"), '/** doc */\nexport const VERSION = "0.2.3";\n');
+    assert.throws(
+        () => stampConstant("export const V = 1;\n", "0.2.3"),
+        /no `export const VERSION/
+    );
+    assert.throws(() => stampConstant(source, "0.2"), /is not x.y.z/);
+
+    const dir = mkdtempSync(join(tmpdir(), "release-version-"));
+    const pkg = join(dir, "package.json");
+    const file = join(dir, "version.ts");
+    writeFileSync(pkg, JSON.stringify({ name: "x", version: "0.1.0" }));
+    writeFileSync(file, source);
+    execFileSync(process.execPath, [
+        SCRIPT,
+        "stamp",
+        "--version",
+        "0.1.7",
+        "--package",
+        pkg,
+        "--constant",
+        file
+    ]);
+    assert.equal(JSON.parse(readFileSync(pkg, "utf8")).version, "0.1.7");
+    assert.match(readFileSync(file, "utf8"), /export const VERSION = "0\.1\.7";/);
 });

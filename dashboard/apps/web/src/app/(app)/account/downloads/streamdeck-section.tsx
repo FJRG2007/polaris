@@ -12,12 +12,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { AppDownload } from "@/lib/app-releases";
-import { Download, Grid3x3, Unplug } from "lucide-react";
+import { Download, ExternalLink, Grid3x3, Unplug } from "lucide-react";
+import { STREAMDECK_MARKETPLACE_URL } from "@/lib/deck/marketplace";
 import { useConfirm } from "@/components/confirm-dialog";
 import { revokeApiKeyAction } from "../api-keys/actions";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
 /** One connected deck, in the fields the list draws. */
 export interface ConnectedDeck {
@@ -103,7 +104,40 @@ export function StreamDeckSection({
             </CardHeader>
             <CardBody className="flex flex-col gap-4 text-sm">
                 <p className="text-muted-foreground">{t("downloads.streamdeck.description")}</p>
-                {install}
+
+                {/* The same row the extension has: the store first, and plainly
+                    not there yet until Elgato approves the listing. */}
+                <div className="flex flex-col gap-2">
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
+                        {t("downloads.streamdeck.store")}
+                        {STREAMDECK_MARKETPLACE_URL ? null : (
+                            <Badge variant="neutral">{t("downloads.extension.notYet")}</Badge>
+                        )}
+                    </p>
+                    {STREAMDECK_MARKETPLACE_URL ? (
+                        <div>
+                            <Button asChild variant="secondary">
+                                <a
+                                    href={STREAMDECK_MARKETPLACE_URL}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    <ExternalLink className="size-4" />
+                                    {t("downloads.streamdeck.openStore")}
+                                </a>
+                            </Button>
+                        </div>
+                    ) : (
+                        <p className="text-muted-foreground">
+                            {t("downloads.streamdeck.storeHint")}
+                        </p>
+                    )}
+                </div>
+
+                <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
+                    <p className="font-medium">{t("downloads.streamdeck.installYourself")}</p>
+                    {install}
+                </div>
 
                 <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
                     <p className="font-medium">{t("downloads.streamdeck.connected")}</p>

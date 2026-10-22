@@ -9,10 +9,17 @@ name: Companion module
 #
 # A pull request that touches the module is built and packed here, because
 # nothing else checks that Companion's packer accepts it; its typecheck and
-# tests already run with every other workspace in `dashboard-ci`. A release is
-# tag-driven, like the Stream Deck plugin: push `companion-v<version>` matching
-# `version` in `dashboard/apps/companion/package.json`, which is also the version
-# the packer writes into the manifest Companion reads.
+# tests already run with every other workspace in `dashboard-ci`.
+#
+# **Every change ships by itself**, exactly like the Stream Deck plugin
+# (`streamdeck.yml`, which explains the rules): a push to `main` that changes
+# what the module ships is released, numbered after the newest `companion-v*`
+# tag by `dashboard/scripts/release-version.mjs`, and the version is stamped
+# into `package.json` (which the packer copies into the manifest Companion
+# reads) and `src/version.ts` (the module's user-agent and its update check)
+# only in this build - no bump commit. The module is also made of the plugin
+# sources it imports, so a change to those releases it too. A tag pushed by
+# hand still releases exactly that version.
 #
 # The build passes `--ignore-license-rules`: the packer refuses AGPL-3.0, which
 # is the policy for modules listed in Bitfocus's own store. This package is not
@@ -20,8 +27,19 @@ name: Companion module
 
 on:
   push:
+    branches: [main]
     tags:
       - "companion-v*"
+    # Not evaluated for tag pushes. Tests ship nothing.
+    paths:
+      - "dashboard/apps/companion/**"
+      - "!dashboard/apps/companion/test/**"
+      - "!dashboard/apps/companion/vitest.config.ts"
+      - "dashboard/apps/streamdeck/src/polaris.ts"
+      - "dashboard/apps/streamdeck/src/sse.ts"
+      - "dashboard/apps/streamdeck/src/address.ts"
+      - "dashboard/apps/streamdeck/src/backoff.ts"
+      - "dashboard/apps/streamdeck/src/update.ts"
   pull_request:
     paths:
       - "dashboard/apps/companion/**"
@@ -29,11 +47,17 @@ on:
       - "dashboard/apps/streamdeck/src/sse.ts"
       - "dashboard/apps/streamdeck/src/address.ts"
       - "dashboard/apps/streamdeck/src/backoff.ts"
+      - "dashboard/apps/streamdeck/src/update.ts"
+      - "dashboard/scripts/release-version.mjs"
       - ".github/workflows/companion.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: companion-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -42,9 +66,77 @@ defaults:
 env:
   # Install scripts one at a time, for the esbuild race dashboard-ci.yml explains.
   NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
+  PREFIX: companion-v
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      release: ${{ steps.plan.outputs.release }}
+      notes: ${{ steps.plan.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Every tag, to number this release after the newest one.
+          fetch-depth: 0
+
+      - name: Which version, and whether to release it
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          pkg=apps/companion/package.json
+          # What the module is made of: its own files and the plugin sources it
+          # imports. Tests ship nothing.
+          shipped="apps/companion apps/streamdeck/src/polaris.ts apps/streamdeck/src/sse.ts apps/streamdeck/src/address.ts apps/streamdeck/src/backoff.ts apps/streamdeck/src/update.ts"
+          release=false
+          if [ "${REF#refs/tags/$PREFIX}" != "$REF" ]; then
+            version="${GITHUB_REF_NAME#"$PREFIX"}"
+            release=true
+          elif [ "$EVENT" != "pull_request" ] && [ "$REF" = "refs/heads/main" ]; then
+            here="$(git tag --points-at HEAD -l "$PREFIX*" --sort=-v:refname | head -n1)"
+            newest="$(git tag -l "$PREFIX*" --sort=-v:refname | head -n1)"
+            if [ -n "$here" ]; then
+              # A re-run: repeat the release this commit already has.
+              version="${here#"$PREFIX"}"
+              release=true
+            elif [ -n "$newest" ] && git merge-base --is-ancestor HEAD "$newest"; then
+              echo "$newest already contains this commit; nothing to release."
+              version="${newest#"$PREFIX"}"
+            # $shipped is a list of paths and is split on purpose.
+            # shellcheck disable=SC2086
+            elif [ -n "$newest" ] && git diff --quiet "$newest" HEAD -- $shipped \
+                ':(exclude)apps/companion/test' \
+                ':(exclude)apps/companion/vitest.config.ts'; then
+              echo "Nothing the module ships changed since $newest; nothing to release."
+              version="${newest#"$PREFIX"}"
+            else
+              version="$(git tag -l "$PREFIX*" | node scripts/release-version.mjs next --prefix "$PREFIX" --package "$pkg")"
+              release=true
+            fi
+          else
+            version="$(node -p "require('./$pkg').version")"
+          fi
+          node -e 'if (!/^\d+\.\d+\.\d+$/.test(process.argv[1])) { console.error(`"${process.argv[1]}" is not x.y.z`); process.exit(1); }' "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+          previous="$(git tag -l "$PREFIX*" --sort=-v:refname | grep -v -x "$PREFIX$version" | head -n1 || true)"
+          range="${previous:+$previous..}HEAD"
+          delimiter="notes-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+          {
+            echo "notes<<$delimiter"
+            # shellcheck disable=SC2086
+            git log --no-merges --format='- %s' "$range" -- $shipped ':!apps/companion/test' | head -n 50
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version $version, release: $release."
+
   build:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -56,18 +148,15 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
-      - name: The tag has to match the package's version
-        if: startsWith(github.ref, 'refs/tags/companion-v')
+      - name: Stamp the version into this build
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          expected="companion-v$(node -p "require('./apps/companion/package.json').version")"
-          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
-            echo "The tag is $GITHUB_REF_NAME but package.json says $expected." >&2
-            exit 1
-          fi
+          node scripts/release-version.mjs stamp --version "$VERSION" \
+            --package apps/companion/package.json \
+            --constant apps/companion/src/version.ts
 
       - run: npm ci --prefer-offline
-
-      - run: npm test --workspace @polaris/companion
 
       - run: npm run build --workspace @polaris/companion
 
@@ -80,8 +169,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/companion-v')
-    needs: build
+    if: needs.plan.outputs.release == 'true'
+    needs: [plan, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -95,8 +184,13 @@ jobs:
         # v2.6.2
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Polaris for Companion ${{ github.ref_name }}
+          # Created at the commit this run built when it does not exist yet. A
+          # tag made with this workflow's token starts no other workflow, so
+          # this run is the only release of it.
+          tag_name: ${{ env.PREFIX }}${{ needs.plan.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Polaris for Companion ${{ env.PREFIX }}${{ needs.plan.outputs.version }}
+          body: ${{ needs.plan.outputs.notes }}
           # This repository releases the dashboard too, and that is what "latest"
           # should keep meaning.
           make_latest: "false"
