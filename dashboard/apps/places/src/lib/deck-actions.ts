@@ -760,7 +760,10 @@ export function placesDeckActions(): readonly AppDeckAction[] {
                 {
                     name: "value",
                     type: "text",
-                    label: { "en-US": "Value (cool, auto, high)", "es-ES": "Valor (cool, auto, high)" },
+                    label: {
+                        "en-US": "Value (cool, auto, high)",
+                        "es-ES": "Valor (cool, auto, high)"
+                    },
                     required: true
                 }
             ],

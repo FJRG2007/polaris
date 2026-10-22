@@ -122,7 +122,11 @@ export class PolarisKey extends SingletonAction<KeySettings> {
         hub.inFlight.begin(id, before);
         if (guess && "face" in guess) hub.setState(id, guess.face);
         const result = await hub.run(id, undefined, binding);
-        const settled = hub.inFlight.settle(id, result?.ok === true, result?.ok ? result.state : undefined);
+        const settled = hub.inFlight.settle(
+            id,
+            result?.ok === true,
+            result?.ok ? result.state : undefined
+        );
         if (settled) hub.setState(id, settled);
         if (result?.ok) {
             if (gesture === "press" && alternates(settings, main)) {

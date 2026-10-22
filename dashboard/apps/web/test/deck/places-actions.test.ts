@@ -270,33 +270,39 @@ describe("every device kind has a key", () => {
     });
 
     it("sends a light's warmth and colour, and a mode or fan by name", () => {
-        expect(action("places.light-white").run.input({ deviceId: DEVICE, kelvin: 2700 }, {})).toEqual({
+        expect(
+            action("places.light-white").run.input({ deviceId: DEVICE, kelvin: 2700 }, {})
+        ).toEqual({
             deviceId: DEVICE,
             action: "set-color-temp",
             kelvin: 2700
         });
         expect(
-            action("places.light-color").run.input({ deviceId: DEVICE, hue: 120, saturation: 80 }, {})
+            action("places.light-color").run.input(
+                { deviceId: DEVICE, hue: 120, saturation: 80 },
+                {}
+            )
         ).toEqual({ deviceId: DEVICE, action: "set-color", hue: 120, saturation: 80 });
         const setting = action("places.device-setting");
-        expect(setting.run.input({ deviceId: DEVICE, command: "set-fan", value: "high" }, {})).toEqual(
-            { deviceId: DEVICE, action: "set-fan", fan: "high" }
-        );
-        expect(setting.run.input({ deviceId: DEVICE, command: "set-mode", value: "cool" }, {})).toEqual(
-            { deviceId: DEVICE, action: "set-mode", mode: "cool" }
-        );
-        expect(setting.options.safeParse({ deviceId: DEVICE, command: "dump", value: "x" }).success).toBe(
-            false
-        );
+        expect(
+            setting.run.input({ deviceId: DEVICE, command: "set-fan", value: "high" }, {})
+        ).toEqual({ deviceId: DEVICE, action: "set-fan", fan: "high" });
+        expect(
+            setting.run.input({ deviceId: DEVICE, command: "set-mode", value: "cool" }, {})
+        ).toEqual({ deviceId: DEVICE, action: "set-mode", mode: "cool" });
+        expect(
+            setting.options.safeParse({ deviceId: DEVICE, command: "dump", value: "x" }).success
+        ).toBe(false);
     });
 
     it("shows a sensor's reading, only shown", () => {
         const reading = action("places.reading");
         expect(reading.kind).toBe("state");
         expect(reading.scope).toBe("home.read");
-        expect(
-            reading.read!.pick({ devices: [listing.devices.at(-1)] }, "en-US")
-        ).toEqual({ tone: "ok", value: "21.5°C" });
+        expect(reading.read!.pick({ devices: [listing.devices.at(-1)] }, "en-US")).toEqual({
+            tone: "ok",
+            value: "21.5°C"
+        });
     });
 });
 
@@ -349,14 +355,18 @@ describe("what a press shows before Polaris answers", () => {
     it("reads the press from the device for its own key, and from the door's command", () => {
         const own = action("places.device");
         const light = {
-            devices: [{ kind: "light", state: "on", online: true, actions: ["turn-on", "turn-off"] }]
+            devices: [
+                { kind: "light", state: "on", online: true, actions: ["turn-on", "turn-off"] }
+            ]
         };
         const state = own.read!.pick(light, "en-US");
         expect(own.read!.press!(state, { deviceId: DEVICE }, light, "en-US")).toEqual({
             face: { tone: "idle", on: false, icon: "lightbulb" }
         });
         const door = action("places.door");
-        expect(door.read!.press!(locked, { deviceId: DEVICE, command: "lock" }, {}, "en-US")).toEqual({
+        expect(
+            door.read!.press!(locked, { deviceId: DEVICE, command: "lock" }, {}, "en-US")
+        ).toEqual({
             noop: true
         });
     });

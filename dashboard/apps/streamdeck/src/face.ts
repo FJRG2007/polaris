@@ -95,7 +95,8 @@ export function faceFor(
     // Set to something this deck may no longer use, or that is gone.
     if (!entry) {
         // Its owner may use it, the deck's key may not: connecting again does.
-        if (locked && link === "online") return { icon: "lock", tone: "bad", label: words.reconnect };
+        if (locked && link === "online")
+            return { icon: "lock", tone: "bad", label: words.reconnect };
         return link === "online"
             ? { icon: "circle-alert", tone: "off", label: words.pick }
             : { icon: "wifi-off", tone: "off", label: words.offline };

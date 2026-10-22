@@ -175,7 +175,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         this.#show(settled);
         if (!ok) {
             this.log("warn", `${entry.label}: ${result?.message ?? "Polaris did not answer"}`);
-            if (keys.length) this.checkFeedbacksById(...keys.filter((key) => !key.startsWith("var:")));
+            if (keys.length)
+                this.checkFeedbacksById(...keys.filter((key) => !key.startsWith("var:")));
         }
     }
 

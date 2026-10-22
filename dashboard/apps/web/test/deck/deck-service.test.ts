@@ -561,7 +561,11 @@ describe("a deck connected without a permission its owner holds", () => {
         const { readings } = await service.readDeckStates(
             caller([]),
             [
-                { key: "a", action: lamp.id, options: { deviceId: "22222222-2222-4222-8222-222222222222" } },
+                {
+                    key: "a",
+                    action: lamp.id,
+                    options: { deviceId: "22222222-2222-4222-8222-222222222222" }
+                },
                 { key: "b", action: "chat.unread", options: {} }
             ],
             words

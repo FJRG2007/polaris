@@ -276,7 +276,9 @@ export async function runDeckAction(
         ? await callTool(caller, app.read.tool, app.read.input(options.data))
         : null;
     const current =
-        app.read && raw ? withPress(app, pickState(app, raw, caller), options.data, raw, caller) : undefined;
+        app.read && raw
+            ? withPress(app, pickState(app, raw, caller), options.data, raw, caller)
+            : undefined;
     // Already where the press would put it: nothing is sent, and the key is
     // told what it is.
     if (current?.press?.noop && !input.push) return { ok: true, state: current };

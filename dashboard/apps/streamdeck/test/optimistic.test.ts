@@ -22,9 +22,9 @@ describe("predict", () => {
 
     it("shows the face Polaris said a press shows", () => {
         const locking: DeckState = { tone: "warn", on: true, icon: "lock", detail: "Locking" };
-        expect(predict(run, { tone: "warn", detail: "Unlocked", press: { face: locking } })).toEqual(
-            { face: locking }
-        );
+        expect(
+            predict(run, { tone: "warn", detail: "Unlocked", press: { face: locking } })
+        ).toEqual({ face: locking });
     });
 
     it("says a press that is already done is one", () => {
@@ -109,12 +109,12 @@ describe("a deck missing a permission", () => {
     const words = wordsFor("es");
 
     it("draws Reconnect on a key set to an action it lost", () => {
-        expect(faceFor("online", { action: "places.door" }, undefined, undefined, words, true)).toEqual(
-            { icon: "lock", tone: "bad", label: "Reconectar" }
-        );
-        expect(faceFor("online", { action: "places.door" }, undefined, undefined, words).label).toBe(
-            words.pick
-        );
+        expect(
+            faceFor("online", { action: "places.door" }, undefined, undefined, words, true)
+        ).toEqual({ icon: "lock", tone: "bad", label: "Reconectar" });
+        expect(
+            faceFor("online", { action: "places.door" }, undefined, undefined, words).label
+        ).toBe(words.pick);
     });
 
     it("keeps only well-formed rows of what reconnecting allows", () => {
