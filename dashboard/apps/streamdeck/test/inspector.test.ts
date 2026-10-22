@@ -87,6 +87,54 @@ describe("the settings screen", () => {
         }
     });
 
+    function showUpdate(update: Record<string, unknown>) {
+        const opened = openScreen("key");
+        opened.listeners.get("message")?.({
+            data: JSON.stringify({
+                event: "sendToPropertyInspector",
+                payload: {
+                    type: "status",
+                    link: "online",
+                    address: "https://polaris.example.com",
+                    account: "Ada",
+                    connecting: { phase: "idle" },
+                    update: {
+                        version: "9.9.9",
+                        url: "https://polaris.example.com/account/downloads",
+                        ...update
+                    },
+                    catalogue: []
+                }
+            })
+        });
+        const text = opened.dom.window.document.body.textContent ?? "";
+        const buttons = [...opened.dom.window.document.querySelectorAll("button")].map(
+            (b) => b.textContent
+        );
+        return { ...opened, text, buttons };
+    }
+
+    it("offers Update now to a copy the install line put in, and asks the plugin for it", () => {
+        const { dom, sent, text } = showUpdate({ now: true, updating: "idle" });
+        expect(text).toContain("installs itself within six hours, or now");
+        const button = [...dom.window.document.querySelectorAll("button")].find(
+            (b) => b.textContent === "Update now"
+        );
+        button?.click();
+        expect(sent.find((message) => message.payload?.type === "updateNow")).toMatchObject({
+            event: "sendToPlugin",
+            context: "inspector-id"
+        });
+    });
+
+    it("sends a copy opened from a file to Downloads, and says when updating is under way or failed", () => {
+        expect(showUpdate({ now: false, updating: "idle" }).buttons).toContain("Open Downloads");
+        const started = showUpdate({ now: true, updating: "started" });
+        expect(started.text).toContain("closes and opens again");
+        expect(started.buttons).not.toContain("Update now");
+        expect(showUpdate({ now: true, updating: "failed" }).buttons).toContain("Open Downloads");
+    });
+
     it("saves a new timer length signed with its own id", async () => {
         const { dom, sent, action } = openScreen("timer");
         const minutes = dom.window.document.querySelector('input[type="number"]');

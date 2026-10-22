@@ -279,9 +279,15 @@ main() {
         mkdir -p "$PLUGINS"
     fi
 
+    # Asked twice: a list GitHub answers while a release is being published has
+    # been seen to come back without any plugin release in it.
     tag=$(newest_tag) || tag=""
+    if [ -z "$tag" ]; then
+        sleep 5
+        tag=$(newest_tag) || tag=""
+    fi
     [ -n "$tag" ] || {
-        err "no Stream Deck plugin release has been published yet, or GitHub could not be reached"
+        err "GitHub listed no Stream Deck plugin release just now, or could not be reached. Run the line again in a minute."
         return 1
     }
     version=${tag#streamdeck-v}

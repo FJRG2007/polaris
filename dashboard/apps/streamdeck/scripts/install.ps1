@@ -128,17 +128,27 @@ function Invoke-PolarisStreamDeckInstall {
 
     # The newest PLUGIN release, which is not the newest release: this
     # repository publishes the dashboard too and marks those as latest.
-    try {
-        $releases = Invoke-RestMethod -Uri "$api/repos/$repo/releases?per_page=100" -Headers $agent
-        $release = $releases |
-            Where-Object { $_.tag_name -like "streamdeck-v*" -and -not $_.draft -and -not $_.prerelease } |
-            Select-Object -First 1
-    } catch {
-        Write-Log "could not reach GitHub: $($_.Exception.Message)"
-        return
+    # Asked twice: a list GitHub answers while a release is being published has
+    # been seen to come back without any plugin release in it, and the line then
+    # reported that none had ever been published.
+    $release = $null
+    foreach ($attempt in 1..2) {
+        try {
+            $releases = Invoke-RestMethod -Uri "$api/repos/$repo/releases?per_page=100" -Headers $agent
+            $release = $releases |
+                Where-Object { $_.tag_name -like "streamdeck-v*" -and -not $_.draft -and -not $_.prerelease } |
+                Select-Object -First 1
+        } catch {
+            if ($attempt -eq 2) {
+                Write-Log "could not reach GitHub: $($_.Exception.Message)"
+                return
+            }
+        }
+        if ($release) { break }
+        if ($attempt -eq 1) { Start-Sleep -Seconds 5 }
     }
     if (-not $release) {
-        Write-Log "no Stream Deck plugin release has been published yet"
+        Write-Log "GitHub listed no Stream Deck plugin release just now. Run the line again in a minute."
         return
     }
     $tag = $release.tag_name

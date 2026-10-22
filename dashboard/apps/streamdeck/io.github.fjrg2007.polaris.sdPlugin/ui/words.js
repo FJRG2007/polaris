@@ -25,6 +25,13 @@
             openAgain: "Open the page again",
             update: "Version {version} of this plugin is out. It does not install itself: download it from your Polaris and open the file.",
             getUpdate: "Open Downloads",
+            updateNow:
+                "Version {version} of this plugin is out. It installs itself within six hours, or now.",
+            updateNowButton: "Update now",
+            updateStarted:
+                "Updating: the Stream Deck app closes and opens again with the new version.",
+            updateFailed:
+                "It could not update by itself. Download it from your Polaris and open the file.",
             failedAddress: "That is not an address Polaris can be reached at.",
             failedDenied: "The request was turned away in Polaris.",
             failedExpired: "The code expired before it was approved. Connect again for a new one.",
@@ -86,6 +93,13 @@
             openAgain: "Abrir la página otra vez",
             update: "Ya está la versión {version} de este plugin. No se instala sola: descárgala desde tu Polaris y abre el archivo.",
             getUpdate: "Abrir Descargas",
+            updateNow:
+                "Ya está la versión {version} de este plugin. Se instala sola en seis horas, o ahora.",
+            updateNowButton: "Actualizar ya",
+            updateStarted:
+                "Actualizando: la app de Stream Deck se cierra y se abre con la versión nueva.",
+            updateFailed:
+                "No se pudo actualizar sola. Descárgala desde tu Polaris y abre el archivo.",
             failedAddress: "Esa no es una dirección en la que se pueda contactar con Polaris.",
             failedDenied: "La solicitud se rechazó en Polaris.",
             failedExpired:
