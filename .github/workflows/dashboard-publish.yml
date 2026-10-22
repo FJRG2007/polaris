@@ -296,6 +296,22 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Next's compile cache from the last image built, handed to the Dockerfile's
+      # `next-cache` stage. The registry cache cannot carry it: the build step runs
+      # after `COPY . .`, so every commit misses that layer and compiled the whole
+      # app cold - 6 to 9 of this job's ~21 minutes. A key of its own, not the one
+      # dashboard-ci.yml keeps, because webpack keys its cache by absolute path and
+      # that copy was compiled outside the image, under another one.
+      - uses: actions/cache/restore@v6
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/next-cache
+          key: next-image-${{ hashFiles('dashboard/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-image-${{ hashFiles('dashboard/package-lock.json') }}-
+            next-image-
+      # The context must exist even when nothing was restored; empty is a cold build.
+      - run: mkdir -p "$RUNNER_TEMP/next-cache/cache"
       - id: build
         uses: docker/build-push-action@v7
         with:
@@ -305,6 +321,7 @@ jobs:
             POLARIS_BUILD_SHA=${{ github.sha }}
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
+          build-contexts: next-cache=${{ runner.temp }}/next-cache
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max' || '' }}
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
@@ -330,6 +347,9 @@ jobs:
             POLARIS_BUILD_SHA=${{ github.sha }}
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
+          # The same context as the build above, or the stages after it would not
+          # match the layers already in this builder and the app would compile again.
+          build-contexts: next-cache=${{ runner.temp }}/next-cache
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           outputs: type=local,dest=${{ runner.temp }}/app-bundles
       # Pushed untagged, like the image; the `tag` job names them once the suites
@@ -344,6 +364,60 @@ jobs:
         run: |
           bash dashboard/docker/app-bundles.sh push "$RUNNER_TEMP/app-bundles"
           echo "list=$(jq -c '.apps | map_values(.manifest)' "$RUNNER_TEMP/app-bundles/index.json")" >> "$GITHUB_OUTPUT"
+      # The compile cache this build left, for the next one. Also from a dry run, so
+      # a change to the build can be timed warm; a branch's copy is only ever read
+      # by that branch. Never fails the publish: the worst case is a cold build.
+      - name: Export the compile cache
+        id: next-cache-out
+        continue-on-error: true
+        uses: docker/build-push-action@v7
+        with:
+          context: dashboard
+          file: dashboard/docker/Dockerfile
+          target: next-cache-out
+          build-args: |
+            POLARIS_BUILD_SHA=${{ github.sha }}
+            NODE_BUILD_OPTIONS=--max-old-space-size=8192
+            POLARIS_APP_BUNDLES=publish
+          build-contexts: next-cache=${{ runner.temp }}/next-cache
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
+          outputs: type=local,dest=${{ runner.temp }}/next-cache-out
+      - id: next-cache-swap
+        if: steps.next-cache-out.outcome == 'success'
+        continue-on-error: true
+        run: rm -rf "$RUNNER_TEMP/next-cache" && mv "$RUNNER_TEMP/next-cache-out" "$RUNNER_TEMP/next-cache"
+      - if: steps.next-cache-swap.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/next-cache
+          key: next-image-${{ hashFiles('dashboard/package-lock.json') }}-${{ github.sha }}
+
+  # Each copy is a few hundred MB of the repository's 10 GB of caches, so main keeps
+  # only the newest. A job of its own so the one holding the registry token never
+  # also holds the right to delete caches.
+  next-cache-prune:
+    needs: web
+    if: ${{ github.ref == 'refs/heads/main' && needs.web.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete main's older image compile caches
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_SHA: ${{ github.sha }}
+        run: |
+          keep=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref refs/heads/main --key "next-image-" --limit 100 --json key \
+            --jq "[.[] | select(.key | endswith(\"-$KEEP_SHA\"))] | length")
+          # Only once this run's copy is there, so main is never left with none.
+          [ "$keep" -gt 0 ] || { echo "This run saved no cache; keeping the older ones."; exit 0; }
+          gh cache list --repo "$GITHUB_REPOSITORY" --ref refs/heads/main --key "next-image-" --limit 100 --json id,key \
+            --jq ".[] | select(.key | endswith(\"-$KEEP_SHA\") | not) | .id" |
+            while read -r id; do
+              gh cache delete "$id" --repo "$GITHUB_REPOSITORY" || echo "::warning::Could not delete cache $id."
+            done
 
   mdns:
     needs: changes

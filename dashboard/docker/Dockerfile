@@ -7,6 +7,17 @@
 # host daemon runs as a separate service (see docker-compose.yml `full` profile).
 
 # ---------------------------------------------------------------------------
+# Next's compile cache from the previous image build. CI hands the last one in as
+# a named build context with this same name (dashboard-publish.yml), which takes
+# the place of this stage; everywhere else, an operator's update included, it is
+# an empty folder and the app compiles from scratch exactly as it did before. A
+# stage rather than an optional COPY because the classic builder has no way to
+# skip a missing source, and an update must keep building there.
+# ---------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS next-cache
+WORKDIR /cache
+
+# ---------------------------------------------------------------------------
 # Builder - compile every workspace package and the Next.js app.
 # ---------------------------------------------------------------------------
 FROM node:22-bookworm-slim AS builder
@@ -103,6 +114,10 @@ RUN npm run db:generate
 # it (the default ~4 GB is what the app build now peaks at). Empty on an
 # operator's machine, which keeps Node's own limit for the RAM that box has.
 ARG NODE_BUILD_OPTIONS=""
+# Most of the app build is recompiling modules that did not change; with the last
+# build's cache in place Next skips them. Only the compiler reads it - the runner
+# below copies the standalone output, so none of it reaches the image.
+COPY --from=next-cache /cache/ ./apps/web/.next/cache/
 RUN NODE_OPTIONS="$NODE_BUILD_OPTIONS" npm run build
 
 # Bundle the deploy terminal sidecar into one self-contained CJS file. It runs as
@@ -227,6 +242,11 @@ RUN node packages/app-host/bundler/build.mjs /build/app-bundles \
 # the digests of the files published.
 FROM scratch AS app-bundles
 COPY --from=app-bundles-build /build/app-bundles /
+
+# The compile cache this build leaves, exported by CI (`--target next-cache-out
+# --output type=local`) and handed to the next build as `next-cache`.
+FROM scratch AS next-cache-out
+COPY --from=builder /build/apps/web/.next/cache /cache/
 
 # ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.
