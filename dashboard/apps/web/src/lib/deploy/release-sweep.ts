@@ -108,7 +108,10 @@ async function removeAll(
             await ports.stackDown(stack);
             removed.push({ name: stack, project: stack });
         } catch (error) {
-            console.error(`polaris: could not remove the superseded release stack ${stack}:`, error);
+            console.error(
+                `polaris: could not remove the superseded release stack ${stack}:`,
+                error
+            );
         }
     }
     return removed;

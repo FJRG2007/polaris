@@ -30,7 +30,10 @@ function container(
     extra: Partial<ReleaseContainer> = {}
 ): ReleaseContainer {
     return {
-        id: `${name.replace(/[^a-f0-9]/g, "a").padEnd(12, "0").slice(0, 12)}`,
+        id: `${name
+            .replace(/[^a-f0-9]/g, "a")
+            .padEnd(12, "0")
+            .slice(0, 12)}`,
         name,
         project,
         engine: "compose",
@@ -121,8 +124,16 @@ describe("reading the engine's listing", () => {
     it("drops anything that is not a release, and anything malformed", () => {
         expect(
             releaseContainersIn([
-                { Id: "dddd", Names: ["/polaris-web"], Labels: { [COMPOSE_PROJECT_LABEL]: "polaris" } },
-                { Id: "eeee", Names: ["/db"], Labels: { [COMPOSE_PROJECT_LABEL]: "polaris-db-c69533f6" } },
+                {
+                    Id: "dddd",
+                    Names: ["/polaris-web"],
+                    Labels: { [COMPOSE_PROJECT_LABEL]: "polaris" }
+                },
+                {
+                    Id: "eeee",
+                    Names: ["/db"],
+                    Labels: { [COMPOSE_PROJECT_LABEL]: "polaris-db-c69533f6" }
+                },
                 { Id: "ffff", Names: ["/mine"], Labels: null },
                 { Names: ["/no-id"], Labels: { [COMPOSE_PROJECT_LABEL]: BASE } },
                 null,
@@ -176,7 +187,9 @@ describe("what a promotion takes down", () => {
 
     it("finds the release left in the service's own project, the older naming", () => {
         const keep = new Set([`${BASE}-ba791a7`]);
-        expect(supersededContainers([legacy, fresh, forwarder, other], BASE, keep)).toEqual([legacy]);
+        expect(supersededContainers([legacy, fresh, forwarder, other], BASE, keep)).toEqual([
+            legacy
+        ]);
     });
 
     it("finds an older change-over release by its marker, whatever the row says", () => {
@@ -210,9 +223,10 @@ describe("what the sweep removes", () => {
         const legacy = container("hmars-hmars-c695", BASE);
         const stopped = container("portfolio-x", "polaris-3f0d2a11", { running: false });
         const current = container("portfolio-x-dc94ed2", "polaris-3f0d2a11-dc94ed2");
-        expect(
-            orphanedReleaseContainers([legacy, stopped, current], services, NOW, HOUR)
-        ).toEqual([legacy, stopped]);
+        expect(orphanedReleaseContainers([legacy, stopped, current], services, NOW, HOUR)).toEqual([
+            legacy,
+            stopped
+        ]);
     });
 
     it("leaves a service it was not told about alone", () => {
