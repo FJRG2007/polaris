@@ -4,7 +4,7 @@
  * check (`guestWatchCamera`) instead of an account's (`mayWatchCamera`).
  */
 
-import { guestWatchCamera } from "../../../../../../../../lib/guest-camera";
+import { guestWatchCamera, whileLinkHolds } from "../../../../../../../../lib/guest-camera";
 import { cameraStream, CameraOfflineError } from "../../../../../../../../lib/live";
 
 export const runtime = "nodejs";
@@ -19,7 +19,11 @@ export async function GET(
     if (!seen) return new Response("Gone", { status: 410 });
     const quality = new URL(request.url).searchParams.get("q") === "sub" ? "sub" : "main";
     try {
-        return await cameraStream(seen.installId, seen.cameraId, quality, request.signal);
+        return whileLinkHolds(
+            await cameraStream(seen.installId, seen.cameraId, quality, request.signal),
+            String(token),
+            String(watch)
+        );
     } catch (caught) {
         if (caught instanceof CameraOfflineError)
             return new Response("Offline", { status: 503 });

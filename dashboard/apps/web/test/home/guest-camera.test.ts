@@ -33,8 +33,15 @@ vi.mock("@polaris-app/places/src/lib/cameras", () => ({
         id === YARD ? { id: YARD, name: "Yard", address: "rtsp://10.0.0.9/live" } : null
 }));
 
-const { forgetWatches, guestCamera, guestWatchCamera, openGuestWatch, WATCH_TTL_MS } =
-    await import("@polaris-app/places/src/lib/guest-camera");
+const {
+    forgetWatches,
+    guestCamera,
+    guestWatchCamera,
+    openGuestWatch,
+    RECHECK_MS,
+    WATCH_TTL_MS,
+    whileLinkHolds
+} = await import("@polaris-app/places/src/lib/guest-camera");
 
 function live(subjectType = "place.camera", id = "g1") {
     return {
@@ -147,5 +154,26 @@ describe("each picture", () => {
         const core = await import("@polaris/core");
         expect(core.linkCapabilities("place.camera")).toEqual(["view"]);
         expect(core.grantActions("place.camera", "view", [])).toEqual(["watch"]);
+    });
+});
+
+describe("a stream already flowing", () => {
+    it("ends once the link is taken back, on the next check", async () => {
+        vi.useFakeTimers();
+        let holds = true;
+        const upstream = new ReadableStream<Uint8Array>({
+            pull: (controller) => controller.enqueue(new Uint8Array([1]))
+        });
+        const flowing = whileLinkHolds(new Response(upstream), "t", "w", async () =>
+            holds ? { installId: "i", cameraId: YARD } : null
+        );
+        const reader = flowing.body!.getReader();
+        expect((await reader.read()).done).toBe(false);
+        holds = false;
+        await vi.advanceTimersByTimeAsync(RECHECK_MS + 1);
+        let done = false;
+        for (let i = 0; i < 50 && !done; i += 1) done = (await reader.read()).done;
+        expect(done).toBe(true);
+        vi.useRealTimers();
     });
 });

@@ -165,6 +165,63 @@ export async function guestWatchCamera(
     return install ? { installId: install.id, cameraId: held.cameraId } : null;
 }
 
+/** How often a stream already flowing asks the link again. */
+export const RECHECK_MS = 10_000;
+
+/**
+ * A live stream that ends when the link does. An MP4 view is one long
+ * response, so the check made when it started is not enough: taking the link
+ * back, or its hours closing, must stop a picture already on somebody's
+ * screen. Asked again every `RECHECK_MS`; the first "no" closes the stream.
+ */
+export function whileLinkHolds(
+    response: Response,
+    token: string,
+    watch: string,
+    check: typeof guestWatchCamera = guestWatchCamera
+): Response {
+    if (!response.body) return response;
+    const reader = response.body.getReader();
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const stop = () => {
+        if (timer) clearInterval(timer);
+        timer = null;
+    };
+    const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+            timer = setInterval(() => {
+                void check(token, watch).then((still) => {
+                    if (still || !timer) return;
+                    stop();
+                    void reader.cancel().catch(() => undefined);
+                    try {
+                        controller.close();
+                    } catch {
+                        // Already closed by the reader below.
+                    }
+                });
+            }, RECHECK_MS);
+        },
+        async pull(controller) {
+            try {
+                const { done, value } = await reader.read();
+                if (done) {
+                    stop();
+                    controller.close();
+                } else controller.enqueue(value);
+            } catch (caught) {
+                stop();
+                controller.error(caught);
+            }
+        },
+        cancel() {
+            stop();
+            return reader.cancel().catch(() => undefined);
+        }
+    });
+    return new Response(body, { status: response.status, headers: response.headers });
+}
+
 /** For tests: forget every watch. */
 export function forgetWatches(): void {
     watches.clear();
