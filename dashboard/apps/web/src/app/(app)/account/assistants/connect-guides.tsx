@@ -50,11 +50,6 @@ const CODE_LANGUAGE: Partial<Record<CopyField["kind"], string>> = {
     config: "json"
 };
 
-/** A command or a configuration: highlighted, the way every code view is. */
-function CodeCopyable({ value, label, language }: { value: string; label: string; language: string }) {
-    return <CodeView value={value} language={language} label={label} className="text-xs" />;
-}
-
 /** A short value somebody copies, with its copy button. */
 function Copyable({ value, label }: { value: string; label: string }) {
     return (
@@ -150,7 +145,12 @@ function Field({ field, urls }: { field: CopyField; urls: ServerUrls }) {
     const t = useTranslations("mcpConnect");
     const language = CODE_LANGUAGE[field.kind];
     const copyable = language ? (
-        <CodeCopyable value={field.value(urls)} label={t(`copy.${field.kind}`)} language={language} />
+        <CodeView
+            value={field.value(urls)}
+            language={language}
+            label={t(`copy.${field.kind}`)}
+            className="text-xs"
+        />
     ) : (
         <Copyable value={field.value(urls)} label={t(`copy.${field.kind}`)} />
     );
@@ -240,7 +240,12 @@ function OtherSteps({ urls }: { urls: ServerUrls }) {
                     <p className="text-xs text-muted-foreground">{t(`other.types.${type}.hint`)}</p>
                 </Step>
                 <Step number={3} text={t("other.step3")}>
-                    <CodeCopyable value={chosen.value(urls)} label={t("copy.config")} language="json" />
+                    <CodeView
+                        value={chosen.value(urls)}
+                        language="json"
+                        label={t("copy.config")}
+                        className="text-xs"
+                    />
                 </Step>
                 <Step number={4} text={t("other.step4")} />
             </Steps>

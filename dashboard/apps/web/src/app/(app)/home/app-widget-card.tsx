@@ -110,7 +110,7 @@ export function AppWidgetBody({
                             )}
                             {item.subtitle ? (
                                 <p
-                                    className="truncate text-xs text-muted-foreground"
+                                    className="relative z-10 w-fit max-w-full truncate text-xs text-muted-foreground"
                                     title={item.subtitle}
                                 >
                                     {item.subtitle}
@@ -132,7 +132,7 @@ export function AppWidgetBody({
                                     </dt>
                                     <dd
                                         className={cn(
-                                            "truncate text-sm font-medium tabular-nums",
+                                            "relative z-10 w-fit max-w-full truncate text-sm font-medium tabular-nums",
                                             reading.tone && READING_TONE[reading.tone]
                                         )}
                                         title={reading.value}
