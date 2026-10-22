@@ -168,6 +168,16 @@ describe("what the key shows", () => {
         });
     });
 
+    it("says a new timer with no name needs one", () => {
+        expect(action.read!.pick(list(), "en-US", { timer: "new", name: "  " })).toEqual({
+            tone: "bad",
+            icon: "timer",
+            detail: "Needs a name"
+        });
+        expect(action.read!.pick(list(), "es-ES", { timer: "new" }).detail).toBe("Sin nombre");
+        expect(action.read!.pick(list(), "en-US", { timer: "" })).toEqual({ tone: "idle" });
+    });
+
     it("tells the plugin what a start or pause shows at once", () => {
         const state = action.read!.pick(list(row()), "en-US", { timer: TEA });
         const press = action.read!.press!(state, { timer: TEA }, list(row()), "en-US");

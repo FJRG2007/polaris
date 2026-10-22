@@ -28,6 +28,7 @@ import { hub } from "./hub";
 import * as timers from "./timer";
 import * as polarisTimers from "./polaris-timer";
 import { keyImage } from "./render";
+import type { DeckState } from "./polaris";
 import { fromInspector, tellInspector } from "./inspector";
 import { DIAL_UUID, KEY_UUID, TIMER_UUID, surfaceOf, type Surface } from "./surfaces";
 import { CONFIRM_MS, Confirmations, DOUBLE_MS, PressTimer, type Gesture } from "./presses";
@@ -311,6 +312,11 @@ export class TimerAction extends SingletonAction<TimerSettings> {
     /** A dial's ticks, gathered into one change of minutes. */
     readonly #ticks = new Map<string, number>();
     readonly #burst = new DialBurst(DIAL_SETTLE_MS, (id) => void this.#remoteShift(id));
+    /** A burst's face before its first tick, and the guess it shows now. */
+    readonly #turned = new Map<
+        string,
+        { before: DeckState | undefined; beforeAt: number | undefined; shown: DeckState }
+    >();
     #ticker: ReturnType<typeof setInterval> | null = null;
 
     #read(settings: TimerSettings): timers.TimerState {
@@ -461,6 +467,7 @@ export class TimerAction extends SingletonAction<TimerSettings> {
         this.#presses.forget(ev.action.id);
         this.#burst.forget(ev.action.id);
         this.#ticks.delete(ev.action.id);
+        this.#turned.delete(ev.action.id);
         if (this.#remote.delete(ev.action.id)) hub.detach(ev.action.id);
     }
 
@@ -488,16 +495,21 @@ export class TimerAction extends SingletonAction<TimerSettings> {
 
     /** Run an operation on a Polaris timer, showing its result at once and
      *  putting the key back if Polaris refuses or does not answer. */
-    async #remoteRun(id: string, op: polarisTimers.TimerOp, step?: number): Promise<boolean> {
+    async #remoteRun(
+        id: string,
+        op: polarisTimers.TimerOp,
+        step?: number,
+        shown?: { before: DeckState | undefined; beforeAt: number | undefined }
+    ): Promise<boolean> {
         const settings = this.#remote.get(id);
         if (!settings || !hub.credentials) return false;
         const key = asKey(settings);
         if (!hub.entry(key)) return false;
-        const before = hub.state(id);
-        const beforeAt = hub.stateAt.get(id);
+        const before = shown ? shown.before : hub.state(id);
+        const beforeAt = shown ? shown.beforeAt : hub.stateAt.get(id);
         const now = Date.now();
         const skew = polarisTimers.skewOf(before?.countdown, beforeAt ?? now);
-        const guess = polarisTimers.predictTimer(before, op, now, skew, step);
+        const guess = shown ? undefined : polarisTimers.predictTimer(before, op, now, skew, step);
         hub.inFlight.begin(id, before);
         if (guess) hub.setState(id, guess);
         this.#alerted.delete(id);
@@ -531,11 +543,15 @@ export class TimerAction extends SingletonAction<TimerSettings> {
     async #remoteShift(id: string): Promise<void> {
         const ticks = Math.max(-50, Math.min(50, this.#ticks.get(id) ?? 0));
         this.#ticks.delete(id);
+        const turned = this.#turned.get(id);
+        this.#turned.delete(id);
         const settings = this.#remote.get(id);
         if (!settings || ticks === 0) return;
+        const shown = turned && hub.state(id) === turned.shown ? turned : undefined;
         const options = polarisTimers.polarisOptions(settings);
-        const unmade = options.timer === "new" && hub.state(id)?.countdown?.state === "idle";
-        if (await this.#remoteRun(id, "shift", ticks)) return;
+        const base = shown ? shown.before : hub.state(id);
+        const unmade = options.timer === "new" && base?.countdown?.state === "idle";
+        if (await this.#remoteRun(id, "shift", ticks, shown)) return;
         const action = streamDeck.actions.getActionById(id);
         if (!action) return;
         if (unmade) {
@@ -579,7 +595,12 @@ export class TimerAction extends SingletonAction<TimerSettings> {
             const now = Date.now();
             const skew = polarisTimers.skewOf(state?.countdown, at ?? now);
             const guess = polarisTimers.predictTimer(state, "shift", now, skew, ev.payload.ticks);
-            if (guess && !hub.inFlight.busy(id)) hub.setState(id, guess);
+            if (guess && !hub.inFlight.busy(id)) {
+                const turned = this.#turned.get(id);
+                const kept = turned && turned.shown === state ? turned : { before: state, beforeAt: at };
+                this.#turned.set(id, { before: kept.before, beforeAt: kept.beforeAt, shown: guess });
+                hub.setState(id, guess);
+            }
             this.#burst.turn(id, 0);
             this.#draw(id);
             return;

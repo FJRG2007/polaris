@@ -88,6 +88,7 @@ export function keyTime(ms: number): string {
 }
 
 const GONE: Words = { "en-US": "Not found", "es-ES": "No existe" };
+const UNNAMED: Words = { "en-US": "Needs a name", "es-ES": "Sin nombre" };
 const DONE: Words = { "en-US": "Done", "es-ES": "Hecho" };
 const PHASES: Readonly<Record<"focus" | "short" | "long", Words>> = {
     focus: { "en-US": "Focus", "es-ES": "Foco" },
@@ -116,7 +117,12 @@ export function countdownFace(
 /** What a key set to `options` shows, from what `clock_list` answered. */
 export function timerState(structured: unknown, locale: Locale, raw: unknown): DeckState {
     const options = timerOptionsSchema.safeParse(raw);
-    if (!options.success) return { tone: "idle" };
+    if (!options.success) {
+        const loose = timerOptionsSchema.innerType().safeParse(raw);
+        return loose.success && loose.data.timer === NEW_TIMER
+            ? { tone: "bad", icon: "timer", detail: UNNAMED[locale] }
+            : { tone: "idle" };
+    }
     const { timers, serverNow } = rowsOf(structured);
     const found = timerFor(timers, options.data);
     if (found === "gone") return { tone: "bad", icon: "timer", detail: GONE[locale] };
