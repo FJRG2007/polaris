@@ -27,7 +27,7 @@ import type { JSONContent } from "@tiptap/core";
 import { afterComposition } from "./composed-shortcuts";
 import { mentionExtension, popupOpen } from "./suggestion";
 import { EditorMenu, type ListAction } from "./editor-menu";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import type { CustomEmojiEntry } from "./custom-emoji";
 import { withCustomEmojiNodes } from "./custom-emoji-doc";
@@ -184,6 +184,9 @@ export interface RichTextEditorProps {
      *  part of a box somebody is about to type in reads as a second control;
      *  chat clients draw none. */
     framed?: boolean;
+    /** Drawn under the text, inside the box: a mail composer's "..." over the
+     *  history it trimmed sits where the message ends, not under the field. */
+    after?: ReactNode;
     className?: string;
 }
 
@@ -242,6 +245,7 @@ export function RichTextEditor({
     emoji = null,
     bordered = false,
     framed = false,
+    after = null,
     className
 }: RichTextEditorProps) {
     // Held in a ref rather than in the dependency list: the editor is built once
@@ -591,6 +595,7 @@ export function RichTextEditor({
             >
                 <EditorContent editor={editor} />
             </EditorMenu>
+            {after}
         </div>
     );
 }

@@ -43,6 +43,8 @@ import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
+import { joinComposerBody, trimComposerBody } from "./trimmed-content";
+import { TrimmedPill } from "./trimmed-pill";
 import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
 import {
     ChevronDown,
@@ -132,6 +134,16 @@ export function Composer() {
     const [showCopies, setShowCopies] = useState(false);
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
+    /**
+     * The history a reply or a forward carries, folded away under "..." the way
+     * Gmail trims it. It is still the message: everything that saves or sends
+     * reads `message`, which is the two joined back exactly - so a quote nobody
+     * opened goes out as the very text it always did. Opening it puts it into
+     * the editor and leaves this empty for the rest of the draft.
+     */
+    const [trimmed, setTrimmed] = useState("");
+    const [expanded, setExpanded] = useState(false);
+    const message = joinComposerBody(body, trimmed);
     const [files, setFiles] = useState<Attached[]>([]);
     const saves = useRef<DraftSaves | null>(null);
     const [sendAt, setSendAt] = useState<Date | null>(null);
@@ -183,7 +195,14 @@ export function Composer() {
             accounts.find((one) => one.id === account),
             identity
         );
-        setBody(body);
+        // Only an answer has history to trim, and a reopened draft only while
+        // its quote is still nothing but the quote.
+        const split = composing.inReplyToId
+            ? trimComposerBody(body, Boolean(composing.draftId))
+            : null;
+        setBody(split ? split.head : body);
+        setTrimmed(split?.tail ?? "");
+        setExpanded(false);
         setFiles([]);
         saves.current = draftSaves(
             {
@@ -249,7 +268,8 @@ export function Composer() {
         };
     }, [composing]);
 
-    const dirty = to.length > 0 || subject.trim() !== "" || body.trim() !== "" || files.length > 0;
+    const dirty =
+        to.length > 0 || subject.trim() !== "" || message.trim() !== "" || files.length > 0;
 
     // The draft, a few seconds after typing stops. Skipped while nothing has been
     // typed - an opened-and-closed composer should not leave an empty draft.
@@ -263,12 +283,24 @@ export function Composer() {
                 cc,
                 bcc,
                 subject,
-                body,
+                body: message,
                 attachmentIds: files.map((file) => file.id)
             });
         }, AUTOSAVE_MS);
         return () => clearTimeout(timer);
-    }, [composing, accountId, identityId, to, cc, bcc, subject, body, files, dirty, queued]);
+    }, [composing, accountId, identityId, to, cc, bcc, subject, message, files, dirty, queued]);
+
+    /** Put the history into the editor, where it can be read, edited or cut. */
+    const showTrimmed = useCallback(() => {
+        setBody(joinComposerBody(body, trimmed));
+        setTrimmed("");
+        setExpanded(true);
+        // The blank line a reply opens on is already in the editor when the
+        // writer typed on it; putting it back would push their words down.
+        if (body.trim()) setOwnLine(false);
+        // The pill is gone, and the focus with it: back to the message.
+        setFocusAt(Date.now());
+    }, [body, trimmed]);
 
     const attach = useCallback(
         async (chosen: readonly File[]) => {
@@ -353,7 +385,7 @@ export function Composer() {
                     cc,
                     bcc,
                     subject,
-                    body,
+                    body: message,
                     attachmentIds: files.map((file) => file.id)
                 };
                 const draftId = (await saves.current?.after((id) => Promise.resolve(id))) ?? null;
@@ -385,7 +417,7 @@ export function Composer() {
             cc,
             bcc,
             subject,
-            body,
+            message,
             files,
             composing,
             refreshMailbox,
@@ -453,7 +485,7 @@ export function Composer() {
             cc,
             bcc,
             subject,
-            body,
+            body: message,
             attachmentIds: files.map((file) => file.id)
         };
         void (async () => {
@@ -470,7 +502,7 @@ export function Composer() {
         cc,
         bcc,
         subject,
-        body,
+        message,
         files,
         refreshMailbox
     ]);
@@ -692,10 +724,19 @@ export function Composer() {
                                     onChange={(next) => setBody(keepSignatureDelimiter(next))}
                                     insert={insert}
                                     focusAt={focusAt}
-                                    focusWhere={ownLine ? "start" : "end"}
+                                    focusWhere={ownLine || expanded ? "start" : "end"}
                                     leadingBlankLine={ownLine}
                                     placeholder={t("compose.bodyPlaceholder")}
                                     className="flex min-h-[14rem] flex-1 flex-col"
+                                    after={
+                                        trimmed ? (
+                                            <TrimmedPill
+                                                className="ml-0.5 mt-1"
+                                                label={tm("body.showTrimmed")}
+                                                onToggle={showTrimmed}
+                                            />
+                                        ) : null
+                                    }
                                     // A screenshot pasted in is an attachment rather
                                     // than a picture pasted into the text: a data URI
                                     // that size is refused by mail servers and shows

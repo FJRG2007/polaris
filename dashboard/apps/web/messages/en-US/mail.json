@@ -313,7 +313,9 @@
         "and": " and ",
         "trackers": "Trackers from {named} were served through Polaris, so they learned nothing about you.",
         "opening": "Opening the message",
-        "frameTitle": "Message"
+        "frameTitle": "Message",
+        "showTrimmed": "Show trimmed content",
+        "hideTrimmed": "Hide trimmed content"
     },
     "address": {
         "copyRefused": "This browser would not let Polaris copy that.",

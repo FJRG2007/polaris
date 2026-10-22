@@ -1047,6 +1047,8 @@
         "web/src/app/(app)/mail/t/[threadId]/page.tsx",
         "web/src/app/(app)/mail/thread-menu.tsx",
         "web/src/app/(app)/mail/thread-view.tsx",
+        "web/src/app/(app)/mail/trimmed-content.ts",
+        "web/src/app/(app)/mail/trimmed-pill.tsx",
         "web/src/app/(app)/mail/unsubscribe-button.tsx",
         "web/src/app/(app)/mail/use-busy.ts",
         "web/src/app/(app)/mail/use-mail-keys.ts",
