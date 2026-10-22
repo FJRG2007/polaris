@@ -20,7 +20,13 @@ import { z } from "zod";
 import { useChat } from "@ai-sdk/react";
 import { Columns3, Plus, Square, X } from "lucide-react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type PointerEvent as ReactPointerEvent
+} from "react";
 import {
     Button,
     cn,
@@ -73,9 +79,7 @@ export type PolarComparison = z.infer<typeof comparisonSchema>;
 export type ComparisonColumn = PolarComparison["columns"][number];
 /** A new comparison, none, or a change worked out from the current one. */
 export type ComparisonUpdate =
-    | PolarComparison
-    | null
-    | ((current: PolarComparison | null) => PolarComparison | null);
+    PolarComparison | null | ((current: PolarComparison | null) => PolarComparison | null);
 
 /** Whether two choices name the same model; Automatic is one model here. */
 export function sameModel(a: ModelChoice, b: ModelChoice): boolean {
@@ -189,10 +193,9 @@ function storeComparison(comparison: PolarComparison | null): void {
  * The open comparison, kept for a reload of this tab. Only the view that can
  * start one (`kept`) reads or writes the stored one; any other stays out of it.
  */
-export function useComparison(kept: boolean): [
-    PolarComparison | null,
-    (next: ComparisonUpdate) => void
-] {
+export function useComparison(
+    kept: boolean
+): [PolarComparison | null, (next: ComparisonUpdate) => void] {
     const [comparison, setComparison] = useState<PolarComparison | null>(null);
     useEffect(() => {
         if (kept) setComparison(readStoredComparison());
@@ -304,7 +307,9 @@ export function AskSeveral({
                                         choice={one}
                                         onChoice={(next) =>
                                             setChoices((current) =>
-                                                current.map((old, at) => (at === index ? next : old))
+                                                current.map((old, at) =>
+                                                    at === index ? next : old
+                                                )
                                             )
                                         }
                                         open={picking === index}
@@ -675,14 +680,20 @@ function ColumnChat({
     return (
         <>
             <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
-                <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground" title={name}>
+                <span
+                    className="min-w-0 flex-1 truncate text-xs font-medium text-foreground"
+                    title={name}
+                >
                     {name}
                 </span>
                 {busy ? (
                     <MessageAction
                         label={t("actions.stop")}
                         onClick={() =>
-                            void Promise.all([chat.stop(), polarRuns.stopPolarAnswer(column.threadId)])
+                            void Promise.all([
+                                chat.stop(),
+                                polarRuns.stopPolarAnswer(column.threadId)
+                            ])
                         }
                     >
                         <Square />
@@ -693,7 +704,9 @@ function ColumnChat({
                 <div className="flex min-w-0 flex-col gap-3" aria-live="polite" aria-busy={busy}>
                     {answers.map((message) => {
                         const text = textOf(message);
-                        return text ? <MessageResponse key={message.id}>{text}</MessageResponse> : null;
+                        return text ? (
+                            <MessageResponse key={message.id}>{text}</MessageResponse>
+                        ) : null;
                     })}
                     {busy && !answered ? (
                         <Shimmer className="text-sm">{t("compare.answering")}</Shimmer>
@@ -715,12 +728,7 @@ function ColumnChat({
                 </div>
             </div>
             <div className="flex shrink-0 justify-end border-t border-border px-3 py-2">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={onContinue}
-                >
+                <Button type="button" variant="secondary" disabled={busy} onClick={onContinue}>
                     {t("compare.continue")}
                 </Button>
             </div>

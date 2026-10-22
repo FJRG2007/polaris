@@ -11,7 +11,11 @@ import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-type Message = { id: string; role: string; parts: Array<{ type: string; text?: string; data?: unknown }> };
+type Message = {
+    id: string;
+    role: string;
+    parts: Array<{ type: string; text?: string; data?: unknown }>;
+};
 type Chat = { messages: Message[]; error?: Error; status?: string };
 
 const chats = new Map<string, Chat>();
@@ -19,7 +23,11 @@ const sent: Array<{ id: string; text: string }> = [];
 const transports = new Map<string, ChatTransport<UIMessage>>();
 
 vi.mock("@ai-sdk/react", () => ({
-    useChat: (options: { id: string; messages?: Message[]; transport: ChatTransport<UIMessage> }) => {
+    useChat: (options: {
+        id: string;
+        messages?: Message[];
+        transport: ChatTransport<UIMessage>;
+    }) => {
         transports.set(options.id, options.transport);
         const chat = chats.get(options.id) ?? { messages: options.messages ?? [] };
         return {
@@ -106,7 +114,12 @@ describe("room for the answers", () => {
             { threadId: "d", state: "done", unread: true, startedAt: 4 }
         ];
         expect(compare.roomFrom({ runs, max: 6 })).toEqual({ room: 4, max: 6 });
-        expect(compare.roomFrom({ runs: [...runs, ...runs.map((run) => ({ ...run, threadId: `${run.threadId}2` }))], max: 3 })).toEqual({ room: 0, max: 3 });
+        expect(
+            compare.roomFrom({
+                runs: [...runs, ...runs.map((run) => ({ ...run, threadId: `${run.threadId}2` }))],
+                max: 3
+            })
+        ).toEqual({ room: 0, max: 3 });
     });
 
     it("says nothing when the server did not say its cap", () => {
@@ -158,7 +171,10 @@ describe("the dialog", () => {
     });
 
     it("starts with the picked models when there is room", async () => {
-        vi.stubGlobal("fetch", vi.fn(async () => Response.json({ runs: [], max: 6 })));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => Response.json({ runs: [], max: 6 }))
+        );
         const onStart = vi.fn();
         render(
             <compare.AskSeveral
@@ -232,7 +248,9 @@ describe("the columns", () => {
             ]
         });
         chats.set(T2, {
-            messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "Which is faster?" }] }],
+            messages: [
+                { id: "u", role: "user", parts: [{ type: "text", text: "Which is faster?" }] }
+            ],
             error: new Error("network")
         });
         let comparison: compare.PolarComparison | null = {
@@ -283,8 +301,18 @@ describe("the columns", () => {
                 Response.json({
                     thread: {
                         messages: [
-                            { id: "u", parentId: null, role: "user", parts: [{ type: "text", text: "Q" }] },
-                            { id: "a", parentId: "u", role: "assistant", parts: [{ type: "text", text: "Stored answer." }] }
+                            {
+                                id: "u",
+                                parentId: null,
+                                role: "user",
+                                parts: [{ type: "text", text: "Q" }]
+                            },
+                            {
+                                id: "a",
+                                parentId: "u",
+                                role: "assistant",
+                                parts: [{ type: "text", text: "Stored answer." }]
+                            }
                         ]
                     }
                 })
@@ -314,7 +342,10 @@ describe("the columns", () => {
     });
 
     it("asks again a column marked sent whose thread the server never stored", async () => {
-        vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "not_found" }, { status: 404 })));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => Response.json({ error: "not_found" }, { status: 404 }))
+        );
         render(
             <compare.PolarCompare
                 comparison={{
@@ -352,7 +383,9 @@ describe("the columns", () => {
             { wrapper: MessagesWrapper }
         );
         await waitFor(() => expect(transports.has(T1)).toBe(true));
-        const posted = vi.fn(async (_url: string, _init: RequestInit) => new Response("", { status: 500 }));
+        const posted = vi.fn(
+            async (_url: string, _init: RequestInit) => new Response("", { status: 500 })
+        );
         vi.stubGlobal("fetch", posted);
         await transports
             .get(T1)!
