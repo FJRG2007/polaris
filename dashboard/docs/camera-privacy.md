@@ -133,10 +133,21 @@ is claimed. They get the Polaris-side privacy and the optional preset.
 
 ## Groups
 
-Privacy can be set for one camera, every camera in a zone of a place, or every
-camera in a place. Each camera is switched on its own and the answer lists the
-ones that failed and why; the others stay switched. Cameras have no room link
-(rooms hold devices), so "room" is not a target; a zone is the camera's room.
+Privacy can be set for one camera, every camera in a zone of a place, every
+camera in a room, a camera set, or every camera in a place. Each camera is
+switched on its own and the answer lists the ones that failed and why; the
+others stay switched.
+
+- **Rooms** are the place's rooms, the same ones its devices are in
+  (`Camera.roomId`, set in the camera's dialog; deleting the room leaves the
+  camera in none).
+- **Camera sets** (`CameraSet`) are groups of one place's cameras picked by
+  hand from the wall (the layers button, `home.manage`). A camera removed later
+  simply stops matching.
+
+Targets as one string: `camera:<id>`, `room:<id>`, `set:<id>`, `place:<id>`,
+`zone:<placeId>:<zone name>`. The deck and Companion picker lists all of them
+from the MCP tool, so a room or set appears there once it holds a camera.
 
 ## Who may switch it
 
@@ -146,8 +157,8 @@ and through the MCP tool alike.
 
 ## Stream Deck and Companion
 
-The **Camera privacy** key (`places.camera-privacy`) toggles a camera, a zone or
-a place, and shows whether it is private (all private: on; some: a count).
+The **Camera privacy** key (`places.camera-privacy`) toggles a camera, a room, a
+set, a zone or a place, and shows whether it is private (all private: on; some: a count).
 It is bound to the `places_camera_privacy` MCP tool, so the deck reaches
 exactly what its owner does.
 

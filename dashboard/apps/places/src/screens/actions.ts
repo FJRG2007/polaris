@@ -33,7 +33,14 @@ import * as devices from "../lib/devices";
 import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
 import * as privacy from "../lib/privacy";
-import { parseTarget, type CameraPrivacy } from "../lib/privacy-kinds";
+import * as cameraSets from "../lib/camera-sets";
+import {
+    cameraSetInputSchema,
+    normalizeCameraSetInput,
+    parseTarget,
+    type CameraPrivacy,
+    type CameraSetView
+} from "../lib/privacy-kinds";
 import * as schemas from "../lib/schemas";
 import { probeCamera } from "../lib/onvif";
 import { streamPathOf } from "../lib/stream-path";
@@ -1075,6 +1082,45 @@ export async function cameraPrivacyAction(
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
     return { results: result.value };
+}
+
+/** The camera sets of a place (the current one when none is named). */
+export async function listCameraSetsAction(
+    placeId?: string | null
+): Promise<{ sets?: CameraSetView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const id = placeId ? String(placeId) : (await currentPlace(install.id)).current.id;
+        return cameraSets.listCameraSets(install.id, id);
+    });
+    return result.error ? { error: result.error } : { sets: result.value };
+}
+
+/** A new camera set (no id), or a set's new name and cameras. Arranging the
+ *  house is `home.manage`; switching the set is `home.control`. */
+export async function saveCameraSetAction(
+    id: string | null,
+    input: unknown
+): Promise<{ set?: CameraSetView; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const parsed = cameraSetInputSchema.safeParse(
+        normalizeCameraSetInput((input ?? {}) as Record<string, unknown>)
+    );
+    if (!parsed.success) {
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.someWrong") };
+    }
+    const result = await guard(() => cameraSets.saveCameraSet(install.id, id ? String(id) : null, parsed.data));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { set: result.value };
+}
+
+export async function deleteCameraSetAction(id: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => cameraSets.deleteCameraSet(install.id, String(id)));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return {};
 }
 
 /** What one camera's privacy is now, read from the camera where it can say. */

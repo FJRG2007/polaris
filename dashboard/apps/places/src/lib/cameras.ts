@@ -19,6 +19,7 @@ import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput } from "./schemas";
 import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "./detection";
 import { host } from "@polaris/app-host";
+import * as rooms from "./rooms";
 
 const { dropGrantsFor } = host.accessGrants;
 
@@ -28,6 +29,8 @@ export interface CameraView {
     readonly name: string;
     readonly placeId: string;
     readonly zone: string;
+    /** The room of its place it is in, or "" for none. */
+    readonly roomId: string;
     readonly vendor: string;
     readonly model: string | null;
     /** The catalog model its owner picked, or "" on one added before the list. */
@@ -111,6 +114,7 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         name: row.name,
         placeId: row.placeId ?? "",
         zone: row.zone ?? "",
+        roomId: row.roomId ?? "",
         vendor: row.vendor,
         model: row.model,
         modelId: row.modelId ?? "",
@@ -238,6 +242,26 @@ async function sharedSecret(installedAppId: string, vendor: string) {
     return null;
 }
 
+/**
+ * The room a save leaves the camera in. A room is one of its place's: one at
+ * another place is refused. Absent keeps the one it has, unless the camera
+ * moved to another place, where that room is not; null or "" is none.
+ */
+async function settledRoom(
+    installedAppId: string,
+    input: { readonly roomId?: string | null; readonly placeId?: string | null },
+    placeBefore: string | null | undefined
+): Promise<string | null | undefined> {
+    const wanted = input.roomId;
+    if (wanted) {
+        const room = await rooms.requireRoom(installedAppId, wanted);
+        if (room.placeId !== (input.placeId || null)) throw new HomeError("That room is at another place");
+        return room.id;
+    }
+    if (wanted === undefined) return placeBefore !== undefined && placeBefore !== (input.placeId || null) ? null : undefined;
+    return null;
+}
+
 export async function createCamera(
     installedAppId: string,
     input: CameraInput
@@ -246,12 +270,14 @@ export async function createCamera(
     const paths = resolvePaths(input);
     const secret =
         secretColumns(input.password) ?? (await sharedSecret(installedAppId, input.vendor));
+    const roomId = await settledRoom(installedAppId, input, undefined);
     const row = await prisma.camera.create({
         data: {
             installedAppId,
             placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,
+            roomId: roomId ?? null,
             vendor: input.vendor,
             modelId: input.modelId || null,
             power: input.power,
@@ -284,9 +310,10 @@ export async function updateCamera(
 ): Promise<CameraView> {
     const existing = await prisma.camera.findFirst({
         where: { id, installedAppId },
-        select: { id: true }
+        select: { id: true, placeId: true }
     });
     if (!existing) throw new HomeError("Camera not found");
+    const roomId = await settledRoom(installedAppId, input, existing.placeId);
     const vendor = cameraVendor(input.vendor);
     const paths = resolvePaths(input);
     // A battery camera is not dialled by the availability pass, and that pass is
@@ -308,6 +335,7 @@ export async function updateCamera(
             placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,
+            ...(roomId !== undefined ? { roomId } : {}),
             vendor: input.vendor,
             modelId: input.modelId || null,
             power: input.power,

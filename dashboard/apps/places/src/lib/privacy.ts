@@ -48,12 +48,19 @@ type Row = { id: string; name: string; vendor: string; address: string } & {
 /** The ids of every camera a target names, in this install. A camera or place
  *  that is not this install's names nothing. */
 export async function camerasFor(installedAppId: string, target: PrivacyTarget): Promise<string[]> {
-    const where =
-        target.kind === "camera"
-            ? { installedAppId, id: target.id }
-            : target.kind === "place"
-              ? { installedAppId, placeId: target.id }
-              : { installedAppId, placeId: target.placeId, zone: target.zone };
+    let where;
+    if (target.kind === "camera") where = { installedAppId, id: target.id };
+    else if (target.kind === "place") where = { installedAppId, placeId: target.id };
+    else if (target.kind === "room") where = { installedAppId, roomId: target.id };
+    else if (target.kind === "zone") where = { installedAppId, placeId: target.placeId, zone: target.zone };
+    else {
+        const set = await prisma.cameraSet.findFirst({
+            where: { id: target.id, installedAppId },
+            select: { placeId: true, cameraIds: true }
+        });
+        if (!set || set.cameraIds.length === 0) return [];
+        where = { installedAppId, placeId: set.placeId, id: { in: set.cameraIds } };
+    }
     const rows = await prisma.camera.findMany({ where, select: { id: true }, orderBy: { name: "asc" } });
     return rows.map((row) => row.id);
 }

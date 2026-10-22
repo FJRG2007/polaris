@@ -482,6 +482,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                     sharedPassword={(cameras ?? []).some(
                         (row) => row.hasPassword && usesAccountPassword(row.vendor)
                     )}
+                    placeId={editing?.placeId || cameras?.[0]?.placeId || ""}
                     servers={servers}
                     storage={storage}
                     defaults={defaults}

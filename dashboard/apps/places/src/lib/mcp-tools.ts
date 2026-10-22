@@ -679,7 +679,7 @@ const privacyReadInput = z.object({
 });
 
 const privacySetInput = z.object({
-    target: z.string().max(300).describe("camera:<id>, zone:<placeId>:<zone name> or place:<id>."),
+    target: z.string().max(300).describe("camera:<id>, room:<id>, set:<id>, zone:<placeId>:<zone name> or place:<id>."),
     private: z.boolean().describe("true turns privacy on, false turns it off.")
 });
 
@@ -693,13 +693,23 @@ function privacyRow(camera: { id: string; name: string; privacy: boolean; privac
 async function privacyTargets(caller: McpCaller) {
     const { user, install } = await contextFor(caller);
     const cameras = await import("./cameras");
+    const rooms = await import("./rooms");
+    const cameraSets = await import("./camera-sets");
     const reach = await placesReach(user);
-    const [list, placeList] = await Promise.all([
+    const [list, placeList, setList] = await Promise.all([
         cameras.listCameras(install.id),
-        places.listPlaces(install.id)
+        places.listPlaces(install.id),
+        cameraSets.listCameraSets(install.id)
     ]);
+    const roomList = placeList.length
+        ? await rooms.listRooms(
+              install.id,
+              placeList.map((place) => place.id)
+          )
+        : [];
     const seen = onlyReachable(list, reach.everything || reach.cameras);
     const names = new Map(placeList.map((place) => [place.id, place.name]));
+    const roomNames = new Map(roomList.map((room) => [room.id, room.name]));
     const groups = new Map<string, { key: string; label: string; cameras: typeof seen }>();
     const add = (key: string, label: string, camera: (typeof seen)[number]) => {
         const group = groups.get(key) ?? { key, label, cameras: [] };
@@ -715,7 +725,25 @@ async function privacyTargets(caller: McpCaller) {
                 [place, camera.zone].filter(Boolean).join(" / "),
                 camera
             );
+        const room = camera.roomId ? roomNames.get(camera.roomId) : undefined;
+        if (room)
+            add(
+                targetKey({ kind: "room", id: camera.roomId }),
+                [place, room].filter(Boolean).join(" / "),
+                camera
+            );
         if (camera.placeId) add(targetKey({ kind: "place", id: camera.placeId }), place, camera);
+    }
+    // A set shows the cameras of it this person can see, and is not offered
+    // to somebody who sees none of them.
+    const byId = new Map(seen.map((camera) => [camera.id, camera]));
+    for (const set of setList) {
+        const label = [names.get(set.placeId) ?? "", set.name].filter(Boolean).join(" / ");
+        for (const id of set.cameraIds) {
+            const camera = byId.get(id);
+            if (camera && camera.placeId === set.placeId)
+                add(targetKey({ kind: "set", id: set.id }), label, camera);
+        }
     }
     return {
         user,
@@ -736,7 +764,7 @@ const privacyTool = () =>
         title: "Camera privacy",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Whether cameras are private (not streaming or recording). Without target, lists every camera, zone and place with how many of its cameras are private. Read-only.",
+            "Whether cameras are private (not streaming or recording). Without target, lists every camera, room, set, zone and place with how many of its cameras are private. Read-only.",
         input: privacyReadInput,
         category: "home",
         scope: "places.read",
@@ -762,7 +790,7 @@ const privacySetTool = () =>
         title: "Switch camera privacy",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Turn privacy on or off for one camera, a zone or a place. A Tapo camera is switched itself and reports back; other cameras are left alone by Polaris (no stream, recording or detection). Answers each camera's result; some may fail while others switch.",
+            "Turn privacy on or off for one camera, a room, a set of cameras, a zone or a place. A Tapo camera is switched itself and reports back; other cameras are left alone by Polaris (no stream, recording or detection). Answers each camera's result; some may fail while others switch.",
         input: privacySetInput,
         category: "home",
         scope: "places.control",
@@ -772,7 +800,7 @@ const privacySetTool = () =>
             if (!(await host.session.sessionCan(user, "home.control")))
                 refuse("Only somebody who may control the house's cameras can switch their privacy.");
             const parsed = parseTarget(input.target);
-            if (!parsed) refuse("That is not a camera, zone or place.");
+            if (!parsed) refuse("That is not a camera, room, set, zone or place.");
             const ids = await privacyLib.camerasFor(install.id, parsed);
             return { id: input.target, name: `${ids.length} camera(s)`, action: input.private ? "privacy on" : "privacy off" };
         },
@@ -781,7 +809,7 @@ const privacySetTool = () =>
             if (!(await host.session.sessionCan(user, "home.control")))
                 refuse("Only somebody who may control the house's cameras can switch their privacy.");
             const parsed = parseTarget(input.target);
-            if (!parsed) refuse("That is not a camera, zone or place.");
+            if (!parsed) refuse("That is not a camera, room, set, zone or place.");
             const ids = await privacyLib.camerasFor(install.id, parsed);
             if (ids.length === 0) refuse("There are no cameras in that target.");
             const results = await privacyLib.groupPrivacy(ids, (id) =>

@@ -15,7 +15,9 @@
 
 import Link from "next/link";
 import * as actions from "./actions";
-import { Cctv, Eye, EyeOff, Plus } from "lucide-react";
+import { Cctv, Eye, EyeOff, Layers, Plus } from "lucide-react";
+import { CameraSetsDialog } from "./cameras/camera-sets-dialog";
+import { usePlaceRooms } from "./use-place-rooms";
 import { CameraTile } from "./camera-tile";
 import { CameraViewer } from "./camera-viewer";
 import { useEffect, useMemo, useState } from "react";
@@ -30,6 +32,7 @@ import {
     rollbackPrivacy,
     settlePrivacy,
     targetKey,
+    type CameraSetView,
     type PrivacyTarget
 } from "../lib/privacy-kinds";
 
@@ -60,6 +63,26 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
     // Every camera on the wall, in one ask. Stopped while one is open: the wall
     // behind a dialog is standing still, and the viewer asks for its own.
     const [privacyError, setPrivacyError] = useState<string | null>(null);
+    const placeId = cameras?.[0]?.placeId ?? "";
+    const [rooms] = usePlaceRooms(placeId);
+    const [sets, setSets] = useState<CameraSetView[]>([]);
+    const [managingSets, setManagingSets] = useState(false);
+
+    // The place's camera sets, once there is a place to ask about. The wall is
+    // drawn without them; the switches appear when they land.
+    useEffect(() => {
+        if (!placeId) return;
+        let current = true;
+        void actions.listCameraSetsAction(placeId).then(
+            (result) => {
+                if (current && result.sets) setSets(result.sets);
+            },
+            () => undefined
+        );
+        return () => {
+            current = false;
+        };
+    }, [placeId]);
 
     /**
      * Privacy for one camera or a group. Shown at once, then each camera's own
@@ -97,12 +120,40 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         );
     }
 
-    /** The switch over a group of cameras: private unless all already are. */
-    function groupSwitch(label: string, target: PrivacyTarget, group: readonly CameraView[]) {
+    /** The switch over a group of cameras: private unless all already are.
+     *  Named groups (rooms, sets) carry their name; a zone's sits by its heading. */
+    function groupSwitch(
+        label: string,
+        target: PrivacyTarget,
+        group: readonly CameraView[],
+        named = false
+    ) {
         if (!canControl || group.length === 0) return null;
         const rows = group.map((camera) => ({ private: camera.privacy }));
         const wanted = nextPrivacy(rows);
         const words = wanted ? t("privacy.groupOn", { group: label }) : t("privacy.groupOff", { group: label });
+        if (named)
+            return (
+                <Button
+                    key={targetKey(target)}
+                    variant="ghost"
+                    size="sm"
+                    className="min-w-0 max-w-48"
+                    aria-pressed={groupState(rows).all}
+                    aria-label={words}
+                    title={words}
+                    onClick={() =>
+                        void switchPrivacy(
+                            target,
+                            group.map((camera) => camera.id),
+                            wanted
+                        )
+                    }
+                >
+                    {wanted ? <EyeOff className="size-4 shrink-0" /> : <Eye className="size-4 shrink-0" />}
+                    <span className="truncate">{label}</span>
+                </Button>
+            );
         return (
             <Button
                 variant="ghost"
@@ -162,6 +213,20 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         );
     }
 
+    // Rooms with a camera on this wall, then the sets, each by what it holds.
+    const namedGroups: { label: string; target: PrivacyTarget; cameras: CameraView[] }[] = [
+        ...(rooms ?? []).map((room) => ({
+            label: room.name,
+            target: { kind: "room", id: room.id } as PrivacyTarget,
+            cameras: cameras.filter((camera) => camera.roomId === room.id)
+        })),
+        ...sets.map((set) => ({
+            label: set.name,
+            target: { kind: "set", id: set.id } as PrivacyTarget,
+            cameras: cameras.filter((camera) => set.cameraIds.includes(camera.id))
+        }))
+    ].filter((group) => group.cameras.length > 0);
+
     const zones = [...new Set(cameras.map((camera) => camera.zone))].sort((left, right) =>
         left === "" ? 1 : right === "" ? -1 : left.localeCompare(right)
     );
@@ -181,6 +246,34 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                         cameras
                     )}
                 </div>
+            ) : null}
+            {placeId && ((canControl && namedGroups.length > 0) || canManage) ? (
+                <div className="-mb-4 flex min-w-0 flex-wrap items-center justify-end gap-1">
+                    {namedGroups.map((group) =>
+                        groupSwitch(group.label, group.target, group.cameras, true)
+                    )}
+                    {canManage ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("cameraSets.title")}
+                            title={t("cameraSets.title")}
+                            onClick={() => setManagingSets(true)}
+                        >
+                            <Layers className="size-4 shrink-0" />
+                        </Button>
+                    ) : null}
+                </div>
+            ) : null}
+            {managingSets ? (
+                <CameraSetsDialog
+                    open
+                    placeId={placeId}
+                    cameras={cameras}
+                    sets={sets}
+                    onClose={() => setManagingSets(false)}
+                    onChange={setSets}
+                />
             ) : null}
             {zones.map((zone) => (
                 <section key={zone || "unplaced"} className="flex flex-col gap-2">

@@ -8,23 +8,29 @@
 
 import { z } from "zod";
 
-/** What a privacy switch is pointed at. A zone is a place's zone by name; the
- *  camera's own grouping, since cameras have no room. */
+/** What a privacy switch is pointed at. A zone is a place's zone by name; a
+ *  room is one of the place's rooms, the same ones its devices are in; a set is
+ *  a group of cameras somebody picked by hand. */
 export type PrivacyTarget =
     | { readonly kind: "camera"; readonly id: string }
     | { readonly kind: "zone"; readonly placeId: string; readonly zone: string }
+    | { readonly kind: "room"; readonly id: string }
+    | { readonly kind: "set"; readonly id: string }
     | { readonly kind: "place"; readonly id: string };
+
+const ID_KINDS = ["camera", "room", "set", "place"] as const;
 
 const uuid = z.string().uuid();
 
 /** A target as one string - what a deck key stores and an MCP call passes:
- *  `camera:<id>`, `place:<id>`, or `zone:<placeId>:<zone name>`. Null when it
- *  is not one. */
+ *  `camera:<id>`, `room:<id>`, `set:<id>`, `place:<id>`, or
+ *  `zone:<placeId>:<zone name>`. Null when it is not one. */
 export function parseTarget(raw: string): PrivacyTarget | null {
     const [kind, ...rest] = raw.split(":");
-    if (kind === "camera" || kind === "place") {
+    const idKind = ID_KINDS.find((each) => each === kind);
+    if (idKind) {
         const id = rest.join(":");
-        return uuid.safeParse(id).success ? { kind, id } : null;
+        return uuid.safeParse(id).success ? { kind: idKind, id } : null;
     }
     if (kind === "zone") {
         const [placeId, ...name] = rest;
@@ -114,3 +120,35 @@ export function rollbackPrivacy<T extends { id: string; privacy: boolean }>(
         return was === undefined ? camera : { ...camera, privacy: was };
     });
 }
+
+/** A group of cameras somebody picked by hand, as a screen sees it. */
+export interface CameraSetView {
+    readonly id: string;
+    readonly placeId: string;
+    readonly name: string;
+    readonly cameraIds: readonly string[];
+}
+
+/** The most cameras one set may name: more than any house has, few enough that
+ *  a set is always read whole. */
+export const CAMERA_SET_LIMIT = 200;
+
+/** One shared normalizer for the set form and the action behind it. */
+export function normalizeCameraSetInput(input: Record<string, unknown>): Record<string, unknown> {
+    const value = { ...input };
+    if (typeof value.name === "string") value.name = value.name.trim().replace(/\s+/g, " ");
+    if (Array.isArray(value.cameraIds))
+        value.cameraIds = [...new Set(value.cameraIds.map((id) => String(id).trim().toLowerCase()))];
+    return value;
+}
+
+export const cameraSetInputSchema = z.object({
+    placeId: uuid,
+    name: z.string().min(1, "Give it a name").max(60, "Keep the name under 60 characters"),
+    cameraIds: z
+        .array(uuid)
+        .min(1, "Pick at least one camera")
+        .max(CAMERA_SET_LIMIT, "That is more cameras than a set can hold")
+});
+
+export type CameraSetInput = z.infer<typeof cameraSetInputSchema>;

@@ -25,8 +25,14 @@ const PLACE = "0192f2a4-6c1e-7c3a-9a40-1d2b3c4d5e6f";
 const CAM = "0192f2a4-6c1e-7c3a-9a40-aaaaaaaaaaaa";
 
 describe("targets", () => {
-    it("round-trips a camera, a zone and a place", () => {
-        for (const raw of [`camera:${CAM}`, `place:${PLACE}`, `zone:${PLACE}:Back: garden`]) {
+    it("round-trips a camera, a room, a set, a zone and a place", () => {
+        for (const raw of [
+            `camera:${CAM}`,
+            `room:${CAM}`,
+            `set:${CAM}`,
+            `place:${PLACE}`,
+            `zone:${PLACE}:Back: garden`
+        ]) {
             const parsed = parseTarget(raw);
             expect(parsed).not.toBeNull();
             expect(targetKey(parsed!)).toBe(raw);
@@ -34,7 +40,7 @@ describe("targets", () => {
     });
 
     it("refuses anything else", () => {
-        for (const raw of ["", "camera:", "camera:1", `room:${PLACE}`, `zone:${PLACE}:`, "zone:x:y"])
+        for (const raw of ["", "camera:", "camera:1", "room:1", "set:", `floor:${PLACE}`, `zone:${PLACE}:`, "zone:x:y"])
             expect(parseTarget(raw)).toBeNull();
     });
 });

@@ -30,6 +30,7 @@ import {
     vendorNote
 } from "../../lib/vendors";
 import { usePlacesT } from "../use-places-t";
+import { usePlaceRooms } from "../use-place-rooms";
 import type { PlacesTranslator } from "../../lib/i18n";
 import {
     BATTERY_COST_WARNING,
@@ -84,6 +85,8 @@ interface Server {
 interface FormState {
     name: string;
     zone: string;
+    /** The room of its place, "" for none. */
+    roomId: string;
     vendor: string;
     /** Not stored: the make is a step on the way to the model, and the model is
      *  what a camera carries. Kept so the picker below it has something to
@@ -126,6 +129,7 @@ function initial(
     return {
         name: camera?.name ?? "",
         zone: camera?.zone ?? "",
+        roomId: camera?.roomId ?? "",
         // The make is still carried, because a camera added before the model
         // list existed has one and no model, and it is what keeps working.
         // A new one names none, so the model it gets settles on the way in
@@ -166,6 +170,7 @@ export function CameraDialog({
     camera,
     prefill = null,
     sharedPassword = false,
+    placeId = "",
     servers,
     storage,
     defaults,
@@ -180,6 +185,8 @@ export function CameraDialog({
      *  password for every camera on the account, so the second one onwards does
      *  not have to be given it again - and the field must not demand it. */
     sharedPassword?: boolean;
+    /** The place it is (or will be) at, whose rooms it can be put in. */
+    placeId?: string;
     servers: Server[];
     /** The disks footage can be pointed at, the instance default first. */
     storage: { id: string; label: string }[];
@@ -201,6 +208,7 @@ export function CameraDialog({
     /** What this camera's detector has been doing, for the reader who opened
      *  this dialog because it has noticed nothing. Undefined until asked. */
     const [activity, setActivity] = useState<CameraActivity | null | undefined>(undefined);
+    const [rooms] = usePlaceRooms(camera?.placeId || placeId);
 
     const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
         setForm((current) => ({ ...current, [key]: value }));
@@ -336,6 +344,7 @@ export function CameraDialog({
     const payloadOf = (state: FormState) => ({
         name: state.name,
         zone: state.zone,
+        roomId: state.roomId || null,
         vendor: vendorForModel(state.modelId, state.vendor),
         modelId: state.modelId,
         power: state.power,
@@ -478,6 +487,26 @@ export function CameraDialog({
                                 placeholder={t("dialog.zonePlaceholder")}
                             />
                         </Field>
+                        {rooms === null || rooms.length > 0 || form.roomId ? (
+                            <Field label={t("dialog.room")} hint={t("dialog.roomHint")}>
+                                <Select
+                                    value={rooms === null ? "" : form.roomId}
+                                    onValueChange={(value) => set("roomId", value)}
+                                    disabled={rooms === null}
+                                    aria-label={t("dialog.room")}
+                                    placeholder={
+                                        rooms === null ? t("deviceDialog.loadingRooms") : undefined
+                                    }
+                                    options={[
+                                        { value: "", label: t("deviceDialog.noRoom") },
+                                        ...(rooms ?? []).map((room) => ({
+                                            value: room.id,
+                                            label: room.floor ? `${room.name} - ${room.floor}` : room.name
+                                        }))
+                                    ]}
+                                />
+                            </Field>
+                        ) : null}
                         <Field label={t("dialog.brand")} required>
                             <BrandPicker
                                 value={form.brand}
