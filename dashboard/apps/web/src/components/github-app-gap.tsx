@@ -29,21 +29,29 @@ export function GithubAppGapNotice({
     const title =
         gap.kind === "app-missing"
             ? t("githubAppGap.missingTitle", { owner: gap.owner })
-            : gap.kind === "repo-not-selected"
-              ? t("githubAppGap.notSelectedTitle", { repository: gap.repository })
-              : t("githubAppGap.noAccountTitle");
+            : gap.kind === "app-private"
+              ? t("githubAppGap.privateTitle", { owner: gap.owner })
+              : gap.kind === "repo-not-selected"
+                ? t("githubAppGap.notSelectedTitle", { repository: gap.repository })
+                : t("githubAppGap.noAccountTitle");
     const body =
         gap.kind === "app-missing"
             ? t("githubAppGap.missingBody", { owner: gap.owner })
-            : gap.kind === "repo-not-selected"
-              ? t("githubAppGap.notSelectedBody", { owner: gap.owner })
-              : t("githubAppGap.noAccountBody");
+            : gap.kind === "app-private"
+              ? gap.url
+                  ? t("githubAppGap.privateBody", { owner: gap.owner })
+                  : t("githubAppGap.privateBodyMember", { owner: gap.owner })
+              : gap.kind === "repo-not-selected"
+                ? t("githubAppGap.notSelectedBody", { owner: gap.owner })
+                : t("githubAppGap.noAccountBody");
     const action =
         gap.kind === "app-missing"
             ? t("githubAppGap.install", { owner: gap.owner })
-            : gap.kind === "repo-not-selected"
-              ? t("githubAppGap.choose")
-              : t("githubAppGap.connect");
+            : gap.kind === "app-private"
+              ? t("githubAppGap.makePublic")
+              : gap.kind === "repo-not-selected"
+                ? t("githubAppGap.choose")
+                : t("githubAppGap.connect");
     return (
         <div
             role="status"
@@ -119,5 +127,5 @@ function isGap(value: unknown): value is GithubAppGap {
     if (typeof gap.owner !== "string") return false;
     if (gap.url !== null && typeof gap.url !== "string") return false;
     if (gap.kind === "repo-not-selected") return typeof gap.repository === "string";
-    return gap.kind === "app-missing" || gap.kind === "no-account";
+    return gap.kind === "app-missing" || gap.kind === "app-private" || gap.kind === "no-account";
 }

@@ -170,6 +170,8 @@
         "poolNotYours": "That runner pool is not one of yours.",
         "hasRules": "That repository already has rules.",
         "githubAppMissing": "Polaris is not installed on {owner} on GitHub, so your account cannot reach this repository. Install it there, then try again.",
+        "githubAppPrivate": "Polaris's GitHub app is private, so it cannot be installed on {owner} and your account cannot reach this repository. Make the app public, install it there, then try again.",
+        "githubAppPrivateMember": "Polaris's GitHub app is private, so it cannot be installed on {owner} and your account cannot reach this repository. An administrator has to make the app public first.",
         "githubRepoNotSelected": "{repository} is not one of the repositories Polaris was given on {owner}. Add it to the installation, then try again."
     },
     "sessions": {

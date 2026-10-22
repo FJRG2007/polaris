@@ -8,8 +8,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const INSTALL = "https://github.com/apps/polaris-agi/installations/new";
+const ADVANCED = "https://github.com/settings/apps/polaris-agi/advanced";
 
 const state = {
+    appPublic: true as boolean | null,
+    admin: true,
     credentials: [] as Array<{ connectionId: string; login: string; method: string; token: string }>
 };
 
@@ -21,12 +24,21 @@ vi.mock("@/lib/github-access", () => ({
     githubTokenForUser: async () => state.credentials[0]?.token ?? null,
     githubCredentialsForUser: async () => state.credentials
 }));
+vi.mock("@polaris/db", () => ({
+    prisma: { user: { findUnique: async () => ({ isAdmin: state.admin }) } }
+}));
+vi.mock("@/lib/effective-access", () => ({
+    effectiveIsAdmin: async (_userId: string, isAdmin: boolean) => isAdmin
+}));
 vi.mock("@/lib/github-service", () => ({
-    githubAppInstallUrl: async () => INSTALL
+    githubAppInstallUrl: async () => INSTALL,
+    githubAppIsPublic: async () => state.appPublic,
+    githubAppVisibilityUrl: async () => ADVANCED
 }));
 
 const { polarRepoTools } = await import("@/lib/polar/code-host-tools");
-const { forgetGithubAppReach, githubInstallGapForRepo } = await import("@/lib/github-app-reach");
+const { forgetGithubAppReach, githubInstallGapForRepo, installGapKey } =
+    await import("@/lib/github-app-reach");
 
 type Reply = { status?: number; body?: unknown };
 let routes: Record<string, Reply> = {};
@@ -34,6 +46,8 @@ let seen: string[] = [];
 
 beforeEach(() => {
     forgetGithubAppReach();
+    state.appPublic = true;
+    state.admin = true;
     state.credentials = [
         { connectionId: "c1", login: "FJRG2007", method: "oauth", token: "user-token" }
     ];
@@ -90,6 +104,44 @@ describe("a repository whose owner lacks the App", () => {
 
     it("is reported for the agents screens too, without a repository list", async () => {
         routes[INSTALLS] = { body: { installations: [] } };
+        expect(await githubInstallGapForRepo("user-1", "bytehide/Backend")).toEqual({
+            kind: "app-missing",
+            owner: "bytehide",
+            url: INSTALL
+        });
+    });
+});
+
+describe("a private App", () => {
+    it("says it has to be made public before it can be installed on another owner", async () => {
+        state.appPublic = false;
+        routes[INSTALLS] = { body: { installations: [installation("FJRG2007", 1, "all")] } };
+        const result = await read("https://github.com/bytehide/Backend/tree/main");
+        expect(result.ok).toBe(false);
+        expect(result.access).toEqual({ kind: "app-private", owner: "bytehide", url: ADVANCED });
+        expect(result.text).toContain("the app is private");
+        expect(result.text).toContain("Make public");
+    });
+
+    it("tells somebody who is not an administrator that one has to, without the settings", async () => {
+        state.appPublic = false;
+        state.admin = false;
+        routes[INSTALLS] = { body: { installations: [installation("FJRG2007", 1, "all")] } };
+        const result = await read("https://github.com/bytehide/Backend/tree/main");
+        expect(result.access).toEqual({ kind: "app-private", owner: "bytehide", url: null });
+        expect(result.text).toContain("Only an administrator");
+        expect(result.text).not.toContain("Make public");
+        const gap = await githubInstallGapForRepo("user-1", "bytehide/Backend");
+        expect(gap && installGapKey(gap)).toBe("errors.githubAppPrivateMember");
+        state.admin = true;
+        const own = await githubInstallGapForRepo("user-1", "bytehide/Backend");
+        expect(own).toEqual({ kind: "app-private", owner: "bytehide", url: ADVANCED });
+        expect(installGapKey(own!)).toBe("errors.githubAppPrivate");
+    });
+
+    it("is still an install when GitHub could not say whether the App is public", async () => {
+        state.appPublic = null;
+        routes[INSTALLS] = { body: { installations: [installation("FJRG2007", 1, "all")] } };
         expect(await githubInstallGapForRepo("user-1", "bytehide/Backend")).toEqual({
             kind: "app-missing",
             owner: "bytehide",
