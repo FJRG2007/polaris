@@ -13,16 +13,20 @@
 import Link from "next/link";
 import { Button } from "@polaris/ui";
 import type { GithubAppGap } from "@/lib/github-app-reach";
-import { ExternalLink, Github, RefreshCw } from "lucide-react";
+import { ExternalLink, Github, Globe, RefreshCw } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function GithubAppGapNotice({
     gap,
     onCheckAgain,
+    onUseBrowser,
     checking = false
 }: {
     gap: GithubAppGap;
     onCheckAgain?: () => void;
+    /** Given where Polar can be asked to read the repository through the
+     *  person's own browser; shown only when that browser is connected. */
+    onUseBrowser?: (text: string) => void;
     checking?: boolean;
 }) {
     const t = useTranslations("components");
@@ -79,6 +83,23 @@ export function GithubAppGapNotice({
                                 </span>
                             </a>
                         )}
+                    </Button>
+                ) : null}
+                {gap.browser && onUseBrowser ? (
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                            onUseBrowser(
+                                t("githubAppGap.browserAsk", { url: gap.browser?.url ?? "" })
+                            )
+                        }
+                        disabled={checking}
+                    >
+                        <Globe className="size-4 shrink-0" />
+                        <span className="min-w-0 truncate" title={t("githubAppGap.browser")}>
+                            {t("githubAppGap.browser")}
+                        </span>
                     </Button>
                 ) : null}
                 {onCheckAgain ? (

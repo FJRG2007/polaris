@@ -22,6 +22,7 @@
 import { z } from "zod";
 import { fenceUntrusted } from "@/lib/polar/web";
 import { githubTokenForUser } from "@/lib/github-access";
+import { browserPresent } from "@/lib/polar/browser-relay";
 import { githubAppGap, type GithubAppGap } from "@/lib/github-app-reach";
 import { tool, type FlexibleSchema, type ToolSet } from "ai";
 import { CONNECTIONS_HUB } from "@/lib/connections/hub-href";
@@ -151,6 +152,12 @@ class RepoFailure extends Error {
  * what to tell the person and that a button is already under the answer.
  */
 export function gapSentence(gap: GithubAppGap, what: string): string {
+    const base = appSentence(gap, what);
+    if (!gap.browser) return base;
+    return `${base} There is a second way, because the person's browser is connected to Polar: their own browser can open ${gap.browser.url} signed in as they are. If they would rather do that, or they ask for it, open it with browser_open and read it with browser_read and browser_find instead of read_page. A "Read it through your browser" button is shown under this answer too. Offer both and let them choose.`;
+}
+
+function appSentence(gap: GithubAppGap, what: string): string {
     if (gap.kind === "no-account") {
         return `${what} was not found. If the repository is private, the person can link their GitHub account in Polaris under Connected accounts (${CONNECTIONS_HUB}) and ask again. A "Connect GitHub" button is shown under this answer.`;
     }
@@ -161,7 +168,7 @@ export function gapSentence(gap: GithubAppGap, what: string): string {
         const step = gap.url
             ? `Whoever manages this Polaris's GitHub app has to make it public in the app's settings on GitHub (Advanced, "Make public"); then Polaris can be installed on ${gap.owner}, and if ${gap.owner} is an organization one of its owners approves it. A button to the app's settings is shown under this answer.`
             : `Only an administrator of this Polaris can make the app public, so tell the person an administrator has to do it; there is nothing for them to change themselves.`;
-        return `${what} could not be read: the Polaris GitHub app is not installed on ${gap.owner}, and it cannot be yet - the app is private, so GitHub only lets it be installed on the account that created it. ${step} Do not answer from the page or guess the contents instead, and do not try to read the repository's pages on github.com: they need the same access.`;
+        return `${what} could not be read: the Polaris GitHub app is not installed on ${gap.owner}, and it cannot be yet - the app is private, so GitHub only lets it be installed on the account that created it. ${step} Do not answer from the page or guess the contents instead, and do not try to read the repository's pages on github.com with read_page: they need the same access.`;
     }
     return `${what} could not be read: the Polaris GitHub app is installed on ${gap.owner}, but only on selected repositories, and ${gap.repository} is not one of them. Whoever manages that installation has to add it. A "Choose repositories" button is shown under this answer: tell the person to use it and then press "Check again". Do not answer from the page or guess the contents instead.`;
 }
@@ -259,8 +266,16 @@ class GithubClient {
             );
         }
         if (reply.status === 404 || reply.status === 403) {
-            const gap = await this.appGap();
-            if (gap) throw new RepoFailure(gapSentence(gap, what), gap);
+            const found = await this.appGap();
+            if (found) {
+                const gap: GithubAppGap = browserPresent(this.asker.userId)
+                    ? {
+                          ...found,
+                          browser: { url: `https://github.com/${this.owner}/${this.name}` }
+                      }
+                    : found;
+                throw new RepoFailure(gapSentence(gap, what), gap);
+            }
         }
         if (reply.status === 404) {
             throw new RepoFailure(

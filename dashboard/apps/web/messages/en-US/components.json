@@ -1476,6 +1476,8 @@
         "continue": "Continue anyway"
     },
     "githubAppGap": {
+        "browser": "Read it through your browser",
+        "browserAsk": "Read {url} through my browser instead.",
         "missingTitle": "Polaris is not installed on {owner}",
         "missingBody": "Your GitHub account only reaches repositories where Polaris is installed. If {owner} is an organization, one of its owners may have to approve the request.",
         "notSelectedTitle": "{repository} is not shared with Polaris",

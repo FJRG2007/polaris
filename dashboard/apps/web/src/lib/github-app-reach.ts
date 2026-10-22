@@ -55,14 +55,19 @@ const MISSING_TTL_MS = 5_000;
 const CACHE_MOST = 500;
 
 /** What stands between a linked account and one repository. */
-export type GithubAppGap =
+export type GithubAppGap = (
     | { kind: "no-account"; owner: string; url: string }
     | { kind: "app-missing"; owner: string; url: string | null }
     /** The App is private, so it can only be installed on the account that
      *  created it: whoever manages it has to make it public first. The link to
      *  its settings is only an administrator's; anybody else gets null. */
     | { kind: "app-private"; owner: string; url: string | null }
-    | { kind: "repo-not-selected"; owner: string; repository: string; url: string | null };
+    | { kind: "repo-not-selected"; owner: string; repository: string; url: string | null }
+) & {
+    /** Set when the person's browser is connected to Polar right now, so the
+     *  repository can be read there instead (`lib/polar/browser-tools.ts`). */
+    browser?: { url: string };
+};
 
 const installationsPage = z.object({
     installations: z.array(
