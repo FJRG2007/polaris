@@ -114,7 +114,7 @@ const data: site.SiteData = {
         en: { apps: site.siteApps(catalog, "en", words("en-US")), replaces: replacesEn, showcase: localize(site.parseShowcase(readmeEn), "en"), guide: guide("en-US") },
         es: {
             apps: site.siteApps(catalog, "es", words("es-ES")),
-            // The Spanish README has no such table yet; the English one stands in until it does.
+            // The English table stands in if the Spanish README ever loses its own.
             replaces: replacesEs.length ? replacesEs : replacesEn,
             showcase: localize(showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn), "es"),
             guide: guide("es-ES")

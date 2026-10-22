@@ -20,8 +20,17 @@ on:
       - "dashboard/apps/web/messages/*/catalog.json"
       - "dashboard/apps/web/messages/*/account.json"
       - ".github/workflows/site.yml"
-  release:
-    types: [published]
+  # Releases are published with each workflow's own token, which starts no
+  # other workflow, so a release is noticed when the workflow that made it ends.
+  workflow_run:
+    workflows:
+      - "Publish extension"
+      - "Publish CLI"
+      - "Stream Deck plugin"
+      - "Companion module"
+      - "Desktop"
+      - "Dashboard Release"
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -43,6 +52,7 @@ env:
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'pull_request') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

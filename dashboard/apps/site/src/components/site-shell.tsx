@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { SiteLocale } from "@/data/builders";
 import { href, siteData, words } from "@/lib/site";
+import { NavLink } from "@/components/nav-link";
 
 const PAGES = [
     { key: "home", page: "" },
@@ -33,13 +34,13 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
                             Polaris
                         </Link>
                         {PAGES.slice(1).map((entry) => (
-                            <Link
+                            <NavLink
                                 key={entry.key}
                                 href={href(locale, entry.page)}
                                 className="shrink-0 rounded-md px-2.5 py-1.5 text-muted-foreground hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground"
                             >
                                 {t.nav[entry.key]}
-                            </Link>
+                            </NavLink>
                         ))}
                         <span className="flex-1" />
                         <Link href={href(other)} hrefLang={other} className="shrink-0 px-2.5 py-1.5 text-muted-foreground hover:text-foreground">

@@ -26,10 +26,10 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
     const { replaces, showcase } = data.locales[locale];
     return (
         <>
-            <section className="flex flex-col items-center gap-5 pt-6 text-center">
+            <section className="flex flex-col gap-5 pt-6">
                 <h1 className="max-w-3xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">{t.title}</h1>
                 <p className="max-w-2xl text-pretty text-muted-foreground">{t.intro}</p>
-                <div className="flex w-full max-w-2xl flex-col gap-3 text-left">
+                <div className="flex w-full max-w-2xl flex-col gap-3">
                     {data.install.unix ? <InstallLine label={t.unix} command={data.install.unix} /> : null}
                     {data.install.windows ? <InstallLine label={t.windows} command={data.install.windows} /> : null}
                     <p className="text-xs text-muted-foreground">{t.installHint}</p>
