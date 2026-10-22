@@ -263,9 +263,15 @@
                 areas.set(entry.area, group);
                 select.append(group);
             }
-            areas.get(entry.area).append(
-                el("option", { value: entry.id, text: entry.label, selected: current === entry.id })
-            );
+            areas
+                .get(entry.area)
+                .append(
+                    el("option", {
+                        value: entry.id,
+                        text: entry.label,
+                        selected: current === entry.id
+                    })
+                );
         }
         return select;
     }

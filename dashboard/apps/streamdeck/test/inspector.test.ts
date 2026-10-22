@@ -128,7 +128,11 @@ describe("the settings screen", () => {
                     }
                 })
             });
-        status([fan("fan.on", "Fan on"), fan("fan.off", "Fan off"), fan("door", "<img onerror=x>")]);
+        status([
+            fan("fan.on", "Fan on"),
+            fan("fan.off", "Fan off"),
+            fan("door", "<img onerror=x>")
+        ]);
         listeners.get("message")?.({
             data: JSON.stringify({
                 event: "didReceiveSettings",
