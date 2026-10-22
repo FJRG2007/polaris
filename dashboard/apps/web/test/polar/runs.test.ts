@@ -128,6 +128,18 @@ describe("polar runs", () => {
         expect(onEnd).toHaveBeenCalledWith(expect.objectContaining({ watched: false }));
     });
 
+    it("does not count a resume whose request was already gone as watching", async () => {
+        const onEnd = vi.fn();
+        const { controller } = started(onEnd);
+        const gone = new AbortController();
+        gone.abort();
+        expect(replayPolarRun(USER, THREAD, gone.signal)).toBeNull();
+        controller.close();
+        await settle();
+        expect(onEnd).toHaveBeenCalledWith(expect.objectContaining({ watched: false }));
+        expect(listPolarRuns(USER)).toMatchObject([{ unread: true }]);
+    });
+
     it("stops on request, says nothing about it, and frees the thread", async () => {
         const onEnd = vi.fn();
         const { run, controller } = started(onEnd);

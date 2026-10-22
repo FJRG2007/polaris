@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { standIn } from "@/components/polar/polar-failure";
 import {
     classifyProviderFailure,
+    decodeLooseFailure,
     decodePolarFailure,
     encodePolarFailure,
     failureLogLine,
@@ -104,6 +105,12 @@ describe("the failure the stream carries", () => {
         expect(decodePolarFailure("polar_failed")).toBeNull();
         expect(decodePolarFailure('{"code":"provider","kind":"exploded"}')).toBeNull();
         expect(decodePolarFailure(undefined)).toBeNull();
+    });
+
+    it("reads a send refused because the chat is still answering", () => {
+        expect(decodeLooseFailure('{"error":"running"}')).toEqual({ code: "running" });
+        expect(decodeLooseFailure('{"error":"view_as"}')).toBeNull();
+        expect(decodeLooseFailure("polar_failed")).toBeNull();
     });
 
     it("logs one line with no body", () => {

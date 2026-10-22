@@ -89,6 +89,27 @@ export function decodePolarFailure(text: string | undefined): PolarFailure | nul
     }
 }
 
+/** A turn refused because its chat is still answering the one before (409 `running`). */
+export interface RunningRefusal {
+    code: "running";
+}
+
+const runningRefusalSchema = z.object({ error: z.literal("running") });
+
+/** Why a send got no answer at all: a provider's refusal, the chat still
+ *  answering, or null for anything else. */
+export function decodeLooseFailure(text: string | undefined): PolarFailure | RunningRefusal | null {
+    const failure = decodePolarFailure(text);
+    if (failure || !text) return failure;
+    try {
+        return runningRefusalSchema.safeParse(JSON.parse(text)).success
+            ? { code: "running" }
+            : null;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Why a turn has no answer, kept in the conversation as a part of the answer it
  * replaced, so a reload, another device and the chat's history all show it.

@@ -2551,7 +2551,7 @@ export function PolarChat({
                             ) : null}
                             {looseError ? (
                                 <PolarFailureNotice
-                                    failure={polarFailure.decodePolarFailure(looseError.message)}
+                                    failure={polarFailure.decodeLooseFailure(looseError.message)}
                                     isAdmin={isAdmin}
                                     providers={providers ?? []}
                                     failedModel={choice?.model ?? null}

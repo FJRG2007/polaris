@@ -151,7 +151,8 @@
         "branchFailed": "Could not branch this chat. Try again in a moment.",
         "usageLimit": "You have used {used} of the {amount} tokens this Polaris allows you on its shared key per {period}. Add your own key, or ask an administrator to raise the limit.",
         "fileUnreadable": "{name} cannot be read by this model and no text could be taken from it. Pick a model that reads this kind of file, or attach it as PDF or text.",
-        "tooManyRuns": "{max} of your chats are answering already. Wait for one to finish, or stop one, and try again."
+        "tooManyRuns": "{max} of your chats are answering already. Wait for one to finish, or stop one, and try again.",
+        "running": "This chat is still answering. Try again once it finishes."
     },
     "queue": {
         "title": "Sends next",

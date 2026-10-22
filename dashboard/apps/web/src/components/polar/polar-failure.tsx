@@ -13,7 +13,7 @@
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ModelSelectorProvider } from "./elements/model-selector";
-import type { PolarFailure, StoredFailure } from "@/lib/polar/provider-failure";
+import type { PolarFailure, StoredFailure, RunningRefusal } from "@/lib/polar/provider-failure";
 
 type ModelEntry = ModelSelectorProvider["models"][number];
 
@@ -46,7 +46,7 @@ export function PolarFailureNotice({
     onTryWith
 }: {
     /** Why the turn has no answer; null when nothing says why. */
-    failure: StoredFailure | null;
+    failure: StoredFailure | RunningRefusal | null;
     isAdmin: boolean;
     providers: readonly ModelSelectorProvider[];
     failedModel: string | null;
@@ -70,9 +70,11 @@ export function PolarFailureNotice({
               ? t("errors.fileUnreadable", { name: stored.name })
               : stored?.code === "too_many_runs"
                 ? t("errors.tooManyRuns", { max: stored.max })
-                : failure
-                  ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
-                  : t("errors.failed");
+                : stored?.code === "running"
+                  ? t("errors.running")
+                  : failure
+                    ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
+                    : t("errors.failed");
     // A limit or a file is not fixed by asking again.
     const retry =
         stored?.code === "usage_limit" || stored?.code === "file_unreadable" ? undefined : onRetry;

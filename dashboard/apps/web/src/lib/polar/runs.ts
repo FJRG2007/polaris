@@ -211,7 +211,7 @@ export function replayPolarRun(
     signal?: AbortSignal
 ): ReadableStream<string> | null {
     const run = runs.get(threadId);
-    if (!run || run.userId !== userId) return null;
+    if (!run || run.userId !== userId || signal?.aborted) return null;
     run.unread = false;
     if (!isLive(run) || !run.replayable) return null;
     let listener: ((chunk: string | null) => void) | null = null;
