@@ -85,6 +85,7 @@ describe("what a page may ask the worker for", () => {
                 "fill",
                 "itemsFor",
                 "pendingCapture",
+                "polarBrowserStop",
                 "secondStepCode",
                 "continueSignIn",
                 "openUnlock",

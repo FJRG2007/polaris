@@ -310,6 +310,18 @@
         "removeOnlyList": "Nobody is signed in on it here, so it only leaves this list."
     },
     "polar": {
+        "browserUse": "Polar can use this browser",
+        "browserUseHint": "Reads pages you can see, signed in as you.",
+        "browserOn": "On",
+        "browserOff": "Off",
+        "browserSites": "{count, plural, one {# site always allowed} other {# sites always allowed}}",
+        "browserForget": "Forget",
+        "browserBar": "Polar is using this tab",
+        "browserAsk": "Let Polar use {site}?",
+        "browserAskBody": "Polar reads it signed in as you. Clicks and typing still ask first in Polar.",
+        "browserOnce": "Allow once",
+        "browserAlways": "Always allow",
+        "browserDeny": "Don't allow",
         "title": "Polar",
         "open": "Open Polar beside the page",
         "change": "Change",
