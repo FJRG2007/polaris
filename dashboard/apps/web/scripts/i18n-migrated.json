@@ -2241,6 +2241,12 @@
         "web/src/lib/tools/access.ts",
         "web/src/app/(app)/admin/email/senders-view.tsx",
         "web/src/app/(app)/admin/channel-card.tsx",
-        "web/src/app/(app)/admin/email/page.tsx"
+        "web/src/app/(app)/admin/email/page.tsx",
+        "security-scans/src/lib/service.ts",
+        "security-scans/src/lib/i18n.ts",
+        "security-scans/src/model/parse.ts",
+        "web/src/lib/agents/session-runtime.ts",
+        "web/src/lib/agents/signin-runtime.ts",
+        "web/src/lib/agents/session-image.ts"
     ]
 }

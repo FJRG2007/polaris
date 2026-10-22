@@ -857,8 +857,10 @@ async function planNewImages(now: Date): Promise<void> {
         });
         if (done) continue;
         if ((await imageOf(release.deployableId)) !== release.imageTag) continue;
-        await queueImage(release.targetId, release.deployableId, null).catch(() => undefined);
-        queued += 1;
+        const scanId = await queueImage(release.targetId, release.deployableId, null).catch(
+            () => null
+        );
+        if (scanId) queued += 1;
     }
 }
 
