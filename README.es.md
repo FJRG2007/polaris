@@ -239,6 +239,26 @@ página con todas sus funciones. Las versiones para móvil están en
   </tr>
 </table>
 
+## Si ya pagas por estas
+
+Lo que Polaris sustituye, en tu propio hardware y con una sola cuenta:
+
+| Lo que usas hoy                                           | Lo que Polaris ejecuta en su lugar                                                                                                                                                                           |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Railway, Render, Fly                                      | Despliegues desde un repositorio o una imagen, en sus servidores o en tus propias máquinas                                                                                                                   |
+| Discord, Slack, WhatsApp, Telegram                        | Un solo chat: canales y servidores, mensajes directos, llamadas, reuniones, notas de voz, clips de pantalla                                                                                                  |
+| GitHub Actions                                            | Los mismos workflows en tus propios runners, así un repositorio privado no gasta minutos                                                                                                                     |
+| CodeRabbit                                                | Revisiones y agentes de código que se ejecutan aquí, con tus propias claves de modelo                                                                                                                        |
+| Pterodactyl y un montón de scripts                        | Servidores de juegos (Minecraft, ARK y FiveM) con mundos, mods, recursos, jugadores y horarios                                                                                                               |
+| ClickUp, Jira, Linear                                     | Espacios, listas, tableros, sprints, objetivos, documentos y control de tiempo, o conecta tu Linear o Jira y mantén sus issues reflejadas, con el estado de vuelta                                           |
+| Google Calendar, Proton Calendar                          | Vistas de día a año, compartir y enlaces públicos, sincronización bidireccional con Google, Microsoft y cualquier servidor CalDAV, recordatorios, invitaciones y páginas de reserva donde otros eligen hueco |
+| Home Assistant, una app de cámaras                        | Lugares: cámaras con vista en directo, detecciones, clips y avisos, además de interruptores, enchufes, luces, cerraduras, aires acondicionados y purificadores de una docena de marcas, con automatizaciones |
+| La web de tu fabricante de NAS                            | Un explorador de archivos para todos tus NAS, con compartir y puntos de entrega                                                                                                                              |
+| Bitwarden, 1Password                                      | Una bóveda a la que pueden apuntar tus apps de Bitwarden, cifrada en el navegador                                                                                                                            |
+| El panel de Cloudflare                                    | Un firewall propio: reglas, bloqueos por país y red, defensas contra bots, baneos                                                                                                                            |
+| Una herramienta de backups y un cliente de bases de datos | Copias programadas con restauración, y Postgres, MySQL, MariaDB, MongoDB y Redis                                                                                                                             |
+| Google Analytics, Plausible                               | Analítica sin cookies para los sitios que alojas                                                                                                                                                             |
+
 ## Instalar
 
 Un comando. Levanta todo: dashboard, base de datos, proxy inverso y el daemon de
