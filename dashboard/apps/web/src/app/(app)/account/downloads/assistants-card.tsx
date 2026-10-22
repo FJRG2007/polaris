@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { Button } from "@polaris/ui";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Plug } from "lucide-react";
 import { AssistantPreview } from "./download-previews";
 import { CLIENT_GUIDES } from "@/lib/mcp/client-guides";
 import { LogoTile } from "@/components/client-logo-tile";
@@ -32,7 +32,7 @@ export function AssistantsCard() {
         <DownloadCard
             id="assistants"
             tint="violet"
-            icon={<Sparkles className="size-4 shrink-0" />}
+            icon={<Plug className="size-4 shrink-0" />}
             title={t("downloads.assistants.title")}
             description={t("downloads.assistants.description")}
             preview={<AssistantPreview />}

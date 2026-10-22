@@ -1319,6 +1319,9 @@
         "web": {
             "title": "Polaris as an app"
         },
+        "desktop": {
+            "description": "A native app for Windows, macOS and Linux: it pushes a build from your own computer and follows a service's logs in a window of its own."
+        },
         "cards": {
             "install": "Install",
             "installIn": "Install in {name}"

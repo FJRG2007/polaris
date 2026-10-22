@@ -22,7 +22,7 @@ import { listenToWorker } from "@/lib/desktop-notify";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button } from "@polaris/ui";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
 /** The event Chromium browsers fire when Polaris can be installed. Not in the DOM
  *  typings, so only what is used here is described. */
@@ -67,6 +67,24 @@ function runningInstalled(): boolean {
     return typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
 }
 
+/** What the page says inside the desktop app instead of offering to install it. */
+function UsingDesktop({ version }: { version: string }) {
+    const t = useTranslations("components");
+    return (
+        <p className="text-sm">
+            {version
+                ? t("installApp.usingDesktopVersion", { version })
+                : t("installApp.usingDesktop")}
+        </p>
+    );
+}
+
+/** The native app's downloads, or inside that app, that it is the one in use. */
+export function NativeAppOffer({ children }: { children: ReactNode }) {
+    const desktop = useDesktopBridge();
+    return desktop ? <UsingDesktop version={desktop.version} /> : <>{children}</>;
+}
+
 /**
  * The offer to install Polaris as an app, or what is true instead: that this is
  * the desktop app, that it is installed already, or where the browser keeps its
@@ -94,14 +112,7 @@ export function InstallAppOffer() {
         }
     };
 
-    if (desktop)
-        return (
-            <p className="text-sm">
-                {desktop.version
-                    ? t("installApp.usingDesktopVersion", { version: desktop.version })
-                    : t("installApp.usingDesktop")}
-            </p>
-        );
+    if (desktop) return <UsingDesktop version={desktop.version} />;
     if (installed) return <p className="text-sm">{t("installApp.installed")}</p>;
     if (prompt)
         return (

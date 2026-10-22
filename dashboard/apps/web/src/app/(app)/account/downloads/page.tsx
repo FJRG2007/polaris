@@ -34,7 +34,7 @@ import { Monitor, Smartphone } from "lucide-react";
 import { SystemMark } from "@/components/client-marks";
 import { publicAppUrl } from "@/lib/domain-service";
 import { getTranslations } from "@/lib/i18n/request";
-import { InstallAppOffer } from "@/components/installed-app";
+import { InstallAppOffer, NativeAppOffer } from "@/components/installed-app";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
 import { companionDownload, streamDeckDownload } from "@/lib/app-releases";
 import { DeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
@@ -159,12 +159,14 @@ export default async function DownloadsPage() {
                     tint="slate"
                     icon={<Monitor className="size-4 shrink-0" />}
                     title={tc("installApp.title")}
-                    description={tc("installApp.native")}
+                    description={t("downloads.desktop.description")}
                     preview={<DesktopPreview />}
                 >
-                    <Suspense fallback={<FilesSkeleton />}>
-                        <DesktopFiles repo={repo} />
-                    </Suspense>
+                    <NativeAppOffer>
+                        <Suspense fallback={<FilesSkeleton />}>
+                            <DesktopFiles repo={repo} />
+                        </Suspense>
+                    </NativeAppOffer>
                 </DownloadCard>
 
                 {/* Present, unlinked and honest. A real plan with nothing built,

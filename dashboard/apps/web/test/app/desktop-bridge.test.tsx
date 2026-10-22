@@ -9,7 +9,8 @@
 
 import { desktopDownload } from "@/lib/app-releases";
 import { renderToStaticMarkup } from "react-dom/server";
-import { InstallAppOffer } from "@/components/installed-app";
+import { render, cleanup } from "@testing-library/react";
+import { InstallAppOffer, NativeAppOffer } from "@/components/installed-app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     arrivedDeployResults,
@@ -145,5 +146,35 @@ describe("the install offer", () => {
         const html = renderToStaticMarkup(withMessages(<InstallAppOffer />));
         expect(html).toContain("Your browser installs it from its own menu");
         expect(html).not.toContain("Download the desktop app");
+    });
+});
+
+describe("the native app's downloads", () => {
+    afterEach(cleanup);
+
+    it("lists the files in a browser", () => {
+        const { container } = render(
+            withMessages(
+                <NativeAppOffer>
+                    <p>files</p>
+                </NativeAppOffer>
+            )
+        );
+        expect(container.textContent).toContain("files");
+    });
+
+    it("says the desktop app is in use instead of offering it again", () => {
+        install(fakeBridge());
+        const { container } = render(
+            withMessages(
+                <NativeAppOffer>
+                    <p>files</p>
+                </NativeAppOffer>
+            )
+        );
+        expect(container.textContent).not.toContain("files");
+        expect(container.textContent).toContain(
+            "You are using the Polaris desktop app, version 0.1.0."
+        );
     });
 });
