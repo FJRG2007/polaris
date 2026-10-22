@@ -43,9 +43,10 @@ the model and have no translations.
 | `chat_send`                          | web          | chat.use                                 | [x] key: tool.chat_send; dedicated: chat.send                                                                                                                                                                                                                                                                      |
 | `clock_alarm_change`                 | calendar     | calendar.manage                          | [x] key: tool.clock_alarm_change (asks for a second press)                                                                                                                                                                                                                                                         |
 | `clock_alarm_set`                    | calendar     | calendar.manage                          | [x] key: tool.clock_alarm_set (asks for a second press)                                                                                                                                                                                                                                                            |
+| `clock_focus_start`                  | calendar     | calendar.manage                          | [x] key: tool.clock_focus_start; dedicated: calendar.timer (the focus cycle, started on its first press)                                                                                                                                                                                                           |
 | `clock_list`                         | calendar     | calendar.read                            | [x] n/a: read-only, nothing to press                                                                                                                                                                                                                                                                               |
-| `clock_timer_change`                 | calendar     | calendar.manage                          | [x] key: tool.clock_timer_change (asks for a second press)                                                                                                                                                                                                                                                         |
-| `clock_timer_start`                  | calendar     | calendar.manage                          | [x] key: tool.clock_timer_start                                                                                                                                                                                                                                                                                    |
+| `clock_timer_change`                 | calendar     | calendar.manage                          | [x] key: tool.clock_timer_change (asks for a second press); dedicated: calendar.timer (start or pause, reset, +1 min, skip the phase; dial moves it by minutes)                                                                                                                                                    |
+| `clock_timer_start`                  | calendar     | calendar.manage                          | [x] key: tool.clock_timer_start; dedicated: calendar.timer (a new timer, made on its first press)                                                                                                                                                                                                                  |
 | `databases_execute`                  | web          | databases.write                          | [ ] off the deck: scope a deck key is never granted (databases.write)                                                                                                                                                                                                                                              |
 | `databases_list`                     | web          | databases.read                           | [x] n/a: read-only, and its scope is off the deck                                                                                                                                                                                                                                                                  |
 | `databases_query`                    | web          | databases.read                           | [x] n/a: read-only, and its scope is off the deck                                                                                                                                                                                                                                                                  |
@@ -189,3 +190,19 @@ allow: ...", a key set to one draws "Reconnect", and a press is refused in
 the same words. A visitor who was lent a door holds no `home.control`, and
 the device tool's scope stands on it, so a deck cannot work a lent device;
 the Places screen can.
+
+## Calendar timers on the deck
+
+`calendar.timer` (`apps/calendar/src/lib/deck-actions.ts`, scope
+`calendar.manage`) works one of the account's Calendar timers, a new one found
+by its name and made on its first press, or the focus cycle - through the clock
+tools above, so a deck reaches exactly the timers its owner does. Its state
+carries `countdown`: what is left, the length, and while it runs when it ends
+and the server's clock, so a Stream Deck key or a Companion button counts down
+between readings to the same second as Calendar. A change made anywhere - the
+Time screen, a tool, another deck, the timer ringing - is announced on the deck
+bus (`lib/deck/live.ts`) and reaches open decks within a second.
+
+On a Stream Deck the timer key's Source picks this or a timer kept in the
+plugin (the default, and every key set before). In Companion the Timer action
+and feedbacks do the same, kept on that machine or in Polaris.

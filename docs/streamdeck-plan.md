@@ -67,7 +67,7 @@ The key is stored in the plugin's global settings, never in a key's own settings
 | Watch | a monitor's up/down and latency on the key; acknowledge an alarm | - |
 | Deploy | redeploy a service; its last deployment state on the key | - |
 | Places | toggle a device; its state on the key; run a scene/automation | brightness, temperature |
-| Timers | start/pause/reset a countdown or stopwatch (runs in the plugin, mirrored to Polaris when asked) | set the time |
+| Timers | start/pause/reset a countdown or stopwatch kept in the plugin, or one of the account's Calendar timers or the focus cycle kept in Polaris (+1 min, skip the phase; live from Calendar) | set the time, or move a Polaris timer by minutes |
 | Polaris | notification count; open a Polaris page | - |
 
 Each key draws a rendered SVG (state colour, icon, short value) so the look does
