@@ -36,12 +36,26 @@ import {
     type PrivacyTarget
 } from "../lib/privacy-kinds";
 
+/**
+ * How long to wait before asking the relay again about a camera it is not
+ * serving yet, by how many times it has been asked since.
+ *
+ * Quick at first: a camera that just came back from privacy is published again
+ * within a second or two, and a single ask the moment the switch answered lands
+ * before the relay has picked it up - the tile then said "Starting" until the
+ * page was reloaded. Slower after that, so a camera that is really down costs
+ * the relay one question every half a minute.
+ */
+const LIVE_RECHECK_MS = [2_000, 2_000, 3_000, 5_000, 10_000, 30_000];
+
 export function Wall({ canManage, canControl }: { canManage: boolean; canControl: boolean }) {
     const t = usePlacesT();
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [live, setLive] = useState<Set<string>>(() => new Set());
     const [error, setError] = useState<string | null>(null);
     const [opened, setOpened] = useState<string | null>(null);
+    /** How many times the relay has been asked again since the last change. */
+    const [recheck, setRecheck] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -121,15 +135,9 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         }
         const results = result.results;
         setCameras((current) => settlePrivacy(current ?? [], results));
-        // A camera made public again is back on the relay; ask which streams it serves now.
-        if (results.some((row) => !row.private && before.get(row.cameraId))) {
-            void actions.liveCamerasAction().then(
-                (status) => {
-                    if (status.live) setLive(new Set(status.live));
-                },
-                () => undefined
-            );
-        }
+        // A camera made public again is on its way back to the relay: ask again
+        // from the quick end until it is served.
+        if (results.some((row) => !row.private && before.get(row.cameraId))) setRecheck(0);
         const failed = results.filter((row) => row.failure);
         if (failed.length === 0) return;
         const first = failed[0];
@@ -217,6 +225,41 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
 
     const watching = useMemo(() => (cameras ?? []).map((camera) => camera.id), [cameras]);
     const boxes = useDetections(watching, opened === null);
+
+    // A camera that should be on the relay and is not is asked about again
+    // until it is, rather than left on "Starting" until a reload. Stopped while
+    // one is open: the viewer asks for its own.
+    const waiting = (cameras ?? []).some(
+        (camera) => camera.enabled && !camera.privacy && !live.has(camera.id)
+    );
+    useEffect(() => {
+        if (!waiting || opened !== null) return;
+        let current = true;
+        const next = () => {
+            if (current) setRecheck((value) => value + 1);
+        };
+        const controller = new AbortController();
+        const timer = setTimeout(
+            () =>
+                void fetch("/api/home/cameras/live", {
+                    signal: controller.signal,
+                    cache: "no-store"
+                })
+                    .then((response): Promise<{ live?: string[] }> =>
+                        response.ok ? response.json() : Promise.resolve({})
+                    )
+                    .then((status) => {
+                        if (current && status.live) setLive(new Set(status.live));
+                        next();
+                    }, next),
+            LIVE_RECHECK_MS[Math.min(recheck, LIVE_RECHECK_MS.length - 1)]
+        );
+        return () => {
+            current = false;
+            controller.abort();
+            clearTimeout(timer);
+        };
+    }, [waiting, opened, recheck]);
 
     if (cameras === null) return <WallSkeleton />;
 
@@ -345,7 +388,11 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                             .filter((camera) => camera.zone === zone)
                             .map((camera) => (
                                 <CameraTile
-                                    key={camera.id}
+                                    // A camera coming back from privacy starts
+                                    // over as a new tile: what the old one had
+                                    // given up on while the camera was masked is
+                                    // not its state any more.
+                                    key={`${camera.id}-${camera.privacy ? "private" : "public"}`}
                                     camera={camera}
                                     live={live.has(camera.id)}
                                     boxes={boxes[camera.id]}

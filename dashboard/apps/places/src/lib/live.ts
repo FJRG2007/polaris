@@ -30,7 +30,9 @@
 
 import { getCamera } from "./cameras";
 import {
+    streamName,
     relayEndpoint,
+    publishedStreams,
     relayServerFor,
     snapshot,
     streamPath,
@@ -67,6 +69,24 @@ async function relayForCamera(
     const endpoint = await relayEndpoint(relayServerFor(camera.reachVia));
     if (!endpoint) throw new CameraOfflineError("The camera relay is still starting");
     return { endpoint, cameraId: camera.id };
+}
+
+/** Which of these cameras the relay is actually serving, so a tile can tell
+ *  "not started yet" from "started and the camera is down". */
+export async function servedCameraIds(
+    cameras: readonly { id: string; reachVia: string }[]
+): Promise<string[]> {
+    const servers = [...new Set(cameras.map((camera) => relayServerFor(camera.reachVia)))];
+    const names = await Promise.all(
+        servers.map(async (server) => {
+            const endpoint = await relayEndpoint(server);
+            return endpoint ? ((await publishedStreams(endpoint)) ?? []) : [];
+        })
+    );
+    const published = new Set(names.flat());
+    return cameras
+        .filter((camera) => published.has(streamName(camera.id, "main")))
+        .map((camera) => camera.id);
 }
 
 /** A still, for the wall and for an event's picture. The small stream on purpose:
