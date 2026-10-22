@@ -59,7 +59,8 @@ export type GithubAppGap =
     | { kind: "no-account"; owner: string; url: string }
     | { kind: "app-missing"; owner: string; url: string | null }
     /** The App is private, so it can only be installed on the account that
-     *  created it: whoever manages it has to make it public first. */
+     *  created it: whoever manages it has to make it public first. The link to
+     *  its settings is only an administrator's; anybody else gets null. */
     | { kind: "app-private"; owner: string; url: string | null }
     | { kind: "repo-not-selected"; owner: string; repository: string; url: string | null };
 
@@ -195,7 +196,7 @@ export async function githubAppGap(
     const key = `${credential.connectionId}:${owner.toLowerCase()}:${fullName.toLowerCase()}`;
     const kept = remembered<GithubAppGap | "none">(key, FOUND_TTL_MS);
     if (kept === "none") return null;
-    if (kept && remembered(key, MISSING_TTL_MS)) return kept;
+    if (kept && remembered(key, MISSING_TTL_MS)) return forReader(userId, kept);
 
     let gap: GithubAppGap | null;
     try {
@@ -206,7 +207,30 @@ export async function githubAppGap(
         return null;
     }
     remember(key, gap ?? "none");
-    return gap;
+    return gap && forReader(userId, gap);
+}
+
+/** The gap as this person may see it: changing the App's visibility is the
+ *  administrator's, so only an administrator is handed its settings. */
+async function forReader(userId: string, gap: GithubAppGap): Promise<GithubAppGap> {
+    if (gap.kind !== "app-private" || !gap.url) return gap;
+    return (await administers(userId)) ? gap : { ...gap, url: null };
+}
+
+async function administers(userId: string): Promise<boolean> {
+    try {
+        const [{ prisma }, { effectiveIsAdmin }] = await Promise.all([
+            import("@polaris/db"),
+            import("@/lib/effective-access")
+        ]);
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { isAdmin: true }
+        });
+        return await effectiveIsAdmin(userId, user?.isAdmin === true);
+    } catch {
+        return false;
+    }
 }
 
 async function askGithub(
@@ -258,9 +282,14 @@ export async function githubInstallGapForRepo(
 /** The sentence for an App gap, in the reader's words, from the `agents` catalog. */
 export function installGapKey(
     gap: GithubInstallGap
-): "errors.githubAppMissing" | "errors.githubAppPrivate" | "errors.githubRepoNotSelected" {
+):
+    | "errors.githubAppMissing"
+    | "errors.githubAppPrivate"
+    | "errors.githubAppPrivateMember"
+    | "errors.githubRepoNotSelected" {
     if (gap.kind === "app-missing") return "errors.githubAppMissing";
-    if (gap.kind === "app-private") return "errors.githubAppPrivate";
+    if (gap.kind === "app-private")
+        return gap.url ? "errors.githubAppPrivate" : "errors.githubAppPrivateMember";
     return "errors.githubRepoNotSelected";
 }
 

@@ -38,7 +38,9 @@ export function GithubAppGapNotice({
         gap.kind === "app-missing"
             ? t("githubAppGap.missingBody", { owner: gap.owner })
             : gap.kind === "app-private"
-              ? t("githubAppGap.privateBody", { owner: gap.owner })
+              ? gap.url
+                  ? t("githubAppGap.privateBody", { owner: gap.owner })
+                  : t("githubAppGap.privateBodyMember", { owner: gap.owner })
               : gap.kind === "repo-not-selected"
                 ? t("githubAppGap.notSelectedBody", { owner: gap.owner })
                 : t("githubAppGap.noAccountBody");
@@ -125,5 +127,5 @@ function isGap(value: unknown): value is GithubAppGap {
     if (typeof gap.owner !== "string") return false;
     if (gap.url !== null && typeof gap.url !== "string") return false;
     if (gap.kind === "repo-not-selected") return typeof gap.repository === "string";
-    return gap.kind === "app-missing" || gap.kind === "no-account";
+    return gap.kind === "app-missing" || gap.kind === "app-private" || gap.kind === "no-account";
 }

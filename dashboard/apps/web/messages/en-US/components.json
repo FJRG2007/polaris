@@ -1485,6 +1485,7 @@
         "install": "Install Polaris on {owner}",
         "privateTitle": "Polaris cannot be installed on {owner} yet",
         "privateBody": "Its GitHub app is private, so GitHub only installs it on the account that created it. Whoever manages it makes it public under Advanced, then installs it on {owner}.",
+        "privateBodyMember": "Its GitHub app is private, so GitHub only installs it on the account that created it. An administrator has to make it public before it can be installed on {owner}.",
         "makePublic": "Open the app's settings",
         "choose": "Choose repositories",
         "connect": "Connect GitHub",

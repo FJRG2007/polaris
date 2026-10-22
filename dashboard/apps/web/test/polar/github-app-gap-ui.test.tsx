@@ -15,6 +15,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 afterEach(cleanup);
 
 const INSTALL = "https://github.com/apps/polaris-agi/installations/new";
+const ADVANCED = "https://github.com/settings/apps/polaris-agi/advanced";
 
 describe("the install notice", () => {
     it("links the App's install page in a new tab and offers Check again", () => {
@@ -80,6 +81,38 @@ describe("the install notice", () => {
                 null
             ])
         ).toHaveLength(1);
+    });
+
+    it("keeps a private App's gap so its notice is drawn under the answer", () => {
+        const gap = { kind: "app-private", owner: "bytehide", url: ADVANCED };
+        expect(gapsOf([{ ok: false, access: gap }])).toEqual([gap]);
+        expect(gapsOf([{ ok: false, access: { ...gap, url: null } }])).toHaveLength(1);
+    });
+});
+
+describe("the private App notice", () => {
+    it("links the App's settings for an administrator", () => {
+        render(
+            <MessagesWrapper>
+                <GithubAppGapNotice
+                    gap={{ kind: "app-private", owner: "bytehide", url: ADVANCED }}
+                />
+            </MessagesWrapper>
+        );
+        expect(
+            screen.getByRole("link", { name: "Open the app's settings" }).getAttribute("href")
+        ).toBe(ADVANCED);
+        expect(screen.getByText(/makes it public under Advanced/)).toBeTruthy();
+    });
+
+    it("tells anybody else an administrator has to do it, with no link", () => {
+        render(
+            <MessagesWrapper>
+                <GithubAppGapNotice gap={{ kind: "app-private", owner: "bytehide", url: null }} />
+            </MessagesWrapper>
+        );
+        expect(screen.queryByRole("link")).toBeNull();
+        expect(screen.getByText(/An administrator has to make it public/)).toBeTruthy();
     });
 });
 
