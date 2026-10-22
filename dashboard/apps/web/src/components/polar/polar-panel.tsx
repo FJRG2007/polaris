@@ -131,6 +131,7 @@ import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { answeredNothing } from "@/lib/polar/unanswered";
 import { repoStepOf } from "@/lib/polar/code-host";
+import { browserStepOf, isBrowserTool } from "@/lib/polar/browser-steps";
 import { GithubAppGapNotice, gapIdentity, gapsOf } from "@/components/github-app-gap";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
@@ -2549,6 +2550,7 @@ export function PolarChat({
                                             })
                                         }
                                         onRegenerate={regenerateWith}
+                                        onAsk={(text) => void sendSpoken(text)}
                                         providers={providers ?? []}
                                         mark={marks[message.id] ?? null}
                                         onMark={(change) => markAnswer(message.id, change)}
@@ -2748,6 +2750,7 @@ function MessageView({
     onQuote,
     onSaveCommand,
     onRegenerate,
+    onAsk,
     providers,
     mark,
     onMark,
@@ -2770,6 +2773,8 @@ function MessageView({
     onQuote: () => void;
     onSaveCommand: () => void;
     onRegenerate: (options: answerActions.RegenerateOptions) => void;
+    /** Sends a line as the next question, for a step offered under an answer. */
+    onAsk?: (text: string) => void;
     providers: ModelSelectorProvider[];
     mark: PolarMark | null;
     onMark: (change: answerActions.MarkChange) => Promise<boolean>;
@@ -2810,6 +2815,16 @@ function MessageView({
             return repo.kind === "search"
                 ? t("repo.search", { repo: repo.repo, query: repo.detail })
                 : t(`repo.${repo.kind}`, { repo: repo.repo, path: repo.detail });
+        }
+        const browser = browserStepOf(name, input);
+        if (browser) {
+            const values = { site: browser.site, element: browser.element || "?" };
+            if (browser.kind === "open") return t("web.browserOpen", values);
+            if (browser.kind === "read") return t("web.browserRead", values);
+            if (browser.kind === "find") return t("web.browserFind", values);
+            if (browser.kind === "click") return t("web.browserClick", values);
+            if (browser.kind === "type") return t("web.browserType", values);
+            return t("web.browserClose");
         }
         const step = webStepOf(name, input);
         if (!step) return toolName(name);
@@ -2992,7 +3007,9 @@ function MessageView({
                                 }
                                 destructive={
                                     described?.destructive ??
-                                    (name !== "polar_remember" && !isWebTool(name))
+                                    (name !== "polar_remember" &&
+                                        !isWebTool(name) &&
+                                        !isBrowserTool(name))
                                 }
                                 input={tool.input}
                                 tool={described?.writes ? name : undefined}
@@ -3015,6 +3032,7 @@ function MessageView({
                     key={gapIdentity(gap)}
                     gap={gap}
                     onCheckAgain={!streaming && last && !busy ? () => onRegenerate({}) : undefined}
+                    onUseBrowser={!streaming && last && !busy ? onAsk : undefined}
                 />
             ))}
             {/* A turn that ended on its steps with nothing said is named, so

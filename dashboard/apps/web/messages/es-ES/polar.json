@@ -596,6 +596,12 @@
         "snowballing": "Amasando nieve"
     },
     "web": {
+        "browserOpen": "Abriendo {site} en tu navegador",
+        "browserRead": "Leyendo {site} en tu navegador",
+        "browserFind": "Revisando {site}",
+        "browserClick": "Pulsar {element} en {site}",
+        "browserType": "Escribir en {element} en {site}",
+        "browserClose": "Cerrando pestaña",
         "toggle": "Buscar en la web",
         "searching": "Buscando: {query}",
         "searched": "Buscó en la web",

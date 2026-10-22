@@ -368,6 +368,18 @@ export type Request =
      * already open, so the marks appear without a reload.
      */
     | { readonly kind: "startInline" }
+    /** Whether Polar may use this browser, and the sites it may always use. */
+    | { readonly kind: "polarBrowser" }
+    | { readonly kind: "setPolarBrowser"; readonly on: boolean }
+    | { readonly kind: "forgetPolarSites" }
+    /** The site question's answer, from the extension's own grant window. */
+    | {
+          readonly kind: "polarBrowserGrant";
+          readonly id: string;
+          readonly grant: "once" | "always" | "deny";
+      }
+    /** The Stop button on the bar inside a tab Polar is using. */
+    | { readonly kind: "polarBrowserStop" }
     /** Change how long an unlocked vault may sit unused before it locks itself. */
     | { readonly kind: "setTimeout"; readonly timeoutMs: number }
     /**
@@ -451,6 +463,10 @@ export type Request =
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
+    | {
+          readonly ok: true;
+          readonly polarBrowser: { readonly on: boolean; readonly sites: readonly string[] };
+      }
     /**
      * A build newer than this one, or null when this one is current - and the
      * version already on disk waiting for a safe moment to start, or null - and
@@ -540,6 +556,9 @@ export type Reply =
  * way.
  */
 export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
+    // Stop on the bar in a tab Polar is using. It can only ever switch Polar
+    // off, so a page that found a way to send it gains nothing.
+    "polarBrowserStop",
     "blocked",
     "itemsFor",
     "fill",

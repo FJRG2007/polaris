@@ -76,7 +76,16 @@ export default defineConfig({
         // unlocked vault on Firefox would stay unlocked until the browser closed.
         // `contextMenus` is Polaris's own entries in the right-click menu on a
         // box you can type into. It carries no install warning.
-        permissions: ["storage", "activeTab", "scripting", "alarms", "contextMenus"],
+        // `tabGroups` keeps the tabs Polar opens in one group named Polar, so it
+        // is plain which tabs it is using. Chromium only; it carries no warning.
+        permissions: [
+            "storage",
+            "activeTab",
+            "scripting",
+            "alarms",
+            "contextMenus",
+            ...(browser === "firefox" ? [] : ["tabGroups"])
+        ],
         // Filling from the keyboard, without going through the toolbar. The
         // browser owns the binding - somebody can change or remove it in its own
         // shortcuts screen - and it does nothing at all while the vault is

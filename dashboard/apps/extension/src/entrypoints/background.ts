@@ -1,3 +1,4 @@
+import { POLAR_BROWSER_ALARM, PolarBrowser, type BrowserApi } from "@/lib/polar-browser";
 import { storage } from "#imports";
 import * as link from "@/lib/link";
 import { onShelf } from "@/lib/shelf";
@@ -3013,6 +3014,13 @@ async function checkForUpdate(): Promise<void> {
     }
 }
 
+/** Polar using this browser (`lib/polar-browser.ts`): off until the popup switches it on. */
+const polarBrowser = new PolarBrowser({
+    api: browser as unknown as BrowserApi,
+    link: async () => ({ origin: await currentOrigin(), token: await LINK_TOKEN.getValue() }),
+    say: (which) => say(which === "bar" ? "polar.browserBar" : "polar.stop")
+});
+
 browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // Only the extension's own pages may ask for any of this. A page that
     // guessed the extension id gets nothing: anything that is not one of ours is
@@ -3636,6 +3644,27 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 await badge();
                 return { ok: true, ...(await blockedHere()) };
             }
+
+            case "polarBrowser":
+                return { ok: true, polarBrowser: await polarBrowser.status() };
+
+            case "setPolarBrowser":
+                await polarBrowser.setOn(request.on === true);
+                return { ok: true, polarBrowser: await polarBrowser.status() };
+
+            case "forgetPolarSites":
+                await polarBrowser.forgetSites();
+                return { ok: true, polarBrowser: await polarBrowser.status() };
+
+            case "polarBrowserGrant":
+                // Only the extension's own grant window answers the question.
+                if (!ours) return { ok: false, error: await say("errors.serverSilent") };
+                polarBrowser.answer(request.id, request.grant);
+                return { ok: true };
+
+            case "polarBrowserStop":
+                await polarBrowser.stop();
+                return { ok: true };
 
             case "startInline": {
                 // Manifest v2 has no `scripting` namespace at all, so on Firefox
@@ -4367,7 +4396,15 @@ export default defineBackground(() => {
     // And the one that makes ending a connection from Polaris mean something in
     // this browser: there is nothing to push it here, so it has to ask.
     browser.alarms.create("link-check", { periodInMinutes: LINK_CHECK_MINUTES });
+    // And Polar's poll, restarted if a recycle took it: half a minute is the
+    // shortest period Chrome honours. It does nothing while Polar is off.
+    browser.alarms.create(POLAR_BROWSER_ALARM, { periodInMinutes: 0.5 });
+    void polarBrowser.loop();
     browser.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === POLAR_BROWSER_ALARM) {
+            void polarBrowser.loop();
+            return;
+        }
         if (alarm.name === "update-check") {
             void checkForUpdate();
             return;

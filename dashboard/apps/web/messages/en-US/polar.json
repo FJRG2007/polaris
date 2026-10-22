@@ -596,6 +596,12 @@
         "snowballing": "Snowballing"
     },
     "web": {
+        "browserOpen": "Opening {site} in your browser",
+        "browserRead": "Reading {site} in your browser",
+        "browserFind": "Looking over {site}",
+        "browserClick": "Click {element} on {site}",
+        "browserType": "Type into {element} on {site}",
+        "browserClose": "Closing a tab",
         "toggle": "Search the web",
         "searching": "Searching: {query}",
         "searched": "Searched the web",

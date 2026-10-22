@@ -44,6 +44,8 @@ import {
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import { polarVisualTools } from "@/lib/polar/visual-tool";
 import { polarRepoTools } from "@/lib/polar/code-host-tools";
+import { browserPresent } from "@/lib/polar/browser-relay";
+import { BROWSER_APPROVAL, polarBrowserTools } from "@/lib/polar/browser-tools";
 import { aboutRepository } from "@/lib/polar/code-host";
 import {
     NATIVE_SEARCH_STAND_INS,
@@ -223,6 +225,7 @@ export async function POST(request: Request): Promise<Response> {
     };
     const visualTools = polarVisualTools();
     const repoTools = polarRepoTools(user.id);
+    const browserTools = polarBrowserTools(user.id);
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
         tools: {
@@ -231,6 +234,7 @@ export async function POST(request: Request): Promise<Response> {
             ...memoryTools,
             ...visualTools,
             ...repoTools,
+            ...browserTools,
             ...NATIVE_SEARCH_STAND_INS,
             ...polarWebTools("", ""),
             ...connectorSet.tools,
@@ -291,6 +295,9 @@ export async function POST(request: Request): Promise<Response> {
     // Reading a repository is reading the web, under the same switch. Always
     // registered; sent while the page shared or the conversation names one.
     const repoOffered = web && aboutRepository(body.data.context?.site?.url, messages);
+    // The person's own browser, under the same switch, while its extension is
+    // polling - the tools say so themselves if it goes away mid-turn.
+    const browserOffered = web && browserPresent(user.id);
     const tools = {
         ...screenTools,
         ...Object.fromEntries(Object.entries(toolset.tools).filter(([name]) => !off.has(name))),
@@ -298,6 +305,7 @@ export async function POST(request: Request): Promise<Response> {
         ...visualTools,
         ...webTools,
         ...(web ? repoTools : {}),
+        ...(web ? browserTools : {}),
         ...(body.data.connectors
             ? Object.fromEntries(
                   Object.entries(connectorSet.tools).filter(([name]) => !off.has(name))
@@ -314,6 +322,7 @@ export async function POST(request: Request): Promise<Response> {
         ...Object.keys(remembers ? memoryTools : {}),
         ...Object.keys(webTools),
         ...(repoOffered ? Object.keys(repoTools) : []),
+        ...(browserOffered ? Object.keys(browserTools) : []),
         // A connector is one the person added on purpose: its tools are always sent.
         ...(body.data.connectors
             ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))
@@ -412,7 +421,8 @@ export async function POST(request: Request): Promise<Response> {
             ...toolset.approval,
             ...(body.data.connectors ? connectorSet.approval : {}),
             ...(remembers ? MEMORY_APPROVAL : {}),
-            ...(web ? WEB_APPROVAL : {})
+            ...(web ? WEB_APPROVAL : {}),
+            ...(web ? BROWSER_APPROVAL : {})
         },
         stopWhen: isStepCount(STEP_MAX),
         // Automatic sends a quick question at the lowest effort.

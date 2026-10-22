@@ -1866,6 +1866,8 @@
         "extension/src/entrypoints/popup/picker.tsx",
         "extension/src/entrypoints/popup/settings.tsx",
         "extension/src/entrypoints/popup/polar-row.tsx",
+        "extension/src/entrypoints/polar-grant/main.tsx",
+        "web/src/components/github-app-gap.tsx",
         "extension/src/entrypoints/sidepanel/panel.tsx",
         "security-scans/src/screens/security-view.tsx",
         "extension/src/lib/context-menu.ts",
