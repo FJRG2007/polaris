@@ -173,11 +173,11 @@ async function viewOf(
                     value: choice.value,
                     label: choice.label[caller.locale]
                 }));
-            } else if (field.choices) {
+            }
+            if (field.choices) {
                 const outcome = await callTool(caller, field.choices.tool, field.choices.input);
-                choices = outcome.ok
-                    ? field.choices.pick(outcome.structured).slice(0, CHOICE_LIMIT)
-                    : [];
+                const listed = outcome.ok ? field.choices.pick(outcome.structured) : [];
+                choices = [...(choices ?? []), ...listed].slice(0, CHOICE_LIMIT);
             }
             return {
                 name: field.name,
@@ -277,7 +277,7 @@ export async function runDeckAction(
         : null;
     const current =
         app.read && raw
-            ? withPress(app, pickState(app, raw, caller), options.data, raw, caller)
+            ? withPress(app, pickState(app, raw, caller, options.data), options.data, raw, caller)
             : undefined;
     // Already where the press would put it: nothing is sent, and the key is
     // told what it is.
@@ -289,7 +289,14 @@ export async function runDeckAction(
         read: raw?.ok ? raw.structured : undefined
     });
     if (sent === null) return { ok: false, message: words("deck.errors.refused") };
-    const outcome = await callTool(caller, app.run.tool, sent);
+    const tool =
+        typeof app.run.tool === "string"
+            ? app.run.tool
+            : app.run.tool(options.data, {
+                  step: input.step,
+                  read: raw?.ok ? raw.structured : undefined
+              });
+    const outcome = await callTool(caller, tool, sent);
     if (!outcome.ok) return { ok: false, message: outcome.message ?? words("deck.errors.refused") };
     const after = app.read ? await readApp(app, options.data, caller) : undefined;
     return after ? { ok: true, state: after } : { ok: true };
@@ -302,7 +309,7 @@ async function readApp(
 ): Promise<DeckState> {
     const read = app.read!;
     const outcome = await callTool(caller, read.tool, read.input(options));
-    return withPress(app, pickState(app, outcome, caller), options, outcome, caller);
+    return withPress(app, pickState(app, outcome, caller, options), options, outcome, caller);
 }
 
 /** The state with what a press would do from it, when the action knows. */
@@ -326,11 +333,12 @@ function withPress(
 function pickState(
     app: AppDeckAction,
     outcome: Awaited<ReturnType<typeof callTool>>,
-    caller: DeckCaller
+    caller: DeckCaller,
+    options: Record<string, unknown>
 ): DeckState {
     if (!outcome.ok) return { tone: "idle" };
     try {
-        return app.read!.pick(outcome.structured, caller.locale);
+        return app.read!.pick(outcome.structured, caller.locale, options);
     } catch {
         return { tone: "idle" };
     }

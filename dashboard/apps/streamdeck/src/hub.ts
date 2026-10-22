@@ -36,8 +36,9 @@ import {
 type Instance = {
     readonly action: KeyAction<KeySettings> | DialAction<KeySettings>;
     settings: KeySettings;
-    /** "key" draws an image; "dial" draws its touch strip. */
-    readonly surface: "key" | "dial";
+    /** "key" draws an image; "dial" draws its touch strip; a "timer" draws
+     *  itself, ticking between readings. */
+    readonly surface: "key" | "dial" | "timer";
 };
 
 /** Where the settings screen's connect flow stands. */
@@ -124,8 +125,13 @@ class Hub {
 
     setState(id: string, state: DeckState): void {
         this.#states.set(id, state);
+        this.stateAt.set(id, Date.now());
         this.redraw(id);
     }
+
+    /** When each key's state arrived, on the deck's clock: a Polaris timer
+     *  counts from it. */
+    readonly stateAt = new Map<string, number>();
 
     state(id: string): DeckState | undefined {
         return this.#states.get(id);

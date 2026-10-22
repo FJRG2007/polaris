@@ -40,8 +40,17 @@ describe("surfaceOf", () => {
         expect(surfaceOf(`${PLUGIN_UUID}.places-dial`)).toBe("places-dial");
     });
 
-    it("has none for the timer, or for an id it does not know", () => {
-        expect(surfaceOf(`${PLUGIN_UUID}.timer`)).toBeNull();
+    it("gives the timer only Calendar's timers, and has none for an id it does not know", () => {
+        expect(surfaceOf(`${PLUGIN_UUID}.timer`)).toBe("timer");
+        expect(
+            offered(
+                [
+                    { id: "calendar.timer", kind: "toggle", area: "tools" },
+                    { id: "tool.clock_timer_start", kind: "run", area: "tools" }
+                ] as never,
+                "timer"
+            ).map((action) => action.id)
+        ).toEqual(["calendar.timer"]);
         expect(surfaceOf("")).toBeNull();
         expect(surfaceOf("com.example.other.key")).toBeNull();
     });

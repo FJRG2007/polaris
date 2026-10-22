@@ -4,6 +4,7 @@
     "clock_alarm_change": "Turn an alarm on, off, skip, snooze or delete it",
     "clock_timer_start": "Start a countdown timer",
     "clock_timer_change": "Pause, resume, reset or delete a timer",
+    "clock_focus_start": "Start a focus cycle",
     "calendar_upcoming": "Upcoming events",
     "calendar_calendars": "List calendars",
     "calendar_events": "Events in a range",

@@ -65,6 +65,8 @@ function blankState() {
         timeZones: new Map<string, string>(),
         requestLocale: "en-US",
         notices: [] as Notice[],
+        /** Accounts whose decks were told a key changed, with the actions. */
+        deckChanges: [] as { userId: string; actions: readonly string[] }[],
         mails: [] as SentMail[],
         mailError: null as string | null,
         rateKeys: [] as string[],
@@ -187,6 +189,11 @@ export const host = {
     notificationsDispatch: {
         notify: async (notice: Notice): Promise<void> => {
             fake.notices.push(notice);
+        }
+    },
+    deckLive: {
+        deckChanged: async (userId: string, actions: readonly string[]): Promise<void> => {
+            fake.deckChanges.push({ userId, actions });
         }
     },
     rateLimitService: {

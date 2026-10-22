@@ -109,6 +109,17 @@ export interface DeckState {
         readonly face?: DeckState;
         readonly noop?: boolean;
     };
+    /** A timer kept in Polaris: what the key counts down from between
+     *  readings. `endsAt` and `serverNow` are on Polaris's clock, and only
+     *  there while it runs. */
+    readonly countdown?: {
+        readonly state: "running" | "paused" | "rung" | "idle";
+        readonly remainingMs: number;
+        readonly durationMs: number;
+        readonly endsAt?: number;
+        readonly serverNow?: number;
+        readonly phase?: "focus" | "short" | "long";
+    };
 }
 
 export type RunResult =

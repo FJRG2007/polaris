@@ -331,6 +331,51 @@ describe("the Time area on the server", () => {
             });
         });
 
+        it("tells the owner's decks of every change, and only of a real one", async () => {
+            const told = () =>
+                fake.deckChanges.filter((change) => change.userId === alice.id).length;
+            const id = await clock.createTimer(
+                alice.id,
+                { label: "", durationMs: 5 * 60_000, sound: "chime", start: true },
+                world.NOW
+            );
+            expect(fake.deckChanges).toEqual([{ userId: alice.id, actions: ["calendar.timer"] }]);
+            await clock.changeTimer(alice.id, id, "start", world.NOW);
+            expect(told()).toBe(1);
+            await clock.changeTimer(alice.id, id, "pause", at("2026-10-01T08:01:00Z"));
+            await clock.changeTimer(alice.id, id, "addMinute", at("2026-10-01T08:01:00Z"));
+            await clock.shiftTimer(alice.id, id, 2, at("2026-10-01T08:01:00Z"));
+            expect(told()).toBe(4);
+            await clock.changeTimer(alice.id, id, "start", at("2026-10-01T08:02:00Z"));
+            await clock.fireDueClocks(at("2026-10-01T09:00:00Z"));
+            expect(told()).toBe(6);
+            await clock.deleteTimer(bob.id, id);
+            expect(fake.deckChanges.some((change) => change.userId === bob.id)).toBe(false);
+            await clock.deleteTimer(alice.id, id);
+            expect(told()).toBe(7);
+        });
+
+        it("shifts a timer by whole minutes either way, never below a second", async () => {
+            const id = await clock.createTimer(
+                alice.id,
+                { label: "", durationMs: 5 * 60_000, sound: "chime", start: false },
+                world.NOW
+            );
+            await clock.shiftTimer(alice.id, id, -2, world.NOW);
+            expect(db.rows("clockTimer")[0]!.durationMs).toBe(3 * 60_000);
+            await clock.shiftTimer(alice.id, id, -10, world.NOW);
+            expect(db.rows("clockTimer")[0]!.durationMs).toBe(1000);
+            await clock.shiftTimer(alice.id, id, 4, world.NOW);
+            await clock.changeTimer(alice.id, id, "start", world.NOW);
+            const started = (db.rows("clockTimer")[0]!.endsAt as Date).getTime();
+            await clock.shiftTimer(alice.id, id, -1, world.NOW);
+            expect((db.rows("clockTimer")[0]!.endsAt as Date).getTime()).toBe(started - 60_000);
+            await clock.shiftTimer(alice.id, id, -60, world.NOW);
+            expect((db.rows("clockTimer")[0]!.endsAt as Date).getTime()).toBe(
+                world.NOW.getTime() + 1000
+            );
+        });
+
         it("lengthens a timer that has not started, and runs a rung one for a minute", async () => {
             const id = await clock.createTimer(
                 alice.id,

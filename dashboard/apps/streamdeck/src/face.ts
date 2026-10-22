@@ -133,7 +133,7 @@ export function runOptions(settings: KeySettings): Record<string, unknown> {
  *  it shows - so turning it does not reopen the state stream. */
 export function watchOptions(
     settings: KeySettings,
-    surface: "key" | "dial"
+    surface: "key" | "dial" | "timer"
 ): Record<string, unknown> {
     const options = runOptions(settings);
     if (surface === "dial") delete options.level;

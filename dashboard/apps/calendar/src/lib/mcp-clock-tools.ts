@@ -88,7 +88,11 @@ function timerRow(timer: model.TimerView, now: number) {
         length: model.formatCountdown(timer.durationMs),
         left: model.formatCountdown(model.timerRemaining(timer, now)),
         endsAt: timer.endsAt,
-        focus: timer.pomodoro ? timer.pomodoro.phase : null
+        focus: timer.pomodoro ? timer.pomodoro.phase : null,
+        durationMs: timer.durationMs,
+        remainingMs: model.timerRemaining(timer, now),
+        round: timer.pomodoro ? timer.pomodoro.round : null,
+        rounds: timer.pomodoro ? timer.pomodoro.rounds : null
     };
 }
 
@@ -168,7 +172,7 @@ const listTool = () =>
             ];
             return {
                 text: lines.length > 0 ? lines.join("\n") : "No alarms or timers.",
-                structured: { alarms, timers, timeZone: zone }
+                structured: { alarms, timers, timeZone: zone, serverNow: snapshot.serverNow }
             };
         }
     });
@@ -363,15 +367,30 @@ const timerStartTool = () =>
         }
     });
 
-const TIMER_ACTIONS = ["pause", "resume", "reset", "add_minute", "delete"] as const;
+const TIMER_ACTIONS = [
+    "pause",
+    "resume",
+    "reset",
+    "add_minute",
+    "shift",
+    "skip",
+    "delete"
+] as const;
 
 const timerChangeInput = z.object({
     timer: z.string().trim().min(1).max(200).describe("The timer: its id or label."),
     action: z
         .enum(TIMER_ACTIONS)
         .describe(
-            "pause or resume it; reset it to its full length, stopped; add_minute adds a minute; delete removes it."
-        )
+            "pause or resume it; reset it to its full length, stopped; add_minute adds a minute; shift adds or takes away the minutes given; skip moves a focus cycle to its next phase; delete removes it."
+        ),
+    minutes: z
+        .number()
+        .int()
+        .min(-600)
+        .max(600)
+        .optional()
+        .describe("For shift: the minutes to add, or to take away when negative.")
 });
 
 const timerChangeTool = () =>
@@ -381,7 +400,7 @@ const timerChangeTool = () =>
         title: "Pause, resume, reset or delete a timer",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Pause, resume, reset, add a minute to, or delete one of this account's timers.",
+            "Pause, resume, reset, add or take away minutes, skip a focus phase of, or delete one of this account's timers.",
         input: timerChangeInput,
         category: "calendar",
         scope: "calendar.manage",
@@ -392,6 +411,10 @@ const timerChangeTool = () =>
             const timer = timerNamed(snapshot.timers, input.timer);
             await attempt(async () => {
                 if (input.action === "delete") return clock.deleteTimer(user.id, timer.id);
+                if (input.action === "shift")
+                    return clock.shiftTimer(user.id, timer.id, input.minutes ?? 0);
+                if (input.action === "skip" && !timer.pomodoro)
+                    refuse("Only a focus cycle has phases to skip.");
                 const change: clock.TimerChange =
                     input.action === "resume"
                         ? "start"
@@ -410,6 +433,77 @@ const timerChangeTool = () =>
                       )} left.`
                     : "Deleted.",
                 structured: { id: timer.id, timer: after ? timerRow(after, Date.now()) : null }
+            };
+        }
+    });
+
+const focusStartInput = z.object({
+    label: z
+        .string()
+        .max(200)
+        .default("")
+        .describe(`What the focus cycle is for, up to ${model.CLOCK_LABEL_MAX} characters.`),
+    focus: z
+        .number()
+        .int()
+        .min(1)
+        .max(180)
+        .default(model.DEFAULT_POMODORO.focus)
+        .describe("Minutes of each focus phase."),
+    short: z
+        .number()
+        .int()
+        .min(1)
+        .max(60)
+        .default(model.DEFAULT_POMODORO.short)
+        .describe("Minutes of a short break."),
+    long: z
+        .number()
+        .int()
+        .min(1)
+        .max(120)
+        .default(model.DEFAULT_POMODORO.long)
+        .describe("Minutes of the long break."),
+    rounds: z
+        .number()
+        .int()
+        .min(2)
+        .max(12)
+        .default(model.DEFAULT_POMODORO.rounds)
+        .describe("Focus phases before the long break."),
+    auto: z
+        .boolean()
+        .default(model.DEFAULT_POMODORO.auto)
+        .describe("Whether each phase starts the next by itself.")
+});
+
+const focusStartTool = () =>
+    host.mcp.defineTool({
+        name: "clock_focus_start",
+        // i18n-ignore shown by the calling client, which has no locale to ask for
+        title: "Start a focus cycle",
+        description:
+            // i18n-ignore read by the calling model, not shown to a person
+            "Start a focus cycle (Pomodoro) now: focus phases with short breaks between them and a long break after the last round, as on the Time screen. It rings in Polaris at the end of each phase.",
+        input: focusStartInput,
+        category: "calendar",
+        scope: "calendar.manage",
+        readOnly: false,
+        destructive: false,
+        async run(input, caller) {
+            const { user } = await readerFor(caller);
+            const label = model.timerInputSchema.shape.label.safeParse(input.label);
+            if (!label.success)
+                refuse(
+                    `Check the cycle's label: it is too long. Keep it to ${model.CLOCK_LABEL_MAX} characters.`
+                );
+            const { label: _label, ...config } = input;
+            await attempt(() => clock.startFocus(user.id, config, label.data));
+            return {
+                text: `Started a focus cycle of ${input.focus} minutes${
+                    input.label ? ` "${input.label}"` : ""
+                }.`,
+                structured: { started: true }
             };
         }
     });
@@ -454,9 +548,14 @@ const clockSearch = () =>
     });
 
 export function clockMcpTools(): McpTool[] {
-    return [listTool, alarmSetTool, alarmChangeTool, timerStartTool, timerChangeTool].map((tool) =>
-        tool()
-    );
+    return [
+        listTool,
+        alarmSetTool,
+        alarmChangeTool,
+        timerStartTool,
+        timerChangeTool,
+        focusStartTool
+    ].map((tool) => tool());
 }
 
 export function clockMcpSearch(): AppHostTypes["McpSearchProvider"][] {

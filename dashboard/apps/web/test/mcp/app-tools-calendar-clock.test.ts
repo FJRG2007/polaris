@@ -21,7 +21,9 @@ const mocks = vi.hoisted(() => ({
     deleteAlarm: vi.fn(),
     createTimer: vi.fn(),
     changeTimer: vi.fn(),
-    deleteTimer: vi.fn()
+    deleteTimer: vi.fn(),
+    shiftTimer: vi.fn(),
+    startFocus: vi.fn()
 }));
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
@@ -40,7 +42,9 @@ vi.mock("@polaris-app/calendar/src/lib/clock/service", () => ({
     deleteAlarm: mocks.deleteAlarm,
     createTimer: mocks.createTimer,
     changeTimer: mocks.changeTimer,
-    deleteTimer: mocks.deleteTimer
+    deleteTimer: mocks.deleteTimer,
+    shiftTimer: mocks.shiftTimer,
+    startFocus: mocks.startFocus
 }));
 
 const { calendarExtension } = await import("@polaris-app/calendar/src/lib/calendar-extension");
@@ -229,5 +233,38 @@ describe("the timer tools", () => {
     it("resume a timer found by its label", async () => {
         await call("clock_timer_change", { timer: "tea", action: "resume" });
         expect(mocks.changeTimer).toHaveBeenCalledWith("user-1", TEA, "start");
+    });
+});
+
+describe("the timer tools a deck presses", () => {
+    it("shift a timer by the minutes given, either way", async () => {
+        await call("clock_timer_change", { timer: "tea", action: "shift", minutes: -2 });
+        expect(mocks.shiftTimer).toHaveBeenCalledWith("user-1", TEA, -2);
+    });
+
+    it("skip only a focus cycle's phase", async () => {
+        const result = await call("clock_timer_change", { timer: "tea", action: "skip" });
+        expect(result.isError).toBe(true);
+        expect(result.content[0]?.text).toContain("focus cycle");
+        expect(mocks.changeTimer).not.toHaveBeenCalled();
+    });
+
+    it("start a focus cycle with the Time screen's lengths unless told otherwise", async () => {
+        await call("clock_focus_start", { label: "Write" });
+        expect(mocks.startFocus).toHaveBeenCalledWith(
+            "user-1",
+            { focus: 25, short: 5, long: 15, rounds: 4, auto: true },
+            "Write"
+        );
+    });
+
+    it("list what a deck counts down from", async () => {
+        const result = await call("clock_list", {}, ["calendar.read"]);
+        expect(result.structuredContent.serverNow).toEqual(expect.any(String));
+        expect(result.structuredContent.timers[0]).toMatchObject({
+            id: TEA,
+            durationMs: expect.any(Number),
+            remainingMs: expect.any(Number)
+        });
     });
 });

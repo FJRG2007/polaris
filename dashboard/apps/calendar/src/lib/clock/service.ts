@@ -335,6 +335,21 @@ async function ownTimer(userId: string, id: string): Promise<TimerRow> {
     return timer;
 }
 
+/** The deck action that shows these timers on a Stream Deck or in Companion. */
+const DECK_TIMER = "calendar.timer";
+
+/** Tell this account's decks that a timer moved, so their keys show it within
+ *  a second instead of on their next reading. Best effort: a timer change
+ *  never fails because of it, and a dashboard without live decks has nobody
+ *  to tell. */
+function tellDecks(userId: string): void {
+    try {
+        void host.deckLive.deckChanged(userId, [DECK_TIMER]).catch(() => undefined);
+    } catch {
+        // No live decks on this dashboard.
+    }
+}
+
 async function roomForTimer(userId: string): Promise<void> {
     if ((await prisma.clockTimer.count({ where: { userId } })) >= model.MAX_TIMERS)
         await refusal(userId, "time.errors.tooManyTimers");
@@ -356,6 +371,7 @@ export async function createTimer(
         },
         select: { id: true }
     });
+    tellDecks(userId);
     return row.id;
 }
 
@@ -378,6 +394,7 @@ export async function startFocus(
             pomodoro: JSON.stringify(state)
         }
     });
+    tellDecks(userId);
 }
 
 /** Write a timer's new state, only if it is still the one this change read. */
@@ -442,6 +459,7 @@ export async function changeTimer(
         data = phaseAdvance(cycle, now, state === "running" || cycle.auto);
     }
     if (!(await writeTimer(userId, timer, data))) await refusal(userId, "time.errors.changed");
+    tellDecks(userId);
     // Restarting, resetting or adding a minute to a timer that is ringing - or
     // has rung - answers that ring too, wherever it is still sounding.
     const ringing =
@@ -453,8 +471,42 @@ export async function changeTimer(
     if (ringing) await noteStopped("timer", userId, id, ringing);
 }
 
+/**
+ * Move a timer by whole minutes, either way, as a dial turned on a deck does:
+ * a running or paused one gains or loses time left, one that has not started
+ * gets a longer or shorter length, and one that rang counts down again only
+ * when time is added. Never below a second left, never past the longest timer.
+ */
+export async function shiftTimer(
+    userId: string,
+    id: string,
+    minutes: number,
+    now = new Date()
+): Promise<void> {
+    if (!Number.isInteger(minutes) || minutes === 0) return;
+    const timer = await ownTimer(userId, id);
+    const at = now.getTime();
+    const delta = minutes * 60_000;
+    const state = model.timerState(timer);
+    const bound = (ms: number) => Math.min(model.CLOCK_TIMER_MAX_MS, Math.max(1000, ms));
+    let data: Partial<Omit<TimerRow, "id">>;
+    if (state === "running") {
+        const left = model.timerRemaining(timer, at);
+        if (left <= 0) return;
+        data = { endsAt: new Date(at + bound(left + delta)) };
+    } else if (state === "paused") data = { remainingMs: bound(timer.remainingMs! + delta) };
+    else if (state === "rung") {
+        if (delta < 0) return;
+        data = { endsAt: new Date(at + bound(delta)), firedAt: null, remainingMs: null };
+    } else data = { durationMs: bound(timer.durationMs + delta) };
+    if (!(await writeTimer(userId, timer, data))) await refusal(userId, "time.errors.changed");
+    tellDecks(userId);
+    if (state === "rung" && timer.firedAt) await noteStopped("timer", userId, id, timer.firedAt);
+}
+
 export async function deleteTimer(userId: string, id: string): Promise<void> {
-    await prisma.clockTimer.deleteMany({ where: { id, userId } });
+    const removed = await prisma.clockTimer.deleteMany({ where: { id, userId } });
+    if (removed.count > 0) tellDecks(userId);
 }
 
 /** A focus cycle moved to its next phase at `from`: counting already when it
@@ -506,7 +558,8 @@ export async function dismissTimer(
         timer.endsAt !== null &&
         timer.endsAt.getTime() <= now.getTime() &&
         (!due || timer.endsAt.getTime() === due.getTime());
-    if (ended) await writeTimer(userId, timer, afterRing(timer, timer.endsAt!, now));
+    if (ended && (await writeTimer(userId, timer, afterRing(timer, timer.endsAt!, now))))
+        tellDecks(userId);
     const rung = due ?? (ended ? timer.endsAt : null);
     if (rung) await noteStopped("timer", userId, id, rung);
 }
@@ -627,6 +680,7 @@ export async function fireDueClocks(now = new Date()): Promise<{ rung: number; l
             data: afterRing(timer, due, now)
         });
         if (claimed.count === 0) continue;
+        tellDecks(timer.userId);
         if (now.getTime() - due.getTime() > STALE_MS) {
             late += 1;
             continue;

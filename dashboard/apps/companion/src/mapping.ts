@@ -16,14 +16,24 @@
  * - a `live` entry that needs nothing to be picked is also a variable, watched
  *   all the time, so `$(polaris:chat_unread)` works on any button;
  * - `open` entries are left out: they open a page in a browser, and the
- *   computer Companion runs on is often not the one in front of anybody.
+ *   computer Companion runs on is often not the one in front of anybody;
+ * - Calendar's timer is left out too: it has buttons of its own (`timers.ts`)
+ *   that count down every second and can also keep a timer on this machine.
  */
 
+import { CALENDAR_TIMER } from "../../streamdeck/src/polaris-timer";
 import type { DeckAction, DeckField, DeckState } from "../../streamdeck/src/polaris";
 
 /** A field as Companion draws it. A structural subset of the SDK's input
  *  fields, so this file needs no SDK and the tests need no Companion. */
-export type OptionField =
+export type OptionField = Field & {
+    /** When it shows, from the other options. */
+    readonly isVisibleExpression?: string;
+    /** For a field another one's visibility reads: it cannot be an expression. */
+    readonly disableAutoExpression?: boolean;
+};
+
+type Field =
     | {
           readonly type: "textinput";
           readonly id: string;
@@ -70,14 +80,19 @@ export function companionId(deckId: string): string {
  *  among them: a Companion button has no second press to ask for, and a
  *  trigger or a page change would run it unseen. */
 export function runnable(catalogue: readonly DeckAction[]): DeckAction[] {
-    return catalogue.filter(
+    return generic(catalogue).filter(
         (entry) => entry.kind !== "open" && entry.kind !== "state" && !entry.confirm
     );
 }
 
 /** The entries Polaris streams a state for. */
 export function watchable(catalogue: readonly DeckAction[]): DeckAction[] {
-    return catalogue.filter((entry) => entry.live && entry.kind !== "open");
+    return generic(catalogue).filter((entry) => entry.live && entry.kind !== "open");
+}
+
+/** The entries made into buttons here one for one: all but the timer. */
+function generic(catalogue: readonly DeckAction[]): DeckAction[] {
+    return catalogue.filter((entry) => entry.id !== CALENDAR_TIMER);
 }
 
 /** A live entry needs nothing picked, so its state can be a variable. */
@@ -325,7 +340,7 @@ export interface PresetSpec {
  */
 export function presetSpecs(catalogue: readonly DeckAction[]): PresetSpec[] {
     const specs: PresetSpec[] = [];
-    for (const entry of catalogue) {
+    for (const entry of generic(catalogue)) {
         if (entry.kind === "open" || !standalone(entry)) continue;
         const options = defaults(entry);
         if (entry.kind === "dial") options[LEVEL_OPTION] = 50;
