@@ -117,9 +117,7 @@ export const cameraSwitchSchema = z
         recording: z.enum(RECORDING_MODES).optional()
     })
     .strict()
-    .refine((value) => value.enabled !== undefined || value.recording !== undefined, {
-        message: "Nothing to change"
-    });
+    .refine((value) => value.enabled !== undefined || value.recording !== undefined);
 
 export type CameraSwitch = z.infer<typeof cameraSwitchSchema>;
 
