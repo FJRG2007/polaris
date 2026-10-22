@@ -60,6 +60,8 @@ export interface RemoteControls {
     readonly canRecord: boolean;
     /** Whether this tab is sharing its screen. Absent is not sharing. */
     readonly sharing?: boolean;
+    /** Whether this browser can share a screen at all. Absent is that it can. */
+    readonly canShare?: boolean;
 }
 
 export type RemoteStep =
@@ -95,6 +97,7 @@ export function remoteStep(command: CallRemoteCommand, now: RemoteControls): Rem
             return command.on ? "startRecording" : "stopRecording";
         case "share":
             if (command.on === Boolean(now.sharing)) return null;
+            if (command.on && now.canShare === false) return null;
             return command.on ? "startShare" : "stopShare";
         case "hangup":
             return "hangup";

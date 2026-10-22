@@ -19,6 +19,7 @@ import { useEffect, useRef } from "react";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { askToShare, clearShareAsk } from "./call-share-ask";
+import { canShareScreen } from "./call-media";
 import type { CallState } from "./call-state";
 import { playClip } from "./soundboard-player";
 import * as rules from "@/lib/chat/soundboard";
@@ -46,7 +47,8 @@ export function useCallRemote(
                 cameraOn: now.cameraOn,
                 recording: recorder.running,
                 canRecord: recorder.supported,
-                sharing: now.sharing
+                sharing: now.sharing,
+                canShare: canShareScreen()
             });
             if (step === "toggleMic") now.toggleMic();
             else if (step === "toggleDeafen") now.toggleDeafen();

@@ -14,6 +14,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /** Every element the player made, in order. */
 let made: FakeAudio[] = [];
 
+/** Whether the browser lets an element play. */
+let playable = true;
+
 class FakeAudio {
     src: string;
     volume = 1;
@@ -28,6 +31,7 @@ class FakeAudio {
         this.handlers.set(name, handler);
     }
     play() {
+        if (!playable) return Promise.reject(new Error("NotAllowedError"));
         this.paused = false;
         return Promise.resolve();
     }
@@ -47,6 +51,7 @@ let player: typeof import("@/app/(app)/chat/soundboard-player");
 
 beforeEach(async () => {
     made = [];
+    playable = true;
     vi.resetModules();
     vi.stubGlobal("Audio", FakeAudio);
     vi.stubGlobal(
@@ -108,5 +113,27 @@ describe("pressing a sound", () => {
         await settle();
         expect(vi.mocked(fetch).mock.calls.length).toBe(fetched);
         expect(made[0]?.paused).toBe(false);
+    });
+
+    it("lets the room's copy play when the press could not sound here", async () => {
+        playable = false;
+        player.playOwnClip(REF, { volume: 1, channel: SELF });
+        await settle();
+        expect(player.clipsPlaying(SELF)).toBe(false);
+        expect(player.ownEcho(SELF, REF)).toBe(false);
+    });
+
+    it("gives two plays of one sound an element each", async () => {
+        player.warmClips([REF]);
+        await settle();
+        void player.playClip(REF, { volume: 1, channel: SELF });
+        void player.playClip(REF, { volume: 1, channel: OTHER });
+        await settle();
+        const playing = made.filter((element) => !element.paused);
+        expect(playing).toHaveLength(2);
+        expect(playing[0]).not.toBe(playing[1]);
+        player.stopClips(SELF);
+        expect(player.clipsPlaying(OTHER)).toBe(true);
+        expect(made.filter((element) => !element.paused)).toHaveLength(1);
     });
 });

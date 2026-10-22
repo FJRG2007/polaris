@@ -19,13 +19,18 @@ const mocks = vi.hoisted(() => ({
     ask: vi.fn(),
     clear: vi.fn(),
     notify: vi.fn(async () => null),
-    watched: true
+    watched: true,
+    shareable: true
 }));
 
 vi.mock("@/app/(app)/chat/call-seat", () => ({ keepSeat: async () => undefined }));
 vi.mock("@/app/(app)/chat/call-share-ask", () => ({
     askToShare: mocks.ask,
     clearShareAsk: mocks.clear
+}));
+vi.mock("@/app/(app)/chat/call-media", async (original) => ({
+    ...(await original<typeof import("@/app/(app)/chat/call-media")>()),
+    canShareScreen: () => mocks.shareable
 }));
 vi.mock("@/lib/desktop-notify", () => ({
     notifyDesktop: mocks.notify,
@@ -59,6 +64,7 @@ afterEach(() => {
     cleanup();
     vi.clearAllMocks();
     mocks.watched = true;
+    mocks.shareable = true;
 });
 
 describe("the share key in the tab", () => {
@@ -78,6 +84,16 @@ describe("the share key in the tab", () => {
         expect(mocks.notify).toHaveBeenCalledWith(
             expect.objectContaining({ tag: `call-share-${MEETING}` })
         );
+    });
+
+    it("marks nothing where this browser cannot share a screen", () => {
+        mocks.shareable = false;
+        mocks.watched = false;
+        const toggleShare = mount(false);
+        act(() => emitCallRemote({ command: "share", on: true }));
+        expect(mocks.ask).not.toHaveBeenCalled();
+        expect(mocks.notify).not.toHaveBeenCalled();
+        expect(toggleShare).not.toHaveBeenCalled();
     });
 
     it("stops a running share at once", () => {

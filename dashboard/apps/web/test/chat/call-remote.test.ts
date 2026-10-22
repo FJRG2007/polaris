@@ -51,6 +51,13 @@ describe("remoteStep", () => {
         expect(remoteStep({ command: "share", on: true }, sharing)).toBeNull();
     });
 
+    it("never asks to share where this browser cannot, and still stops one", () => {
+        expect(remoteStep({ command: "share", on: true }, { ...IDLE, canShare: false })).toBeNull();
+        expect(
+            remoteStep({ command: "share", on: false }, { ...IDLE, sharing: true, canShare: false })
+        ).toBe("stopShare");
+    });
+
     it("starts and stops recording, and never starts where it cannot record", () => {
         expect(remoteStep({ command: "record", on: true }, IDLE)).toBe("startRecording");
         expect(remoteStep({ command: "record", on: false }, { ...IDLE, recording: true })).toBe(

@@ -102,9 +102,10 @@ function prepare(ref: string, src: string): Promise<HTMLAudioElement> {
 
 /** The ready element for a clip, handed over once; the next one is made behind it. */
 async function take(ref: string, src: string): Promise<HTMLAudioElement> {
-    const element = await prepare(ref, src);
+    const made = prepare(ref, src);
     ready.delete(ref);
     void prepare(ref, src);
+    const element = await made;
     // The speaker was changed since it was made: moved now, before it plays.
     const chosen = speakerDevice();
     const sink = (element as Routed).sinkId;
@@ -175,8 +176,13 @@ async function start(
     };
     element.addEventListener("ended", done);
     element.addEventListener("error", done);
-    await element.play().catch(() => undefined);
-    return element;
+    const played = await element.play().then(
+        () => true,
+        () => false
+    );
+    if (played) return element;
+    done();
+    return null;
 }
 
 /**
@@ -202,8 +208,13 @@ export function playOwnClip(
     { volume, channel }: { volume: number; channel: string }
 ): { readonly settle: () => void; readonly undo: () => void } {
     const key = echoKey(channel, ref);
-    echoes.set(key, Date.now() + ECHO_MS);
+    const until = Date.now() + ECHO_MS;
+    echoes.set(key, until);
     const started = start(ref, { volume, channel }).catch(() => null);
+    // Nothing sounded here, so the room's copy is what the reader hears.
+    void started.then((element) => {
+        if (!element && echoes.get(key) === until) echoes.delete(key);
+    });
     return {
         // Nobody else is connected, so no copy is coming back.
         settle: () => echoes.delete(key),
