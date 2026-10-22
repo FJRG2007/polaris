@@ -706,7 +706,8 @@
         "floorGone": "Planta inexistente",
         "floorElsewhere": "Esa planta es de otro sitio",
         "floorTaken": "Ya hay una planta con ese nombre",
-        "notOnEarth": "Eso no es un lugar de la Tierra."
+        "notOnEarth": "Eso no es un lugar de la Tierra.",
+        "batteryLine": "Entre 1 y 99"
     },
     "connections": {
         "nuki-web": {
@@ -1748,7 +1749,8 @@
         "filterSoon": "Filtro: cambiar pronto",
         "filterNow": "Cambiar filtro",
         "connectLocally": "Conectar {name} en local",
-        "accountSettings": "Ajustes de {name}"
+        "accountSettings": "Ajustes de {name}",
+        "batteryLowTitle": "Batería al {percent}% o menos"
     },
     "devicePanel": {
         "watchOnly": "Configurado para vigilarse, no para manejarse.",
@@ -1756,7 +1758,7 @@
         "firmware": "firmware {version}",
         "battery": "batería {percent} %",
         "readAt": "leído a las {time}",
-        "batteryLow": "La batería está casi agotada. Cuando se acabe dejará de responder y lo que hace habrá que hacerlo a mano.",
+        "batteryLow": "La batería está baja. Cuando se acabe dejará de responder y lo que hace habrá que hacerlo a mano.",
         "usage": "Veces usado, últimos {days} días",
         "failed": "No ha funcionado.",
         "edit": "Editar",
@@ -1844,7 +1846,8 @@
             "dumpBody": "El arenero vuelca toda la arena en su cubo de residuos. Tendrás que rellenarlo antes de que tu gato pueda volver a usarlo.",
             "dumpConfirm": "Vaciar arena",
             "cancel": "Cancelar"
-        }
+        },
+        "batteryLine": "baja al {percent}%"
     },
     "roomsDialog": {
         "title": "Salas y plantas",
@@ -1897,7 +1900,10 @@
         "roomName": "Nombre",
         "roomNamePlaceholder": "Cocina",
         "floor": "Planta",
-        "floorPlaceholder": "Planta baja"
+        "floorPlaceholder": "Planta baja",
+        "batteryLine": "Batería baja al",
+        "batteryLineHint": "Con esta carga o menos su batería cuenta como baja, para automatizaciones y el resumen. Déjalo vacío para usar {percent}%, el valor por defecto de este tipo.",
+        "batteryLineFlag": "El dispositivo también avisa él mismo de batería baja, y eso cuenta diga lo que diga esto."
     },
     "connect": {
         "reconnectTitle": "Reconectar {name}",
@@ -2614,7 +2620,7 @@
                     "unlocked": "Cuando una cerradura dice que está abierta.",
                     "motion": "Cuando un sensor de movimiento lo detecta.",
                     "still": "Cuando un sensor de movimiento deja de verlo.",
-                    "batteryLow": "Cuando un dispositivo avisa de batería baja, o baja al 20% o menos.",
+                    "batteryLow": "Cuando una batería baja al nivel de su dispositivo, fijado en sus ajustes, o el dispositivo avisa de que está baja.",
                     "unavailable": "Cuando ya no se puede llegar a un dispositivo."
                 },
                 "condition": {
@@ -2635,7 +2641,10 @@
         },
         "battery": {
             "low": "Baja",
-            "ok": "Bien"
+            "ok": "Bien",
+            "lowAt": "Baja (al {percent}% o menos)",
+            "lowAtOrFlag": "Baja (al {percent}% o menos, o cuando el propio dispositivo lo avise)",
+            "okOver": "Bien (más del {percent}%)"
         },
         "start": {
             "title": "Nueva automatización",

@@ -57,13 +57,70 @@ export const AVAILABILITY_WORDS = ["online", "offline"] as const;
 export const BATTERY_WORDS = ["low", "ok"] as const;
 
 /** At or under this share a battery reads as low, unless its own maker says
- *  so first. */
+ *  so first - for a kind with no line of its own below. */
 export const BATTERY_LOW_PERCENT = 20;
 
-/** What a device says about its battery, where it has one. */
+/** The line somebody can set on one device, as both sides of the wire check it. */
+export const BATTERY_LINE_LIMITS = { min: 1, max: 99 } as const;
+
+/**
+ * The line per kind of device, where a flat battery costs more than on most.
+ * Nuki raise their own critical flag and warn in their app under 20%
+ * (help.nuki.io/hc/articles/360015883057), so a lock or an opener is called low
+ * at 30%, to warn with room to spare before theirs does. A smoke, gas or
+ * leak sensor gets the same margin, by our choice: it is the one nobody notices
+ * has gone quiet. A remote or a wall button costs nothing to let run down, so it
+ * waits until 15%, the line IKEA hub devices were flagged at before this.
+ */
+const KIND_LINES: Partial<Readonly<Record<DeviceKind, number>>> = {
+    lock: 30,
+    opener: 30,
+    switch: 15
+};
+
+/** The safety sensors, by the words their drivers read them in. */
+const SAFETY_READINGS: readonly string[] = ["Smoke", "Gas", "Wet", "Dry", "Clear"];
+
+/** What a device says about its battery, where it has one, and what decides
+ *  the line it is read against. */
 export interface BatteryReport {
     readonly batteryPercent?: number | null;
     readonly batteryCritical?: boolean;
+    readonly kind?: string;
+    readonly vendor?: string;
+    readonly reading?: { readonly value: string } | null;
+    /** The line set on this device, or null/absent for its kind's. */
+    readonly batteryLowPercent?: number | null;
+}
+
+/** The line a device's kind is read against when nobody has set one on it. */
+export function defaultBatteryLine(device: BatteryReport): number {
+    if (!device.kind) return BATTERY_LOW_PERCENT;
+    const kind = kinds.deviceKind(device.kind);
+    if (kind === "sensor" && SAFETY_READINGS.includes(device.reading?.value ?? ""))
+        return 30;
+    return KIND_LINES[kind] ?? BATTERY_LOW_PERCENT;
+}
+
+function validLine(value: number | null | undefined): value is number {
+    return (
+        typeof value === "number" &&
+        Number.isInteger(value) &&
+        value >= BATTERY_LINE_LIMITS.min &&
+        value <= BATTERY_LINE_LIMITS.max
+    );
+}
+
+/** At or under this share the device's battery reads as low: its own line, or
+ *  its kind's. */
+export function batteryLine(device: BatteryReport): number {
+    return validLine(device.batteryLowPercent) ? device.batteryLowPercent : defaultBatteryLine(device);
+}
+
+/** Whether the device's maker raises a critical flag of its own, which counts as
+ *  low whatever the share says. Only Nuki does, of the makes read here. */
+export function makerFlagsBattery(vendor: string | undefined): boolean {
+    return vendor === "nuki" || vendor?.startsWith("nuki-") === true;
 }
 
 /** A battery's word - low or ok - or empty for a device that reports none. */
@@ -71,7 +128,12 @@ export function batteryWord(device: BatteryReport): string {
     if (device.batteryCritical) return "low";
     const percent = device.batteryPercent;
     if (typeof percent !== "number" || !Number.isFinite(percent)) return "";
-    return percent <= BATTERY_LOW_PERCENT ? "low" : "ok";
+    return percent <= batteryLine(device) ? "low" : "ok";
+}
+
+/** Whether a device's battery is low, by the same line automations use. */
+export function batteryLow(device: BatteryReport): boolean {
+    return batteryWord(device) === "low";
 }
 
 export function hasBattery(device: BatteryReport): boolean {

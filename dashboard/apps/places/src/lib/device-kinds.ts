@@ -837,6 +837,9 @@ export interface DeviceView {
     readonly doorState: DoorState;
     readonly batteryPercent: number | null;
     readonly batteryCritical: boolean;
+    /** Where its battery reads as low, set on this device. Null, or absent, is
+     *  its kind's line (`batteryLine` in automation-kinds). */
+    readonly batteryLowPercent?: number | null;
     readonly online: boolean;
     readonly controllable: boolean;
     /** What it last read, for a device that measures rather than does. Null for
