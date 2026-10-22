@@ -137,7 +137,10 @@ export function AttachmentSection({
                     className="w-full px-3 py-4 text-center text-xs text-muted-foreground hover:text-foreground"
                 >
                     {busy ? (
-                        <Loader2 className="mx-auto mb-1 size-4 animate-spin opacity-60" aria-hidden />
+                        <Loader2
+                            className="mx-auto mb-1 size-4 animate-spin opacity-60"
+                            aria-hidden
+                        />
                     ) : (
                         <Upload className="mx-auto mb-1 size-4 opacity-60" aria-hidden />
                     )}

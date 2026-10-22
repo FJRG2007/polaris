@@ -222,7 +222,9 @@ describe("an update waiting stays off the bell", () => {
         const deploymentWide = () =>
             notificationDeleteMany.mock.calls
                 .map(([input]) => input as unknown as MarkRead)
-                .filter((call) => call.where.type.in.includes("system.update") && !call.where.userId);
+                .filter(
+                    (call) => call.where.type.in.includes("system.update") && !call.where.userId
+                );
         await fresh.checkForUpdate();
         expect(deploymentWide()).toHaveLength(1);
         await fresh.checkForUpdate();

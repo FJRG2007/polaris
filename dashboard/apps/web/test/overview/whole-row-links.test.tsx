@@ -46,7 +46,15 @@ describe("overview rows are whole links", () => {
     it("makes a Storage row one link holding its name and its bar", () => {
         render(
             <StorageWidget
-                data={[{ id: "d1", name: "NAS", usedBytes: 50, totalBytes: 100, href: "/drive/overview" }]}
+                data={[
+                    {
+                        id: "d1",
+                        name: "NAS",
+                        usedBytes: 50,
+                        totalBytes: 100,
+                        href: "/drive/overview"
+                    }
+                ]}
             />,
             { wrapper: MessagesWrapper }
         );

@@ -42,9 +42,18 @@ export function WidgetCard({
     return (
         <Card className="group/card flex h-full min-w-0 flex-col">
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-                {grip ? <span className="opacity-0 transition-opacity group-hover/card:opacity-100 focus-within:opacity-100 -ml-1.5">{grip}</span> : null}
+                {grip ? (
+                    <span className="opacity-0 transition-opacity group-hover/card:opacity-100 focus-within:opacity-100 -ml-1.5">
+                        {grip}
+                    </span>
+                ) : null}
                 <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <h2 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight" title={title}>{title}</h2>
+                <h2
+                    className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight"
+                    title={title}
+                >
+                    {title}
+                </h2>
                 {hint}
                 {href ? (
                     <Link
@@ -106,7 +115,13 @@ const STATE_TONE = {
 } as const;
 
 export function StateDot({ state, label }: { state: keyof typeof STATE_TONE; label: string }) {
-    return <span className={cn("size-2 shrink-0 rounded-full", STATE_TONE[state])} title={label} aria-label={label} />;
+    return (
+        <span
+            className={cn("size-2 shrink-0 rounded-full", STATE_TONE[state])}
+            title={label}
+            aria-label={label}
+        />
+    );
 }
 
 /** One line of a list card: something, where it is, and somewhere to go. */
@@ -135,8 +150,14 @@ export function WidgetRow({
             >
                 {icon}
                 <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm" title={label}>{label}</span>
-                    {detail ? <span className="truncate text-xs text-muted-foreground" title={detail}>{detail}</span> : null}
+                    <span className="truncate text-sm" title={label}>
+                        {label}
+                    </span>
+                    {detail ? (
+                        <span className="truncate text-xs text-muted-foreground" title={detail}>
+                            {detail}
+                        </span>
+                    ) : null}
                 </span>
                 {trailing}
             </Link>

@@ -62,11 +62,13 @@ function props(overrides: Partial<ViewProps> = {}): ViewProps {
 }
 
 function render(overrides: Partial<ViewProps> = {}): string {
-    return renderToStaticMarkup(withMessages(
-        <DisplayFormatProvider preferences={DISPLAY_DEFAULTS}>
-            <BoardView {...props(overrides)} />
-        </DisplayFormatProvider>
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <DisplayFormatProvider preferences={DISPLAY_DEFAULTS}>
+                <BoardView {...props(overrides)} />
+            </DisplayFormatProvider>
+        )
+    );
 }
 
 /** A board whose columns may be reshaped, removed and reordered. */

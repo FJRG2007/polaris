@@ -215,7 +215,9 @@ describe("reaching the page", () => {
     });
 
     it("leaves shared links in the Drive rail", () => {
-        const entry = (APP_SECTIONS.drive ?? []).find((section) => section.href === "/drive/shared-links");
+        const entry = (APP_SECTIONS.drive ?? []).find(
+            (section) => section.href === "/drive/shared-links"
+        );
         expect(entry?.label).toBe("Shared links");
     });
 

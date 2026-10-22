@@ -59,7 +59,8 @@ export function DropZone({
             onDrop={(event) => {
                 event.preventDefault();
                 setOver(false);
-                if (!disabled && event.dataTransfer.files.length > 0) onFiles(event.dataTransfer.files);
+                if (!disabled && event.dataTransfer.files.length > 0)
+                    onFiles(event.dataTransfer.files);
             }}
             className={cn(
                 "rounded-md border border-dashed border-border transition-colors hover:border-border-strong hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-60",

@@ -176,7 +176,10 @@ export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
         <ul className="-mx-2 flex flex-col gap-1">
             {data.map((server) => (
                 <li key={server.id}>
-                    <Link href={server.href} className="flex flex-col gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Link
+                        href={server.href}
+                        className="flex flex-col gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
                         <div className="flex items-baseline justify-between gap-2">
                             <span className="min-w-0 truncate text-sm" title={server.name}>
                                 {server.name}
@@ -187,7 +190,9 @@ export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
                                     loadTone(server.cpuPercent)
                                 )}
                             >
-                                {server.cpuPercent == null ? "-" : `${Math.round(server.cpuPercent)}%`}
+                                {server.cpuPercent == null
+                                    ? "-"
+                                    : `${Math.round(server.cpuPercent)}%`}
                             </span>
                         </div>
                         <Sparkline values={server.spark} tone={loadTone(server.cpuPercent)} />
@@ -314,7 +319,10 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
                         : Math.min(100, Math.round((device.usedBytes / device.totalBytes) * 100));
                 return (
                     <li key={device.id}>
-                        <Link href={device.href} className="flex flex-col gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <Link
+                            href={device.href}
+                            className="flex flex-col gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
                             <div className="flex items-baseline justify-between gap-2">
                                 <span className="min-w-0 truncate text-sm" title={device.name}>
                                     {device.name}

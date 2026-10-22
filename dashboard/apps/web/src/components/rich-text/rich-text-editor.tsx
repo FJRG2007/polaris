@@ -537,7 +537,11 @@ export function RichTextEditor({
 
     if (!editor) {
         // The same box, before the view exists, so nothing jumps when it does.
-        return <div className={cn(surfaceClass(bordered, framed, disabled), "min-h-[3rem]", className)} />;
+        return (
+            <div
+                className={cn(surfaceClass(bordered, framed, disabled), "min-h-[3rem]", className)}
+            />
+        );
     }
 
     // A surface nobody may write in keeps the browser's menu: every item this
@@ -600,11 +604,11 @@ function surfaceClass(bordered: boolean, framed: boolean, disabled: boolean): st
             : framed
               ? ""
               : // Camouflaged until you point at it, and plain again once the caret
-              // is in: the tint says "this is editable", and once you are editing
-              // it is only a box around what you are writing. Written as one
-              // selector rather than hover plus focus-within, which are the same
-              // specificity and would resolve by stylesheet order.
-              "-mx-2 rounded-md px-2 py-1 transition-colors [&:not(:focus-within):hover]:bg-muted/40",
+                // is in: the tint says "this is editable", and once you are editing
+                // it is only a box around what you are writing. Written as one
+                // selector rather than hover plus focus-within, which are the same
+                // specificity and would resolve by stylesheet order.
+                "-mx-2 rounded-md px-2 py-1 transition-colors [&:not(:focus-within):hover]:bg-muted/40",
         disabled && "cursor-default opacity-70",
         disabled && !framed && "[&:not(:focus-within):hover]:bg-transparent"
     );
