@@ -193,8 +193,109 @@ const readDevice = {
     input: (options: Record<string, unknown>) => ({ deviceId: options.deviceId })
 };
 
+const naturalRows = z.object({
+    devices: z.array(
+        z
+            .object({
+                kind: z.string().nullish(),
+                state: z.string().nullish(),
+                online: z.boolean(),
+                actions: z.array(z.string()),
+                climate: z.object({ target: z.number().nullable() }).passthrough().nullish()
+            })
+            .passthrough()
+    )
+});
+
+/** The icon a device kind is drawn with on a key. */
+const KIND_ICONS: Readonly<Record<string, string>> = {
+    light: "lightbulb",
+    switch: "zap",
+    outlet: "plug",
+    climate: "snowflake",
+    air: "fan",
+    lock: "lock",
+    opener: "door-open",
+    appliance: "power"
+};
+
+/**
+ * What pressing a device's own key does: what its owner would mean by it. On
+ * and off flips; a door opens - the Open button, which unlocks and pulls the
+ * latch; a lock with no latch to pull locks or unlocks. Null for a device that
+ * takes none of those, which a key has nothing natural to do with.
+ */
+export function naturalAction(device: {
+    readonly state?: string | null;
+    readonly actions: readonly string[];
+}): string | null {
+    const takes = (action: string) => device.actions.includes(action);
+    if (takes("turn-on") && takes("turn-off")) return device.state === "on" ? "turn-off" : "turn-on";
+    if (takes("open")) return "open";
+    if (takes("lock") && takes("unlock")) return device.state === "locked" ? "unlock" : "lock";
+    return null;
+}
+
+/** A device on its own key: its kind's icon, on or off, the bolt of a lock and
+ *  the temperature an air conditioner is set to. */
+export function naturalState(structured: unknown, locale: Locale) {
+    const parsed = naturalRows.safeParse(structured);
+    const device = parsed.success ? parsed.data.devices[0] : undefined;
+    if (!device) return { tone: "idle" as const };
+    const icon = KIND_ICONS[device.kind ?? ""] ?? "power";
+    if (!device.online) return { tone: "bad" as const, icon, detail: OFFLINE[locale] };
+    if (device.state === "locked" || device.state === "unlocked") {
+        const locked = device.state === "locked";
+        return {
+            tone: locked ? ("ok" as const) : ("warn" as const),
+            on: locked,
+            icon: locked ? "lock" : "lock-open",
+            detail: BOLT[device.state][locale]
+        };
+    }
+    const on = device.state === "on";
+    const target = device.climate?.target;
+    return {
+        tone: on ? ("ok" as const) : ("idle" as const),
+        on,
+        icon,
+        ...(on && typeof target === "number" ? { value: `${target}°` } : {})
+    };
+}
+
 export function placesDeckActions(): readonly AppDeckAction[] {
     return [
+        {
+            id: "places.device",
+            kind: "toggle",
+            area: "places",
+            icon: "house",
+            label: { "en-US": "A device, its own key", "es-ES": "Un aparato, su tecla" },
+            scope: "home.control",
+            options: z.object({ deviceId: z.string().uuid() }),
+            fields: [
+                {
+                    name: "deviceId",
+                    type: "choice",
+                    label: { "en-US": "Device", "es-ES": "Dispositivo" },
+                    required: true,
+                    choices: { tool: "places_devices", input: {}, pick: operableDevices }
+                }
+            ],
+            // What it does is read from the device on every press, so a light
+            // turns off when it is on and a door opens, whatever the key last
+            // showed. The tool checks the person may work it, as the panel does.
+            run: {
+                tool: "places_device_control",
+                input: (options, press) => {
+                    const parsed = naturalRows.safeParse(press.read);
+                    const device = parsed.success ? parsed.data.devices[0] : undefined;
+                    const action = device ? naturalAction(device) : null;
+                    return action ? { deviceId: options.deviceId, action } : null;
+                }
+            },
+            read: { ...readDevice, pick: naturalState }
+        },
         {
             id: "places.door",
             kind: "run",
