@@ -24,7 +24,9 @@ import {
     isReleaseImage,
     parseReclaimedBytes,
     quoteArg,
+    releaseContainersFromPs,
     renderComposeYaml,
+    RELEASE_PS_FORMAT,
     type BuildRequest,
     type ComposeSpec,
     type ExecResult,
@@ -33,6 +35,7 @@ import {
     type LogOptions,
     type MountTarget,
     type OutputSink,
+    type ReleaseContainer,
     type RuntimePorts,
     type WorldTrimOptions
 } from "@polaris/deploy";
@@ -574,6 +577,20 @@ export class SshPorts implements RuntimePorts {
 
     /** `docker ps` by the compose and swarm labels, names only. The project name
      *  is quoted like every other value that reaches the remote shell. */
+    public async releaseContainers(): Promise<ReleaseContainer[]> {
+        let out = "";
+        await this.run(`docker ps -a --no-trunc --format ${quoteArg(RELEASE_PS_FORMAT)}`, (chunk) => {
+            out += chunk.toString("utf8");
+        });
+        return releaseContainersFromPs(out);
+    }
+
+    /** `rm -f` stops a running one first; without `-v`, so no volume goes with it. */
+    public async removeContainer(id: string): Promise<void> {
+        if (!/^[0-9a-f]{12,64}$/.test(id)) throw new Error("not a container id");
+        await this.run(`docker rm -f ${quoteArg(id)}`);
+    }
+
     public async listContainers(project: string): Promise<string[]> {
         const names = new Set<string>();
         for (const label of [

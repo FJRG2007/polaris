@@ -101,6 +101,7 @@ import {
     githubTokenForOwner
 } from "./github-access";
 import * as deployReleases from "./deploy/releases";
+import { downSupersededReleases } from "./deploy/release-sweep";
 import {
     ROLLBACK_WINDOW,
     machineOfTarget,
@@ -130,6 +131,8 @@ import {
     isReleaseImage,
     normalizeRoot,
     releaseImage,
+    removalPlan,
+    supersededContainers,
     normalizeZoneName,
     parseHttpLogs,
     privateDomain,
@@ -5470,6 +5473,11 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
  *  drain and retire, never `retireHeldReleases`'. */
 const promoting = new Set<string>();
 
+/** Whether a promotion is under way for a service, so a sweep leaves it alone. */
+export function releaseBusy(applicationId: string): boolean {
+    return promoting.has(applicationId);
+}
+
 async function promoteRelease(
     deploymentId: string,
     dep: { readonly deployableId: string }
@@ -5744,26 +5752,43 @@ async function retireReplaced(
     if (!app) return;
     const serving = await deployReleases.currentReleaseRef(app);
     const base = deployReleases.serviceRef(app.environment.project.slug, app.slug, app.id);
+    // A service that keeps its releases keeps them; only a change-over copy
+    // beside them goes.
+    const retiring = replaced.filter((row) => !app.keepReleases || row.cutover);
     const projects = new Set(
-        replaced.flatMap((row) =>
-            // A service that keeps its releases keeps them; only a change-over copy
-            // beside them goes.
-            app.keepReleases && !row.cutover
-                ? []
-                : [
-                      row.isolated
-                          ? deployReleases.releaseRef(base, deployReleases.markerOf(row)).project
-                          : base.project
-                  ]
+        retiring.map((row) =>
+            row.isolated
+                ? deployReleases.releaseRef(base, deployReleases.markerOf(row)).project
+                : base.project
         )
     );
     // Whatever resolves to what is serving now stays - an ordinary redeploy in
     // place replaces the project it came from.
     projects.delete(serving.project);
-    if (projects.size === 0) return;
+    if (projects.size === 0 && retiring.length === 0) return;
+    const swarm = app.target.runtime === "swarm";
     const ports = await getPorts(app.target as TargetRow, app.environment.project.ownerId);
     try {
-        for (const project of projects) await ports.composeDown(project).catch(() => undefined);
+        for (const project of projects) {
+            await (swarm ? ports.stackDown(project) : ports.composeDown(project)).catch(
+                (error: unknown) => {
+                    console.error(`polaris: could not take ${project} down by name:`, error);
+                }
+            );
+        }
+        // The names above are worked out again from the rows, and taken down
+        // through the compose file kept for each. A release created under another
+        // shape - the service's own project from before releases had their own -
+        // or one whose file no longer names its container survives that, still
+        // serving beside the new one. The engine's labels find it whatever it is
+        // called.
+        await downSupersededReleases(
+            app,
+            ports,
+            retiring.map((row) => row.id)
+        ).catch((error: unknown) => {
+            console.error("polaris: could not list the replaced release's containers:", error);
+        });
     } finally {
         await ports.dispose().catch(() => undefined);
     }
@@ -5947,6 +5972,16 @@ async function downAllReleases(
     for (const project of [...new Set(projects)]) {
         if (swarm) await ports.stackDown(project).catch(() => undefined);
         else await ports.composeDown(project).catch(() => undefined);
+    }
+    // And whatever the names above missed, by the engine's labels: nothing of the
+    // service is kept, so every release container of it goes, volumes left alone.
+    if (ports.releaseContainers && ports.removeContainer) {
+        const containers = await ports.releaseContainers().catch(() => []);
+        const left = supersededContainers(containers, base.project, new Set());
+        const plan = removalPlan(left);
+        for (const container of plan.containers)
+            await ports.removeContainer(container.id).catch(() => undefined);
+        for (const stack of plan.stacks) await ports.stackDown(stack).catch(() => undefined);
     }
 }
 
