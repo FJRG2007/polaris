@@ -86,6 +86,7 @@ export function PolarRow({
 export function PolarBrowserRow(): React.JSX.Element | null {
     const t = useWords();
     const [state, setState] = useState<{ on: boolean; sites: readonly string[] } | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         void askBackground({ kind: "polarBrowser" })
@@ -95,12 +96,22 @@ export function PolarBrowserRow(): React.JSX.Element | null {
             .catch(() => undefined);
     }, []);
 
-    const send = (request: Parameters<typeof askBackground>[0]) => {
+    /** Sends a change; on a refusal or no answer, puts `previous` back and says why. */
+    const send = (
+        request: Parameters<typeof askBackground>[0],
+        previous: { on: boolean; sites: readonly string[] }
+    ) => {
+        setError(null);
         void askBackground(request)
             .then((reply) => {
-                if (reply.ok && "polarBrowser" in reply) setState(reply.polarBrowser);
+                if (reply.ok && "polarBrowser" in reply) return setState(reply.polarBrowser);
+                setState(previous);
+                setError(reply.ok ? t("errors.serverSilent") : reply.error);
             })
-            .catch(() => undefined);
+            .catch(() => {
+                setState(previous);
+                setError(t("errors.serverSilent"));
+            });
     };
 
     if (!state) return null;
@@ -113,7 +124,7 @@ export function PolarBrowserRow(): React.JSX.Element | null {
                 onClick={() => {
                     // Shown at once, put back if the worker did not take it.
                     setState({ ...state, on: !state.on });
-                    send({ kind: "setPolarBrowser", on: !state.on });
+                    send({ kind: "setPolarBrowser", on: !state.on }, state);
                 }}
             >
                 <span className="section-text">
@@ -132,10 +143,22 @@ export function PolarBrowserRow(): React.JSX.Element | null {
                     <span style={{ minWidth: 0, flex: 1 }} title={state.sites.join(", ")}>
                         {t("polar.browserSites", { count: state.sites.length })}
                     </span>
-                    <button className="link" onClick={() => send({ kind: "forgetPolarSites" })}>
+                    <button
+                        className="link"
+                        onClick={() => send({ kind: "forgetPolarSites" }, state)}
+                    >
                         {t("polar.browserForget")}
                     </button>
                 </div>
+            ) : null}
+            {error ? (
+                <p
+                    className="muted small"
+                    role="alert"
+                    style={{ padding: "0 12px 8px", margin: 0 }}
+                >
+                    {error}
+                </p>
             ) : null}
         </li>
     );
