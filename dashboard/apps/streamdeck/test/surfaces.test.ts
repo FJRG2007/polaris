@@ -119,6 +119,7 @@ describe("a key's icon", () => {
             "circle-dot",
             "phone-off",
             "volume-2",
+            "screen-share",
             "house",
             "lightbulb",
             "zap",

@@ -16,7 +16,7 @@
     },
     "io.github.fjrg2007.polaris.call": {
         "Name": "Call",
-        "Tooltip": "Mute, deafen, camera, record or hang up the call you are on in Polaris."
+        "Tooltip": "Mute, deafen, camera, record, share your screen or hang up the call you are on in Polaris."
     },
     "io.github.fjrg2007.polaris.sound": {
         "Name": "Soundboard",
