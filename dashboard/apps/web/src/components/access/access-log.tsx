@@ -142,7 +142,7 @@ export function AccessLog({
             ) : uses.length === 0 ? (
                 <p className="text-[12px] text-muted-foreground">{t("share.log.none")}</p>
             ) : (
-                <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+                <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto overscroll-contain">
                     {uses.map((use) => (
                         <li
                             key={use.id}

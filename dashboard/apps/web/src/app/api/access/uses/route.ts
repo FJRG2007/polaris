@@ -10,6 +10,7 @@
 import { z } from "zod";
 import * as core from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { requireMayShare } from "@/lib/access/sharing-service";
 import { usesCsv } from "@/lib/access/grant-use-csv";
 import { GRANT_USE_OUTCOMES, listGrantUses } from "@/lib/access/grants";
@@ -56,7 +57,8 @@ export async function GET(request: Request): Promise<Response> {
             headers: {
                 "content-type": "text/csv; charset=utf-8",
                 "content-disposition": `attachment; filename="access-log-${subjectId}.csv"`,
-                "cache-control": "no-store"
+                "cache-control": "no-store",
+                ...downloadTicketHeaders(request)
             }
         });
     }
