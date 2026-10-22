@@ -18,6 +18,7 @@ import type { DeployBehaviourView } from "@/lib/deploy/deploy-behaviour";
 import { externalNetworksSchema } from "@/lib/deploy/external-networks-schema";
 import {
     deployBehaviourAction,
+    setBlockVulnerableDeploysAction,
     setExternalNetworksAction,
     setOverlapVolumesAction
 } from "./deploy-behaviour-actions";
@@ -58,6 +59,7 @@ export function DeployBehaviourSection({
     const [rows, setRows] = useState<NetworkRow[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [networkError, setNetworkError] = useState<string | null>(null);
+    const [blockError, setBlockError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [justSaved, markSaved] = useSavedFlash();
 
@@ -124,6 +126,21 @@ export function DeployBehaviourSection({
         if (fresh.view) setView(fresh.view);
     }
 
+    /** Shown at once and put back if the server says no. */
+    async function toggleBlock(next: boolean) {
+        if (!view || view.blockVulnerableDeploys === next) return;
+        const before = view;
+        setBlockError(null);
+        setView({ ...view, blockVulnerableDeploys: next });
+        const result = await setBlockVulnerableDeploysAction(applicationId, next).catch(() => ({
+            error: t("security.blockFailed")
+        }));
+        if (result.error) {
+            setView(before);
+            setBlockError(result.error);
+        }
+    }
+
     async function saveNetworks() {
         if (!view || !dirty || issues.size > 0) return;
         const before = view;
@@ -184,6 +201,22 @@ export function DeployBehaviourSection({
                     </div>
                 )}
                 {error && <p className="text-xs text-danger-ink">{error}</p>}
+            </SettingsCard>
+
+            <SettingsCard
+                title={t("security.blockTitle")}
+                description={t("security.blockShort")}
+                learnMore={t("security.blockHint")}
+                actions={
+                    <Switch
+                        checked={view.blockVulnerableDeploys}
+                        onChange={(next) => void toggleBlock(next)}
+                        disabled={!canConfigure}
+                        aria-label={t("security.blockTitle")}
+                    />
+                }
+            >
+                {blockError && <p className="text-xs text-danger-ink">{blockError}</p>}
             </SettingsCard>
 
             <SettingsCard

@@ -16,6 +16,7 @@
  * Server-only.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 
 /** How old a scan of the same reference may be and still decide. */
@@ -26,6 +27,7 @@ export interface GateFinding {
     readonly location: string;
     readonly fixedIn: string | null;
     readonly severity: string;
+    readonly url?: string | null;
 }
 
 export interface GateWarning {
@@ -34,6 +36,56 @@ export interface GateWarning {
     readonly package: string;
     readonly fixedIn: string;
     readonly scanId: string;
+    /** The advisory the first one links to, when the scan gave one. */
+    readonly url: string | null;
+}
+
+/** What is stored on the deployment: the warning, and whether it refused it. */
+export interface StoredGateWarning extends GateWarning {
+    readonly refused: boolean;
+}
+
+const storedSchema = z.object({
+    count: z.number().int().positive(),
+    id: z.string().min(1).max(200),
+    package: z.string().max(400),
+    fixedIn: z.string().max(200),
+    scanId: z.string().max(100),
+    url: z
+        .string()
+        .max(500)
+        .url()
+        .refine((value) => value.startsWith("https://"))
+        .nullable()
+        .catch(null)
+        .default(null),
+    // Warnings stored before refusals were recorded never refused anything.
+    refused: z.boolean().default(false)
+});
+
+/** A deployment's stored warning, read back; null when there is none or it
+ *  does not parse - a row is older than the screen reading it. */
+export function parseStoredWarning(raw: string | null | undefined): StoredGateWarning | null {
+    if (!raw) return null;
+    try {
+        const parsed = storedSchema.safeParse(JSON.parse(raw));
+        return parsed.success ? parsed.data : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Whether a deployment is one "Deploy anyway" applies to: it failed because
+ * the check refused it, and nobody has let it through yet. Pure.
+ */
+export function canDeployAnyway(deployment: {
+    status: string;
+    securityWarning: string | null;
+    securityOverrideAt: Date | string | null;
+}): boolean {
+    if (deployment.status !== "failed" || deployment.securityOverrideAt) return false;
+    return parseStoredWarning(deployment.securityWarning)?.refused === true;
 }
 
 /** What a scan's findings mean for a release. Pure. */
@@ -50,7 +102,8 @@ export function decideGate(
             id: first.title,
             package: first.location,
             fixedIn: first.fixedIn!,
-            scanId: options.scanId
+            scanId: options.scanId,
+            url: first.url?.startsWith("https://") ? first.url : null
         },
         refuse: options.block && !options.overridden
     };
@@ -96,7 +149,13 @@ export async function checkReleaseImage(input: {
                 where: { scanId: scan.id, severity: "critical", fixedIn: { not: null } },
                 orderBy: { position: "asc" },
                 take: 50,
-                select: { title: true, location: true, fixedIn: true, severity: true }
+                select: {
+                    title: true,
+                    location: true,
+                    fixedIn: true,
+                    severity: true,
+                    url: true
+                }
             }),
             prisma.application.findUnique({
                 where: { id: deployment.deployableId },
@@ -111,7 +170,12 @@ export async function checkReleaseImage(input: {
         if (!decision.warning) return null;
         await prisma.deployment.update({
             where: { id: input.deploymentId },
-            data: { securityWarning: JSON.stringify(decision.warning) }
+            data: {
+                securityWarning: JSON.stringify({
+                    ...decision.warning,
+                    refused: decision.refuse
+                } satisfies StoredGateWarning)
+            }
         });
         return decision.refuse ? refusalReason(decision.warning) : null;
     } catch (caught) {

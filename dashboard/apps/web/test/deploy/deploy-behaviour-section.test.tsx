@@ -13,21 +13,25 @@
 
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { DeployBehaviourView } from "@/lib/deploy/deploy-behaviour";
 import { DeployBehaviourSection } from "@/app/(app)/apps/deploy/deploy-behaviour-section";
 
 const behaviourAction = vi.fn();
+const blockAction = vi.fn();
 
 vi.mock("@/app/(app)/apps/deploy/deploy-behaviour-actions", () => ({
     deployBehaviourAction: (applicationId: string) => behaviourAction(applicationId),
     setOverlapVolumesAction: vi.fn(async () => ({})),
+    setBlockVulnerableDeploysAction: (applicationId: string, value: boolean) =>
+        blockAction(applicationId, value),
     setExternalNetworksAction: vi.fn(async () => ({}))
 }));
 
 afterEach(() => {
     cleanup();
     behaviourAction.mockReset();
+    blockAction.mockReset();
 });
 
 function view(overrides: Partial<DeployBehaviourView> = {}): DeployBehaviourView {
@@ -38,6 +42,7 @@ function view(overrides: Partial<DeployBehaviourView> = {}): DeployBehaviourView
         overlapVolumes: false,
         externalNetworks: [],
         defaultAlias: "shop",
+        blockVulnerableDeploys: false,
         ...overrides
     };
 }
@@ -101,5 +106,43 @@ describe("the Deploys section of a service page", () => {
         });
 
         expect(await screen.findByText("Could not read how this service deploys")).toBeDefined();
+    });
+
+    it("turns blocking vulnerable releases on at once, and puts it back when the server refuses", async () => {
+        behaviourAction.mockResolvedValue({ view: view() });
+        blockAction.mockResolvedValue({ error: "Could not save how this service deploys" });
+        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, {
+            wrapper: MessagesWrapper
+        });
+
+        const toggle = await screen.findByRole("switch", { name: "Block vulnerable releases" });
+        expect(toggle.getAttribute("aria-checked")).toBe("false");
+        fireEvent.click(toggle);
+        expect(blockAction).toHaveBeenCalledWith("app-1", true);
+        expect(await screen.findByText("Could not save how this service deploys")).toBeDefined();
+        await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
+    });
+
+    it("keeps the setting on once the server takes it", async () => {
+        behaviourAction.mockResolvedValue({ view: view() });
+        blockAction.mockResolvedValue({});
+        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, {
+            wrapper: MessagesWrapper
+        });
+
+        const toggle = await screen.findByRole("switch", { name: "Block vulnerable releases" });
+        fireEvent.click(toggle);
+        await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
+    });
+
+    it("shows the setting to a reader who may not change it, switched off for them", async () => {
+        behaviourAction.mockResolvedValue({ view: view({ blockVulnerableDeploys: true }) });
+        render(<DeployBehaviourSection applicationId="app-1" canConfigure={false} />, {
+            wrapper: MessagesWrapper
+        });
+
+        const toggle = await screen.findByRole("switch", { name: "Block vulnerable releases" });
+        expect(toggle.getAttribute("aria-checked")).toBe("true");
+        expect((toggle as HTMLButtonElement).disabled).toBe(true);
     });
 });

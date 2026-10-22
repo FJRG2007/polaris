@@ -21,6 +21,9 @@ export interface DeployBehaviourView {
     readonly externalNetworks: readonly ExternalNetwork[];
     /** The name it answers to on such a network when none is given. */
     readonly defaultAlias: string;
+    /** Whether a release with a critical, fixable vulnerability is refused
+     *  rather than only marked (see lib/security/deploy-gate.ts). */
+    readonly blockVulnerableDeploys: boolean;
 }
 
 export async function deployBehaviour(
@@ -37,6 +40,7 @@ export async function deployBehaviour(
             sourceType: true,
             sourceConfig: true,
             overlapVolumes: true,
+            blockVulnerableDeploys: true,
             externalNetworks: true,
             currentDeploymentId: true,
             volumes: { select: { name: true, kind: true, createdAt: true } },
@@ -66,8 +70,29 @@ export async function deployBehaviour(
         overlapChoice: app.volumes.length > 0 && app.target.runtime === "compose",
         overlapVolumes: app.overlapVolumes,
         externalNetworks: storedExternalNetworks(app.externalNetworks),
-        defaultAlias: app.slug
+        defaultAlias: app.slug,
+        blockVulnerableDeploys: app.blockVulnerableDeploys
     };
+}
+
+/** Refuse releases a scan found a critical, fixable vulnerability in, or only
+ *  mark them. The next deploy is checked. False when nothing changed. */
+export async function setBlockVulnerableDeploys(
+    applicationId: string,
+    ownerId: string,
+    value: boolean
+): Promise<boolean> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { blockVulnerableDeploys: true }
+    });
+    if (!app) throw new Error("Application not found");
+    if (app.blockVulnerableDeploys === value) return false;
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { blockVulnerableDeploys: value }
+    });
+    return true;
 }
 
 /** Let a service with volumes change over beside its running version, or not.

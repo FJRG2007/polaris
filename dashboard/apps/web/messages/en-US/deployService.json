@@ -780,5 +780,22 @@
             "forbidden": "You cannot redeploy this service.",
             "notFound": "That deploy hook no longer exists."
         }
+    },
+    "security": {
+        "chip": "Vulnerable",
+        "chipHeld": "Held back",
+        "chipTitle": "{count, plural, one {# critical vulnerability} other {# critical vulnerabilities}} with a known fix in this release's image",
+        "found": "{count, plural, one {# critical vulnerability} other {# critical vulnerabilities}} with a known fix:",
+        "where": "in {package}, fixed in {fixedIn}",
+        "refused": "This service blocks such releases, so this one did not go live.",
+        "overridden": "Deployed anyway, despite the warning.",
+        "deployAnyway": "Deploy anyway",
+        "confirmTitle": "Deploy this release anyway?",
+        "confirmBody": "The same commit goes live with the vulnerabilities its image scan found. Your name and the time are recorded on the new deployment.",
+        "failed": "Could not start the deployment",
+        "blockTitle": "Block vulnerable releases",
+        "blockShort": "Hold back a release whose image has a critical vulnerability with a known fix.",
+        "blockHint": "Checked against the latest scan of the same image on this server. Off, such a release still goes live and carries a warning. A held-back release can be deployed anyway from its row, and who did it is recorded.",
+        "blockFailed": "Could not save this setting"
     }
 }

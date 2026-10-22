@@ -18,6 +18,7 @@ import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { externalNetworksSchema } from "@/lib/deploy/external-networks-schema";
 import {
     deployBehaviour,
+    setBlockVulnerableDeploys,
     setOverlapVolumes,
     type DeployBehaviourView
 } from "@/lib/deploy/deploy-behaviour";
@@ -60,6 +61,33 @@ export async function setOverlapVolumesAction(
             targetType: "application",
             targetId: applicationId,
             metadata: { overlapVolumes: parsed.data }
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "behaviour.saveFailed");
+    }
+}
+
+export async function setBlockVulnerableDeploysAction(
+    applicationId: string,
+    value: unknown
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = z
+        .object({ applicationId: z.string().uuid(), value: z.boolean() })
+        .safeParse({ applicationId, value });
+    if (!parsed.success) return { error: await reply("behaviour.saveFailed") };
+    const { applicationId: id, value: block } = parsed.data;
+    try {
+        const access = await requireApplicationAccess(id, user.id, "service.configure");
+        if (!(await setBlockVulnerableDeploys(id, access.ownerId, block))) return {};
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.app.blockVulnerableDeploys",
+            targetType: "application",
+            targetId: id,
+            metadata: { blockVulnerableDeploys: block }
         });
         revalidatePath(DEPLOY_PATH);
         return {};

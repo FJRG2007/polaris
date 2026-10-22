@@ -6,7 +6,7 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
-import { checkReleaseImage } from "@/lib/security/deploy-gate";
+import { canDeployAnyway, checkReleaseImage, parseStoredWarning } from "@/lib/security/deploy-gate";
 import {
     parsePrivateAccess,
     storePrivateAccess,
@@ -3708,6 +3708,9 @@ export async function deployApplication(
         audit?: Record<string, unknown>;
         /** Close the service's host port with this release (see `buildAppPlan`). */
         closePort?: boolean;
+        /** Let this release through a service that blocks vulnerable ones: the
+         *  person who asked and when are recorded on it (`deployAnyway`). */
+        securityOverride?: boolean;
     },
     /** Run a kept release image instead of building: a rollback, or the live
      *  release started again with changed variables. */
@@ -3819,7 +3822,10 @@ export async function deployApplication(
                 rollback && (rollback.kind ?? "rollback") === "rollback"
                     ? rollback.deploymentId
                     : null,
-            trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual")
+            trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual"),
+            ...(meta?.securityOverride
+                ? { securityOverrideById: userId, securityOverrideAt: new Date() }
+                : {})
         }
     });
     startedInThisProcess(deployment.id);
@@ -4276,6 +4282,20 @@ export interface DeploymentSummary {
     trafficPercent: number | null;
     /** The machine its image was built on, when that was not where it runs. */
     builtOn: string | null;
+    /** What a scan of its image found before it started: critical
+     *  vulnerabilities with a known fix, and whether that refused it. */
+    security: {
+        count: number;
+        id: string;
+        package: string;
+        fixedIn: string;
+        url: string | null;
+        refused: boolean;
+    } | null;
+    /** When somebody let it through a service that blocks vulnerable releases. */
+    securityOverrideAt: string | null;
+    /** Whether "Deploy anyway" applies: refused by the check, not let through. */
+    canDeployAnyway: boolean;
 }
 
 /**
@@ -4417,7 +4437,9 @@ export async function listDeployments(
             startedAt: true,
             finishedAt: true,
             isolated: true,
-            cutover: true
+            cutover: true,
+            securityWarning: true,
+            securityOverrideAt: true
         }
     });
     // The hostname a kept release answers on. Only releases that are still up have
@@ -4463,8 +4485,66 @@ export async function listDeployments(
             !row.cutover &&
             row.id !== app.currentDeploymentId,
         trafficPercent: canary?.deploymentId === row.id ? canary.percent : null,
-        builtOn: row.builtOn
+        builtOn: row.builtOn,
+        security: (() => {
+            const warning = parseStoredWarning(row.securityWarning);
+            return warning
+                ? {
+                      count: warning.count,
+                      id: warning.id,
+                      package: warning.package,
+                      fixedIn: warning.fixedIn,
+                      url: warning.url,
+                      refused: warning.refused
+                  }
+                : null;
+        })(),
+        securityOverrideAt: row.securityOverrideAt?.toISOString() ?? null,
+        canDeployAnyway: canDeployAnyway(row)
     }));
+}
+
+/**
+ * Deploy again a release the vulnerability check refused, letting this one
+ * through: the same commit, with who asked and when recorded on the new
+ * deployment, which is the one the check reads. Throws when the release is
+ * not one the check refused, or was already let through.
+ */
+export async function deployAnyway(
+    deploymentId: string,
+    ownerId: string,
+    userId: string
+): Promise<{ deploymentId: string; applicationId: string }> {
+    const refused = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: {
+            deployableType: true,
+            deployableId: true,
+            status: true,
+            securityWarning: true,
+            securityOverrideAt: true,
+            commitSha: true,
+            commitMessage: true,
+            authorName: true,
+            authorAvatarUrl: true
+        }
+    });
+    if (!refused || refused.deployableType !== "application") {
+        throw new Error("Deployment not found");
+    }
+    if (!canDeployAnyway(refused)) {
+        throw new Error("This release was not held back by the vulnerability check.");
+    }
+    const started = await deployApplication(refused.deployableId, ownerId, userId, {
+        ...(refused.commitSha ? { commitSha: refused.commitSha } : {}),
+        ...(refused.commitMessage ? { commitMessage: refused.commitMessage } : {}),
+        ...(refused.authorName ? { authorName: refused.authorName } : {}),
+        ...(refused.authorAvatarUrl ? { authorAvatarUrl: refused.authorAvatarUrl } : {}),
+        trigger: "manual",
+        securityOverride: true,
+        audit: { securityOverrideOf: deploymentId }
+    });
+    return { deploymentId: started, applicationId: refused.deployableId };
 }
 
 /** Map deployment ids to their current status (for showing running/failed/…). */

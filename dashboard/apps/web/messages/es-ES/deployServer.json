@@ -70,7 +70,8 @@
         "trafficFailed": "No se pudo cambiar adónde va el tráfico",
         "restartFailed": "No se pudo reiniciar el despliegue",
         "updateFailed": "No se pudo actualizar el despliegue",
-        "removeFailed": "No se pudo quitar el despliegue"
+        "removeFailed": "No se pudo quitar el despliegue",
+        "overrideFailed": "No se pudo desplegar esa versión igualmente"
     },
     "domains": {
         "portRequired": "Falta un puerto de destino válido",

@@ -70,7 +70,8 @@
         "trafficFailed": "Could not change where the traffic goes",
         "restartFailed": "Could not restart the deployment",
         "updateFailed": "Could not update the deployment",
-        "removeFailed": "Could not remove the deployment"
+        "removeFailed": "Could not remove the deployment",
+        "overrideFailed": "Could not deploy that release anyway"
     },
     "domains": {
         "portRequired": "A valid target port is required",

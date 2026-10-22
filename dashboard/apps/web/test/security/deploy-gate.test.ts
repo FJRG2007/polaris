@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 
-import { decideGate, refusalReason } from "@/lib/security/deploy-gate";
+import { canDeployAnyway, decideGate, parseStoredWarning, refusalReason } from "@/lib/security/deploy-gate";
 
 const FIXTURE = [
     { title: "CVE-0000-0003", location: "fixture-lib 1.0", fixedIn: null, severity: "critical" },
@@ -35,7 +35,8 @@ describe("deploy vulnerability check", () => {
             id: "CVE-0000-0004",
             package: "fixture-node 22.0.0",
             fixedIn: "22.0.1",
-            scanId: "s"
+            scanId: "s",
+            url: null
         });
     });
 
@@ -47,5 +48,31 @@ describe("deploy vulnerability check", () => {
     it("says what was found and how to go on", () => {
         const warning = decideGate(FIXTURE, { scanId: "s", block: true, overridden: false }).warning!;
         expect(refusalReason(warning)).toContain("CVE-0000-0004 in fixture-node 22.0.0, fixed in 22.0.1");
+    });
+});
+
+describe("a stored warning, read back", () => {
+    const refused = { ...decideGate(FIXTURE, { scanId: "s", block: true, overridden: false }).warning, refused: true };
+    const stored = JSON.stringify(refused);
+
+    it("knows whether the check refused the release", () => {
+        expect(canDeployAnyway({ status: "failed", securityWarning: stored, securityOverrideAt: null })).toBe(true);
+        // Let through already, still live, or only warned and failed for another reason.
+        expect(canDeployAnyway({ status: "failed", securityWarning: stored, securityOverrideAt: new Date() })).toBe(false);
+        expect(canDeployAnyway({ status: "running", securityWarning: stored, securityOverrideAt: null })).toBe(false);
+        const warned = JSON.stringify({ ...refused, refused: false });
+        expect(canDeployAnyway({ status: "failed", securityWarning: warned, securityOverrideAt: null })).toBe(false);
+    });
+
+    it("reads a row stored before refusals were recorded as a plain warning", () => {
+        const old = JSON.stringify({ count: 1, id: "CVE-0000-0004", package: "p 1", fixedIn: "2", scanId: "s" });
+        expect(parseStoredWarning(old)).toMatchObject({ refused: false, url: null });
+    });
+
+    it("drops what does not parse, and a link that is not https", () => {
+        expect(parseStoredWarning("{not json")).toBeNull();
+        expect(parseStoredWarning(JSON.stringify({ count: "1" }))).toBeNull();
+        const unsafe = JSON.stringify({ ...refused, url: "javascript:void(0)" });
+        expect(parseStoredWarning(unsafe)?.url).toBeNull();
     });
 });
