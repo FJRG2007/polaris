@@ -14,7 +14,7 @@ import {
     thumbnailBy,
     visibleBox,
     type Box
-} from "@/components/image-flight";
+} from "@polaris/ui/image-flight";
 
 const viewport = { width: 1000, height: 800 };
 
