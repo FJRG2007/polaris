@@ -680,7 +680,9 @@
                 "watch": "vio",
                 "command": "envió una orden"
             }
-        }
+        },
+        "checkIn": "Hora de entrada",
+        "checkOut": "Hora de salida"
     },
     "environments": {
         "homeNat": {

@@ -52,6 +52,7 @@ import { z } from "zod";
 import {
     EVERY_DAY,
     MINUTES_IN_DAY,
+    clockMinute,
     clockTime,
     nameDays,
     weeklyWindow
@@ -421,6 +422,20 @@ export function dayBegins(day: string): Date | null {
     if (parts.length !== 3 || !year || !month || !date) return null;
     const at = new Date(year, month - 1, date, 0, 0, 0, 0);
     return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/**
+ * A day at a wall-clock time in the reader's own zone: a hotel's check-in at
+ * 15:00 and check-out at 11:00, the way a PMS hands a key its stay
+ * (https://www.mews.com/en/blog/keyless-entry-hotels). Null for a day or a
+ * time that does not read.
+ */
+export function dayAt(day: string, clock: string): Date | null {
+    const begins = dayBegins(day);
+    const minute = clockMinute(clock);
+    if (!begins || minute === null) return null;
+    begins.setHours(Math.floor(minute / 60), minute % 60, 0, 0);
+    return begins;
 }
 
 /**

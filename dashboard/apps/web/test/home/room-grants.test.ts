@@ -150,3 +150,13 @@ describe("check-in and check-out", () => {
         expect(core.linkCapabilities("place.room")).toEqual(["view", "control"]);
     });
 });
+
+describe("a stay typed in the share dialog", () => {
+    it("starts at check-in and ends at check-out on the days picked", () => {
+        const from = core.dayAt("2026-05-08", "15:00")!;
+        const to = core.dayAt("2026-05-10", "11:00")!;
+        expect([from.getHours(), from.getMinutes()]).toEqual([15, 0]);
+        expect([to.getDate(), to.getHours()]).toEqual([10, 11]);
+        expect(core.dayAt("2026-05-10", "25:00")).toBeNull();
+    });
+});

@@ -148,6 +148,10 @@ export function ShareDialog({
     const [limited, setLimited] = useState(false);
     const [startsAt, setStartsAt] = useState("");
     const [endsAt, setEndsAt] = useState("");
+    // Check-in and check-out: the time on the first and the last day. Empty is
+    // the whole day, which is what a share without a stay means.
+    const [checkIn, setCheckIn] = useState("");
+    const [checkOut, setCheckOut] = useState("");
     const [days, setDays] = useState(core.EVERY_DAY);
     const [hours, setHours] = useState({ from: "", to: "" });
     const [maxUses, setMaxUses] = useState("");
@@ -214,6 +218,8 @@ export function ShareDialog({
         setLimited(false);
         setStartsAt("");
         setEndsAt("");
+        setCheckIn("");
+        setCheckOut("");
         setDays(core.EVERY_DAY);
         setHours({ from: "", to: "" });
         setMaxUses("");
@@ -233,8 +239,14 @@ export function ShareDialog({
                   // one lent whole: sent as a bare date these are both
                   // midnight UTC, which begins a grant early and ends it a
                   // day short.
-                  startsAt: core.dayBegins(startsAt)?.toISOString(),
-                  endsAt: core.dayEnds(endsAt)?.toISOString(),
+                  startsAt: (checkIn
+                      ? core.dayAt(startsAt, checkIn)
+                      : core.dayBegins(startsAt)
+                  )?.toISOString(),
+                  endsAt: (checkOut
+                      ? core.dayAt(endsAt, checkOut)
+                      : core.dayEnds(endsAt)
+                  )?.toISOString(),
                   days,
                   startMinute: core.clockMinute(hours.from),
                   endMinute: core.clockMinute(hours.to),
@@ -649,6 +661,31 @@ export function ShareDialog({
                                                 onChange={(event) => setEndsAt(event.target.value)}
                                             />
                                         </Field>
+                                        <Field label={t("share.checkIn")} htmlFor="share-check-in">
+                                            <Input
+                                                id="share-check-in"
+                                                type="time"
+                                                value={checkIn}
+                                                disabled={!startsAt}
+                                                onChange={(event) =>
+                                                    setCheckIn(event.target.value)
+                                                }
+                                            />
+                                        </Field>
+                                        <Field
+                                            label={t("share.checkOut")}
+                                            htmlFor="share-check-out"
+                                        >
+                                            <Input
+                                                id="share-check-out"
+                                                type="time"
+                                                value={checkOut}
+                                                disabled={!endsAt}
+                                                onChange={(event) =>
+                                                    setCheckOut(event.target.value)
+                                                }
+                                            />
+                                        </Field>
                                     </div>
 
                                     <fieldset className="flex flex-col gap-1">
@@ -841,7 +878,15 @@ function describe(
 ): string {
     // `core.describeGrant`'s sentence, in the reader's words.
     const schedule = grant.schedule;
-    const day = (iso: string) => iso.slice(0, 10);
+    // The day, and the time too when the bound is a check-in or a check-out
+    // rather than the whole day.
+    const day = (iso: string) => {
+        const at = new Date(iso);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const date = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+        const clock = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+        return clock === "00:00" || clock === "23:59" ? date : `${date} ${clock}`;
+    };
     const parts: string[] = [];
     if (schedule.startsAt && schedule.endsAt) {
         parts.push(t("share.range", { from: day(schedule.startsAt), to: day(schedule.endsAt) }));
