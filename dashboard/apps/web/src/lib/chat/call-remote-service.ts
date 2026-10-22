@@ -47,6 +47,7 @@ const REGISTRY = Symbol.for("polaris.chat.call-remote-service");
 interface Registry {
     seats: Map<string, Held>;
     listeners: Set<ControlsListener>;
+    sweptAt?: number;
 }
 
 function registry(): Registry {
@@ -59,8 +60,15 @@ function registry(): Registry {
  *  the calls going on now and nothing else. */
 const FORGET_MS = 10 * 60_000;
 
+/** How often the map is walked for them: often enough that it stays the calls
+ *  going on now, rarely enough that a beat does not pay for every seat. */
+const SWEEP_MS = 60_000;
+
 function forgetOld(now: number): void {
-    for (const [id, held] of registry().seats) if (now - held.at > FORGET_MS) registry().seats.delete(id);
+    const held = registry();
+    if (now - (held.sweptAt ?? 0) < SWEEP_MS) return;
+    held.sweptAt = now;
+    for (const [id, seat] of held.seats) if (now - seat.at > FORGET_MS) held.seats.delete(id);
 }
 
 /**
@@ -131,12 +139,24 @@ export interface LiveCall {
     readonly mayRecord: boolean;
 }
 
+/** The lookups in flight, by account: a deck reads every call key at once,
+ *  and they all ask the same question. */
+const asking = new Map<string, Promise<LiveCall | null>>();
+
 /**
  * The seat this account holds in a call that is going on, newest beat first.
  * Admitted, not left, and heard from inside the time a seat counts as there -
  * a tab closed without saying goodbye is not "in a call".
  */
-export async function liveCallOf(userId: string): Promise<LiveCall | null> {
+export function liveCallOf(userId: string): Promise<LiveCall | null> {
+    const pending = asking.get(userId);
+    if (pending) return pending;
+    const lookup = readLiveCall(userId).finally(() => asking.delete(userId));
+    asking.set(userId, lookup);
+    return lookup;
+}
+
+async function readLiveCall(userId: string): Promise<LiveCall | null> {
     const row = await prisma.meetingParticipant.findFirst({
         where: {
             userId,
@@ -253,6 +273,10 @@ const PICKER_LIMIT = 100;
  * The sounds a deck key can be set to: Polaris's own, then those of every space
  * this account reaches. Whether one may be played in a given call is the play's
  * question, asked on the press.
+ *
+ * Taken a sound from each space in turn - every space's first, then every
+ * space's second - so a few full boards never crowd the other spaces out of a
+ * picker that holds only so many.
  */
 export async function deckSounds(
     userId: string,
@@ -264,15 +288,26 @@ export async function deckSounds(
     }));
     const spaces = [...(await reachableSpaceIds({ id: userId }))];
     if (spaces.length === 0) return own;
-    const rows = await prisma.chatSpaceSound.findMany({
-        where: { spaceId: { in: spaces } },
-        orderBy: [{ spaceId: "asc" }, { createdAt: "asc" }],
-        take: Math.min(PICKER_LIMIT, SOUNDBOARD_SLOTS * 2),
-        select: { id: true, name: true, emoji: true, space: { select: { name: true } } }
-    });
-    const theirs = rows.map((row) => ({
-        value: row.id,
-        label: `${row.emoji ? `${row.emoji} ` : ""}${row.name} (${row.space.name})`
-    }));
+    const room = PICKER_LIMIT - own.length;
+    if (room <= 0) return own.slice(0, PICKER_LIMIT);
+    const rows = await prisma.$queryRaw<
+        { id: string; name: string; emoji: string; spaceName: string; turn: bigint }[]
+    >`SELECT "id", "name", "emoji", "spaceName", "turn" FROM (
+        SELECT s."id", s."name", s."emoji", c."name" AS "spaceName", s."createdAt",
+               ROW_NUMBER() OVER (PARTITION BY s."spaceId" ORDER BY s."createdAt", s."id") AS "turn"
+        FROM "ChatSpaceSound" s
+        JOIN "ChatSpace" c ON c."id" = s."spaceId"
+        WHERE s."spaceId" = ANY(${spaces}::uuid[])
+    ) ranked
+    WHERE "turn" <= ${SOUNDBOARD_SLOTS}
+    ORDER BY "turn", "spaceName", "createdAt", "id"
+    LIMIT ${room}`;
+    // Listed a space at a time, as a picker reads best.
+    const theirs = [...rows]
+        .sort((a, b) => a.spaceName.localeCompare(b.spaceName) || Number(a.turn - b.turn))
+        .map((row) => ({
+            value: row.id,
+            label: `${row.emoji ? `${row.emoji} ` : ""}${row.name} (${row.spaceName})`
+        }));
     return [...own, ...theirs].slice(0, PICKER_LIMIT);
 }

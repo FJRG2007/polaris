@@ -73,8 +73,14 @@ export type RemoteStep =
  *  command wants it, so a repeated command is harmless. */
 export function remoteStep(command: CallRemoteCommand, now: RemoteControls): RemoteStep | null {
     switch (command.command) {
-        case "mic":
-            return command.on === now.micOn ? null : "toggleMic";
+        case "mic": {
+            // Heard is what the seat reports and the key reads: deafened is
+            // muted too, and unmuting from a deck takes the headphones off as
+            // well, as the mute button does.
+            const heard = now.micOn && !now.deafened;
+            if (command.on === heard) return null;
+            return command.on && now.micOn ? "toggleDeafen" : "toggleMic";
+        }
         case "deafen":
             return command.on === now.deafened ? null : "toggleDeafen";
         case "camera":

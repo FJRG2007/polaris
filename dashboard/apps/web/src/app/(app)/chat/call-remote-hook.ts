@@ -60,12 +60,15 @@ export function useCallRemote(
         });
     }, [meetingId]);
 
-    // Said when any of them moves, so a key shows the change within a moment
-    // rather than at the next beat. Only by the seat this tab is in.
-    const { micOn, deafened, cameraOn, sharing, participantId, ended } = call;
+    // The camera and the recorder, said when either moves, so a key shows the
+    // change within a moment rather than at the next beat. The microphone,
+    // headphones and screen are the call's own beat to say. Only by the seat
+    // this tab is in: a browser another device took the call from has ended.
+    const { cameraOn, participantId, ended } = call;
     const running = recording.running;
     useEffect(() => {
         if (!meetingId || !participantId || ended) return;
+        const { micOn, deafened, sharing } = latest.current.call;
         void keepSeat(meetingId, {
             muted: !micOn || deafened,
             deafened,
@@ -73,5 +76,5 @@ export function useCallRemote(
             camera: cameraOn,
             recording: running
         }).catch(() => undefined);
-    }, [meetingId, participantId, ended, micOn, deafened, cameraOn, sharing, running]);
+    }, [meetingId, participantId, ended, cameraOn, running]);
 }

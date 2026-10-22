@@ -34,6 +34,15 @@ describe("remoteStep", () => {
         expect(remoteStep({ command: "record", on: false }, IDLE)).toBeNull();
     });
 
+    it("unmutes a deafened seat the way the mute button does, by undeafening too", () => {
+        const deafened = { ...IDLE, micOn: false, deafened: true };
+        expect(remoteStep({ command: "mic", on: true }, deafened)).toBe("toggleMic");
+        expect(remoteStep({ command: "mic", on: false }, deafened)).toBeNull();
+        expect(remoteStep({ command: "mic", on: true }, { ...deafened, micOn: true })).toBe(
+            "toggleDeafen"
+        );
+    });
+
     it("starts and stops recording, and never starts where it cannot record", () => {
         expect(remoteStep({ command: "record", on: true }, IDLE)).toBe("startRecording");
         expect(remoteStep({ command: "record", on: false }, { ...IDLE, recording: true })).toBe(
