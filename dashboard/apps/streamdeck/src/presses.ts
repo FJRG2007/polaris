@@ -128,26 +128,27 @@ export const CONFIRM_MS = 2000;
 
 /**
  * The second press that confirms an action that cannot be undone. The first
- * press arms the key; another within `CONFIRM_MS` runs it, and after that the
- * key is disarmed again.
+ * press arms the key for that one action; another press of the same action
+ * within `CONFIRM_MS` runs it, and after that the key is disarmed again. A
+ * press of a different action on the same key only arms that one instead.
  */
 export class Confirmations {
-    readonly #armed = new Map<string, number>();
+    readonly #armed = new Map<string, { what: string; until: number }>();
 
     /** True when this press runs the action; false when it only armed it. */
-    press(key: string, now: number): boolean {
-        const until = this.#armed.get(key);
-        if (until !== undefined && now <= until) {
+    press(key: string, what: string, now: number): boolean {
+        const armed = this.#armed.get(key);
+        if (armed && armed.what === what && now <= armed.until) {
             this.#armed.delete(key);
             return true;
         }
-        this.#armed.set(key, now + CONFIRM_MS);
+        this.#armed.set(key, { what, until: now + CONFIRM_MS });
         return false;
     }
 
     armed(key: string, now: number): boolean {
-        const until = this.#armed.get(key);
-        return until !== undefined && now <= until;
+        const armed = this.#armed.get(key);
+        return armed !== undefined && now <= armed.until;
     }
 
     forget(key: string): void {

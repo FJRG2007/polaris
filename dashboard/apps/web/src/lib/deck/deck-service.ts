@@ -13,7 +13,14 @@
 import { z } from "zod";
 import { callTool } from "./tool-call";
 import { appDeckActions } from "@/lib/app-extensions/registry";
-import { deckTools, toolInput, toolView, type DeckTool } from "./tool-actions";
+import {
+    deckTools,
+    toolInput,
+    toolView,
+    TOOL_PREFIX,
+    type DeckTool,
+    type ToolListings
+} from "./tool-actions";
 import { coreDeckActions, type CoreDeckAction } from "./core-actions";
 import type {
     AppDeckAction,
@@ -45,8 +52,13 @@ function allowed(scope: string | null, caller: DeckCaller): boolean {
 }
 
 /** Every action there is right now: core's and the apps' before the key's
- *  scopes are applied, the tools after (a tool's scope is the MCP one). */
-async function everyAction(words: DeckWords, caller: DeckCaller): Promise<Resolved[]> {
+ *  scopes are applied, the tools after (a tool's scope is the MCP one). The
+ *  tools are left out when nothing asked for one. */
+async function everyAction(
+    words: DeckWords,
+    caller: DeckCaller,
+    withTools = true
+): Promise<Resolved[]> {
     const core = coreDeckActions(words("deck.errors.refused")).map((action) => ({
         id: action.id,
         scope: action.scope,
@@ -60,6 +72,7 @@ async function everyAction(words: DeckWords, caller: DeckCaller): Promise<Resolv
         taken.add(action.id);
         apps.push({ id: action.id, scope: action.scope, app: action });
     }
+    if (!withTools) return [...core, ...apps];
     const tools = (await deckTools(caller)).map((tool) => ({ id: tool.id, scope: null, tool }));
     return [...core, ...apps, ...tools];
 }
@@ -67,9 +80,10 @@ async function everyAction(words: DeckWords, caller: DeckCaller): Promise<Resolv
 async function viewOf(
     action: Resolved,
     caller: DeckCaller,
-    words: DeckWords
+    words: DeckWords,
+    listings: ToolListings
 ): Promise<DeckActionView> {
-    if (action.tool) return toolView(action.tool, caller);
+    if (action.tool) return toolView(action.tool, caller, words, listings);
     if (action.core) {
         const core = action.core;
         const fields: DeckOptionField[] = await Promise.all(
@@ -150,7 +164,8 @@ export async function deckCatalogue(
     const offered = (await everyAction(words, caller)).filter((action) =>
         allowed(action.scope, caller)
     );
-    return Promise.all(offered.map((action) => viewOf(action, caller, words)));
+    const listings: ToolListings = new Map();
+    return Promise.all(offered.map((action) => viewOf(action, caller, words, listings)));
 }
 
 /** A run as the plugin asks for it. */
@@ -172,7 +187,7 @@ export async function runDeckAction(
     input: DeckRunInput,
     words: DeckWords
 ): Promise<DeckRunResult> {
-    const action = (await everyAction(words, caller)).find(
+    const action = (await everyAction(words, caller, input.action.startsWith(TOOL_PREFIX))).find(
         (candidate) => candidate.id === input.action
     );
     if (!action) return { ok: false, message: words("deck.errors.unknownAction") };
@@ -289,7 +304,7 @@ export async function readDeckStates(
     words: DeckWords
 ): Promise<{ readings: DeckReading[]; chat: boolean }> {
     const actions = new Map(
-        (await everyAction(words, caller)).map((action) => [action.id, action])
+        (await everyAction(words, caller, false)).map((action) => [action.id, action])
     );
     let chat = false;
     const readings = await Promise.all(

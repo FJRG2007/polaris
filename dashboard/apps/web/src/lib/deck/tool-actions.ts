@@ -21,6 +21,7 @@ import { mcpTools } from "@/lib/mcp/catalog";
 import { callerMayUse, type McpTool } from "@/lib/mcp/protocol";
 import { toJsonSchema, type JsonSchema } from "@/lib/mcp/json-schema";
 import type { DeckActionView, DeckCaller, DeckOptionField } from "./types";
+import type { DeckWords } from "./deck-service";
 
 /** The id a tool is offered under. */
 export const TOOL_PREFIX = "tool.";
@@ -138,26 +139,48 @@ export async function deckTools(caller: DeckCaller): Promise<DeckTool[]> {
     return offered;
 }
 
-/** One tool as the catalogue hands it out. The tool's title is English: MCP
- *  tools are named for the model and the client, which have no locale. */
-export async function toolView(entry: DeckTool, caller: DeckCaller): Promise<DeckActionView> {
+/** The listings one catalogue has already asked for, by tool, so a picker
+ *  many tools share is read once. */
+export type ToolListings = Map<string, Promise<{ value: string; label: string }[]>>;
+
+function listing(
+    caller: DeckCaller,
+    source: string,
+    listings: ToolListings
+): Promise<{ value: string; label: string }[]> {
+    let pending = listings.get(source);
+    if (!pending) {
+        pending = callTool(caller, source, {}).then((outcome) =>
+            outcome.ok ? rowsOf(outcome.structured) : []
+        );
+        listings.set(source, pending);
+    }
+    return pending;
+}
+
+/** One tool as the catalogue hands it out. The tool's title, and a field
+ *  named only by its schema, are English: MCP tools are named for the model
+ *  and the client, which have no locale. */
+export async function toolView(
+    entry: DeckTool,
+    caller: DeckCaller,
+    words: DeckWords,
+    listings: ToolListings = new Map()
+): Promise<DeckActionView> {
     const options: DeckOptionField[] = await Promise.all(
         entry.fields.map(async (field) => {
             let choices: { value: string; label: string }[] | undefined;
             if (field.enum) choices = field.enum.map((value) => ({ value, label: value }));
             else if (field.boolean)
                 choices = [
-                    { value: "true", label: "true" },
-                    { value: "false", label: "false" }
+                    { value: "true", label: words("deck.choice.yes") },
+                    { value: "false", label: words("deck.choice.no") }
                 ];
-            else if (field.source) {
-                const outcome = await callTool(caller, field.source, {});
-                choices = outcome.ok ? rowsOf(outcome.structured) : [];
-            }
+            else if (field.source) choices = await listing(caller, field.source, listings);
             return {
                 name: field.name,
                 type: field.type,
-                label: spokenName(field.name),
+                label: field.source ? words(`deck.fields.${field.name}`) : spokenName(field.name),
                 required: field.required,
                 ...(field.min === undefined ? {} : { min: field.min }),
                 ...(field.max === undefined ? {} : { max: field.max }),

@@ -252,12 +252,18 @@
             "body": "Mensaje",
             "choice": "Estado",
             "service": "Servicio",
-            "path": "Página"
+            "path": "Página",
+            "deviceId": "Aparato",
+            "routineId": "Rutina",
+            "calendarId": "Calendario",
+            "sessionId": "Sesión"
         },
         "choice": {
             "busy": "No molestar",
             "away": "Ausente",
-            "invisible": "Invisible"
+            "invisible": "Invisible",
+            "yes": "Sí",
+            "no": "No"
         },
         "actions": {
             "chat_send": "Enviar un mensaje",

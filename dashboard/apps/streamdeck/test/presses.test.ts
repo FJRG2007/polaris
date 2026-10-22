@@ -115,18 +115,26 @@ describe("PressTimer", () => {
 describe("Confirmations", () => {
     it("arms on the first press and runs on a second within the wait", () => {
         const confirm = new Confirmations();
-        expect(confirm.press("k", 0)).toBe(false);
+        expect(confirm.press("k", "a", 0)).toBe(false);
         expect(confirm.armed("k", 1000)).toBe(true);
-        expect(confirm.press("k", 1000)).toBe(true);
+        expect(confirm.press("k", "a", 1000)).toBe(true);
         // Run, it is disarmed: the next press only arms it again.
-        expect(confirm.press("k", 1100)).toBe(false);
+        expect(confirm.press("k", "a", 1100)).toBe(false);
     });
 
     it("lets the wait run out", () => {
         const confirm = new Confirmations();
-        confirm.press("k", 0);
+        confirm.press("k", "a", 0);
         expect(confirm.armed("k", CONFIRM_MS + 1)).toBe(false);
-        expect(confirm.press("k", CONFIRM_MS + 1)).toBe(false);
+        expect(confirm.press("k", "a", CONFIRM_MS + 1)).toBe(false);
+    });
+
+    it("confirms only the action that was armed", () => {
+        const confirm = new Confirmations();
+        expect(confirm.press("k", "hold:a", 0)).toBe(false);
+        expect(confirm.press("k", "press:b", 500)).toBe(false);
+        expect(confirm.press("k", "hold:a", 900)).toBe(false);
+        expect(confirm.press("k", "hold:a", 1200)).toBe(true);
     });
 });
 

@@ -89,6 +89,11 @@ vi.mock("@/lib/mcp/catalog", () => {
                 "chat.use",
                 z.object({ conversationId: z.string().uuid(), body: z.string().min(1) })
             ),
+            tool(
+                "chat_mute",
+                "chat.use",
+                z.object({ conversationId: z.string().uuid(), muted: z.boolean() })
+            ),
             tool("chat_conversations", "chat.use", z.object({}), {
                 conversations: [{ id: "c1", name: "general" }]
             }),
@@ -412,12 +417,37 @@ describe("MCP tools as deck actions", () => {
         // A field naming one of the person's things is a picker of them.
         expect(send?.options.find((field) => field.name === "conversationId")).toMatchObject({
             type: "choice",
-            label: "Conversation",
+            label: "deck.fields.conversationId",
             choices: [{ value: "c1", label: "general" }]
         });
         expect(offered.some((action) => action.id === "tool.deploy_restart")).toBe(false);
         // Read-only tools have nothing to press.
         expect(offered.some((action) => action.id === "tool.chat_conversations")).toBe(false);
+    });
+
+    it("reads a picker many tools share once, in the reader's words", async () => {
+        const offered = await service.deckCatalogue(caller(["chat.use"]), words);
+        const mute = offered.find((action) => action.id === "tool.chat_mute");
+        expect(mute?.options.find((field) => field.name === "muted")).toMatchObject({
+            choices: [
+                { value: "true", label: "deck.choice.yes" },
+                { value: "false", label: "deck.choice.no" }
+            ]
+        });
+        expect(mute?.options.find((field) => field.name === "conversationId")).toMatchObject({
+            choices: [{ value: "c1", label: "general" }]
+        });
+        expect(calls.filter((call) => call.name === "chat_conversations")).toHaveLength(2);
+    });
+
+    it("leaves the tools out of a state read", async () => {
+        const { readings } = await service.readDeckStates(
+            caller(["chat.use"]),
+            [{ key: "k", action: "tool.chat_send", options: {} }],
+            words
+        );
+        expect(readings).toEqual([{ key: "k", state: { tone: "idle" } }]);
+        expect(calls).toEqual([]);
     });
 
     it("never offers a tool the deck's key cannot be granted", async () => {
@@ -456,9 +486,8 @@ describe("MCP tools as deck actions", () => {
     });
 
     it("reads fields from a schema and leaves out a tool no screen can fill", async () => {
-        const { toolFields, spokenName, rowsOf, toolInput } = await import(
-            "@/lib/deck/tool-actions"
-        );
+        const { toolFields, spokenName, rowsOf, toolInput } =
+            await import("@/lib/deck/tool-actions");
         const { toJsonSchema } = await import("@/lib/mcp/json-schema");
         const fields = toolFields(
             toJsonSchema(

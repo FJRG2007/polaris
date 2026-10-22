@@ -93,7 +93,7 @@ export class PolarisKey extends SingletonAction<KeySettings> {
             return;
         }
         // Something that cannot be undone runs on the second press only.
-        if (entry.confirm && !this.#confirmed(id)) return;
+        if (entry.confirm && !this.#confirmed(id, `${gesture}:${entry.id}`)) return;
         if (entry.kind === "open" || entry.kind === "state") {
             // An "open a page" key opens the page it was set to; a key that
             // only shows something opens Polaris, where the rest of it is.
@@ -124,8 +124,8 @@ export class PolarisKey extends SingletonAction<KeySettings> {
 
     /** True on the press that confirms; the first one arms the key, which
      *  says "Again?" until it runs or the wait is over. */
-    #confirmed(id: string): boolean {
-        if (this.#confirm.press(id, Date.now())) {
+    #confirmed(id: string, what: string): boolean {
+        if (this.#confirm.press(id, what, Date.now())) {
             hub.armed.delete(id);
             hub.redraw(id);
             return true;
