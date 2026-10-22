@@ -4,6 +4,7 @@
     "clock_alarm_change": "Activar, desactivar, saltar, posponer o borrar una alarma",
     "clock_timer_start": "Iniciar un temporizador",
     "clock_timer_change": "Pausar, reanudar, reiniciar o borrar un temporizador",
+    "clock_focus_start": "Iniciar un ciclo de foco",
     "calendar_upcoming": "Próximos eventos",
     "calendar_calendars": "Ver calendarios",
     "calendar_events": "Eventos de un periodo",

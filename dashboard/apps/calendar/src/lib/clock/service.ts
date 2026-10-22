@@ -453,6 +453,38 @@ export async function changeTimer(
     if (ringing) await noteStopped("timer", userId, id, ringing);
 }
 
+/**
+ * Move a timer by whole minutes, either way, as a dial turned on a deck does:
+ * a running or paused one gains or loses time left, one that has not started
+ * gets a longer or shorter length, and one that rang counts down again only
+ * when time is added. Never below a second left, never past the longest timer.
+ */
+export async function shiftTimer(
+    userId: string,
+    id: string,
+    minutes: number,
+    now = new Date()
+): Promise<void> {
+    if (!Number.isInteger(minutes) || minutes === 0) return;
+    const timer = await ownTimer(userId, id);
+    const at = now.getTime();
+    const delta = minutes * 60_000;
+    const state = model.timerState(timer);
+    const bound = (ms: number) => Math.min(model.CLOCK_TIMER_MAX_MS, Math.max(1000, ms));
+    let data: Partial<Omit<TimerRow, "id">>;
+    if (state === "running") {
+        const left = model.timerRemaining(timer, at);
+        if (left <= 0) return;
+        data = { endsAt: new Date(at + bound(left + delta)) };
+    } else if (state === "paused") data = { remainingMs: bound(timer.remainingMs! + delta) };
+    else if (state === "rung") {
+        if (delta < 0) return;
+        data = { endsAt: new Date(at + bound(delta)), firedAt: null, remainingMs: null };
+    } else data = { durationMs: bound(timer.durationMs + delta) };
+    if (!(await writeTimer(userId, timer, data))) await refusal(userId, "time.errors.changed");
+    if (state === "rung" && timer.firedAt) await noteStopped("timer", userId, id, timer.firedAt);
+}
+
 export async function deleteTimer(userId: string, id: string): Promise<void> {
     await prisma.clockTimer.deleteMany({ where: { id, userId } });
 }

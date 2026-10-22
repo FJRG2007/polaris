@@ -331,6 +331,27 @@ describe("the Time area on the server", () => {
             });
         });
 
+        it("shifts a timer by whole minutes either way, never below a second", async () => {
+            const id = await clock.createTimer(
+                alice.id,
+                { label: "", durationMs: 5 * 60_000, sound: "chime", start: false },
+                world.NOW
+            );
+            await clock.shiftTimer(alice.id, id, -2, world.NOW);
+            expect(db.rows("clockTimer")[0]!.durationMs).toBe(3 * 60_000);
+            await clock.shiftTimer(alice.id, id, -10, world.NOW);
+            expect(db.rows("clockTimer")[0]!.durationMs).toBe(1000);
+            await clock.shiftTimer(alice.id, id, 4, world.NOW);
+            await clock.changeTimer(alice.id, id, "start", world.NOW);
+            const started = (db.rows("clockTimer")[0]!.endsAt as Date).getTime();
+            await clock.shiftTimer(alice.id, id, -1, world.NOW);
+            expect((db.rows("clockTimer")[0]!.endsAt as Date).getTime()).toBe(started - 60_000);
+            await clock.shiftTimer(alice.id, id, -60, world.NOW);
+            expect((db.rows("clockTimer")[0]!.endsAt as Date).getTime()).toBe(
+                world.NOW.getTime() + 1000
+            );
+        });
+
         it("lengthens a timer that has not started, and runs a rung one for a minute", async () => {
             const id = await clock.createTimer(
                 alice.id,
