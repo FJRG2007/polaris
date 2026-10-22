@@ -14,6 +14,9 @@ describe("normalizeDnsRule", () => {
         ["  Ads.Example.COM. ", "ads.example.com"],
         ["https://tracker.example.com/path", "tracker.example.com"],
         ["*.Example.com", "*.example.com"],
+        ["Google.*", "google.*"],
+        ["http://Example.com:8080/path?q=1", "example.com"],
+        ["example.com:443", "example.com"],
         ["/^ads?[0-9]*\\./", "/^ads?[0-9]*\\./"]
     ])("keeps %j as %j", (input, expected) => {
         expect(dns.normalizeDnsRule(input)).toBe(expected);
@@ -24,6 +27,9 @@ describe("normalizeDnsRule", () => {
         "not a name",
         "-bad.example.com",
         "*.",
+        ".*",
+        "*.google.*",
+        "-google.*",
         "/(?<=x)ads/",
         "/(?=x)/",
         "/(a)\\1/",

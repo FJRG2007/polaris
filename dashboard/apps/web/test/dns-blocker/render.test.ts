@@ -85,6 +85,27 @@ describe("blockyConfig", () => {
         );
     });
 
+    it("writes a name with any ending as the anchored pattern the engine reads", () => {
+        const files = render.ruleFiles({ allow: [], deny: ["google.*", "mail.google.*"] });
+        expect(files.get(render.RULES_DENY_PATH)).toBe(
+            "# Polaris: your rules\n" +
+                "/^(.+\\.)?google(\\.[a-z0-9-]+){1,2}$/\n" +
+                "/^(.+\\.)?mail\\.google(\\.[a-z0-9-]+){1,2}$/\n"
+        );
+        // The pattern, read the way the engine reads it, covers every ending
+        // and what is under it, and nothing that only shares the name.
+        const line = files.get(render.RULES_DENY_PATH)!.split("\n")[1]!;
+        const pattern = new RegExp(line.slice(1, -1));
+        for (const name of ["google.com", "google.es", "google.co.uk", "www.google.es"])
+            expect(pattern.test(name)).toBe(true);
+        for (const name of ["google", "notgoogle.com", "google-analytics.com", "google.a.b.c"])
+            expect(pattern.test(name)).toBe(false);
+        // A list whose rules all read the same way the operator typed them stays as it was.
+        expect(render.ruleFiles({ allow: ["ok.test"], deny: [] }).get(render.RULES_ALLOW_PATH)).toBe(
+            "# Polaris: your rules\nok.test\n"
+        );
+    });
+
     it("uses the preset's resolvers, and a fallback bootstrap only for encrypted custom ones", () => {
         const preset = dns.DNS_UPSTREAM_PRESETS.find((item) => item.id === "cloudflare");
         expect(servers(render.blockyConfig(settings()))).toEqual(preset?.servers);

@@ -484,7 +484,7 @@ export const ruleFromLogSchema = z.object({
 export const lookupSchema = z.object({
     domain: z.string().transform((value, ctx) => {
         const rule = normalizeDnsRule(value);
-        if (!rule || rule.startsWith("/") || rule.startsWith("*.")) {
+        if (!rule || rule.startsWith("/") || rule.startsWith("*.") || rule.endsWith(".*")) {
             ctx.addIssue({ code: "custom", message: "invalidName" }); // i18n-ignore a key the screen says
             return z.NEVER;
         }

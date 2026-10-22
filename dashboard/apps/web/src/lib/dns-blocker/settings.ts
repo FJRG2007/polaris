@@ -241,12 +241,13 @@ const HOSTNAME = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63
 const IPV4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 const IPV6 = /^[0-9a-f:]+$/i;
 
-/** Lower-cased, trimmed, with a trailing dot and any scheme or path taken off,
- *  so `https://Example.com/x` and `example.com.` are the same rule. */
+/** Lower-cased, trimmed, with a trailing dot and any scheme, path or port taken
+ *  off, so `https://Example.com:8443/x` and `example.com.` are the same rule. */
 export function normalizeDnsName(text: string): string {
     let value = text.trim().toLowerCase();
-    value = value.replace(/^[a-z]+:\/\//, "");
-    value = value.split("/")[0] ?? "";
+    value = value.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
+    value = value.split(/[/?#]/)[0] ?? "";
+    value = value.replace(/:\d{1,5}$/, "");
     return value.replace(/\.$/, "");
 }
 
@@ -259,9 +260,12 @@ const NOT_RE2 = /\(\?[=!<]|\\[1-9]/;
 /**
  * One allow or block rule, normalized, or null when it is not one.
  *
- * Three shapes, the ones the engine reads: an exact name (`ads.example.com`),
- * a name with everything under it (`*.example.com`), or a regular expression
- * between slashes (`/^ads?[0-9]*\./`).
+ * Four shapes: an exact name (`ads.example.com`), a name with everything
+ * under it (`*.example.com`), a name with any ending (`google.*`, for
+ * google.com, google.es, google.co.uk and what is under them), or a regular
+ * expression between slashes (`/^ads?[0-9]*\./`). The engine reads the first
+ * two and the last as they are; the any-ending shape is written for it as a
+ * pattern (`engineRule` in `rules.ts`).
  */
 export function normalizeDnsRule(text: string): string | null {
     const trimmed = text.trim();
@@ -278,6 +282,7 @@ export function normalizeDnsRule(text: string): string | null {
     }
     const name = normalizeDnsName(trimmed);
     if (name.startsWith("*.")) return HOSTNAME.test(name.slice(2)) ? name : null;
+    if (name.endsWith(".*")) return HOSTNAME.test(name.slice(0, -2)) ? name : null;
     return HOSTNAME.test(name) ? name : null;
 }
 

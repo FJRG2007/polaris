@@ -10,6 +10,7 @@
  * break the file whatever characters it holds.
  */
 
+import { engineRule } from "./rules";
 import { QUERY_LOG_DIR } from "./query-log";
 import { engineSchedules } from "./schedules";
 import { safeSearchAliases } from "./safe-search";
@@ -35,11 +36,12 @@ export const RULES_DENY_PATH = `${QUERY_LOG_DIR}/rules-deny.txt`;
 
 /**
  * The operator's rules as the two files the configuration names, one rule per
- * line in the syntax the engine reads in a list. A comment line keeps an empty
- * file a list that loads.
+ * line in the syntax the engine reads in a list (a `name.*` rule written as the
+ * pattern it stands for). A comment line keeps an empty file a list that loads.
  */
 export function ruleFiles(settings: Pick<DnsSettings, "allow" | "deny">): Map<string, string> {
-    const file = (rules: readonly string[]) => inline(["# Polaris: your rules", ...rules]);
+    const file = (rules: readonly string[]) =>
+        inline(["# Polaris: your rules", ...rules.map(engineRule)]);
     return new Map([
         [RULES_ALLOW_PATH, file(settings.allow)],
         [RULES_DENY_PATH, file(settings.deny)]
