@@ -10,7 +10,7 @@ import { ArrowRight } from "lucide-react";
 import type { DocPage } from "@/data/docs";
 import type { SiteLocale } from "@/data/builders";
 import { DocsSearch } from "@/components/docs-search";
-import { href, searchRecords, siteData, words } from "@/lib/site";
+import { asset, href, siteData, words } from "@/lib/site";
 
 function DocsFrame({
     locale,
@@ -31,7 +31,13 @@ function DocsFrame({
                 aria-label={t.guides}
                 className="flex shrink-0 flex-col gap-3 text-sm lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-56 lg:self-start lg:overflow-y-auto"
             >
-                <DocsSearch records={searchRecords(locale)} label={t.search} empty={t.empty} />
+                <DocsSearch
+                    index={asset(href(locale, "docs/search.json"))}
+                    label={t.search}
+                    empty={t.empty}
+                    loading={t.loading}
+                    failed={t.failed}
+                />
                 <SideList label={t.guides}>
                     <p className="text-xs font-medium uppercase tracking-wide text-foreground-subtle">
                         {t.guides}

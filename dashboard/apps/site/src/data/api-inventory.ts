@@ -36,8 +36,9 @@ export interface InventoryRoute {
 }
 
 const KEY_AUTH = /\b(authenticateApiKey|requireApiKey)\s*\(/;
-const METHOD_EXPORT =
-    /export\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|PATCH|DELETE)\b|export\s*\{[^}]*\b(GET|POST|PUT|PATCH|DELETE)\b/g;
+const METHOD = /^(GET|POST|PUT|PATCH|DELETE)$/;
+const METHOD_DECLARATION = /export\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|PATCH|DELETE)\b/g;
+const EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
 /** `api/v1/projects/[id]/route.ts` as `/api/v1/projects/{id}`. */
 export function routePath(file: string): string {
@@ -59,9 +60,12 @@ export function routeGroup(path: string): string {
 
 export function routeMethods(source: string): string[] {
     const found = new Set<string>();
-    for (const match of source.matchAll(METHOD_EXPORT)) {
-        const method = match[1] ?? match[2];
-        if (method) found.add(method);
+    for (const match of source.matchAll(METHOD_DECLARATION)) if (match[1]) found.add(match[1]);
+    for (const match of source.matchAll(EXPORT_LIST)) {
+        for (const entry of (match[1] ?? "").split(",")) {
+            const name = entry.split(/\s+as\s+/).pop()?.trim() ?? "";
+            if (METHOD.test(name)) found.add(name);
+        }
     }
     return [...found];
 }

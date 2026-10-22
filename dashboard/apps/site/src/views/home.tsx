@@ -24,20 +24,15 @@ function shot(item: ShowcaseItem): Shot {
 
 function SectionHead({
     id,
-    eyebrow,
     title,
     intro
 }: {
     id: string;
-    eyebrow: string;
     title: string;
     intro: string;
 }) {
     return (
         <div className="flex max-w-2xl flex-col gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                {eyebrow}
-            </span>
             <h2 id={id} className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                 {title}
             </h2>
@@ -61,11 +56,7 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
     ];
     return (
         <>
-            <section className="relative flex flex-col items-center gap-6 pt-8 text-center sm:pt-14">
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 -top-10 -z-10 mx-auto h-72 max-w-3xl rounded-full bg-primary/15 blur-3xl"
-                />
+            <section className="flex flex-col items-center gap-6 pt-8 text-center sm:pt-14">
                 <span className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
                     {t.eyebrow}
                 </span>
@@ -105,7 +96,6 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
                 <section aria-labelledby="replaces" className="flex flex-col gap-6">
                     <SectionHead
                         id="replaces"
-                        eyebrow={t.replacesEyebrow}
                         title={t.replacesTitle}
                         intro={t.replacesIntro}
                     />
@@ -150,7 +140,6 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
             <section aria-labelledby="steps" className="flex flex-col gap-6">
                 <SectionHead
                     id="steps"
-                    eyebrow={t.stepsEyebrow}
                     title={t.stepsTitle}
                     intro={t.stepsIntro}
                 />
@@ -179,7 +168,6 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
             <section aria-labelledby="look" className="flex flex-col gap-8">
                 <SectionHead
                     id="look"
-                    eyebrow={t.lookEyebrow}
                     title={t.lookTitle}
                     intro={t.lookIntro}
                 />

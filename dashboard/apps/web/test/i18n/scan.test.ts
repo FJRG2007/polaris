@@ -106,7 +106,8 @@ describe("the areas findings are counted under", () => {
         ["web/src/components/transfers/transfers-view.tsx", "components/transfers"],
         ["web/src/components/app-sidebar.tsx", "components"],
         ["web/src/lib/apps.ts", "lib"],
-        ["game-servers/src/screens/players.tsx", "game-servers"]
+        ["game-servers/src/screens/players.tsx", "game-servers"],
+        ["../packages/ui/src/downloads/account/cli-section.tsx", "packages/ui"]
     ])("%s is %s", (path, area) => {
         expect(areaOf(path)).toBe(area);
     });

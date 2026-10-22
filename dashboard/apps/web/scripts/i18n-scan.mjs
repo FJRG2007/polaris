@@ -27,6 +27,8 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..");
 const APPS = join(WEB, "..");
+/** The shared UI package, whose screens both the dashboard and the site draw. */
+const SHARED_UI = join(APPS, "..", "packages", "ui", "src");
 
 /** The props and properties whose string value is read by a person. */
 export const COPY_NAMES = new Set([
@@ -138,11 +140,12 @@ export function scanSource(source, fileName = "file.tsx") {
  * The area a file belongs to - roughly, the namespace its strings will go to.
  * `app/(app)/chat/...` is `chat`, `app/(app)/apps/deploy/...` is `apps/deploy`,
  * `components/transfers/...` is `components/transfers`, an installed app is
- * its own name.
+ * its own name, and the shared UI package is `packages/ui`.
  */
 export function areaOf(path) {
-    const parts = path.split(/[\\/]/).filter((part) => part !== "" && !/^\(.*\)$/.test(part));
+    const parts = path.split(/[\\/]/).filter((part) => part !== "" && part !== ".." && !/^\(.*\)$/.test(part));
     const [root = "", ...rest] = parts;
+    if (root === "packages") return `packages/${rest[0] ?? ""}`;
     if (root !== "web") return root;
     const [, top = "", first = "", second = ""] = rest; // src, app|components|lib, ...
     const isDir = (name) => name !== "" && !/\.[jt]sx?$/.test(name);
@@ -150,7 +153,7 @@ export function areaOf(path) {
     return isDir(first) ? `${top}/${first}` : top;
 }
 
-/** Every source file the scan reads: the dashboard's and each installed app's. */
+/** Every source file the scan reads: the dashboard's, each installed app's and the shared UI's. */
 function sourceFiles() {
     const files = [];
     const walk = (directory) => {
@@ -168,6 +171,7 @@ function sourceFiles() {
             // An app with no sources of its own.
         }
     }
+    walk(SHARED_UI);
     return files;
 }
 

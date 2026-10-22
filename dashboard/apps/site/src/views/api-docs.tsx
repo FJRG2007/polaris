@@ -13,7 +13,7 @@ import { SideList } from "@/views/docs";
 import { DocsSearch } from "@/components/docs-search";
 import { highlight, highlightAll } from "@/lib/highlight";
 import { EXAMPLE_ORIGIN } from "@/lib/example-origin";
-import { asset, searchRecords, siteData, words } from "@/lib/site";
+import { asset, href, siteData, words } from "@/lib/site";
 
 export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
     const t = words(locale).api;
@@ -36,7 +36,13 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                 aria-label={t.title}
                 className="flex shrink-0 flex-col gap-3 text-sm lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-56 lg:self-start lg:overflow-y-auto"
             >
-                <DocsSearch records={searchRecords(locale)} label={d.search} empty={d.empty} />
+                <DocsSearch
+                    index={asset(href(locale, "docs/search.json"))}
+                    label={d.search}
+                    empty={d.empty}
+                    loading={d.loading}
+                    failed={d.failed}
+                />
                 <SideList label={t.title}>
                     <a href="#authentication" className="text-muted-foreground hover:text-foreground">
                         {t.authTitle}

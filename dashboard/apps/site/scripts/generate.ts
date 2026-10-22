@@ -3,9 +3,6 @@
  * into `public/`: everything the static pages read, taken from the sources the
  * dashboard and the README already use, so a new catalogue app or a new release
  * appears on the next build with no edit to the site.
- *
- * The release lookup uses `GITHUB_TOKEN` when the workflow provides one. The
- * token only authenticates this request; nothing of it is written out.
  */
 
 import { createElement } from "react";
@@ -13,9 +10,6 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildOpenApi } from "@/lib/api-docs/openapi";
 import { renderToStaticMarkup } from "react-dom/server";
-import { installCommand } from "@/lib/install-command";
-import { cliInstallLine } from "@/lib/cli/install-line";
-import { deckInstallCommand } from "@/lib/deck-install-command";
 import { AppMark } from "@/components/app-mark";
 import { STREAMDECK_MARKETPLACE_URL } from "@/lib/deck/marketplace";
 import {
@@ -53,37 +47,6 @@ const repo = process.env.GITHUB_REPOSITORY || "FJRG2007/polaris";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
-/** The newest releases, or none when GitHub cannot be reached. */
-async function releases(): Promise<site.ReleaseInput[]> {
-    const headers: Record<string, string> = {
-        accept: "application/vnd.github+json",
-        "user-agent": "polaris-site"
-    };
-    if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    try {
-        const all: site.ReleaseInput[] = [];
-        for (let page = 1; page <= 3; page++) {
-            const response = await fetch(
-                `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}`,
-                {
-                    headers,
-                    signal: AbortSignal.timeout(15000)
-                }
-            );
-            if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
-            const batch = (await response.json()) as site.ReleaseInput[];
-            all.push(...batch);
-            if (batch.length < 100) break;
-        }
-        return all;
-    } catch (error) {
-        console.warn(
-            `[site] releases unavailable, downloads link to the release pages: ${String(error)}`
-        );
-        return [];
-    }
-}
-
 const catalog: site.CatalogInput[] = catalogApps()
     .filter(isOffered)
     .map((app) => ({
@@ -104,8 +67,6 @@ const catalog: site.CatalogInput[] = catalogApps()
     }));
 
 const logos = new Set(readdirSync(logosDir));
-const guide = (locale: string): site.GuideWords =>
-    JSON.parse(read(join(web, "messages", locale, "account.json"))).downloads.guide;
 const words = (locale: string): site.CatalogWords => ({
     ...JSON.parse(read(join(web, "messages", locale, "catalog.json"))),
     card: JSON.parse(read(join(web, "messages", locale, "marketplace.json"))).card
@@ -256,37 +217,20 @@ const [docsEn, docsEs] = await Promise.all([guides(false), guides(true)]);
 const data: site.SiteData = {
     repo,
     install: site.parseInstallLines(readmeEn),
-    cli: {
-        unix: cliInstallLine("linux", repo).command,
-        windows: cliInstallLine("windows", repo).command
-    },
-    lines: {
-        extension: {
-            unix: installCommand("unix", repo).command,
-            windows: installCommand("windows", repo).command
-        },
-        streamdeck: {
-            macos: deckInstallCommand("macos", repo).command,
-            windows: deckInstallCommand("windows", repo).command
-        }
-    },
     locales: {
         en: {
             apps: site.siteApps(catalog, "en", words("en-US")),
             replaces: replacesEn,
-            showcase: localize(site.parseShowcase(readmeEn), "en"),
-            guide: guide("en-US")
+            showcase: localize(site.parseShowcase(readmeEn), "en")
         },
         es: {
             apps: site.siteApps(catalog, "es", words("es-ES")),
             // The English table stands in if the Spanish README ever loses its own.
             replaces: replacesEs.length ? replacesEs : replacesEn,
-            showcase: localize(showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn), "es"),
-            guide: guide("es-ES")
+            showcase: localize(showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn), "es")
         }
     },
     docs: { en: docsEn, es: docsEs },
-    downloads: site.downloadEntries(await releases(), repo),
     downloadsPage: {
         files: { desktop, extension, streamdeck, companion },
         storeUrl: STREAMDECK_MARKETPLACE_URL,
@@ -359,7 +303,6 @@ for (const app of catalog)
                 copyFileSync(join(web, "public", path), join(siteDir, "public", path));
 
 const operations = data.api.groups.reduce((sum, group) => sum + group.operations.length, 0);
-const released = data.downloads.filter((entry) => entry.released).length;
 console.log(
-    `[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} documented API operations, ${inventory.routes.length} key-reachable of ${routeSources.length} route files, ${released} released products, ${docsEn.length} guides`
+    `[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} documented API operations, ${inventory.routes.length} key-reachable of ${routeSources.length} route files, ${docsEn.length} guides`
 );

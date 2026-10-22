@@ -1,7 +1,6 @@
 /**
  * The site's data builders over fixtures: the catalogue to marketplace entries,
- * the README to the "replaces" table and the screenshots, releases to downloads
- * (with the fallback when there is no release or no network), and the OpenAPI
+ * the README to the "replaces" table and the screenshots, and the OpenAPI
  * document to the reference.
  */
 
@@ -144,69 +143,6 @@ describe("README", () => {
     });
 });
 
-describe("downloadEntries", () => {
-    const releases: site.ReleaseInput[] = [
-        {
-            tag_name: "extension-v0.1.0",
-            html_url: "https://gh.test/e1",
-            published_at: "2026-01-01T00:00:00Z",
-            assets: []
-        },
-        {
-            tag_name: "extension-v0.2.0",
-            html_url: "https://gh.test/e2",
-            published_at: "2026-02-01T00:00:00Z",
-            assets: [
-                {
-                    name: "polaris-0.2.0-chrome.zip",
-                    browser_download_url: "https://gh.test/c.zip",
-                    size: 10
-                },
-                { name: 3 }
-            ]
-        },
-        { tag_name: "streamdeck-v9.0.0", html_url: "https://gh.test/s", draft: true },
-        { tag_name: "cli-v1.0.0", html_url: "https://gh.test/c", prerelease: true }
-    ];
-
-    it("takes the newest published release of each product", () => {
-        const [extension] = site.downloadEntries(releases, "o/r");
-        expect(extension).toEqual({
-            product: "extension",
-            released: true,
-            version: "0.2.0",
-            url: "https://gh.test/e2",
-            publishedAt: "2026-02-01T00:00:00Z",
-            files: [{ name: "polaris-0.2.0-chrome.zip", url: "https://gh.test/c.zip", size: 10 }]
-        });
-    });
-
-    it("falls back to the release page for drafts, prereleases, missing products and no network", () => {
-        const entries = site.downloadEntries(releases, "o/r");
-        expect(entries.find((entry) => entry.product === "streamdeck")).toEqual({
-            product: "streamdeck",
-            released: false,
-            url: "https://github.com/o/r/releases?q=streamdeck"
-        });
-        expect(entries.find((entry) => entry.product === "cli")?.released).toBe(false);
-        expect(site.downloadEntries([], "o/r").every((entry) => !entry.released)).toBe(true);
-    });
-
-    it("opens the install guide only for files installed by hand", () => {
-        expect(site.guideItemFor("extension", "polaris-0.2.0-chrome.zip")).toBe(
-            "extension-chromium"
-        );
-        expect(site.guideItemFor("extension", "polaris-0.2.0-firefox.zip")).toBe(
-            "extension-firefox"
-        );
-        expect(site.guideItemFor("extension", "polaris-0.2.0-sources.zip")).toBeNull();
-        expect(site.guideItemFor("streamdeck", "polaris.streamDeckPlugin")).toBe("streamdeck");
-        expect(site.guideItemFor("companion", "polaris.tgz")).toBe("companion");
-        expect(site.guideItemFor("desktop", "Polaris-0.2.0-arm64.dmg")).toBe("desktop");
-        expect(site.guideItemFor("cli", "plr-linux-x64")).toBeNull();
-    });
-});
-
 describe("apiOperations", () => {
     it("groups operations by tag in the document's order", () => {
         const groups = site.apiOperations({
@@ -260,28 +196,5 @@ describe("site words", () => {
         const en = (await import("../../src/messages/en.json")).default;
         const es = (await import("../../src/messages/es.json")).default;
         expect(keys(es).sort()).toEqual(keys(en).sort());
-    });
-});
-
-describe("release files", () => {
-    it("offers what is installed by hand, not the scripts the install lines fetch", () => {
-        expect(site.offeredFile("streamdeck", "io.github.fjrg2007.polaris.streamDeckPlugin")).toBe(
-            true
-        );
-        expect(site.offeredFile("extension", "polaris-extension-chrome.zip")).toBe(true);
-        expect(site.offeredFile("streamdeck", "install.ps1")).toBe(false);
-        expect(site.offeredFile("extension", "install.sh")).toBe(false);
-        expect(site.offeredFile("extension", "polaris-extension-sources.zip")).toBe(false);
-    });
-
-    it("hides a sources archive only for the extension", () => {
-        expect(site.offeredFile("desktop", "polaris-sources.zip")).toBe(true);
-        expect(site.offeredFile("extension", "polaris-extension-sources-notes.txt")).toBe(true);
-    });
-
-    it("marks a file with a type short enough for its square", () => {
-        expect(site.fileMark("io.github.fjrg2007.polaris.streamDeckPlugin")).toBe("SD");
-        expect(site.fileMark("polaris-0.1.3.tgz")).toBe("tgz");
-        expect(site.fileMark("Polaris.AppImage")).toBe("App");
     });
 });

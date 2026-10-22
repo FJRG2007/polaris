@@ -273,102 +273,6 @@ export function parseInstallLines(markdown: string): {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Releases                                                                    */
-/* -------------------------------------------------------------------------- */
-
-/** The products released from this repository, by the prefix of their tags. */
-export const PRODUCTS = [
-    { id: "extension", prefix: "extension-v" },
-    { id: "streamdeck", prefix: "streamdeck-v" },
-    { id: "companion", prefix: "companion-v" },
-    { id: "cli", prefix: "cli-v" },
-    { id: "desktop", prefix: "desktop-v" }
-] as const;
-
-export type ProductId = (typeof PRODUCTS)[number]["id"];
-
-/** The release answer, in the fields read; anything else is ignored. */
-export interface ReleaseInput {
-    readonly tag_name?: unknown;
-    readonly html_url?: unknown;
-    readonly draft?: unknown;
-    readonly prerelease?: unknown;
-    readonly published_at?: unknown;
-    readonly assets?: unknown;
-}
-
-export interface DownloadFile {
-    readonly name: string;
-    readonly url: string;
-    readonly size: number | null;
-}
-
-export type DownloadEntry =
-    | {
-          readonly product: ProductId;
-          readonly released: true;
-          readonly version: string;
-          readonly url: string;
-          readonly publishedAt: string | null;
-          readonly files: readonly DownloadFile[];
-      }
-    | {
-          readonly product: ProductId;
-          readonly released: false;
-          /** Where the releases would be listed, so the page still links somewhere real. */
-          readonly url: string;
-      };
-
-/**
- * The newest published, non-draft, non-prerelease release of each product, or
- * the fact that it has none - which is also the answer for every product when
- * the lookup failed, so the site builds without the network.
- */
-export function downloadEntries(releases: readonly ReleaseInput[], repo: string): DownloadEntry[] {
-    return PRODUCTS.map(({ id, prefix }) => {
-        const found = releases
-            .filter(
-                (release) =>
-                    typeof release.tag_name === "string" &&
-                    release.tag_name.startsWith(prefix) &&
-                    release.draft !== true &&
-                    release.prerelease !== true &&
-                    typeof release.html_url === "string"
-            )
-            .sort((a, b) =>
-                String(b.published_at ?? "").localeCompare(String(a.published_at ?? ""))
-            )[0];
-        if (!found)
-            return {
-                product: id,
-                released: false,
-                url: `https://github.com/${repo}/releases?q=${prefix.slice(0, -2)}`
-            };
-        const assets = Array.isArray(found.assets)
-            ? (found.assets as Record<string, unknown>[])
-            : [];
-        return {
-            product: id,
-            released: true,
-            version: (found.tag_name as string).slice(prefix.length),
-            url: found.html_url as string,
-            publishedAt: typeof found.published_at === "string" ? found.published_at : null,
-            files: assets
-                .filter(
-                    (asset) =>
-                        typeof asset?.name === "string" &&
-                        typeof asset?.browser_download_url === "string"
-                )
-                .map((asset) => ({
-                    name: asset.name as string,
-                    url: asset.browser_download_url as string,
-                    size: typeof asset.size === "number" ? asset.size : null
-                }))
-        };
-    });
-}
-
-/* -------------------------------------------------------------------------- */
 /* API reference                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -451,54 +355,7 @@ export interface LocaleData {
     readonly apps: readonly SiteApp[];
     readonly replaces: readonly ReplacesRow[];
     readonly showcase: readonly ShowcaseSection[];
-    /** The dashboard's own words for the install guide (`downloads.guide` in its account catalog). */
-    readonly guide: GuideWords;
 }
-
-export interface GuideWords {
-    readonly title: string;
-    readonly description: string;
-    readonly step: string;
-    readonly done: string;
-    readonly steps: Readonly<Record<string, string>>;
-    readonly items: Readonly<Record<string, Readonly<Record<string, string>>>>;
-}
-
-/** Which install guide a released file opens, or none for a file nobody installs by hand. */
-export function guideItemFor(product: ProductId, fileName: string): GuideItemId | null {
-    const name = fileName.toLowerCase();
-    if (product === "streamdeck") return name.endsWith(".streamdeckplugin") ? "streamdeck" : null;
-    if (product === "companion") return name.endsWith(".tgz") ? "companion" : null;
-    if (product === "extension") {
-        if (name.includes("sources") || !name.endsWith(".zip")) return null;
-        if (name.includes("firefox")) return "extension-firefox";
-        return name.includes("chrome") ? "extension-chromium" : null;
-    }
-    if (product === "desktop") return /\.(exe|dmg|deb|appimage)$/.test(name) ? "desktop" : null;
-    return null;
-}
-
-/**
- * Whether a release file is offered as a download. The install scripts are what
- * the one-line installs fetch, not something to save and run by hand, and the
- * extension's source archive is for store review.
- */
-export function offeredFile(product: ProductId, fileName: string): boolean {
-    const name = fileName.toLowerCase();
-    if (name === "install.ps1" || name === "install.sh") return false;
-    return !(product === "extension" && name.endsWith("-sources.zip"));
-}
-
-/** The short type shown in a file's square: its extension, or a fixed word for one too long to fit. */
-export function fileMark(fileName: string): string {
-    const extension = fileName.split(".").pop() ?? "";
-    if (extension.toLowerCase() === "streamdeckplugin") return "SD";
-    return extension.length <= 4 ? extension : extension.slice(0, 3);
-}
-
-/** The guide items, as `@polaris/ui/install-guide-steps` names them. */
-export type GuideItemId =
-    "streamdeck" | "companion" | "extension-chromium" | "extension-firefox" | "desktop";
 
 /** A message with `{name}` placeholders filled in. */
 export function fill(
@@ -528,16 +385,9 @@ export interface DownloadsData {
 export interface SiteData {
     readonly repo: string;
     readonly install: { unix: string | null; windows: string | null };
-    readonly cli: { unix: string; windows: string };
-    /** The one-line installs the dashboard's Downloads offers, built by the same code. */
-    readonly lines: {
-        readonly extension: { unix: string; windows: string };
-        readonly streamdeck: { macos: string; windows: string };
-    };
     readonly locales: Readonly<Record<SiteLocale, LocaleData>>;
     /** The feature guides from `docs/features`, rendered per locale. */
     readonly docs: Readonly<Record<SiteLocale, readonly DocPage[]>>;
-    readonly downloads: readonly DownloadEntry[];
     readonly downloadsPage: DownloadsData;
     readonly api: {
         title: string;
