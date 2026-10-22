@@ -5,6 +5,7 @@
  * Pure functions over plain inputs, so the build script feeds them the real
  * sources and the tests feed them fixtures. Nothing here fetches or reads files.
  */
+import type { InventoryRoute } from "@/data/api-inventory";
 
 export type SiteLocale = "en" | "es";
 
@@ -518,5 +519,15 @@ export interface SiteData {
     };
     readonly locales: Readonly<Record<SiteLocale, LocaleData>>;
     readonly downloads: readonly DownloadEntry[];
-    readonly api: { title: string; description: string; groups: ReturnType<typeof apiOperations> };
+    readonly api: {
+        title: string;
+        description: string;
+        groups: ReturnType<typeof apiOperations>;
+        /** Every route that answers to an API key, from the code. */
+        routes: InventoryRoute[];
+        /** Route handlers left out as the interface's own. */
+        internal: number;
+        /** Route files read. */
+        scanned: number;
+    };
 }

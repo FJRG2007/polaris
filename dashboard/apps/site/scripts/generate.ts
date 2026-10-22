@@ -30,6 +30,7 @@ import {
     writeFileSync
 } from "node:fs";
 import * as site from "../src/data/builders";
+import { apiInventory, type ModuleSource, type RouteSource } from "../src/data/api-inventory";
 
 const siteDir = process.env.POLARIS_SITE_DIR ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 const dashboard = join(siteDir, "..", "..");
@@ -123,6 +124,41 @@ const showcaseEs = site.parseShowcase(readmeEs);
 const openapi = buildOpenApi("https://polaris.example.com");
 const info = (openapi.info ?? {}) as { title?: string; description?: string };
 
+/** Every file under `dir` whose name passes `keep`, relative to it with forward slashes. */
+function walk(dir: string, keep: (name: string) => boolean, prefix = ""): string[] {
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory()
+            ? entry.name === "node_modules"
+                ? []
+                : walk(join(dir, entry.name), keep, `${prefix}${entry.name}/`)
+            : keep(entry.name)
+              ? [`${prefix}${entry.name}`]
+              : []
+    );
+}
+
+const routeSources: RouteSource[] = [];
+const moduleSources: ModuleSource[] = [];
+for (const app of readdirSync(join(dashboard, "apps"))) {
+    const src = join(dashboard, "apps", app, "src");
+    for (const file of walk(join(src, "app"), (name) => /^route\.tsx?$/.test(name)))
+        if (file.startsWith("api/") || file.includes("/api/"))
+            routeSources.push({ app, file, source: read(join(src, "app", file)) });
+    for (const file of walk(join(src, "lib"), (name) => /\.tsx?$/.test(name)))
+        moduleSources.push({
+            app,
+            specifier: `@/lib/${file.replace(/(\/index)?\.tsx?$/, "")}`,
+            source: read(join(src, "lib", file))
+        });
+}
+const documented = site.apiOperations(openapi as Record<string, unknown>);
+const inventory = apiInventory(
+    routeSources,
+    moduleSources,
+    documented.flatMap((group) => group.operations)
+);
+
 const data: site.SiteData = {
     repo,
     install: site.parseInstallLines(readmeEn),
@@ -159,7 +195,10 @@ const data: site.SiteData = {
     api: {
         title: String(info.title ?? ""),
         description: String(info.description ?? ""),
-        groups: site.apiOperations(openapi as Record<string, unknown>)
+        groups: documented,
+        routes: inventory.routes,
+        internal: inventory.internal,
+        scanned: routeSources.length
     }
 };
 
@@ -190,5 +229,5 @@ for (const app of catalog)
 const operations = data.api.groups.reduce((sum, group) => sum + group.operations.length, 0);
 const released = data.downloads.filter((entry) => entry.released).length;
 console.log(
-    `[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} API operations, ${released} released products`
+    `[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} documented API operations, ${inventory.routes.length} key-reachable of ${routeSources.length} route files, ${released} released products`
 );
