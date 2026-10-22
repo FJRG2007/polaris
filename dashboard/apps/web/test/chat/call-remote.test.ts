@@ -43,6 +43,14 @@ describe("remoteStep", () => {
         );
     });
 
+    it("asks to start a share, and stops one, only when it is not already there", () => {
+        expect(remoteStep({ command: "share", on: true }, IDLE)).toBe("startShare");
+        expect(remoteStep({ command: "share", on: false }, IDLE)).toBeNull();
+        const sharing = { ...IDLE, sharing: true };
+        expect(remoteStep({ command: "share", on: false }, sharing)).toBe("stopShare");
+        expect(remoteStep({ command: "share", on: true }, sharing)).toBeNull();
+    });
+
     it("starts and stops recording, and never starts where it cannot record", () => {
         expect(remoteStep({ command: "record", on: true }, IDLE)).toBe("startRecording");
         expect(remoteStep({ command: "record", on: false }, { ...IDLE, recording: true })).toBe(

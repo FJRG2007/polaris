@@ -38,7 +38,18 @@ import { useRingBack } from "./ring-back";
 import { useMutedSpeech } from "./muted-speech";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
-import { AlertTriangle, Hand, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
+import { useShareAsked } from "./call-share-ask";
+import {
+    AlertTriangle,
+    Hand,
+    Headphones,
+    HeadphoneOff,
+    Mic,
+    MicOff,
+    MonitorUp,
+    MonitorX,
+    PhoneOff
+} from "lucide-react";
 
 // The context and the two hooks that read it live in `call-hold`, which has no
 // runtime dependency of its own - see the note there. Passed on from here so
@@ -242,6 +253,9 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
         shown && !call.micOn && call.audioRole !== "companion"
     );
     const micButton = useRef<HTMLButtonElement>(null);
+    const shareButton = useRef<HTMLButtonElement>(null);
+    // A deck key asked to share, which only a press here can start.
+    const shareAsked = useShareAsked() && !call.sharing;
     if (!session || !shown) return null;
 
     const others = (call.meeting?.participants ?? []).filter(
@@ -388,6 +402,44 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                         <Headphones className="size-4" />
                     )}
                 </button>
+                {(shareAsked || call.sharing) && (
+                    <>
+                        <ControlHint
+                            anchor={shareButton}
+                            hint={
+                                shareAsked
+                                    ? { text: t("callRoom.hints.shareAsked"), tone: "warn" }
+                                    : null
+                            }
+                        />
+                        <button
+                            ref={shareButton}
+                            type="button"
+                            onClick={call.toggleShare}
+                            aria-pressed={call.sharing}
+                            aria-label={
+                                call.sharing
+                                    ? t("callRoom.stopSharing")
+                                    : t("callSession.shareScreen")
+                            }
+                            title={
+                                call.sharing
+                                    ? t("callRoom.stopSharing")
+                                    : t("callSession.shareScreen")
+                            }
+                            className={cn(
+                                "rounded-full p-1.5 transition-colors hover:bg-muted",
+                                call.sharing ? "text-primary" : "text-warning"
+                            )}
+                        >
+                            {call.sharing ? (
+                                <MonitorX className="size-4" />
+                            ) : (
+                                <MonitorUp className="size-4" />
+                            )}
+                        </button>
+                    </>
+                )}
                 <Button
                     size="icon"
                     variant="hangUp"

@@ -157,6 +157,7 @@ import {
     useShortcutHint
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import { useShareAsked } from "./call-share-ask";
 
 /**
  * The room.
@@ -250,6 +251,9 @@ export function CallRoom({
     const micHint: ControlHintText | null = talkingMuted
         ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
         : null;
+    // A deck key asked to share: the button is pointed at, and kept on the bar
+    // even where it would fold into the menu - see `call-share-ask`.
+    const shareAsked = useShareAsked() && !call.sharing;
     // Everything the call has to say, weighed once: the strip draws it, and the
     // microphone button carries whichever of it is about the microphone.
     const notices = useCallNotices(call);
@@ -1317,8 +1321,13 @@ export function CallRoom({
                         than offered and answered with an error. A share already
                         running is always given its stop. On a narrow bar it
                         moves into the menu at the end of this group. */}
-                    {!narrow && (screenShareable || call.sharing) && (
+                    {(!narrow || shareAsked) && (screenShareable || call.sharing) && (
                         <Split
+                            hint={
+                                shareAsked
+                                    ? { text: t("callRoom.hints.shareAsked"), tone: "warn" }
+                                    : null
+                            }
                             label={
                                 call.sharing ? t("callRoom.stopSharing") : t("callRoom.shareScreen")
                             }
@@ -1374,7 +1383,7 @@ export function CallRoom({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" side="top" className="w-72">
-                                {narrow && (screenShareable || call.sharing) && (
+                                {narrow && !shareAsked && (screenShareable || call.sharing) && (
                                     <DropdownMenuItem onSelect={call.toggleShare}>
                                         {call.sharing ? (
                                             <MonitorX className="size-4 shrink-0" />

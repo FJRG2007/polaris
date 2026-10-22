@@ -471,7 +471,8 @@
         },
         "sentLevel": "What others hear",
         "hints": {
-            "talkingMuted": "You're muted - nobody can hear you"
+            "talkingMuted": "You're muted - nobody can hear you",
+            "shareAsked": "Your deck asked to share - press here"
         },
         "arrivals": {
             "joined": "{name} joined",
@@ -1123,7 +1124,10 @@
         "undeafen": "Undeafen",
         "deafen": "Deafen",
         "aModeratorDeafenedYou": "A moderator deafened you",
-        "leaveTheCall": "Leave the call"
+        "leaveTheCall": "Leave the call",
+        "shareAsked": "Share your screen?",
+        "shareAskedBody": "Your deck asked to go live. Pick a screen in Polaris.",
+        "shareScreen": "Share screen"
     },
     "schedule": {
         "sendThisLater": "Send this later",

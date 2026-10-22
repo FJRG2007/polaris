@@ -32,6 +32,8 @@ export interface SeatControls {
     readonly deafened: boolean;
     readonly camera: boolean;
     readonly recording: boolean;
+    /** Whether the seat is sharing its screen. */
+    readonly sharing: boolean;
 }
 
 interface Held {
@@ -83,6 +85,8 @@ export async function noteControls(
         deafened?: boolean;
         camera?: boolean;
         recording?: boolean;
+        /** The beat's own word for a screen being shared. */
+        streaming?: boolean;
     }
 ): Promise<void> {
     const now = Date.now();
@@ -96,7 +100,13 @@ export async function noteControls(
             .catch(() => null);
         held = {
             userId: row?.userId ?? null,
-            controls: { muted: false, deafened: false, camera: false, recording: false },
+            controls: {
+                muted: false,
+                deafened: false,
+                camera: false,
+                recording: false,
+                sharing: false
+            },
             at: now
         };
         seats.set(participantId, held);
@@ -106,7 +116,8 @@ export async function noteControls(
         muted: said.muted ?? before.muted,
         deafened: said.deafened ?? before.deafened,
         camera: said.camera ?? before.camera,
-        recording: said.recording ?? before.recording
+        recording: said.recording ?? before.recording,
+        sharing: said.streaming ?? before.sharing
     };
     held.at = now;
     held.controls = next;
@@ -171,6 +182,7 @@ async function readLiveCall(userId: string): Promise<LiveCall | null> {
             meetingId: true,
             muted: true,
             deafened: true,
+            streaming: true,
             meeting: { select: { hostId: true, channelId: true } }
         }
     });
@@ -185,10 +197,11 @@ async function readLiveCall(userId: string): Promise<LiveCall | null> {
     return {
         seat: { meetingId: row.meetingId, participantId: row.id, admission: "admitted" },
         controls: {
-            // The row is the seat's own record of these two; the tab's word on
+            // The row is the seat's own record of these three; the tab's word on
             // the other two is held here.
             muted: row.muted,
             deafened: row.deafened,
+            sharing: row.streaming,
             camera: held?.camera ?? false,
             recording: held?.recording ?? false
         },
@@ -214,6 +227,8 @@ export function wantedOn(which: CallSwitch, controls: SeatControls): boolean {
             return !controls.camera;
         case "record":
             return !controls.recording;
+        case "share":
+            return !controls.sharing;
     }
 }
 

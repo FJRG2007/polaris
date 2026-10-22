@@ -471,7 +471,8 @@
         },
         "sentLevel": "Lo que oyen otros",
         "hints": {
-            "talkingMuted": "Estás silenciado: nadie te oye"
+            "talkingMuted": "Estás silenciado: nadie te oye",
+            "shareAsked": "Tu deck pide compartir: pulsa aquí"
         },
         "arrivals": {
             "joined": "{name} se ha unido",
@@ -1123,7 +1124,10 @@
         "undeafen": "Oír",
         "deafen": "No oír",
         "aModeratorDeafenedYou": "Un moderador te ensordeció",
-        "leaveTheCall": "Colgar"
+        "leaveTheCall": "Colgar",
+        "shareAsked": "¿Compartir pantalla?",
+        "shareAskedBody": "Tu deck pidió emitir. Elige pantalla en Polaris.",
+        "shareScreen": "Compartir"
     },
     "schedule": {
         "sendThisLater": "Enviar más tarde",
