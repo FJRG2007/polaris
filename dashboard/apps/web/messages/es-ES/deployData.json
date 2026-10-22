@@ -311,6 +311,16 @@
                 "mysqlOld": "No se puede aplicar: requiere MySQL 8 o posterior.",
                 "noLimit": "Pon un límite de memoria para aplicarlos. Sin él se calculan para todo el servidor, que también ejecuta todo lo demás."
             }
+        },
+        "cloud": {
+            "runsIn": "Funciona en {provider}",
+            "creating": "Se está creando en la nube. Esta página se actualiza cuando esté lista.",
+            "failed": {
+                "lost": "Polaris perdió lo que necesitaba para crear esta instancia. Bórrala y créala de nuevo.",
+                "timeout": "CloudAMQP no terminó de crear esta instancia en 30 minutos. Bórrala aquí para quitarla también allí.",
+                "keyRefused": "CloudAMQP rechazó la clave de API. Borra esta instancia y créala con una clave válida.",
+                "createRefused": "CloudAMQP rechazó el plan o la región. Borra esta instancia y créala de nuevo."
+            }
         }
     },
     "volume": {

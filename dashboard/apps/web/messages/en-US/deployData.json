@@ -311,6 +311,16 @@
                 "mysqlOld": "Applying is not available: it needs MySQL 8 or later.",
                 "noLimit": "Set a memory limit to apply these. Without one they are sized for the whole server, which runs everything else too."
             }
+        },
+        "cloud": {
+            "runsIn": "Runs in {provider}",
+            "creating": "Being created in the cloud. This page updates when it is ready.",
+            "failed": {
+                "lost": "Polaris lost what it needed to create this instance. Delete it and create it again.",
+                "timeout": "CloudAMQP did not finish creating this instance within 30 minutes. Delete it here to remove it there too.",
+                "keyRefused": "CloudAMQP refused the API key. Delete this instance and create it with a valid key.",
+                "createRefused": "CloudAMQP refused the plan or region. Delete this instance and create it again."
+            }
         }
     },
     "volume": {

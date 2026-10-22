@@ -148,6 +148,32 @@
             "engineAccount": "That account belongs to the engine.",
             "generatedPassword": "A password has to be one Polaris generated.",
             "connectionId": "That is not a connection id."
+        },
+        "cloud": {
+            "nothingAnswered": "Nothing answered at that address",
+            "httpStatus": "The server answered HTTP {status}",
+            "noResolve": "That host name does not resolve",
+            "privateAddress": "That address cannot be reached from here.",
+            "keysRefused": "The keys were refused, or they cannot reach that bucket",
+            "keyRefused": "The API key was refused",
+            "userRefused": "The user or password was refused",
+            "tokenRefused": "The token was refused",
+            "noBucket": "That organization has no bucket by that name",
+            "environmentNotFound": "Environment not found",
+            "nameEmpty": "Database name must contain letters or digits",
+            "nameTaken": "This environment already has a database called {name}",
+            "notReady": "This instance has no address yet. Open Manage to see how its create is going.",
+            "amqpKeyRefused": "CloudAMQP refused the API key",
+            "amqpListFailed": "CloudAMQP could not list your instances (HTTP {status})",
+            "amqpCreateFailed": "CloudAMQP could not create the instance (HTTP {status})",
+            "amqpReadFailed": "CloudAMQP could not read the instance (HTTP {status})",
+            "amqpDeleteFailed": "CloudAMQP could not delete the instance (HTTP {status})",
+            "failed": {
+                "lost": "Polaris lost what it needed to create this instance. Create it again.",
+                "timeout": "CloudAMQP did not finish creating this instance within 30 minutes.",
+                "keyRefused": "CloudAMQP refused the API key. Check it and send the form again.",
+                "createRefused": "CloudAMQP refused to create it with that plan and region. Check them and send the form again."
+            }
         }
     },
     "registry": {

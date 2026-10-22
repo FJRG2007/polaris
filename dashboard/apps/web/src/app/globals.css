@@ -301,6 +301,38 @@ body {
 }
 
 /*
+ * Kafka's mark is near-black and ClickHouse's is yellow: the first vanishes on
+ * the dark theme and the second on the light one. Kafka is white on dark and
+ * its own ink on light; ClickHouse keeps its yellow on dark and turns to the
+ * black its brand pairs it with on light.
+ */
+.db-mark-kafka {
+    color: #ffffff;
+}
+
+.db-mark-clickhouse {
+    color: #ffcc01;
+}
+
+:root.light .db-mark-kafka {
+    color: #231f20;
+}
+
+:root.light .db-mark-clickhouse {
+    color: #151515;
+}
+
+@media (prefers-color-scheme: light) {
+    :root.system .db-mark-kafka {
+        color: #231f20;
+    }
+
+    :root.system .db-mark-clickhouse {
+        color: #151515;
+    }
+}
+
+/*
  * The PDF viewer renders through pdf.js, whose stylesheet paints a white page
  * against a browser chrome that is not ours. These are the places that have to
  * meet the dashboard: the paper's edge and the dialog printing puts on screen.

@@ -25,8 +25,11 @@ import { LogViewer } from "@/components/log-viewer";
 import type { ImportedConfig } from "@polaris/deploy";
 import { DatabaseManageDialog } from "./database-panel";
 import { RepoConfigPreview } from "./repo-config-preview";
-import { DbEngineIcon } from "@/components/db-engine-icon";
+import { CloudProviderIcon, DbEngineIcon } from "@/components/db-engine-icon";
 import { dbEngineOptions } from "@/components/db-engine-select";
+import { CloudDatabaseForm } from "./cloud-database-form";
+import { Field } from "./form-field";
+import { databaseFormAccess, offeredServiceTypes } from "./service-type-access";
 import { isLocalDomain, isTunnelEntry, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import type { ServiceAttention } from "@/lib/deploy/attention";
@@ -61,6 +64,10 @@ import {
 import {
     databaseCreateSchema,
     dbEngineLabel,
+    cloudProvidersFor,
+    engineGroup,
+    ENGINE_GROUPS,
+    isDataEngine,
     dbVersionCaveat,
     MANAGED_ENGINES,
     MANAGED_ENGINE_INFO,
@@ -91,7 +98,14 @@ import {
     Trash2
 } from "lucide-react";
 
-const ENGINE_OPTIONS: SelectOption[] = dbEngineOptions(MANAGED_ENGINES);
+// Grouped the way the picker reads: relational, key-value, documents, search,
+// analytics, object storage, messaging.
+const ENGINE_OPTIONS: SelectOption[] = dbEngineOptions(
+    [...MANAGED_ENGINES].sort(
+        (left, right) =>
+            ENGINE_GROUPS.indexOf(engineGroup(left)) - ENGINE_GROUPS.indexOf(engineGroup(right))
+    )
+);
 
 type DbInstance = Awaited<ReturnType<typeof deployActions.listDatabaseInstancesAction>>[number];
 type DbConnection = NonNullable<
@@ -205,6 +219,8 @@ export interface ProjectSummary {
             /** True when this is a database living inside another instance rather
              *  than a container of its own. */
             hostedOnInstance?: boolean;
+            /** True when it lives in a cloud: no container, nothing to deploy. */
+            cloud?: boolean;
             /** How many databases are hosted inside this one, which is what makes
              *  removing it destroy more than itself. */
             hostedCount?: number;
@@ -594,26 +610,28 @@ function DatabaseCard({
             {error && <p className="text-xs text-danger">{error}</p>}
 
             {canManage && can("databases.manage") && (
-                <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={pending}
-                        className="mr-auto"
-                        onClick={() =>
-                            startTransition(async () => {
-                                await deployActions.deployDatabaseAction(database.id);
-                                onChanged();
-                            })
-                        }
-                    >
-                        {pending ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Rocket className="size-4" />
-                        )}{" "}
-                        {t("view.provision")}
-                    </Button>
+                <div className="mt-auto flex items-center justify-end gap-1 border-t border-border/60 pt-3">
+                    {!database.cloud && (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={pending}
+                            className="mr-auto"
+                            onClick={() =>
+                                startTransition(async () => {
+                                    await deployActions.deployDatabaseAction(database.id);
+                                    onChanged();
+                                })
+                            }
+                        >
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Rocket className="size-4" />
+                            )}{" "}
+                            {t("view.provision")}
+                        </Button>
+                    )}
                     <Button
                         variant="ghost"
                         size="icon"
@@ -998,7 +1016,7 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
     const can = useProjectCan();
     // Starting a database is its own grant, so it is offered only to whoever
     // holds it - the form behind it would refuse anyway.
-    const types = SERVICE_TYPES.filter((type) => type.id !== "database" || can("databases.manage"));
+    const types = offeredServiceTypes(SERVICE_TYPES, can);
     return (
         <div className="flex flex-col gap-1">
             {types.map((type) => (
@@ -1387,6 +1405,28 @@ const redisTopologyOptions = (t: NamespaceTranslator<"deploy">): SelectOption[] 
 
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const t = useTranslations("deploy");
+    const can = useProjectCan();
+    // Every way in is behind deploy.manage; the database grant is checked here
+    // too, so a form that cannot be sent says why instead of failing on submit.
+    const access = databaseFormAccess(true, can);
+    if (!access.allowed) {
+        return (
+            <p className="text-sm text-muted-foreground">
+                {t(`view.database.cloud.denied_${access.reason}`)}
+            </p>
+        );
+    }
+    return <NewDatabaseFields environmentId={environmentId} onDone={onDone} />;
+}
+
+function NewDatabaseFields({
+    environmentId,
+    onDone
+}: {
+    environmentId: string;
+    onDone: () => void;
+}) {
+    const t = useTranslations("deploy");
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<ManagedEngine>("postgres");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
@@ -1406,6 +1446,8 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     const [privileges, setPrivileges] = useState("owner");
     const [redisLayout, setRedisLayout] = useState(SINGLE);
     const [topology, setTopology] = useState<TopologyValue>(SINGLE_TOPOLOGY);
+    /** "server", or the id of the cloud provider a data engine lives with. */
+    const [where, setWhere] = useState("server");
 
     const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
@@ -1418,6 +1460,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     // so is the layout, which each engine offers differently.
     useEffect(() => {
         setInstanceId(DEDICATED);
+        setWhere("server");
         setTopology(SINGLE_TOPOLOGY);
         setRedisLayout(SINGLE);
         if (!info.namedDatabases) {
@@ -1473,8 +1516,10 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
         });
     }
 
-    return (
-        <div className="flex flex-col gap-3">
+    // The name, the engine and where it runs are asked the same way wherever
+    // it runs; only what follows them changes.
+    const header = (
+        <>
             <Field label={t("view.name")}>
                 <Input
                     value={name}
@@ -1491,6 +1536,43 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     options={ENGINE_OPTIONS}
                 />
             </Field>
+            {isDataEngine(engine) && (
+                <Field label={t("view.database.cloud.where")}>
+                    <Select
+                        value={where}
+                        onValueChange={setWhere}
+                        options={[
+                            { value: "server", label: t("view.database.cloud.onServer") },
+                            ...cloudProvidersFor(engine).map((one) => ({
+                                value: one.id,
+                                label: one.label,
+                                icon: <CloudProviderIcon provider={one.id} className="size-5" />
+                            }))
+                        ]}
+                    />
+                </Field>
+            )}
+        </>
+    );
+
+    if (isDataEngine(engine) && where !== "server") {
+        return (
+            <div className="flex flex-col gap-3">
+                {header}
+                <CloudDatabaseForm
+                    environmentId={environmentId}
+                    engine={engine}
+                    name={name}
+                    provider={where}
+                    onDone={onDone}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-3">
+            {header}
             {engine === "redis" && (
                 <Field
                     label={t("view.database.runsAs")}
