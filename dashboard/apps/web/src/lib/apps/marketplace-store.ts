@@ -5,10 +5,18 @@
  * app's own page and the tests all read the same answers.
  */
 
+import { POLARIS_APPS, type AppEntry } from "@/lib/apps";
 import { appProvenance } from "@/lib/apps/provenance";
 import { hasScreenshots } from "@/lib/apps/app-screenshots";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
-import { isInstallable, type AppCategory, type AppManifest } from "@/lib/apps/catalog";
+import { findTemplateApp, templateApps } from "@/lib/apps/template-apps";
+import {
+    appsByCategory,
+    findApp,
+    isInstallable,
+    type AppCategory,
+    type AppManifest
+} from "@/lib/apps/catalog";
 
 /** How the grid is ordered. `featured` is the catalog's own, deliberate order. */
 export type StoreSort = "featured" | "name" | "recent";
@@ -141,6 +149,7 @@ export interface StoreInstall {
  */
 export type PrimaryAction =
     | { readonly kind: "open"; readonly href: string }
+    | { readonly kind: "deploy" }
     | { readonly kind: "installing" }
     | { readonly kind: "install"; readonly configurable: boolean }
     | { readonly kind: "locked" }
@@ -160,6 +169,8 @@ export function primaryAction(
     if (app.comingSoon) return { kind: "comingSoon" };
     if (!isInstallable(app)) return { kind: "unavailable" };
     if (!state.canInstall) return { kind: "locked" };
+    // A template is a service in a project, not an install: Deploy's flow makes it.
+    if (app.installMethod === "deploy-template") return { kind: "deploy" };
     return { kind: "install", configurable: app.installMethod !== "builtin" };
 }
 
@@ -176,4 +187,60 @@ export function installBadge(
     if (!first) return null;
     if (app.installMethod === "builtin") return { kind: "installed" };
     return { kind: "status", status: first.status };
+}
+
+/**
+ * Which marketplace an app is listed in.
+ *
+ * `deployable` is /apps/marketplace: other developers' software that Polaris
+ * deploys and runs for you. `polaris` is the admin screen (/admin/apps): the
+ * apps that are part of Polaris itself and switch on for the whole instance.
+ */
+export type StoreScope = "deployable" | "polaris";
+
+export function storeScope(app: AppManifest): StoreScope {
+    return storeShelf(app) === "polaris" ? "polaris" : "deployable";
+}
+
+/** Everything the two marketplaces list: the catalog's offered apps, then Deploy's templates. */
+export function storeApps(): AppManifest[] {
+    return [...appsByCategory().flatMap((group) => group.apps), ...templateApps()];
+}
+
+/** A catalog app or a template entry, by its store id. */
+export function findStoreApp(id: string): AppManifest | undefined {
+    return findApp(id) ?? findTemplateApp(id);
+}
+
+/** The admin marketplace's address, opened on one app when one is named. */
+export const POLARIS_APPS_PATH = "/admin/apps";
+
+export function polarisAppsHref(appId?: string): string {
+    return appId ? `${POLARIS_APPS_PATH}?app=${encodeURIComponent(appId)}` : POLARIS_APPS_PATH;
+}
+
+/** The user marketplace's address: other developers' apps. */
+export const DEPLOYABLE_APPS_PATH = "/apps/marketplace";
+
+/** The grid an app is listed in. */
+export function storeHome(scope: StoreScope): string {
+    return scope === "polaris" ? POLARIS_APPS_PATH : DEPLOYABLE_APPS_PATH;
+}
+
+/** An app's own page, in the marketplace that lists it. */
+export function listingHref(app: AppManifest): string {
+    return `${storeHome(storeScope(app))}/${encodeURIComponent(app.id)}`;
+}
+
+/** Entries of the switcher that are screens of the shell rather than apps anybody installs. */
+const NOT_AN_APP = new Set(["overview", "admin", "account"]);
+
+/**
+ * The apps every Polaris comes with: in the switcher with no marketplace app
+ * behind them (`requiresApp`), so nothing installs them and nothing removes
+ * them yet. Listed on the admin screen the way a phone lists the apps it
+ * shipped with.
+ */
+export function builtInApps(): AppEntry[] {
+    return POLARIS_APPS.filter((app) => !app.requiresApp && !app.hidden && !NOT_AN_APP.has(app.id));
 }

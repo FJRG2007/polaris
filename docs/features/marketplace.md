@@ -6,6 +6,12 @@ The apps Polaris can add, installed with one press: Calendar, CRM, Tools, a
 mail server for your own domains, game servers, Places for cameras and smart
 devices, and the messaging bridge behind the Inbox.
 
+There are two marketplaces. Polaris's own apps are switched on for everybody
+by an administrator, from **Management > Polaris apps**, which also lists
+the apps every Polaris comes with - Drive, Chat, Mail, Tasks and the rest -
+marked Built in, with nothing to uninstall. **Apps > Marketplace** is for
+other developers' software that Polaris deploys and runs for you.
+
 Every picture is the real interface drawn with made-up people and data, and
 follows your light or dark setting. Phone-sized versions are in
 [docs/assets/media](../assets/media).

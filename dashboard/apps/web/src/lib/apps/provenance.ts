@@ -20,6 +20,7 @@
  * Pure and client-safe: the marketplace grid runs in the browser.
  */
 
+import { serviceTemplate } from "@polaris/core";
 import type { AppManifest } from "./catalog";
 
 /** What a card says under the app's name. */
@@ -78,8 +79,15 @@ function siteOf(url: string | undefined): string {
  * lines say whose.
  */
 export function appProvenance(app: AppManifest): AppProvenance {
-    const image = app.template?.image ?? "";
-    const firstParty = image === "" || image.startsWith(OWN_IMAGE_PREFIX);
+    const image =
+        app.template?.image ??
+        (app.deployTemplate ? serviceTemplate(app.deployTemplate)?.image : "") ??
+        "";
+    // A template is always somebody else's software, and a wrapped app says so itself.
+    const firstParty =
+        !app.thirdParty &&
+        !app.deployTemplate &&
+        (image === "" || image.startsWith(OWN_IMAGE_PREFIX));
     if (firstParty) {
         return { developer: POLARIS, distributor: POLARIS, firstParty: true, docsUrl: app.docsUrl };
     }

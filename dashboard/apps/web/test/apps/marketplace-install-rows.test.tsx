@@ -1,5 +1,5 @@
 /**
- * The Marketplace lists instance-wide apps somebody else installed beside the
+ * The admin marketplace lists instance-wide apps somebody else installed beside the
  * reader's own. Those rows must not carry who owns them or where they run, and
  * carry the service id only to a reader who may uninstall them - the one thing
  * the page reads it for.
@@ -14,10 +14,13 @@ const uninstallable = vi.hoisted(() => ({ ids: new Set<string>() }));
 vi.mock("next/navigation", () => ({
     notFound: () => {
         throw new Error("not found");
+    },
+    redirect: (to: string) => {
+        throw new Error(`redirect ${to}`);
     }
 }));
 vi.mock("@/lib/session", () => ({
-    requirePermission: vi.fn(async () => ({ id: "reader-1", isAdmin: false })),
+    requireAdmin: vi.fn(async () => ({ id: "reader-1", isAdmin: true })),
     sessionCan: vi.fn(async () => true)
 }));
 vi.mock("@/lib/apps/install-access", () => ({
@@ -32,12 +35,10 @@ vi.mock("@/lib/apps/install-service", async (importOriginal) => {
     return {
         installForReader: actual.installForReader,
         instanceWideInstallIds: vi.fn(async () => ["install-theirs"]),
-        listInstalledApps: vi.fn(
-            async (): Promise<InstalledAppView[]> => [
-                row("install-mine", "reader-1"),
-                row("install-theirs", "owner-2")
-            ]
-        )
+        listInstalledApps: vi.fn(async (): Promise<InstalledAppView[]> => [
+            row("install-mine", "reader-1"),
+            row("install-theirs", "owner-2")
+        ])
     };
 });
 vi.mock("@/app/(app)/apps/marketplace/marketplace-view", () => ({ MarketplaceView: () => null }));
@@ -60,8 +61,8 @@ function row(id: string, ownerId: string): InstalledAppView {
     };
 }
 
-const { default: MarketplacePage } = await import("@/app/(app)/apps/marketplace/page");
-const { default: MarketplaceAppPage } = await import("@/app/(app)/apps/marketplace/[appId]/page");
+const { default: MarketplacePage } = await import("@/app/(app)/admin/apps/page");
+const { default: MarketplaceAppPage } = await import("@/app/(app)/admin/apps/[appId]/page");
 
 type Row = Record<string, unknown>;
 

@@ -16,6 +16,7 @@
  */
 
 import { z } from "zod";
+import { DATA_ENGINES, DATA_ENGINE_INFO, type DataEngine } from "./data-engines.js";
 
 export const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
 export type DbEngine = (typeof DB_ENGINES)[number];
@@ -103,7 +104,7 @@ export const STORAGE_ENGINES = ["seaweedfs"] as const;
 export type StorageEngine = (typeof STORAGE_ENGINES)[number];
 
 /** Everything that can be created from the "new database" flow. */
-export const MANAGED_ENGINES = [...DB_ENGINES, ...STORAGE_ENGINES] as const;
+export const MANAGED_ENGINES = [...DB_ENGINES, ...STORAGE_ENGINES, ...DATA_ENGINES] as const;
 export type ManagedEngine = (typeof MANAGED_ENGINES)[number];
 
 export interface ManagedEngineInfo extends Omit<DbEngineInfo, "id"> {
@@ -126,7 +127,21 @@ export const MANAGED_ENGINE_INFO: Readonly<Record<ManagedEngine, ManagedEngineIn
         namedDatabases: false,
         namedUsers: false,
         storage: true
-    }
+    },
+    ...(Object.fromEntries(
+        DATA_ENGINES.map((engine) => [
+            engine,
+            {
+                id: engine,
+                label: DATA_ENGINE_INFO[engine].label,
+                port: DATA_ENGINE_INFO[engine].port,
+                versions: DATA_ENGINE_INFO[engine].versions,
+                namedDatabases: false,
+                namedUsers: false,
+                storage: false
+            }
+        ])
+    ) as Record<DataEngine, ManagedEngineInfo>)
 };
 
 /** True for an engine this build can create. */

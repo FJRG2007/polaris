@@ -30,6 +30,19 @@ import {
 } from "@polaris/ui";
 
 /**
+ * The preview's height: 16:10 of its width, rounded down to a whole pixel.
+ *
+ * A plain `aspect-[16/10]` gives a fractional height for almost every column
+ * width (a 415px card is 259.375px tall), and every card body and every row
+ * below it then starts between two pixels. A browser that scrolls in
+ * fractions of a pixel snaps each line of text to the pixel grid on its own,
+ * so while the page moves the text steps up and down against the borders
+ * around it. `round()` against the container's width keeps the height whole;
+ * a browser without `round()` drops the declaration and keeps the ratio.
+ */
+export const PREVIEW_HEIGHT = "aspect-[16/10] h-[round(down,calc(100cqw*10/16),1px)]";
+
+/**
  * A 16:10 preview: the capture in the reader's theme (picked by CSS, so the
  * first paint is already right), or the designed placeholder.
  */
@@ -45,41 +58,49 @@ export function AppPreview({
     eager?: boolean;
 }) {
     const t = useTranslations("marketplace");
-    const frame = cn("relative aspect-[16/10] w-full overflow-hidden bg-surface", className);
+    const box = cn("overflow-hidden [container-type:inline-size]", className);
+    const frame = cn("relative w-full overflow-hidden bg-surface", PREVIEW_HEIGHT);
     if (shot) {
         return (
-            <div className={frame}>
-                {(["dark", "light"] as const).map((theme) => (
-                    <picture key={theme} className={styles[theme]}>
-                        <source media="(max-width: 640px)" srcSet={shot[theme].mobile} />
-                        {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
-                        <img
-                            src={shot[theme].desktop}
-                            alt={t("card.preview", { name: app.name })}
-                            loading={eager ? "eager" : "lazy"}
-                            className="size-full object-cover object-top"
-                        />
-                    </picture>
-                ))}
+            <div className={box}>
+                <div className={frame}>
+                    {(["dark", "light"] as const).map((theme) => (
+                        <picture key={theme} className={styles[theme]}>
+                            <source media="(max-width: 640px)" srcSet={shot[theme].mobile} />
+                            {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
+                            <img
+                                src={shot[theme].desktop}
+                                alt={t("card.preview", { name: app.name })}
+                                loading={eager ? "eager" : "lazy"}
+                                className="size-full object-cover object-top"
+                            />
+                        </picture>
+                    ))}
+                </div>
             </div>
         );
     }
     const tint = tintFor(app.id);
     return (
-        <div
-            className={cn(frame, "flex flex-col items-center justify-center gap-2 p-4 text-center")}
-            style={{ backgroundColor: tint, color: initialsInk(tint) }}
-            data-preview="placeholder"
-            role="img"
-            aria-label={t("card.preview", { name: app.name })}
-        >
-            <span className="rounded-xl bg-background/90 p-2 shadow-sm">
-                <AppMark app={app} size={44} />
-            </span>
-            <span className="max-w-full truncate text-sm font-semibold" title={app.name}>
-                {app.name}
-            </span>
-            <span className="line-clamp-2 max-w-[28ch] text-xs opacity-80">{app.summary}</span>
+        <div className={box}>
+            <div
+                className={cn(
+                    frame,
+                    "flex flex-col items-center justify-center gap-2 p-4 text-center"
+                )}
+                style={{ backgroundColor: tint, color: initialsInk(tint) }}
+                data-preview="placeholder"
+                role="img"
+                aria-label={t("card.preview", { name: app.name })}
+            >
+                <span className="rounded-xl bg-background/90 p-2 shadow-sm">
+                    <AppMark app={app} size={44} />
+                </span>
+                <span className="max-w-full truncate text-sm font-semibold" title={app.name}>
+                    {app.name}
+                </span>
+                <span className="line-clamp-2 max-w-[28ch] text-xs opacity-80">{app.summary}</span>
+            </div>
         </div>
     );
 }
@@ -116,6 +137,12 @@ export function PrimaryActionButton({
             return (
                 <Button size={size} onClick={onInstall} disabled={disabled}>
                     {t("card.install")}
+                </Button>
+            );
+        case "deploy":
+            return (
+                <Button size={size} onClick={onInstall} disabled={disabled}>
+                    {t("card.deploy")}
                 </Button>
             );
         case "locked":

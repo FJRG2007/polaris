@@ -122,6 +122,7 @@ export async function uninstallInstalledAppAction(
             metadata: { deleteData: parsed.data.deleteData }
         });
         revalidatePath("/apps/marketplace");
+        revalidatePath("/admin/apps");
         return {};
     } catch (caught) {
         if (caught instanceof InstallFilesLeftError) {

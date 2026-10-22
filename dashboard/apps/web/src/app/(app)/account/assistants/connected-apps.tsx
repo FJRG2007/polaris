@@ -740,7 +740,7 @@ function EditScopes({
 
     return (
         <Dialog open onOpenChange={(open) => !open && onCancel()}>
-            <DialogContent className="w-[calc(100%-2rem)] max-w-md">
+            <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className="break-words pr-6 [overflow-wrap:anywhere]">
                         {t("connectedApps.editTitle", { app: name })}

@@ -451,5 +451,9 @@
         "exitedBody": "El agente salió por su cuenta. Abre otra sesión para seguir.",
         "workKeptTitle": "No se subió el trabajo de {session}",
         "workKeptBody": "Polaris no pudo subir {branch}, así que guardó la máquina de la sesión y su trabajo. Ábrela para reintentar o descartarlo."
+    },
+    "cloudLeft": {
+        "title": "{name} puede seguir funcionando en CloudAMQP",
+        "body": "CloudAMQP rechazó la clave de API guardada, así que la instancia {name} no se pudo quitar allí. Bórrala en la consola de CloudAMQP para que deje de cobrarse."
     }
 }

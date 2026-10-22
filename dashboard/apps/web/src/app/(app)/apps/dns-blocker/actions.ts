@@ -62,6 +62,7 @@ export async function installDnsBlockerAppAction(): Promise<Result> {
         });
         revalidatePath("/", "layout");
         revalidatePath("/apps/marketplace");
+        revalidatePath("/admin/apps");
         refresh();
         return {};
     } catch (error) {

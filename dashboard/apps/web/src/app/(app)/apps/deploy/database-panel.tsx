@@ -122,7 +122,8 @@ export function DatabaseManageDialog({
     const running =
         overview?.operations.some((operation) => operation.status === "running") ||
         overview?.upgrade?.state === "running" ||
-        overview?.upgrade?.state === "starting";
+        overview?.upgrade?.state === "starting" ||
+        (overview?.cloud && overview.status === "provisioning");
     useEffect(() => {
         if (!open || !running) return;
         const timer = setInterval(() => void load(), 3000);
@@ -149,15 +150,16 @@ export function DatabaseManageDialog({
                         { value: "tuning" as const, label: t("database.tabs.tuning") }
                     ]
                   : []),
-              // A database inside another instance is reached through that one's container.
-              ...(!overview.hosted
+              // A database inside another instance is reached through that one's
+              // container, and one in a cloud has no container here at all.
+              ...(!overview.hosted && !overview.cloud
                   ? [{ value: "network" as const, label: t("database.tabs.network") }]
                   : []),
               ...(overview.pitr
                   ? [{ value: "pitr" as const, label: t("database.tabs.pitr") }]
                   : []),
               // A cluster's keys are spread over its masters; one dump cannot be loaded into it.
-              ...(!overview.storage && !overview.redis?.clusterMasters
+              ...(!overview.storage && !overview.cloud && !overview.redis?.clusterMasters
                   ? [{ value: "copy" as const, label: t("database.tabs.copy") }]
                   : []),
               ...(overview.storage
@@ -233,6 +235,15 @@ export function DatabaseManageDialog({
                                 from: overview.recovery.from ?? t("database.removedInstance")
                             })}
                         </DialogDescription>
+                    ) : overview?.cloud ? (
+                        <DialogDescription>
+                            {t("database.cloud.runsIn", {
+                                provider:
+                                    core.DATA_CLOUD_PROVIDERS.find(
+                                        (one) => one.id === overview.cloud?.provider
+                                    )?.label ?? overview.cloud.provider
+                            })}
+                        </DialogDescription>
                     ) : null}
                 </DialogHeader>
 
@@ -246,6 +257,15 @@ export function DatabaseManageDialog({
 
                 {overview ? (
                     <div className="flex flex-col gap-4">
+                        {overview.cloud?.failure ? (
+                            <p className="text-sm text-danger">
+                                {t(`database.cloud.failed.${overview.cloud.failure}`)}
+                            </p>
+                        ) : overview.cloud && overview.status === "provisioning" ? (
+                            <p className="text-sm text-muted-foreground">
+                                {t("database.cloud.creating")}
+                            </p>
+                        ) : null}
                         {overview.failedDeploymentId ? (
                             <LikelyCause
                                 deploymentId={overview.failedDeploymentId}

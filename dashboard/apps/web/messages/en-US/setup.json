@@ -1,7 +1,7 @@
 {
     "wizard": {
         "title": "Set up Polaris",
-        "intro": "Say what Polaris is for and only the apps that fit get installed. You can add more later from Marketplace.",
+        "intro": "Say what Polaris is for and only the apps that fit get installed. You can add more later from Polaris apps.",
         "useCasesLabel": "What will you use Polaris for?",
         "useCases": {
             "hosting": {
@@ -40,7 +40,7 @@
         "retry": "Retry",
         "retryNamed": "Retry {app}",
         "allDone": "All set. The apps you picked are in the app menu.",
-        "someFailed": "Some apps were not installed. Retry them, or finish and add them later from Marketplace.",
+        "someFailed": "Some apps were not installed. Retry them, or finish and add them later from Polaris apps.",
         "reopenHint": "You can open this again from Management, under Get started.",
         "step": "Step {current} of {total}",
         "loading": "Checking what is installed"
@@ -52,7 +52,7 @@
     "errors": {
         "adminOnly": "Only an administrator can install apps.",
         "unknownApp": "That app is not offered here.",
-        "install": "{app} was not installed. Retry, or open it in Marketplace to see what it needs.",
+        "install": "{app} was not installed. Retry, or open it in Polaris apps to see what it needs.",
         "network": "Polaris did not answer. Check your connection, then retry."
     },
     "presets": {

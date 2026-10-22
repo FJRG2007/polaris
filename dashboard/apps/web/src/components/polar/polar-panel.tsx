@@ -127,6 +127,7 @@ import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activi
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
+import { answeredNothing } from "@/lib/polar/unanswered";
 import { repoStepOf } from "@/lib/polar/code-host";
 import { GithubAppGapNotice, gapIdentity, gapsOf } from "@/components/github-app-gap";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
@@ -792,6 +793,7 @@ export function PolarChat({
         onRemoved: (id) => removed.current(id)
     });
     const [lastApproved, setLastApproved] = useState(false);
+    const [stopped, setStopped] = useState<string | null>(null);
     const [collapsed, setCollapsed] = useState(false);
     const [drawer, setDrawer] = useState(false);
     const [modelOpen, setModelOpen] = useState(false);
@@ -963,6 +965,10 @@ export function PolarChat({
     // for a turn that never got an answer to carry one, a dropped connection.
     const looseError =
         chat.error && !polarFailure.messageFailure(chat.messages.at(-1)) ? chat.error : null;
+    const stopTurn = () => {
+        setStopped(chat.messages.at(-1)?.id ?? null);
+        void chat.stop();
+    };
     const waitingApproval = chat.messages
         .at(-1)
         ?.parts.some((part) => "state" in part && part.state === "approval-requested");
@@ -2128,7 +2134,7 @@ export function PolarChat({
                     disabled: !choice || files.some(stillStaging),
                     sendLabel: t("actions.send"),
                     stopLabel: t("actions.stop"),
-                    onStop: () => void chat.stop()
+                    onStop: stopTurn
                 }}
             />
             {inCall ? (
@@ -2142,7 +2148,7 @@ export function PolarChat({
                     onTranscriber={chooseTranscriber}
                     tools={tools}
                     onSend={(text) => void sendSpoken(text)}
-                    onStop={() => void chat.stop()}
+                    onStop={stopTurn}
                     onApprove={(id, approved) => {
                         setLastApproved(approved);
                         void chat.addToolApprovalResponse({ id, approved });
@@ -2448,6 +2454,10 @@ export function PolarChat({
                                         tools={tools}
                                         last={index === chat.messages.length - 1}
                                         busy={busy}
+                                        explained={
+                                            message.id === stopped ||
+                                            (index === chat.messages.length - 1 && !!looseError)
+                                        }
                                         version={{
                                             current: at + 1,
                                             total: versions.length
@@ -2669,6 +2679,7 @@ function MessageView({
     tools,
     last,
     busy,
+    explained,
     version,
     onVersion,
     onApprove,
@@ -2689,6 +2700,8 @@ function MessageView({
     tools: Record<string, ToolDescription>;
     last: boolean;
     busy: boolean;
+    /** Whether something else already says why this answer is empty: a stop, a dropped turn. */
+    explained: boolean;
     version: { current: number; total: number };
     onVersion: (step: -1 | 1) => void;
     onApprove: (id: string, approved: boolean) => void;
@@ -2759,6 +2772,12 @@ function MessageView({
                       : [];
               })
           );
+    const unanswered =
+        !mine &&
+        !streaming &&
+        !explained &&
+        !gaps.length &&
+        answeredNothing(message.parts as never);
     const { copied, copy } = useCopied();
     const toast = useToast();
     const reading = answerActions.useReading(message.id);
@@ -2937,6 +2956,18 @@ function MessageView({
                     onCheckAgain={!streaming && last && !busy ? () => onRegenerate({}) : undefined}
                 />
             ))}
+            {/* A turn that ended on its steps with nothing said is named, so
+                the empty space under them never reads as an answer. */}
+            {unanswered ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm text-foreground-muted">
+                    <span>{t("errors.unanswered")}</span>
+                    {last && !busy ? (
+                        <Button size="sm" variant="outline" onClick={() => onRegenerate({})}>
+                            {t("errors.provider.retry")}
+                        </Button>
+                    ) : null}
+                </div>
+            ) : null}
             {!mine && typeof meta.model === "string" ? (
                 <p className="text-xs text-foreground-subtle">
                     {t(meta.automatic ? "picker.autoPicked" : "picker.answeredBy", {

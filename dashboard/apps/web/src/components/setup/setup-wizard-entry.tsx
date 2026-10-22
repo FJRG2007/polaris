@@ -67,7 +67,7 @@ export function SetupWizardOffer() {
 
     return (
         <Dialog open={state.offer && !closed} onOpenChange={dismiss}>
-            <DialogContent className="w-[calc(100%-2rem)] max-w-xl" showClose={!installing}>
+            <DialogContent className="max-w-xl" showClose={!installing}>
                 <DialogHeader>
                     <DialogTitle>{t("wizard.title")}</DialogTitle>
                     <DialogDescription className="sr-only">{t("wizard.intro")}</DialogDescription>

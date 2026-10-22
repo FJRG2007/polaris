@@ -10,6 +10,7 @@
 
 import type { PrivateAccess } from "@/lib/deploy/private-domain";
 import { FilesPanel } from "./files-panel";
+import { Field, NewTemplateForm, ServerField, useDeployServers } from "./service-form";
 import { dbTone, StatusPill } from "./status-pill";
 import { DeployFailureNote } from "./deploy-failure";
 import * as deployActions from "./actions";
@@ -19,13 +20,16 @@ import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConnectionsHref } from "@/components/use-connections-href";
-import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { LogViewer } from "@/components/log-viewer";
 import type { ImportedConfig } from "@polaris/deploy";
 import { DatabaseManageDialog } from "./database-panel";
 import { RepoConfigPreview } from "./repo-config-preview";
-import { DbEngineIcon } from "@/components/db-engine-icon";
+import { CloudProviderIcon, DbEngineIcon } from "@/components/db-engine-icon";
 import { dbEngineOptions } from "@/components/db-engine-select";
+import { CloudDatabaseForm } from "./cloud-database-form";
+import { Field } from "./form-field";
+import { databaseFormAccess, offeredServiceTypes } from "./service-type-access";
 import { isLocalDomain, isTunnelEntry, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import type { ServiceAttention } from "@/lib/deploy/attention";
@@ -34,7 +38,7 @@ import type { ElsewhereSummary } from "@/lib/deploy/external-services";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
-import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
     DatabaseTopologyField,
     hasTopologyChoice,
@@ -60,12 +64,14 @@ import {
 import {
     databaseCreateSchema,
     dbEngineLabel,
+    cloudProvidersFor,
+    engineGroup,
+    ENGINE_GROUPS,
+    isDataEngine,
     dbVersionCaveat,
     MANAGED_ENGINES,
     MANAGED_ENGINE_INFO,
     REDIS_CLUSTER_MASTERS,
-    SERVICE_TEMPLATES,
-    type ServiceTemplate,
     type DatabaseCreateInput,
     type ManagedEngine
 } from "@polaris/core";
@@ -92,7 +98,14 @@ import {
     Trash2
 } from "lucide-react";
 
-const ENGINE_OPTIONS: SelectOption[] = dbEngineOptions(MANAGED_ENGINES);
+// Grouped the way the picker reads: relational, key-value, documents, search,
+// analytics, object storage, messaging.
+const ENGINE_OPTIONS: SelectOption[] = dbEngineOptions(
+    [...MANAGED_ENGINES].sort(
+        (left, right) =>
+            ENGINE_GROUPS.indexOf(engineGroup(left)) - ENGINE_GROUPS.indexOf(engineGroup(right))
+    )
+);
 
 type DbInstance = Awaited<ReturnType<typeof deployActions.listDatabaseInstancesAction>>[number];
 type DbConnection = NonNullable<
@@ -206,6 +219,8 @@ export interface ProjectSummary {
             /** True when this is a database living inside another instance rather
              *  than a container of its own. */
             hostedOnInstance?: boolean;
+            /** True when it lives in a cloud: no container, nothing to deploy. */
+            cloud?: boolean;
             /** How many databases are hosted inside this one, which is what makes
              *  removing it destroy more than itself. */
             hostedCount?: number;
@@ -595,26 +610,28 @@ function DatabaseCard({
             {error && <p className="text-xs text-danger">{error}</p>}
 
             {canManage && can("databases.manage") && (
-                <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={pending}
-                        className="mr-auto"
-                        onClick={() =>
-                            startTransition(async () => {
-                                await deployActions.deployDatabaseAction(database.id);
-                                onChanged();
-                            })
-                        }
-                    >
-                        {pending ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Rocket className="size-4" />
-                        )}{" "}
-                        {t("view.provision")}
-                    </Button>
+                <div className="mt-auto flex items-center justify-end gap-1 border-t border-border/60 pt-3">
+                    {!database.cloud && (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={pending}
+                            className="mr-auto"
+                            onClick={() =>
+                                startTransition(async () => {
+                                    await deployActions.deployDatabaseAction(database.id);
+                                    onChanged();
+                                })
+                            }
+                        >
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Rocket className="size-4" />
+                            )}{" "}
+                            {t("view.provision")}
+                        </Button>
+                    )}
                     <Button
                         variant="ghost"
                         size="icon"
@@ -999,7 +1016,7 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
     const can = useProjectCan();
     // Starting a database is its own grant, so it is offered only to whoever
     // holds it - the form behind it would refuse anyway.
-    const types = SERVICE_TYPES.filter((type) => type.id !== "database" || can("databases.manage"));
+    const types = offeredServiceTypes(SERVICE_TYPES, can);
     return (
         <div className="flex flex-col gap-1">
             {types.map((type) => (
@@ -1020,61 +1037,6 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
     );
 }
 
-interface ServerOption {
-    id: string;
-    name: string;
-}
-
-/**
- * The servers a new service can deploy to (local host + connected SSH hosts),
- * with the first one selected by default - so a single-server setup needs no
- * choice and multi-server setups get an explicit picker.
- */
-function useDeployServers(environmentId: string): {
-    servers: ServerOption[];
-    serverId: string;
-    setServerId: (id: string) => void;
-} {
-    const [servers, setServers] = useState<ServerOption[]>([]);
-    const [serverId, setServerId] = useState("local");
-    useEffect(() => {
-        // Scoped to the environment being deployed into, so the list is the
-        // project owner's machines rather than the machines of whoever happens to
-        // be filling the form in.
-        void deployActions
-            .listDeployServersAction(environmentId)
-            .then((list) => {
-                setServers(list);
-                if (list[0]) setServerId(list[0].id);
-            })
-            .catch(() => undefined);
-    }, [environmentId]);
-    return { servers, serverId, setServerId };
-}
-
-function ServerField({
-    servers,
-    value,
-    onChange
-}: {
-    servers: ServerOption[];
-    value: string;
-    onChange: (id: string) => void;
-}) {
-    const t = useTranslations("deploy");
-    if (servers.length === 0) return null;
-    return (
-        <Field label={t("view.server")} hint={t("view.serverHint")}>
-            <Select
-                value={value}
-                onValueChange={onChange}
-                options={servers.map((server) => ({ value: server.id, label: server.name }))}
-                aria-label={t("view.server")}
-            />
-        </Field>
-    );
-}
-
 /** A new service from an uploaded folder, on the server picked here. */
 function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
@@ -1085,159 +1047,6 @@ function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDon
             serverField={<ServerField servers={servers} value={serverId} onChange={setServerId} />}
             onDone={onDone}
         />
-    );
-}
-
-/** What a template creates besides its own service, in the picker's words. */
-function templateExtra(
-    template: ServiceTemplate
-): { engine: string } | { companion: string } | null {
-    if (template.database) return { engine: dbEngineLabel(template.database.engine) };
-    if (template.companion) return { companion: template.companion.label };
-    return null;
-}
-
-/** A one-click service: pick a template, name it, and it deploys with its
- *  volumes and variables already set. */
-function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
-    const t = useTranslations("deploy");
-    const [picked, setPicked] = useState<ServiceTemplate | null>(null);
-    const [name, setName] = useState("");
-    const [query, setQuery] = useState("");
-    const { servers, serverId, setServerId } = useDeployServers(environmentId);
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    function submit() {
-        if (!picked) return;
-        setError(null);
-        startTransition(async () => {
-            const result = await deployActions.createApplicationAction({
-                environmentId,
-                name: name.trim() || picked.name,
-                templateId: picked.id,
-                serverId
-            });
-            if (result.error) setError(result.error);
-            else onDone();
-        });
-    }
-
-    const describe = (template: ServiceTemplate) =>
-        t(`view.template.catalog.${template.id}.description` as NamespaceKey<"deploy">);
-    const firstRun = (template: ServiceTemplate) =>
-        t(`view.template.catalog.${template.id}.firstRun` as NamespaceKey<"deploy">);
-
-    if (!picked) {
-        const needle = query.trim().toLowerCase();
-        const shown = [...SERVICE_TEMPLATES]
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .filter(
-                (template) =>
-                    !needle ||
-                    template.name.toLowerCase().includes(needle) ||
-                    describe(template).toLowerCase().includes(needle)
-            );
-        return (
-            <div className="flex flex-col gap-2">
-                <Input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={t("view.template.search")}
-                    aria-label={t("view.template.search")}
-                    autoFocus
-                />
-                <div className="flex max-h-96 flex-col gap-1 overflow-y-auto overscroll-contain">
-                    {shown.length === 0 && (
-                        <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-                            {t("view.template.none")}
-                        </p>
-                    )}
-                    {shown.map((template) => (
-                        <button
-                            key={template.id}
-                            type="button"
-                            onClick={() => {
-                                setPicked(template);
-                                setName(template.name);
-                            }}
-                            className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
-                        >
-                            <span className="min-w-0 flex-1">
-                                <span className="block text-sm font-medium text-foreground">
-                                    {template.name}
-                                    {(() => {
-                                        const extra = templateExtra(template);
-                                        if (!extra) return null;
-                                        return (
-                                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                                                {"engine" in extra
-                                                    ? t("view.template.withEngine", {
-                                                          engine: extra.engine
-                                                      })
-                                                    : t("view.template.withCompanion", {
-                                                          companion: extra.companion
-                                                      })}
-                                            </span>
-                                        );
-                                    })()}
-                                </span>
-                                <span
-                                    className="block truncate text-xs text-muted-foreground"
-                                    title={describe(template)}
-                                >
-                                    {describe(template)}
-                                </span>
-                            </span>
-                            <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                        </button>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">
-                {picked.description} <span className="font-mono text-xs">{picked.image}</span>
-            </p>
-            <Field label={t("view.name")}>
-                <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder={picked.name}
-                />
-            </Field>
-            <ServerField servers={servers} value={serverId} onChange={setServerId} />
-            {picked.database && (
-                <p className="text-xs text-muted-foreground">
-                    {t("view.template.createsDatabase", {
-                        engine: dbEngineLabel(picked.database.engine)
-                    })}
-                </p>
-            )}
-            {picked.companion && (
-                <p className="text-xs text-muted-foreground">
-                    {t("view.template.createsCompanion", { companion: picked.companion.label })}
-                </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-                {firstRun(picked)}
-                {picked.secrets.length > 0 && t("view.template.secrets")}
-                {picked.prepare?.length ? t("view.template.setup") : ""}
-            </p>
-            {error && <p className="text-sm text-danger">{error}</p>}
-            <div className="flex justify-between gap-2">
-                <Button variant="ghost" onClick={() => setPicked(null)} disabled={pending}>
-                    {t("view.template.other")}
-                </Button>
-                <Button onClick={submit} disabled={pending}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.deploy")}
-                </Button>
-            </div>
-        </div>
     );
 }
 
@@ -1596,6 +1405,28 @@ const redisTopologyOptions = (t: NamespaceTranslator<"deploy">): SelectOption[] 
 
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const t = useTranslations("deploy");
+    const can = useProjectCan();
+    // Every way in is behind deploy.manage; the database grant is checked here
+    // too, so a form that cannot be sent says why instead of failing on submit.
+    const access = databaseFormAccess(true, can);
+    if (!access.allowed) {
+        return (
+            <p className="text-sm text-muted-foreground">
+                {t(`view.database.cloud.denied_${access.reason}`)}
+            </p>
+        );
+    }
+    return <NewDatabaseFields environmentId={environmentId} onDone={onDone} />;
+}
+
+function NewDatabaseFields({
+    environmentId,
+    onDone
+}: {
+    environmentId: string;
+    onDone: () => void;
+}) {
+    const t = useTranslations("deploy");
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<ManagedEngine>("postgres");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
@@ -1615,6 +1446,8 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     const [privileges, setPrivileges] = useState("owner");
     const [redisLayout, setRedisLayout] = useState(SINGLE);
     const [topology, setTopology] = useState<TopologyValue>(SINGLE_TOPOLOGY);
+    /** "server", or the id of the cloud provider a data engine lives with. */
+    const [where, setWhere] = useState("server");
 
     const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
@@ -1627,6 +1460,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     // so is the layout, which each engine offers differently.
     useEffect(() => {
         setInstanceId(DEDICATED);
+        setWhere("server");
         setTopology(SINGLE_TOPOLOGY);
         setRedisLayout(SINGLE);
         if (!info.namedDatabases) {
@@ -1682,8 +1516,10 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
         });
     }
 
-    return (
-        <div className="flex flex-col gap-3">
+    // The name, the engine and where it runs are asked the same way wherever
+    // it runs; only what follows them changes.
+    const header = (
+        <>
             <Field label={t("view.name")}>
                 <Input
                     value={name}
@@ -1700,6 +1536,43 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     options={ENGINE_OPTIONS}
                 />
             </Field>
+            {isDataEngine(engine) && (
+                <Field label={t("view.database.cloud.where")}>
+                    <Select
+                        value={where}
+                        onValueChange={setWhere}
+                        options={[
+                            { value: "server", label: t("view.database.cloud.onServer") },
+                            ...cloudProvidersFor(engine).map((one) => ({
+                                value: one.id,
+                                label: one.label,
+                                icon: <CloudProviderIcon provider={one.id} className="size-5" />
+                            }))
+                        ]}
+                    />
+                </Field>
+            )}
+        </>
+    );
+
+    if (isDataEngine(engine) && where !== "server") {
+        return (
+            <div className="flex flex-col gap-3">
+                {header}
+                <CloudDatabaseForm
+                    environmentId={environmentId}
+                    engine={engine}
+                    name={name}
+                    provider={where}
+                    onDone={onDone}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-3">
+            {header}
             {engine === "redis" && (
                 <Field
                     label={t("view.database.runsAs")}
@@ -2115,16 +1988,6 @@ function DomainDialog({
                 </div>
             </DialogContent>
         </Dialog>
-    );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-    return (
-        <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{label}</span>
-            {children}
-            {hint && <span className="text-xs text-muted-foreground/70">{hint}</span>}
-        </label>
     );
 }
 

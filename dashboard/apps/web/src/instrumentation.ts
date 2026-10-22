@@ -182,6 +182,11 @@ export async function register(): Promise<void> {
     const { startVolumeWatcher } = await import("./lib/deploy/volume-watch");
     void afterPredecessor().then(startVolumeWatcher);
 
+    // Carry on creating the data engines a provider was still creating when the
+    // last process stopped, and give up with a reason on the ones that took too long.
+    const { startCloudProvisionWatch } = await import("./lib/data-cloud/service");
+    void afterPredecessor().then(startCloudProvisionWatch);
+
     // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS
     // once the operator installs the root. Best-effort: a failure keeps the

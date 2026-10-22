@@ -53,7 +53,9 @@ export type AppCapability =
 /** How an app is provisioned. `compose-template` runs a compose stack via Deploy;
  *  `builtin` is served by the dashboard itself (no container); `integration`
  *  defers to the integrations catalog for credential-only providers. */
-export type AppInstallMethod = "compose-template" | "builtin" | "integration";
+/** `deploy-template` is one of Deploy's one-click templates, listed in the
+ *  marketplace and deployed by Deploy's own template flow into a project. */
+export type AppInstallMethod = "compose-template" | "builtin" | "integration" | "deploy-template";
 
 /** How an installed app's detail view is rendered. `builtin` mounts a
  *  manifest-keyed panel; `generic` reuses Deploy's logs/metrics/terminal/files
@@ -206,6 +208,14 @@ export interface AppManifest {
     opensAt?: string;
     /** Declared but not yet installable - shown locked in the marketplace. */
     comingSoon?: boolean;
+    /**
+     * Somebody else's software that Polaris only wraps and deploys, for an app
+     * whose manifest names no image to read that off. It lists the app in the
+     * user marketplace rather than with Polaris's own.
+     */
+    thirdParty?: boolean;
+    /** The Deploy template an entry stands for, for `deploy-template`. */
+    deployTemplate?: string;
     /** Not offered in the marketplace: it is created from inside another app that
      *  owns it (a Minecraft server is created by the Game servers app). Still a
      *  real manifest - it is what the install is made from. */
@@ -1413,7 +1423,8 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         installMethod: "compose-template",
         capabilities: ["ai-assistant"],
         dashboard: "builtin",
-        comingSoon: true
+        comingSoon: true,
+        thirdParty: true
     },
     {
         id: "hermes",
@@ -1426,7 +1437,8 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         installMethod: "compose-template",
         capabilities: ["ai-assistant"],
         dashboard: "builtin",
-        comingSoon: true
+        comingSoon: true,
+        thirdParty: true
     }
 ];
 
@@ -1475,6 +1487,7 @@ export function isInstallable(app: AppManifest): boolean {
     // A builtin app has nothing to run: installing it records that this Polaris
     // has it, and the app itself is the dashboard.
     if (app.installMethod === "builtin") return true;
+    if (app.installMethod === "deploy-template") return Boolean(app.deployTemplate);
     return app.installMethod === "compose-template" && Boolean(app.template?.image);
 }
 

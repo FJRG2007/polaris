@@ -19,6 +19,8 @@ import { findAppRoute, knownApps } from "./code";
 import { appUnavailableReason } from "./lifecycle";
 import * as mount from "@/components/app-bundles/mount";
 import { isAppInstalled } from "@/lib/apps/install-presence";
+import { homePathForUser, requireUser } from "@/lib/session";
+import { polarisAppsHref } from "@/lib/apps/marketplace-store";
 import { AppUnavailable } from "@/components/app-bundles/unavailable";
 import { getTranslations } from "@/lib/i18n/request";
 import type { ComponentType } from "react";
@@ -59,7 +61,10 @@ export async function renderAppPage(
     }
     if (!knownApps().includes(app) || options.public) notFound();
     // Not installed here: where it is installed from.
-    if (!(await isAppInstalled(app))) redirect(`/apps/marketplace?app=${encodeURIComponent(app)}`);
+    if (!(await isAppInstalled(app))) {
+        const user = await requireUser();
+        redirect(user.isAdmin ? polarisAppsHref(app) : await homePathForUser(user));
+    }
     if (loadedBundle(app)) notFound();
     // Installed, and its code not here yet.
     const t = await getTranslations("components");

@@ -5,6 +5,7 @@
  */
 
 import { pitrWindow } from "./pitr";
+import { provisionFailure } from "../data-cloud/errors";
 import { prisma } from "@polaris/db";
 import { listOperations, DatabaseOperationError } from "./ops";
 import {
@@ -24,7 +25,9 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
     const engine = row.engine as ManagedEngine;
     const hosted = row.parentId !== null;
-    const dedicated = !hosted && !row.recoveryBase;
+    // In a cloud: no container, so nothing below that acts on one applies.
+    const cloud = row.provider !== "";
+    const dedicated = !hosted && !cloud && !row.recoveryBase;
     // Moved by a dump and a reload, which a cluster cannot take (`upgradable`).
     const upgradable = dedicated && !row.clusterMasters;
     const topology = resolveTopology(row);
@@ -46,7 +49,14 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
         engine,
         version: row.version,
         status: row.status,
-        deployed: Boolean(row.containerName),
+        deployed: cloud ? row.status === "running" : Boolean(row.containerName),
+        // Where it lives when that is a cloud, and why creating it there failed.
+        cloud: cloud
+            ? {
+                  provider: row.provider,
+                  failure: row.status === "failed" ? provisionFailure(row.providerError) : null
+              }
+            : null,
         // The last provision, when it failed, so the panel can say why.
         failedDeploymentId: lastDeploy?.status === "failed" ? lastDeploy.id : null,
         hosted,
@@ -68,7 +78,7 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
                   }
                 : null,
         redis:
-            engine === "redis" && !hosted
+            engine === "redis" && !hosted && !cloud
                 ? {
                       mode: row.mode,
                       maxMemoryMb: row.maxMemoryMb,
@@ -82,7 +92,7 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
         // Laid out over several containers: what it is, and each member by name
         // and role. How each is doing is read on demand (`databaseMembers`).
         topology:
-            !hosted && topology.kind !== "single"
+            !hosted && !cloud && topology.kind !== "single"
                 ? {
                       kind: topology.kind,
                       label: topologyLabel(topology),
@@ -94,7 +104,7 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
                   }
                 : null,
         // A hosted database runs in its parent's container, so the parent's limits are its own.
-        limits: hosted ? null : { cpus: row.cpuLimit, memoryMb: row.memoryLimitMb },
+        limits: hosted || cloud ? null : { cpus: row.cpuLimit, memoryMb: row.memoryLimitMb },
         pitr: engine === "postgres" && dedicated ? await pitrWindow(databaseId, ownerId) : null,
         recovery: row.recoveryTarget
             ? { from: recoveredFrom?.name ?? null, target: row.recoveryTarget.toISOString() }
