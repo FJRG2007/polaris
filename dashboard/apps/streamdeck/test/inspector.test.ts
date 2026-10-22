@@ -15,9 +15,12 @@ const UI = join(__dirname, "..", "io.github.fjrg2007.polaris.sdPlugin", "ui");
 type Sent = { event: string; action?: string; context?: string; payload?: Record<string, unknown> };
 
 function openScreen(screen: "key" | "timer") {
-    const dom = new JSDOM(`<!doctype html><body data-screen="${screen}"><main id="root"></main></body>`, {
-        runScripts: "outside-only"
-    });
+    const dom = new JSDOM(
+        `<!doctype html><body data-screen="${screen}"><main id="root"></main></body>`,
+        {
+            runScripts: "outside-only"
+        }
+    );
     const sent: Sent[] = [];
     const listeners = new Map<string, (event: { data?: string }) => void>();
     class FakeSocket {
@@ -35,7 +38,9 @@ function openScreen(screen: "key" | "timer") {
     dom.window.eval(readFileSync(join(UI, "words.js"), "utf8"));
     dom.window.eval(readFileSync(join(UI, "pi.js"), "utf8"));
     const action = `io.github.fjrg2007.polaris.${screen}`;
-    (dom.window as unknown as { connectElgatoStreamDeckSocket: (...args: unknown[]) => void }).connectElgatoStreamDeckSocket(
+    (
+        dom.window as unknown as { connectElgatoStreamDeckSocket: (...args: unknown[]) => void }
+    ).connectElgatoStreamDeckSocket(
         1234,
         "inspector-id",
         "registerPropertyInspector",
@@ -53,7 +58,15 @@ describe("the settings screen", () => {
         listeners.get("message")?.({
             data: JSON.stringify({
                 event: "sendToPropertyInspector",
-                payload: { type: "status", link: "unset", address: null, account: null, connecting: { phase: "idle" }, update: null, catalogue: [] }
+                payload: {
+                    type: "status",
+                    link: "unset",
+                    address: null,
+                    account: null,
+                    connecting: { phase: "idle" },
+                    update: null,
+                    catalogue: []
+                }
             })
         });
         const input = dom.window.document.querySelector("input");
