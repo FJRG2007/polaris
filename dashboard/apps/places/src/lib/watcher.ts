@@ -21,7 +21,13 @@ import { prisma } from "@polaris/db";
 import { withinHours } from "./detection";
 import { parseDetection, cameraTarget } from "./cameras";
 import { recordDetection, type Detection } from "./events";
-import { createPullPoint, pullMessages, OnvifError, type OnvifEndpoint } from "./onvif";
+import {
+    createPullPoint,
+    pullMessages,
+    recentlySteered,
+    OnvifError,
+    type OnvifEndpoint
+} from "./onvif";
 import { host } from "@polaris/app-host";
 
 const { isAppInstalled } = host.appsInstallPresence;
@@ -33,6 +39,10 @@ const RETRY_MS = 60_000;
 /** How often the camera list is re-read, so a camera added from a screen starts
  *  being watched without a restart. */
 const RESCAN_MS = 30_000;
+
+/** How often a watcher that is standing aside for somebody steering looks
+ *  again. */
+const STEERING_PAUSE_MS = 1000;
 
 /** What each ONVIF topic means in the vocabulary events are written in.
  *
@@ -94,6 +104,14 @@ async function watchCamera(
 ): Promise<void> {
     let subscription: string | null = null;
     while (!cancelled()) {
+        // Somebody is pointing this camera. A camera that answers one request
+        // at a time would hold their arrow behind the pull, so the pull waits
+        // instead: the subscription keeps what the camera notices meanwhile,
+        // and most of it is the camera noticing itself move.
+        if (recentlySteered(endpoint)) {
+            await sleep(STEERING_PAUSE_MS);
+            continue;
+        }
         try {
             if (!subscription) {
                 subscription = await createPullPoint(endpoint);
@@ -118,9 +136,13 @@ async function watchCamera(
             // earned its event.
             await settleOverdue(cameraId);
         } catch (error) {
-            subscription = null;
             // A camera that has forgotten the subscription says so as a fault, and
-            // the next pass simply asks for a new one. Anything else waits.
+            // the next pass simply asks for a new one. One that did not answer,
+            // or dropped the connection on an empty pull (a C210 does), still
+            // has it: opening another would leave the first one occupying the
+            // camera until it expires, and a camera that keeps only a few
+            // refuses new ones once they are all taken.
+            if (!(error instanceof OnvifError) || error.failure === "refused") subscription = null;
             if (!(error instanceof OnvifError)) await sleep(RETRY_MS);
             else await sleep(2000);
         }

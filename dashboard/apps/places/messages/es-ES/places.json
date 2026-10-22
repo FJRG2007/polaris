@@ -122,6 +122,9 @@
     "models": {
         "brandOther": "Otra",
         "conditionalNote": "Esta solo responde por RTSP cuando está conectada a la corriente, tiene el puente puesto y está configurada para no dormirse en la app de Tapo. Con batería no publica nada, y Polaris llega a ella por el protocolo propio de TP-Link.",
+        "tips": {
+            "frameRate25": "Recomendado: en la app de Tapo, en los ajustes de la cámara, apartado de vídeo, pon la frecuencia de imagen en 25 fps. Con los 15 de serie se ve a saltos en Polaris."
+        },
         "names": {
             "amcrest-other": "Cualquier Amcrest",
             "dahua-other": "Cualquier Dahua",
@@ -289,6 +292,7 @@
     },
     "ptz": {
         "down": "Abajo",
+        "failed": "Ese movimiento no llegó a la cámara",
         "in": "Acercar",
         "left": "Izquierda",
         "out": "Alejar",
@@ -495,6 +499,8 @@
         "moveCameras": "Mueve o quita antes sus cámaras",
         "lastPlace": "Tiene que haber un sitio para las cámaras",
         "noPtz": "Esta cámara no se mueve",
+        "ptzLate": "La cámara no recibió el movimiento a tiempo y se le pidió parar",
+        "ptzUnreachable": "No se pudo llegar a la cámara para moverla",
         "notInstalled": "Places no está instalado",
         "recognizerMissing": "El reconocedor se instaló pero no aparece",
         "recognizerAddress": "Escribe la dirección como http://192.168.1.20:8000",

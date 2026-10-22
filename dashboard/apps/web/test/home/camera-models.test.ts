@@ -30,7 +30,9 @@ import {
     drawsFromBattery,
     modelCanPan,
     searchModels,
-    vendorForModel
+    modelTip,
+    vendorForModel,
+    withModel
 } from "@polaris-app/places/src/lib/camera-models";
 
 describe("finding a camera by what is written on it", () => {
@@ -378,5 +380,35 @@ describe("the list against the one the maker published", () => {
         for (const name of battery) {
             expect(connectionsFor(`tapo-${name.toLowerCase()}`)).toEqual(["tapo-battery"]);
         }
+    });
+});
+
+describe("a new camera starts on the way in marked recommended", () => {
+    it("takes the model's first connection, the one the picker labels recommended", () => {
+        const picked = withModel({ modelId: "", vendor: "" }, "tapo-c210");
+        expect(vendorForModel(picked.modelId, picked.vendor)).toBe(connectionsFor("tapo-c210")[0]);
+        expect(vendorForModel(picked.modelId, picked.vendor)).toBe("tapo");
+    });
+
+    it("drops the way picked for another model when the model changes", () => {
+        const picked = withModel({ modelId: "tapo-c210", vendor: "tapo-cloud" }, "tapo-c200");
+        expect(vendorForModel(picked.modelId, picked.vendor)).toBe("tapo");
+    });
+
+    it("keeps a way the owner picked while the model stays", () => {
+        const picked = withModel({ modelId: "tapo-c210", vendor: "tapo-cloud" }, "tapo-c210");
+        expect(vendorForModel(picked.modelId, picked.vendor)).toBe("tapo-cloud");
+    });
+});
+
+describe("settings on the camera worth recommending", () => {
+    it("tells a C210 owner to raise the frame rate", () => {
+        const c210 = cameraModel("tapo-c210");
+        expect(c210 && modelTip(c210)).toMatch(/25 fps/);
+    });
+
+    it("recommends nothing nobody has measured", () => {
+        const c200 = cameraModel("tapo-c200");
+        expect(c200 && modelTip(c200)).toBeNull();
     });
 });

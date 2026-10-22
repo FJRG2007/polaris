@@ -18,7 +18,15 @@
 
 import { cameraTarget } from "./cameras";
 import { HomeError } from "./home-error";
-import { getPresets, getProfiles, gotoPreset, ptzMove, ptzStop, type OnvifEndpoint } from "./onvif";
+import {
+    getPresets,
+    getProfiles,
+    gotoPreset,
+    ptzMove,
+    ptzStop,
+    OnvifError,
+    type OnvifEndpoint
+} from "./onvif";
 
 /** Which way, as a person would say it. */
 export type PtzDirection = "up" | "down" | "left" | "right" | "in" | "out";
@@ -71,21 +79,74 @@ async function controlsFor(installedAppId: string, cameraId: string): Promise<Co
     return { endpoint, profileToken: token };
 }
 
+/**
+ * What each camera was last asked to do, so a start that answers late can tell
+ * whether it was overtaken.
+ *
+ * The press and the release are separate requests, and on a slow camera the
+ * release can reach Polaris - and its stop the camera - before the start has
+ * been answered. A camera that takes the start after the stop is a camera left
+ * moving with nobody holding the arrow, so a start that comes back to find a
+ * stop was asked for since is followed by another stop.
+ */
+const lastAsked = new Map<string, { readonly press: number; readonly stopped: boolean }>();
+let presses = 0;
+
+/** Whether a start that has just been answered must be followed by a stop:
+ *  the last thing asked of this camera since was a stop. Pure for the test. */
+export function overtakenByStop(
+    asked: { readonly press: number; readonly stopped: boolean } | undefined,
+    press: number
+): boolean {
+    return asked !== undefined && asked.press === press && asked.stopped;
+}
+
+/** A start that ran into trouble, in the words the screen shows. */
+function moveFailure(error: unknown): never {
+    if (error instanceof OnvifError && error.failure === "timeout") {
+        throw new HomeError("The camera did not take that move in time and was told to stop");
+    }
+    if (error instanceof OnvifError && error.failure === "unreachable") {
+        throw new HomeError("Could not reach the camera to move it");
+    }
+    throw error;
+}
+
 /** Start moving. Pair it with `stop`. */
 export async function move(
     installedAppId: string,
     cameraId: string,
     direction: PtzDirection
 ): Promise<void> {
+    // Recorded before anything is awaited, so a release that arrives while the
+    // camera's profile is still being looked up already counts as after it.
+    presses += 1;
+    const press = presses;
+    lastAsked.set(cameraId, { press, stopped: false });
     const controls = await controlsFor(installedAppId, cameraId);
     if (!controls) throw new HomeError("This camera does not move");
-    await ptzMove(controls.endpoint, controls.profileToken, VECTORS[direction]);
+    try {
+        await ptzMove(controls.endpoint, controls.profileToken, VECTORS[direction]);
+    } catch (error) {
+        // A start nobody heard back from may still be carried out, after
+        // whatever stop the release sent. Another stop goes behind it, so a
+        // camera that queues its requests stops after it moves.
+        if (error instanceof OnvifError && error.failure !== "refused") {
+            await ptzStop(controls.endpoint, controls.profileToken).catch(() => undefined);
+        }
+        moveFailure(error);
+    }
+    if (overtakenByStop(lastAsked.get(cameraId), press)) {
+        await ptzStop(controls.endpoint, controls.profileToken).catch(() => undefined);
+    }
 }
 
 /** Stop moving. Never refuses loudly: a stop that fails because the camera has
  *  already stopped is the state we were asking for, and the one thing worse than
  *  a failed stop is a screen that hides it behind an error. */
 export async function stop(installedAppId: string, cameraId: string): Promise<void> {
+    const asked = lastAsked.get(cameraId);
+    if (asked) lastAsked.set(cameraId, { press: asked.press, stopped: true });
     const controls = await controlsFor(installedAppId, cameraId);
     if (!controls) return;
     await ptzStop(controls.endpoint, controls.profileToken).catch(() => undefined);

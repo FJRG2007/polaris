@@ -34,6 +34,7 @@ import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
 import * as schemas from "../lib/schemas";
 import { probeCamera } from "../lib/onvif";
+import { streamPathOf } from "../lib/stream-path";
 import { HomeError } from "../lib/home-error";
 import * as recording from "../lib/recording";
 import { footageTarget } from "../lib/stills";
@@ -430,21 +431,12 @@ export async function probeCameraAction(input: unknown): Promise<{
     // Only the path is kept from what the camera answered. Its URL carries the
     // host it thinks it is on, which on a camera behind a repeater is an address
     // nothing else can reach.
-    const pathOf = (url: string | null) => {
-        if (!url) return "";
-        try {
-            const parsedUrl = new URL(url);
-            return `${parsedUrl.pathname}${parsedUrl.search}`;
-        } catch {
-            return "";
-        }
-    };
     return {
         probe: {
             model: result.value.device.model,
             manufacturer: result.value.device.manufacturer,
-            mainPath: pathOf(result.value.mainUrl),
-            subPath: pathOf(result.value.subUrl),
+            mainPath: streamPathOf(result.value.mainUrl),
+            subPath: streamPathOf(result.value.subUrl),
             ptz: result.value.ptz,
             verified: "onvif"
         }

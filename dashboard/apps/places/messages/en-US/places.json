@@ -122,6 +122,9 @@
     "models": {
         "brandOther": "Other",
         "conditionalNote": "This one answers RTSP only when it is wired for power, has the jumper fitted, and is set to stay awake in the Tapo app. On its battery it publishes nothing, and Polaris reaches it over TP-Link's own protocol instead.",
+        "tips": {
+            "frameRate25": "Recommended: in the Tapo app, open the camera's Device Settings > Video & Display and set Frame Rate to 25 fps. At its default 15 the picture stutters in Polaris."
+        },
         "names": {
             "amcrest-other": "Any Amcrest camera",
             "dahua-other": "Any Dahua camera",
@@ -289,6 +292,7 @@
     },
     "ptz": {
         "down": "Down",
+        "failed": "That move did not get through",
         "in": "Zoom in",
         "left": "Left",
         "out": "Zoom out",
@@ -495,6 +499,8 @@
         "moveCameras": "Move or remove its cameras first",
         "lastPlace": "There has to be somewhere for cameras to be",
         "noPtz": "This camera does not move",
+        "ptzLate": "The camera did not take that move in time and was told to stop",
+        "ptzUnreachable": "Could not reach the camera to move it",
         "notInstalled": "Home is not installed",
         "recognizerMissing": "The recognizer was installed but cannot be found",
         "recognizerAddress": "Write the address as http://192.168.1.20:8000",
