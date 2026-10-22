@@ -1021,7 +1021,10 @@ export async function listGrantUses(query: GrantUseQuery): Promise<GrantUseView[
     });
     const ids = [...new Set(rows.flatMap((row) => (row.userId ? [row.userId] : [])))];
     const people = ids.length
-        ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+        ? await prisma.user.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, name: true }
+          })
         : [];
     const names = new Map(people.map((person) => [person.id, person.name]));
     return rows.map((row) => ({

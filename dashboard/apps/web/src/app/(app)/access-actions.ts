@@ -179,12 +179,7 @@ export async function shareLinkAction(
                     (await getTranslations("common"))("share.notWritten")
             };
         }
-        const { token } = await writeGrantLink(
-            kind,
-            String(subjectId),
-            parsed.data,
-            user.id
-        );
+        const { token } = await writeGrantLink(kind, String(subjectId), parsed.data, user.id);
         await recordAudit({
             actorId: user.id,
             action: "access.linked",

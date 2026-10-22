@@ -158,7 +158,13 @@ export async function pressUpsGuest(
         };
     }
     const outcome = await upsService.runUpsCommand(row, command);
-    await logCommand(grant, row, note, outcome === "ok" ? "done" : "refused", outcome === "ok" ? "" : "failed");
+    await logCommand(
+        grant,
+        row,
+        note,
+        outcome === "ok" ? "done" : "refused",
+        outcome === "ok" ? "" : "failed"
+    );
     if (outcome === "ok") {
         await spendGrant(grant).catch((caught: unknown) =>
             console.error("polaris: a UPS link use could not be counted:", caught)

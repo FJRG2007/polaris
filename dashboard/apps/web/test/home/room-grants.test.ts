@@ -14,13 +14,16 @@ const PLACE = "00000000-0000-4000-8000-0000000000a1";
 /** Which room each device is in, as the database would answer now. */
 let deviceRooms: Record<string, string | null> = {};
 let cameraZones: Record<string, { placeId: string; zone: string; roomId?: string | null }> = {};
-let lent: Record<string, { id: string; capability: string; counted: boolean; actions: string[] }[]> =
-    {};
+let lent: Record<
+    string,
+    { id: string; capability: string; counted: boolean; actions: string[] }[]
+> = {};
 const recordGrantUse = vi.fn(async (_use: Record<string, unknown>) => undefined);
 
 vi.mock("@/lib/session", () => ({ sessionCan: async () => false }));
 vi.mock("@/lib/access/grants", () => ({
-    liveGrants: async (_user: string, subject: string, id: string) => lent[`${subject}:${id}`] ?? [],
+    liveGrants: async (_user: string, subject: string, id: string) =>
+        lent[`${subject}:${id}`] ?? [],
     grantedSubjects: async (_user: string, subject: string) =>
         new Map(
             Object.entries(lent)
@@ -48,7 +51,8 @@ vi.mock("@polaris/db", () => ({
                     .map(([id, roomId]) => ({ id, roomId }))
         },
         camera: {
-            findUnique: async ({ where }: { where: { id: string } }) => cameraZones[where.id] ?? null,
+            findUnique: async ({ where }: { where: { id: string } }) =>
+                cameraZones[where.id] ?? null,
             findMany: async () =>
                 Object.entries(cameraZones)
                     .filter(

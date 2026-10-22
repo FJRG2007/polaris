@@ -73,7 +73,12 @@ describe("making a link", () => {
 
     it("lets a camera, a NAS, a server and a domain be linked, but only to watch", async () => {
         const NAS = "00000000-0000-4000-8000-0000000000a1";
-        for (const subject of ["place.camera", "place.nas", "place.server", "place.domain"] as const) {
+        for (const subject of [
+            "place.camera",
+            "place.nas",
+            "place.server",
+            "place.domain"
+        ] as const) {
             await expect(
                 writeGrantLink(subject, NAS, link({ capability: "view", actions: [] }), "owner")
             ).resolves.toHaveProperty("token");

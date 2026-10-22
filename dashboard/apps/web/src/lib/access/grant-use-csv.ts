@@ -10,7 +10,18 @@ export function csvCell(value: string): string {
 }
 
 export function usesCsv(uses: readonly GrantUseView[]): string {
-    const head = ["at", "who", "link", "for", "target", "targetId", "action", "outcome", "reason", "grant"];
+    const head = [
+        "at",
+        "who",
+        "link",
+        "for",
+        "target",
+        "targetId",
+        "action",
+        "outcome",
+        "reason",
+        "grant"
+    ];
     const lines = uses.map((use) =>
         [
             use.at,

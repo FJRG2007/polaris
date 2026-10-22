@@ -81,8 +81,7 @@ async function readDomain(id: string): Promise<Reading | null> {
     if (!row) return null;
     return {
         name: row.hostname,
-        state:
-            row.healthStatus === "up" ? "up" : row.healthStatus === "down" ? "down" : "unknown",
+        state: row.healthStatus === "up" ? "up" : row.healthStatus === "down" ? "down" : "unknown",
         uptimeSeconds: null,
         checkedAt: row.healthCheckedAt?.toISOString() ?? null
     };
@@ -106,8 +105,7 @@ export async function guestStatusView(token: string): Promise<GuestStatusView | 
     if (!link || link.standing !== "live") return null;
     const kind = KINDS[link.subjectType];
     if (!kind) return null;
-    const read =
-        kind === "server" ? readServer : kind === "domain" ? readDomain : readNasStatus;
+    const read = kind === "server" ? readServer : kind === "domain" ? readDomain : readNasStatus;
     const reading = await shared(`${kind}:${link.subjectId}`, () => read(link.subjectId));
     if (!reading) return null;
     return {

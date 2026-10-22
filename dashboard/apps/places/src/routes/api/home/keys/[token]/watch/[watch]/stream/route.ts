@@ -25,8 +25,7 @@ export async function GET(
             String(watch)
         );
     } catch (caught) {
-        if (caught instanceof CameraOfflineError)
-            return new Response("Offline", { status: 503 });
+        if (caught instanceof CameraOfflineError) return new Response("Offline", { status: 503 });
         throw caught;
     }
 }

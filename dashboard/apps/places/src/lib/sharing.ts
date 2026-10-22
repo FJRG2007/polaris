@@ -123,7 +123,8 @@ export async function roomContents(
     for (const device of deviceRows) if (device.roomId) devices.set(device.id, device.roomId);
     for (const camera of cameraRows) {
         if (camera.roomId) {
-            if (rooms.some((one) => one.id === camera.roomId)) cameras.set(camera.id, camera.roomId);
+            if (rooms.some((one) => one.id === camera.roomId))
+                cameras.set(camera.id, camera.roomId);
             continue;
         }
         const room = rooms.find(

@@ -14,8 +14,12 @@ function span(seconds: number, words: (key: "days" | "hours" | "minutes", n: num
     const days = Math.floor(seconds / 86_400);
     const hours = Math.floor((seconds % 86_400) / 3_600);
     const minutes = Math.floor((seconds % 3_600) / 60);
-    if (days > 0) return [words("days", days), hours > 0 ? words("hours", hours) : ""].join(" ").trim();
-    if (hours > 0) return [words("hours", hours), minutes > 0 ? words("minutes", minutes) : ""].join(" ").trim();
+    if (days > 0)
+        return [words("days", days), hours > 0 ? words("hours", hours) : ""].join(" ").trim();
+    if (hours > 0)
+        return [words("hours", hours), minutes > 0 ? words("minutes", minutes) : ""]
+            .join(" ")
+            .trim();
     return words("minutes", Math.max(1, minutes));
 }
 

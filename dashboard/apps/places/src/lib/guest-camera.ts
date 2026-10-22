@@ -121,7 +121,10 @@ export async function openGuestWatch(
     asked?: string
 ): Promise<{ ok: true; watch: string } | { ok: false; error: OpenRefusal }> {
     const reached = await host.accessGrants.linkReach(token);
-    if (!reached || (reached.subjectType !== "place.camera" && reached.subjectType !== "place.room")) {
+    if (
+        !reached ||
+        (reached.subjectType !== "place.camera" && reached.subjectType !== "place.room")
+    ) {
         return { ok: false, error: "closed" };
     }
     const cameraId = reached.subjectType === "place.camera" ? reached.subjectId : (asked ?? "");

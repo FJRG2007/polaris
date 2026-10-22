@@ -66,7 +66,11 @@ export default async function GuestKeyPage({
                         initiallyPrivate={camera.private}
                     />
                 ))}
-                <RoomFooter until={room.until} note={room.note} empty={room.devices.length + room.cameras.length === 0} />
+                <RoomFooter
+                    until={room.until}
+                    note={room.note}
+                    empty={room.devices.length + room.cameras.length === 0}
+                />
             </div>
         );
     }

@@ -128,11 +128,7 @@ export function AccessLog({
                     <span className="min-w-0 truncate">
                         {t("share.log.onlyKey", { name: grantLabel })}
                     </span>
-                    <button
-                        type="button"
-                        className="shrink-0 underline"
-                        onClick={onClearGrant}
-                    >
+                    <button type="button" className="shrink-0 underline" onClick={onClearGrant}>
                         {t("share.log.everyKey")}
                     </button>
                 </p>
@@ -159,9 +155,7 @@ export function AccessLog({
                                 {who(use)} - {actionLabel(use.action)}
                             </span>
                             <Badge variant={use.outcome === "done" ? "success" : "warning"}>
-                                {use.outcome === "done"
-                                    ? t("share.log.done")
-                                    : refusal(use.reason)}
+                                {use.outcome === "done" ? t("share.log.done") : refusal(use.reason)}
                             </Badge>
                         </li>
                     ))}

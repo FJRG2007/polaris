@@ -66,7 +66,12 @@ describe("a watch-only link", () => {
     it("shows a NAS's uptime, never its host name", async () => {
         reach = live("place.nas");
         const view = await guestStatusView("t");
-        expect(view).toMatchObject({ kind: "nas", name: "Vault", state: "up", uptimeSeconds: 7200 });
+        expect(view).toMatchObject({
+            kind: "nas",
+            name: "Vault",
+            state: "up",
+            uptimeSeconds: 7200
+        });
         expect(JSON.stringify(view)).not.toContain("unas.lan");
     });
 

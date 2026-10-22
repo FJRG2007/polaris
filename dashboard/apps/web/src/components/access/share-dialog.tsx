@@ -667,9 +667,7 @@ export function ShareDialog({
                                                 type="time"
                                                 value={checkIn}
                                                 disabled={!startsAt}
-                                                onChange={(event) =>
-                                                    setCheckIn(event.target.value)
-                                                }
+                                                onChange={(event) => setCheckIn(event.target.value)}
                                             />
                                         </Field>
                                         <Field
@@ -831,7 +829,6 @@ export function ShareDialog({
                             {asLink ? t("share.makeLink") : t("share.share")}
                         </Button>
                     </div>
-
                 </section>
                 {bounded && open ? (
                     <AccessLog
