@@ -122,6 +122,11 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Move or remove its cameras first", "refusals.moveCameras"],
     ["There has to be somewhere for cameras to be", "refusals.lastPlace"],
     ["This camera does not move", "refusals.noPtz"],
+    [
+        "The camera did not take that move in time and was told to stop",
+        "refusals.ptzLate"
+    ],
+    ["Could not reach the camera to move it", "refusals.ptzUnreachable"],
     ["Home is not installed", "refusals.notInstalled"],
     ["The recognizer was installed but cannot be found", "refusals.recognizerMissing"],
     ["Write the address as http://192.168.1.20:8000", "refusals.recognizerAddress"],

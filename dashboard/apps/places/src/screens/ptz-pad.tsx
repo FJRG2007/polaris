@@ -12,7 +12,7 @@
  * of bug somebody finds a day later pointed at a wall.
  */
 
-import { cn } from "@polaris/ui";
+import { cn, useToast } from "@polaris/ui";
 import * as actions from "./actions";
 import { usePlacesT } from "./use-places-t";
 import type { PtzDirection } from "../lib/ptz";
@@ -38,6 +38,7 @@ export function PtzPad({ cameraId }: { cameraId: string }) {
     // stop when there is something to stop.
     const moving = useRef(false);
     const t = usePlacesT();
+    const toast = useToast();
 
     const stop = useCallback(() => {
         if (!moving.current) return;
@@ -58,9 +59,17 @@ export function PtzPad({ cameraId }: { cameraId: string }) {
         };
     }, [stop]);
 
+    // A move that did not reach the camera is said so: an arrow that silently
+    // does nothing reads as a camera that cannot move, or one that is broken.
     const start = (direction: PtzDirection) => {
         moving.current = true;
-        void actions.ptzMoveAction(cameraId, direction).catch(() => null);
+        const key = `places-ptz-${cameraId}`;
+        void actions
+            .ptzMoveAction(cameraId, direction)
+            .then((result) => {
+                if (result.error) toast.show({ key, title: result.error });
+            })
+            .catch(() => toast.show({ key, title: t("ptz.failed") }));
     };
 
     return (

@@ -100,16 +100,44 @@ export function attrValues(xml: string, localName: string, attribute: string): s
     return [...xml.matchAll(pattern)].map((match) => match[1] ?? "");
 }
 
-export class OnvifError extends Error {}
+/**
+ * How a call failed. "refused" is the camera answering with an error, the only
+ * one that says anything about what was asked. "timeout" is no answer before
+ * the wait ran out - the camera may still carry the request out later.
+ * "unreachable" is the connection failing, or the camera closing it unanswered.
+ */
+export type OnvifFailure = "refused" | "timeout" | "unreachable";
+
+export class OnvifError extends Error {
+    readonly failure: OnvifFailure;
+
+    constructor(message: string, failure: OnvifFailure = "refused") {
+        super(message);
+        this.failure = failure;
+    }
+
+    get timedOut(): boolean {
+        return this.failure === "timeout";
+    }
+}
 
 /**
  * One SOAP call. `service` is the path below the host - the device service for
  * anything about the camera itself, the media or PTZ service for the rest.
+ *
+ * `timeoutMs` is for the calls whose answer is late by design, which is a long
+ * poll: giving up on one before the camera was asked to answer does not end it
+ * on the camera, it only leaves the camera holding a request nobody reads.
  */
-async function call(endpoint: OnvifEndpoint, service: string, body: string): Promise<string> {
+async function call(
+    endpoint: OnvifEndpoint,
+    service: string,
+    body: string,
+    timeoutMs = TIMEOUT_MS
+): Promise<string> {
     const envelope = `<?xml version="1.0" encoding="UTF-8"?><s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">${securityHeader(endpoint.username, endpoint.password)}<s:Body>${body}</s:Body></s:Envelope>`;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const response = await fetch(`http://${endpoint.address}:${endpoint.port}${service}`, {
             method: "POST",
@@ -131,9 +159,9 @@ async function call(endpoint: OnvifEndpoint, service: string, body: string): Pro
     } catch (error) {
         if (error instanceof OnvifError) throw error;
         if (error instanceof Error && error.name === "AbortError") {
-            throw new OnvifError("The camera did not answer in time");
+            throw new OnvifError("The camera did not answer in time", "timeout");
         }
-        throw new OnvifError("Could not reach the camera");
+        throw new OnvifError("Could not reach the camera", "unreachable");
     } finally {
         clearTimeout(timer);
     }
@@ -322,7 +350,64 @@ export interface PtzVector {
 }
 
 /**
- * Start moving, and keep moving until told to stop.
+ * When each camera was last pointed somewhere, by address and port.
+ *
+ * Some cameras answer ONVIF one request at a time. A Tapo C200 holds every
+ * other call - an arrow press included - for as long as an events long poll is
+ * open on it, so the event watcher reads this and stands aside while somebody
+ * is steering. Measured on one: a clock query sent during a ten-second pull
+ * answered after 9.5 s, the moment the pull did.
+ */
+const steeredAt = new Map<string, number>();
+
+/** How long after the last arrow the event watcher keeps standing aside. */
+export const STEERING_GRACE_MS = 15_000;
+
+function endpointKey(endpoint: OnvifEndpoint): string {
+    return `${endpoint.address}:${endpoint.port}`;
+}
+
+/** Whether somebody pointed this camera within the last `withinMs`. */
+export function recentlySteered(
+    endpoint: OnvifEndpoint,
+    withinMs = STEERING_GRACE_MS,
+    now = Date.now()
+): boolean {
+    const at = steeredAt.get(endpointKey(endpoint));
+    return at !== undefined && now - at < withinMs;
+}
+
+function noteSteering(endpoint: OnvifEndpoint): void {
+    steeredAt.set(endpointKey(endpoint), Date.now());
+}
+
+/**
+ * The longest one press may move a camera, as the camera's own timer.
+ *
+ * Polaris stops a camera on release, and again when a start answered after the
+ * release. This is what holds when neither reaches it: a camera told to move
+ * with a limit stops on its own when the limit runs out, rather than at the end
+ * of its range or at its own default (20 s on a C200, 180 s on a C210).
+ */
+export const MOVE_LIMIT_SECONDS = 10;
+
+/** Cameras that refused a move carrying a limit, and are sent moves without
+ *  one. Learned per camera rather than assumed per make. */
+const noMoveLimit = new Set<string>();
+
+/** The ContinuousMove body, with the limit or without it. Pure for the test. */
+export function continuousMoveBody(
+    profileToken: string,
+    vector: PtzVector,
+    limitSeconds: number | null
+): string {
+    const clamp = (value: number) => Math.max(-1, Math.min(1, value)).toFixed(2);
+    const limit = limitSeconds ? `<Timeout>PT${limitSeconds}S</Timeout>` : "";
+    return `<ContinuousMove xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken><Velocity xmlns="http://www.onvif.org/ver10/schema"><PanTilt x="${clamp(vector.pan)}" y="${clamp(vector.tilt)}"/><Zoom x="${clamp(vector.zoom)}"/></Velocity>${limit}</ContinuousMove>`;
+}
+
+/**
+ * Start moving, and keep moving until told to stop or the limit runs out.
  *
  * Continuous rather than absolute on purpose: a person holding an arrow expects
  * the camera to travel while they hold it, and absolute moves turn that into a
@@ -335,19 +420,36 @@ export async function ptzMove(
     profileToken: string,
     vector: PtzVector
 ): Promise<void> {
-    const clamp = (value: number) => Math.max(-1, Math.min(1, value)).toFixed(2);
-    await call(
-        endpoint,
-        (await getServices(endpoint)).ptz,
-        `<ContinuousMove xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken><Velocity xmlns="http://www.onvif.org/ver10/schema"><PanTilt x="${clamp(vector.pan)}" y="${clamp(vector.tilt)}"/><Zoom x="${clamp(vector.zoom)}"/></Velocity></ContinuousMove>`
-    );
+    noteSteering(endpoint);
+    const service = (await getServices(endpoint)).ptz;
+    const key = endpointKey(endpoint);
+    if (noMoveLimit.has(key)) {
+        await call(endpoint, service, continuousMoveBody(profileToken, vector, null));
+        return;
+    }
+    try {
+        await call(endpoint, service, continuousMoveBody(profileToken, vector, MOVE_LIMIT_SECONDS));
+    } catch (error) {
+        // Only a refusal says the limit itself might be the problem. A camera
+        // that did not answer may yet act on the move, and sending a second one
+        // behind it would only queue more travel.
+        if (!(error instanceof OnvifError) || error.timedOut) throw error;
+        await call(endpoint, service, continuousMoveBody(profileToken, vector, null));
+        noMoveLimit.add(key);
+    }
 }
 
+/** Stop waits longer than anything else: it is the one call that has to land,
+ *  and on a camera that queues its requests it lands behind whatever is ahead. */
+const STOP_TIMEOUT_MS = 15_000;
+
 export async function ptzStop(endpoint: OnvifEndpoint, profileToken: string): Promise<void> {
+    noteSteering(endpoint);
     await call(
         endpoint,
         (await getServices(endpoint)).ptz,
-        `<Stop xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken><PanTilt>true</PanTilt><Zoom>true</Zoom></Stop>`
+        `<Stop xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken><PanTilt>true</PanTilt><Zoom>true</Zoom></Stop>`,
+        STOP_TIMEOUT_MS
     );
 }
 
@@ -376,6 +478,7 @@ export async function gotoPreset(
     profileToken: string,
     preset: string
 ): Promise<void> {
+    noteSteering(endpoint);
     await call(
         endpoint,
         (await getServices(endpoint)).ptz,
@@ -403,6 +506,30 @@ export async function createPullPoint(endpoint: OnvifEndpoint): Promise<string |
     return tagValue(xml, "Address");
 }
 
+/**
+ * How long one events pull asks the camera to wait for something to happen.
+ *
+ * Short on purpose. A camera that serves one request at a time - a Tapo C200 -
+ * holds every other call behind an open pull, so this is also the longest an
+ * arrow press can sit waiting for the camera to take it. A camera with nothing
+ * to report answers an empty pull this often, which is a small SOAP document.
+ */
+export const PULL_WAIT_SECONDS = 2;
+
+/**
+ * How long Polaris waits for a pull to come back: the wait it asked the camera
+ * for, plus the time any other call gets.
+ *
+ * Never less than the wait itself. Giving up on a pull before the camera was due
+ * to answer is what kept a C200 saturated: the camera went on holding the pull
+ * nobody read, the watcher counted it a failure and opened a new subscription
+ * two seconds later, and the camera filled up with abandoned subscriptions
+ * until it refused new ones and answered everything else 5-15 s late.
+ */
+export function pullTimeoutMs(waitSeconds: number): number {
+    return waitSeconds * 1000 + TIMEOUT_MS;
+}
+
 export interface OnvifNotification {
     /** The topic as the camera words it, e.g. "tns1:RuleEngine/CellMotionDetector/Motion". */
     readonly topic: string;
@@ -420,13 +547,15 @@ export interface OnvifNotification {
 export async function pullMessages(
     endpoint: OnvifEndpoint,
     subscription: string,
-    waitSeconds = 20
+    waitSeconds = PULL_WAIT_SECONDS
 ): Promise<OnvifNotification[]> {
     const path = subscriptionPath(subscription);
+    const wait = Math.max(1, Math.min(60, waitSeconds));
     const xml = await call(
         endpoint,
         path,
-        `<PullMessages xmlns="http://www.onvif.org/ver10/events/wsdl"><Timeout>PT${Math.max(1, Math.min(60, waitSeconds))}S</Timeout><MessageLimit>32</MessageLimit></PullMessages>`
+        `<PullMessages xmlns="http://www.onvif.org/ver10/events/wsdl"><Timeout>PT${wait}S</Timeout><MessageLimit>32</MessageLimit></PullMessages>`,
+        pullTimeoutMs(wait)
     );
     const topics = tagValues(xml, "Topic");
     // The camera reports the state as an attribute of an item named Value, and

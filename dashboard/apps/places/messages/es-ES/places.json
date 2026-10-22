@@ -292,6 +292,7 @@
     },
     "ptz": {
         "down": "Abajo",
+        "failed": "Ese movimiento no llegó a la cámara",
         "in": "Acercar",
         "left": "Izquierda",
         "out": "Alejar",
@@ -498,6 +499,8 @@
         "moveCameras": "Mueve o quita antes sus cámaras",
         "lastPlace": "Tiene que haber un sitio para las cámaras",
         "noPtz": "Esta cámara no se mueve",
+        "ptzLate": "La cámara no recibió el movimiento a tiempo y se le pidió parar",
+        "ptzUnreachable": "No se pudo llegar a la cámara para moverla",
         "notInstalled": "Places no está instalado",
         "recognizerMissing": "El reconocedor se instaló pero no aparece",
         "recognizerAddress": "Escribe la dirección como http://192.168.1.20:8000",
