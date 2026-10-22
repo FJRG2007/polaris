@@ -11,6 +11,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { legalContactSchema } from "@polaris/core";
 import { setLegalContact } from "@/lib/legal/service";
 import { saveUpdateSource } from "@/lib/update-source";
+import { ownVulnerabilities, type OwnVulnerabilities } from "@/lib/security/own-images";
 import { type UpdateTrigger } from "@/lib/update-runner";
 import { collectUpdateReport, issueUrl } from "@/lib/update-report";
 import { getUpdateStatus, resetUpdateStatus, type UpdateStatus } from "@/lib/update-service";
@@ -25,6 +26,12 @@ import { autoUpdatePolicySchema, updateSourceSchema, type AutoUpdatePolicy, type
 export async function checkUpdatesAction(force = true): Promise<UpdateStatus> {
     await requireAdmin();
     return getUpdateStatus(force);
+}
+
+/** What the scans found in Polaris's own images here; null when none ran. */
+export async function ownVulnerabilitiesAction(): Promise<OwnVulnerabilities | null> {
+    await requireAdmin();
+    return ownVulnerabilities().catch(() => null);
 }
 
 /** Ask the host agent to install an update the way this deployment is set to. */

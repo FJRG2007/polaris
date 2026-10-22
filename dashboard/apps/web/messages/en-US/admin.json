@@ -3285,7 +3285,11 @@
             "lastChecked": "Last checked",
             "never": "never",
             "viewChanges": "<link>View changes</link> before installing, or update now - the dashboard stays up while it rolls over.",
-            "updateNow": "Update now"
+            "updateNow": "Update now",
+            "ownVulns": "The last scans of Polaris's own images ({images}) found {critical} critical and {high} high vulnerabilities.",
+            "ownVulnsNone": "The last scans of Polaris's own images ({images}) found nothing critical or high.",
+            "ownVulnsUpdate": "Updating installs freshly built images on patched base images.",
+            "ownVulnsLink": "See findings"
         },
         "run": {
             "starting": "The update is starting; waiting for it to report.",

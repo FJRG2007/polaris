@@ -58,9 +58,11 @@ import {
     DownloadCloud,
     Hammer,
     RefreshCw,
+    ShieldAlert,
     TriangleAlert
 } from "lucide-react";
 import {
+    ownVulnerabilitiesAction,
     saveAutoUpdateAction,
     saveLegalContactAction,
     saveUpdateSourceAction,
@@ -911,6 +913,8 @@ export function SettingsView({
                         {policyError ? <p className="text-xs text-danger">{policyError}</p> : null}
                     </div>
 
+                    <OwnVulnerabilitiesLine available={available} />
+
                     {available || updating || logText ? (
                         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
                             {available ? (
@@ -1138,6 +1142,47 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
 
 /** One fact. A null value is one that has not arrived yet - the label is already
  *  right, so it stays and only the answer is a placeholder. */
+/**
+ * What the last scans found in Polaris's own images, beside the Update control.
+ * Only what a scan reported: with no scan of them there is no line at all.
+ */
+function OwnVulnerabilitiesLine({ available }: { available: boolean }) {
+    const t = useTranslations("admin");
+    const [found, setFound] = useState<Awaited<ReturnType<typeof ownVulnerabilitiesAction>>>(null);
+    useEffect(() => {
+        let live = true;
+        void ownVulnerabilitiesAction()
+            .then((result) => live && setFound(result))
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, []);
+    if (!found) return null;
+    const serious = found.critical + found.high > 0;
+    return (
+        <div className="flex items-start gap-2 text-sm">
+            <ShieldAlert
+                className={`mt-0.5 size-4 shrink-0 ${serious ? "text-danger" : "text-muted-foreground"}`}
+                aria-hidden
+            />
+            <p className="min-w-0">
+                {serious
+                    ? t("settings.updates.ownVulns", {
+                          critical: found.critical,
+                          high: found.high,
+                          images: found.images
+                      })
+                    : t("settings.updates.ownVulnsNone", { images: found.images })}{" "}
+                {serious && available ? t("settings.updates.ownVulnsUpdate") + " " : null}
+                <a className="text-primary hover:underline" href="/apps/servers/security">
+                    {t("settings.updates.ownVulnsLink")}
+                </a>
+            </p>
+        </div>
+    );
+}
+
 function Row({ label, value, href }: { label: string; value: string | null; href?: string }) {
     return (
         <>
