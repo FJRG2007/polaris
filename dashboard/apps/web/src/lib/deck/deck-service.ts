@@ -13,6 +13,14 @@
 import { z } from "zod";
 import { callTool } from "./tool-call";
 import { appDeckActions } from "@/lib/app-extensions/registry";
+import {
+    deckTools,
+    toolInput,
+    toolView,
+    TOOL_PREFIX,
+    type DeckTool,
+    type ToolListings
+} from "./tool-actions";
 import { coreDeckActions, type CoreDeckAction } from "./core-actions";
 import type {
     AppDeckAction,
@@ -32,6 +40,8 @@ interface Resolved {
     readonly scope: string | null;
     readonly core?: CoreDeckAction;
     readonly app?: AppDeckAction;
+    /** An MCP tool offered as it is; already narrowed to the key's scopes. */
+    readonly tool?: DeckTool;
 }
 
 /** The most choices one picker carries. */
@@ -41,8 +51,14 @@ function allowed(scope: string | null, caller: DeckCaller): boolean {
     return scope === null || caller.scopes.includes(scope);
 }
 
-/** Every action there is right now, before the key's scopes are applied. */
-async function everyAction(words: DeckWords): Promise<Resolved[]> {
+/** Every action there is right now: core's and the apps' before the key's
+ *  scopes are applied, the tools after (a tool's scope is the MCP one). The
+ *  tools are left out when nothing asked for one. */
+async function everyAction(
+    words: DeckWords,
+    caller: DeckCaller,
+    withTools = true
+): Promise<Resolved[]> {
     const core = coreDeckActions(words("deck.errors.refused")).map((action) => ({
         id: action.id,
         scope: action.scope,
@@ -56,14 +72,18 @@ async function everyAction(words: DeckWords): Promise<Resolved[]> {
         taken.add(action.id);
         apps.push({ id: action.id, scope: action.scope, app: action });
     }
-    return [...core, ...apps];
+    if (!withTools) return [...core, ...apps];
+    const tools = (await deckTools(caller)).map((tool) => ({ id: tool.id, scope: null, tool }));
+    return [...core, ...apps, ...tools];
 }
 
 async function viewOf(
     action: Resolved,
     caller: DeckCaller,
-    words: DeckWords
+    words: DeckWords,
+    listings: ToolListings
 ): Promise<DeckActionView> {
+    if (action.tool) return toolView(action.tool, caller, words, listings);
     if (action.core) {
         const core = action.core;
         const fields: DeckOptionField[] = await Promise.all(
@@ -101,7 +121,12 @@ async function viewOf(
     const fields: DeckOptionField[] = await Promise.all(
         app.fields.map(async (field) => {
             let choices: { value: string; label: string }[] | undefined;
-            if (field.choices) {
+            if (field.fixed) {
+                choices = field.fixed.map((choice) => ({
+                    value: choice.value,
+                    label: choice.label[caller.locale]
+                }));
+            } else if (field.choices) {
                 const outcome = await callTool(caller, field.choices.tool, field.choices.input);
                 choices = outcome.ok
                     ? field.choices.pick(outcome.structured).slice(0, CHOICE_LIMIT)
@@ -125,7 +150,9 @@ async function viewOf(
         label: app.label[caller.locale],
         icon: app.icon,
         options: fields,
-        live: app.read !== undefined
+        live: app.read !== undefined,
+        ...(app.confirm ? { confirm: true } : {}),
+        ...(app.dial ? { dial: app.dial } : {})
     };
 }
 
@@ -134,8 +161,11 @@ export async function deckCatalogue(
     caller: DeckCaller,
     words: DeckWords
 ): Promise<DeckActionView[]> {
-    const offered = (await everyAction(words)).filter((action) => allowed(action.scope, caller));
-    return Promise.all(offered.map((action) => viewOf(action, caller, words)));
+    const offered = (await everyAction(words, caller)).filter((action) =>
+        allowed(action.scope, caller)
+    );
+    const listings: ToolListings = new Map();
+    return Promise.all(offered.map((action) => viewOf(action, caller, words, listings)));
 }
 
 /** A run as the plugin asks for it. */
@@ -143,7 +173,9 @@ export const deckRunSchema = z.object({
     action: z.string().trim().min(1).max(80),
     options: z.record(z.unknown()).default({}),
     /** A dial's turn, in ticks: negative is anticlockwise. */
-    step: z.number().int().min(-50).max(50).optional()
+    step: z.number().int().min(-50).max(50).optional(),
+    /** A dial pushed rather than turned. */
+    push: z.boolean().optional()
 });
 
 export type DeckRunInput = z.infer<typeof deckRunSchema>;
@@ -155,7 +187,9 @@ export async function runDeckAction(
     input: DeckRunInput,
     words: DeckWords
 ): Promise<DeckRunResult> {
-    const action = (await everyAction(words)).find((candidate) => candidate.id === input.action);
+    const action = (await everyAction(words, caller, input.action.startsWith(TOOL_PREFIX))).find(
+        (candidate) => candidate.id === input.action
+    );
     if (!action) return { ok: false, message: words("deck.errors.unknownAction") };
     if (!allowed(action.scope, caller))
         return { ok: false, message: words("deck.errors.notAllowed") };
@@ -168,17 +202,35 @@ export async function runDeckAction(
         return core.run(options.data, caller);
     }
 
+    if (action.tool) {
+        // The tool's own schema, scope and budgets decide, in callTool.
+        const outcome = await callTool(
+            caller,
+            action.tool.tool.name,
+            toolInput(action.tool, input.options)
+        );
+        return outcome.ok
+            ? { ok: true }
+            : { ok: false, message: outcome.message ?? words("deck.errors.refused") };
+    }
+
     const app = action.app!;
     const options = app.options.safeParse(input.options);
     if (!options.success) return { ok: false, message: words("deck.errors.badOptions") };
     // A toggle flips what is there now and a dial moves from it, so both read
     // it first, through the same tool the key's state comes from.
-    const current = app.read ? await readApp(app, options.data, caller) : undefined;
-    const outcome = await callTool(
-        caller,
-        app.run.tool,
-        app.run.input(options.data, { step: input.step, current })
-    );
+    const raw = app.read
+        ? await callTool(caller, app.read.tool, app.read.input(options.data))
+        : null;
+    const current = app.read && raw ? pickState(app, raw, caller) : undefined;
+    const sent = app.run.input(options.data, {
+        step: input.step,
+        push: input.push,
+        current,
+        read: raw?.ok ? raw.structured : undefined
+    });
+    if (sent === null) return { ok: false, message: words("deck.errors.refused") };
+    const outcome = await callTool(caller, app.run.tool, sent);
     if (!outcome.ok) return { ok: false, message: outcome.message ?? words("deck.errors.refused") };
     const after = app.read ? await readApp(app, options.data, caller) : undefined;
     return after ? { ok: true, state: after } : { ok: true };
@@ -190,10 +242,17 @@ async function readApp(
     caller: DeckCaller
 ): Promise<DeckState> {
     const read = app.read!;
-    const outcome = await callTool(caller, read.tool, read.input(options));
+    return pickState(app, await callTool(caller, read.tool, read.input(options)), caller);
+}
+
+function pickState(
+    app: AppDeckAction,
+    outcome: Awaited<ReturnType<typeof callTool>>,
+    caller: DeckCaller
+): DeckState {
     if (!outcome.ok) return { tone: "idle" };
     try {
-        return read.pick(outcome.structured, caller.locale);
+        return app.read!.pick(outcome.structured, caller.locale);
     } catch {
         return { tone: "idle" };
     }
@@ -244,7 +303,9 @@ export async function readDeckStates(
     watched: DeckWatch,
     words: DeckWords
 ): Promise<{ readings: DeckReading[]; chat: boolean }> {
-    const actions = new Map((await everyAction(words)).map((action) => [action.id, action]));
+    const actions = new Map(
+        (await everyAction(words, caller, false)).map((action) => [action.id, action])
+    );
     let chat = false;
     const readings = await Promise.all(
         watched.map(async (entry): Promise<DeckReading> => {

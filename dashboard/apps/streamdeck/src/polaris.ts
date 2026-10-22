@@ -23,6 +23,10 @@ export interface DeckAction {
     readonly options: readonly DeckField[];
     readonly live: boolean;
     readonly path?: string;
+    /** It cannot be undone: a key asks for a second press before it runs. */
+    readonly confirm?: boolean;
+    /** For a dial: what its value runs between, and how far a tick moves it. */
+    readonly dial?: { readonly min: number; readonly max: number; readonly step: number };
 }
 
 /** The newest released plugin and Companion module, as Polaris knows them. */
@@ -214,12 +218,18 @@ export class PolarisClient {
         credentials: Credentials,
         action: string,
         options: Record<string, unknown>,
-        step?: number
+        step?: number,
+        push?: boolean
     ): Promise<RunResult> {
         const response = await this.fetcher(`${credentials.address}/api/deck/run`, {
             method: "POST",
             headers: this.#headers(credentials.token),
-            body: JSON.stringify({ action, options, ...(step === undefined ? {} : { step }) })
+            body: JSON.stringify({
+                action,
+                options,
+                ...(step === undefined ? {} : { step }),
+                ...(push ? { push: true } : {})
+            })
         });
         return this.#json<RunResult>(response);
     }

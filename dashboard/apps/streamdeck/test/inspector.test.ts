@@ -101,4 +101,69 @@ describe("the settings screen", () => {
             payload: { minutes: 12 }
         });
     });
+
+    it("draws more presses for a key and saves a double press with its window", () => {
+        const { dom, sent, listeners } = openScreen("key");
+        const fan = (id: string, label: string, kind = "run") => ({
+            id,
+            kind,
+            area: "places",
+            label,
+            icon: "fan",
+            live: false,
+            options: []
+        });
+        const status = (catalogue: unknown[]) =>
+            listeners.get("message")?.({
+                data: JSON.stringify({
+                    event: "sendToPropertyInspector",
+                    payload: {
+                        type: "status",
+                        link: "online",
+                        address: "https://polaris.example.com",
+                        account: "Ana",
+                        connecting: { phase: "idle" },
+                        update: null,
+                        catalogue
+                    }
+                })
+            });
+        status([
+            fan("fan.on", "Fan on"),
+            fan("fan.off", "Fan off"),
+            fan("door", "<img onerror=x>")
+        ]);
+        listeners.get("message")?.({
+            data: JSON.stringify({
+                event: "didReceiveSettings",
+                context: "action-id",
+                payload: { settings: { action: "fan.on" } }
+            })
+        });
+        const document = dom.window.document;
+        const double = document.querySelector('select[data-binding="double"]') as InstanceType<
+            typeof dom.window.HTMLSelectElement
+        >;
+        expect(double).not.toBeNull();
+        expect(document.querySelector('select[data-binding="alternate"]')).not.toBeNull();
+        expect(document.querySelector('input[data-window="doubleMs"]')).toBeNull();
+        // A label from Polaris stays text.
+        expect(document.querySelector("img")).toBeNull();
+
+        double.value = "fan.off";
+        double.dispatchEvent(new dom.window.Event("change"));
+        const saved = sent.filter((message) => message.event === "setSettings").at(-1);
+        expect(saved?.payload).toMatchObject({ action: "fan.on", double: { action: "fan.off" } });
+        const window = document.querySelector('input[data-window="doubleMs"]') as InstanceType<
+            typeof dom.window.HTMLInputElement
+        >;
+        expect(window.value).toBe("300");
+
+        // A real toggle offers nothing to alternate.
+        status([fan("fan.on", "Fan", "toggle"), fan("fan.off", "Fan off")]);
+        expect(document.querySelector('select[data-binding="alternate"]')).toBeNull();
+        expect(document.querySelector(".gestures")?.textContent).toContain(
+            "already switches on and off"
+        );
+    });
 });

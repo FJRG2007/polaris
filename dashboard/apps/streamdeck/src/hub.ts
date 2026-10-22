@@ -15,7 +15,7 @@ import { wordsFor } from "./words";
 import { keyImage } from "./render";
 import { backoffMs } from "./backoff";
 import { joinPath, normalizeAddress } from "./address";
-import { faceFor, runOptions, watchOptions, type KeySettings } from "./face";
+import { faceFor, runOptions, watchOptions, type Binding, type KeySettings } from "./face";
 import streamDeck, { type DialAction, type KeyAction } from "@elgato/streamdeck";
 import {
     PolarisClient,
@@ -62,6 +62,8 @@ class Hub {
     #catalogueAt = 0;
     readonly #instances = new Map<string, Instance>();
     readonly #states = new Map<string, DeckState>();
+    /** Keys waiting for the second press that confirms them. */
+    readonly armed = new Set<string>();
     #stream: AbortController | null = null;
     #restart: ReturnType<typeof setTimeout> | null = null;
     /** What the stream last opened watched, to tell a change from a redraw. */
@@ -131,7 +133,10 @@ class Hub {
             this.#states.get(id),
             this.words
         );
-        if (instance.action.isKey()) void instance.action.setImage(keyImage(face));
+        const shown = this.armed.has(id)
+            ? { ...face, tone: "warn" as const, label: this.words.again }
+            : face;
+        if (instance.action.isKey()) void instance.action.setImage(keyImage(shown));
     }
 
     #redrawAll(): void {
@@ -177,27 +182,35 @@ class Hub {
         }
     }
 
-    /** Run a key's action. The caller shows OK or the alert. */
-    async run(id: string, step?: number): Promise<RunResult | null> {
+    /** Run a key's action, or the other one a gesture is set to. The caller
+     *  shows OK or the alert. A dial's push says so, for an entry that does
+     *  something else pushed than turned. */
+    async run(
+        id: string,
+        step?: number,
+        binding?: Binding | null,
+        push?: boolean
+    ): Promise<RunResult | null> {
         const instance = this.#instances.get(id);
         const credentials = this.credentials;
-        if (!instance?.settings.action || !credentials) return null;
+        const action = binding ? binding.action : instance?.settings.action;
+        if (!instance || !action || !credentials) return null;
+        // Another entry's state is not this key's: only the key's own is kept.
+        const own = !binding || binding.action === instance.settings.action;
         try {
             const result = await this.client.run(
                 credentials,
-                instance.settings.action,
-                runOptions(instance.settings),
-                step
+                action,
+                binding ? runOptions(binding) : runOptions(instance.settings),
+                step,
+                push
             );
             if (this.link !== "online") {
                 this.link = "online";
                 this.#redrawAll();
             }
-            if (result.ok && result.state) this.setState(id, result.state);
-            if (!result.ok)
-                streamDeck.logger.info(
-                    `Polaris refused ${instance.settings.action}: ${result.message}`
-                );
+            if (result.ok && result.state && own) this.setState(id, result.state);
+            if (!result.ok) streamDeck.logger.info(`Polaris refused ${action}: ${result.message}`);
             return result;
         } catch (caught) {
             this.#failed(caught);

@@ -196,7 +196,16 @@ describe("deck routes", () => {
                 "deploy.manage",
                 "home.read",
                 "home.control",
-                "home.manage"
+                "home.manage",
+                "tasks.read",
+                "tasks.manage",
+                "notes.use",
+                "calendar.use",
+                "games.read",
+                "games.moderate",
+                "games.manage",
+                "agents.read",
+                "agents.manage"
             ]
         });
         const refused = await authorize.POST(

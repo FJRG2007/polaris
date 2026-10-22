@@ -35,7 +35,16 @@ const SCOPE_WORDS = {
     "chat.use": "cli.scope.chatUse",
     "home.read": "cli.scope.homeRead",
     "home.control": "cli.scope.homeControl",
-    "home.manage": "cli.scope.homeManage"
+    "home.manage": "cli.scope.homeManage",
+    "tasks.read": "cli.scope.tasksRead",
+    "tasks.manage": "cli.scope.tasksManage",
+    "notes.use": "cli.scope.notesUse",
+    "calendar.use": "cli.scope.calendarUse",
+    "games.read": "cli.scope.gamesRead",
+    "games.moderate": "cli.scope.gamesModerate",
+    "games.manage": "cli.scope.gamesManage",
+    "agents.read": "cli.scope.agentsRead",
+    "agents.manage": "cli.scope.agentsManage"
 } as const satisfies Record<SignInScope, `cli.scope.${string}`>;
 
 /**

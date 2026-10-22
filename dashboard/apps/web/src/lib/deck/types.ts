@@ -13,7 +13,7 @@ import type { Locale } from "@polaris/core";
 export type DeckActionKind = "run" | "toggle" | "state" | "dial" | "open";
 
 /** The heading the plugin's picker groups actions under. */
-export type DeckArea = "chat" | "status" | "watch" | "deploy" | "places" | "polaris";
+export type DeckArea = "chat" | "status" | "watch" | "deploy" | "places" | "polaris" | "tools";
 
 /** One setting an action takes, as the plugin's settings screen draws it. */
 export interface DeckOptionField {
@@ -41,6 +41,17 @@ export interface DeckActionView {
     readonly live: boolean;
     /** For `open`: the page, joined to the Polaris address by the plugin. */
     readonly path?: string;
+    /** It cannot be undone: the key asks for a second press before it runs. */
+    readonly confirm?: boolean;
+    /** For a dial: the range its value runs over and how far a tick moves it. */
+    readonly dial?: DeckDialRange;
+}
+
+/** A dial's range: a temperature, say, rather than a 1 to 100 level. */
+export interface DeckDialRange {
+    readonly min: number;
+    readonly max: number;
+    readonly step: number;
 }
 
 /** Tone of a key: drawn as its colour. */
@@ -108,6 +119,11 @@ export interface AppDeckAction {
         readonly required: boolean;
         readonly min?: number;
         readonly max?: number;
+        /** For `choice`: fixed values, named in every locale. */
+        readonly fixed?: readonly {
+            readonly value: string;
+            readonly label: Readonly<Record<Locale, string>>;
+        }[];
         /** For `choice`: the tool that lists them and how to read its answer. */
         readonly choices?: {
             readonly tool: string;
@@ -115,13 +131,25 @@ export interface AppDeckAction {
             readonly pick: (structured: unknown) => { value: string; label: string }[];
         };
     }[];
+    /** It cannot be undone: the key asks for a second press before it runs. */
+    readonly confirm?: boolean;
+    /** For a dial: its range, when it is not a 1 to 100 level. */
+    readonly dial?: DeckDialRange;
     /** The tool a press calls, and its input. `step` is a dial's turn, in
-     *  ticks; `current` is the state last read, for a toggle. */
+     *  ticks; `push` says a dial was pushed rather than turned; `current` is
+     *  the state last read, for a toggle. A null input is a press that has
+     *  nothing to send (a step from a value the device has not reported). */
     readonly run: {
         readonly tool: string;
         readonly input: (
             options: Record<string, unknown>,
-            press: { readonly step?: number; readonly current?: DeckState }
+            press: {
+                readonly step?: number;
+                readonly push?: boolean;
+                readonly current?: DeckState;
+                /** What the read tool answered, for a press that moves from it. */
+                readonly read?: unknown;
+            }
         ) => unknown;
     };
     /** The tool that reads its state, for a live action. `locale` is the

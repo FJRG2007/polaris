@@ -89,6 +89,11 @@ vi.mock("@/lib/mcp/catalog", () => {
                 "chat.use",
                 z.object({ conversationId: z.string().uuid(), body: z.string().min(1) })
             ),
+            tool(
+                "chat_mute",
+                "chat.use",
+                z.object({ conversationId: z.string().uuid(), muted: z.boolean() })
+            ),
             tool("chat_conversations", "chat.use", z.object({}), {
                 conversations: [{ id: "c1", name: "general" }]
             }),
@@ -402,5 +407,115 @@ describe("readWatch", () => {
             )
         ).toBeNull();
         expect(service.readWatch("a".repeat(20_000))).toBeNull();
+    });
+});
+describe("MCP tools as deck actions", () => {
+    it("offers a tool that changes something, with the key's scope, and asks twice", async () => {
+        const offered = await service.deckCatalogue(caller(["chat.use"]), words);
+        const send = offered.find((action) => action.id === "tool.chat_send");
+        expect(send).toMatchObject({ kind: "run", area: "tools", confirm: true, live: false });
+        // A field naming one of the person's things is a picker of them.
+        expect(send?.options.find((field) => field.name === "conversationId")).toMatchObject({
+            type: "choice",
+            label: "deck.fields.conversationId",
+            choices: [{ value: "c1", label: "general" }]
+        });
+        expect(offered.some((action) => action.id === "tool.deploy_restart")).toBe(false);
+        // Read-only tools have nothing to press.
+        expect(offered.some((action) => action.id === "tool.chat_conversations")).toBe(false);
+    });
+
+    it("reads a picker many tools share once, in the reader's words", async () => {
+        const offered = await service.deckCatalogue(caller(["chat.use"]), words);
+        const mute = offered.find((action) => action.id === "tool.chat_mute");
+        expect(mute?.options.find((field) => field.name === "muted")).toMatchObject({
+            choices: [
+                { value: "true", label: "deck.choice.yes" },
+                { value: "false", label: "deck.choice.no" }
+            ]
+        });
+        expect(mute?.options.find((field) => field.name === "conversationId")).toMatchObject({
+            choices: [{ value: "c1", label: "general" }]
+        });
+        expect(calls.filter((call) => call.name === "chat_conversations")).toHaveLength(2);
+    });
+
+    it("leaves the tools out of a state read", async () => {
+        const { readings } = await service.readDeckStates(
+            caller(["chat.use"]),
+            [{ key: "k", action: "tool.chat_send", options: {} }],
+            words
+        );
+        expect(readings).toEqual([{ key: "k", state: { tone: "idle" } }]);
+        expect(calls).toEqual([]);
+    });
+
+    it("never offers a tool the deck's key cannot be granted", async () => {
+        const offered = await service.deckCatalogue(caller(["chat.use", "deploy.read"]), words);
+        expect(offered.some((action) => action.id.startsWith("tool.databases"))).toBe(false);
+        expect(offered.some((action) => action.id === "tool.places_camera_snapshot")).toBe(false);
+    });
+
+    it("runs a tool through its own schema with only its own fields", async () => {
+        const result = await service.runDeckAction(
+            caller(["chat.use"]),
+            {
+                action: "tool.chat_send",
+                options: { conversationId: CONVERSATION, body: "hi", stray: "x" }
+            },
+            words
+        );
+        expect(result).toEqual({ ok: true });
+        expect(calls).toEqual([
+            {
+                name: "chat_send",
+                input: { conversationId: CONVERSATION, body: "hi" },
+                scopes: ["chat.use"]
+            }
+        ]);
+    });
+
+    it("refuses a tool the key may not use, by the same words as any other", async () => {
+        const result = await service.runDeckAction(
+            caller(["chat.use"]),
+            { action: "tool.deploy_restart", options: { service: "web/api" } },
+            words
+        );
+        expect(result).toEqual({ ok: false, message: "deck.errors.unknownAction" });
+        expect(calls).toEqual([]);
+    });
+
+    it("reads fields from a schema and leaves out a tool no screen can fill", async () => {
+        const { toolFields, spokenName, rowsOf, toolInput } =
+            await import("@/lib/deck/tool-actions");
+        const { toJsonSchema } = await import("@/lib/mcp/json-schema");
+        const fields = toolFields(
+            toJsonSchema(
+                z.object({
+                    deviceId: z.string(),
+                    mode: z.enum(["cool", "heat"]),
+                    level: z.number().min(1).max(100).optional(),
+                    on: z.boolean().optional(),
+                    tags: z.array(z.string()).optional()
+                })
+            )
+        );
+        expect(fields?.map((field) => [field.name, field.type])).toEqual([
+            ["deviceId", "choice"],
+            ["mode", "choice"],
+            ["level", "number"],
+            ["on", "choice"]
+        ]);
+        expect(toolFields(toJsonSchema(z.object({ ids: z.array(z.string()) })))).toBeNull();
+        expect(spokenName("maxPlayers")).toBe("Max players");
+        expect(rowsOf({ rows: [{ id: "a", title: "Alpha" }, { id: "b" }] })).toEqual([
+            { value: "a", label: "Alpha" },
+            { value: "b", label: "b" }
+        ]);
+        const entry = { id: "tool.x", tool: {} as never, fields: fields! };
+        expect(toolInput(entry, { deviceId: "d", on: "false", level: "", stray: 1 })).toEqual({
+            deviceId: "d",
+            on: false
+        });
     });
 });

@@ -1329,7 +1329,16 @@
             "chatUse": "Enviar mensajes y ver lo pendiente en Chat",
             "homeRead": "Ver tus lugares y el estado de sus dispositivos",
             "homeControl": "Encender y ajustar los dispositivos que puedes usar",
-            "homeManage": "Ejecutar las rutinas de tus lugares"
+            "homeManage": "Ejecutar las rutinas de tus lugares",
+            "tasksRead": "Ver tus tareas y sus listas",
+            "tasksManage": "Crear, completar y cambiar tus tareas",
+            "notesUse": "Leer y escribir tus notas",
+            "calendarUse": "Ver y cambiar los eventos de tus calendarios",
+            "gamesRead": "Ver tus servidores de juegos, sus jugadores y sus registros",
+            "gamesModerate": "Expulsar, vetar y escribir a jugadores de tus servidores de juegos",
+            "gamesManage": "Iniciar, detener, reiniciar y respaldar tus servidores de juegos",
+            "agentsRead": "Ver tus sesiones de agentes y lo que están haciendo",
+            "agentsManage": "Iniciar, responder y detener tus sesiones de agentes"
         },
         "consent": "Si dices que sí, este equipo recibe una clave que actúa en nombre de tu cuenta durante un año, limitada a lo que aparece arriba. Aparece en Claves de API, donde puedes revocarla, y plr logout también la revoca.",
         "working": "Procesando",
