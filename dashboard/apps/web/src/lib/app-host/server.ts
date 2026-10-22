@@ -176,6 +176,7 @@ export const serverHost = {
         grantedSubjects: later(load.accessGrants, "grantedSubjects"),
         linkReach: later(load.accessGrants, "linkReach"),
         linkReachPaid: later(load.accessGrants, "linkReachPaid"),
+        recordGrantUse: later(load.accessGrants, "recordGrantUse"),
         liveGrants: later(load.accessGrants, "liveGrants"),
         reachesAnySubject: later(load.accessGrants, "reachesAnySubject"),
         spendGrant: later(load.accessGrants, "spendGrant")
