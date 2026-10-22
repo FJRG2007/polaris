@@ -26,6 +26,7 @@ import {
     type InstanceTypes,
     type SomeCompanionConfigField
 } from "@companion-module/base";
+import { MARK_PRESET_ID, POLARIS_MARK_PNG64 } from "./mark";
 import { updateFor } from "../../streamdeck/src/update";
 import { phaseStatus, phaseText, type Update } from "./status";
 import { VERSION } from "./version";
@@ -564,6 +565,24 @@ export default class PolarisInstance extends InstanceBase<Schema> {
 
         const presets: CompanionPresetDefinitions<Schema> = {};
         const sections = new Map<string, string[]>();
+        // The Polaris mark on a button of its own, first in the list: a module
+        // cannot make a page or give its presets an icon, so this is what heads
+        // a page of Polaris buttons.
+        presets[MARK_PRESET_ID] = {
+            type: "simple",
+            name: "Polaris",
+            style: {
+                text: "",
+                size: "auto",
+                color: mapping.COLORS.white,
+                bgcolor: mapping.COLORS.black,
+                png64: POLARIS_MARK_PNG64,
+                pngalignment: "center:center"
+            },
+            steps: [{ down: [], up: [] }],
+            feedbacks: []
+        } as CompanionPresetDefinitions<Schema>[string];
+        sections.set("polaris", [MARK_PRESET_ID]);
         for (const spec of timers.timerPresets(timerEntry !== undefined)) {
             presets[spec.id] = {
                 type: "simple",

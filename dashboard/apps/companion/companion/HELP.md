@@ -8,6 +8,8 @@ Run Polaris actions and show live Polaris state on Companion buttons.
 2. The connection's status shows a code and a page. Open that page in a browser, sign in to Polaris and approve the code.
 3. The actions, feedbacks, variables and presets your account may use appear on their own.
 
+The **polaris** presets start with a button showing the Polaris mark, to head a page of your Polaris buttons.
+
 To stop using it, run the **sign out** action, or disconnect it from **Downloads** in Polaris.
 
 ## Timers
