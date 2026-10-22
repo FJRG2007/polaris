@@ -304,5 +304,25 @@
             "nearbyVague": "Your location is not precise enough to tell.",
             "nearbyUnplaced": "The place has no location yet, so this cannot check."
         }
+    },
+    "guestStatus": {
+        "state": {
+            "up": "Online",
+            "down": "Offline",
+            "unknown": "Unknown"
+        },
+        "kind": {
+            "nas": "Storage",
+            "server": "Server",
+            "domain": "Website"
+        },
+        "upFor": "Up for {span}.",
+        "checked": "Last checked {when} UTC.",
+        "seeOnly": "This link only shows how it is doing.",
+        "units": {
+            "days": "{n} d",
+            "hours": "{n} h",
+            "minutes": "{n} min"
+        }
     }
 }
