@@ -80,7 +80,17 @@ export const CLI_PROTOCOL_RANGE = "1-1";
 const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
-    experimental: { serverActions: { bodySizeLimit: "32mb" } },
+    // Next only compiles in a separate worker by default when there is no custom
+    // `webpack` hook, and there is one below. Without the worker, the server, edge
+    // and client compilations all pile up in the build's own heap, and a cold
+    // build (any lockfile change empties .next/cache) died at CI's 6 GB cap. The
+    // worker runs each compilation in a process of its own and frees it after;
+    // the memory optimizations trade a little build time for a smaller peak.
+    experimental: {
+        serverActions: { bodySizeLimit: "32mb" },
+        webpackBuildWorker: true,
+        webpackMemoryOptimizations: true
+    },
     // CI's checks job runs ESLint over these same sources beside the app build, so
     // linting again inside `next build` proved nothing new. Skipped only where that
     // job is known to run: dashboard-ci.yml sets the flag on its build, and nothing
