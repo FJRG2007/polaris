@@ -37,7 +37,8 @@ export interface InventoryRoute {
 
 const KEY_AUTH = /\b(authenticateApiKey|requireApiKey)\s*\(/;
 const METHOD = /^(GET|POST|PUT|PATCH|DELETE)$/;
-const METHOD_DECLARATION = /export\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|PATCH|DELETE)\b/g;
+const METHOD_DECLARATION =
+    /export\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|PATCH|DELETE)\b/g;
 const EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
 /** `api/v1/projects/[id]/route.ts` as `/api/v1/projects/{id}`. */
@@ -63,7 +64,11 @@ export function routeMethods(source: string): string[] {
     for (const match of source.matchAll(METHOD_DECLARATION)) if (match[1]) found.add(match[1]);
     for (const match of source.matchAll(EXPORT_LIST)) {
         for (const entry of (match[1] ?? "").split(",")) {
-            const name = entry.split(/\s+as\s+/).pop()?.trim() ?? "";
+            const name =
+                entry
+                    .split(/\s+as\s+/)
+                    .pop()
+                    ?.trim() ?? "";
             if (METHOD.test(name)) found.add(name);
         }
     }
@@ -72,7 +77,9 @@ export function routeMethods(source: string): string[] {
 
 /** The specifiers a module imports. */
 function imports(source: string): string[] {
-    return [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].flatMap((m) => (m[1] ? [m[1]] : []));
+    return [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].flatMap((m) =>
+        m[1] ? [m[1]] : []
+    );
 }
 
 export function apiInventory(

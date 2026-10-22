@@ -7,11 +7,13 @@ type Props = { params: Promise<{ locale: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { locale } = await params;
-    return isLocale(locale) ? pageMetadata(locale, {
+    return isLocale(locale)
+        ? pageMetadata(locale, {
               title: words(locale).api.title,
               description: words(locale).meta.api,
               page: "docs/api/"
-          }) : {};
+          })
+        : {};
 }
 
 export default async function Page({ params }: Props) {

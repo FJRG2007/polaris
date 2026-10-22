@@ -22,15 +22,7 @@ function shot(item: ShowcaseItem): Shot {
     };
 }
 
-function SectionHead({
-    id,
-    title,
-    intro
-}: {
-    id: string;
-    title: string;
-    intro: string;
-}) {
+function SectionHead({ id, title, intro }: { id: string; title: string; intro: string }) {
     return (
         <div className="flex max-w-2xl flex-col gap-2">
             <h2 id={id} className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -94,11 +86,7 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
 
             {replaces.length ? (
                 <section aria-labelledby="replaces" className="flex flex-col gap-6">
-                    <SectionHead
-                        id="replaces"
-                        title={t.replacesTitle}
-                        intro={t.replacesIntro}
-                    />
+                    <SectionHead id="replaces" title={t.replacesTitle} intro={t.replacesIntro} />
                     <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         {replaces.map((row) => (
                             <li
@@ -138,11 +126,7 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
             ) : null}
 
             <section aria-labelledby="steps" className="flex flex-col gap-6">
-                <SectionHead
-                    id="steps"
-                    title={t.stepsTitle}
-                    intro={t.stepsIntro}
-                />
+                <SectionHead id="steps" title={t.stepsTitle} intro={t.stepsIntro} />
                 <ol className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     {steps.map((step, index) => (
                         <li
@@ -166,11 +150,7 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
             </section>
 
             <section aria-labelledby="look" className="flex flex-col gap-8">
-                <SectionHead
-                    id="look"
-                    title={t.lookTitle}
-                    intro={t.lookIntro}
-                />
+                <SectionHead id="look" title={t.lookTitle} intro={t.lookIntro} />
                 {showcase.map((section) => (
                     <div key={section.heading} className="flex flex-col gap-3">
                         <h3 className="text-lg font-semibold">{section.heading}</h3>

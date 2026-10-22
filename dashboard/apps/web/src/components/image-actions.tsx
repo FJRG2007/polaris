@@ -149,7 +149,9 @@ function ImageItems({
                 <Item
                     onSelect={() =>
                         void copyImage(image.url).then((outcome) =>
-                            announce(outcome === "copied" ? t("images.copied") : t("images.copyRefused"))
+                            announce(
+                                outcome === "copied" ? t("images.copied") : t("images.copyRefused")
+                            )
                         )
                     }
                 >

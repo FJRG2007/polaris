@@ -105,7 +105,12 @@ export function searchRecords(locale: SiteLocale): SearchRecord[] {
     const records: SearchRecord[] = [];
     for (const page of docs[locale]) {
         const at = asset(href(locale, `docs/${page.slug}/`));
-        records.push({ title: page.title, section: page.summary, href: at, text: page.text[""] ?? "" });
+        records.push({
+            title: page.title,
+            section: page.summary,
+            href: at,
+            text: page.text[""] ?? ""
+        });
         for (const heading of page.headings)
             records.push({
                 title: heading.text,

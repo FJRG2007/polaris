@@ -79,18 +79,25 @@ function attributeName(node) {
  *  the expression itself, either side of a ternary or `??`/`||`, a template. */
 function literalsIn(expression) {
     if (!expression) return [];
-    if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) return [expression];
+    if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression))
+        return [expression];
     if (ts.isTemplateExpression(expression)) return [expression];
     if (ts.isParenthesizedExpression(expression)) return literalsIn(expression.expression);
-    if (ts.isConditionalExpression(expression)) return [...literalsIn(expression.whenTrue), ...literalsIn(expression.whenFalse)];
-    if (ts.isBinaryExpression(expression) && ["??", "||"].includes(expression.operatorToken.getText()))
+    if (ts.isConditionalExpression(expression))
+        return [...literalsIn(expression.whenTrue), ...literalsIn(expression.whenFalse)];
+    if (
+        ts.isBinaryExpression(expression) &&
+        ["??", "||"].includes(expression.operatorToken.getText())
+    )
         return [...literalsIn(expression.left), ...literalsIn(expression.right)];
     return [];
 }
 
 function textOf(literal) {
     if (ts.isTemplateExpression(literal)) {
-        return [literal.head.text, ...literal.templateSpans.map((span) => span.literal.text)].join(" {} ");
+        return [literal.head.text, ...literal.templateSpans.map((span) => span.literal.text)].join(
+            " {} "
+        );
     }
     return literal.text;
 }
@@ -104,7 +111,8 @@ export function scanSource(source, fileName = "file.tsx") {
     const kind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
     const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
     const lines = source.split("\n");
-    const ignored = (line) => /i18n-ignore/.test(lines[line] ?? "") || /i18n-ignore/.test(lines[line - 1] ?? "");
+    const ignored = (line) =>
+        /i18n-ignore/.test(lines[line] ?? "") || /i18n-ignore/.test(lines[line - 1] ?? "");
     const found = [];
     const report = (node, kindOf, name, text) => {
         const line = file.getLineAndCharacterOfPosition(node.getStart(file)).line;
@@ -115,8 +123,13 @@ export function scanSource(source, fileName = "file.tsx") {
     const visit = (node) => {
         if (ts.isJsxText(node)) {
             report(node, "text", "", node.text);
-        } else if (ts.isJsxExpression(node) && node.parent && (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent))) {
-            for (const literal of literalsIn(node.expression)) report(literal, "text", "", textOf(literal));
+        } else if (
+            ts.isJsxExpression(node) &&
+            node.parent &&
+            (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent))
+        ) {
+            for (const literal of literalsIn(node.expression))
+                report(literal, "text", "", textOf(literal));
         } else if (ts.isJsxAttribute(node) && COPY_NAMES.has(attributeName(node))) {
             const value = node.initializer;
             const literals = !value
@@ -126,9 +139,11 @@ export function scanSource(source, fileName = "file.tsx") {
                   : ts.isJsxExpression(value)
                     ? literalsIn(value.expression)
                     : [];
-            for (const literal of literals) report(literal, "prop", attributeName(node), textOf(literal));
+            for (const literal of literals)
+                report(literal, "prop", attributeName(node), textOf(literal));
         } else if (ts.isPropertyAssignment(node) && COPY_NAMES.has(attributeName(node))) {
-            for (const literal of literalsIn(node.initializer)) report(literal, "property", attributeName(node), textOf(literal));
+            for (const literal of literalsIn(node.initializer))
+                report(literal, "property", attributeName(node), textOf(literal));
         }
         ts.forEachChild(node, visit);
     };
@@ -143,13 +158,16 @@ export function scanSource(source, fileName = "file.tsx") {
  * its own name, and the shared UI package is `packages/ui`.
  */
 export function areaOf(path) {
-    const parts = path.split(/[\\/]/).filter((part) => part !== "" && part !== ".." && !/^\(.*\)$/.test(part));
+    const parts = path
+        .split(/[\\/]/)
+        .filter((part) => part !== "" && part !== ".." && !/^\(.*\)$/.test(part));
     const [root = "", ...rest] = parts;
     if (root === "packages") return `packages/${rest[0] ?? ""}`;
     if (root !== "web") return root;
     const [, top = "", first = "", second = ""] = rest; // src, app|components|lib, ...
     const isDir = (name) => name !== "" && !/\.[jt]sx?$/.test(name);
-    if (top === "app") return first === "apps" && isDir(second) ? `apps/${second}` : isDir(first) ? first : "app";
+    if (top === "app")
+        return first === "apps" && isDir(second) ? `apps/${second}` : isDir(first) ? first : "app";
     return isDir(first) ? `${top}/${first}` : top;
 }
 
@@ -160,7 +178,8 @@ function sourceFiles() {
         for (const entry of readdirSync(directory)) {
             const full = join(directory, entry);
             if (statSync(full).isDirectory()) walk(full);
-            else if (/\.(ts|tsx)$/.test(entry) && !/\.(test|d)\.tsx?$/.test(entry)) files.push(full);
+            else if (/\.(ts|tsx)$/.test(entry) && !/\.(test|d)\.tsx?$/.test(entry))
+                files.push(full);
         }
     };
     for (const app of readdirSync(APPS)) {
@@ -181,7 +200,11 @@ export function scan(files = sourceFiles()) {
         const path = relative(APPS, full).split(sep).join("/");
         // The engine itself, whose strings are the ones that report problems.
         if (path.startsWith("web/src/lib/i18n/")) return [];
-        return scanSource(readFileSync(full, "utf8"), full).map((finding) => ({ ...finding, path, area: areaOf(path) }));
+        return scanSource(readFileSync(full, "utf8"), full).map((finding) => ({
+            ...finding,
+            path,
+            area: areaOf(path)
+        }));
     });
 }
 
@@ -195,7 +218,9 @@ function main(args) {
     if (listed >= 0) {
         const area = args[listed + 1] ?? "";
         for (const finding of findings.filter((entry) => entry.area === area)) {
-            console.log(`${finding.path}:${finding.line}  ${finding.kind}${finding.name ? ` ${finding.name}` : ""}  ${finding.text}`);
+            console.log(
+                `${finding.path}:${finding.line}  ${finding.kind}${finding.name ? ` ${finding.name}` : ""}  ${finding.text}`
+            );
         }
         return;
     }
@@ -210,9 +235,14 @@ function main(args) {
     const width = Math.max(4, ...rows.map(([area]) => area.length));
     console.log(`${"area".padEnd(width)}  strings  files`);
     for (const [area, entry] of rows) {
-        console.log(`${area.padEnd(width)}  ${String(entry.strings).padStart(7)}  ${String(entry.files.size).padStart(5)}`);
+        console.log(
+            `${area.padEnd(width)}  ${String(entry.strings).padStart(7)}  ${String(entry.files.size).padStart(5)}`
+        );
     }
-    console.log(`${"total".padEnd(width)}  ${String(findings.length).padStart(7)}  ${String(new Set(findings.map((f) => f.path)).size).padStart(5)}`);
+    console.log(
+        `${"total".padEnd(width)}  ${String(findings.length).padStart(7)}  ${String(new Set(findings.map((f) => f.path)).size).padStart(5)}`
+    );
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main(process.argv.slice(2));
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1])
+    main(process.argv.slice(2));

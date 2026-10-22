@@ -55,8 +55,12 @@ export function DocsSearch({
     };
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
-            const typing = event.target instanceof HTMLElement && /INPUT|TEXTAREA/.test(event.target.tagName);
-            if ((event.key === "k" && (event.ctrlKey || event.metaKey)) || (event.key === "/" && !typing)) {
+            const typing =
+                event.target instanceof HTMLElement && /INPUT|TEXTAREA/.test(event.target.tagName);
+            if (
+                (event.key === "k" && (event.ctrlKey || event.metaKey)) ||
+                (event.key === "/" && !typing)
+            ) {
                 event.preventDefault();
                 input.current?.focus();
             }
@@ -103,7 +107,9 @@ export function DocsSearch({
                                     href={record.href}
                                     className="flex min-w-0 flex-col rounded px-2 py-1.5 hover:bg-muted"
                                 >
-                                    <span className="truncate text-sm" title={record.title}>{record.title}</span>
+                                    <span className="truncate text-sm" title={record.title}>
+                                        {record.title}
+                                    </span>
                                     <span className="truncate text-xs text-muted-foreground">
                                         {record.section}
                                     </span>

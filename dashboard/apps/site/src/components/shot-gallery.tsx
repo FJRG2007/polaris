@@ -45,7 +45,12 @@ export function ShotPicture({ shot, className }: { shot: Shot; className?: strin
                 <source media="(prefers-color-scheme: light)" srcSet={shot.light} />
             ) : null}
             {/* eslint-disable-next-line @next/next/no-img-element -- static export, webp */}
-            <img src={shot.dark} alt={shot.alt} loading="lazy" className={cn("w-full", className)} />
+            <img
+                src={shot.dark}
+                alt={shot.alt}
+                loading="lazy"
+                className={cn("w-full", className)}
+            />
         </picture>
     );
 }
@@ -53,7 +58,8 @@ export function ShotPicture({ shot, className }: { shot: Shot; className?: strin
 /** Opens any of `shots` in the viewer; `children` draws the thumbnails. */
 export function useShotViewer(shots: readonly Shot[], words: ViewerWords) {
     const [open, setOpen] = useState<ViewedImage | null>(null);
-    const gallery = (): ViewedImage[] => shots.map((shot) => ({ url: shown(shot), name: shot.name }));
+    const gallery = (): ViewedImage[] =>
+        shots.map((shot) => ({ url: shown(shot), name: shot.name }));
     const viewer = (
         <ImageViewer
             image={open}
@@ -63,7 +69,9 @@ export function useShotViewer(shots: readonly Shot[], words: ViewerWords) {
             labels={{
                 ...words,
                 position: (index, count) =>
-                    words.position.replace("{index}", String(index)).replace("{count}", String(count))
+                    words.position
+                        .replace("{index}", String(index))
+                        .replace("{count}", String(count))
             }}
         />
     );

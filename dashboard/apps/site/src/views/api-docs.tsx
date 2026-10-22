@@ -24,7 +24,10 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
         Promise.all(operations.map((op) => highlightAll(requestSamples(op, EXAMPLE_ORIGIN)))),
         Promise.all(operations.map((op) => (op.body ? highlight(op.body, "json") : null))),
         highlightAll(
-            requestSamples({ method: "GET", path: "/api/v1/me", body: null }, EXAMPLE_ORIGIN).slice(0, 1)
+            requestSamples({ method: "GET", path: "/api/v1/me", body: null }, EXAMPLE_ORIGIN).slice(
+                0,
+                1
+            )
         )
     ]);
     const sampleFor = new Map(operations.map((op, at) => [op.id, samples[at]!]));
@@ -44,7 +47,10 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                     failed={d.failed}
                 />
                 <SideList label={t.title}>
-                    <a href="#authentication" className="text-muted-foreground hover:text-foreground">
+                    <a
+                        href="#authentication"
+                        className="text-muted-foreground hover:text-foreground"
+                    >
                         {t.authTitle}
                     </a>
                     {api.groups.map((group) => (
@@ -65,7 +71,10 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                         </div>
                     ))}
                     {undocumented.length ? (
-                        <a href="#undocumented" className="text-muted-foreground hover:text-foreground">
+                        <a
+                            href="#undocumented"
+                            className="text-muted-foreground hover:text-foreground"
+                        >
                             {t.undocumented}
                         </a>
                     ) : null}
@@ -106,7 +115,9 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                                         <Badge variant="neutral">{op.method}</Badge>
                                         <code className="min-w-0 break-all text-sm">{op.path}</code>
                                     </div>
-                                    {op.summary ? <p className="font-medium">{op.summary}</p> : null}
+                                    {op.summary ? (
+                                        <p className="font-medium">{op.summary}</p>
+                                    ) : null}
                                     {op.description ? (
                                         <p className="text-sm text-muted-foreground">
                                             {op.description}
@@ -126,7 +137,9 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                                                         <code>{param.name}</code>
                                                         <span className="text-xs text-muted-foreground">
                                                             {param.in} · {param.type}
-                                                            {param.required ? ` · ${t.required}` : ""}
+                                                            {param.required
+                                                                ? ` · ${t.required}`
+                                                                : ""}
                                                         </span>
                                                         {param.description ? (
                                                             <span className="w-full text-muted-foreground">
@@ -154,7 +167,10 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                                         <p className="text-xs font-medium text-muted-foreground">
                                             {t.examples}
                                         </p>
-                                        <CodeTabs samples={sampleFor.get(op.id) ?? []} copy={t.copy} />
+                                        <CodeTabs
+                                            samples={sampleFor.get(op.id) ?? []}
+                                            copy={t.copy}
+                                        />
                                     </div>
                                     <div className="flex flex-col gap-1">
                                         <p className="text-xs font-medium text-muted-foreground">
@@ -163,7 +179,9 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                                         <ul className="flex flex-col gap-1 text-sm">
                                             {op.responses.map((response) => (
                                                 <li key={response.status} className="flex gap-2">
-                                                    <code className="shrink-0">{response.status}</code>
+                                                    <code className="shrink-0">
+                                                        {response.status}
+                                                    </code>
                                                     <span className="text-muted-foreground">
                                                         {response.description}
                                                     </span>

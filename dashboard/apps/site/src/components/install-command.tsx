@@ -47,7 +47,10 @@ export function InstallCommand({
                 />
             </div>
             <div className="flex min-w-0 items-center gap-2 rounded-lg bg-background px-3 py-2.5">
-                <span aria-hidden="true" className="select-none font-mono text-sm text-muted-foreground">
+                <span
+                    aria-hidden="true"
+                    className="select-none font-mono text-sm text-muted-foreground"
+                >
                     {system === "windows" ? ">" : "$"}
                 </span>
                 <code

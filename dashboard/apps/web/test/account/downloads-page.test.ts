@@ -24,11 +24,14 @@ import { describe, expect, it } from "vitest";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 const page = // The page and the shared layout it renders, which the public site draws too.
-        Promise.all([
-            readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8"),
-            readFile(`${SRC}../../../packages/ui/src/downloads/account/downloads-page.tsx`, "utf8")
-        ]).then((parts) => parts.join(" "));
-const extensionCard = readFile(`${SRC}../../../packages/ui/src/downloads/account/extension-card.tsx`, "utf8");
+    Promise.all([
+        readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8"),
+        readFile(`${SRC}../../../packages/ui/src/downloads/account/downloads-page.tsx`, "utf8")
+    ]).then((parts) => parts.join(" "));
+const extensionCard = readFile(
+    `${SRC}../../../packages/ui/src/downloads/account/extension-card.tsx`,
+    "utf8"
+);
 // The offer is drawn by `app-download-offers` and awaited by `app-download`, and
 // its sentences live in the English catalog, so all three are what it says.
 const files = Promise.all([

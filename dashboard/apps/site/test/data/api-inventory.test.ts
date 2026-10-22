@@ -35,11 +35,18 @@ describe("a route's methods", () => {
 });
 
 describe("the public API", () => {
-    const keyed = "import { authenticateApiKey } from '@/lib/api-keys';\nexport async function GET(req) { await authenticateApiKey(req); }";
-    const viaModule = 'import { deckAuth } from "@/lib/deck/auth";\nexport async function POST() {}';
-    const internal = 'import { auth } from "@/lib/auth";\nexport async function GET() {}\nexport async function DELETE() {}';
+    const keyed =
+        "import { authenticateApiKey } from '@/lib/api-keys';\nexport async function GET(req) { await authenticateApiKey(req); }";
+    const viaModule =
+        'import { deckAuth } from "@/lib/deck/auth";\nexport async function POST() {}';
+    const internal =
+        'import { auth } from "@/lib/auth";\nexport async function GET() {}\nexport async function DELETE() {}';
     const modules = [
-        { app: "web", specifier: "@/lib/deck/auth", source: "export const deckAuth = (r) => requireApiKey(r);" },
+        {
+            app: "web",
+            specifier: "@/lib/deck/auth",
+            source: "export const deckAuth = (r) => requireApiKey(r);"
+        },
         { app: "web", specifier: "@/lib/auth", source: "export const auth = () => session();" }
     ];
     const documented: ApiOperation[] = [

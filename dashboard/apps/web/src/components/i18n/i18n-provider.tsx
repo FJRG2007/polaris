@@ -31,7 +31,6 @@ import {
     type Namespaces
 } from "@polaris/core";
 
-
 /** The locale and the first namespaces, for everything below. Pure, so a test
  *  can render a translated component inside one without a router. */
 export function I18nProvider({

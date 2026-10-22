@@ -86,7 +86,10 @@ describe("the API examples", () => {
     });
 
     it("sends no body when the operation takes none", () => {
-        const [curl] = requestSamples({ method: "GET", path: "/api/v1/me", body: null }, "https://x.test");
+        const [curl] = requestSamples(
+            { method: "GET", path: "/api/v1/me", body: null },
+            "https://x.test"
+        );
         expect(curl!.code).not.toContain("-d ");
         expect(curl!.code).not.toContain("Content-Type");
     });

@@ -24,7 +24,11 @@ export default function GlobalNotFound() {
                     <Link href={href("en")} className={buttonVariants({ variant: "primary" })}>
                         {en.home}
                     </Link>
-                    <Link href={href("es")} hrefLang="es" className={buttonVariants({ variant: "secondary" })}>
+                    <Link
+                        href={href("es")}
+                        hrefLang="es"
+                        className={buttonVariants({ variant: "secondary" })}
+                    >
                         {es.home}
                     </Link>
                 </div>

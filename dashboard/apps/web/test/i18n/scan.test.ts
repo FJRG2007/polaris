@@ -115,7 +115,9 @@ describe("the areas findings are counted under", () => {
 
 describe("a migrated file", () => {
     const APPS = resolve(__dirname, "../../..");
-    const listed = JSON.parse(readFileSync(resolve(__dirname, "../../scripts/i18n-migrated.json"), "utf8")) as {
+    const listed = JSON.parse(
+        readFileSync(resolve(__dirname, "../../scripts/i18n-migrated.json"), "utf8")
+    ) as {
         files: string[];
     };
 

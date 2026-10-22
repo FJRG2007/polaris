@@ -197,7 +197,8 @@ async function renderDoc(slug: string, markdown: string): Promise<docs.DocPage> 
     const text: Record<string, string> = {};
     const parts = html.split(/<h[1-6] id="([^"]+)">/);
     text[""] = docs.plainText(parts[0] ?? "");
-    for (let at = 1; at < parts.length; at += 2) text[parts[at]!] = docs.plainText(parts[at + 1] ?? "");
+    for (let at = 1; at < parts.length; at += 2)
+        text[parts[at]!] = docs.plainText(parts[at + 1] ?? "");
     const summary = docs.plainText(/<p>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? "");
     return { slug, title, summary, headings, html, text };
 }
@@ -207,7 +208,10 @@ async function guides(spanish: boolean): Promise<docs.DocPage[]> {
         featureFiles.map((file) => {
             const slug = docs.docSlug(file);
             const own = join(featuresDir, `${slug}.es.md`);
-            return renderDoc(slug, read(spanish && existsSync(own) ? own : join(featuresDir, file)));
+            return renderDoc(
+                slug,
+                read(spanish && existsSync(own) ? own : join(featuresDir, file))
+            );
         })
     );
     return pages.sort((a, b) => a.title.localeCompare(b.title));

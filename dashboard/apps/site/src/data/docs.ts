@@ -48,7 +48,8 @@ export function splitDoc(markdown: string): { title: string; body: string } {
     const title = at >= 0 ? lines[at]!.slice(2).trim() : "";
     let rest = at >= 0 ? lines.slice(at + 1) : lines;
     const first = rest.findIndex((line) => line.trim() !== "");
-    if (first >= 0 && /\]\([^)]*README(?:\.es)?\.md\)/.test(rest[first]!)) rest = rest.slice(first + 1);
+    if (first >= 0 && /\]\([^)]*README(?:\.es)?\.md\)/.test(rest[first]!))
+        rest = rest.slice(first + 1);
     return { title, body: rest.join("\n").trim() };
 }
 
@@ -99,15 +100,20 @@ export function rewriteDocLinks(
         return `https://github.com/${repo}/blob/main/${resolved.join("/")}${anchor}`;
     };
     const out = html
-        .replace(/\b(href|src)="([^"]*)"/g, (_, attr: string, url: string) => `${attr}="${target(url)}"`)
-        .replace(/\bsrcset="([^"]*)"/g, (_, set: string) =>
-            `srcset="${set
-                .split(",")
-                .map((entry) => {
-                    const [url = "", ...size] = entry.trim().split(/\s+/);
-                    return [target(url), ...size].join(" ");
-                })
-                .join(", ")}"`
+        .replace(
+            /\b(href|src)="([^"]*)"/g,
+            (_, attr: string, url: string) => `${attr}="${target(url)}"`
+        )
+        .replace(
+            /\bsrcset="([^"]*)"/g,
+            (_, set: string) =>
+                `srcset="${set
+                    .split(",")
+                    .map((entry) => {
+                        const [url = "", ...size] = entry.trim().split(/\s+/);
+                        return [target(url), ...size].join(" ");
+                    })
+                    .join(", ")}"`
         );
     return { html: out, media: [...media] };
 }
@@ -130,7 +136,10 @@ export function exampleFromSchema(schema: unknown, depth = 0): unknown {
         case "object": {
             const props = (s.properties ?? {}) as Record<string, unknown>;
             return Object.fromEntries(
-                Object.entries(props).map(([key, value]) => [key, exampleFromSchema(value, depth + 1)])
+                Object.entries(props).map(([key, value]) => [
+                    key,
+                    exampleFromSchema(value, depth + 1)
+                ])
             );
         }
         case "array":

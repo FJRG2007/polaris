@@ -26,14 +26,7 @@
  * message offers the same things without opening it first.
  */
 
-import {
-    useCallback,
-    useEffect,
-    useLayoutEffect,
-    useRef,
-    useState,
-    type ReactNode
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as flying from "./flight";
 import { MoreHorizontal, X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -313,69 +306,67 @@ export function ImageViewer({
 
     const stage = (
         <div
-                    className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
-                    onWheel={(event) => {
-                        setZoom((current) =>
-                            clamp(current * Math.exp(-event.deltaY * WHEEL_STEP))
-                        );
-                    }}
-                    onDoubleClick={() => {
-                        setZoom((current) => (current === 1 ? 2 : 1));
-                        setAt({ x: 0, y: 0 });
-                    }}
-                    onPointerDown={(event) => {
-                        dragging.current = { x: event.clientX - at.x, y: event.clientY - at.y };
-                        press.current = {
-                            x: event.clientX,
-                            y: event.clientY,
-                            // The stage is everything under the bar, so the
-                            // dark around the picture is this element itself
-                            // and the picture is a child of it. Recorded on
-                            // the press because the pointer is captured from
-                            // here on, and every later event says "stage".
-                            outside: event.target === event.currentTarget
-                        };
-                        event.currentTarget.setPointerCapture(event.pointerId);
-                    }}
-                    onPointerMove={(event) => {
-                        const from = dragging.current;
-                        if (!from) return;
-                        setAt({ x: event.clientX - from.x, y: event.clientY - from.y });
-                    }}
-                    // A press on the dark closes, the way every viewer does -
-                    // but only a press. A drag that started there was somebody
-                    // moving the picture, and closing on it would undo the
-                    // gesture they were in the middle of.
-                    onPointerUp={(event) => {
-                        const from = press.current;
-                        dragging.current = null;
-                        press.current = null;
-                        if (closesOnRelease(from, event)) close();
-                    }}
-                    onPointerCancel={() => {
-                        dragging.current = null;
-                        press.current = null;
-                    }}
-                >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- one picture, sized by the viewer */}
-                    <img
-                        ref={picture}
-                        onLoad={() => {
-                            flyIn();
-                            slideIn();
-                        }}
-                        src={image.url}
-                        alt={image.name}
-                        draggable={false}
-                        style={{
-                            transform: `translate(${at.x}px, ${at.y}px) scale(${zoom})`
-                        }}
-                        className={cn(
-                            "max-h-full max-w-full select-none object-contain transition-transform duration-fast",
-                            zoom > 1 ? "cursor-grab" : "cursor-zoom-in"
-                        )}
-                    />
-                </div>
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+            onWheel={(event) => {
+                setZoom((current) => clamp(current * Math.exp(-event.deltaY * WHEEL_STEP)));
+            }}
+            onDoubleClick={() => {
+                setZoom((current) => (current === 1 ? 2 : 1));
+                setAt({ x: 0, y: 0 });
+            }}
+            onPointerDown={(event) => {
+                dragging.current = { x: event.clientX - at.x, y: event.clientY - at.y };
+                press.current = {
+                    x: event.clientX,
+                    y: event.clientY,
+                    // The stage is everything under the bar, so the
+                    // dark around the picture is this element itself
+                    // and the picture is a child of it. Recorded on
+                    // the press because the pointer is captured from
+                    // here on, and every later event says "stage".
+                    outside: event.target === event.currentTarget
+                };
+                event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+                const from = dragging.current;
+                if (!from) return;
+                setAt({ x: event.clientX - from.x, y: event.clientY - from.y });
+            }}
+            // A press on the dark closes, the way every viewer does -
+            // but only a press. A drag that started there was somebody
+            // moving the picture, and closing on it would undo the
+            // gesture they were in the middle of.
+            onPointerUp={(event) => {
+                const from = press.current;
+                dragging.current = null;
+                press.current = null;
+                if (closesOnRelease(from, event)) close();
+            }}
+            onPointerCancel={() => {
+                dragging.current = null;
+                press.current = null;
+            }}
+        >
+            {/* eslint-disable-next-line @next/next/no-img-element -- one picture, sized by the viewer */}
+            <img
+                ref={picture}
+                onLoad={() => {
+                    flyIn();
+                    slideIn();
+                }}
+                src={image.url}
+                alt={image.name}
+                draggable={false}
+                style={{
+                    transform: `translate(${at.x}px, ${at.y}px) scale(${zoom})`
+                }}
+                className={cn(
+                    "max-h-full max-w-full select-none object-contain transition-transform duration-fast",
+                    zoom > 1 ? "cursor-grab" : "cursor-zoom-in"
+                )}
+            />
+        </div>
     );
 
     return (

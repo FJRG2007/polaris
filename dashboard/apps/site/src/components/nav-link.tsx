@@ -29,7 +29,9 @@ export function NavLink({
     const path = trim(usePathname() ?? "");
     const current =
         path === trim(href) ||
-        (section === true && path.startsWith(`${trim(href)}/`) && (!except || !path.startsWith(trim(except))));
+        (section === true &&
+            path.startsWith(`${trim(href)}/`) &&
+            (!except || !path.startsWith(trim(except))));
     return (
         <Link href={href} className={className} aria-current={current ? "page" : undefined}>
             {children}
