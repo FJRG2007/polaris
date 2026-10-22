@@ -24,7 +24,7 @@ export function AppLink({
     children: ReactNode;
 }) {
     const to = useContext(AppHrefContext)(href);
-    if (to === null) return <span>{children}</span>;
+    if (to === null) return <span className={rest.className}>{children}</span>;
     return /^https?:/.test(to) ? (
         <a {...rest} href={to}>
             {children}

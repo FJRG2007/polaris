@@ -17,6 +17,14 @@ import { installCommand } from "@/lib/install-command";
 import { cliInstallLine } from "@/lib/cli/install-line";
 import { deckInstallCommand } from "@/lib/deck-install-command";
 import { AppMark } from "@/components/app-mark";
+import { STREAMDECK_MARKETPLACE_URL } from "@/lib/deck/marketplace";
+import {
+    appDownload,
+    COMPANION_TAG_PREFIX,
+    DESKTOP_TAG_PREFIX,
+    EXTENSION_TAG_PREFIX,
+    STREAMDECK_TAG_PREFIX
+} from "@polaris/ui/account-downloads/app-releases";
 import { initialsInk, tintFor } from "@polaris/core";
 import { appPreview } from "@/lib/apps/app-screenshots";
 import { appProvenance } from "@/lib/apps/provenance";
@@ -159,6 +167,22 @@ const inventory = apiInventory(
     documented.flatMap((group) => group.operations)
 );
 
+/** The catalogs the shared Downloads components read, cut to what they use. */
+const downloadMessages = (locale: string): site.DownloadsData["messages"]["en"] => {
+    const account = JSON.parse(read(join(web, "messages", locale, "account.json")));
+    const components = JSON.parse(read(join(web, "messages", locale, "components.json")));
+    return {
+        account: { downloads: account.downloads },
+        components: { installApp: components.installApp, downloads: components.downloads }
+    };
+};
+// The same lookup the dashboard's Downloads makes, so the files offered match.
+const [desktop, extension, streamdeck, companion] = await Promise.all(
+    [DESKTOP_TAG_PREFIX, EXTENSION_TAG_PREFIX, STREAMDECK_TAG_PREFIX, COMPANION_TAG_PREFIX].map(
+        (prefix) => appDownload(repo, prefix).catch(() => null)
+    )
+);
+
 const data: site.SiteData = {
     repo,
     install: site.parseInstallLines(readmeEn),
@@ -192,6 +216,11 @@ const data: site.SiteData = {
         }
     },
     downloads: site.downloadEntries(await releases(), repo),
+    downloadsPage: {
+        files: { desktop, extension, streamdeck, companion },
+        storeUrl: STREAMDECK_MARKETPLACE_URL,
+        messages: { en: downloadMessages("en-US"), es: downloadMessages("es-ES") }
+    },
     api: {
         title: String(info.title ?? ""),
         description: String(info.description ?? ""),

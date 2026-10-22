@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isLocale, words, pageMetadata } from "@/lib/site";
-import { DownloadsView } from "@/views/downloads";
+import { isLocale, words, pageMetadata, siteData } from "@/lib/site";
+import { SiteDownloads } from "@/components/site-downloads";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -17,5 +17,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function Page({ params }: Props) {
     const { locale } = await params;
     if (!isLocale(locale)) notFound();
-    return <DownloadsView locale={locale} />;
+    const data = siteData();
+    return <SiteDownloads locale={locale} repo={data.repo} data={data.downloadsPage} />;
 }

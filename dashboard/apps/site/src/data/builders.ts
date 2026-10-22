@@ -6,6 +6,7 @@
  * sources and the tests feed them fixtures. Nothing here fetches or reads files.
  */
 import type { InventoryRoute } from "@/data/api-inventory";
+import type { AppDownload } from "@polaris/ui/account-downloads/app-releases";
 
 export type SiteLocale = "en" | "es";
 
@@ -508,6 +509,21 @@ export function fill(
     );
 }
 
+/** What the shared Downloads page is fed with on the site. */
+export interface DownloadsData {
+    readonly files: Readonly<
+        Record<"desktop" | "extension" | "streamdeck" | "companion", AppDownload | null>
+    >;
+    readonly storeUrl: string | null;
+    /** The dashboard's own catalogs, cut to the Downloads keys, per site locale. */
+    readonly messages: Readonly<
+        Record<
+            SiteLocale,
+            { account: Record<string, unknown>; components: Record<string, unknown> }
+        >
+    >;
+}
+
 export interface SiteData {
     readonly repo: string;
     readonly install: { unix: string | null; windows: string | null };
@@ -519,6 +535,7 @@ export interface SiteData {
     };
     readonly locales: Readonly<Record<SiteLocale, LocaleData>>;
     readonly downloads: readonly DownloadEntry[];
+    readonly downloadsPage: DownloadsData;
     readonly api: {
         title: string;
         description: string;
