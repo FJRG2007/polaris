@@ -2036,7 +2036,8 @@
             "delay": "Esperar un rato",
             "wait": "Esperar a un aparato",
             "notify": "Avisarme",
-            "run": "Lanzar automatización"
+            "run": "Lanzar automatización",
+            "privacy": "Privacidad"
         },
         "compare": {
             "gt": "Más de",
@@ -2068,6 +2069,9 @@
             "on": "Días: {days}",
             "act": "{action}: {device}",
             "delay": "Esperar {span}",
+            "privacyOn": "Privado: {target}",
+            "privacyOff": "Sin privado: {target}",
+            "someCameras": "Cámaras que ya no están",
             "wait": "Esperar a que {device} esté {value}, hasta {span}",
             "notify": "Avisar: {message}",
             "run": "Lanzar {name}",
@@ -2131,6 +2135,8 @@
             "loop": "No se lanzó: unas automatizaciones se lanzaban entre sí en bucle.",
             "failed": "El dispositivo no respondió. No se cambió nada.",
             "notifyFailed": "No se pudo enviar el aviso.",
+            "privacyFailed": "Una cámara no cambió su privacidad.",
+            "camerasGone": "Esas cámaras ya no están aquí.",
             "automationGone": "Esa automatización ya no está.",
             "automationOff": "Esa automatización está apagada, así que no se lanzó.",
             "automationHeld": "Esa automatización no se lanzó: se ejecutó demasiadas veces en los últimos minutos, o este paso ya la había lanzado.",
@@ -2138,6 +2144,7 @@
         },
         "errors": {
             "placeGone": "Esa sala o planta ya no está.",
+            "privacyTarget": "Elige qué cámaras.",
             "placeEmpty": "Nada de ahí puede hacer esto.",
             "broken": "Algo en esta tarjeta no está bien. Quítala y vuelve a añadirla.",
             "time": "Escribe la hora como 07:30.",
@@ -2312,6 +2319,12 @@
             "timeoutContinue": "Seguir igualmente",
             "message": "Mensaje",
             "messagePlaceholder": "La luz del porche sigue encendida",
+            "privacyCameras": "Cámaras",
+            "chooseCameras": "Elige cámaras",
+            "noCameras": "Aún no hay cámaras en este sitio.",
+            "privacyState": "Privacidad",
+            "privacyOn": "Sí",
+            "privacyOff": "No",
             "automation": "Automatización",
             "chooseAutomation": "Elige una automatización",
             "chooseDevice": "Elige un aparato",
@@ -2552,6 +2565,7 @@
                 },
                 "step": {
                     "device": "Encender, apagar, bloquear, abrir o ajustar un dispositivo.",
+                    "privacy": "Activa o quita la privacidad.",
                     "wait": "Esperar a que un dispositivo esté en un estado, o rendirse tras un rato.",
                     "delay": "Pausa antes del siguiente paso.",
                     "notify": "Enviarte una notificación.",

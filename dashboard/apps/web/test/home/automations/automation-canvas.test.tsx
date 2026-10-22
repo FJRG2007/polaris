@@ -413,7 +413,8 @@ describe("the palette", () => {
             "Wait a while",
             "Wait for a device",
             "Notify me",
-            "Run an automation"
+            "Run an automation",
+            "Camera privacy"
         ]);
     });
 

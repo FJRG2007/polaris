@@ -154,6 +154,16 @@ Targets as one string: `camera:<id>`, `room:<id>`, `set:<id>`, `place:<id>`,
 `zone:<placeId>:<zone name>`. The deck and Companion picker lists all of them
 from the MCP tool, so a room or set appears there once it holds a camera.
 
+## Automations
+
+A Places automation has a **Camera privacy** step: a target (any of the ones
+above, picked from the place's cameras, zones, rooms, sets and the place
+itself) and on or off. It runs the same switch as the wall, camera by camera.
+A camera that refuses fails the step and nothing after it runs, so a run never
+reads "done" over a camera still streaming. The step needs the owner to hold
+`home.control`, asked again at every run, like a device step. It is in the
+Places editor only; the central automations canvas does not offer it yet.
+
 ## Who may switch it
 
 `home.control`, the same as pointing a camera. Somebody a camera was lent to

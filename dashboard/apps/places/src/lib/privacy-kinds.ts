@@ -152,3 +152,59 @@ export const cameraSetInputSchema = z.object({
 });
 
 export type CameraSetInput = z.infer<typeof cameraSetInputSchema>;
+
+/** What grouping needs of a camera. */
+export interface GroupedCamera {
+    readonly id: string;
+    readonly name: string;
+    readonly placeId: string;
+    readonly zone: string;
+    readonly roomId: string;
+}
+
+/**
+ * Every target a list of cameras makes up - each camera, its zone, its room,
+ * its place, and the sets that hold it - with the cameras of each, in the
+ * order a picker lists them. One function, so the deck, the Polar tool and
+ * the automation editor all offer the same targets under the same names.
+ */
+export function privacyGroups<T extends GroupedCamera>(
+    cameras: readonly T[],
+    names: {
+        readonly places: ReadonlyMap<string, string>;
+        readonly rooms: ReadonlyMap<string, string>;
+        readonly sets: readonly CameraSetView[];
+    }
+): { target: string; label: string; cameras: T[] }[] {
+    const groups = new Map<string, { target: string; label: string; cameras: T[] }>();
+    const add = (target: PrivacyTarget, label: string, camera: T) => {
+        const key = targetKey(target);
+        const group = groups.get(key) ?? { target: key, label, cameras: [] };
+        group.cameras.push(camera);
+        groups.set(key, group);
+    };
+    for (const camera of cameras) {
+        const place = names.places.get(camera.placeId) ?? "";
+        add({ kind: "camera", id: camera.id }, camera.name, camera);
+        if (camera.placeId && camera.zone)
+            add(
+                { kind: "zone", placeId: camera.placeId, zone: camera.zone },
+                [place, camera.zone].filter(Boolean).join(" / "),
+                camera
+            );
+        const room = camera.roomId ? names.rooms.get(camera.roomId) : undefined;
+        if (room) add({ kind: "room", id: camera.roomId }, [place, room].filter(Boolean).join(" / "), camera);
+        if (camera.placeId) add({ kind: "place", id: camera.placeId }, place, camera);
+    }
+    // A set shows the cameras of it in the list, and is not offered when it
+    // holds none of them.
+    const byId = new Map(cameras.map((camera) => [camera.id, camera]));
+    for (const set of names.sets) {
+        const label = [names.places.get(set.placeId) ?? "", set.name].filter(Boolean).join(" / ");
+        for (const id of set.cameraIds) {
+            const camera = byId.get(id);
+            if (camera && camera.placeId === set.placeId) add({ kind: "set", id: set.id }, label, camera);
+        }
+    }
+    return [...groups.values()];
+}

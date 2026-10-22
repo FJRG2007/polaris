@@ -30,6 +30,7 @@ import {
     wornFilter
 } from "./device-kinds";
 import { prismaAutomationStore } from "./automation-store";
+import { parseTarget } from "./privacy-kinds";
 import {
     createEngine,
     StepRefusal,
@@ -203,6 +204,13 @@ export function automationEngine(): AutomationEngine {
             }
         },
         mayOperate,
+        async cameraPrivacy(installedAppId, target, on) {
+            const parsed = parseTarget(target);
+            if (!parsed) return [];
+            const privacy = await import("./privacy");
+            const ids = await privacy.camerasFor(installedAppId, parsed);
+            return privacy.groupPrivacy(ids, (id) => privacy.cameraPrivacy(installedAppId, id, on));
+        },
         async notify(automation, message, runId, delivery) {
             const t = await placesTFor(automation.ownerId);
             await deliverAutomationNotice({

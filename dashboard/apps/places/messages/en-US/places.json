@@ -2036,7 +2036,8 @@
             "delay": "Wait a while",
             "wait": "Wait for a device",
             "notify": "Notify me",
-            "run": "Run an automation"
+            "run": "Run an automation",
+            "privacy": "Camera privacy"
         },
         "compare": {
             "gt": "Above",
@@ -2068,6 +2069,9 @@
             "on": "On {days}",
             "act": "{action}: {device}",
             "delay": "Wait {span}",
+            "privacyOn": "Privacy on: {target}",
+            "privacyOff": "Privacy off: {target}",
+            "someCameras": "Cameras no longer here",
             "wait": "Wait until {device} is {value}, up to {span}",
             "notify": "Notify: {message}",
             "run": "Run {name}",
@@ -2131,6 +2135,8 @@
             "loop": "Not started: automations were starting each other in a loop.",
             "failed": "The device did not answer. Nothing was changed.",
             "notifyFailed": "The notification could not be sent.",
+            "privacyFailed": "A camera did not switch privacy.",
+            "camerasGone": "Those cameras are no longer here.",
             "automationGone": "That automation is no longer here.",
             "automationOff": "That automation is switched off, so it was not started.",
             "automationHeld": "That automation was not started: it ran too many times in the last few minutes, or this step had already started it.",
@@ -2138,6 +2144,7 @@
         },
         "errors": {
             "placeGone": "That room or floor is no longer here.",
+            "privacyTarget": "Choose which cameras.",
             "placeEmpty": "Nothing there can do this yet.",
             "broken": "Something in this card is not right. Remove it and add it again.",
             "time": "Write a time as 07:30.",
@@ -2312,6 +2319,12 @@
             "timeoutContinue": "Carry on anyway",
             "message": "Message",
             "messagePlaceholder": "The porch light was left on",
+            "privacyCameras": "Cameras",
+            "chooseCameras": "Choose cameras",
+            "noCameras": "No cameras at this place yet.",
+            "privacyState": "Privacy",
+            "privacyOn": "On",
+            "privacyOff": "Off",
             "automation": "Automation to run",
             "chooseAutomation": "Choose an automation",
             "chooseDevice": "Choose a device",
@@ -2552,6 +2565,7 @@
                 },
                 "step": {
                     "device": "Turn on, off, lock, open or set a device.",
+                    "privacy": "Turn privacy on or off for cameras.",
                     "wait": "Wait until a device is in a state, or give up after a while.",
                     "delay": "Pause before the next step.",
                     "notify": "Send a notification to you.",

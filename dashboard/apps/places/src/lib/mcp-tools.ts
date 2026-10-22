@@ -27,7 +27,7 @@ import { z } from "zod";
 import * as places from "./places";
 import * as devices from "./devices";
 import * as privacyLib from "./privacy";
-import { groupState, parseTarget, targetKey } from "./privacy-kinds";
+import { groupState, parseTarget, privacyGroups } from "./privacy-kinds";
 import { homeInstall } from "./access";
 import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
@@ -709,47 +709,16 @@ async function privacyTargets(caller: McpCaller) {
         : [];
     const seen = onlyReachable(list, reach.everything || reach.cameras);
     const names = new Map(placeList.map((place) => [place.id, place.name]));
-    const roomNames = new Map(roomList.map((room) => [room.id, room.name]));
-    const groups = new Map<string, { key: string; label: string; cameras: typeof seen }>();
-    const add = (key: string, label: string, camera: (typeof seen)[number]) => {
-        const group = groups.get(key) ?? { key, label, cameras: [] };
-        group.cameras.push(camera);
-        groups.set(key, group);
-    };
-    for (const camera of seen) {
-        const place = names.get(camera.placeId) ?? "";
-        add(targetKey({ kind: "camera", id: camera.id }), camera.name, camera);
-        if (camera.placeId && camera.zone)
-            add(
-                targetKey({ kind: "zone", placeId: camera.placeId, zone: camera.zone }),
-                [place, camera.zone].filter(Boolean).join(" / "),
-                camera
-            );
-        const room = camera.roomId ? roomNames.get(camera.roomId) : undefined;
-        if (room)
-            add(
-                targetKey({ kind: "room", id: camera.roomId }),
-                [place, room].filter(Boolean).join(" / "),
-                camera
-            );
-        if (camera.placeId) add(targetKey({ kind: "place", id: camera.placeId }), place, camera);
-    }
-    // A set shows the cameras of it this person can see, and is not offered
-    // to somebody who sees none of them.
-    const byId = new Map(seen.map((camera) => [camera.id, camera]));
-    for (const set of setList) {
-        const label = [names.get(set.placeId) ?? "", set.name].filter(Boolean).join(" / ");
-        for (const id of set.cameraIds) {
-            const camera = byId.get(id);
-            if (camera && camera.placeId === set.placeId)
-                add(targetKey({ kind: "set", id: set.id }), label, camera);
-        }
-    }
+    const groups = privacyGroups(seen, {
+        places: names,
+        rooms: new Map(roomList.map((room) => [room.id, room.name])),
+        sets: setList
+    });
     return {
         user,
         install,
-        targets: [...groups.values()].map((group) => ({
-            target: group.key,
+        targets: groups.map((group) => ({
+            target: group.target,
             label: group.label,
             ...groupState(group.cameras.map((camera) => ({ private: camera.privacy }))),
             cameras: group.cameras.map(privacyRow)

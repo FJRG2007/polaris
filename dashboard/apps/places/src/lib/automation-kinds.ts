@@ -16,6 +16,7 @@
 
 import { z } from "zod";
 import * as kinds from "./device-kinds";
+import { parseTarget } from "./privacy-kinds";
 import {
     automationsListHref,
     automationNodeId,
@@ -751,6 +752,18 @@ export const actionSchema = z.discriminatedUnion("kind", [
             .string({ required_error: "automations.errors.automation" })
             .min(1, "automations.errors.automation")
             .max(64)
+    }),
+    z.object({
+        id: nodeId,
+        ...blockBase,
+        kind: z.literal("privacy"),
+        /** A camera, room, set, zone or place, written as privacy-kinds does. */
+        target: z
+            .string({ required_error: "automations.errors.privacyTarget" })
+            .max(300)
+            .refine((value) => parseTarget(value) !== null, "automations.errors.privacyTarget"),
+        /** True turns privacy on, false off. */
+        on: z.boolean()
     })
 ]);
 
@@ -991,7 +1004,14 @@ export const CONDITION_KINDS: readonly ConditionKind[] = [
     "sun",
     "triggeredBy"
 ];
-export const STEP_KINDS: readonly StepKind[] = ["device", "delay", "wait", "notify", "run"];
+export const STEP_KINDS: readonly StepKind[] = [
+    "device",
+    "delay",
+    "wait",
+    "notify",
+    "run",
+    "privacy"
+];
 
 // --- normalizing ------------------------------------------------------------
 
@@ -1285,10 +1305,11 @@ export function deviceIssues(
     return issues;
 }
 
-/** Whether any step acts on a device, which is what needs the right to operate
- *  them as well as the right to write automations. */
+/** Whether any step acts on a device or a camera, which is what needs the right
+ *  to operate them as well as the right to write automations. */
 export function actsOnDevices(definition: AutomationDefinition): boolean {
-    return definition.actions.some((step) => step.kind === "device");
+    // Switching a camera's privacy is controlling it, the same right as pointing it.
+    return definition.actions.some((step) => step.kind === "device" || step.kind === "privacy");
 }
 
 /** Whether an automation reads what any device is doing - a change, a state
@@ -1437,6 +1458,8 @@ export function blankStep(kind: StepKind): Step {
             return { id, kind, message: "" };
         case "run":
             return { id, kind, automationId: "" };
+        case "privacy":
+            return { id, kind, target: "", on: true };
     }
 }
 

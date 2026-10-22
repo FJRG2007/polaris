@@ -147,6 +147,9 @@ let centralFired: { automationId: string; key: string; triggerId?: string; depth
 /** Set to make the next hand-over fail, as a dropped database connection would. */
 let centralFails = 0;
 let mayOperate: boolean;
+/** Camera privacy switched by steps, and what each switch answers. */
+let privacyCalls: { target: string; on: boolean }[];
+let privacyAnswer: { failure?: string }[];
 let refuse: Map<string, Error>;
 let engine: AutomationEngine;
 /** Which room each device is in and which floor each room is on. */
@@ -188,6 +191,10 @@ function boot(): AutomationEngine {
         },
         places: async () => scope,
         mayOperate: async () => mayOperate,
+        cameraPrivacy: async (_install, target, on) => {
+            privacyCalls.push({ target, on });
+            return privacyAnswer;
+        },
         notify: async (_automation, message) => {
             notified.push(message);
         },
@@ -280,6 +287,8 @@ beforeEach(() => {
     centralFired = [];
     centralFails = 0;
     mayOperate = true;
+    privacyCalls = [];
+    privacyAnswer = [{}];
     refuse = new Map();
     scope = { devices: [], rooms: [] };
     engine = boot();
@@ -2736,5 +2745,58 @@ describe("an automation that moved to the central engine", () => {
         expect(store.runsOf("old")[0]?.status).toBe("succeeded");
         expect(acted).toEqual([{ deviceId: "plug", action: "turn-on" }]);
         expect(centralFired).toEqual([]);
+    });
+});
+
+describe("a camera privacy step", () => {
+    const ROOM = "room:0192f2a4-6c1e-7c3a-9a40-bbbbbbbbbbbb";
+
+    beforeEach(() => {
+        automation("night", {
+            triggers: [{ id: "trigtime", kind: "time", at: "07:00", days: [1, 2, 3, 4, 5] }],
+            actions: [
+                { id: "stepcam", kind: "privacy", target: ROOM, on: true },
+                { id: "stepnote", kind: "notify", message: "private" }
+            ]
+        });
+        at("2026-09-30T07:00:20.000Z");
+    });
+
+    it("switches the target and carries on", async () => {
+        await engine.evaluateSchedules(INSTALL);
+        await engine.drain();
+        expect(privacyCalls).toEqual([{ target: ROOM, on: true }]);
+        expect(notified).toEqual(["private"]);
+        expect(store.runsOf("night")[0]?.status).toBe("succeeded");
+    });
+
+    it("fails when a camera refused, and runs nothing after it", async () => {
+        privacyAnswer = [{}, { failure: "password" }];
+        await engine.evaluateSchedules(INSTALL);
+        await engine.drain();
+        expect(notified).toEqual([]);
+        expect(store.runsOf("night")[0]?.status).toBe("failed");
+    });
+
+    it("is refused once the owner may no longer control the cameras", async () => {
+        mayOperate = false;
+        await engine.evaluateSchedules(INSTALL);
+        await engine.drain();
+        expect(privacyCalls).toEqual([]);
+    });
+
+    it("refuses a target that is not one", () => {
+        const parsed = auto.actionSchema.safeParse({
+            id: "stepcam",
+            kind: "privacy",
+            target: "room:1",
+            on: true
+        });
+        expect(parsed.success).toBe(false);
+        const definition = {
+            ...auto.blankDefinition("UTC"),
+            actions: [{ id: "stepcam", kind: "privacy" as const, target: ROOM, on: true }]
+        };
+        expect(auto.actsOnDevices(definition)).toBe(true);
     });
 });

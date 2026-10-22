@@ -204,7 +204,8 @@ describe("the fixture", () => {
             }
         };
         expect(auto.definitionSchema.safeParse(added).success).toBe(true);
-        expect(new Set(EVERYTHING.actions.map((node) => node.kind))).toEqual(
+        // Camera privacy is newer than the fixture too; its step is kept whole below.
+        expect(new Set([...EVERYTHING.actions.map((node) => node.kind), "privacy"])).toEqual(
             new Set(auto.STEP_KINDS)
         );
     });
