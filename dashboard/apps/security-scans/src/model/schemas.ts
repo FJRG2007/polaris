@@ -83,3 +83,6 @@ export const scanListInput = z.object({
 });
 
 export const scanInput = z.object({ scanId: id });
+
+/** The scan an alert opens; none means the newest one with a serious finding. */
+export const focusInput = z.object({ scanId: id.nullable().default(null) }).strict();

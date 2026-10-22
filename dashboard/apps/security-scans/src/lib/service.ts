@@ -13,6 +13,8 @@ import * as parse from "../model/parse";
 import * as specs from "../model/specs";
 import * as images from "../model/images";
 import * as history from "../model/history";
+import * as subjects from "../model/subjects";
+import { alertHref } from "../model/landing";
 import { gunzip, gzip } from "node:zlib";
 import { Readable } from "node:stream";
 import { decodeLockfiles, dependencyContext, shortHash } from "@polaris/deploy";
@@ -68,6 +70,47 @@ interface VolumeRow {
     readonly label: string;
 }
 
+/**
+ * Apps by id, under the name and screen they have now - not the name a scan
+ * stored when it ran (see `subjects.currentApp`).
+ */
+export async function currentApps(
+    ids: readonly string[]
+): Promise<Map<string, subjects.CurrentApp>> {
+    const unique = [...new Set(ids)].slice(0, 500);
+    if (unique.length === 0) return new Map();
+    const [apps, installed] = await Promise.all([
+        prisma.application.findMany({
+            where: { id: { in: unique } },
+            select: { id: true, name: true, environment: { select: { projectId: true } } }
+        }),
+        prisma.installedApp.findMany({
+            where: { applicationId: { in: unique }, status: { not: "removed" } },
+            select: { id: true, applicationId: true, catalogId: true },
+            take: 500
+        })
+    ]);
+    const byApp = new Map(installed.map((row) => [row.applicationId!, row]));
+    const find = (catalogId: string) => host.appsCatalog.findApp(catalogId);
+    return new Map(
+        apps.map((app) => {
+            const install = byApp.get(app.id);
+            return [
+                app.id,
+                subjects.currentApp(
+                    {
+                        id: app.id,
+                        name: app.name,
+                        projectId: app.environment?.projectId ?? null,
+                        installed: install ? { id: install.id, catalogId: install.catalogId } : null
+                    },
+                    find
+                )
+            ];
+        })
+    );
+}
+
 async function volumesOf(targetId: string, ids?: readonly string[]): Promise<VolumeRow[]> {
     const rows = await prisma.volume.findMany({
         where: {
@@ -87,20 +130,26 @@ async function volumesOf(targetId: string, ids?: readonly string[]): Promise<Vol
         orderBy: { createdAt: "asc" },
         take: 200
     });
+    const names = await currentApps(rows.map((row) => row.applicationId!));
     return rows.map((row) => ({
         id: row.id,
         dockerName: volumeDockerName(row.applicationId!, row.source!),
-        label: `${row.application?.name ?? "?"} / ${row.name}`
+        label: `${names.get(row.applicationId!)?.name ?? row.application?.name ?? "?"} / ${row.name}`
     }));
 }
 
+/** A server's apps, under their current names. */
 async function appsOf(targetId: string) {
-    return prisma.application.findMany({
+    const rows = await prisma.application.findMany({
         where: { targetId },
         select: { id: true, name: true },
         orderBy: { name: "asc" },
         take: 200
     });
+    const names = await currentApps(rows.map((row) => row.id));
+    return rows
+        .map((row) => ({ id: row.id, name: names.get(row.id)?.name ?? row.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** The image an app is running now: its newest running deployment's. */
@@ -153,6 +202,7 @@ export async function serverOverview(targetId: string) {
                 state: true,
                 summary: true,
                 error: true,
+                input: true,
                 createdAt: true,
                 finishedAt: true
             }
@@ -176,10 +226,22 @@ export async function serverOverview(targetId: string) {
             take: 100
         })
     ]);
+    const names = await currentApps(
+        scans.flatMap((scan) => {
+            const id = subjects.applicationIdOf(safeJson(scan.input));
+            return id ? [id] : [];
+        })
+    );
     return {
         volumes: volumes.map(({ id, label }) => ({ id, label })),
         apps,
-        scans: scans.map((scan) => ({ ...scan, summary: safeJson(scan.summary) })),
+        // The stored input stays here: it is the scan's own record, not the screen's.
+        scans: scans.map(({ input: raw, ...scan }) => ({
+            ...scan,
+            label: subjects.subjectName({ label: scan.label, input: safeJson(raw) }, names),
+            subject: subjects.subjectKind({ kind: scan.kind, input: safeJson(raw) }),
+            summary: safeJson(scan.summary)
+        })),
         quarantine,
         baselines
     };
@@ -201,6 +263,82 @@ export async function scanFindings(scanId: string) {
             layer: true
         }
     });
+}
+
+const VULN_KINDS = ["image", "deps"];
+
+/**
+ * One vulnerability scan as an alert opens it: what was scanned and where,
+ * under today's names, with what the screen needs to act on it. Without a
+ * scan id - an alert from before links named one, or the bare page - the
+ * newest finished scan with a critical or high finding. Null when there is
+ * none, or the scan is gone (pruned, or its server removed).
+ */
+export async function focusScan(scanId: string | null) {
+    const select = {
+        id: true,
+        targetId: true,
+        kind: true,
+        label: true,
+        state: true,
+        error: true,
+        summary: true,
+        input: true,
+        imageId: true,
+        source: true,
+        createdAt: true,
+        finishedAt: true,
+        target: { select: { name: true, kind: true } }
+    } as const;
+    const scan = scanId
+        ? await prisma.securityScan.findFirst({
+              where: { id: scanId, kind: { in: VULN_KINDS } },
+              select
+          })
+        : await prisma.securityScan.findFirst({
+              where: {
+                  kind: { in: VULN_KINDS },
+                  state: "done",
+                  findings: { some: { severity: { in: ["critical", "high"] } } }
+              },
+              orderBy: { createdAt: "desc" },
+              select
+          });
+    if (!scan) return null;
+    const input = safeJson(scan.input);
+    const appId = subjects.applicationIdOf(input);
+    const app = appId ? ((await currentApps([appId])).get(appId) ?? null) : null;
+    const summary = safeJson(scan.summary);
+    return {
+        id: scan.id,
+        targetId: scan.targetId,
+        serverName: scan.target.name,
+        serverLocal: scan.target.kind === "local",
+        kind: scan.kind as "image" | "deps",
+        subject: subjects.subjectKind({ kind: scan.kind, input }),
+        name: subjects.subjectName(
+            { label: scan.label, input },
+            app && appId ? new Map([[appId, app]]) : new Map()
+        ),
+        applicationId: appId,
+        appHref: app?.href ?? null,
+        // Removed apps are not offered again.
+        appGone: Boolean(appId) && !app,
+        imageId: scan.imageId,
+        imageRef:
+            typeof input.ref === "string"
+                ? input.ref
+                : typeof input.image === "string"
+                  ? input.image
+                  : null,
+        source: scan.source,
+        state: scan.state,
+        error: scan.error,
+        summary,
+        sbom: summary.sbom === true,
+        createdAt: scan.createdAt,
+        finishedAt: scan.finishedAt
+    };
 }
 
 /** The inventory a scan produced, as the JSON it was. */
@@ -458,6 +596,7 @@ async function execute(scanId: string): Promise<void> {
             target: { select: TARGET_SELECT }
         }
     });
+    const scanInput = safeJson(scan.input);
     try {
         const input = safeJson(scan.input);
         const result =
@@ -489,7 +628,12 @@ async function execute(scanId: string): Promise<void> {
             })
         ]);
         if (result.alerts?.length) {
-            await alertNew(scan.target, scan.label, scanId, result.alerts).catch((caught) =>
+            const appId = subjects.applicationIdOf(scanInput);
+            const name = subjects.subjectName(
+                { label: scan.label, input: scanInput },
+                appId ? await currentApps([appId]) : new Map()
+            );
+            await alertNew(scan.target, name, scanId, result.alerts).catch((caught) =>
                 console.error(
                     `polaris: security scan ${scanId} could not raise its alerts:`,
                     caught
@@ -525,9 +669,6 @@ interface ScanResult {
     /** Every finding that may ring the bell, before the cap on stored rows. */
     alerts?: parse.Vulnerability[];
 }
-
-/** The page an image's findings are on. */
-const SECURITY_HREF = "/apps/servers/security";
 
 /**
  * Ring the bell once for each critical or high finding this server has not
@@ -583,7 +724,11 @@ async function alertNew(
                         ? t("images.fixedIn", { version: worst.fixedIn })
                         : t("images.noFix")
                 }),
-                href: SECURITY_HREF,
+                href: alertHref({
+                    targetId: target.id,
+                    scanId,
+                    ids: fresh.slice(0, 20).map((i) => i.id)
+                }),
                 metadata: { scanId, targetId: target.id, ids: fresh.slice(0, 20).map((i) => i.id) }
             });
         })

@@ -30,7 +30,8 @@
         "restore": "Restaurar",
         "delete": "Eliminar",
         "deleteConfirm": "¿Eliminar este archivo definitivamente? Después no se podrá restaurar.",
-        "noneHeld": "No hay archivos en cuarentena."
+        "noneHeld": "No hay archivos en cuarentena.",
+        "noVolumes": "Ninguna app de este servidor guarda datos en un volumen, así que no hay nada que analizar."
     },
     "files": {
         "hint": "Registra la huella de cada archivo una vez y comprueba después qué se añadió, eliminó o cambió.",
@@ -97,7 +98,8 @@
             "app": "App",
             "agent": "Agente",
             "other": "Otra"
-        }
+        },
+        "noApps": "Aún no hay apps en este servidor."
     },
     "history": "Recientes",
     "noScans": "Aún no hay análisis.",
@@ -150,5 +152,44 @@
     "deps": {
         "label": "Dependencias de {app}",
         "files": "Leídas de {files}"
+    },
+    "refreshFailed": "No se pudo actualizar. Se ven los últimos resultados.",
+    "focus": {
+        "fromAlert": "Desde tu aviso",
+        "attention": "Requiere atención",
+        "onServer": "En {server}",
+        "scannedAt": "Analizado {when}",
+        "kind": {
+            "appImage": "Imagen de app",
+            "image": "Imagen",
+            "deps": "Dependencias"
+        },
+        "openApp": "Abrir app",
+        "rescan": "Reanalizar",
+        "close": "Cerrar",
+        "showFindings": "Ver hallazgos",
+        "onlyNew": "Solo nuevas",
+        "newBadge": "Nueva",
+        "technical": "Detalles técnicos",
+        "imageRef": "Imagen",
+        "scanId": "Referencia",
+        "gone": "Este análisis ya no se conserva. Abajo están los más recientes del servidor.",
+        "serverGone": "Ese servidor ya no está en Polaris. Se muestra otro.",
+        "running": "Este análisis aún no ha terminado. La página se actualiza cuando acabe.",
+        "loadFailed": "No se pudo abrir este análisis. Inténtalo de nuevo.",
+        "appGone": "La app de este análisis se ha eliminado desde entonces."
+    },
+    "verdict": {
+        "issues": "{count, plural, =0 {Sin problemas conocidos} one {# problema} other {# problemas}}",
+        "fixAll": "Todos se corrigen en una versión más nueva.",
+        "fixSome": "{count, plural, one {# de ellos se corrige en una versión más nueva.} other {# de ellos se corrigen en una versión más nueva.}}",
+        "fixNone": "Ninguno tiene solución todavía."
+    },
+    "next": {
+        "updateApp": "Actualiza {app} a su última versión y vuelve a analizar.",
+        "updatePolaris": "Actualiza Polaris desde Ajustes y vuelve a analizar.",
+        "updateImage": "Usa una versión más nueva de esta imagen y vuelve a analizar.",
+        "updateDeps": "Actualiza estas dependencias en el repositorio y vuelve a desplegar.",
+        "wait": "Aún no hay solución. Vuelve a analizar más tarde por si ya ha salido."
     }
 }

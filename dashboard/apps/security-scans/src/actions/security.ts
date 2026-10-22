@@ -11,7 +11,8 @@ import { ScanFailure } from "../lib/runner";
 import { requireSecurityUser } from "../lib/access";
 
 export type Result<T> =
-    { readonly ok: true; readonly data: T } | { readonly ok: false; readonly error: string };
+    | { readonly ok: true; readonly data: T }
+    | { readonly ok: false; readonly error: string };
 
 async function run<T>(work: () => Promise<T>): Promise<Result<T>> {
     try {
@@ -136,4 +137,11 @@ export async function scheduleAction(input: unknown) {
     return run(async () =>
         (await service()).setSchedule(parsed.data.targetId, parsed.data.everyHours)
     );
+}
+
+export async function focusAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.focusInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await service()).focusScan(parsed.data.scanId));
 }

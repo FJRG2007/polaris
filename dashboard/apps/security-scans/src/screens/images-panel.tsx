@@ -135,7 +135,8 @@ export function ImagesPanel({
                                 : data.images.map((image) => {
                                       const scan = image.scan;
                                       const counts = scan?.summary as
-                                          Record<string, unknown> | undefined;
+                                          | Record<string, unknown>
+                                          | undefined;
                                       const expanded =
                                           open === image.imageId && scan?.state === "done";
                                       return [
@@ -155,8 +156,7 @@ export function ImagesPanel({
                                                       title={image.users.join(", ")}
                                                   >
                                                       <span className="lg:hidden">
-                                                          {t(`images.source.${image.source}`)}{" "}
-                                                          -{" "}
+                                                          {t(`images.source.${image.source}`)} -{" "}
                                                       </span>
                                                       {image.users.join(", ")}
                                                   </span>
@@ -288,6 +288,9 @@ function AppsFallback({
             <CardBody className="flex flex-col gap-2">
                 <p className="text-sm text-muted-foreground">{t("images.hint")}</p>
                 <p className="text-sm text-muted-foreground">{t("images.listUnavailable")}</p>
+                {apps.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t("images.noApps")}</p>
+                ) : null}
                 <ul className="flex flex-col gap-1">
                     {apps.map((app) => (
                         <li key={app.id} className="flex min-w-0 items-center gap-2 text-sm">
