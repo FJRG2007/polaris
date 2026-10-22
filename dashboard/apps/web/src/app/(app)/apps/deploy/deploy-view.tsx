@@ -10,7 +10,7 @@
 
 import type { PrivateAccess } from "@/lib/deploy/private-domain";
 import { FilesPanel } from "./files-panel";
-import { Field, NewTemplateForm, ServerField, useDeployServers } from "./service-form";
+import { NewTemplateForm, ServerField, useDeployServers } from "./service-form";
 import { dbTone, StatusPill } from "./status-pill";
 import { DeployFailureNote } from "./deploy-failure";
 import * as deployActions from "./actions";
