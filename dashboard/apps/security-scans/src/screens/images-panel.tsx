@@ -135,8 +135,7 @@ export function ImagesPanel({
                                 : data.images.map((image) => {
                                       const scan = image.scan;
                                       const counts = scan?.summary as
-                                          | Record<string, unknown>
-                                          | undefined;
+                                          Record<string, unknown> | undefined;
                                       const expanded =
                                           open === image.imageId && scan?.state === "done";
                                       return [
@@ -156,7 +155,8 @@ export function ImagesPanel({
                                                       title={image.users.join(", ")}
                                                   >
                                                       <span className="lg:hidden">
-                                                          {t(`images.source.${image.source}`)} -{" "}
+                                                          {t(`images.source.${image.source}`)}{" "}
+                                                          -{" "}
                                                       </span>
                                                       {image.users.join(", ")}
                                                   </span>
