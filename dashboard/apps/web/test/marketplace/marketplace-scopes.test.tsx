@@ -7,6 +7,7 @@
  * no way to remove it.
  */
 
+import { hasAppLogo } from "@polaris/ui";
 import { APP_SUBAPPS } from "@/lib/apps";
 import { MessagesWrapper } from "../setup/i18n";
 import { SERVICE_TEMPLATES } from "@polaris/core";
@@ -187,6 +188,22 @@ describe("the admin marketplace", () => {
             expect(within(row as HTMLElement).getByRole("link", { name: "Open" })).toBeTruthy();
         }
         expect(within(section).queryByText(/uninstall/i)).toBeNull();
+    });
+
+    it("draws each built-in app with its own logo, not the plain icon", () => {
+        render(<MarketplaceView scope="polaris" installed={[]} />, {
+            wrapper: MessagesWrapper
+        });
+        const section = screen.getByRole("region", { name: "Built in" });
+        const withLogo = builtInApps().filter((app) => hasAppLogo(app.id));
+        expect(withLogo.length).toBeGreaterThan(0);
+        for (const app of withLogo) {
+            const row = section.querySelector(`[data-built-in="${app.id}"]`);
+            expect(row, app.id).not.toBeNull();
+            // jsdom does not match a camelCase SVG attribute such as viewBox in
+            // a selector, so look for the mark AppLogo puts on its own svg.
+            expect(row!.querySelector(`svg[data-app-logo="${app.id}"]`), app.id).not.toBeNull();
+        }
     });
 
     it("lists no Deploy template or wrapped app", () => {
