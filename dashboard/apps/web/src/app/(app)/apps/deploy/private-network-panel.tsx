@@ -211,6 +211,7 @@ export function PrivateNetworkPanel({
     if (embedded) {
         return (
             <SettingsCard
+                entry="privateNetwork"
                 id={privateNetworkAnchor(id)}
                 title={t("title")}
                 description={t("intro")}

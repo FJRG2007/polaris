@@ -45,6 +45,7 @@ export function BuildMachineSection({ applicationId }: { applicationId: string }
 
     return (
         <SettingsCard
+            entry="buildMachine"
             title={t("buildMachine.title")}
             description={t("buildMachine.hint")}
             badge={saved ? <Badge variant="success">{t("kit.saved")}</Badge> : undefined}

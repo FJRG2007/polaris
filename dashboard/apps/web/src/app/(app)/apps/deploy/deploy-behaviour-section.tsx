@@ -46,6 +46,19 @@ function listOf(rows: readonly NetworkRow[]) {
     }));
 }
 
+/** The three cards this draws, which the Settings tab places in three sections. */
+export type DeployBehaviourPart = "strategy" | "block" | "networks";
+
+const ALL_PARTS: readonly DeployBehaviourPart[] = ["strategy", "block", "networks"];
+
+/** The settings index entry each card is found by (service-settings-index.ts). */
+const PART_ENTRY = {
+    strategy: "deployStrategy",
+    block: "blockVulnerable",
+    networks: "externalNetworks"
+} as const satisfies Record<DeployBehaviourPart, string>;
+
+/** All three cards together, each reading and saving through one shared state. */
 export function DeployBehaviourSection({
     applicationId,
     canConfigure
@@ -53,6 +66,16 @@ export function DeployBehaviourSection({
     applicationId: string;
     canConfigure: boolean;
 }) {
+    const state = useDeployBehaviour(applicationId);
+    return <DeployBehaviourCards state={state} canConfigure={canConfigure} />;
+}
+
+/**
+ * What the cards read and write, loaded once. The cards sit in different
+ * sections of the tab, and each instance holding a copy would let one card save
+ * over what another had just stored.
+ */
+export function useDeployBehaviour(applicationId: string) {
     const t = useTranslations("deployService");
     const [view, setView] = useState<DeployBehaviourView | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -95,12 +118,83 @@ export function DeployBehaviourSection({
         return found;
     }, [rows]);
 
-    if (loadError) return <CardError title={t("behaviour.title")} message={loadError} />;
+    return {
+        applicationId,
+        view,
+        setView,
+        loadError,
+        rows,
+        setRows,
+        error,
+        setError,
+        networkError,
+        setNetworkError,
+        blockError,
+        setBlockError,
+        saving,
+        setSaving,
+        justSaved,
+        markSaved,
+        issues
+    };
+}
+
+export type DeployBehaviourState = ReturnType<typeof useDeployBehaviour>;
+
+/** The cards `parts` names, drawn from a state `useDeployBehaviour` holds. */
+export function DeployBehaviourCards({
+    state,
+    canConfigure,
+    parts = ALL_PARTS
+}: {
+    state: DeployBehaviourState;
+    canConfigure: boolean;
+    parts?: readonly DeployBehaviourPart[];
+}) {
+    const t = useTranslations("deployService");
+    const {
+        applicationId,
+        view,
+        setView,
+        loadError,
+        rows,
+        setRows,
+        error,
+        setError,
+        networkError,
+        setNetworkError,
+        blockError,
+        setBlockError,
+        saving,
+        setSaving,
+        justSaved,
+        markSaved,
+        issues
+    } = state;
+    const show = (part: DeployBehaviourPart) => parts.includes(part);
+    const titleOf = (part: DeployBehaviourPart) =>
+        part === "strategy"
+            ? t("behaviour.title")
+            : part === "block"
+              ? t("security.blockTitle")
+              : t("behaviour.networks");
+
+    // One card says it, whichever of the cards this draws: the reason is the same.
+    if (loadError) {
+        const first = parts[0] ?? "strategy";
+        return <CardError entry={PART_ENTRY[first]} title={titleOf(first)} message={loadError} />;
+    }
     if (!view) {
         return (
             <>
-                <CardSkeleton title={t("behaviour.title")} rows={1} />
-                <CardSkeleton title={t("behaviour.networks")} rows={1} />
+                {parts.map((part) => (
+                    <CardSkeleton
+                        key={part}
+                        entry={PART_ENTRY[part]}
+                        title={titleOf(part)}
+                        rows={1}
+                    />
+                ))}
             </>
         );
     }
@@ -164,171 +258,186 @@ export function DeployBehaviourSection({
     const listProblem = issues.get("list");
     return (
         <>
-            <SettingsCard
-                title={t("behaviour.title")}
-                badge={
-                    strategy.mode === "restart" ? (
-                        <Badge variant="warning">{t("behaviour.restart")}</Badge>
-                    ) : (
-                        <Badge variant="success">{t("behaviour.noGap")}</Badge>
-                    )
-                }
-                description={
-                    strategy.mode === "restart" ? undefined : t(`behaviour.mode.${strategy.mode}`)
-                }
-            >
-                {strategy.mode === "restart" && (
-                    <ul className="flex list-disc flex-col gap-1 pl-5 text-xs text-muted-foreground">
-                        {strategy.reasons.map((reason, index) => (
-                            <li key={index}>{reasonText(reason, t)}</li>
-                        ))}
-                    </ul>
-                )}
-                {view.overlapChoice && (
-                    <div className="flex items-start justify-between gap-3 rounded-md bg-surface p-3">
-                        <div className="flex min-w-0 flex-col gap-0.5">
-                            <span className="text-xs font-medium">{t("behaviour.overlap")}</span>
-                            <span className="text-xs text-muted-foreground">
-                                {t("behaviour.overlapHint")}
-                            </span>
+            {show("strategy") && (
+                <SettingsCard
+                    entry="deployStrategy"
+                    title={t("behaviour.title")}
+                    badge={
+                        strategy.mode === "restart" ? (
+                            <Badge variant="warning">{t("behaviour.restart")}</Badge>
+                        ) : (
+                            <Badge variant="success">{t("behaviour.noGap")}</Badge>
+                        )
+                    }
+                    description={
+                        strategy.mode === "restart"
+                            ? undefined
+                            : t(`behaviour.mode.${strategy.mode}`)
+                    }
+                >
+                    {strategy.mode === "restart" && (
+                        <ul className="flex list-disc flex-col gap-1 pl-5 text-xs text-muted-foreground">
+                            {strategy.reasons.map((reason, index) => (
+                                <li key={index}>{reasonText(reason, t)}</li>
+                            ))}
+                        </ul>
+                    )}
+                    {view.overlapChoice && (
+                        <div className="flex items-start justify-between gap-3 rounded-md bg-surface p-3">
+                            <div className="flex min-w-0 flex-col gap-0.5">
+                                <span className="text-xs font-medium">
+                                    {t("behaviour.overlap")}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("behaviour.overlapHint")}
+                                </span>
+                            </div>
+                            <Switch
+                                checked={view.overlapVolumes}
+                                onChange={(next) => void toggleOverlap(next)}
+                                disabled={!canConfigure}
+                                aria-label={t("behaviour.overlap")}
+                            />
                         </div>
+                    )}
+                    {error && <p className="text-xs text-danger-ink">{error}</p>}
+                </SettingsCard>
+            )}
+
+            {show("block") && (
+                <SettingsCard
+                    entry="blockVulnerable"
+                    title={t("security.blockTitle")}
+                    description={t("security.blockShort")}
+                    learnMore={t("security.blockHint")}
+                    actions={
                         <Switch
-                            checked={view.overlapVolumes}
-                            onChange={(next) => void toggleOverlap(next)}
+                            checked={view.blockVulnerableDeploys}
+                            onChange={(next) => void toggleBlock(next)}
                             disabled={!canConfigure}
-                            aria-label={t("behaviour.overlap")}
+                            aria-label={t("security.blockTitle")}
                         />
-                    </div>
-                )}
-                {error && <p className="text-xs text-danger-ink">{error}</p>}
-            </SettingsCard>
+                    }
+                >
+                    {blockError && <p className="text-xs text-danger-ink">{blockError}</p>}
+                </SettingsCard>
+            )}
 
-            <SettingsCard
-                title={t("security.blockTitle")}
-                description={t("security.blockShort")}
-                learnMore={t("security.blockHint")}
-                actions={
-                    <Switch
-                        checked={view.blockVulnerableDeploys}
-                        onChange={(next) => void toggleBlock(next)}
-                        disabled={!canConfigure}
-                        aria-label={t("security.blockTitle")}
-                    />
-                }
-            >
-                {blockError && <p className="text-xs text-danger-ink">{blockError}</p>}
-            </SettingsCard>
-
-            <SettingsCard
-                title={t("behaviour.networks")}
-                description={t("behaviour.networksShort")}
-                learnMore={t("behaviour.networksHint", { name: view.defaultAlias })}
-                actions={
-                    canConfigure ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setRows([...rows, { name: "", aliases: "" }])}
-                            disabled={rows.length >= 8}
-                        >
-                            <Plus aria-hidden /> {t("behaviour.addNetwork")}
-                        </Button>
-                    ) : undefined
-                }
-                footer={
-                    canConfigure ? (
-                        <SaveBar
-                            dirty={dirty}
-                            pending={saving}
-                            justSaved={justSaved}
-                            invalid={
-                                incomplete
-                                    ? t("behaviour.nameMissing")
-                                    : issues.size > 0
-                                      ? issueText([...issues.values()][0] ?? "", t)
-                                      : null
-                            }
-                            error={networkError}
-                            onSave={() => void saveNetworks()}
-                            onDiscard={() => setRows(rowsOf(view))}
-                        />
-                    ) : undefined
-                }
-            >
-                {rows.length === 0 && (
-                    <p className="text-xs text-foreground-subtle">{t("behaviour.noNetworks")}</p>
-                )}
-                {rows.map((row, index) => {
-                    const nameIssue = issues.get(`${row.name.trim()}:name`);
-                    const aliasIssue = issues.get(`${row.name.trim()}:aliases`);
-                    return (
-                        <div key={index} className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    value={row.name}
-                                    onChange={(event) =>
-                                        setRows(
-                                            rows.map((r, at) =>
-                                                at === index
-                                                    ? { ...r, name: event.target.value }
-                                                    : r
+            {show("networks") && (
+                <SettingsCard
+                    entry="externalNetworks"
+                    title={t("behaviour.networks")}
+                    description={t("behaviour.networksShort")}
+                    learnMore={t("behaviour.networksHint", { name: view.defaultAlias })}
+                    actions={
+                        canConfigure ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setRows([...rows, { name: "", aliases: "" }])}
+                                disabled={rows.length >= 8}
+                            >
+                                <Plus aria-hidden /> {t("behaviour.addNetwork")}
+                            </Button>
+                        ) : undefined
+                    }
+                    footer={
+                        canConfigure ? (
+                            <SaveBar
+                                dirty={dirty}
+                                pending={saving}
+                                justSaved={justSaved}
+                                invalid={
+                                    incomplete
+                                        ? t("behaviour.nameMissing")
+                                        : issues.size > 0
+                                          ? issueText([...issues.values()][0] ?? "", t)
+                                          : null
+                                }
+                                error={networkError}
+                                onSave={() => void saveNetworks()}
+                                onDiscard={() => setRows(rowsOf(view))}
+                            />
+                        ) : undefined
+                    }
+                >
+                    {rows.length === 0 && (
+                        <p className="text-xs text-foreground-subtle">
+                            {t("behaviour.noNetworks")}
+                        </p>
+                    )}
+                    {rows.map((row, index) => {
+                        const nameIssue = issues.get(`${row.name.trim()}:name`);
+                        const aliasIssue = issues.get(`${row.name.trim()}:aliases`);
+                        return (
+                            <div key={index} className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        value={row.name}
+                                        onChange={(event) =>
+                                            setRows(
+                                                rows.map((r, at) =>
+                                                    at === index
+                                                        ? { ...r, name: event.target.value }
+                                                        : r
+                                                )
                                             )
-                                        )
-                                    }
-                                    placeholder="app_network"
-                                    className="h-8 w-40 shrink-0"
-                                    disabled={!canConfigure}
-                                    aria-label={t("behaviour.networkName")}
-                                    aria-invalid={nameIssue ? true : undefined}
-                                />
-                                <Input
-                                    value={row.aliases}
-                                    onChange={(event) =>
-                                        setRows(
-                                            rows.map((r, at) =>
-                                                at === index
-                                                    ? { ...r, aliases: event.target.value }
-                                                    : r
-                                            )
-                                        )
-                                    }
-                                    placeholder={view.defaultAlias}
-                                    className="h-8 min-w-0 flex-1"
-                                    disabled={!canConfigure}
-                                    aria-label={t("behaviour.networkAliases")}
-                                    aria-invalid={aliasIssue ? true : undefined}
-                                />
-                                {canConfigure && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setRows(rows.filter((_, at) => at !== index))
                                         }
-                                        className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                        aria-label={t("behaviour.removeNetwork")}
-                                        title={t("behaviour.removeNetwork")}
-                                    >
-                                        <Trash2 className="size-4" />
-                                    </button>
+                                        placeholder="app_network"
+                                        className="h-8 w-40 shrink-0"
+                                        disabled={!canConfigure}
+                                        aria-label={t("behaviour.networkName")}
+                                        aria-invalid={nameIssue ? true : undefined}
+                                    />
+                                    <Input
+                                        value={row.aliases}
+                                        onChange={(event) =>
+                                            setRows(
+                                                rows.map((r, at) =>
+                                                    at === index
+                                                        ? { ...r, aliases: event.target.value }
+                                                        : r
+                                                )
+                                            )
+                                        }
+                                        placeholder={view.defaultAlias}
+                                        className="h-8 min-w-0 flex-1"
+                                        disabled={!canConfigure}
+                                        aria-label={t("behaviour.networkAliases")}
+                                        aria-invalid={aliasIssue ? true : undefined}
+                                    />
+                                    {canConfigure && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setRows(rows.filter((_, at) => at !== index))
+                                            }
+                                            className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                            aria-label={t("behaviour.removeNetwork")}
+                                            title={t("behaviour.removeNetwork")}
+                                        >
+                                            <Trash2 className="size-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                {(nameIssue || aliasIssue) && (
+                                    <p className="text-xs text-danger-ink">
+                                        {issueText(nameIssue ?? aliasIssue ?? "", t)}
+                                    </p>
                                 )}
                             </div>
-                            {(nameIssue || aliasIssue) && (
-                                <p className="text-xs text-danger-ink">
-                                    {issueText(nameIssue ?? aliasIssue ?? "", t)}
-                                </p>
-                            )}
-                        </div>
-                    );
-                })}
-                {issues.get("list") && (
-                    <p className="text-xs text-danger-ink">
-                        {issueText(issues.get("list") ?? "", t)}
-                    </p>
-                )}
-                {listProblem && (
-                    <p className="text-xs text-danger-ink">{issueText(listProblem, t)}</p>
-                )}
-            </SettingsCard>
+                        );
+                    })}
+                    {issues.get("list") && (
+                        <p className="text-xs text-danger-ink">
+                            {issueText(issues.get("list") ?? "", t)}
+                        </p>
+                    )}
+                    {listProblem && (
+                        <p className="text-xs text-danger-ink">{issueText(listProblem, t)}</p>
+                    )}
+                </SettingsCard>
+            )}
         </>
     );
 }

@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * A service's Settings tab, in the service panel: networking, source and
- * deploys, scaling, the rarer machine-level choices, and removal - each a
- * section of cards with a Save of its own, under a navigator that follows the
- * scroll (see settings-kit.tsx for the pieces).
+ * A service's Settings tab, in the service panel: source, networking, security
+ * and edge, scaling, build, deploys, the rest, and removal - each a section of
+ * cards with a Save of its own, under a navigator that follows the scroll and a
+ * filter that finds a setting by name (see settings-kit.tsx for the pieces).
  */
 
 import { DeployHooksCard } from "./deploy-hooks-card";
@@ -27,7 +27,13 @@ import { UploadedSourceSection } from "./upload-source";
 import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
 import { RegistryPickCard } from "./registries/registry-pick-card";
-import { DeployBehaviourSection } from "./deploy-behaviour-section";
+import { DeployBehaviourCards, useDeployBehaviour } from "./deploy-behaviour-section";
+import { BuilderCard, SourceRepositoryCard } from "./service-source-cards";
+import {
+    SERVICE_SETTINGS_SEARCH,
+    SERVICE_SETTINGS_SECTIONS,
+    type ServiceSettingsSection
+} from "./service-settings-index";
 import { isTunnelHostname, runtimeVersionSchema } from "@polaris/core";
 import { ServiceTags } from "./variable-groups";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -70,11 +76,13 @@ import {
     Gauge,
     GitBranch,
     Globe,
+    Hammer,
     House,
     Loader2,
     MapPin,
     Network,
     Plus,
+    Rocket,
     ShieldCheck,
     SlidersHorizontal,
     Trash2,
@@ -668,10 +676,11 @@ function useDomainHealth(
 }
 
 /**
- * The service's Settings tab: five sections - where it answers, where its code
- * comes from and how it ships, how it scales, the rarer machine-level choices,
- * and removing it - each a stack of cards with a Save of its own, under a
- * navigator that follows the scroll.
+ * The service's Settings tab, in Railway's order: where the code comes from,
+ * where it answers, what guards it, how it scales, how it builds, how a new
+ * version goes out, the rest, and removing it - each a stack of cards with a Save
+ * of its own, under a navigator that follows the scroll and a filter that finds
+ * any setting by name (service-settings-index.ts lists every card).
  *
  * Each section is drawn only when the reader may use something in it, and a
  * card the reader cannot change is not drawn at all, as before.
@@ -692,62 +701,124 @@ export function SettingsTab({
     const can = useProjectCan();
     const configure = can("service.configure");
     const domains = can("domains.manage");
+    // Held here, once: their cards sit in different sections, and a copy per
+    // section would let one card save over what another had just stored.
+    const source = useSourceCards(app, onChanged);
+    const behaviour = useDeployBehaviour(app.id);
 
-    const sections: (SettingsSectionLink & { intro: string; shown: boolean })[] = [
-        {
+    const sections: Record<
+        ServiceSettingsSection,
+        SettingsSectionLink & { intro: string; shown: boolean }
+    > = {
+        source: {
+            id: `settings-source-${app.id}`,
+            group: "source",
+            label: t("kit.sourceTitle"),
+            intro: t("kit.sourceIntro"),
+            icon: GitBranch,
+            // The source and the deploy triggers are shown, read-only, to anybody.
+            shown: true
+        },
+        networking: {
             id: `settings-networking-${app.id}`,
+            group: "networking",
             label: t("settings.networking"),
             intro: t("kit.networkingIntro"),
             icon: Network,
             // The private network is shown, read-only, to anybody on the tab.
             shown: true
         },
-        {
-            id: `settings-source-${app.id}`,
-            label: t("kit.source"),
-            intro: t("kit.sourceIntro"),
-            icon: GitBranch,
-            // The deploy behaviour is shown, read-only, to anybody on the tab.
+        security: {
+            id: `settings-security-${app.id}`,
+            group: "security",
+            label: t("kit.securityTitle"),
+            intro: t("kit.securityIntro"),
+            icon: ShieldCheck,
+            // The vulnerability gate is shown, read-only, to anybody on the tab.
             shown: true
         },
-        {
+        scale: {
             id: `settings-scaling-${app.id}`,
+            group: "scale",
             label: t("scaling.title"),
             intro: t("kit.scalingIntro"),
             icon: Gauge,
             shown: configure
         },
-        {
-            id: `settings-advanced-${app.id}`,
-            label: t("kit.advanced"),
-            intro: t("kit.advancedIntro"),
-            icon: SlidersHorizontal,
-            shown: configure
+        build: {
+            id: `settings-build-${app.id}`,
+            group: "build",
+            label: t("kit.buildTitle"),
+            intro: t("kit.buildIntro"),
+            icon: Hammer,
+            // What builds the service is shown, read-only, to anybody.
+            shown: true
         },
-        {
+        deploy: {
+            id: `settings-deploy-${app.id}`,
+            group: "deploy",
+            label: t("kit.deployTitle"),
+            intro: t("kit.deployIntro"),
+            icon: Rocket,
+            // How a deploy changes over is shown, read-only, to anybody.
+            shown: true
+        },
+        other: {
+            id: `settings-other-${app.id}`,
+            group: "other",
+            label: t("kit.otherTitle"),
+            intro: t("kit.otherIntro"),
+            icon: SlidersHorizontal,
+            shown: true
+        },
+        danger: {
             id: `settings-danger-${app.id}`,
+            group: "danger",
             label: t("kit.danger"),
             intro: t("kit.dangerIntro"),
             icon: TriangleAlert,
             danger: true,
             shown: can("service.delete")
         }
-    ];
-    const shown = sections.filter((section) => section.shown);
-    const section = (index: number) => sections[index]!;
-    const head = (index: number) => ({
-        id: section(index).id,
-        icon: section(index).icon,
-        title: section(index).label,
-        intro: section(index).intro
+    };
+    const shown = SERVICE_SETTINGS_SECTIONS.map((key) => sections[key]).filter(
+        (section) => section.shown
+    );
+    const head = (key: ServiceSettingsSection) => ({
+        id: sections[key].id,
+        group: key,
+        icon: sections[key].icon,
+        title: sections[key].label,
+        intro: sections[key].intro
     });
+    const sourceProps = { state: source, app, isGit, canConfigure: configure } as const;
 
     return (
-        <SettingsLayout sections={shown}>
-            <SettingsSection {...head(0)}>
+        <SettingsLayout sections={shown} index={SERVICE_SETTINGS_SEARCH}>
+            <SettingsSection {...head("source")}>
+                <SourceRepositoryCard app={app} />
+                <SourceCards {...sourceProps} part="root" />
+                <SourceCards {...sourceProps} part="autoDeploy" />
+                {configure && (
+                    <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />
+                )}
+                {app.sourceType === "image" && (
+                    <RegistryPickCard applicationId={app.id} canConfigure={configure} />
+                )}
+            </SettingsSection>
+
+            <SettingsSection {...head("networking")}>
                 {domains && <PublicNetworking app={app} onChanged={onChanged} />}
                 <PrivateNetworkPanel kind="application" id={app.id} embedded />
                 {configure && <ContainerPortCard app={app} onChanged={onChanged} />}
+                <DeployBehaviourCards
+                    state={behaviour}
+                    canConfigure={configure}
+                    parts={["networks"]}
+                />
+            </SettingsSection>
+
+            <SettingsSection {...head("security")}>
                 {(configure || domains) && (
                     <EdgeSettings
                         applicationId={app.id}
@@ -756,51 +827,56 @@ export function SettingsTab({
                         onChanged={onChanged}
                     />
                 )}
+                <DeployBehaviourCards
+                    state={behaviour}
+                    canConfigure={configure}
+                    parts={["block"]}
+                />
             </SettingsSection>
 
-            <SettingsSection {...head(1)}>
-                {configure && <SourceCards app={app} isGit={isGit} onChanged={onChanged} />}
-                {configure && (
-                    <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />
-                )}
-                <DeployBehaviourSection applicationId={app.id} canConfigure={configure} />
-                {can("deploy.run") && <DeployHooksCard applicationId={app.id} />}
-                {app.sourceType === "image" && (
-                    <RegistryPickCard applicationId={app.id} canConfigure={configure} />
-                )}
-                <SettingsCard title={tc("tags.title")}>
-                    <ServiceTags applicationId={app.id} />
-                </SettingsCard>
-            </SettingsSection>
-
-            {section(2).shown && (
-                <SettingsSection {...head(2)}>
+            {sections.scale.shown && (
+                <SettingsSection {...head("scale")}>
                     <ScalingSection applicationId={app.id} onChanged={onChanged} />
                     <GpuCard
                         applicationId={app.id}
                         canConfigure={configure}
                         onChanged={onChanged}
                     />
-                </SettingsSection>
-            )}
-
-            {section(3).shown && (
-                <SettingsSection {...head(3)}>
                     <ServerSection app={app} onChanged={onChanged} />
-                    <BuildMachineSection applicationId={app.id} />
-                    {can("service.create") && <MoveOutSection app={app} />}
                 </SettingsSection>
             )}
 
-            {section(4).shown && (
-                <SettingsSection {...head(4)} danger>
+            <SettingsSection {...head("build")}>
+                <SourceCards {...sourceProps} part="builder" />
+                <SourceCards {...sourceProps} part="commands" />
+                {configure && <BuildMachineSection applicationId={app.id} />}
+            </SettingsSection>
+
+            <SettingsSection {...head("deploy")}>
+                <DeployBehaviourCards
+                    state={behaviour}
+                    canConfigure={configure}
+                    parts={["strategy"]}
+                />
+                <SourceCards {...sourceProps} part="releases" />
+                {can("deploy.run") && <DeployHooksCard applicationId={app.id} />}
+            </SettingsSection>
+
+            <SettingsSection {...head("other")}>
+                <SettingsCard entry="tags" title={tc("tags.title")}>
+                    <ServiceTags applicationId={app.id} />
+                </SettingsCard>
+                {can("service.create") && <MoveOutSection app={app} />}
+            </SettingsSection>
+
+            {sections.danger.shown && (
+                <SettingsSection {...head("danger")} danger>
                     <DangerSection app={app} staged={staged} onChanged={onChanged} />
                 </SettingsSection>
             )}
         </SettingsLayout>
     );
 }
-
 /**
  * The port the app listens on inside its container. Empty in the stored config
  * means "detect it from the image"; once one is pinned it can be changed but not
@@ -831,6 +907,7 @@ function ContainerPortCard({ app, onChanged }: { app: ProjectApp; onChanged: () 
 
     return (
         <SettingsCard
+            entry="containerPort"
             title={t("settings.containerPort")}
             description={t("settings.containerPortShort")}
             learnMore={t("settings.containerPortHint")}
@@ -897,10 +974,8 @@ function sourceFieldsOf(app: ProjectApp) {
 
 type SourceFields = ReturnType<typeof sourceFieldsOf>;
 
-const SOURCE_KEYS = [
-    "rootDirectory",
-    "dockerfilePath"
-] as const satisfies readonly (keyof SourceFields)[];
+const ROOT_KEYS = ["rootDirectory"] as const satisfies readonly (keyof SourceFields)[];
+const DOCKERFILE_KEYS = ["dockerfilePath"] as const satisfies readonly (keyof SourceFields)[];
 const BUILD_KEYS = [
     "installCommand",
     "buildCommand",
@@ -917,21 +992,13 @@ const AUTO_DEPLOY_KEYS = [
 const RELEASE_KEYS = ["keepReleases"] as const satisfies readonly (keyof SourceFields)[];
 
 /**
- * Source, build, auto-deploy and releases. Two server writes sit behind four
- * cards (the repository paths and build commands are one, the deploy triggers and
- * releases the other), so each card saves its own fields over what is stored for
- * the rest - a pending edit in the card next to it is neither sent nor lost.
+ * Root directory, Dockerfile, build commands, auto-deploy and releases. Two
+ * server writes sit behind five cards in three sections (the repository paths and
+ * build commands are one, the deploy triggers and releases the other), so the
+ * form is held once, here, and each card saves its own fields over what is stored
+ * for the rest - a pending edit in another card is neither sent nor lost.
  */
-function SourceCards({
-    app,
-    isGit,
-    onChanged
-}: {
-    app: ProjectApp;
-    isGit: boolean;
-    onChanged: () => void;
-}) {
-    const t = useTranslations("deployService");
+function useSourceCards(app: ProjectApp, onChanged: () => void) {
     const form = useCardForm(sourceFieldsOf(app));
     const [errors, setErrors] = useState<Record<string, string | null>>({});
     const [pendingCard, setPendingCard] = useState<string | null>(null);
@@ -1009,54 +1076,94 @@ function SourceCards({
             onDiscard={() => form.discard(keys)}
         />
     );
-    const plain = { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } as const;
+    return { form, draft, bar, savePaths, saveDeploys, runtimeVersionProblem };
+}
+
+type SourceCardsState = ReturnType<typeof useSourceCards>;
+
+/** Which of the source form's cards to draw: each sits in its own section. */
+type SourcePart = "root" | "builder" | "commands" | "autoDeploy" | "releases";
+
+const PLAIN = { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } as const;
+
+function SourceCards({
+    state,
+    app,
+    isGit,
+    canConfigure,
+    part
+}: {
+    state: SourceCardsState;
+    app: ProjectApp;
+    isGit: boolean;
+    canConfigure: boolean;
+    part: SourcePart;
+}) {
+    const t = useTranslations("deployService");
+    const { form, draft, bar, savePaths, saveDeploys, runtimeVersionProblem } = state;
+    const plain = PLAIN;
+
+    if (part === "builder") {
+        const editsPath = isGit && canConfigure;
+        return (
+            <BuilderCard
+                app={app}
+                footer={
+                    editsPath
+                        ? bar("dockerfile", DOCKERFILE_KEYS, () =>
+                              savePaths("dockerfile", DOCKERFILE_KEYS)
+                          )
+                        : undefined
+                }
+            >
+                {editsPath && (
+                    <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground sm:max-w-sm">
+                        {t("settings.dockerfilePath")}
+                        <Input
+                            value={draft.dockerfilePath}
+                            onChange={(event) => form.patch({ dockerfilePath: event.target.value })}
+                            // i18n-ignore: a file name
+                            placeholder="Dockerfile"
+                            {...plain}
+                        />
+                        <span className="text-foreground-subtle">
+                            {draft.rootDirectory.trim()
+                                ? t("settings.relativeTo", {
+                                      directory: draft.rootDirectory.trim()
+                                  })
+                                : t("settings.relativeToRoot")}
+                        </span>
+                    </label>
+                )}
+            </BuilderCard>
+        );
+    }
+    if (!canConfigure) return null;
 
     return (
         <>
-            {isGit && (
+            {part === "root" && isGit && (
                 <SettingsCard
-                    title={t("settings.source")}
-                    description={t("settings.sourceShort")}
+                    entry="rootDirectory"
+                    title={t("settings.rootDirectory")}
+                    description={t("settings.rootDirectoryShort")}
                     learnMore={t("settings.rootDirectoryHint")}
-                    footer={bar("source", SOURCE_KEYS, () => savePaths("source", SOURCE_KEYS))}
+                    footer={bar("root", ROOT_KEYS, () => savePaths("root", ROOT_KEYS))}
                 >
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
-                            {t("settings.rootDirectory")}
-                            <Input
-                                value={draft.rootDirectory}
-                                onChange={(event) =>
-                                    form.patch({ rootDirectory: event.target.value })
-                                }
-                                placeholder="apps/web"
-                                {...plain}
-                            />
-                        </label>
-                        <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
-                            {t("settings.dockerfilePath")}
-                            <Input
-                                value={draft.dockerfilePath}
-                                onChange={(event) =>
-                                    form.patch({ dockerfilePath: event.target.value })
-                                }
-                                // i18n-ignore: a file name
-                                placeholder="Dockerfile"
-                                {...plain}
-                            />
-                            <span className="text-foreground-subtle">
-                                {draft.rootDirectory.trim()
-                                    ? t("settings.relativeTo", {
-                                          directory: draft.rootDirectory.trim()
-                                      })
-                                    : t("settings.relativeToRoot")}
-                            </span>
-                        </label>
-                    </div>
+                    <Input
+                        value={draft.rootDirectory}
+                        onChange={(event) => form.patch({ rootDirectory: event.target.value })}
+                        placeholder="apps/web"
+                        aria-label={t("settings.rootDirectory")}
+                        className="sm:max-w-sm"
+                        {...plain}
+                    />
                 </SettingsCard>
             )}
 
-            {app.sourceType === "nixpacks" && (
+            {part === "commands" && app.sourceType === "nixpacks" && (
                 <SettingsCard
+                    entry="buildCommands"
                     title={t("settings.build")}
                     description={t("settings.buildShort")}
                     learnMore={t("settings.buildIntro")}
@@ -1148,8 +1255,9 @@ function SourceCards({
                 </SettingsCard>
             )}
 
-            {isGit && (
+            {part === "autoDeploy" && isGit && (
                 <SettingsCard
+                    entry="autoDeploy"
                     title={t("settings.autoDeploy")}
                     description={t("settings.autoDeployShort")}
                     badge={
@@ -1206,19 +1314,24 @@ function SourceCards({
                 </SettingsCard>
             )}
 
-            <SettingsCard
-                title={t("settings.keepReleases")}
-                description={t("settings.keepReleasesShort")}
-                learnMore={t("settings.keepReleasesHint")}
-                actions={
-                    <Switch
-                        checked={draft.keepReleases}
-                        onChange={(next) => form.patch({ keepReleases: next })}
-                        aria-label={t("settings.keepReleases")}
-                    />
-                }
-                footer={bar("releases", RELEASE_KEYS, () => saveDeploys("releases", RELEASE_KEYS))}
-            />
+            {part === "releases" && (
+                <SettingsCard
+                    entry="keepReleases"
+                    title={t("settings.keepReleases")}
+                    description={t("settings.keepReleasesShort")}
+                    learnMore={t("settings.keepReleasesHint")}
+                    actions={
+                        <Switch
+                            checked={draft.keepReleases}
+                            onChange={(next) => form.patch({ keepReleases: next })}
+                            aria-label={t("settings.keepReleases")}
+                        />
+                    }
+                    footer={bar("releases", RELEASE_KEYS, () =>
+                        saveDeploys("releases", RELEASE_KEYS)
+                    )}
+                />
+            )}
         </>
     );
 }
@@ -1579,6 +1692,7 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
     return (
         <>
             <SettingsCard
+                entry="publicDomains"
                 title={t("publicNet.title")}
                 description={t("publicNet.intro")}
                 actions={
@@ -1830,6 +1944,7 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
 
             <div ref={addForm} className="scroll-mt-16">
                 <SettingsCard
+                    entry="addDomain"
                     title={t("settings.addADomain")}
                     description={t("kit.addADomainShort")}
                     learnMore={t("settings.addADomainIntro")}
@@ -2204,6 +2319,7 @@ function MoveOutSection({ app }: { app: ProjectApp }) {
 
     return (
         <SettingsCard
+            entry="moveOut"
             title={t("moveOut.heading")}
             description={t("kit.moveOutShort")}
             learnMore={t("moveOut.body")}
@@ -2260,6 +2376,7 @@ function DangerSection({
 
     return (
         <SettingsCard
+            entry="deleteService"
             danger
             title={t("danger.deleteService")}
             description={staged ? t("danger.queued") : t("danger.hint")}
@@ -2329,6 +2446,7 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
 
     return (
         <SettingsCard
+            entry="server"
             title={t("server.label")}
             description={t("kit.serverShort")}
             learnMore={t("server.hint")}
