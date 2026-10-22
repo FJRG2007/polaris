@@ -53,6 +53,8 @@ export const GRID_CSS = `
 .pc-grid .fc a.fc-daygrid-more-link:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
 .pc-grid .fc .fc-popover { background: hsl(var(--elevated)); border-color: hsl(var(--border-strong)); border-radius: 0.5rem; box-shadow: var(--shadow-popover, 0 8px 24px rgb(0 0 0 / 0.35)); }
 .pc-grid .fc .fc-popover-header { background: transparent; color: hsl(var(--muted-foreground)); }
+.pc-grid .fc .fc-popover { display: flex; flex-direction: column; }
+.pc-grid .fc .fc-popover-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .pc-grid .fc .fc-event { border-radius: 4px; font-size: 0.75rem; cursor: pointer; }
 .pc-grid .fc .fc-event:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
 .pc-grid .fc .fc-daygrid-dot-event .fc-event-title { font-weight: 500; }

@@ -5,6 +5,7 @@
  */
 
 import { GRID_CSS } from "../grid-css";
+import { keepPopoversInView } from "../popover-fit";
 import { useEffect, useRef } from "react";
 import listPlugin from "@fullcalendar/list";
 import FullCalendar from "@fullcalendar/react";
@@ -37,7 +38,9 @@ export interface PublicGridProps {
 
 export default function PublicGrid(props: PublicGridProps) {
     const calendar = useRef<FullCalendar>(null);
+    const root = useRef<HTMLDivElement>(null);
     const fcView = PUBLIC_VIEWS[props.view];
+    useEffect(() => (root.current ? keepPopoversInView(root.current) : undefined), []);
 
     useEffect(() => {
         const api = calendar.current?.getApi();
@@ -47,7 +50,7 @@ export default function PublicGrid(props: PublicGridProps) {
     }, [fcView, props.anchor]);
 
     return (
-        <div className="pc-grid h-full min-h-0">
+        <div ref={root} className="pc-grid h-full min-h-0">
             <style>{GRID_CSS}</style>
             <FullCalendar
                 ref={calendar}
