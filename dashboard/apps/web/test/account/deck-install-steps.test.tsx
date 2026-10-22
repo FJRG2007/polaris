@@ -16,12 +16,20 @@ import { DeckInstallSteps, detectDeckHost } from "@/app/(app)/account/downloads/
 // these tests never press.
 vi.mock("@/app/(app)/account/api-keys/actions", () => ({ revokeApiKeyAction: vi.fn() }));
 
+const marketplace = vi.hoisted(() => ({ url: null as string | null }));
+vi.mock("@/lib/deck/marketplace", () => ({
+    get STREAMDECK_MARKETPLACE_URL() {
+        return marketplace.url;
+    }
+}));
+
 // jsdom has no layout; the picker scrolls its chosen option into view.
 Element.prototype.scrollIntoView ??= () => undefined;
 
 afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    marketplace.url = null;
 });
 
 const RELEASE: AppDownload = {
@@ -167,5 +175,14 @@ describe("the Elgato Marketplace row", () => {
         expect(screen.getByText("Not there yet")).toBeTruthy();
         expect(screen.queryByRole("link", { name: "Open in Marketplace" })).toBeNull();
         expect(screen.getByText("Install it yourself")).toBeTruthy();
+    });
+
+    it("links the listing once it has an address", () => {
+        marketplace.url = "https://marketplace.example.test/polaris";
+        render(<StreamDeckSection decks={[]} install={null} />, { wrapper: MessagesWrapper });
+        expect(screen.queryByText("Not there yet")).toBeNull();
+        expect(
+            screen.getByRole("link", { name: "Open in Marketplace" }).getAttribute("href")
+        ).toBe("https://marketplace.example.test/polaris");
     });
 });

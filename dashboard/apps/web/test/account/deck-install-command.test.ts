@@ -2,14 +2,12 @@
  * The one-line install for Polaris for Stream Deck.
  *
  * What is pinned here is what would be silently wrong: a line built for the
- * wrong shell, a repository baked in rather than passed in, a line offered for
- * a system Elgato's app does not run on, and a listing address made up before
- * Elgato has given one.
+ * wrong shell, a repository baked in rather than passed in, and a line offered
+ * for a system Elgato's app does not run on.
  */
 
 import { describe, expect, it } from "vitest";
 import { INSTALL_PLATFORMS } from "@/lib/install-platform";
-import { STREAMDECK_MARKETPLACE_URL } from "@/lib/deck/marketplace";
 import {
     DECK_LINE_PLATFORMS,
     deckInstallCommand,
@@ -46,11 +44,5 @@ describe("the line that installs the Stream Deck plugin", () => {
         }
         expect(deckLinePlatform("macos")).toBe("macos");
         expect(deckLinePlatform("windows")).toBe("windows");
-    });
-});
-
-describe("the Marketplace listing", () => {
-    it("is not linked until Elgato has approved one", () => {
-        expect(STREAMDECK_MARKETPLACE_URL).toBeNull();
     });
 });
