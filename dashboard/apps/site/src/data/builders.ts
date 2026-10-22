@@ -44,7 +44,9 @@ export interface StoreShot {
 
 /** A locale's words for the catalogue: per-app overrides and category names. */
 export interface CatalogWords {
-    readonly apps?: Readonly<Record<string, { name?: string; summary?: string; description?: string }>>;
+    readonly apps?: Readonly<
+        Record<string, { name?: string; summary?: string; description?: string }>
+    >;
     readonly categories?: Readonly<Record<string, string>>;
     /** The dashboard marketplace's card words: `card.by`, `card.byImage`, `card.preview`. */
     readonly card?: { readonly by: string; readonly byImage: string; readonly preview: string };
@@ -74,8 +76,16 @@ export interface SiteApp {
  * Every offered app in one locale, sorted by name. A word the locale has not
  * translated falls back to the catalogue's own English, as the dashboard does.
  */
-export function siteApps(catalog: readonly CatalogInput[], locale: SiteLocale, words: CatalogWords = {}): SiteApp[] {
-    const card = words.card ?? { by: "By {developer}", byImage: "By {developer} - image by {distributor}", preview: "{name} preview" };
+export function siteApps(
+    catalog: readonly CatalogInput[],
+    locale: SiteLocale,
+    words: CatalogWords = {}
+): SiteApp[] {
+    const card = words.card ?? {
+        by: "By {developer}",
+        byImage: "By {developer} - image by {distributor}",
+        preview: "{name} preview"
+    };
     return catalog
         .map((app) => {
             const own = words.apps?.[app.id] ?? {};
@@ -114,7 +124,9 @@ export function matchesApp(app: SiteApp, query: string, category: string): boole
     if (category && app.category !== category) return false;
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
-    return [app.name, app.summary, app.categoryLabel].some((text) => text.toLowerCase().includes(needle));
+    return [app.name, app.summary, app.categoryLabel].some((text) =>
+        text.toLowerCase().includes(needle)
+    );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -146,7 +158,11 @@ export function logoSlug(name: string): string {
  * is its slug, the only one named after it with a suffix ("Fly" is `fly-io.svg`),
  * or the first of its words that is one, or none.
  */
-export function parseReplaces(markdown: string, heading: RegExp, logos: ReadonlySet<string>): ReplacesRow[] {
+export function parseReplaces(
+    markdown: string,
+    heading: RegExp,
+    logos: ReadonlySet<string>
+): ReplacesRow[] {
     const lines = markdown.split(/\r?\n/);
     const start = lines.findIndex((line) => /^#{2,3} /.test(line) && heading.test(line));
     if (start < 0) return [];
@@ -160,9 +176,17 @@ export function parseReplaces(markdown: string, heading: RegExp, logos: Readonly
             continue;
         }
         inTable = true;
-        const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
+        const cells = line
+            .split("|")
+            .slice(1, -1)
+            .map((cell) => cell.trim());
         // The separator line, and the header row right above it.
-        if (cells.length < 2 || /^-+$/.test(cells[0] ?? "") || SEPARATOR.test(lines[index + 1] ?? "")) continue;
+        if (
+            cells.length < 2 ||
+            /^-+$/.test(cells[0] ?? "") ||
+            SEPARATOR.test(lines[index + 1] ?? "")
+        )
+            continue;
         const tools = (cells[0] ?? "")
             .split(/,\s*|\s+and\s+|\s+y\s+/)
             .map((name) => name.trim())
@@ -179,7 +203,9 @@ const SEPARATOR = /^\|\s*-{3,}/;
 function logoFor(name: string, logos: ReadonlySet<string>): string | null {
     const whole = logoSlug(name);
     if (logos.has(`${whole}.svg`)) return `${whole}.svg`;
-    const suffixed = [...logos].filter((file) => file.startsWith(`${whole}-`) && file.endsWith(".svg"));
+    const suffixed = [...logos].filter(
+        (file) => file.startsWith(`${whole}-`) && file.endsWith(".svg")
+    );
     if (whole && suffixed.length === 1) return suffixed[0] ?? null;
     for (const word of name.split(/\s+/)) {
         const slug = logoSlug(word);
@@ -233,7 +259,10 @@ export function parseShowcase(markdown: string): ShowcaseSection[] {
 }
 
 /** The install lines the README gives, by shell. */
-export function parseInstallLines(markdown: string): { unix: string | null; windows: string | null } {
+export function parseInstallLines(markdown: string): {
+    unix: string | null;
+    windows: string | null;
+} {
     return {
         unix: /^curl -fsSL \S+install\.sh \| sh$/m.exec(markdown)?.[0] ?? null,
         windows: /^irm \S+install\.ps1 \| iex$/m.exec(markdown)?.[0] ?? null
@@ -303,9 +332,18 @@ export function downloadEntries(releases: readonly ReleaseInput[], repo: string)
                     release.prerelease !== true &&
                     typeof release.html_url === "string"
             )
-            .sort((a, b) => String(b.published_at ?? "").localeCompare(String(a.published_at ?? "")))[0];
-        if (!found) return { product: id, released: false, url: `https://github.com/${repo}/releases?q=${prefix.slice(0, -2)}` };
-        const assets = Array.isArray(found.assets) ? (found.assets as Record<string, unknown>[]) : [];
+            .sort((a, b) =>
+                String(b.published_at ?? "").localeCompare(String(a.published_at ?? ""))
+            )[0];
+        if (!found)
+            return {
+                product: id,
+                released: false,
+                url: `https://github.com/${repo}/releases?q=${prefix.slice(0, -2)}`
+            };
+        const assets = Array.isArray(found.assets)
+            ? (found.assets as Record<string, unknown>[])
+            : [];
         return {
             product: id,
             released: true,
@@ -313,7 +351,11 @@ export function downloadEntries(releases: readonly ReleaseInput[], repo: string)
             url: found.html_url as string,
             publishedAt: typeof found.published_at === "string" ? found.published_at : null,
             files: assets
-                .filter((asset) => typeof asset?.name === "string" && typeof asset?.browser_download_url === "string")
+                .filter(
+                    (asset) =>
+                        typeof asset?.name === "string" &&
+                        typeof asset?.browser_download_url === "string"
+                )
                 .map((asset) => ({
                     name: asset.name as string,
                     url: asset.browser_download_url as string,
@@ -361,9 +403,9 @@ export function apiOperations(doc: Json): { tag: string; operations: ApiOperatio
             const op = item[method] as Json | undefined;
             if (!op) continue;
             const params = (Array.isArray(op.parameters) ? op.parameters : []) as Json[];
-            const body = ((op.requestBody as Json | undefined)?.content as Json | undefined)?.["application/json"] as
-                | Json
-                | undefined;
+            const body = ((op.requestBody as Json | undefined)?.content as Json | undefined)?.[
+                "application/json"
+            ] as Json | undefined;
             operations.push({
                 id: String(op.operationId ?? `${method}-${path}`),
                 method: method.toUpperCase(),
@@ -379,18 +421,23 @@ export function apiOperations(doc: Json): { tag: string; operations: ApiOperatio
                     description: String(param.description ?? "")
                 })),
                 body: body?.schema ? JSON.stringify(body.schema, null, 2) : null,
-                responses: Object.entries((op.responses ?? {}) as Record<string, Json>).map(([status, value]) => ({
-                    status,
-                    description: String(value?.description ?? "")
-                }))
+                responses: Object.entries((op.responses ?? {}) as Record<string, Json>).map(
+                    ([status, value]) => ({
+                        status,
+                        description: String(value?.description ?? "")
+                    })
+                )
             });
         }
     }
     const order = ((doc.tags ?? []) as Json[]).map((tag) => String(tag.name));
     const groups = new Map<string, ApiOperation[]>();
     for (const tag of order) groups.set(tag, []);
-    for (const op of operations) (groups.get(op.tag) ?? groups.set(op.tag, []).get(op.tag)!).push(op);
-    return [...groups].filter(([, ops]) => ops.length).map(([tag, ops]) => ({ tag, operations: ops }));
+    for (const op of operations)
+        (groups.get(op.tag) ?? groups.set(op.tag, []).get(op.tag)!).push(op);
+    return [...groups]
+        .filter(([, ops]) => ops.length)
+        .map(([tag, ops]) => ({ tag, operations: ops }));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -429,11 +476,17 @@ export function guideItemFor(product: ProductId, fileName: string): GuideItemId 
 }
 
 /** The guide items, as `@polaris/ui/install-guide-steps` names them. */
-export type GuideItemId = "streamdeck" | "companion" | "extension-chromium" | "extension-firefox" | "desktop";
+export type GuideItemId =
+    "streamdeck" | "companion" | "extension-chromium" | "extension-firefox" | "desktop";
 
 /** A message with `{name}` placeholders filled in. */
-export function fill(message: string, values: Readonly<Record<string, string | number>> = {}): string {
-    return message.replace(/\{(\w+)\}/g, (whole, key: string) => (key in values ? String(values[key]) : whole));
+export function fill(
+    message: string,
+    values: Readonly<Record<string, string | number>> = {}
+): string {
+    return message.replace(/\{(\w+)\}/g, (whole, key: string) =>
+        key in values ? String(values[key]) : whole
+    );
 }
 
 export interface SiteData {

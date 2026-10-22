@@ -68,7 +68,10 @@ export function GuideFile({
                     art: step.art,
                     label: fill(guide.step, { n: index + 1 }),
                     title: guide.steps[step.id] ?? step.id,
-                    body: fill(guide.items[item]?.[step.id] ?? "", { file: fileName, app: "Polaris" })
+                    body: fill(guide.items[item]?.[step.id] ?? "", {
+                        file: fileName,
+                        app: "Polaris"
+                    })
                 }))
             }}
         >

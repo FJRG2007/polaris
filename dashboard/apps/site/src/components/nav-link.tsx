@@ -11,7 +11,15 @@ import { usePathname } from "next/navigation";
 
 const trim = (path: string) => path.replace(/\/+$/, "");
 
-export function NavLink({ href, className, children }: { href: string; className: string; children: ReactNode }) {
+export function NavLink({
+    href,
+    className,
+    children
+}: {
+    href: string;
+    className: string;
+    children: ReactNode;
+}) {
     const current = trim(usePathname() ?? "") === trim(href);
     return (
         <Link href={href} className={className} aria-current={current ? "page" : undefined}>

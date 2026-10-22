@@ -95,7 +95,10 @@ export function StorePreview({
     return (
         <div className={box}>
             <div
-                className={cn(frame, "flex flex-col items-center justify-center gap-2 p-4 text-center")}
+                className={cn(
+                    frame,
+                    "flex flex-col items-center justify-center gap-2 p-4 text-center"
+                )}
                 style={{ backgroundColor: tint, color: ink }}
                 data-preview="placeholder"
                 role="img"
@@ -193,7 +196,12 @@ export function StoreCard({
                     </p>
                 </div>
             </div>
-            <p className={cn("text-sm text-muted-foreground", featured ? "line-clamp-3" : "line-clamp-2")}>
+            <p
+                className={cn(
+                    "text-sm text-muted-foreground",
+                    featured ? "line-clamp-3" : "line-clamp-2"
+                )}
+            >
                 {summary}
             </p>
             <div className="flex min-w-0 flex-wrap gap-1">{badges}</div>

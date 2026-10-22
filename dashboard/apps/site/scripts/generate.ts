@@ -19,7 +19,14 @@ import { initialsInk, tintFor } from "@polaris/core";
 import { appPreview } from "@/lib/apps/app-screenshots";
 import { appProvenance } from "@/lib/apps/provenance";
 import { catalogApps, isOffered } from "@/lib/apps/catalog";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+    copyFileSync,
+    existsSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    writeFileSync
+} from "node:fs";
 import * as site from "../src/data/builders";
 
 const siteDir = process.env.POLARIS_SITE_DIR ?? join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,15 +41,21 @@ const read = (path: string) => readFileSync(path, "utf8");
 
 /** The newest releases, or none when GitHub cannot be reached. */
 async function releases(): Promise<site.ReleaseInput[]> {
-    const headers: Record<string, string> = { accept: "application/vnd.github+json", "user-agent": "polaris-site" };
+    const headers: Record<string, string> = {
+        accept: "application/vnd.github+json",
+        "user-agent": "polaris-site"
+    };
     if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
     try {
         const all: site.ReleaseInput[] = [];
         for (let page = 1; page <= 3; page++) {
-            const response = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}`, {
-                headers,
-                signal: AbortSignal.timeout(15000)
-            });
+            const response = await fetch(
+                `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}`,
+                {
+                    headers,
+                    signal: AbortSignal.timeout(15000)
+                }
+            );
             if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
             const batch = (await response.json()) as site.ReleaseInput[];
             all.push(...batch);
@@ -50,7 +63,9 @@ async function releases(): Promise<site.ReleaseInput[]> {
         }
         return all;
     } catch (error) {
-        console.warn(`[site] releases unavailable, downloads link to the release pages: ${String(error)}`);
+        console.warn(
+            `[site] releases unavailable, downloads link to the release pages: ${String(error)}`
+        );
         return [];
     }
 }
@@ -109,9 +124,17 @@ const info = (openapi.info ?? {}) as { title?: string; description?: string };
 const data: site.SiteData = {
     repo,
     install: site.parseInstallLines(readmeEn),
-    cli: { unix: cliInstallLine("linux", repo).command, windows: cliInstallLine("windows", repo).command },
+    cli: {
+        unix: cliInstallLine("linux", repo).command,
+        windows: cliInstallLine("windows", repo).command
+    },
     locales: {
-        en: { apps: site.siteApps(catalog, "en", words("en-US")), replaces: replacesEn, showcase: localize(site.parseShowcase(readmeEn), "en"), guide: guide("en-US") },
+        en: {
+            apps: site.siteApps(catalog, "en", words("en-US")),
+            replaces: replacesEn,
+            showcase: localize(site.parseShowcase(readmeEn), "en"),
+            guide: guide("en-US")
+        },
         es: {
             apps: site.siteApps(catalog, "es", words("es-ES")),
             // The English table stands in if the Spanish README ever loses its own.
@@ -138,16 +161,22 @@ writeFileSync(join(siteDir, "public", "openapi.json"), JSON.stringify(openapi, n
 const pictures = new Set<string>();
 for (const locale of Object.values(data.locales))
     for (const section of locale.showcase)
-        for (const item of section.items) for (const file of [item.dark, item.light]) if (file) pictures.add(file);
-for (const file of pictures) copyFileSync(join(media, file), join(siteDir, "public", "media", file));
-for (const file of logos) copyFileSync(join(logosDir, file), join(siteDir, "public", "logos", file));
+        for (const item of section.items)
+            for (const file of [item.dark, item.light]) if (file) pictures.add(file);
+for (const file of pictures)
+    copyFileSync(join(media, file), join(siteDir, "public", "media", file));
+for (const file of logos)
+    copyFileSync(join(logosDir, file), join(siteDir, "public", "logos", file));
 // The marketplace captures, from the dashboard's own public folder.
 mkdirSync(join(siteDir, "public", "marketplace"), { recursive: true });
 for (const app of catalog)
     for (const shot of Object.values(app.shots))
         for (const theme of shot ? [shot.dark, shot.light] : [])
-            for (const path of [theme.desktop, theme.mobile]) copyFileSync(join(web, "public", path), join(siteDir, "public", path));
+            for (const path of [theme.desktop, theme.mobile])
+                copyFileSync(join(web, "public", path), join(siteDir, "public", path));
 
 const operations = data.api.groups.reduce((sum, group) => sum + group.operations.length, 0);
 const released = data.downloads.filter((entry) => entry.released).length;
-console.log(`[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} API operations, ${released} released products`);
+console.log(
+    `[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} API operations, ${released} released products`
+);

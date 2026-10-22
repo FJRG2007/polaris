@@ -8,7 +8,8 @@
  */
 
 /** A file that opens the guide once its download has started. */
-export type GuideItem = "streamdeck" | "companion" | "extension-chromium" | "extension-firefox" | "desktop";
+export type GuideItem =
+    "streamdeck" | "companion" | "extension-chromium" | "extension-firefox" | "desktop";
 
 /** Every item, in the order the catalogs list them. */
 export const GUIDE_ITEMS: readonly GuideItem[] = [

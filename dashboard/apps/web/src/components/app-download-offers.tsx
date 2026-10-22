@@ -32,7 +32,8 @@ export function DesktopDownloadOffer({ download }: { download: AppDownload | nul
             <div>
                 <Button asChild variant="secondary">
                     <a href={download.url} target="_blank" rel="noreferrer">
-                        <Download className="size-4" /> {t("downloads.desktopVersion", { version: download.version })}
+                        <Download className="size-4" />{" "}
+                        {t("downloads.desktopVersion", { version: download.version })}
                     </a>
                 </Button>
             </div>
@@ -62,7 +63,8 @@ export function ExtensionDownloadOffer({ download }: { download: AppDownload | n
                 {download ? (
                     <Button asChild size="sm">
                         <a href={download.url} target="_blank" rel="noreferrer">
-                            <Download className="size-4" /> {t("downloads.version", { version: download.version })}
+                            <Download className="size-4" />{" "}
+                            {t("downloads.version", { version: download.version })}
                         </a>
                     </Button>
                 ) : (
@@ -121,7 +123,12 @@ const EXTENSION_ROWS: readonly PlatformRow[] = [
     // The sources archive WXT writes beside the Firefox package is a zip with
     // "firefox" nowhere in it, but the add-on and the sources both sit on the same
     // release - so the add-on is the one that is not the sources.
-    { platform: "chromium", has: [".zip", "chrome"], not: ["sources"], guide: "extension-chromium" },
+    {
+        platform: "chromium",
+        has: [".zip", "chrome"],
+        not: ["sources"],
+        guide: "extension-chromium"
+    },
     { platform: "firefox", has: [".zip", "firefox"], not: ["sources"], guide: "extension-firefox" }
 ];
 
@@ -131,7 +138,9 @@ function PlatformFile({ row, file }: { row: PlatformRow; file: AppFile | null })
     return (
         <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
             <div className="min-w-0">
-                <p className="text-sm">{t(`downloads.platforms.${row.platform}` as NamespaceKey<"components">)}</p>
+                <p className="text-sm">
+                    {t(`downloads.platforms.${row.platform}` as NamespaceKey<"components">)}
+                </p>
                 {row.note ? (
                     <p className="text-xs text-muted-foreground">
                         {t(`downloads.notes.${row.note}` as NamespaceKey<"components">)}
@@ -145,7 +154,9 @@ function PlatformFile({ row, file }: { row: PlatformRow; file: AppFile | null })
             ) : (
                 // Named rather than hidden: a build missing from a release that has
                 // the others is something to notice, not something to smooth over.
-                <span className="shrink-0 text-xs text-muted-foreground">{t("downloads.notInRelease")}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                    {t("downloads.notInRelease")}
+                </span>
             )}
         </div>
     );
@@ -196,11 +207,23 @@ function PlatformList({
 /** The desktop app, one installer per platform. */
 export function DesktopFilesOffer({ download }: { download: AppDownload | null }) {
     const t = useTranslations("components");
-    return <PlatformList rows={DESKTOP_ROWS} download={download} nothing={t("downloads.noDesktopVersion")} />;
+    return (
+        <PlatformList
+            rows={DESKTOP_ROWS}
+            download={download}
+            nothing={t("downloads.noDesktopVersion")}
+        />
+    );
 }
 
 /** The extension, one package per browser. */
 export function ExtensionFilesOffer({ download }: { download: AppDownload | null }) {
     const t = useTranslations("components");
-    return <PlatformList rows={EXTENSION_ROWS} download={download} nothing={t("downloads.noExtensionVersion")} />;
+    return (
+        <PlatformList
+            rows={EXTENSION_ROWS}
+            download={download}
+            nothing={t("downloads.noExtensionVersion")}
+        />
+    );
 }

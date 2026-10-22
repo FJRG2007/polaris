@@ -41,9 +41,15 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                         {entry.product === "cli" ? (
                             <DownloadRows>
                                 {[data.cli.unix, data.cli.windows].map((command) => (
-                                    <DownloadRow key={command} mark={<span className="text-xs">$</span>} name={command.startsWith("irm") ? "PowerShell" : "Terminal"}>
+                                    <DownloadRow
+                                        key={command}
+                                        mark={<span className="text-xs">$</span>}
+                                        name={command.startsWith("irm") ? "PowerShell" : "Terminal"}
+                                    >
                                         <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-                                            <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs">{command}</code>
+                                            <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs">
+                                                {command}
+                                            </code>
                                             <CopyButton value={command} />
                                         </div>
                                     </DownloadRow>
@@ -54,7 +60,9 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                         {entry.released ? (
                             <>
                                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Badge variant="neutral">{fill(t.version, { version: entry.version })}</Badge>
+                                    <Badge variant="neutral">
+                                        {fill(t.version, { version: entry.version })}
+                                    </Badge>
                                     <a className="underline" href={entry.url}>
                                         {t.notes}
                                     </a>
@@ -64,11 +72,18 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                                         {entry.files.map((file) => (
                                             <DownloadRow
                                                 key={file.url}
-                                                mark={<span className="text-[10px] uppercase">{file.name.split(".").pop()}</span>}
+                                                mark={
+                                                    <span className="text-[10px] uppercase">
+                                                        {file.name.split(".").pop()}
+                                                    </span>
+                                                }
                                                 name={file.name}
                                                 action={
                                                     <GuideFile
-                                                        item={guideItemFor(entry.product, file.name)}
+                                                        item={guideItemFor(
+                                                            entry.product,
+                                                            file.name
+                                                        )}
                                                         href={file.url}
                                                         fileName={file.name}
                                                         label={t.download}
@@ -85,7 +100,10 @@ export function DownloadsView({ locale }: { locale: SiteLocale }) {
                                 <p className="text-sm text-muted-foreground">
                                     <Badge variant="neutral">{t.none}</Badge> {t.noneHint}
                                 </p>
-                                <a className={`${buttonVariants({ variant: "secondary", size: "sm" })} self-start`} href={entry.url}>
+                                <a
+                                    className={`${buttonVariants({ variant: "secondary", size: "sm" })} self-start`}
+                                    href={entry.url}
+                                >
                                     {t.releases}
                                 </a>
                             </div>

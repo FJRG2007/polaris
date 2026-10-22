@@ -19,7 +19,10 @@ function Markup({ html }: { html: string }) {
 function withBase(shot: store.StoreShot | null): store.StoreShot | null {
     if (!shot) return null;
     const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-    const theme = (entry: store.StoreShot["dark"]) => ({ desktop: base + entry.desktop, mobile: base + entry.mobile });
+    const theme = (entry: store.StoreShot["dark"]) => ({
+        desktop: base + entry.desktop,
+        mobile: base + entry.mobile
+    });
     return { dark: theme(shot.dark), light: theme(shot.light) };
 }
 
@@ -37,7 +40,10 @@ export function MarketplaceGrid({ apps, t }: { apps: readonly SiteApp[]; t: Mark
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState("");
     const shown = apps.filter((app) => matchesApp(app, query, category));
-    const options = [{ value: "", label: t.all }, ...siteCategories(apps).map((entry) => ({ value: entry.id, label: entry.label }))];
+    const options = [
+        { value: "", label: t.all },
+        ...siteCategories(apps).map((entry) => ({ value: entry.id, label: entry.label }))
+    ];
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-3">
@@ -50,12 +56,21 @@ export function MarketplaceGrid({ apps, t }: { apps: readonly SiteApp[]; t: Mark
                     className="w-full sm:w-72"
                 />
                 <div className="max-w-full overflow-x-auto">
-                    <SegmentedControl value={category} onValueChange={setCategory} options={options} aria-label={t.all} />
+                    <SegmentedControl
+                        value={category}
+                        onValueChange={setCategory}
+                        options={options}
+                        aria-label={t.all}
+                    />
                 </div>
-                <span className="text-xs text-muted-foreground">{fill(t.count, { n: shown.length })}</span>
+                <span className="text-xs text-muted-foreground">
+                    {fill(t.count, { n: shown.length })}
+                </span>
             </div>
             {shown.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">{t.empty}</p>
+                <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                    {t.empty}
+                </p>
             ) : (
                 <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {shown.map((app) => (
@@ -84,7 +99,11 @@ export function MarketplaceGrid({ apps, t }: { apps: readonly SiteApp[]; t: Mark
                                 summary={app.summary}
                                 badges={<Badge>{app.categoryLabel}</Badge>}
                                 status={<Badge>{app.builtin ? t.builtin : t.optional}</Badge>}
-                                actions={app.comingSoon ? <Badge className="text-muted-foreground">{t.soon}</Badge> : null}
+                                actions={
+                                    app.comingSoon ? (
+                                        <Badge className="text-muted-foreground">{t.soon}</Badge>
+                                    ) : null
+                                }
                             />
                         </li>
                     ))}

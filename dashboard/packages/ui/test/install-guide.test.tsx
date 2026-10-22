@@ -8,8 +8,17 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { GuideDownloadLink, InstallGuideDialog, type InstallGuideContent } from "../src/downloads/install-guide";
-import { detectGuideBrowser, detectGuideOs, GUIDE_ITEMS, guideSteps } from "../src/downloads/install-guide-steps";
+import {
+    GuideDownloadLink,
+    InstallGuideDialog,
+    type InstallGuideContent
+} from "../src/downloads/install-guide";
+import {
+    detectGuideBrowser,
+    detectGuideOs,
+    GUIDE_ITEMS,
+    guideSteps
+} from "../src/downloads/install-guide-steps";
 
 afterEach(cleanup);
 
@@ -35,9 +44,17 @@ describe("guideSteps", () => {
     });
 
     it("draws an extension in the browser's toolbar and everything else on the system's dock", () => {
-        expect(guideSteps("extension-chromium").map((step) => step.art)).toEqual(["download", "progress", "toolbar"]);
+        expect(guideSteps("extension-chromium").map((step) => step.art)).toEqual([
+            "download",
+            "progress",
+            "toolbar"
+        ]);
         expect(guideSteps("extension-firefox")[2].art).toBe("toolbar");
-        expect(guideSteps("streamdeck").map((step) => step.art)).toEqual(["download", "progress", "dock"]);
+        expect(guideSteps("streamdeck").map((step) => step.art)).toEqual([
+            "download",
+            "progress",
+            "dock"
+        ]);
         expect(guideSteps("companion")[2].art).toBe("dock");
         expect(guideSteps("desktop")[2].art).toBe("dock");
     });
@@ -51,8 +68,12 @@ describe("detection", () => {
     });
 
     it("prefers client hints, so Brave and Edge count as Chromium", () => {
-        expect(detectGuideBrowser("Mozilla/5.0", { brands: [{ brand: "Brave" }] })).toBe("chromium");
-        expect(detectGuideBrowser("Mozilla/5.0", { brands: [{ brand: "Microsoft Edge" }] })).toBe("chromium");
+        expect(detectGuideBrowser("Mozilla/5.0", { brands: [{ brand: "Brave" }] })).toBe(
+            "chromium"
+        );
+        expect(detectGuideBrowser("Mozilla/5.0", { brands: [{ brand: "Microsoft Edge" }] })).toBe(
+            "chromium"
+        );
         expect(detectGuideOs("Mozilla/5.0", { platform: "macOS" })).toBe("macos");
     });
 
@@ -82,7 +103,15 @@ const content: InstallGuideContent = {
 
 describe("InstallGuideDialog", () => {
     it("shows the three steps with the file in the download list", () => {
-        render(<InstallGuideDialog open onOpenChange={() => {}} content={content} browser="firefox" os="macos" />);
+        render(
+            <InstallGuideDialog
+                open
+                onOpenChange={() => {}}
+                content={content}
+                browser="firefox"
+                os="macos"
+            />
+        );
         expect(screen.getByText("Install and open it")).toBeTruthy();
         expect(screen.getAllByRole("listitem")).toHaveLength(3);
         expect(screen.getByText("Step 3")).toBeTruthy();
@@ -92,18 +121,37 @@ describe("InstallGuideDialog", () => {
     });
 
     it("stacks the cards on a phone and sets them side by side from sm up", () => {
-        render(<InstallGuideDialog open onOpenChange={() => {}} content={content} browser="neutral" os="neutral" />);
+        render(
+            <InstallGuideDialog
+                open
+                onOpenChange={() => {}}
+                content={content}
+                browser="neutral"
+                os="neutral"
+            />
+        );
         const list = screen.getAllByRole("listitem")[0].parentElement!;
         expect(list.className).toContain("grid-cols-1");
         expect(list.className).toContain("sm:grid-cols-3");
     });
 
     it("moves nothing unless motion is allowed", () => {
-        render(<InstallGuideDialog open onOpenChange={() => {}} content={content} browser="chromium" os="windows" />);
+        render(
+            <InstallGuideDialog
+                open
+                onOpenChange={() => {}}
+                content={content}
+                browser="chromium"
+                os="windows"
+            />
+        );
         const moving = Array.from(document.querySelectorAll("[data-motion]"));
         expect(moving.length).toBeGreaterThanOrEqual(3);
         for (const element of moving) {
-            const animations = element.getAttribute("class")!.split(/\s+/).filter((name) => name.includes("animate"));
+            const animations = element
+                .getAttribute("class")!
+                .split(/\s+/)
+                .filter((name) => name.includes("animate"));
             expect(animations.length).toBeGreaterThan(0);
             for (const name of animations) expect(name.startsWith("motion-safe:")).toBe(true);
         }

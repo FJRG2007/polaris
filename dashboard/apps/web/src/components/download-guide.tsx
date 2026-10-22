@@ -18,7 +18,11 @@ import { GUIDE_KEY_ROOT, guideSteps, type GuideItem } from "@polaris/ui/install-
 const APP_NAME = "Polaris";
 
 /** The guide's words for one item and one file, translated here. */
-export function useGuideContent(item: GuideItem, href: string, fileName: string): InstallGuideContent {
+export function useGuideContent(
+    item: GuideItem,
+    href: string,
+    fileName: string
+): InstallGuideContent {
     const t = useTranslations("account");
     const key = (rest: string) => `${GUIDE_KEY_ROOT}.${rest}` as NamespaceKey<"account">;
     return {

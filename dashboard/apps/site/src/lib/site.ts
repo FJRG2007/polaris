@@ -21,7 +21,9 @@ let cached: SiteData | null = null;
 
 /** The data `npm run generate` wrote; the build fails loudly without it. */
 export function siteData(): SiteData {
-    cached ??= JSON.parse(readFileSync(join(process.cwd(), "generated", "site-data.json"), "utf8")) as SiteData;
+    cached ??= JSON.parse(
+        readFileSync(join(process.cwd(), "generated", "site-data.json"), "utf8")
+    ) as SiteData;
     return cached;
 }
 

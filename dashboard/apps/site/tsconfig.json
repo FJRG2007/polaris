@@ -1,45 +1,26 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "jsx": "preserve",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "noEmit": true,
-    "declaration": false,
-    "declarationMap": false,
-    "incremental": true,
-    "isolatedModules": true,
-    "types": [
-      "node",
-      "react",
-      "react-dom"
-    ],
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "jsx": "preserve",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "noEmit": true,
+        "declaration": false,
+        "declarationMap": false,
+        "incremental": true,
+        "isolatedModules": true,
+        "types": ["node", "react", "react-dom"],
+        "plugins": [
+            {
+                "name": "next"
+            }
+        ],
+        "paths": {
+            "@/*": ["./src/*"]
+        },
+        "allowJs": true
     },
-    "allowJs": true
-  },
-  "include": [
-    "next-env.d.ts",
-    "src",
-    "test",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "generated",
-    "scripts"
-  ]
+    "include": ["next-env.d.ts", "src", "test", ".next/types/**/*.ts"],
+    "exclude": ["node_modules", "generated", "scripts"]
 }

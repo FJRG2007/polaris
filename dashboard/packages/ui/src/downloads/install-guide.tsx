@@ -18,8 +18,19 @@
 import { cn } from "../lib/cn";
 import { Download, MousePointer2, Puzzle } from "lucide-react";
 import { useState, type MouseEvent, type ReactNode } from "react";
-import { detectGuideEnv, type GuideArt, type GuideBrowser, type GuideOs } from "./install-guide-steps";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/dialog";
+import {
+    detectGuideEnv,
+    type GuideArt,
+    type GuideBrowser,
+    type GuideOs
+} from "./install-guide-steps";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from "../components/dialog";
 
 /** One step, in the words the reader sees. */
 export interface GuideStepView {
@@ -53,7 +64,11 @@ function Pointer({ className }: { className?: string }) {
     return (
         <MousePointer2
             data-motion="pointer"
-            className={cn("absolute size-4 fill-foreground text-background drop-shadow", POINTER, className)}
+            className={cn(
+                "absolute size-4 fill-foreground text-background drop-shadow",
+                POINTER,
+                className
+            )}
         />
     );
 }
@@ -63,13 +78,24 @@ function Ring() {
     return (
         <span
             data-motion="pulse"
-            className={cn("absolute inset-0 rounded-full border-2 border-primary opacity-60", PULSE)}
+            className={cn(
+                "absolute inset-0 rounded-full border-2 border-primary opacity-60",
+                PULSE
+            )}
         />
     );
 }
 
 /** The browser's download list, where that browser keeps it. */
-function DownloadArt({ browser, fileName, doneLabel }: { browser: GuideBrowser; fileName: string; doneLabel: string }) {
+function DownloadArt({
+    browser,
+    fileName,
+    doneLabel
+}: {
+    browser: GuideBrowser;
+    fileName: string;
+    doneLabel: string;
+}) {
     const firefox = browser === "firefox";
     const safari = browser === "safari";
     return (
@@ -104,7 +130,10 @@ function DownloadArt({ browser, fileName, doneLabel }: { browser: GuideBrowser; 
                         <Download className="size-3" />
                     </span>
                     <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11px] font-medium text-foreground" title={fileName}>
+                        <p
+                            className="truncate text-[11px] font-medium text-foreground"
+                            title={fileName}
+                        >
                             {fileName}
                         </p>
                         <p className="text-[10px] text-muted-foreground">{doneLabel}</p>
@@ -123,7 +152,10 @@ function ProgressArt({ appName }: { appName: string }) {
             <div className="flex h-6 items-center gap-1 border-b border-border px-2">
                 <span className="size-1.5 rounded-full bg-foreground-subtle/50" />
                 <span className="size-1.5 rounded-full bg-foreground-subtle/50" />
-                <span className="ml-1 min-w-0 truncate text-[10px] text-muted-foreground" title={appName}>
+                <span
+                    className="ml-1 min-w-0 truncate text-[10px] text-muted-foreground"
+                    title={appName}
+                >
                     {appName}
                 </span>
             </div>
@@ -160,7 +192,10 @@ function DockArt({ os, appName }: { os: GuideOs; appName: string }) {
         // A side dock, the way the most common desktops draw one.
         return (
             <div className="absolute inset-3 overflow-hidden rounded-lg border border-border bg-background">
-                <div data-os="linux" className="absolute inset-y-0 left-0 flex w-10 flex-col items-center justify-center gap-2 bg-surface">
+                <div
+                    data-os="linux"
+                    className="absolute inset-y-0 left-0 flex w-10 flex-col items-center justify-center gap-2 bg-surface"
+                >
                     {icons}
                     <AppTile appName={appName} />
                 </div>
@@ -199,9 +234,25 @@ function ToolbarArt({ appName }: { appName: string }) {
     );
 }
 
-function StepArt({ art, content, browser, os }: { art: GuideArt; content: InstallGuideContent; browser: GuideBrowser; os: GuideOs }) {
+function StepArt({
+    art,
+    content,
+    browser,
+    os
+}: {
+    art: GuideArt;
+    content: InstallGuideContent;
+    browser: GuideBrowser;
+    os: GuideOs;
+}) {
     if (art === "download")
-        return <DownloadArt browser={browser} fileName={content.fileName} doneLabel={content.doneLabel} />;
+        return (
+            <DownloadArt
+                browser={browser}
+                fileName={content.fileName}
+                doneLabel={content.doneLabel}
+            />
+        );
     if (art === "progress") return <ProgressArt appName={content.appName} />;
     if (art === "toolbar") return <ToolbarArt appName={content.appName} />;
     return <DockArt os={os} appName={content.appName} />;
@@ -231,13 +282,23 @@ export function InstallGuideDialog({
                 {/* Side by side from `sm` up; stacked on a phone. */}
                 <ol className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
                     {content.steps.map((step) => (
-                        <li key={step.label} className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+                        <li
+                            key={step.label}
+                            className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card"
+                        >
                             <div aria-hidden className="relative h-36 bg-surface">
-                                <StepArt art={step.art} content={content} browser={browser} os={os} />
+                                <StepArt
+                                    art={step.art}
+                                    content={content}
+                                    browser={browser}
+                                    os={os}
+                                />
                             </div>
                             <div className="flex min-w-0 flex-col gap-0.5 p-3">
                                 <p className="text-xs text-muted-foreground">{step.label}</p>
-                                <p className="text-sm font-semibold text-foreground">{step.title}</p>
+                                <p className="text-sm font-semibold text-foreground">
+                                    {step.title}
+                                </p>
                                 <p className="text-sm text-muted-foreground">{step.body}</p>
                             </div>
                         </li>
@@ -267,7 +328,10 @@ export function GuideDownloadLink({
     children: ReactNode;
 }) {
     const [open, setOpen] = useState(false);
-    const [env, setEnv] = useState<{ browser: GuideBrowser; os: GuideOs }>({ browser: "neutral", os: "neutral" });
+    const [env, setEnv] = useState<{ browser: GuideBrowser; os: GuideOs }>({
+        browser: "neutral",
+        os: "neutral"
+    });
     const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
         // A press that opens the file somewhere else is not a download here.
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -277,10 +341,23 @@ export function GuideDownloadLink({
     return (
         <>
             {/* A plain link: a router link would prefetch the file. */}
-            <a href={href} download rel="noreferrer" className={className} title={title} onClick={onClick}>
+            <a
+                href={href}
+                download
+                rel="noreferrer"
+                className={className}
+                title={title}
+                onClick={onClick}
+            >
                 {children}
             </a>
-            <InstallGuideDialog open={open} onOpenChange={setOpen} content={content} browser={env.browser} os={env.os} />
+            <InstallGuideDialog
+                open={open}
+                onOpenChange={setOpen}
+                content={content}
+                browser={env.browser}
+                os={env.os}
+            />
         </>
     );
 }
