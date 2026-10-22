@@ -20,7 +20,9 @@ function popoverAt(top: number, height: number, offsetTop = 0): HTMLElement {
     element.style.top = `${top - offsetTop}px`;
     element.getBoundingClientRect = () => {
         const placed = (Number.parseFloat(element.style.top) || 0) + offsetTop;
-        const capped = element.style.maxHeight ? Number.parseFloat(element.style.maxHeight) : height;
+        const capped = element.style.maxHeight
+            ? Number.parseFloat(element.style.maxHeight)
+            : height;
         const shown = Math.min(height, capped);
         return { top: placed, bottom: placed + shown, height: shown } as DOMRect;
     };
