@@ -26,6 +26,11 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/chat/chat-service", () => ({
     unreadTotal: async () => ({ messages: 7, conversations: 2 })
 }));
+vi.mock("@/lib/chat/chat-guard", () => ({ guardChat: async () => ({ value: null }) }));
+vi.mock("@/lib/chat/call-remote-service", () => ({
+    liveCallOf: async () => null,
+    deckSounds: async () => []
+}));
 vi.mock("@/lib/presence-service", () => ({
     presenceChoiceOf: async () => ({
         choice: presence,

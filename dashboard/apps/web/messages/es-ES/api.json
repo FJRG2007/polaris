@@ -297,7 +297,7 @@
             "removed": "Eliminado"
         },
         "call": {
-            "none": "Sin llamada",
+            "none": "Colgado",
             "inCall": "En llamada",
             "mic": {
                 "on": "Silencio",

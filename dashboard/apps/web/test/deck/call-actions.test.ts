@@ -74,7 +74,7 @@ describe("out of a call", () => {
         for (const entry of callDeckActions()) {
             expect(await entry.read!({}, caller())).toEqual({ tone: "idle", detail: "No call" });
         }
-        expect(noCallState("es-ES")).toEqual({ tone: "idle", detail: "Sin llamada" });
+        expect(noCallState("es-ES")).toEqual({ tone: "idle", detail: "Colgado" });
     });
 
     it("a press does nothing and says why", async () => {
