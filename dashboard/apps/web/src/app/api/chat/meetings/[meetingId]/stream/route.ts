@@ -95,7 +95,9 @@ export async function GET(
                     kind: event.kind,
                     ...(event.deviceId ? { deviceId: event.deviceId } : {}),
                     ...(event.action ? { action: event.action } : {}),
-                    ...(event.remote ? { remote: event.remote } : {})
+                    // Only on its own kind, which the rule above already
+                    // narrowed to this seat.
+                    ...(event.kind === "remote" && event.remote ? { remote: event.remote } : {})
                 });
                 // The roster moving is the only thing that can admit somebody,
                 // and only a stream that is still waiting has to ask.
