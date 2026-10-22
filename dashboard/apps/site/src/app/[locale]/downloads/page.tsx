@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isLocale, words } from "@/lib/site";
+import { isLocale, words, pageMetadata } from "@/lib/site";
 import { DownloadsView } from "@/views/downloads";
 
 type Props = { params: Promise<{ locale: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { locale } = await params;
-    return isLocale(locale) ? { title: `${words(locale).downloads.title} - Polaris` } : {};
+    return isLocale(locale) ? pageMetadata(locale, {
+              title: words(locale).downloads.title,
+              description: words(locale).meta.downloads,
+              page: "downloads/"
+          }) : {};
 }
 
 export default async function Page({ params }: Props) {

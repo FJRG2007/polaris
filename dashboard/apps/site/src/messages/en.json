@@ -9,7 +9,11 @@
         "skip": "Skip to content"
     },
     "meta": {
-        "description": "Self-hosted platform to run your servers and your team from one place."
+        "description": "Self-hosted platform to run your servers and your team from one place.",
+        "marketplace": "Every app you can add to Polaris, with screenshots of each one.",
+        "downloads": "The browser extension, the CLI, the Stream Deck plugin and the desktop app for Polaris.",
+        "api": "Every Polaris route you can call with an API key, with examples in curl, JavaScript and Python.",
+        "ogAlt": "The Polaris interface"
     },
     "home": {
         "eyebrow": "Open source. Self-hosted. One install.",

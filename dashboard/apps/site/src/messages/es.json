@@ -9,7 +9,11 @@
         "skip": "Ir al contenido"
     },
     "meta": {
-        "description": "Plataforma autoalojada para llevar tus servidores y tu equipo desde un sitio."
+        "description": "Plataforma autoalojada para llevar tus servidores y tu equipo desde un solo sitio.",
+        "marketplace": "Todas las apps que puedes añadir a Polaris, con capturas de cada una.",
+        "downloads": "La extensión del navegador, la CLI, el plugin de Stream Deck y la app de escritorio de Polaris.",
+        "api": "Todas las rutas de Polaris que puedes llamar con una clave de API, con ejemplos en curl, JavaScript y Python.",
+        "ogAlt": "La interfaz de Polaris"
     },
     "home": {
         "eyebrow": "Código abierto. En tu servidor. Una instalación.",

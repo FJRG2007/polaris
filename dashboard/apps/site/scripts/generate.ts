@@ -218,6 +218,37 @@ for (const file of pictures)
     copyFileSync(join(media, file), join(siteDir, "public", "media", file));
 for (const file of logos)
     copyFileSync(join(logosDir, file), join(siteDir, "public", "logos", file));
+// The dashboard's own mark, so a tab, a home screen and a shared link show the
+// same Polaris icon the product does.
+copyFileSync(join(web, "src", "app", "icon.svg"), join(siteDir, "public", "icon.svg"));
+for (const file of [
+    "favicon.ico",
+    "apple-touch-icon.png",
+    "polaris-mark-192.png",
+    "polaris-mark-512.png"
+])
+    copyFileSync(join(web, "public", file), join(siteDir, "public", file));
+const base = process.env.SITE_BASE_PATH ?? "/polaris";
+writeFileSync(
+    join(siteDir, "public", "manifest.webmanifest"),
+    JSON.stringify(
+        {
+            name: "Polaris",
+            short_name: "Polaris",
+            start_url: `${base}/`,
+            display: "browser",
+            background_color: "#0b0c0e",
+            theme_color: "#0b0c0e",
+            icons: [
+                { src: `${base}/icon.svg`, sizes: "any", type: "image/svg+xml" },
+                { src: `${base}/polaris-mark-192.png`, sizes: "192x192", type: "image/png" },
+                { src: `${base}/polaris-mark-512.png`, sizes: "512x512", type: "image/png" }
+            ]
+        },
+        null,
+        2
+    ) + "\n"
+);
 // The marketplace captures, from the dashboard's own public folder.
 mkdirSync(join(siteDir, "public", "marketplace"), { recursive: true });
 for (const app of catalog)
