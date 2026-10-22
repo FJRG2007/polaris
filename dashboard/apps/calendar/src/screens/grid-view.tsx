@@ -23,6 +23,7 @@
 
 import * as time from "./time";
 import { GRID_CSS } from "./grid-css";
+import { keepPopoversInView } from "./popover-fit";
 import listPlugin from "@fullcalendar/list";
 import { KEYBOARD_CELLS } from "./grid-target";
 import { measureMonth, monthLimits, type MonthEvents, type MonthRoom } from "./month-rows";
@@ -192,6 +193,8 @@ export default function GridView(props: GridViewProps) {
     const calendar = useRef<FullCalendar>(null);
     const root = useRef<HTMLDivElement>(null);
     const fcView = FC_VIEWS[props.view];
+    // "+N more" on a day in the last row opened past the bottom of the screen.
+    useEffect(() => (root.current ? keepPopoversInView(root.current) : undefined), []);
     const propsRef = useRef(props);
     propsRef.current = props;
     /** What the grid itself has highlighted, so the screen's range is drawn once. */
