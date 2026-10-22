@@ -31,6 +31,7 @@ import { NukiLocalDialog } from "./nuki-local-dialog";
 import { RoomsDialog } from "./rooms-dialog";
 import { AccountOptionsDialog } from "./account-options-dialog";
 import * as kinds from "../../lib/device-kinds";
+import { batteryLine, batteryLow } from "../../lib/automation-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceAccountView } from "../../lib/device-accounts";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -665,8 +666,13 @@ const DeviceRow = memo(function DeviceRow({
                         {kinds.badgeText(device, t)}
                     </Badge>
                     <FilterChip air={device.air} />
-                    {device.batteryCritical && (
-                        <Badge className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink">
+                    {batteryLow(device) && (
+                        <Badge
+                            className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink"
+                            title={t("devicesView.batteryLowTitle", {
+                                percent: batteryLine(device)
+                            })}
+                        >
                             <BatteryLow className="size-3 shrink-0" />
                             {t("power.labels.battery")}
                         </Badge>

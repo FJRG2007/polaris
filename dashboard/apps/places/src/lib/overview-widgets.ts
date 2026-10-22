@@ -21,6 +21,7 @@
 import { placesT } from "./i18n";
 import { homeInstall } from "./access";
 import * as kinds from "./device-kinds";
+import { batteryLine, batteryLow } from "./automation-kinds";
 import { listDevices } from "./devices";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -179,8 +180,8 @@ export function deviceItem(
     if (device.batteryPercent !== null) {
         readings.push({
             label: t("overview.battery"),
-            value: `${device.batteryPercent}%`,
-            tone: device.batteryCritical ? "bad" : device.batteryPercent <= 20 ? "warn" : undefined
+            value: `${device.batteryPercent}% - ${t("devicePanel.batteryLine", { percent: batteryLine(device) })}`,
+            tone: device.batteryCritical ? "bad" : batteryLow(device) ? "warn" : undefined
         });
     }
 
