@@ -30,7 +30,8 @@
         "restore": "Restore",
         "delete": "Delete",
         "deleteConfirm": "Delete this file for good? It cannot be restored afterwards.",
-        "noneHeld": "No files in quarantine."
+        "noneHeld": "No files in quarantine.",
+        "noVolumes": "No app on this server keeps data in a volume yet, so there is nothing to scan."
     },
     "files": {
         "hint": "Record every file's fingerprint once, then check later what was added, removed or changed.",
@@ -97,7 +98,8 @@
             "app": "App",
             "agent": "Agent",
             "other": "Other"
-        }
+        },
+        "noApps": "No apps on this server yet."
     },
     "history": "Recent scans",
     "noScans": "No scans yet.",
@@ -150,5 +152,44 @@
     "deps": {
         "label": "{app} dependencies",
         "files": "Read from {files}"
+    },
+    "refreshFailed": "Could not refresh. Showing the last results.",
+    "focus": {
+        "fromAlert": "From your alert",
+        "attention": "Needs attention",
+        "onServer": "On {server}",
+        "scannedAt": "Scanned {when}",
+        "kind": {
+            "appImage": "App image",
+            "image": "Image",
+            "deps": "Dependencies"
+        },
+        "openApp": "Open app",
+        "rescan": "Scan again",
+        "close": "Close",
+        "showFindings": "Show findings",
+        "onlyNew": "Only new",
+        "newBadge": "New",
+        "technical": "Technical details",
+        "imageRef": "Image",
+        "scanId": "Reference",
+        "gone": "This scan is no longer kept. The newest scans of the server are below.",
+        "serverGone": "That server is no longer in Polaris. Showing another one.",
+        "running": "This scan has not finished yet. The page updates when it does.",
+        "loadFailed": "Could not open this scan. Try again.",
+        "appGone": "The app this scan was about has been removed since."
+    },
+    "verdict": {
+        "issues": "{count, plural, =0 {No known issues} one {# issue} other {# issues}}",
+        "fixAll": "All of them are fixed in a newer version.",
+        "fixSome": "{count, plural, one {# of them is fixed in a newer version.} other {# of them are fixed in a newer version.}}",
+        "fixNone": "None has a fix yet."
+    },
+    "next": {
+        "updateApp": "Update {app} to its newest version, then scan again.",
+        "updatePolaris": "Update Polaris from Settings, then scan again.",
+        "updateImage": "Run a newer version of this image, then scan again.",
+        "updateDeps": "Update these dependencies in the repository, then deploy again.",
+        "wait": "No fix is out yet. Scan again later to see if one has been released."
     }
 }

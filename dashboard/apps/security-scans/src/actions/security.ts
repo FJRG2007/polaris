@@ -137,3 +137,10 @@ export async function scheduleAction(input: unknown) {
         (await service()).setSchedule(parsed.data.targetId, parsed.data.everyHours)
     );
 }
+
+export async function focusAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.focusInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await service()).focusScan(parsed.data.scanId));
+}

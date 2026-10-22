@@ -34,7 +34,9 @@ export function findingsLabels(t: SecurityTranslator): VulnerabilityTableLabels 
         noMatch: t("findings.noMatch"),
         noFix: t("images.noFix"),
         severityName: (severity) => t(`images.severity.${severity}` as never),
-        openAdvisory: (id) => t("findings.openAdvisory", { id })
+        openAdvisory: (id) => t("findings.openAdvisory", { id }),
+        onlyNew: t("focus.onlyNew"),
+        newBadge: t("focus.newBadge")
     };
 }
 
