@@ -88,6 +88,12 @@ const nextConfig = {
     // it also covers the route types Next generates under .next/types, which exist
     // only after a build, so the checks job's `tsc` never sees them.
     eslint: { ignoreDuringBuilds: process.env.POLARIS_BUILD_SKIP_LINT === "1" },
+    // The same split for the type check, and for memory rather than time: Next
+    // type-checks in a child that inherits the compiler's heap cap, so the pair
+    // capped how much heap the compile could be given. dashboard-ci.yml sets this
+    // only on a build it follows with `tsc` over the same tsconfig, which still
+    // reads the route types under .next/types - nothing goes unchecked.
+    typescript: { ignoreBuildErrors: process.env.POLARIS_BUILD_SKIP_TYPECHECK === "1" },
     transpilePackages: ["@polaris/ui", "@polaris/file-parse", "@polaris/app-host"],
     serverExternalPackages: [
         "@prisma/client",

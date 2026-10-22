@@ -484,7 +484,7 @@ function RulePreview({
                         {t("rules.preview", { count: adding.length })}
                     </span>
                     <ul
-                        className="flex max-h-32 min-w-0 flex-wrap gap-1 overflow-y-auto"
+                        className="flex max-h-32 min-w-0 flex-wrap gap-1 overflow-y-auto overscroll-contain"
                         aria-label={t("rules.preview", { count: adding.length })}
                     >
                         {adding.slice(0, PREVIEW_MAX).map((rule) => (
@@ -512,7 +512,7 @@ function RulePreview({
                         {t("rules.skipped", { count: left.length })}
                     </span>
                     <ul
-                        className="flex max-h-32 min-w-0 flex-col gap-0.5 overflow-y-auto"
+                        className="flex max-h-32 min-w-0 flex-col gap-0.5 overflow-y-auto overscroll-contain"
                         aria-label={t("rules.skipped", { count: left.length })}
                     >
                         {left.slice(0, PREVIEW_MAX).map((entry, index) => (
