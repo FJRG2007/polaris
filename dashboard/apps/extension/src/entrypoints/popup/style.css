@@ -89,6 +89,14 @@
     box-sizing: border-box;
 }
 
+/* Form controls take the popup's type, never the browser's own default for them. */
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
 body {
     margin: 0;
     width: 360px;
@@ -1335,17 +1343,39 @@ button.picker-button {
 }
 
 /* Settings: the shortcuts list drawn as Polaris's account page draws it - a
-   box per group, a row per action, the keys as caps at the end. */
+   box per group, a row per action, the keys as caps at the end. Each section is
+   a heading and a body; the body holds the popup's 16px gutter, the same as the
+   heading's, so nothing under a heading touches the popup's edge. */
 .settings {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+    padding-bottom: 16px;
 }
-.settings section {
+.settings-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
     min-width: 0;
+}
+.settings-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 0 16px;
+}
+.settings-body p,
+.settings-body .problem {
+    margin: 0;
+}
+.settings-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+/* The character-kind chips are monospace on purpose; a choice in Settings is words. */
+button.chip.choice {
+    font-family: var(--font-sans);
 }
 .sheet {
     display: flex;
@@ -1428,7 +1458,4 @@ button.picker-button {
     flex-direction: column;
     gap: 6px;
     min-width: 0;
-}
-.setting p {
-    margin: 0;
 }

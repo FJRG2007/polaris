@@ -94,7 +94,7 @@ export function ServersPanel({
 
     return (
         <>
-            <ul className="servers" aria-label={t("servers.listLabel")}>
+            <ul aria-label={t("servers.listLabel")}>
                 {shown.map((server) => (
                     <li key={server.origin} className="server-row">
                         {renaming === server.origin ? (

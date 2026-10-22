@@ -143,7 +143,7 @@ export function ShortcutSheet({
                                             </span>
                                         )}
                                         <button
-                                            className={listening ? "chip" : "ghost"}
+                                            className={listening ? "chip choice" : "ghost"}
                                             aria-label={
                                                 listening
                                                     ? t("polar.pressKeys")
@@ -177,6 +177,28 @@ export function ShortcutSheet({
     );
 }
 
+/**
+ * One block of Settings: its heading, then everything under it inside the
+ * popup's gutter. Every section goes through this, so nothing in Settings can
+ * sit against the popup's edge while its heading is indented.
+ */
+export function SettingsSection({
+    id,
+    title,
+    children
+}: {
+    id: string;
+    title: string;
+    children: React.ReactNode;
+}): React.JSX.Element {
+    return (
+        <section className="settings-section" aria-labelledby={id}>
+            <h2 id={id}>{title}</h2>
+            <div className="settings-body">{children}</div>
+        </section>
+    );
+}
+
 /** A choice of two, as the popup's chips draw one, with a line saying what it does. */
 function Choice<T extends string>({
     label,
@@ -196,11 +218,11 @@ function Choice<T extends string>({
     return (
         <div className="setting">
             <span className="strong small">{label}</span>
-            <div className="row" role="radiogroup" aria-label={label}>
+            <div className="settings-options" role="radiogroup" aria-label={label}>
                 {options.map((option) => (
                     <button
                         key={option.value}
-                        className="chip"
+                        className="chip choice"
                         role="radio"
                         aria-checked={value === option.value}
                         aria-pressed={value === option.value}
@@ -287,8 +309,7 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
     const hintKey: WordKey = firefox ? "settings.shortcutsFirefox" : "settings.shortcutsChromium";
     return (
         <main className="settings">
-            <section aria-labelledby="settings-shortcuts">
-                <h2 id="settings-shortcuts">{t("settings.shortcuts")}</h2>
+            <SettingsSection id="settings-shortcuts" title={t("settings.shortcuts")}>
                 <p className="muted small">{t(hintKey)}</p>
                 {all === null ? (
                     <div className="sheet-box skeleton" aria-hidden="true" />
@@ -304,10 +325,9 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
                     />
                 )}
                 {refused ? <p className="problem">{t("polar.shortcutRefused")}</p> : null}
-            </section>
+            </SettingsSection>
             {canPolar ? (
-                <section aria-labelledby="settings-polar">
-                    <h2 id="settings-polar">{t("polar.title")}</h2>
+                <SettingsSection id="settings-polar" title={t("polar.title")}>
                     <Choice
                         label={t("settings.openIn")}
                         value={firefox ? "all" : panelScope}
@@ -341,7 +361,7 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
                         )}
                         onChange={chooseChat}
                     />
-                </section>
+                </SettingsSection>
             ) : null}
         </main>
     );
