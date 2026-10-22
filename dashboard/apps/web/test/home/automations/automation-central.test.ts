@@ -147,12 +147,20 @@ describe("the camera privacy node", () => {
     it("is one of the node types Places contributes, with the Places step as its config", () => {
         expect(privacyNode).toBeTruthy();
         expect(
-            privacyNode.config.safeParse({ kind: "privacy", target: `camera:${CAMERA}`, on: true, placeId: PLACE })
-                .success
+            privacyNode.config.safeParse({
+                kind: "privacy",
+                target: `camera:${CAMERA}`,
+                on: true,
+                placeId: PLACE
+            }).success
         ).toBe(true);
         expect(
-            privacyNode.config.safeParse({ kind: "privacy", target: "camera:1", on: true, placeId: PLACE })
-                .success
+            privacyNode.config.safeParse({
+                kind: "privacy",
+                target: "camera:1",
+                on: true,
+                placeId: PLACE
+            }).success
         ).toBe(false);
     });
 

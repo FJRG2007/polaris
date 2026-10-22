@@ -157,7 +157,11 @@ export function outageHeadline(
 
 /** How long it was gone, in the words somebody would use. Read off the row
  *  rather than counted in passes, so a restart does not reset it. */
-export function outageLength(since: Date, until: Date, t: PlacesTranslator = englishPlaces): string {
+export function outageLength(
+    since: Date,
+    until: Date,
+    t: PlacesTranslator = englishPlaces
+): string {
     const minutes = Math.max(1, Math.round((until.getTime() - since.getTime()) / 60_000));
     if (minutes < 60) return t("outage.minutes", { count: minutes });
     const hours = Math.round(minutes / 60);

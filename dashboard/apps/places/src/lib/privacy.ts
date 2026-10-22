@@ -68,7 +68,8 @@ export async function storedCamerasFor(
     if (target.kind === "camera") where = { installedAppId, id: target.id };
     else if (target.kind === "place") where = { installedAppId, placeId: target.id };
     else if (target.kind === "room") where = { installedAppId, roomId: target.id };
-    else if (target.kind === "zone") where = { installedAppId, placeId: target.placeId, zone: target.zone };
+    else if (target.kind === "zone")
+        where = { installedAppId, placeId: target.placeId, zone: target.zone };
     else {
         const set = await prisma.cameraSet.findFirst({
             where: { id: target.id, installedAppId },
@@ -103,11 +104,15 @@ async function askCamera(
                 send
             );
             if (answer.pin && answer.pin !== row.controlPin)
-                await prisma.camera.update({ where: { id: row.id }, data: { controlPin: answer.pin } });
+                await prisma.camera.update({
+                    where: { id: row.id },
+                    data: { controlPin: answer.pin }
+                });
             return { private: answer.private };
         } catch (caught) {
             if (!(caught instanceof TapoError)) throw caught;
-            if (caught.failure === "locked") return { failure: "locked", waitSeconds: caught.waitSeconds };
+            if (caught.failure === "locked")
+                return { failure: "locked", waitSeconds: caught.waitSeconds };
             if (caught.failure !== "password" && caught.failure !== "account")
                 return { failure: caught.failure };
             // "account" outranks "password": it is the more useful sentence.
@@ -203,7 +208,8 @@ export async function groupPrivacy(
         try {
             results.push(await run(camera.id));
         } catch (caught) {
-            if (!(caught instanceof HomeError)) console.warn("[places] privacy failed", camera.id, (caught as Error).name);
+            if (!(caught instanceof HomeError))
+                console.warn("[places] privacy failed", camera.id, (caught as Error).name);
             results.push({
                 cameraId: camera.id,
                 name: camera.name,
@@ -219,7 +225,10 @@ export async function groupPrivacy(
 /** Take the certificate each of these cameras answers with next on trust, as
  *  the first sign-in did: for a camera that was replaced or reset, whose new
  *  certificate is the one now refused. */
-export async function trustCamerasAgain(installedAppId: string, cameraIds: readonly string[]): Promise<void> {
+export async function trustCamerasAgain(
+    installedAppId: string,
+    cameraIds: readonly string[]
+): Promise<void> {
     if (cameraIds.length === 0) return;
     await prisma.camera.updateMany({
         where: { installedAppId, id: { in: [...cameraIds] } },

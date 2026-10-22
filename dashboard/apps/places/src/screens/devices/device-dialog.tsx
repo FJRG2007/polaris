@@ -81,7 +81,6 @@ export function DeviceDialog({
         setError("");
     }, [device]);
 
-
     const issue = name.trim()
         ? (deviceEditSchema.shape.name.safeParse(name).error?.issues[0]?.message ?? null)
         : null;

@@ -170,7 +170,8 @@ export async function signIn(
     );
     const pin = camera.pin ?? first.fingerprint;
     const firstCode = errorCode(first.json);
-    if (firstCode === -40211) return { pin, session: await tpapSignIn(origin, camera, pin, post, bytes) };
+    if (firstCode === -40211)
+        return { pin, session: await tpapSignIn(origin, camera, pin, post, bytes) };
     const wait = lockoutSeconds(first.json);
     const data = record(record(record(first.json).result).data);
     const offered = Array.isArray(data.encrypt_type) ? data.encrypt_type.map(String) : [];
@@ -277,7 +278,8 @@ async function tpapSignIn(
     const discovered = await post({ method: "login", params: { sub_method: "discover" } }, pin);
     const info = record(record(record(discovered.json).result).tpap);
     if (Array.isArray(info.pake) && !info.pake.includes(2)) throw new TapoError("unsupported");
-    const username = info.user_hash_type === 1 ? tpap.sha256HexUpper(TPAP_USER) : tpap.md5Hex(TPAP_USER);
+    const username =
+        info.user_hash_type === 1 ? tpap.sha256HexUpper(TPAP_USER) : tpap.md5Hex(TPAP_USER);
 
     for (const passcode of [tpap.md5Hex(camera.password), tpap.sha256HexUpper(camera.password)]) {
         const userRandom = bytes(32);
@@ -331,7 +333,8 @@ async function tpapSignIn(
         }
         // Only the camera that holds the password can confirm the key; an
         // answer that does not is not from the camera this row names.
-        if (!client.deviceConfirms(Buffer.from(done.dev_confirm, "base64"))) throw new TapoError("failed");
+        if (!client.deviceConfirms(Buffer.from(done.dev_confirm, "base64")))
+            throw new TapoError("failed");
         const seq = Number(done.start_seq);
         if (!Number.isInteger(seq)) throw new TapoError("failed");
         return {
@@ -359,7 +362,11 @@ async function tpapRoundTrip(
     const answer = await send({
         url: session.url,
         body,
-        headers: { ...headers, "Content-Type": "application/octet-stream", Accept: "application/octet-stream" },
+        headers: {
+            ...headers,
+            "Content-Type": "application/octet-stream",
+            Accept: "application/octet-stream"
+        },
         pin: session.pin
     });
     const raw = answer.raw ?? Buffer.alloc(0);
@@ -380,8 +387,12 @@ async function call(
     send: TapoTransport,
     headers: Record<string, string>
 ): Promise<Json> {
-    const inner = JSON.stringify({ method: "multipleRequest", params: { requests: [{ method, params }] } });
-    if (session.tpap) return firstResult(await tpapRoundTrip(session, session.tpap, inner, send, headers));
+    const inner = JSON.stringify({
+        method: "multipleRequest",
+        params: { requests: [{ method, params }] }
+    });
+    if (session.tpap)
+        return firstResult(await tpapRoundTrip(session, session.tpap, inner, send, headers));
     let body = inner;
     const extra: Record<string, string> = {};
     if (session.secure) {
@@ -390,10 +401,20 @@ async function call(
             params: { request: crypto.encryptRequest(session.secure, inner) }
         });
         extra.Seq = String(session.seq);
-        extra.Tapo_tag = crypto.requestTag(session.secure.hashed, session.secure.cnonce, body, session.seq);
+        extra.Tapo_tag = crypto.requestTag(
+            session.secure.hashed,
+            session.secure.cnonce,
+            body,
+            session.seq
+        );
         session.seq += 1;
     }
-    const answer = await send({ url: session.url, body, headers: { ...headers, ...extra }, pin: session.pin });
+    const answer = await send({
+        url: session.url,
+        body,
+        headers: { ...headers, ...extra },
+        pin: session.pin
+    });
     let json = record(answer.json);
     const wrapped = record(json.result).response;
     if (session.secure && typeof wrapped === "string") {

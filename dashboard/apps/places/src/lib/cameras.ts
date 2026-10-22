@@ -255,10 +255,14 @@ async function settledRoom(
     const wanted = input.roomId;
     if (wanted) {
         const room = await rooms.requireRoom(installedAppId, wanted);
-        if (room.placeId !== (input.placeId || null)) throw new HomeError("That room is at another place");
+        if (room.placeId !== (input.placeId || null))
+            throw new HomeError("That room is at another place");
         return room.id;
     }
-    if (wanted === undefined) return placeBefore !== undefined && placeBefore !== (input.placeId || null) ? null : undefined;
+    if (wanted === undefined)
+        return placeBefore !== undefined && placeBefore !== (input.placeId || null)
+            ? null
+            : undefined;
     return null;
 }
 

@@ -45,7 +45,8 @@ export function confirmedHash(
     deviceConfirm: string
 ): PasswordHash | null {
     for (const hash of ["sha256", "md5"] as const) {
-        const expected = sha256Upper(cnonce + hashedPassword(password, hash) + nonce) + nonce + cnonce;
+        const expected =
+            sha256Upper(cnonce + hashedPassword(password, hash) + nonce) + nonce + cnonce;
         if (expected === deviceConfirm) return hash;
     }
     return null;

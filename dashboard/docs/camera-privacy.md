@@ -47,52 +47,52 @@ the preset from the camera, best effort (`RemovePreset`). Both need
   (https://github.com/JurajNyiri/HomeAssistant-Tapo-Control).
 - **Sign-in, three generations**, as pytapo implements them
   (`pytapo/transport/pytapo/pytapo.py`, `pytapo/transport/tpap/tpap.py`):
-  1. *Old firmware*: `login` with `{"hashed": true, "password": MD5(pw) upper
-     hex, "username": user}` answers a `stok`; requests go in clear to
-     `https://<ip>/stok=<stok>/ds`.
-  2. *Secure firmware ("encrypt_type 3")*: a `login` carrying only `username`,
-     `cnonce` and `encrypt_type: "3"` answers `-40413` with the camera's
-     `nonce` and a `device_confirm` = `SHA256(cnonce + H(pw) + nonce) + nonce +
-     cnonce`, where `H` is SHA-256 or MD5 upper hex; matching it proves the
-     camera knows the password and tells which hash it uses. The second `login`
-     sends `digest_passwd` = `SHA256(H(pw) + cnonce + nonce) + cnonce + nonce`
-     and answers `stok`, `start_seq` and `user_group`. Requests are wrapped in
-     `securePassthrough`: AES-128-CBC/PKCS7 with key `lsk` and IV `ivb`, each the
-     first 16 bytes of `SHA256(label + cnonce + nonce + SHA256(cnonce + H(pw) +
-     nonce))`; headers `Seq` (incremented per request) and `Tapo_tag` =
-     `SHA256(SHA256(H(pw) + cnonce) + body + seq)`.
-  3. *Newest firmware ("TPAP")*: answers the encrypt_type 3 login with
-     `-40211` and advertises `{"tpap": {"pake": [2]}}` in `login` /
-     `sub_method: discover`. It uses a SPAKE2+ (P-256) login and an AES-CCM
-     channel (write-up: https://github.com/freeKC/tapo-v4-protocol). pytapo
-     notes a C200 on firmware 1.4.6 using it. In detail, as pytapo's
-     `transport/tpap/spake2p.py` and `tpap.py` run it:
-     - `discover` answers `user_hash_type`; the user is always the literal
-       `admin`, sent as MD5 hex (or SHA-256 upper hex when that is 1).
-     - `pake_register` (with a random `user_random`, `cipher_suites: [1]`,
-       `encryption: ["aes_128_ccm"]`) answers `dev_salt`, `iterations`,
-       `dev_share`, `dev_random` and optionally `extra_crypt`. The passcode is
-       MD5 hex of the app password, then SHA-256 upper hex if that is refused
-       with `-40401`. `extra_crypt` `password_shadow` turns it into a
-       SHA-256-crypt string (`passwd_id` 5, salt from `passwd_prefix`) or a
-       SHA-1 hex (`passwd_id` 2).
-     - PBKDF2-SHA256 of that credential gives 80 bytes: `w0`, `w1` (40 each,
-       mod the curve order). `X = x*G + w0*M`; the transcript (8-byte
-       little-endian length before each part) is `SHA256("PAKE V1" +
-       user_random + dev_random)`, two empty ids, `M`, `N`, `X`, `Y`,
-       `x*(Y - w0*N)`, `w1*(Y - w0*N)`, `w0`; HKDF-SHA256 of its hash gives
-       `ConfirmationKeys` (64) and `SharedKey` (32). `pake_share` sends `X` and
-       `HMAC(KcA, Y)` and answers `dev_confirm` = `HMAC(KcB, X)` (checked
-       before anything is sent), `stok` and `start_seq`.
-     - Requests go to `/stok=<stok>/ds` as `seq` (4 bytes big-endian) +
-       AES-128-CCM ciphertext + 16-byte tag, key and nonce from HKDF of the
-       shared key (`tp-kdf-salt-aes128-key` / `-iv`), the nonce's last 4
-       bytes replaced by `seq`. A plain JSON answer is a refusal.
+    1. _Old firmware_: `login` with `{"hashed": true, "password": MD5(pw) upper
+hex, "username": user}` answers a `stok`; requests go in clear to
+       `https://<ip>/stok=<stok>/ds`.
+    2. _Secure firmware ("encrypt_type 3")_: a `login` carrying only `username`,
+       `cnonce` and `encrypt_type: "3"` answers `-40413` with the camera's
+       `nonce` and a `device_confirm` = `SHA256(cnonce + H(pw) + nonce) + nonce +
+cnonce`, where `H` is SHA-256 or MD5 upper hex; matching it proves the
+       camera knows the password and tells which hash it uses. The second `login`
+       sends `digest_passwd` = `SHA256(H(pw) + cnonce + nonce) + cnonce + nonce`
+       and answers `stok`, `start_seq` and `user_group`. Requests are wrapped in
+       `securePassthrough`: AES-128-CBC/PKCS7 with key `lsk` and IV `ivb`, each the
+       first 16 bytes of `SHA256(label + cnonce + nonce + SHA256(cnonce + H(pw) +
+nonce))`; headers `Seq` (incremented per request) and `Tapo_tag` =
+       `SHA256(SHA256(H(pw) + cnonce) + body + seq)`.
+    3. _Newest firmware ("TPAP")_: answers the encrypt_type 3 login with
+       `-40211` and advertises `{"tpap": {"pake": [2]}}` in `login` /
+       `sub_method: discover`. It uses a SPAKE2+ (P-256) login and an AES-CCM
+       channel (write-up: https://github.com/freeKC/tapo-v4-protocol). pytapo
+       notes a C200 on firmware 1.4.6 using it. In detail, as pytapo's
+       `transport/tpap/spake2p.py` and `tpap.py` run it:
+        - `discover` answers `user_hash_type`; the user is always the literal
+          `admin`, sent as MD5 hex (or SHA-256 upper hex when that is 1).
+        - `pake_register` (with a random `user_random`, `cipher_suites: [1]`,
+          `encryption: ["aes_128_ccm"]`) answers `dev_salt`, `iterations`,
+          `dev_share`, `dev_random` and optionally `extra_crypt`. The passcode is
+          MD5 hex of the app password, then SHA-256 upper hex if that is refused
+          with `-40401`. `extra_crypt` `password_shadow` turns it into a
+          SHA-256-crypt string (`passwd_id` 5, salt from `passwd_prefix`) or a
+          SHA-1 hex (`passwd_id` 2).
+        - PBKDF2-SHA256 of that credential gives 80 bytes: `w0`, `w1` (40 each,
+          mod the curve order). `X = x*G + w0*M`; the transcript (8-byte
+          little-endian length before each part) is `SHA256("PAKE V1" +
+user_random + dev_random)`, two empty ids, `M`, `N`, `X`, `Y`,
+          `x*(Y - w0*N)`, `w1*(Y - w0*N)`, `w0`; HKDF-SHA256 of its hash gives
+          `ConfirmationKeys` (64) and `SharedKey` (32). `pake_share` sends `X` and
+          `HMAC(KcA, Y)` and answers `dev_confirm` = `HMAC(KcB, X)` (checked
+          before anything is sent), `stok` and `start_seq`.
+        - Requests go to `/stok=<stok>/ds` as `seq` (4 bytes big-endian) +
+          AES-128-CCM ciphertext + 16-byte tag, key and nonce from HKDF of the
+          shared key (`tp-kdf-salt-aes128-key` / `-iv`), the nonce's last 4
+          bytes replaced by `seq`. A plain JSON answer is a refusal.
 - **Which password.** Encrypted control is only accepted for `user_group:
-  "root"`, which is the user `admin` with the **TP-Link (Tapo app) account
+"root"`, which is the user `admin` with the **TP-Link (Tapo app) account
   password**. The camera account made in the app for RTSP signs in as a third
   party account and is refused for control (pytapo raises on `user_group !=
-  "root"`, see HomeAssistant-Tapo-Control issue #456). Polaris therefore uses
+"root"`, see HomeAssistant-Tapo-Control issue #456). Polaris therefore uses
   the account password Places already stores for the "Tapo app password"
   connection (`tapo-cloud`), on this camera or another one in the house, and
   only falls back to the camera account on old firmware that accepts it.

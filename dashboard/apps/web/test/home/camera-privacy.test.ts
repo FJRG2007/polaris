@@ -40,22 +40,45 @@ describe("targets", () => {
     });
 
     it("refuses anything else", () => {
-        for (const raw of ["", "camera:", "camera:1", "room:1", "set:", `floor:${PLACE}`, `zone:${PLACE}:`, "zone:x:y"])
+        for (const raw of [
+            "",
+            "camera:",
+            "camera:1",
+            "room:1",
+            "set:",
+            `floor:${PLACE}`,
+            `zone:${PLACE}:`,
+            "zone:x:y"
+        ])
             expect(parseTarget(raw)).toBeNull();
     });
 });
 
-const stored = (id: string, privacy = false) => ({ id, name: `Camera ${id}`, vendor: "generic", privacy });
+const stored = (id: string, privacy = false) => ({
+    id,
+    name: `Camera ${id}`,
+    vendor: "generic",
+    privacy
+});
 
 describe("a group", () => {
     it("switches every camera it can and reports the one that refused", async () => {
         const run = vi.fn(async (id: string): Promise<CameraPrivacy> => {
             if (id === "b")
-                return { cameraId: "b", name: "Garden", private: false, native: true, failure: "password" };
+                return {
+                    cameraId: "b",
+                    name: "Garden",
+                    private: false,
+                    native: true,
+                    failure: "password"
+                };
             if (id === "c") throw new Error("socket closed");
             return { cameraId: id, name: id, private: true, native: true };
         });
-        const results = await groupPrivacy(["a", "b", "c", "d"].map((id) => stored(id)), run);
+        const results = await groupPrivacy(
+            ["a", "b", "c", "d"].map((id) => stored(id)),
+            run
+        );
         expect(run).toHaveBeenCalledTimes(4);
         expect(results.map((row) => [row.cameraId, row.private, row.failure ?? null])).toEqual([
             ["a", true, null],

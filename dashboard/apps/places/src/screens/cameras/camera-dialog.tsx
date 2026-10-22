@@ -501,7 +501,9 @@ export function CameraDialog({
                                         { value: "", label: t("deviceDialog.noRoom") },
                                         ...(rooms ?? []).map((room) => ({
                                             value: room.id,
-                                            label: room.floor ? `${room.name} - ${room.floor}` : room.name
+                                            label: room.floor
+                                                ? `${room.name} - ${room.floor}`
+                                                : room.name
                                         }))
                                     ]}
                                 />

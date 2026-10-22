@@ -198,13 +198,21 @@ async function privacyRow(installedAppId: string, cameraId: string) {
  * saved as a preset on the camera (the one saved before is moved, not
  * duplicated) and its token stored. Answers the token.
  */
-export async function savePrivacyPosition(installedAppId: string, cameraId: string): Promise<string> {
+export async function savePrivacyPosition(
+    installedAppId: string,
+    cameraId: string
+): Promise<string> {
     const row = await privacyRow(installedAppId, cameraId);
     const controls = await controlsFor(installedAppId, cameraId);
     if (!controls) throw new HomeError("This camera does not move");
     let token: string;
     try {
-        token = await setPreset(controls.endpoint, controls.profileToken, PRIVACY_PRESET_NAME, row.privacyPreset);
+        token = await setPreset(
+            controls.endpoint,
+            controls.profileToken,
+            PRIVACY_PRESET_NAME,
+            row.privacyPreset
+        );
     } catch (error) {
         if (error instanceof OnvifError && error.failure !== "refused")
             throw new HomeError("Could not reach the camera to move it");
@@ -216,11 +224,16 @@ export async function savePrivacyPosition(installedAppId: string, cameraId: stri
 
 /** Forget the privacy position. The preset is taken off the camera too, best
  *  effort: a camera that cannot be reached still stops being turned. */
-export async function clearPrivacyPosition(installedAppId: string, cameraId: string): Promise<void> {
+export async function clearPrivacyPosition(
+    installedAppId: string,
+    cameraId: string
+): Promise<void> {
     const row = await privacyRow(installedAppId, cameraId);
     if (!row.privacyPreset) return;
     const controls = await controlsFor(installedAppId, cameraId).catch(() => null);
     if (controls)
-        await removePreset(controls.endpoint, controls.profileToken, row.privacyPreset).catch(() => undefined);
+        await removePreset(controls.endpoint, controls.profileToken, row.privacyPreset).catch(
+            () => undefined
+        );
     await prisma.camera.update({ where: { id: cameraId }, data: { privacyPreset: null } });
 }

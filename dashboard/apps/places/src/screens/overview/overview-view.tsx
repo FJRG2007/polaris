@@ -333,7 +333,9 @@ export function OverviewView({
                                 ? {
                                       ...current,
                                       cameras: current.cameras.map((camera) =>
-                                          camera.id === id ? { ...camera, privacyPreset: preset } : camera
+                                          camera.id === id
+                                              ? { ...camera, privacyPreset: preset }
+                                              : camera
                                       )
                                   }
                                 : current

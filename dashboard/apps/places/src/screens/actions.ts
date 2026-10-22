@@ -1150,7 +1150,9 @@ export async function saveCameraSetAction(
     if (!parsed.success) {
         return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.someWrong") };
     }
-    const result = await guard(() => cameraSets.saveCameraSet(install.id, id ? String(id) : null, parsed.data));
+    const result = await guard(() =>
+        cameraSets.saveCameraSet(install.id, id ? String(id) : null, parsed.data)
+    );
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
     return { set: result.value };

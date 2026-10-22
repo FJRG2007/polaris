@@ -679,13 +679,26 @@ const privacyReadInput = z.object({
 });
 
 const privacySetInput = z.object({
-    target: z.string().max(300).describe("camera:<id>, room:<id>, set:<id>, zone:<placeId>:<zone name> or place:<id>."),
+    target: z
+        .string()
+        .max(300)
+        .describe("camera:<id>, room:<id>, set:<id>, zone:<placeId>:<zone name> or place:<id>."),
     private: z.boolean().describe("true turns privacy on, false turns it off.")
 });
 
 /** One camera's privacy as a tool row. */
-function privacyRow(camera: { id: string; name: string; privacy: boolean; privacyNative: boolean }) {
-    return { id: camera.id, name: camera.name, private: camera.privacy, native: camera.privacyNative };
+function privacyRow(camera: {
+    id: string;
+    name: string;
+    privacy: boolean;
+    privacyNative: boolean;
+}) {
+    return {
+        id: camera.id,
+        name: camera.name,
+        private: camera.privacy,
+        native: camera.privacyNative
+    };
 }
 
 /** The cameras this person may see, every target they make up, and each
@@ -740,12 +753,18 @@ const privacyTool = () =>
         readOnly: true,
         async run(input, caller) {
             const { targets } = await privacyTargets(caller);
-            const shown = input.target ? targets.filter((row) => row.target === input.target) : targets;
-            if (input.target && shown.length === 0) refuse("No cameras you can see are in that target.");
+            const shown = input.target
+                ? targets.filter((row) => row.target === input.target)
+                : targets;
+            if (input.target && shown.length === 0)
+                refuse("No cameras you can see are in that target.");
             return {
                 text:
                     shown
-                        .map((row) => `${row.target}  ${row.label}: ${row.some} of ${row.total} private`)
+                        .map(
+                            (row) =>
+                                `${row.target}  ${row.label}: ${row.some} of ${row.total} private`
+                        )
                         .join("\n") || "No cameras.",
                 structured: { targets: shown }
             };
@@ -767,16 +786,24 @@ const privacySetTool = () =>
         async target(input, caller) {
             const { install, user } = await contextFor(caller);
             if (!(await host.session.sessionCan(user, "home.control")))
-                refuse("Only somebody who may control the house's cameras can switch their privacy.");
+                refuse(
+                    "Only somebody who may control the house's cameras can switch their privacy."
+                );
             const parsed = parseTarget(input.target);
             if (!parsed) refuse("That is not a camera, room, set, zone or place.");
             const ids = await privacyLib.camerasFor(install.id, parsed);
-            return { id: input.target, name: `${ids.length} camera(s)`, action: input.private ? "privacy on" : "privacy off" };
+            return {
+                id: input.target,
+                name: `${ids.length} camera(s)`,
+                action: input.private ? "privacy on" : "privacy off"
+            };
         },
         async run(input, caller) {
             const { user, install } = await contextFor(caller);
             if (!(await host.session.sessionCan(user, "home.control")))
-                refuse("Only somebody who may control the house's cameras can switch their privacy.");
+                refuse(
+                    "Only somebody who may control the house's cameras can switch their privacy."
+                );
             const parsed = parseTarget(input.target);
             if (!parsed) refuse("That is not a camera, room, set, zone or place.");
             const results = await privacyLib.switchPrivacy(install.id, parsed, input.private);

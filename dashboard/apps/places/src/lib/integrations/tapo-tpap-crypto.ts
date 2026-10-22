@@ -301,7 +301,11 @@ export async function pakeClient(
     credential: string,
     randomScalar: Buffer
 ): Promise<PakeClient> {
-    if (!Number.isInteger(register.iterations) || register.iterations < 1 || register.iterations > MAX_PAKE_ITERATIONS)
+    if (
+        !Number.isInteger(register.iterations) ||
+        register.iterations < 1 ||
+        register.iterations > MAX_PAKE_ITERATIONS
+    )
         throw new Error("bad iterations");
     const dk = await pbkdf2Async(
         Buffer.from(credential, "utf8"),

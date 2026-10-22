@@ -544,7 +544,11 @@ export async function setPreset(
     name: string,
     token?: string | null
 ): Promise<string> {
-    const xml = await call(endpoint, (await getServices(endpoint)).ptz, setPresetBody(profileToken, name, token));
+    const xml = await call(
+        endpoint,
+        (await getServices(endpoint)).ptz,
+        setPresetBody(profileToken, name, token)
+    );
     const saved = tagValue(xml, "PresetToken") ?? token ?? null;
     if (!saved) throw new OnvifError("SetPreset answered no token", "refused");
     return saved;

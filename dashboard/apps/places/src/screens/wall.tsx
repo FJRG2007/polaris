@@ -103,7 +103,9 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
     ) {
         const list = cameras ?? [];
         const before = new Map(
-            list.filter((camera) => ids.includes(camera.id)).map((camera) => [camera.id, camera.privacy])
+            list
+                .filter((camera) => ids.includes(camera.id))
+                .map((camera) => [camera.id, camera.privacy])
         );
         setPrivacyError(null);
         setUntrusted(null);
@@ -131,8 +133,11 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         const failed = results.filter((row) => row.failure);
         if (failed.length === 0) return;
         const first = failed[0];
-        const refused = failed.filter((row) => row.failure === "certificate").map((row) => row.cameraId);
-        if (canManage && refused.length > 0) setUntrusted({ target, ids, cameraIds: refused, wanted });
+        const refused = failed
+            .filter((row) => row.failure === "certificate")
+            .map((row) => row.cameraId);
+        if (canManage && refused.length > 0)
+            setUntrusted({ target, ids, cameraIds: refused, wanted });
         const reason =
             first?.failure === "locked"
                 ? t("privacy.locked", { seconds: first.waitSeconds ?? 0 })
@@ -157,7 +162,9 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         if (!canControl || group.length === 0) return null;
         const rows = group.map((camera) => ({ private: camera.privacy }));
         const wanted = nextPrivacy(rows);
-        const words = wanted ? t("privacy.groupOn", { group: label }) : t("privacy.groupOff", { group: label });
+        const words = wanted
+            ? t("privacy.groupOn", { group: label })
+            : t("privacy.groupOff", { group: label });
         if (named)
             return (
                 <Button
@@ -176,7 +183,11 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                         )
                     }
                 >
-                    {wanted ? <EyeOff className="size-4 shrink-0" /> : <Eye className="size-4 shrink-0" />}
+                    {wanted ? (
+                        <EyeOff className="size-4 shrink-0" />
+                    ) : (
+                        <Eye className="size-4 shrink-0" />
+                    )}
                     <span className="truncate">{label}</span>
                 </Button>
             );
@@ -195,7 +206,11 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                     )
                 }
             >
-                {wanted ? <EyeOff className="size-4 shrink-0" /> : <Eye className="size-4 shrink-0" />}
+                {wanted ? (
+                    <EyeOff className="size-4 shrink-0" />
+                ) : (
+                    <Eye className="size-4 shrink-0" />
+                )}
             </Button>
         );
     }
@@ -206,13 +221,7 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
     if (cameras === null) return <WallSkeleton />;
 
     if (error && cameras.length === 0) {
-        return (
-            <EmptyState
-                icon={<Cctv />}
-                title={t("wall.listFailed")}
-                description={error}
-            />
-        );
+        return <EmptyState icon={<Cctv />} title={t("wall.listFailed")} description={error} />;
     }
 
     if (cameras.length === 0) {
@@ -220,11 +229,7 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
             <EmptyState
                 icon={<Cctv />}
                 title={t("wall.empty.title")}
-                description={
-                    canManage
-                        ? t("wall.empty.manage")
-                        : t("wall.empty.view")
-                }
+                description={canManage ? t("wall.empty.manage") : t("wall.empty.view")}
                 action={
                     canManage ? (
                         <Button asChild size="sm">

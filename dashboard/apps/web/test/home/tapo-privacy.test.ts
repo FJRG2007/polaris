@@ -30,7 +30,9 @@ describe("the encrypt_type 3 arithmetic", () => {
             "sha256"
         );
         expect(crypto.confirmedHash(password, cnonce, nonce, fixture.deviceConfirmMd5)).toBe("md5");
-        expect(crypto.confirmedHash("wrong", cnonce, nonce, fixture.deviceConfirmSha256)).toBeNull();
+        expect(
+            crypto.confirmedHash("wrong", cnonce, nonce, fixture.deviceConfirmSha256)
+        ).toBeNull();
     });
 
     it("builds the digest, the session key and IV, the cipher and the tag", () => {
@@ -46,7 +48,11 @@ describe("the encrypt_type 3 arithmetic", () => {
     });
 });
 
-type Sent = { url: string; body: { method: string; params: Record<string, unknown> }; seq?: string };
+type Sent = {
+    url: string;
+    body: { method: string; params: Record<string, unknown> };
+    seq?: string;
+};
 
 /** A camera on secure firmware, answering from the fixture's session. */
 function secureCamera(options: { userGroup?: string; mask?: "on" | "off" } = {}) {
@@ -169,9 +175,16 @@ describe("lensMask", () => {
             bodies.push(String(body));
             return { status: 200, fingerprint: null, json: { error_code: -40211 } };
         };
-        await expect(lensMask(camera, true, send, cnonce)).rejects.toMatchObject({ failure: "failed" });
-        expect(JSON.parse(bodies[1]!)).toEqual({ method: "login", params: { sub_method: "discover" } });
-        expect(bodies.some((body) => body.includes("digest_passwd") || body.includes("hashed"))).toBe(false);
+        await expect(lensMask(camera, true, send, cnonce)).rejects.toMatchObject({
+            failure: "failed"
+        });
+        expect(JSON.parse(bodies[1]!)).toEqual({
+            method: "login",
+            params: { sub_method: "discover" }
+        });
+        expect(
+            bodies.some((body) => body.includes("digest_passwd") || body.includes("hashed"))
+        ).toBe(false);
     });
 
     it("passes a lockout on with its wait", async () => {

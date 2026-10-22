@@ -49,13 +49,7 @@ export function targetKey(target: PrivacyTarget): string {
 
 /** Why one camera did not switch, as a code the screen turns into a sentence. */
 export type PrivacyFailure =
-    | "password"
-    | "account"
-    | "locked"
-    | "unsupported"
-    | "certificate"
-    | "unreachable"
-    | "failed";
+    "password" | "account" | "locked" | "unsupported" | "certificate" | "unreachable" | "failed";
 
 /** One camera's answer. `private` is what it is now - the camera's own word on
  *  one with a privacy mode, Polaris' on one without. */
@@ -94,7 +88,9 @@ export function applyPrivacy<T extends { id: string; privacy: boolean }>(
     wanted: boolean
 ): T[] {
     const switched = new Set(ids);
-    return cameras.map((camera) => (switched.has(camera.id) ? { ...camera, privacy: wanted } : camera));
+    return cameras.map((camera) =>
+        switched.has(camera.id) ? { ...camera, privacy: wanted } : camera
+    );
 }
 
 /** The wall's cameras once they answered: each takes its own answer, so one
@@ -138,7 +134,9 @@ export function normalizeCameraSetInput(input: Record<string, unknown>): Record<
     const value = { ...input };
     if (typeof value.name === "string") value.name = value.name.trim().replace(/\s+/g, " ");
     if (Array.isArray(value.cameraIds))
-        value.cameraIds = [...new Set(value.cameraIds.map((id) => String(id).trim().toLowerCase()))];
+        value.cameraIds = [
+            ...new Set(value.cameraIds.map((id) => String(id).trim().toLowerCase()))
+        ];
     return value;
 }
 
@@ -154,7 +152,10 @@ export const cameraSetInputSchema = z.object({
 export type CameraSetInput = z.infer<typeof cameraSetInputSchema>;
 
 /** The cameras an action names by id, as many as a set can hold. */
-export const cameraIdsSchema = z.array(z.string().trim().toLowerCase().pipe(uuid)).min(1).max(CAMERA_SET_LIMIT);
+export const cameraIdsSchema = z
+    .array(z.string().trim().toLowerCase().pipe(uuid))
+    .min(1)
+    .max(CAMERA_SET_LIMIT);
 
 /** What grouping needs of a camera. */
 export interface GroupedCamera {
@@ -196,7 +197,12 @@ export function privacyGroups<T extends GroupedCamera>(
                 camera
             );
         const room = camera.roomId ? names.rooms.get(camera.roomId) : undefined;
-        if (room) add({ kind: "room", id: camera.roomId }, [place, room].filter(Boolean).join(" / "), camera);
+        if (room)
+            add(
+                { kind: "room", id: camera.roomId },
+                [place, room].filter(Boolean).join(" / "),
+                camera
+            );
         if (camera.placeId) add({ kind: "place", id: camera.placeId }, place, camera);
     }
     // A set shows the cameras of it in the list, and is not offered when it
@@ -206,7 +212,8 @@ export function privacyGroups<T extends GroupedCamera>(
         const label = [names.places.get(set.placeId) ?? "", set.name].filter(Boolean).join(" / ");
         for (const id of set.cameraIds) {
             const camera = byId.get(id);
-            if (camera && camera.placeId === set.placeId) add({ kind: "set", id: set.id }, label, camera);
+            if (camera && camera.placeId === set.placeId)
+                add({ kind: "set", id: set.id }, label, camera);
         }
     }
     return [...groups.values()];

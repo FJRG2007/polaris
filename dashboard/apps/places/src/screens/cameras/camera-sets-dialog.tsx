@@ -187,7 +187,9 @@ export function CameraSetsDialog({
                                                             id: set.id,
                                                             name: set.name,
                                                             cameraIds: set.cameraIds.filter((id) =>
-                                                                cameras.some((camera) => camera.id === id)
+                                                                cameras.some(
+                                                                    (camera) => camera.id === id
+                                                                )
                                                             )
                                                         })
                                                     }
