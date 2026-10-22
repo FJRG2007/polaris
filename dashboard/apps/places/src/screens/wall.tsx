@@ -104,6 +104,15 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         }
         const results = result.results;
         setCameras((current) => settlePrivacy(current ?? [], results));
+        // A camera made public again is back on the relay; ask which streams it serves now.
+        if (results.some((row) => !row.private && before.get(row.cameraId))) {
+            void actions.liveCamerasAction().then(
+                (status) => {
+                    if (status.live) setLive(new Set(status.live));
+                },
+                () => undefined
+            );
+        }
         const failed = results.filter((row) => row.failure);
         if (failed.length === 0) return;
         const first = failed[0];
@@ -325,6 +334,13 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                     camera={cameras.find((camera) => camera.id === opened) as CameraView}
                     canControl={canControl}
                     onClose={() => setOpened(null)}
+                    onPrivacyPreset={(preset) =>
+                        setCameras((current) =>
+                            (current ?? []).map((camera) =>
+                                camera.id === opened ? { ...camera, privacyPreset: preset } : camera
+                            )
+                        )
+                    }
                 />
             ) : null}
         </div>

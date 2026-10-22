@@ -779,11 +779,8 @@ const privacySetTool = () =>
                 refuse("Only somebody who may control the house's cameras can switch their privacy.");
             const parsed = parseTarget(input.target);
             if (!parsed) refuse("That is not a camera, room, set, zone or place.");
-            const ids = await privacyLib.camerasFor(install.id, parsed);
-            if (ids.length === 0) refuse("There are no cameras in that target.");
-            const results = await privacyLib.groupPrivacy(ids, (id) =>
-                privacyLib.cameraPrivacy(install.id, id, input.private)
-            );
+            const results = await privacyLib.switchPrivacy(install.id, parsed, input.private);
+            if (results.length === 0) refuse("There are no cameras in that target.");
             const failed = results.filter((row) => row.failure);
             return {
                 text:

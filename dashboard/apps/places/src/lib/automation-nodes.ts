@@ -33,7 +33,8 @@ export const STEP_NODE_KINDS = [
     "device",
     "wait",
     "notify",
-    "run"
+    "run",
+    "privacy"
 ] as const satisfies readonly auto.StepKind[];
 export type StepNodeKind = (typeof STEP_NODE_KINDS)[number];
 

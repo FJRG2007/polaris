@@ -21,6 +21,7 @@ import { prisma } from "@polaris/db";
 import { homeInstall } from "./access";
 import * as auto from "./automation-kinds";
 import * as nodes from "./automation-nodes";
+import { parseTarget } from "./privacy-kinds";
 import { host, type AppHostTypes } from "@polaris/app-host";
 import { automationEngine, mayOperate } from "./automation-runtime";
 import { MAX_DEPTH, RECHECK_MS, type AutomationRecord } from "./automation-engine";
@@ -214,6 +215,7 @@ type DeviceConfig = Omit<Extract<auto.Step, { kind: "device" }>, "id"> & { place
 type WaitConfig = Omit<Extract<auto.Step, { kind: "wait" }>, "id"> & { placeId: string };
 type NotifyConfig = Omit<Extract<auto.Step, { kind: "notify" }>, "id"> & { placeId: string };
 type RunConfig = Omit<Extract<auto.Step, { kind: "run" }>, "id"> & { placeId: string };
+type PrivacyConfig = Omit<Extract<auto.Step, { kind: "privacy" }>, "id"> & { placeId: string };
 
 const deviceNode: ServerNode<DeviceConfig> = {
     type: nodes.stepNodeType("device"),
@@ -344,6 +346,31 @@ const runNode: ServerNode<RunConfig> = {
     }
 };
 
+const privacyNode: ServerNode<PrivacyConfig> = {
+    type: nodes.stepNodeType("privacy"),
+    meta: { role: "action", ports: [], idempotent: true } as never,
+    config: nodes.stepNodeConfig("privacy") as never,
+    run: async (config, context, io) => {
+        // Switching a camera's privacy is controlling it, asked again on every run.
+        await requireRight(io.actor.id, "control");
+        const record = await recordFor(config.placeId, io, context.automation.name);
+        const target = parseTarget(config.target);
+        if (!target) throw new StepError("camerasGone");
+        io.recordInput({ target: config.target, on: config.on });
+        const privacy = await import("./privacy");
+        const results = await privacy.switchPrivacy(record.installedAppId, target, config.on);
+        if (results.length === 0) throw new StepError("camerasGone");
+        const cameras = results.map((row) => ({
+            name: row.name,
+            private: row.private,
+            ...(row.failure ? { failure: row.failure } : {})
+        }));
+        // One camera that refused fails the step, so nobody reads "done" over a camera still streaming.
+        if (results.some((row) => row.failure)) throw new StepError("privacyFailed", { cameras });
+        return { output: { on: config.on, cameras } };
+    }
+};
+
 /** Every node type Places contributes. */
 export function placesAutomationNodes(): ServerNode[] {
     return [
@@ -352,6 +379,7 @@ export function placesAutomationNodes(): ServerNode[] {
         deviceNode as ServerNode,
         waitNode as ServerNode,
         notifyNode as ServerNode,
-        runNode as ServerNode
+        runNode as ServerNode,
+        privacyNode as ServerNode
     ];
 }

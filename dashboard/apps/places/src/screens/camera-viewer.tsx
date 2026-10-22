@@ -153,11 +153,14 @@ const CHROME_LINGER_MS = 2500;
 export function CameraViewer({
     camera,
     canControl,
-    onClose
+    onClose,
+    onPrivacyPreset
 }: {
     camera: CameraView;
     canControl: boolean;
     onClose: () => void;
+    /** Told the camera's stored privacy position once it changed. */
+    onPrivacyPreset?: (preset: string) => void;
 }) {
     const t = usePlacesT();
     const frame = useRef<HTMLDivElement | null>(null);
@@ -814,6 +817,7 @@ export function CameraViewer({
                         <PtzPad
                             cameraId={camera.id}
                             privacyPreset={camera.privacyNative ? null : camera.privacyPreset}
+                            onPrivacyPreset={onPrivacyPreset}
                         />
                     ) : null}
                 </div>

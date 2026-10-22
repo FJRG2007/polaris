@@ -68,8 +68,8 @@ describe("the TPAP arithmetic", () => {
         expect(tpap.applyExtraCrypt(fixture.passcodeMd5, { type: "other" })).toBeNull();
     });
 
-    it("derives the share, both confirmations and the session key", () => {
-        const client = tpap.pakeClient(
+    it("derives the share, both confirmations and the session key", async () => {
+        const client = await tpap.pakeClient(
             fixture.register,
             Buffer.from(fixture.userRandom, "base64"),
             fixture.credential,
@@ -94,6 +94,20 @@ describe("the TPAP arithmetic", () => {
         const tampered = Buffer.from(fixture.replySealed, "hex");
         tampered[10] = (tampered[10] ?? 0) ^ 1;
         expect(() => tpap.openReply(channel, tampered)).toThrow();
+    });
+
+    it("refuses more work than any camera asks of a sign-in", async () => {
+        expect(() =>
+            tpap.sha256Crypt("key", `$5$rounds=${tpap.MAX_CRYPT_ROUNDS + 1}$salt$`)
+        ).toThrow();
+        await expect(
+            tpap.pakeClient(
+                { ...fixture.register, iterations: tpap.MAX_PAKE_ITERATIONS + 1 },
+                Buffer.from(fixture.userRandom, "base64"),
+                fixture.credential,
+                Buffer.from(fixture.scalar, "hex")
+            )
+        ).rejects.toThrow();
     });
 
     it("refuses a share that is not a point of the curve", () => {

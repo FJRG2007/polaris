@@ -13,6 +13,7 @@ import {
     Clock,
     Columns3,
     Ear,
+    EyeOff,
     Gauge,
     GitBranch,
     Globe,
@@ -222,7 +223,9 @@ const RUN_ERRORS = [
     "webhookLimited",
     "noticeNotDelivered",
     "announceLimited",
-    "announceFailed"
+    "announceFailed",
+    "privacyFailed",
+    "camerasGone"
 ] as const;
 
 /** A stored error code in the reader's words. */
@@ -283,7 +286,8 @@ const APP_NODE_KEYS = {
     "home.action.device": "homeDevice",
     "home.action.wait": "homeWait",
     "home.action.notify": "homeNotify",
-    "home.action.run": "homeRun"
+    "home.action.run": "homeRun",
+    "home.action.privacy": "homePrivacy"
 } as const;
 
 type AppNodeKey = (typeof APP_NODE_KEYS)[keyof typeof APP_NODE_KEYS];
@@ -300,6 +304,7 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "home.action.wait": Hourglass,
     "home.action.notify": Bell,
     "home.action.run": Workflow,
+    "home.action.privacy": EyeOff,
     "core.manual": Hand,
     "core.schedule": Clock,
     "core.webhook": Webhook,

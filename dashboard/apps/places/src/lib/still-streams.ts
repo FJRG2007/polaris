@@ -30,6 +30,7 @@ interface StillCandidate {
     readonly id: string;
     readonly installedAppId: string;
     readonly enabled: boolean;
+    readonly privacy: boolean;
     readonly power: string;
     readonly vendor: string;
     readonly subPath: string | null;

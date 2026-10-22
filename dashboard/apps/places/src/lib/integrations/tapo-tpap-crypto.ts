@@ -23,9 +23,21 @@ import {
     createHash,
     createHmac,
     hkdfSync,
-    pbkdf2Sync,
+    pbkdf2,
     timingSafeEqual
 } from "node:crypto";
+import { promisify } from "node:util";
+
+const pbkdf2Async = promisify(pbkdf2);
+
+/**
+ * The most work a camera may ask of one sign-in, as SHA-256-crypt rounds and
+ * PBKDF2 iterations. Both come from `pake_register`, before anything proves the
+ * answer is the camera's own, and a camera has to do the same work itself - so
+ * anything far past these is refused rather than run on the dashboard.
+ */
+export const MAX_CRYPT_ROUNDS = 100_000;
+export const MAX_PAKE_ITERATIONS = 100_000;
 
 type Point = { readonly x: bigint; readonly y: bigint } | null;
 
@@ -208,8 +220,8 @@ export function sha256Crypt(key: string, prefix: string): string {
         const cut = rest.indexOf("$");
         if (cut >= 0 && cut < rest.length - 1) {
             const asked = Number.parseInt(rest.slice(7, cut), 10);
-            if (!Number.isFinite(asked)) throw new Error("bad rounds");
-            rounds = Math.max(1000, Math.min(999_999_999, asked));
+            if (!Number.isFinite(asked) || asked > MAX_CRYPT_ROUNDS) throw new Error("bad rounds");
+            rounds = Math.max(1000, asked);
             rest = rest.slice(cut + 1);
             explicit = true;
         }
@@ -283,13 +295,15 @@ export interface PakeClient {
     readonly nonce: Buffer;
 }
 
-export function pakeClient(
+export async function pakeClient(
     register: PakeRegister,
     userRandom: Buffer,
     credential: string,
     randomScalar: Buffer
-): PakeClient {
-    const dk = pbkdf2Sync(
+): Promise<PakeClient> {
+    if (!Number.isInteger(register.iterations) || register.iterations < 1 || register.iterations > MAX_PAKE_ITERATIONS)
+        throw new Error("bad iterations");
+    const dk = await pbkdf2Async(
         Buffer.from(credential, "utf8"),
         Buffer.from(register.dev_salt, "base64"),
         register.iterations,

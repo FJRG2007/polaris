@@ -208,8 +208,7 @@ export function automationEngine(): AutomationEngine {
             const parsed = parseTarget(target);
             if (!parsed) return [];
             const privacy = await import("./privacy");
-            const ids = await privacy.camerasFor(installedAppId, parsed);
-            return privacy.groupPrivacy(ids, (id) => privacy.cameraPrivacy(installedAppId, id, on));
+            return privacy.switchPrivacy(installedAppId, parsed, on);
         },
         async notify(automation, message, runId, delivery) {
             const t = await placesTFor(automation.ownerId);

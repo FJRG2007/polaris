@@ -1095,10 +1095,7 @@ export async function cameraPrivacyAction(
     const { install } = await requireHome("home.control");
     const parsed = parseTarget(target);
     if (!parsed) return { error: await say("privacy.badTarget") };
-    const result = await guard(async () => {
-        const ids = await privacy.camerasFor(install.id, parsed);
-        return privacy.groupPrivacy(ids, (id) => privacy.cameraPrivacy(install.id, id, wanted));
-    });
+    const result = await guard(() => privacy.switchPrivacy(install.id, parsed, wanted));
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
     return { results: result.value };
@@ -1141,15 +1138,6 @@ export async function deleteCameraSetAction(id: string): Promise<{ error?: strin
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
     return {};
-}
-
-/** What one camera's privacy is now, read from the camera where it can say. */
-export async function readCameraPrivacyAction(
-    cameraId: string
-): Promise<{ result?: CameraPrivacy; error?: string }> {
-    const { install } = await requireHome("home.read");
-    const result = await guard(() => privacy.cameraPrivacy(install.id, cameraId, null));
-    return result.error ? { error: result.error } : { result: result.value };
 }
 
 export async function listClipsAction(input: {

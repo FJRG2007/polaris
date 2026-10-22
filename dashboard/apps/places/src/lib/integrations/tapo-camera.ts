@@ -249,7 +249,7 @@ function tpapOffer(json: unknown): tpap.PakeRegister & { extra: tpap.ExtraCrypt 
         typeof offer.dev_random !== "string" ||
         !Number.isInteger(iterations) ||
         iterations < 1 ||
-        iterations > 10_000_000
+        iterations > tpap.MAX_PAKE_ITERATIONS
     )
         throw new TapoError("failed");
     return {
@@ -298,11 +298,16 @@ async function tpapSignIn(
         const registerWait = lockoutSeconds(register.json);
         if (registerWait > 0) throw new TapoError("locked", registerWait);
         const offer = tpapOffer(register.json);
-        const credential = tpap.applyExtraCrypt(passcode, offer.extra);
+        let credential: string | null;
+        try {
+            credential = tpap.applyExtraCrypt(passcode, offer.extra);
+        } catch {
+            throw new TapoError("failed");
+        }
         if (credential === null) throw new TapoError("unsupported");
         let client: tpap.PakeClient;
         try {
-            client = tpap.pakeClient(offer, userRandom, credential, bytes(32));
+            client = await tpap.pakeClient(offer, userRandom, credential, bytes(32));
         } catch {
             throw new TapoError("failed");
         }

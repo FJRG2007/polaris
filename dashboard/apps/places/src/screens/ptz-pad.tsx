@@ -47,12 +47,15 @@ const ARROWS: {
 
 export function PtzPad({
     cameraId,
-    privacyPreset = null
+    privacyPreset = null,
+    onPrivacyPreset
 }: {
     cameraId: string;
     /** The stored privacy position ("" for none), or null on a camera whose own
      *  privacy mode is used instead - which then gets no such buttons. */
     privacyPreset?: string | null;
+    /** Told the stored position once the camera took it ("" once cleared). */
+    onPrivacyPreset?: (preset: string) => void;
 }) {
     const [preset, setPreset] = useState(privacyPreset);
     const [saving, setSaving] = useState(false);
@@ -109,6 +112,7 @@ export function PtzPad({
             return;
         }
         setPreset(result.privacyPreset);
+        onPrivacyPreset?.(result.privacyPreset);
         toast.show({ key, title: t("ptz.privacySaved") });
     };
 
@@ -123,7 +127,9 @@ export function PtzPad({
         if (!result || result.error) {
             setPreset(before);
             toast.show({ key, title: result?.error ?? t("ptz.failed") });
+            return;
         }
+        onPrivacyPreset?.("");
     };
 
     return (

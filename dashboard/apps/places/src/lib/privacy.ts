@@ -45,9 +45,25 @@ type Row = { id: string; name: string; vendor: string; address: string } & {
     controlPin: string | null;
 };
 
+/** A camera as it is stored, before anything is asked of it. */
+export interface StoredCamera {
+    readonly id: string;
+    readonly name: string;
+    readonly vendor: string;
+    readonly privacy: boolean;
+}
+
 /** The ids of every camera a target names, in this install. A camera or place
  *  that is not this install's names nothing. */
 export async function camerasFor(installedAppId: string, target: PrivacyTarget): Promise<string[]> {
+    return (await storedCamerasFor(installedAppId, target)).map((row) => row.id);
+}
+
+/** Every camera a target names, in this install, as it is stored. */
+export async function storedCamerasFor(
+    installedAppId: string,
+    target: PrivacyTarget
+): Promise<StoredCamera[]> {
     let where;
     if (target.kind === "camera") where = { installedAppId, id: target.id };
     else if (target.kind === "place") where = { installedAppId, placeId: target.id };
@@ -61,8 +77,11 @@ export async function camerasFor(installedAppId: string, target: PrivacyTarget):
         if (!set || set.cameraIds.length === 0) return [];
         where = { installedAppId, placeId: set.placeId, id: { in: set.cameraIds } };
     }
-    const rows = await prisma.camera.findMany({ where, select: { id: true }, orderBy: { name: "asc" } });
-    return rows.map((row) => row.id);
+    return prisma.camera.findMany({
+        where,
+        select: { id: true, name: true, vendor: true, privacy: true },
+        orderBy: { name: "asc" }
+    });
 }
 
 /** Ask the camera itself, trying each sign-in the house holds once. A wrong
@@ -173,19 +192,36 @@ export async function cameraPrivacy(
 
 /** Every camera of a group, each answering for itself. Run one at a time: a
  *  house of Tapo cameras is one TP-Link account, and a burst of sign-ins is
- *  what its lockout counts. */
+ *  what its lockout counts. One that could not be asked keeps what is stored
+ *  for it, so a failed switch never reads as done. */
 export async function groupPrivacy(
-    cameraIds: readonly string[],
+    cameras: readonly StoredCamera[],
     run: (cameraId: string) => Promise<CameraPrivacy>
 ): Promise<CameraPrivacy[]> {
     const results: CameraPrivacy[] = [];
-    for (const cameraId of cameraIds) {
+    for (const camera of cameras) {
         try {
-            results.push(await run(cameraId));
+            results.push(await run(camera.id));
         } catch (caught) {
-            if (!(caught instanceof HomeError)) console.warn("[places] privacy failed", cameraId, (caught as Error).name);
-            results.push({ cameraId, name: "", private: false, native: false, failure: "failed" });
+            if (!(caught instanceof HomeError)) console.warn("[places] privacy failed", camera.id, (caught as Error).name);
+            results.push({
+                cameraId: camera.id,
+                name: camera.name,
+                private: camera.privacy,
+                native: hasNativePrivacy(camera.vendor),
+                failure: "failed"
+            });
         }
     }
     return results;
+}
+
+/** Switch every camera a target names, each answering for itself. */
+export async function switchPrivacy(
+    installedAppId: string,
+    target: PrivacyTarget,
+    wanted: boolean
+): Promise<CameraPrivacy[]> {
+    const cameras = await storedCamerasFor(installedAppId, target);
+    return groupPrivacy(cameras, (id) => cameraPrivacy(installedAppId, id, wanted));
 }

@@ -291,6 +291,8 @@
         "answerTooLarge": "La respuesta era muy grande",
         "announceLimited": "Demasiados anuncios",
         "announceFailed": "El anuncio no se envió",
+        "privacyFailed": "Una cámara no cambió su privacidad",
+        "camerasGone": "Esas cámaras ya no están",
         "valuesTooLarge": "Valores demasiado grandes",
         "messageEmpty": "El mensaje quedó vacío",
         "messageRefused": "El canal no aceptó el mensaje",
@@ -793,6 +795,7 @@
         "homeWait": "Lugares: esperar a un equipo",
         "homeNotify": "Lugares: avisar a alguien",
         "homeRun": "Lugares: ejecutar otro",
+        "homePrivacy": "Lugares: privacidad",
         "missing": "Necesita una app que aquí no está instalada: no se puede cambiar ni ejecutar.",
         "install": "Instalar la app"
     },

@@ -323,6 +323,22 @@ export function OverviewView({
                     camera={watching}
                     canControl={canControl}
                     onClose={() => setWatching(null)}
+                    onPrivacyPreset={(preset) => {
+                        const id = watching.id;
+                        setWatching((current) =>
+                            current?.id === id ? { ...current, privacyPreset: preset } : current
+                        );
+                        setData((current) =>
+                            current
+                                ? {
+                                      ...current,
+                                      cameras: current.cameras.map((camera) =>
+                                          camera.id === id ? { ...camera, privacyPreset: preset } : camera
+                                      )
+                                  }
+                                : current
+                        );
+                    }}
                 />
             ) : null}
         </div>

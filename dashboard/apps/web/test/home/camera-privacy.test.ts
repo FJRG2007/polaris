@@ -45,6 +45,8 @@ describe("targets", () => {
     });
 });
 
+const stored = (id: string, privacy = false) => ({ id, name: `Camera ${id}`, vendor: "generic", privacy });
+
 describe("a group", () => {
     it("switches every camera it can and reports the one that refused", async () => {
         const run = vi.fn(async (id: string): Promise<CameraPrivacy> => {
@@ -53,7 +55,7 @@ describe("a group", () => {
             if (id === "c") throw new Error("socket closed");
             return { cameraId: id, name: id, private: true, native: true };
         });
-        const results = await groupPrivacy(["a", "b", "c", "d"], run);
+        const results = await groupPrivacy(["a", "b", "c", "d"].map((id) => stored(id)), run);
         expect(run).toHaveBeenCalledTimes(4);
         expect(results.map((row) => [row.cameraId, row.private, row.failure ?? null])).toEqual([
             ["a", true, null],
@@ -62,10 +64,24 @@ describe("a group", () => {
             ["d", true, null]
         ]);
         expect(groupState(results)).toEqual({ all: false, some: 2, total: 4 });
+        expect(results[2]!.name).toBe("Camera c");
+    });
+
+    it("keeps what is stored for a camera that could not be asked", async () => {
+        const results = await groupPrivacy(
+            [stored("a", true), { ...stored("b", true), vendor: "tapo" }],
+            async () => {
+                throw new Error("socket closed");
+            }
+        );
+        expect(results).toEqual([
+            { cameraId: "a", name: "Camera a", private: true, native: false, failure: "failed" },
+            { cameraId: "b", name: "Camera b", private: true, native: true, failure: "failed" }
+        ]);
     });
 
     it("keeps going past a camera that is not this house's", async () => {
-        const results = await groupPrivacy(["x", "y"], async (id) => {
+        const results = await groupPrivacy([stored("x"), stored("y")], async (id) => {
             if (id === "x") throw new HomeError("Camera not found");
             return { cameraId: id, name: id, private: true, native: false };
         });
