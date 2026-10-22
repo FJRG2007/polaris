@@ -133,14 +133,19 @@ describe("cameras saved reading the stills", () => {
     });
 
     it("skip a make that speaks no ONVIF, or never reads the path", async () => {
-        const skipped = [camera("c4", "/stream8", "tapo-battery"), camera("c6", "/stream8", "tapo-cloud")];
+        const skipped = [
+            camera("c4", "/stream8", "tapo-battery"),
+            camera("c6", "/stream8", "tapo-cloud")
+        ];
         expect(await repairStillStreams(relay, skipped, () => true)).toBe(0);
         expect(updates).toEqual([]);
     });
 
     it("are left for the next pass once the time for this one has run out", async () => {
         const spent = Date.now() - 1;
-        expect(await repairStillStreams(relay, [camera("c7", "/stream8")], () => true, spent)).toBe(0);
+        expect(await repairStillStreams(relay, [camera("c7", "/stream8")], () => true, spent)).toBe(
+            0
+        );
         expect(updates).toEqual([]);
 
         expect(await repairStillStreams(relay, [camera("c7", "/stream8")], () => true)).toBe(1);
