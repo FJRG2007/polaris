@@ -681,6 +681,10 @@
         "pairingRanOut": "Ese paso ha tardado demasiado y ha caducado. Vuelve a empezar la conexión.",
         "uploadToGoOn": "Sube el archivo de la app Philips Air+ para seguir",
         "petkitTooMany": "Demasiadas órdenes a PETKIT en un minuto; prueba de nuevo en un momento",
+        "petkitNoAccount": "PETKIT no tiene una cuenta con ese correo en ese país. En la app de PETKIT abre Settings > Account management > Change the region, revisa el país (puede que se eligiera mal al crear la cuenta) y elige aquí el mismo.",
+        "noSuchSetting": "Esa conexión no tiene ese ajuste",
+        "petkitTakenOver": "PETKIT cerró la sesión de Polaris porque esta cuenta inició sesión en otro sitio, casi seguro la app de PETKIT: solo permite una sesión por cuenta. Activa \"Recuperar la sesión\" en los ajustes de esta conexión o vuelve a conectarla.",
+        "petkitEndedWaiting": "La sesión de Polaris en PETKIT ha terminado y \"Recuperar la sesión\" está desactivado, así que Polaris no ha vuelto a entrar para no cerrar la sesión de la app de PETKIT. Actívalo en los ajustes de esta conexión o vuelve a conectarla.",
         "litterNothingRunning": "No tiene nada en marcha que pausar o reanudar",
         "litterNoDeodorizerReset": "El ambientador de este arenero no se reinicia desde aquí",
         "notOnAccount": "Ese dispositivo no está en esta cuenta",
@@ -1150,7 +1154,7 @@
             "fields": {
                 "country": {
                     "label": "País",
-                    "hint": "El país que elegiste al crear la cuenta de PETKIT."
+                    "hint": "El que tiene la app de PETKIT en Settings > Account management > Change the region."
                 },
                 "email": {
                     "label": "Correo",
@@ -1158,6 +1162,12 @@
                 },
                 "password": {
                     "label": "Contraseña"
+                }
+            },
+            "options": {
+                "takeBack": {
+                    "label": "Recuperar la sesión",
+                    "hint": "PETKIT permite una sola sesión por cuenta: entrar aquí cierra la app de PETKIT en esa cuenta. Activo, Polaris vuelve a entrar cuando la app se la quita. Desactívalo mientras uses la app."
                 }
             }
         }
@@ -1737,7 +1747,8 @@
         "disconnect": "Desconectar",
         "filterSoon": "Filtro: cambiar pronto",
         "filterNow": "Cambiar filtro",
-        "connectLocally": "Conectar {name} en local"
+        "connectLocally": "Conectar {name} en local",
+        "accountSettings": "Ajustes de {name}"
     },
     "devicePanel": {
         "watchOnly": "Configurado para vigilarse, no para manejarse.",

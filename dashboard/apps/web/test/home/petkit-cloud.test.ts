@@ -18,7 +18,8 @@ import {
     litterOf
 } from "@polaris-app/places/src/lib/drivers/petkit-cloud";
 import { DriverError } from "@polaris-app/places/src/lib/drivers/contract";
-import { deviceConnection } from "@polaris-app/places/src/lib/device-connections";
+import { placesRefusalText } from "@polaris-app/places/src/lib/refusal-text";
+import { deviceConnection, optionOn } from "@polaris-app/places/src/lib/device-connections";
 
 const GATEWAY = "https://api.example-petkit.test/latest/";
 
@@ -281,7 +282,36 @@ describe("PETKIT litter boxes", () => {
         expect(calls.length).toBe(before);
     });
 
-    it("signs in again once when the session has ended, then reads", async () => {
+    it("signs in again when the stored session has run its time, then reads", async () => {
+        const stored = (await driver.verify(typed))!;
+        usePetkitFetch(null);
+        calls = [];
+        const cloud = defaultCloud();
+        respond = (call) =>
+            call.url.pathname.endsWith("/user/login")
+                ? fixtureSession("fixture-session-renewed")
+                : cloud(call);
+        usePetkitFetch(async (input, init) => {
+            const call: Call = {
+                url: new URL(String(input)),
+                method: init?.method ?? "GET",
+                headers: (init?.headers ?? {}) as Record<string, string>,
+                form: new URLSearchParams(typeof init?.body === "string" ? init.body : "")
+            };
+            calls.push(call);
+            const answer = respond(call);
+            return answer instanceof Response ? answer : json(answer);
+        });
+        const lapsed = { ...stored, sessionUntil: String(Date.now() - 1_000) };
+        const boxes = await driver.list(lapsed);
+        expect(boxes).toHaveLength(1);
+        expect(calls.filter((call) => call.url.pathname.endsWith("/user/login"))).toHaveLength(1);
+        // The new session is written back on the next use.
+        const renewed = await driver.renew!(lapsed);
+        expect(renewed?.session).toBe("fixture-session-renewed");
+    });
+
+    it("takes the session back by default when the phone app took it", async () => {
         const stored = (await driver.verify(typed))!;
         const cloud = defaultCloud();
         let ended = false;
@@ -291,15 +321,130 @@ describe("PETKIT litter boxes", () => {
                 return { error: { code: 5, msg: "fixture: session expired" } };
             }
             if (call.url.pathname.endsWith("/user/login"))
-                return fixtureSession("fixture-session-renewed");
+                return fixtureSession("fixture-session-taken-back");
             return cloud(call);
         };
-        const boxes = await driver.list(stored);
-        expect(boxes).toHaveLength(1);
+        expect(await driver.list(stored)).toHaveLength(1);
         expect(calls.filter((call) => call.url.pathname.endsWith("/user/login"))).toHaveLength(2);
-        // The new session is written back on the next use.
         const renewed = await driver.renew!(stored);
-        expect(renewed?.session).toBe("fixture-session-renewed");
+        expect(renewed?.session).toBe("fixture-session-taken-back");
+    });
+
+    it("gives the session up to the phone app when taking it back is switched off", async () => {
+        const stored = { ...(await driver.verify(typed))!, takeBack: "0" };
+        const cloud = defaultCloud();
+        // The PETKIT app signed in with the same account: Polaris's session,
+        // still well inside its time, is refused from here on.
+        respond = (call) =>
+            call.url.pathname.endsWith("/group/family/list") ||
+            call.url.pathname.endsWith("/t4/device_detail")
+                ? { error: { code: 5, msg: "fixture: session expired" } }
+                : cloud(call);
+        const logins = () =>
+            calls.filter((call) => call.url.pathname.endsWith("/user/login")).length;
+        const before = logins();
+
+        const failure = await driver.list(stored).catch((caught) => caught);
+        expect(failure).toBeInstanceOf(DriverError);
+        expect((failure as DriverError).kind).toBe("unauthorized");
+        expect((failure as DriverError).message).toBe(
+            "PETKIT signed Polaris out because this account signed in somewhere else"
+        );
+        // Every later read and renewal waits, rather than signing the app out again.
+        await driver.probe!(stored);
+        await expect(driver.list(stored)).rejects.toBeInstanceOf(DriverError);
+        await expect(driver.renew!(stored)).rejects.toBeInstanceOf(DriverError);
+        expect(logins()).toBe(before);
+
+        // Switching it back on takes the session back on the next read: the old
+        // one is still refused, so it signs in again.
+        const fresh = defaultCloud();
+        respond = (call) =>
+            call.url.pathname.endsWith("/user/login")
+                ? fixtureSession("fixture-session-back")
+                : call.headers["F-Session"] === stored.session
+                  ? { error: { code: 5, msg: "fixture: session expired" } }
+                  : fresh(call);
+        await driver.probe!(stored);
+        expect(await driver.list({ ...stored, takeBack: "1" })).toHaveLength(1);
+        expect(logins()).toBe(before + 1);
+
+        // So does connecting it again.
+        respond = defaultCloud();
+        const again = (await driver.verify(typed))!;
+        await driver.probe!(again);
+        expect(await driver.list(again)).toHaveLength(1);
+    });
+
+    it("never signs in early or on a lapsed session while taking it back is off", async () => {
+        const stored = { ...(await driver.verify(typed))!, takeBack: "0" };
+        usePetkitFetch(null);
+        calls = [];
+        respond = defaultCloud();
+        usePetkitFetch(async (input, init) => {
+            const call: Call = {
+                url: new URL(String(input)),
+                method: init?.method ?? "GET",
+                headers: (init?.headers ?? {}) as Record<string, string>,
+                form: new URLSearchParams(typeof init?.body === "string" ? init.body : "")
+            };
+            calls.push(call);
+            const answer = respond(call);
+            return answer instanceof Response ? answer : json(answer);
+        });
+        const logins = () =>
+            calls.filter((call) => call.url.pathname.endsWith("/user/login")).length;
+
+        // In its last day it is used to its end rather than replaced.
+        const ending = { ...stored, sessionUntil: String(Date.now() + 60 * 60_000) };
+        expect(await driver.renew!(ending)).toBeNull();
+        expect(await driver.list(ending)).toHaveLength(1);
+
+        // Once it has run out it waits, saying why.
+        await driver.probe!(ending);
+        const lapsed = { ...stored, sessionUntil: String(Date.now() - 1_000) };
+        expect(await driver.renew!(lapsed)).toBeNull();
+        const failure = await driver.list(lapsed).catch((caught) => caught);
+        expect(failure).toBeInstanceOf(DriverError);
+        expect((failure as DriverError).kind).toBe("unauthorized");
+        expect((failure as DriverError).message).toBe(
+            "The PETKIT sign-in has ended and Polaris is not to take the session back"
+        );
+        expect(logins()).toBe(0);
+
+        // Switched on, it signs in; switched off again, that session is used.
+        await driver.probe!(lapsed);
+        expect(await driver.list({ ...lapsed, takeBack: "1" })).toHaveLength(1);
+        expect(logins()).toBe(1);
+        await driver.probe!(lapsed);
+        expect(await driver.list(lapsed)).toHaveLength(1);
+        expect(logins()).toBe(1);
+    });
+
+    it("says to check the region when PETKIT does not know the email", async () => {
+        respond = (call) =>
+            call.url.pathname.endsWith("/v1/regionservers")
+                ? FIXTURE_REGIONS
+                : { error: { code: 125, msg: "fixture: no such account" } };
+        const failure = await driver.verify(typed).catch((caught) => caught);
+        expect(failure).toBeInstanceOf(DriverError);
+        expect((failure as DriverError).message).toBe(
+            "PETKIT has no account with that email in that country"
+        );
+        // Both sentences reach the screen in the reader's language, with the
+        // way to fix it.
+        for (const locale of ["en-US", "es-ES"] as const) {
+            const t = placesCatalogs.translator(locale, "places");
+            expect(placesRefusalText(t, (failure as DriverError).message)).toContain(
+                "Change the region"
+            );
+            expect(
+                placesRefusalText(
+                    t,
+                    "PETKIT signed Polaris out because this account signed in somewhere else"
+                )
+            ).toContain(locale === "en-US" ? "Take the session back" : "Recuperar la sesión");
+        }
     });
 
     it("reads a running cycle, a full bin and a fault", () => {
@@ -508,6 +653,22 @@ describe("PETKIT day boundary", () => {
 });
 
 describe("PETKIT connection and words", () => {
+    it("offers taking the session back as a switch, on unless turned off", () => {
+        const connection = deviceConnection("petkit-cloud")!;
+        const option = connection.options?.find((entry) => entry.key === "takeBack");
+        expect(option?.defaultOn).toBe(true);
+        expect(optionOn(option!, {})).toBe(true);
+        expect(optionOn(option!, null)).toBe(true);
+        expect(optionOn(option!, { takeBack: "0" })).toBe(false);
+        expect(optionOn(option!, { takeBack: "1" })).toBe(true);
+        for (const locale of ["en-US", "es-ES"] as const) {
+            const t = placesCatalogs.translator(locale, "places");
+            expect(t.has("connections.petkit-cloud.options.takeBack.label")).toBe(true);
+            expect(t.has("connections.petkit-cloud.options.takeBack.hint")).toBe(true);
+            expect(t.has("devicesView.accountSettings")).toBe(true);
+        }
+    });
+
     it("is registered with a country, an email and a secret password", () => {
         const connection = deviceConnection("petkit-cloud")!;
         expect(connection.kinds).toEqual(["litter"]);

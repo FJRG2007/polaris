@@ -116,6 +116,8 @@ export interface DeviceAccountView {
      *  address is not a credential, and "which bridge is this pointed at" has to
      *  be answerable without disconnecting it. */
     readonly settings: Readonly<Record<string, string>>;
+    /** Each of the connection's options (`ConnectionOption`), on or off. */
+    readonly options: Readonly<Record<string, boolean>>;
     readonly deviceCount: number;
 }
 
@@ -134,6 +136,7 @@ type AccountRow = {
 function toView(row: AccountRow): DeviceAccountView {
     const connection = registry.deviceConnection(row.connection);
     let settings: Record<string, string> = {};
+    const options: Record<string, boolean> = {};
     if (connection) {
         // A credential that cannot be read is not a reason for the row to vanish
         // off the screen: it is exactly the case somebody has to be told about,
@@ -143,6 +146,8 @@ function toView(row: AccountRow): DeviceAccountView {
             const value = fields?.[field.key];
             if (value !== undefined) settings[field.key] = value;
         }
+        for (const option of connection.options ?? [])
+            options[option.key] = registry.optionOn(option, fields);
     } else {
         settings = {};
     }
@@ -156,6 +161,7 @@ function toView(row: AccountRow): DeviceAccountView {
         statusNote: row.statusNote ?? "",
         lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
         settings,
+        options,
         deviceCount: row._count?.devices ?? 0
     };
 }
@@ -284,11 +290,43 @@ async function renewed(
         throw caught;
     }
     if (!next) return credentials;
-    await prisma.placeDeviceAccount.updateMany({
-        where: { id },
-        data: { secret: sealCredentials(next) }
-    });
-    return next;
+    const renewal = next;
+    const written = await rewriteSecret({ id }, (current) => ({
+        ...optionsOf(connection, current),
+        ...renewal
+    }));
+    return written ?? { ...optionsOf(connection, credentials), ...renewal };
+}
+
+/**
+ * Change an account's sealed fields from what is stored at the moment of the
+ * write, not from a copy read earlier: a renewal and a switch flipped during
+ * it would otherwise each put back what the other wrote.
+ *
+ * The write only lands on the secret it was worked out from, and is worked
+ * out again when something else wrote first. Null when the account is gone
+ * or its fields cannot be read.
+ */
+async function rewriteSecret(
+    where: { id: string; installedAppId?: string },
+    change: (fields: Record<string, string>) => Record<string, string>,
+    data: { status?: string; statusNote?: string | null } = {}
+): Promise<Record<string, string> | null> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const row = await prisma.placeDeviceAccount.findFirst({
+            where,
+            select: { secret: true }
+        });
+        const fields = row ? readCredentials(row.secret) : null;
+        if (!row || !fields) return null;
+        const next = change(fields);
+        const { count } = await prisma.placeDeviceAccount.updateMany({
+            where: { ...where, secret: row.secret },
+            data: { ...data, secret: sealCredentials(next) }
+        });
+        if (count === 1) return next;
+    }
+    throw new Error("places: an account kept changing while its fields were written");
 }
 
 // ---------------------------------------------------------------------------
@@ -362,6 +400,7 @@ export async function reconnectAccount(
             label: input.label.trim() || existing.label,
             secret: sealCredentials({
                 ...localLinkOf(readCredentials(existing.secret)),
+                ...optionsOf(existing.connection, readCredentials(existing.secret)),
                 ...(paired ?? input.fields)
             }),
             status: "ok",
@@ -375,6 +414,58 @@ export async function reconnectAccount(
         await signOut(existing.connection, existing.secret);
     }
     return toView(row);
+}
+
+/** The connection's options as they are set on these fields, which a
+ *  renewal or a sign-in typed again must not put back to their defaults. */
+function optionsOf(
+    connection: string,
+    fields: Readonly<Record<string, string>> | null
+): Record<string, string> {
+    const kept: Record<string, string> = {};
+    for (const option of registry.deviceConnection(connection)?.options ?? []) {
+        const value = fields?.[option.key];
+        if (value === "1" || value === "0") kept[option.key] = value;
+    }
+    return kept;
+}
+
+/**
+ * Turn one of an account's options on or off.
+ *
+ * Only the option is changed: the credential stays as it is, so nothing signs
+ * in for it. A key the connection does not declare is refused rather than
+ * stored, since the driver would never read it.
+ */
+export async function setAccountOption(
+    installedAppId: string,
+    id: string,
+    key: string,
+    on: boolean
+): Promise<DeviceAccountView> {
+    const row = await prisma.placeDeviceAccount.findFirst({
+        where: { id, installedAppId },
+        select: ACCOUNT_FIELDS
+    });
+    if (!row) throw new HomeError("That connection is not here");
+    const connection = registry.deviceConnection(row.connection);
+    if (!connection?.options?.some((option) => option.key === key))
+        throw new HomeError("That connection has no such setting");
+    // Turning a switch on is what an account refused for having it off was
+    // asked to do; the next use says whether anything else is still wrong.
+    const cleared = on && row.status === "unauthorized" ? { status: "ok", statusNote: null } : {};
+    const written = await rewriteSecret(
+        { id: row.id, installedAppId },
+        (fields) => ({ ...fields, [key]: on ? "1" : "0" }),
+        cleared
+    );
+    if (!written) throw new HomeError(`${row.label} has to be connected again`);
+    const updated = await prisma.placeDeviceAccount.findFirst({
+        where: { id: row.id, installedAppId },
+        select: { ...ACCOUNT_FIELDS, _count: { select: { devices: true } } }
+    });
+    if (!updated) throw new HomeError("That connection is not here");
+    return toView(updated);
 }
 
 /** The fields Polaris writes itself for a local link (`local*`), which a
@@ -397,18 +488,14 @@ export async function linkLocal(
 ): Promise<void> {
     const row = await prisma.placeDeviceAccount.findFirst({
         where: { id, installedAppId },
-        select: { secret: true }
+        select: { id: true }
     });
     if (!row) throw new HomeError("That connection is not here");
-    const fields = readCredentials(row.secret);
-    if (!fields) throw new HomeError("That connection has to be connected again");
-    const kept = Object.fromEntries(
-        Object.entries(fields).filter(([key]) => !key.startsWith("local"))
-    );
-    await prisma.placeDeviceAccount.updateMany({
-        where: { id, installedAppId },
-        data: { secret: sealCredentials({ ...kept, ...(broker ?? {}) }) }
-    });
+    const written = await rewriteSecret({ id, installedAppId }, (fields) => ({
+        ...Object.fromEntries(Object.entries(fields).filter(([key]) => !key.startsWith("local"))),
+        ...(broker ?? {})
+    }));
+    if (!written) throw new HomeError("That connection has to be connected again");
 }
 
 /**

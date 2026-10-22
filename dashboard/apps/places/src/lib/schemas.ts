@@ -372,6 +372,14 @@ export const deviceAccountSchema = z.object({
 
 export type DeviceAccountInput = z.infer<typeof deviceAccountSchema>;
 
+/** One of a connected account's switches (`ConnectionOption`), on or off.
+ *  Whether the connection has that switch is the service's to check. */
+export const deviceAccountOptionSchema = z.object({
+    accountId: z.string().uuid(),
+    key: z.string().trim().min(1).max(64),
+    on: z.boolean()
+});
+
 /** Asking a connection which units it finds on the network. `fresh` is the
  *  "look again" button: anything else may be answered from a scan a few
  *  seconds old. */
