@@ -11,6 +11,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import type { Fetch } from "../../src/api.js";
 import type { Host } from "../../src/paths.js";
 import type { Context } from "../../src/context.js";
+import type { Ui } from "../../src/ui.js";
 import { secrets, type RunResult, type Runner } from "../../src/secrets.js";
 
 /** Every temporary folder a test made, removed when its file is done. */
@@ -73,6 +74,8 @@ export interface ContextOptions {
     readonly platform?: NodeJS.Platform;
     /** What a hidden prompt or stdin hands `readSecret`; null when nothing does. */
     readonly secret?: string | null;
+    /** The framed prompts; given, the terminal counts as one a person is at. */
+    readonly ui?: Ui;
 }
 
 export async function testContext(options: ContextOptions = {}): Promise<Recorded> {
@@ -95,7 +98,7 @@ export async function testContext(options: ContextOptions = {}): Promise<Recorde
         io: {
             out: (text) => void (out += text),
             err: (text) => void (err += text),
-            interactive: answers.length > 0
+            interactive: answers.length > 0 || options.ui !== undefined
         },
         openBrowser: async (url) => {
             opened.push(url);
@@ -105,7 +108,8 @@ export async function testContext(options: ContextOptions = {}): Promise<Recorde
         sleep: async () => undefined,
         prompt: async () => answers.shift() ?? null,
         readSecret: async () => options.secret ?? null,
-        machineName: () => "test-laptop"
+        machineName: () => "test-laptop",
+        ui: options.ui ? async () => options.ui! : undefined
     };
     return { context, stdout: () => out, stderr: () => err, opened, dir };
 }

@@ -14,6 +14,7 @@
  * nothing of a Polaris server's is ever touched.
  */
 
+import { fancy, report, spinning } from "../ui.js";
 import { send } from "../api.js";
 import { line } from "../output.js";
 import { createHash } from "node:crypto";
@@ -129,24 +130,35 @@ export async function update(context: Context, flags: Flags): Promise<void> {
         );
     }
     const repo = marker.repo ?? DEFAULT_REPO;
-    let bytes: Uint8Array;
-    let origin: string;
-    let named: string;
-    if (flags.url) {
-        origin = normalizeUrl(flags.url);
-        bytes = await fetchBundle(context, origin);
-        named = `the CLI ${origin} serves`;
-    } else {
+    const download = async () => {
+        if (flags.url) {
+            const origin = normalizeUrl(flags.url);
+            return {
+                bytes: await fetchBundle(context, origin),
+                origin,
+                named: `the CLI ${origin} serves`
+            };
+        }
         const release = await newestRelease(context.fetch, repo);
-        bytes = await fetchRelease(context, release);
-        origin = `https://github.com/${repo}`;
-        named = `CLI ${release.version}`;
-    }
+        return {
+            bytes: await fetchRelease(context, release),
+            origin: `https://github.com/${repo}`,
+            named: `CLI ${release.version}`
+        };
+    };
+    const ui = await fancy(context, flags);
+    const { bytes, origin, named } = ui
+        ? await spinning(
+              ui,
+              { start: "Downloading the CLI", done: () => "Downloaded", failed: "Download failed" },
+              download
+          )
+        : await download();
 
     const digest = sha256(bytes);
     const current = sha256(new Uint8Array(await readFile(bundle)));
     if (digest === current) {
-        line(context.io, `Already up to date (${named}).`);
+        report(context, ui, `Already up to date (${named}).`);
         return;
     }
     // Written beside the old one and renamed over it: the rename is atomic, so
@@ -158,7 +170,7 @@ export async function update(context: Context, flags: Flags): Promise<void> {
         join(dirname(bundle), INSTALL_MARKER_FILE),
         `${JSON.stringify({ marker: CLI_MARKER, origin, repo, sha256: digest, installedAt: new Date().toISOString() }, null, 4)}\n`
     );
-    line(context.io, `Updated to ${named}.`);
+    report(context, ui, `Updated to ${named}.`);
 }
 
 /** Lines the installer added to a shell startup file, which carry the marker. */
@@ -194,7 +206,14 @@ export async function uninstall(
 ): Promise<void> {
     const config = await loadConfig(context.configDir);
     const names = Object.keys(config.profiles);
-    if (!flags.yes) {
+    const ui = await fancy(context, flags);
+    const question = `Remove the Polaris CLI from this computer${names.length ? ` and sign out ${names.length} profile(s)` : ""}?`;
+    if (ui) {
+        if (!(await ui.confirm(question))) {
+            ui.info("Nothing was removed.");
+            return;
+        }
+    } else if (!flags.yes) {
         const answer = await context.prompt(
             `Remove the Polaris CLI from this computer${names.length ? ` and sign out ${names.length} profile(s)` : ""}? [y/N] `
         );
@@ -258,5 +277,5 @@ export async function uninstall(
     const folder = installDir(host);
     if (await readMarker(join(folder, "polaris.mjs")))
         await rm(folder, { recursive: true, force: true });
-    line(context.io, "The Polaris CLI was removed from this computer.");
+    report(context, ui, "The Polaris CLI was removed from this computer.");
 }

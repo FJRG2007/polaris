@@ -14,6 +14,7 @@ import { readSecret } from "./secret-input.js";
 import { secrets, type Secrets } from "./secrets.js";
 import { canOpenBrowser, openBrowser } from "./browser.js";
 import { timed } from "./timing.js";
+import { clackUi, type Ui } from "./ui.js";
 import { configDir, currentHost, type Host } from "./paths.js";
 import { loadConfig, profileNameSchema, type Profile } from "./config.js";
 
@@ -40,6 +41,9 @@ export interface Context {
      *  something is piped in. Null when it was abandoned or too large. */
     readSecret(question: string): Promise<string | null>;
     machineName(): string;
+    /** The framed prompts, when a person is at the terminal (`ui.ts` decides
+     *  per command whether to use them). Absent where nobody can be asked. */
+    readonly ui?: () => Promise<Ui>;
 }
 
 /** The context of this process. */
@@ -71,7 +75,8 @@ export function processContext(): Context {
             }
         },
         readSecret,
-        machineName: () => hostname()
+        machineName: () => hostname(),
+        ui: interactive ? clackUi : undefined
     };
 }
 

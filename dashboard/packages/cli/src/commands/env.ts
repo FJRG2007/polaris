@@ -16,6 +16,7 @@ import { CliError, usage } from "../errors.js";
 import { refOf, resolveService } from "./deploy.js";
 import { line, printJson, table } from "../output.js";
 import { withoutFinalNewline } from "../secret-input.js";
+import { fancy, report, type Ui } from "../ui.js";
 import { requireSession, type Context } from "../context.js";
 import { envNamesSchema, envRemovedSchema, envSavedSchema } from "../schemas.js";
 
@@ -41,7 +42,12 @@ function checkedName(name: string | undefined): string {
 
 /** The value to store, from wherever it was offered. Refusals name the
  *  variable, never the value. */
-async function valueFor(context: Context, flags: Flags, name: string): Promise<string> {
+async function valueFor(
+    context: Context,
+    flags: Flags,
+    name: string,
+    ui: Ui | null
+): Promise<string> {
     let value: string | null;
     if (flags.fromFile) {
         try {
@@ -49,6 +55,8 @@ async function valueFor(context: Context, flags: Flags, name: string): Promise<s
         } catch {
             throw new CliError(`Could not read ${flags.fromFile}. Nothing was changed.`);
         }
+    } else if (ui) {
+        value = await ui.password(`Value for ${name} (not shown)`);
     } else {
         value = await context.readSecret(`Value for ${name} (not shown): `);
         if (value === null)
@@ -93,7 +101,7 @@ export async function env(context: Context, flags: Flags, args: readonly string[
 
 async function list(context: Context, flags: Flags, ref: string | undefined): Promise<void> {
     const session = await requireSession(context, flags);
-    const found = await resolveService(context, session, ref);
+    const found = await resolveService(context, session, ref, await fancy(context, flags));
     const { variables } = await call(
         session.connection,
         "GET",
@@ -122,8 +130,9 @@ async function set(
 ): Promise<void> {
     const name = checkedName(typed);
     const session = await requireSession(context, flags);
-    const found = await resolveService(context, session, ref);
-    const value = await valueFor(context, flags, name);
+    const ui = await fancy(context, flags);
+    const found = await resolveService(context, session, ref, ui);
+    const value = await valueFor(context, flags, name, ui);
     const saved = await call(
         session.connection,
         "PUT",
@@ -145,8 +154,9 @@ async function set(
     const note = saved.redeployed
         ? " The service redeploys to pick it up."
         : " The service picks it up on its next deploy (or run again with --restart).";
-    line(
-        context.io,
+    report(
+        context,
+        ui,
         `${saved.created ? "Created" : "Replaced"} ${name} on ${refOf(found)}.${note}`
     );
 }
@@ -159,8 +169,14 @@ async function remove(
 ): Promise<void> {
     const name = checkedName(typed);
     const session = await requireSession(context, flags);
-    const found = await resolveService(context, session, ref);
-    if (!flags.yes) {
+    const ui = await fancy(context, flags);
+    const found = await resolveService(context, session, ref, ui);
+    if (ui) {
+        if (!(await ui.confirm(`Remove ${name} from ${refOf(found)}?`))) {
+            ui.info("Nothing was removed.");
+            return;
+        }
+    } else if (!flags.yes) {
         const answer = await context.prompt(`Remove ${name} from ${refOf(found)}? [y/N] `);
         if (answer === null)
             throw usage(
@@ -189,5 +205,5 @@ async function remove(
     const note = removed.redeployed
         ? " The service redeploys without it."
         : " The service drops it on its next deploy (or run again with --restart).";
-    line(context.io, `Removed ${name} from ${refOf(found)}.${note}`);
+    report(context, ui, `Removed ${name} from ${refOf(found)}.${note}`);
 }

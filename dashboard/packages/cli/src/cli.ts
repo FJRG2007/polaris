@@ -78,7 +78,8 @@ export async function main(): Promise<void> {
         await run(argv, context);
     } catch (caught) {
         if (caught instanceof CliError) {
-            context.io.err(`plr: ${caught.message}\n`);
+            // A cancelled prompt has already said so on screen.
+            if (!("quiet" in caught && caught.quiet)) context.io.err(`plr: ${caught.message}\n`);
             process.exitCode = caught.exitCode;
             return;
         }
