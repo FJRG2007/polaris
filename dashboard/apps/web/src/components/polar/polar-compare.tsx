@@ -185,17 +185,22 @@ function storeComparison(comparison: PolarComparison | null): void {
     }
 }
 
-/** The open comparison, kept for a reload of this tab. */
-export function useComparison(): [
+/**
+ * The open comparison, kept for a reload of this tab. Only the view that can
+ * start one (`kept`) reads or writes the stored one; any other stays out of it.
+ */
+export function useComparison(kept: boolean): [
     PolarComparison | null,
     (next: ComparisonUpdate) => void
 ] {
     const [comparison, setComparison] = useState<PolarComparison | null>(null);
-    useEffect(() => setComparison(readStoredComparison()), []);
+    useEffect(() => {
+        if (kept) setComparison(readStoredComparison());
+    }, [kept]);
     const set = (next: ComparisonUpdate) =>
         setComparison((current) => {
             const value = typeof next === "function" ? next(current) : next;
-            storeComparison(value);
+            if (kept) storeComparison(value);
             return value;
         });
     return [comparison, set];
@@ -384,7 +389,7 @@ export function PolarCompare({
     onContinue: (threadId: string) => void;
     onClose: () => void;
     /** A column's answer ended: the sidebar and its title catch up. */
-    onSettled: (threadId: string) => void;
+    onSettled: (threadId: string, answered: boolean) => void;
 }) {
     const t = useTranslations("polar");
     const count = comparison.columns.length;
@@ -449,7 +454,7 @@ export function PolarCompare({
                         aria-controls={`polar-compare-column-${index}`}
                         onClick={() => setActive(index)}
                         className={cn(
-                            "max-w-[12rem] shrink-0 truncate rounded-md px-2 py-1 text-xs",
+                            "min-h-11 max-w-[12rem] shrink-0 truncate rounded-md px-3 text-xs",
                             index === active
                                 ? "bg-muted text-foreground"
                                 : "text-muted-foreground hover:bg-card-hover"
@@ -508,7 +513,7 @@ export function PolarCompare({
                                 settings={settings}
                                 onSent={() => markSent(column.threadId)}
                                 onContinue={() => onContinue(column.threadId)}
-                                onSettled={() => onSettled(column.threadId)}
+                                onSettled={(answered) => onSettled(column.threadId, answered)}
                             />
                         </section>
                     </div>
@@ -520,9 +525,13 @@ export function PolarCompare({
 
 type StoredMessage = UIMessage & { parentId: string | null };
 
-/** A thread's newest path, as the chat shows it; null when it cannot be read. */
-async function storedPath(threadId: string): Promise<UIMessage[] | null> {
+/**
+ * A thread's newest path, as the chat shows it; "missing" when the server has
+ * no such thread, null when it cannot be read.
+ */
+async function storedPath(threadId: string): Promise<UIMessage[] | "missing" | null> {
     const response = await fetch(`/api/polar/threads/${threadId}`).catch(() => null);
+    if (response?.status === 404) return "missing";
     if (!response?.ok) return null;
     const body = (await response.json().catch(() => null)) as {
         thread?: { messages?: StoredMessage[] };
@@ -544,7 +553,7 @@ interface ColumnProps {
     settings: CompareSettings;
     onSent: () => void;
     onContinue: () => void;
-    onSettled: () => void;
+    onSettled: (answered: boolean) => void;
 }
 
 /**
@@ -553,13 +562,16 @@ interface ColumnProps {
  */
 function ComparisonColumnView(props: ColumnProps) {
     // Decided once: marking the question sent must not reopen the column.
-    const [restored] = useState(props.column.sent);
+    const [restored, setRestored] = useState(props.column.sent);
     const [opening, setOpening] = useState<UIMessage[] | null>(restored ? null : []);
     useEffect(() => {
         if (!restored) return;
         let gone = false;
         void storedPath(props.column.threadId).then((messages) => {
-            if (!gone) setOpening(messages ?? []);
+            if (gone) return;
+            // Never reached the server: it is asked again.
+            if (messages === "missing") setRestored(false);
+            setOpening(messages === "missing" ? [] : (messages ?? []));
         });
         return () => {
             gone = true;
@@ -614,6 +626,7 @@ function ColumnChat({
                         temporary: false,
                         web: live.current.web,
                         off: live.current.toolNames,
+                        connectors: false,
                         refine: null,
                         parentId:
                             messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
@@ -624,30 +637,40 @@ function ColumnChat({
     );
     const chat = useChat({ id: column.threadId, messages: opening, transport, resume });
     const busy = chat.status === "submitted" || chat.status === "streaming";
+    const answers = chat.messages.filter((message) => message.role === "assistant");
+    const answered = answers.some((message) => textOf(message) !== "");
 
     // A new column asks its question once, as soon as it is on screen.
     const asked = useRef(resume);
     useEffect(() => {
         if (asked.current) return;
         asked.current = true;
-        onSent();
         void chat.sendMessage({ text: question });
     }, []);
 
+    // Marked sent once the server took the turn, so a reload before that asks again.
+    const accepted = useRef(resume);
+    useEffect(() => {
+        if (accepted.current) return;
+        const answering =
+            chat.status === "streaming" ||
+            chat.messages.some((message) => message.role === "assistant");
+        if (!answering) return;
+        accepted.current = true;
+        onSent();
+    }, [chat.status, chat.messages]);
+
     const wasBusy = useRef(busy);
     useEffect(() => {
-        if (wasBusy.current && !busy) onSettled();
+        if (wasBusy.current && !busy) onSettled(answered);
         wasBusy.current = busy;
     }, [busy]);
-
-    const answers = chat.messages.filter((message) => message.role === "assistant");
     const last = chat.messages.at(-1);
     const failure = last?.role === "assistant" ? polarFailure.messageFailure(last) : null;
     const looseError = chat.error && !failure ? chat.error : null;
     const waiting = last?.parts.some(
         (part) => "state" in part && part.state === "approval-requested"
     );
-    const answered = answers.some((message) => textOf(message) !== "");
 
     return (
         <>

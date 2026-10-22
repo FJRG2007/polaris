@@ -789,7 +789,7 @@ export function PolarChat({
     const [newProject, setNewProject] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(fullPage);
     // One question asked of several models, laid out side by side.
-    const [comparison, setComparison] = polarCompare.useComparison();
+    const [comparison, setComparison] = polarCompare.useComparison(fullPage);
     // A deleted conversation that is open is replaced by a new one.
     const removed = useRef<(id: string) => void>(() => undefined);
     const sidebar = usePolarSidebar({
@@ -1060,11 +1060,9 @@ export function PolarChat({
     // A new thread is named by its model after the first answer; its title is
     // asked for once, and the placeholder in the list is swapped for it.
     const titled = useRef(new Set<string>());
-    useEffect(() => {
-        if (!settled || titled.current.has(threadId)) return;
-        if (!chat.messages.some((message) => message.role === "assistant")) return;
-        titled.current.add(threadId);
-        const id = threadId;
+    const askTitle = (id: string) => {
+        if (titled.current.has(id)) return;
+        titled.current.add(id);
         fetch(`/api/polar/threads/${id}/title`)
             .then((response) => (response.ok ? response.json() : null))
             .then((data: { title?: unknown } | null) => {
@@ -1072,6 +1070,11 @@ export function PolarChat({
                 if (title) sidebar.retitle(id, title);
             })
             .catch(() => undefined);
+    };
+    useEffect(() => {
+        if (!settled) return;
+        if (!chat.messages.some((message) => message.role === "assistant")) return;
+        askTitle(threadId);
     }, [settled, threadId]);
     // The suggested next message (`lib/polar/suggestions.ts`): asked for once
     // after an answer finishes in this tab, never for one only opened, and
@@ -2423,15 +2426,9 @@ export function PolarChat({
                                 setComparison(null);
                                 void openThread(id);
                             }}
-                            onSettled={(id) => {
+                            onSettled={(id, answered) => {
                                 sidebar.refresh(true);
-                                fetch(`/api/polar/threads/${id}/title`)
-                                    .then((response) => (response.ok ? response.json() : null))
-                                    .then((data: { title?: unknown } | null) => {
-                                        if (typeof data?.title === "string")
-                                            sidebar.retitle(id, data.title);
-                                    })
-                                    .catch(() => undefined);
+                                if (answered) askTitle(id);
                             }}
                         />
                     ) : welcome ? (

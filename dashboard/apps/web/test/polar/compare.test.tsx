@@ -16,9 +16,11 @@ type Chat = { messages: Message[]; error?: Error; status?: string };
 
 const chats = new Map<string, Chat>();
 const sent: Array<{ id: string; text: string }> = [];
+const transports = new Map<string, ChatTransport<UIMessage>>();
 
 vi.mock("@ai-sdk/react", () => ({
-    useChat: (options: { id: string; messages?: Message[] }) => {
+    useChat: (options: { id: string; messages?: Message[]; transport: ChatTransport<UIMessage> }) => {
+        transports.set(options.id, options.transport);
         const chat = chats.get(options.id) ?? { messages: options.messages ?? [] };
         return {
             id: options.id,
@@ -34,6 +36,7 @@ vi.mock("@ai-sdk/react", () => ({
     }
 }));
 
+import type { ChatTransport, UIMessage } from "ai";
 import type { ModelChoice } from "@/lib/polar/shared";
 import * as compare from "@/components/polar/polar-compare";
 
@@ -64,7 +67,9 @@ const T2 = "22222222-2222-4222-8222-222222222222";
 
 beforeEach(() => {
     chats.clear();
+    transports.clear();
     sent.length = 0;
+    window.sessionStorage.clear();
 });
 afterEach(() => {
     cleanup();
@@ -257,8 +262,9 @@ describe("the columns", () => {
         await waitFor(() => expect(sent).toHaveLength(2));
         expect(sent.map((one) => one.id).sort()).toEqual([T1, T2]);
         expect(sent.every((one) => one.text === "Which is faster?")).toBe(true);
-        // Both columns marked themselves sent, neither overwrote the other.
-        expect(comparison!.columns.every((column) => column.sent)).toBe(true);
+        // Only the column the server answered is marked sent; the failed one
+        // is asked again after a reload.
+        expect(comparison!.columns.map((column) => column.sent)).toEqual([true, false]);
 
         expect(screen.getByText("The first one.")).toBeTruthy();
         expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
@@ -305,5 +311,99 @@ describe("the columns", () => {
         );
         expect(await screen.findAllByText("Stored answer.")).toHaveLength(2);
         expect(sent).toHaveLength(0);
+    });
+
+    it("asks again a column marked sent whose thread the server never stored", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "not_found" }, { status: 404 })));
+        render(
+            <compare.PolarCompare
+                comparison={{
+                    question: "Q",
+                    columns: [{ threadId: T1, choice: choice("anthropic", "m-1"), sent: true }]
+                }}
+                onChange={() => undefined}
+                providers={PROVIDERS}
+                isAdmin={false}
+                settings={{ web: false, toolNames: [] }}
+                onContinue={() => undefined}
+                onClose={() => undefined}
+                onSettled={() => undefined}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        await waitFor(() => expect(sent).toEqual([{ id: T1, text: "Q" }]));
+    });
+
+    it("posts each turn with every Polaris tool and the connectors off", async () => {
+        render(
+            <compare.PolarCompare
+                comparison={{
+                    question: "Q",
+                    columns: [{ threadId: T1, choice: choice("anthropic", "m-1"), sent: false }]
+                }}
+                onChange={() => undefined}
+                providers={PROVIDERS}
+                isAdmin={false}
+                settings={{ web: true, toolNames: ["tasks_create", "connector_github_issue"] }}
+                onContinue={() => undefined}
+                onClose={() => undefined}
+                onSettled={() => undefined}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        await waitFor(() => expect(transports.has(T1)).toBe(true));
+        const posted = vi.fn(async (_url: string, _init: RequestInit) => new Response("", { status: 500 }));
+        vi.stubGlobal("fetch", posted);
+        await transports
+            .get(T1)!
+            .sendMessages({
+                chatId: T1,
+                trigger: "submit-message",
+                messageId: undefined,
+                abortSignal: undefined,
+                messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "Q" }] }]
+            })
+            .catch(() => undefined);
+        expect(posted).toHaveBeenCalledTimes(1);
+        const [url, init] = posted.mock.calls[0]!;
+        expect(url).toBe("/api/polar/chat");
+        const body = JSON.parse(String(init.body));
+        expect(body).toMatchObject({
+            threadId: T1,
+            choice: choice("anthropic", "m-1"),
+            web: true,
+            off: ["tasks_create", "connector_github_issue"],
+            connectors: false,
+            temporary: false,
+            projectId: null
+        });
+    });
+});
+
+describe("the stored comparison", () => {
+    const stored = {
+        question: "Q",
+        columns: [{ threadId: T1, choice: choice("anthropic", "m-1"), sent: true }]
+    };
+
+    function Probe({ kept, clear }: { kept: boolean; clear?: boolean }) {
+        const [comparison, setComparison] = compare.useComparison(kept);
+        return (
+            <button type="button" onClick={() => clear && setComparison(null)}>
+                {comparison ? "open" : "none"}
+            </button>
+        );
+    }
+
+    it("is restored only where a comparison can be started", async () => {
+        window.sessionStorage.setItem("polar.compare", JSON.stringify(stored));
+        render(<Probe kept />);
+        expect(await screen.findByText("open")).toBeTruthy();
+        cleanup();
+        render(<Probe kept={false} clear />);
+        fireEvent.click(screen.getByRole("button"));
+        expect(screen.getByText("none")).toBeTruthy();
+        // The side panel neither shows it nor clears it for the full page.
+        expect(window.sessionStorage.getItem("polar.compare")).not.toBeNull();
     });
 });
