@@ -13,7 +13,8 @@ import type { Locale } from "@polaris/core";
 export type DeckActionKind = "run" | "toggle" | "state" | "dial" | "open";
 
 /** The heading the plugin's picker groups actions under. */
-export type DeckArea = "chat" | "status" | "watch" | "deploy" | "places" | "polaris" | "tools";
+export type DeckArea =
+    "chat" | "call" | "status" | "watch" | "deploy" | "places" | "polaris" | "tools";
 
 /** One setting an action takes, as the plugin's settings screen draws it. */
 export interface DeckOptionField {
@@ -66,6 +67,10 @@ export interface DeckState {
     readonly on?: boolean;
     /** One more short line under the value. */
     readonly detail?: string;
+    /** An icon for what it is now - a crossed-out microphone, a fan rather
+     *  than a bulb - drawn instead of the action's. A name the plugin does not
+     *  know falls back to the action's own. */
+    readonly icon?: string;
 }
 
 /** What a run answers. `message` is a refusal written for a person. */

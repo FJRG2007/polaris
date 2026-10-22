@@ -235,6 +235,7 @@
             box.append(row(field.label, control, null, field.required));
         }
         if (entry?.confirm) box.append(el("p", { class: "hint", text: words.confirmHint }));
+        if (entry?.area === "call") box.append(el("p", { class: "hint", text: words.callHint }));
 
         const name = el("input", { type: "text", maxlength: 40, value: settings.label ?? "" });
         name.addEventListener("input", () =>

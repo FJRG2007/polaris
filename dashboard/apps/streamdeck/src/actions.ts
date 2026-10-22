@@ -1,10 +1,12 @@
 /**
- * The plugin's three actions.
+ * The plugin's actions.
  *
  * - **Action** (the key): any key the catalogue offers - run, toggle, show or open -
  *   set in its settings screen.
  * - **Device dial**: a dial the catalogue offers (a light's brightness),
  *   turned on the Stream Deck +; the level lands once the turning stops.
+ * - **Call**, **Soundboard**, **Places device** and **Places dial**: the same
+ *   key and dial, offering only that part of the catalogue.
  * - **Timer**: a countdown or stopwatch kept in the plugin, on a key or a dial.
  */
 
@@ -25,6 +27,7 @@ import { hub } from "./hub";
 import * as timers from "./timer";
 import { keyImage } from "./render";
 import { fromInspector, tellInspector } from "./inspector";
+import { DIAL_UUID, KEY_UUID, TIMER_UUID, surfaceOf, type Surface } from "./surfaces";
 import { CONFIRM_MS, Confirmations, PressTimer, type Gesture } from "./presses";
 import {
     alternates,
@@ -35,22 +38,26 @@ import {
     type KeySettings
 } from "./face";
 
-export const PLUGIN_UUID = "io.github.fjrg2007.polaris";
-export const KEY_UUID = `${PLUGIN_UUID}.key`;
-export const DIAL_UUID = `${PLUGIN_UUID}.dial`;
-export const TIMER_UUID = `${PLUGIN_UUID}.timer`;
-
 /** How long the timer's key is held before letting go resets it. */
 const LONG_PRESS_MS = 600;
 /** A dial stops turning for this long before its level is sent. */
 const DIAL_SETTLE_MS = 350;
 
 export class PolarisKey extends SingletonAction<KeySettings> {
-    override readonly manifestId = KEY_UUID;
+    override readonly manifestId: string;
+    readonly #surface: Surface;
     readonly #presses = new PressTimer((id, gesture) => void this.#gesture(id, gesture));
     readonly #confirm = new Confirmations();
     /** Each key's settings as last heard, for the gesture that fires later. */
     readonly #settings = new Map<string, KeySettings>();
+
+    /** `manifestId` is the action of the manifest it stands for: the general
+     *  key, or one offering only the call, the soundboard or Places. */
+    constructor(manifestId: string = KEY_UUID) {
+        super();
+        this.manifestId = manifestId;
+        this.#surface = surfaceOf(manifestId) ?? "key";
+    }
 
     override onWillAppear(ev: WillAppearEvent<KeySettings>): void {
         if (!ev.action.isKey()) return;
@@ -144,17 +151,25 @@ export class PolarisKey extends SingletonAction<KeySettings> {
         _ev: PropertyInspectorDidAppearEvent<KeySettings>
     ): Promise<void> {
         await hub.refreshCatalogue(false);
-        await tellInspector("key");
+        await tellInspector(this.#surface);
     }
 
     override async onSendToPlugin(ev: SendToPluginEvent<never, KeySettings>): Promise<void> {
-        await fromInspector(ev.payload, "key");
+        await fromInspector(ev.payload, this.#surface);
     }
 }
 
 export class PolarisDial extends SingletonAction<KeySettings> {
-    override readonly manifestId = DIAL_UUID;
+    override readonly manifestId: string;
+    readonly #surface: Surface;
     readonly #settle = new Map<string, ReturnType<typeof setTimeout>>();
+
+    /** `manifestId` is the general dial, or the one offering only Places. */
+    constructor(manifestId: string = DIAL_UUID) {
+        super();
+        this.manifestId = manifestId;
+        this.#surface = surfaceOf(manifestId) ?? "dial";
+    }
 
     #draw(id: string, settings: KeySettings): void {
         const action = streamDeck.actions.getActionById(id);
@@ -230,11 +245,11 @@ export class PolarisDial extends SingletonAction<KeySettings> {
         _ev: PropertyInspectorDidAppearEvent<KeySettings>
     ): Promise<void> {
         await hub.refreshCatalogue(false);
-        await tellInspector("dial");
+        await tellInspector(this.#surface);
     }
 
     override async onSendToPlugin(ev: SendToPluginEvent<never, KeySettings>): Promise<void> {
-        await fromInspector(ev.payload, "dial");
+        await fromInspector(ev.payload, this.#surface);
     }
 }
 

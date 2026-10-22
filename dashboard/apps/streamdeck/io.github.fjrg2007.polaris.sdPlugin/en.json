@@ -1,6 +1,6 @@
 {
     "Name": "Polaris",
-    "Description": "Keys and dials for your Polaris: send a message, set your status, see unread messages, alarms and deployments, and switch the devices in your places.",
+    "Description": "Keys and dials for your Polaris: send a message, set your status, mute or hang up your call, play a sound, see unread messages, alarms and deployments, and switch the devices in your places.",
     "Category": "Polaris",
     "io.github.fjrg2007.polaris.key": {
         "Name": "Action",
@@ -13,6 +13,22 @@
     "io.github.fjrg2007.polaris.timer": {
         "Name": "Timer",
         "Tooltip": "A countdown or stopwatch. Press to start or pause, hold to reset."
+    },
+    "io.github.fjrg2007.polaris.call": {
+        "Name": "Call",
+        "Tooltip": "Mute, deafen, camera, record or hang up the call you are on in Polaris."
+    },
+    "io.github.fjrg2007.polaris.sound": {
+        "Name": "Soundboard",
+        "Tooltip": "Plays one of your sounds into the call you are on."
+    },
+    "io.github.fjrg2007.polaris.places": {
+        "Name": "Places device",
+        "Tooltip": "A device of your places on its own key: shows it, and switches, opens or locks it."
+    },
+    "io.github.fjrg2007.polaris.places-dial": {
+        "Name": "Places dial",
+        "Tooltip": "Sets a light's brightness or an air conditioner's temperature."
     },
     "Localization": {}
 }

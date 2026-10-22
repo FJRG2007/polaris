@@ -26,6 +26,7 @@ import { CallAudio } from "./call-audio";
 import { Button, cn, useShortcutHint } from "@polaris/ui";
 import { useCallHotkeys } from "./call-hotkeys";
 import { useCallRecorder } from "./call-recorder";
+import { useCallRemote } from "./call-remote-hook";
 import { useChatStream } from "./use-chat-stream";
 import { playCallSound } from "@/lib/call-sounds";
 import { RecordingPanel } from "./recording-panel";
@@ -75,6 +76,8 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
         if (recorder.current.running) recorder.current.stop();
         setSession(null);
     }, []);
+    // A deck key's mute, camera, record or hang-up, done in this tab.
+    useCallRemote(session?.meetingId ?? null, call, recording, leave);
 
     /**
      * Everybody's face, asked again, the moment this browser joins or leaves.

@@ -302,11 +302,12 @@ export async function readDeckStates(
     caller: DeckCaller,
     watched: DeckWatch,
     words: DeckWords
-): Promise<{ readings: DeckReading[]; chat: boolean }> {
+): Promise<{ readings: DeckReading[]; chat: boolean; call: boolean }> {
     const actions = new Map(
         (await everyAction(words, caller, false)).map((action) => [action.id, action])
     );
     let chat = false;
+    let call = false;
     const readings = await Promise.all(
         watched.map(async (entry): Promise<DeckReading> => {
             const action = actions.get(entry.action);
@@ -316,6 +317,7 @@ export async function readDeckStates(
                 const options = action.core.options.safeParse(entry.options);
                 if (!options.success) return { key: entry.key, state: { tone: "idle" } };
                 if (action.core.wakes === "chat") chat = true;
+                if (action.core.wakes === "call") call = true;
                 try {
                     return { key: entry.key, state: await action.core.read(options.data, caller) };
                 } catch (caught) {
@@ -331,5 +333,5 @@ export async function readDeckStates(
             return { key: entry.key, state: { tone: "idle" } };
         })
     );
-    return { readings, chat };
+    return { readings, chat, call };
 }

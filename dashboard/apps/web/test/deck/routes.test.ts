@@ -65,6 +65,11 @@ vi.mock("@/lib/chat/chat-service", () => ({ unreadTotal: async () => ({ messages
 vi.mock("@/lib/presence-service", () => ({}));
 vi.mock("@/lib/chat/access", () => ({ reachableChannelIds: async () => new Set<string>() }));
 vi.mock("@/lib/chat/live", () => ({ subscribeChatChanges: () => () => undefined }));
+vi.mock("@/lib/chat/chat-guard", () => ({ guardChat: async () => ({ value: null }) }));
+vi.mock("@/lib/chat/call-remote-service", () => ({
+    liveCallOf: async () => null,
+    deckSounds: async () => []
+}));
 vi.mock("@/lib/deck/deck-service", async (original) => ({
     ...(await original<typeof import("@/lib/deck/deck-service")>()),
     deckCatalogue: async () => [{ id: "chat.unread" }],

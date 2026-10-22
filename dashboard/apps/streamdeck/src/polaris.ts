@@ -71,6 +71,9 @@ export interface DeckState {
     readonly value?: string;
     readonly on?: boolean;
     readonly detail?: string;
+    /** What it is now - a crossed-out microphone, a fan rather than a bulb -
+     *  drawn instead of the action's icon when the plugin knows the name. */
+    readonly icon?: string;
 }
 
 export type RunResult =

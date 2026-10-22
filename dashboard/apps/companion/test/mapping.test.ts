@@ -236,6 +236,114 @@ describe("presets", () => {
     });
 });
 
+describe("your call and your places on Companion buttons", () => {
+    const entry = (
+        id: string,
+        kind: DeckAction["kind"],
+        options: DeckAction["options"] = []
+    ): DeckAction => ({
+        id,
+        kind,
+        area: id.split(".")[0]!,
+        label: id,
+        icon: "power",
+        options,
+        live: true
+    });
+    const MIC = entry("call.mic", "toggle");
+    const CAMERA = entry("call.camera", "toggle");
+    const RECORD = entry("call.record", "toggle");
+    const HANGUP = entry("call.hangup", "run");
+    const SOUND = entry("call.sound", "run", [
+        {
+            name: "sound",
+            type: "choice",
+            label: "Sound",
+            required: true,
+            choices: [{ value: "default-applause", label: "Applause" }]
+        }
+    ]);
+    const DEVICE = entry("places.device", "toggle", [
+        {
+            name: "deviceId",
+            type: "choice",
+            label: "Device",
+            required: true,
+            choices: [{ value: "d1", label: "Lamp" }]
+        }
+    ]);
+    const CALL = [MIC, CAMERA, RECORD, HANGUP, SOUND, DEVICE];
+
+    it("runs every call control, the soundboard and a Places device", () => {
+        expect(mapping.runnable(CALL).map((action) => action.id)).toEqual([
+            "call.mic",
+            "call.camera",
+            "call.record",
+            "call.hangup",
+            "call.sound",
+            "places.device"
+        ]);
+        expect(mapping.actionOptions(SOUND)).toEqual([
+            {
+                type: "dropdown",
+                id: "sound",
+                label: "Sound",
+                default: "default-applause",
+                choices: [{ id: "default-applause", label: "Applause" }]
+            }
+        ]);
+    });
+
+    it("has the mute, camera and recording state as variables, on or off", () => {
+        expect(mapping.catalogueVariables(CALL).map((variable) => variable.id)).toEqual([
+            "call_mic",
+            "call_camera",
+            "call_record",
+            "call_hangup",
+            "call_sound",
+            "places_device"
+        ]);
+        expect(mapping.stateValue({ tone: "warn", on: true, detail: "Muted" })).toBe("on");
+        expect(mapping.stateValue({ tone: "idle", detail: "No call" })).toBe("No call");
+    });
+
+    it("lights muted and deafened amber, recording red, and the camera green", () => {
+        expect(mapping.onStyle(MIC).bgcolor).toBe(mapping.COLORS.warn);
+        expect(mapping.onStyle(entry("call.deafen", "toggle")).bgcolor).toBe(mapping.COLORS.warn);
+        expect(mapping.onStyle(RECORD).bgcolor).toBe(mapping.COLORS.bad);
+        expect(mapping.onStyle(CAMERA).bgcolor).toBe(mapping.COLORS.ok);
+        expect(mapping.onStyle(DEVICE).bgcolor).toBe(mapping.COLORS.ok);
+    });
+
+    it("says out of a call on the button, and shows the switch as off", () => {
+        expect(mapping.stateStyle("Mute", { tone: "idle", detail: "No call" }, true)).toEqual({
+            bgcolor: mapping.COLORS.idle,
+            color: mapping.COLORS.white,
+            text: "Mute\nNo call"
+        });
+        expect(
+            mapping.stateStyle("Camera", { tone: "idle", on: false, detail: "Camera off" }, false)
+                .bgcolor
+        ).toBe(mapping.COLORS.off);
+    });
+
+    it("offers a ready-made button for each, under the call and Places", () => {
+        const specs = mapping.presetSpecs(CALL);
+        expect(specs.map((spec) => [spec.area, spec.id])).toEqual([
+            ["call", "call_mic"],
+            ["call", "call_camera"],
+            ["call", "call_record"],
+            ["call", "call_hangup"],
+            ["call", "call_sound"],
+            ["places", "places_device"]
+        ]);
+        expect(specs.find((spec) => spec.id === "call_sound")?.options).toEqual({
+            sound: "default-applause"
+        });
+        expect(specs.find((spec) => spec.id === "call_mic")?.feedbackId).toBe("call_mic");
+    });
+});
+
 describe("the connection's status", () => {
     it("shows the code and where to approve it while signing in", () => {
         const phase = {

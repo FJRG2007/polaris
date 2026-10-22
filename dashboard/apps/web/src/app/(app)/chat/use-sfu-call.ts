@@ -36,6 +36,7 @@
  */
 
 import { z } from "zod";
+import { callRemoteSchema, emitCallRemote } from "@/lib/chat/call-remote";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as quality from "./call-quality";
 import { volumeFor } from "./call-volumes";
@@ -288,7 +289,10 @@ const frameSchema = z.discriminatedUnion("kind", [
     /** Another browser of this same account took the call. */
     z.object({ kind: z.literal("claimed"), deviceId: z.string().optional() }),
     /** A moderator muted, deafened or disconnected this seat, or undid it. */
-    z.object({ kind: z.literal("moderated"), action: z.enum(CALL_MODERATIONS) })
+    z.object({ kind: z.literal("moderated"), action: z.enum(CALL_MODERATIONS) }),
+    /** The person in this seat asked for one of their own controls from a
+     *  deck key. Acted on by the provider, which holds the recorder too. */
+    z.object({ kind: z.literal("remote"), remote: callRemoteSchema })
 ]);
 
 /** Whether two verdicts say the same thing, so a call that has not changed does
@@ -2085,6 +2089,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         displaced.current = true;
                         setEnded(true);
                     }
+                    return;
+                }
+                if (frame.data.kind === "remote") {
+                    // A browser that was replaced no longer speaks for the seat.
+                    if (!displaced.current && !removed.current) emitCallRemote(frame.data.remote);
                     return;
                 }
                 if (frame.data.kind === "said") {

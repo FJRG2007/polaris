@@ -635,6 +635,9 @@ export function CallRoom({
      *  nowhere to put what it would make. */
     const canRecord =
         (canShare || (Boolean(viewerId) && mayRecord)) && held !== null && held.recording.supported;
+    // `mayRecord` is the conversation being a direct message or a group, and
+    // `canShare` being its host: `mayRecordCall` in `lib/chat/call-remote` is
+    // the same rule, asked by the server for a deck's record key.
     const mayAdd = Boolean(viewerId) && (mayInvite || canShare);
     const callItems = (canRecord && !call.recording) || mayAdd || Boolean(moreItems);
     const wasEnded = useRef(false);

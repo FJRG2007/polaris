@@ -4,7 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 
-const { placesDeckActions, clampTarget } = await import("@polaris-app/places/src/lib/deck-actions");
+const { placesDeckActions, clampTarget, naturalAction, naturalState } =
+    await import("@polaris-app/places/src/lib/deck-actions");
 
 const toggle = placesDeckActions().find((action) => action.id === "places.device-toggle")!;
 const device = (online: boolean, state = "on") => ({
@@ -128,5 +129,78 @@ describe("places air conditioners", () => {
         expect(command.options.safeParse({ deviceId: DEVICE, command: "turn-on" }).success).toBe(
             true
         );
+    });
+});
+
+describe("a device on its own key", () => {
+    const own = action("places.device");
+    const one = (fields: Record<string, unknown>) => ({
+        devices: [{ id: "d1", name: "Thing", online: true, operable: true, actions: [], ...fields }]
+    });
+
+    it("does what its owner means: flips on and off, opens a door, locks a lock", () => {
+        expect(naturalAction({ state: "on", actions: ["turn-on", "turn-off"] })).toBe("turn-off");
+        expect(naturalAction({ state: "off", actions: ["turn-on", "turn-off"] })).toBe("turn-on");
+        expect(naturalAction({ state: null, actions: ["turn-on", "turn-off"] })).toBe("turn-on");
+        // A door with a latch opens - unlocked and pulled - rather than locking.
+        expect(naturalAction({ state: "locked", actions: ["lock", "unlock", "open"] })).toBe(
+            "open"
+        );
+        expect(naturalAction({ state: "locked", actions: ["lock", "unlock"] })).toBe("unlock");
+        expect(naturalAction({ state: "unlocked", actions: ["lock", "unlock"] })).toBe("lock");
+        expect(naturalAction({ state: "on", actions: ["turn-on"] })).toBeNull();
+        expect(naturalAction({ state: null, actions: [] })).toBeNull();
+    });
+
+    it("reads the device on the press and sends nothing it has no natural thing for", () => {
+        expect(own.kind).toBe("toggle");
+        expect(own.scope).toBe("home.control");
+        expect(own.run.tool).toBe("places_device_control");
+        expect(
+            own.run.input(
+                { deviceId: DEVICE },
+                { read: one({ state: "on", actions: ["turn-on", "turn-off"] }) }
+            )
+        ).toEqual({ deviceId: DEVICE, action: "turn-off" });
+        expect(
+            own.run.input({ deviceId: DEVICE }, { read: one({ actions: ["dump"] }) })
+        ).toBeNull();
+        expect(own.run.input({ deviceId: DEVICE }, {})).toBeNull();
+        expect(own.options.safeParse({ deviceId: "not-a-device" }).success).toBe(false);
+    });
+
+    it("draws its kind, its bolt and the temperature it is set to", () => {
+        expect(naturalState(one({ kind: "light", state: "on", actions: [] }), "en-US")).toEqual({
+            tone: "ok",
+            on: true,
+            icon: "lightbulb"
+        });
+        expect(naturalState(one({ kind: "unknown", state: "off", actions: [] }), "en-US")).toEqual({
+            tone: "idle",
+            on: false,
+            icon: "power"
+        });
+        expect(
+            naturalState(
+                one({ kind: "climate", state: "on", actions: [], climate: { target: 22.5 } }),
+                "en-US"
+            )
+        ).toEqual({ tone: "ok", on: true, icon: "snowflake", value: "22.5°" });
+        expect(
+            naturalState(one({ kind: "lock", state: "unlocked", actions: [] }), "es-ES")
+        ).toEqual({ tone: "warn", on: false, icon: "lock-open", detail: "Abierta" });
+        expect(naturalState(one({ kind: "lock", state: "locked", actions: [] }), "en-US")).toEqual({
+            tone: "ok",
+            on: true,
+            icon: "lock",
+            detail: "Locked"
+        });
+    });
+
+    it("says an offline device is offline, still in its kind's icon", () => {
+        expect(
+            naturalState(one({ kind: "air", state: "on", online: false, actions: [] }), "es-ES")
+        ).toEqual({ tone: "bad", icon: "fan", detail: "Sin conexión" });
+        expect(naturalState({ devices: [] }, "en-US")).toEqual({ tone: "idle" });
     });
 });

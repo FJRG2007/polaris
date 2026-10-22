@@ -10,7 +10,7 @@ import { z } from "zod";
 import { hub } from "./hub";
 import { updateFor } from "./update";
 import streamDeck from "@elgato/streamdeck";
-import type { DeckAction } from "./polaris";
+import { offered, type Surface } from "./surfaces";
 
 /** What the screen may send. Anything else is ignored. */
 const messageSchema = z.discriminatedUnion("type", [
@@ -20,15 +20,6 @@ const messageSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("disconnect") }),
     z.object({ type: z.literal("refresh") })
 ]);
-
-/** Which catalogue entries an action of the plugin can be set to. */
-export type Surface = "key" | "dial";
-
-function offered(catalogue: readonly DeckAction[], surface: Surface): DeckAction[] {
-    return catalogue.filter((entry) =>
-        surface === "dial" ? entry.kind === "dial" : entry.kind !== "dial"
-    );
-}
 
 /** Tell the open settings screen where things stand. */
 export async function tellInspector(surface: Surface): Promise<void> {

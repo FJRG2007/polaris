@@ -188,6 +188,22 @@ export const COLORS = {
     off: 0x404040
 } as const;
 
+/**
+ * The colour a toggle's "is on" feedback lights a button with: green, but for
+ * the call's switches the colour their Stream Deck key turns - amber while
+ * nobody can hear you, red while the call is recorded - so a muted button
+ * reads as a warning rather than as everything being fine.
+ */
+const ON_TONES: Readonly<Record<string, DeckState["tone"]>> = {
+    "call.mic": "warn",
+    "call.deafen": "warn",
+    "call.record": "bad"
+};
+
+export function onStyle(entry: DeckAction): { bgcolor: number; color: number } {
+    return { bgcolor: COLORS[ON_TONES[entry.id] ?? "ok"], color: COLORS.white };
+}
+
 /** How a button looks for a state: its colour from the tone, and - when the
  *  feedback is set to - the value or status line under the name. */
 export function stateStyle(

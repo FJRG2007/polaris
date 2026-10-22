@@ -33,7 +33,11 @@ export async function GET(
     const seat = await resolveSeat(meetingId);
     // A non-200 makes EventSource give up rather than reconnect forever against
     // a call it is not in.
-    if (!seat) return Response.json({ error: (await readerWords("chat"))("errors.notInThatCall") }, { status: 403 });
+    if (!seat)
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.notInThatCall") },
+            { status: 403 }
+        );
 
     /** Settled by the request that proved the seat, and what everything below
      *  is about. Held on its own so the long-lived callbacks below do not each
@@ -87,10 +91,17 @@ export async function GET(
                 // What a moderator did to one seat is that seat's business. The
                 // rest of the room sees it on the roster.
                 if (event.kind === "moderated" && event.participantId !== participantId) return;
+                // The person's own controls, asked for from a deck: theirs
+                // alone, and never for a seat still at the door.
+                if (event.kind === "remote" && (event.participantId !== participantId || !admitted))
+                    return;
                 send({
                     kind: event.kind,
                     ...(event.deviceId ? { deviceId: event.deviceId } : {}),
-                    ...(event.action ? { action: event.action } : {})
+                    ...(event.action ? { action: event.action } : {}),
+                    // Only on its own kind, which the rule above already
+                    // narrowed to this seat.
+                    ...(event.kind === "remote" && event.remote ? { remote: event.remote } : {})
                 });
                 // The roster moving is the only thing that can admit somebody,
                 // and only a stream that is still waiting has to ask.

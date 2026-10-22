@@ -55,8 +55,11 @@
                 "Set, presses alternate: the action above, then this one, like on and off. The key shows which ran last.",
             realToggle: "This action already switches on and off, following what Polaris reads.",
             confirmHint: "This cannot be undone: press twice within 2 seconds to run it.",
+            callHint:
+                "Works the call you are on in Polaris, in the tab it is in. Not on a call, the key says so.",
             areas: {
                 chat: "Chat",
+                call: "Call",
                 status: "Status",
                 watch: "Watch",
                 deploy: "Deploy",
@@ -114,8 +117,11 @@
                 "Si se elige, alterna: la acción de arriba y luego esta, como encender y apagar. La tecla indica cuál fue.",
             realToggle: "Esta acción ya enciende y apaga según lo que Polaris lee del aparato.",
             confirmHint: "No se puede deshacer: pulsa dos veces en menos de 2 segundos.",
+            callHint:
+                "Maneja tu llamada de Polaris, en la pestaña donde está. Sin llamada, la tecla lo dice.",
             areas: {
                 chat: "Chat",
+                call: "Llamada",
                 status: "Estado",
                 watch: "Watch",
                 deploy: "Deploy",
