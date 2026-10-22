@@ -98,20 +98,28 @@ describe("the settings screen", () => {
                     address: "https://polaris.example.com",
                     account: "Ada",
                     connecting: { phase: "idle" },
-                    update: { version: "9.9.9", url: "https://polaris.example.com/account/downloads", ...update },
+                    update: {
+                        version: "9.9.9",
+                        url: "https://polaris.example.com/account/downloads",
+                        ...update
+                    },
                     catalogue: []
                 }
             })
         });
         const text = opened.dom.window.document.body.textContent ?? "";
-        const buttons = [...opened.dom.window.document.querySelectorAll("button")].map((b) => b.textContent);
+        const buttons = [...opened.dom.window.document.querySelectorAll("button")].map(
+            (b) => b.textContent
+        );
         return { ...opened, text, buttons };
     }
 
     it("offers Update now to a copy the install line put in, and asks the plugin for it", () => {
         const { dom, sent, text } = showUpdate({ now: true, updating: "idle" });
         expect(text).toContain("installs itself within six hours, or now");
-        const button = [...dom.window.document.querySelectorAll("button")].find((b) => b.textContent === "Update now");
+        const button = [...dom.window.document.querySelectorAll("button")].find(
+            (b) => b.textContent === "Update now"
+        );
         button?.click();
         expect(sent.find((message) => message.payload?.type === "updateNow")).toMatchObject({
             event: "sendToPlugin",

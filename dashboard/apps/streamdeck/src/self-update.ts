@@ -32,7 +32,9 @@ export function updaterPath(
     }
     if (platform === "darwin") {
         const home = env.HOME;
-        return home ? join(home, "Library", "Application Support", "Polaris", "streamdeck", "update.sh") : null;
+        return home
+            ? join(home, "Library", "Application Support", "Polaris", "streamdeck", "update.sh")
+            : null;
     }
     return null;
 }
@@ -73,7 +75,10 @@ export type UpdateRun = { ok: boolean; at: number } | null;
 
 /** Where that run stands: a job that outlives its time limit and has not swapped
  *  the plugin (which would have closed this copy) did not update it. */
-export function updateState(run: UpdateRun, now: number = Date.now()): "idle" | "started" | "failed" {
+export function updateState(
+    run: UpdateRun,
+    now: number = Date.now()
+): "idle" | "started" | "failed" {
     if (!run) return "idle";
     if (!run.ok || now - run.at >= UPDATE_RUN_MS) return "failed";
     return "started";

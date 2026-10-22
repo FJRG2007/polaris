@@ -35,7 +35,9 @@ export async function tellInspector(surface: Surface): Promise<void> {
         address: hub.credentials?.address ?? null,
         account: hub.credentials?.account ?? null,
         connecting: hub.connecting,
-        update: withUpdateNow(updateFor(hub.latest, hub.client.version, hub.credentials?.address ?? null)),
+        update: withUpdateNow(
+            updateFor(hub.latest, hub.client.version, hub.credentials?.address ?? null)
+        ),
         catalogue: offered(hub.catalogue, surface) as never,
         locked: hub.locked as never
     });

@@ -13,7 +13,14 @@ describe("updaterPath", () => {
             join(String.raw`C:\Users\ada\AppData\Local`, "Polaris", "streamdeck", "update.ps1")
         );
         expect(updaterPath("darwin", { HOME: "/Users/ada" })).toBe(
-            join("/Users/ada", "Library", "Application Support", "Polaris", "streamdeck", "update.sh")
+            join(
+                "/Users/ada",
+                "Library",
+                "Application Support",
+                "Polaris",
+                "streamdeck",
+                "update.sh"
+            )
         );
     });
 

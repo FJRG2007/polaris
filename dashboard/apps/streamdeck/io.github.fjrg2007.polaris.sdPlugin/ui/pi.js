@@ -92,9 +92,12 @@
                 on: { click: () => send("openUrl", { url: update.url }) }
             })
         ]);
-        if (!update.now) return [el("p", { class: "notice", text: fill(words.update, update) }), downloads];
-        if (update.updating === "started") return [el("p", { class: "notice", text: words.updateStarted })];
-        if (update.updating === "failed") return [el("p", { class: "notice", text: words.updateFailed }), downloads];
+        if (!update.now)
+            return [el("p", { class: "notice", text: fill(words.update, update) }), downloads];
+        if (update.updating === "started")
+            return [el("p", { class: "notice", text: words.updateStarted })];
+        if (update.updating === "failed")
+            return [el("p", { class: "notice", text: words.updateFailed }), downloads];
         return [
             el("p", { class: "notice", text: fill(words.updateNow, update) }),
             el("div", { class: "buttons" }, [
