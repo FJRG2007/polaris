@@ -6,6 +6,8 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
+import { canDeployAnyway, checkReleaseImage, parseStoredWarning } from "@/lib/security/deploy-gate";
+import { queueDependencyScan } from "@/lib/security/lockfiles";
 import {
     parsePrivateAccess,
     storePrivateAccess,
@@ -3707,6 +3709,9 @@ export async function deployApplication(
         audit?: Record<string, unknown>;
         /** Close the service's host port with this release (see `buildAppPlan`). */
         closePort?: boolean;
+        /** Let this release through a service that blocks vulnerable ones: the
+         *  person who asked and when are recorded on it (`deployAnyway`). */
+        securityOverride?: boolean;
     },
     /** Run a kept release image instead of building: a rollback, or the live
      *  release started again with changed variables. */
@@ -3818,7 +3823,10 @@ export async function deployApplication(
                 rollback && (rollback.kind ?? "rollback") === "rollback"
                     ? rollback.deploymentId
                     : null,
-            trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual")
+            trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual"),
+            ...(meta?.securityOverride
+                ? { securityOverrideById: userId, securityOverrideAt: new Date() }
+                : {})
         }
     });
     startedInThisProcess(deployment.id);
@@ -3961,10 +3969,12 @@ export async function restartFromKeptImage(
     reason: "variables" | "settings" | "scale" = "variables",
     /** More to say on the deploy's audit entry, such as the API key that asked. */
     audit?: Record<string, unknown>,
-    /** Close the service's host port with this release (see `buildAppPlan`). */
-    options?: { readonly closePort?: boolean }
+    /** Close the service's host port with this release (see `buildAppPlan`),
+     *  and let it through a service that blocks vulnerable ones (`deployAnyway`). */
+    options?: { readonly closePort?: boolean; readonly securityOverride?: boolean }
 ): Promise<string> {
     const closePort = options?.closePort === true;
+    const override = options?.securityOverride ? { securityOverride: true } : {};
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { currentDeploymentId: true }
@@ -3988,14 +3998,15 @@ export async function restartFromKeptImage(
         return deployApplication(applicationId, ownerId, userId, {
             trigger: reason,
             audit,
-            closePort
+            closePort,
+            ...override
         });
     }
     return deployApplication(
         applicationId,
         ownerId,
         userId,
-        { audit, closePort },
+        { audit, closePort, ...override },
         {
             deploymentId: live.id,
             imageTag: live.imageTag,
@@ -4275,6 +4286,20 @@ export interface DeploymentSummary {
     trafficPercent: number | null;
     /** The machine its image was built on, when that was not where it runs. */
     builtOn: string | null;
+    /** What a scan of its image found before it started: critical
+     *  vulnerabilities with a known fix, and whether that refused it. */
+    security: {
+        count: number;
+        id: string;
+        package: string;
+        fixedIn: string;
+        url: string | null;
+        refused: boolean;
+    } | null;
+    /** When somebody let it through a service that blocks vulnerable releases. */
+    securityOverrideAt: string | null;
+    /** Whether "Deploy anyway" applies: refused by the check, not let through. */
+    canDeployAnyway: boolean;
 }
 
 /**
@@ -4416,7 +4441,9 @@ export async function listDeployments(
             startedAt: true,
             finishedAt: true,
             isolated: true,
-            cutover: true
+            cutover: true,
+            securityWarning: true,
+            securityOverrideAt: true
         }
     });
     // The hostname a kept release answers on. Only releases that are still up have
@@ -4462,8 +4489,124 @@ export async function listDeployments(
             !row.cutover &&
             row.id !== app.currentDeploymentId,
         trafficPercent: canary?.deploymentId === row.id ? canary.percent : null,
-        builtOn: row.builtOn
+        builtOn: row.builtOn,
+        security: (() => {
+            const warning = parseStoredWarning(row.securityWarning);
+            return warning
+                ? {
+                      count: warning.count,
+                      id: warning.id,
+                      package: warning.package,
+                      fixedIn: warning.fixedIn,
+                      url: warning.url,
+                      refused: warning.refused
+                  }
+                : null;
+        })(),
+        securityOverrideAt: row.securityOverrideAt?.toISOString() ?? null,
+        canDeployAnyway: canDeployAnyway(row)
     }));
+}
+
+/**
+ * Deploy again a release the vulnerability check refused, letting this one
+ * through: the same commit, with who asked and when recorded on the new
+ * deployment, which is the one the check reads. Throws when the release is
+ * not one the check refused, or was already let through.
+ */
+export async function deployAnyway(
+    deploymentId: string,
+    ownerId: string,
+    userId: string
+): Promise<{ deploymentId: string; applicationId: string }> {
+    const refused = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: {
+            deployableType: true,
+            deployableId: true,
+            status: true,
+            securityWarning: true,
+            securityOverrideAt: true,
+            trigger: true,
+            rollbackOfId: true,
+            commitSha: true,
+            commitMessage: true,
+            authorName: true,
+            authorAvatarUrl: true
+        }
+    });
+    if (!refused || refused.deployableType !== "application") {
+        throw new Error("Deployment not found");
+    }
+    if (!canDeployAnyway(refused)) {
+        throw new Error("This release was not held back by the vulnerability check.");
+    }
+    const audit = { securityOverrideOf: deploymentId };
+    // A held-back rollback puts the kept release back, as it would have; a
+    // fresh build of its commit could be different code.
+    if (refused.rollbackOfId) {
+        const source = await prisma.deployment.findFirst({
+            where: {
+                id: refused.rollbackOfId,
+                deployableType: "application",
+                deployableId: refused.deployableId
+            },
+            select: {
+                id: true,
+                imageTag: true,
+                imageKept: true,
+                commitSha: true,
+                commitMessage: true,
+                authorName: true,
+                authorAvatarUrl: true
+            }
+        });
+        if (!source?.imageKept || !isReleaseImage(source.imageTag)) {
+            throw new Error(
+                "That release's image is no longer kept on the server, so it cannot be rolled back to instantly. Deploy its commit again instead."
+            );
+        }
+        const started = await deployApplication(
+            refused.deployableId,
+            ownerId,
+            userId,
+            { securityOverride: true, audit },
+            {
+                deploymentId: source.id,
+                imageTag: source.imageTag,
+                commitSha: source.commitSha,
+                commitMessage: source.commitMessage,
+                authorName: source.authorName,
+                authorAvatarUrl: source.authorAvatarUrl
+            }
+        );
+        return { deploymentId: started, applicationId: refused.deployableId };
+    }
+    if (
+        refused.trigger === "variables" ||
+        refused.trigger === "settings" ||
+        refused.trigger === "scale"
+    ) {
+        const started = await restartFromKeptImage(
+            refused.deployableId,
+            ownerId,
+            userId,
+            refused.trigger,
+            audit,
+            { securityOverride: true }
+        );
+        return { deploymentId: started, applicationId: refused.deployableId };
+    }
+    const started = await deployApplication(refused.deployableId, ownerId, userId, {
+        ...(refused.commitSha ? { commitSha: refused.commitSha } : {}),
+        ...(refused.commitMessage ? { commitMessage: refused.commitMessage } : {}),
+        ...(refused.authorName ? { authorName: refused.authorName } : {}),
+        ...(refused.authorAvatarUrl ? { authorAvatarUrl: refused.authorAvatarUrl } : {}),
+        trigger: "manual",
+        securityOverride: true,
+        audit
+    });
+    return { deploymentId: started, applicationId: refused.deployableId };
 }
 
 /** Map deployment ids to their current status (for showing running/failed/…). */
@@ -4785,9 +4928,21 @@ function runDeployment(
                 ctx.log(Buffer.from(`==> Failed: ${refused}\n`));
                 return { ok: false, error: refused };
             }
+            // A scale step runs the release already serving; only a new one is checked.
+            const checked = scaling
+                ? ctx
+                : {
+                      ...ctx,
+                      beforeServe: (refs: readonly string[]) =>
+                          checkReleaseImage({
+                              deploymentId,
+                              targetId: target.id,
+                              refs
+                          })
+                  };
             const result = await driver.deployApplication(
                 plan,
-                scaling ? ctx : await sharedVolumesFreedBeforeUp(deploymentId, plan, ctx)
+                scaling ? checked : await sharedVolumesFreedBeforeUp(deploymentId, plan, checked)
             );
             if (result.ok && result.detectedPort) {
                 await rememberDetectedPort(deploymentId, result.detectedPort);
@@ -5293,7 +5448,11 @@ export async function executeDeployment(
         const buildContext = buildSource
             ? "archive" in buildSource
                 ? sourceUpload.uploadedBuildContext(buildSource.archive, log, buildCommands)
-                : gitBuildContext(buildSource, log, buildCommands)
+                : gitBuildContext(buildSource, log, buildCommands, (dir) =>
+                      queuedRow.deployableType === "application"
+                          ? queueDependencyScan(deploymentId, dir)
+                          : Promise.resolve()
+                  )
             : undefined;
         // Authenticate to any private registry whose image this deploy pulls, so the
         // pull below (inside the driver) is authorized. A login failure is logged but

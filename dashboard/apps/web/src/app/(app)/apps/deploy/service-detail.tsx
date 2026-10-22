@@ -23,6 +23,8 @@ import { DeployCallouts } from "./deploy-callouts";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { VariablesEditor } from "./variables-editor";
+import { SecurityChip, SecurityNote } from "./deployment-security";
+import { DependenciesPanel } from "./dependencies-panel";
 import { LinkedGroupsPanel } from "./variable-groups";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
@@ -785,6 +787,13 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [items]);
 
+    /** Open the deployment a "Deploy anyway" started, and read the list again. */
+    function follow(deploymentId: string) {
+        setLogsFor(deploymentId);
+        reload();
+        onChanged();
+    }
+
     function deploy() {
         startTransition(async () => {
             try {
@@ -812,6 +821,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     reload();
                     onChanged();
                 }}
+                onDeployStarted={follow}
             />
         );
     }
@@ -913,12 +923,18 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                     <p className="truncate text-xs text-muted-foreground">
                                         {deploySubtitle(active, app, format, t)}
                                     </p>
+                                    <SecurityNote
+                                        deployment={active}
+                                        onDeployStarted={follow}
+                                        className="mt-1"
+                                    />
                                 </div>
                                 {active.commitSha && (
                                     <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
                                         <CommitRef deployment={active} />
                                     </span>
                                 )}
+                                <SecurityChip deployment={active} />
                                 <KeptChip deployment={active} />
                                 <Button
                                     variant="outline"
@@ -1014,9 +1030,18 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     <p className="truncate text-xs text-muted-foreground">
                                                         {deploySubtitle(deployment, app, format, t)}
                                                     </p>
-                                                    <DeployFailureLine
-                                                        status={deployment.status}
-                                                        error={deployment.error}
+                                                    {/* A release the check held back
+                                                        says so in its own words below. */}
+                                                    {!deployment.canDeployAnyway && (
+                                                        <DeployFailureLine
+                                                            status={deployment.status}
+                                                            error={deployment.error}
+                                                        />
+                                                    )}
+                                                    <SecurityNote
+                                                        deployment={deployment}
+                                                        onDeployStarted={follow}
+                                                        className="mt-1"
                                                     />
                                                     {!isSettled(deployment) && (
                                                         <InFlightSteps
@@ -1029,6 +1054,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                         <CommitRef deployment={deployment} />
                                                     </span>
                                                 )}
+                                                <SecurityChip deployment={deployment} />
                                                 <KeptChip deployment={deployment} />
                                                 <ReleaseLink deployment={deployment} />
                                                 {/* A deploy still in flight is listed
@@ -1056,6 +1082,11 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Built from a repository: its lockfiles are what a deploy reads. */}
+            {(app.sourceType === "dockerfile" || app.sourceType === "nixpacks") && (
+                <DependenciesPanel applicationId={app.id} />
             )}
 
             <ServiceActivity applicationId={app.id} />
@@ -1279,11 +1310,14 @@ function DeploymentLogsView({
     onRedeploy,
     redeploying,
     onBack,
-    onDone
+    onDone,
+    onDeployStarted
 }: {
     app: ProjectApp;
     deploymentId: string;
     deployment: DepSummary | null;
+    /** A new deployment started from here ("Deploy anyway"); the caller follows it. */
+    onDeployStarted?: (deploymentId: string) => void;
     /** Start a new deploy of this service; absent for readers who may not deploy. */
     onRedeploy?: () => void;
     redeploying?: boolean;
@@ -1345,6 +1379,7 @@ function DeploymentLogsView({
                     </>
                 )}
                 {deployment && <StateBadge deployment={deployment} />}
+                {deployment && <SecurityChip deployment={deployment} />}
                 {deployment && (
                     <span className="ml-auto text-xs text-muted-foreground">
                         {format.dateTime(deployment.createdAt)}
@@ -1374,7 +1409,14 @@ function DeploymentLogsView({
 
             {/* Why it did not go live, above every tab, so no tab is a log that
                 just stops. The build log carries its own, next to the output. */}
-            {deployment && cat !== "Build Logs" && (
+            {deployment && (
+                <SecurityNote
+                    deployment={deployment}
+                    onDeployStarted={(id) => onDeployStarted?.(id)}
+                    className="rounded-md bg-surface p-3"
+                />
+            )}
+            {deployment && cat !== "Build Logs" && !deployment.canDeployAnyway && (
                 <DeployFailureNote
                     status={deployment.status}
                     error={deployment.error}

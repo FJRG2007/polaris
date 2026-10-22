@@ -11,8 +11,7 @@ import { ScanFailure } from "../lib/runner";
 import { requireSecurityUser } from "../lib/access";
 
 export type Result<T> =
-    | { readonly ok: true; readonly data: T }
-    | { readonly ok: false; readonly error: string };
+    { readonly ok: true; readonly data: T } | { readonly ok: false; readonly error: string };
 
 async function run<T>(work: () => Promise<T>): Promise<Result<T>> {
     try {
@@ -79,6 +78,22 @@ export async function scanImageAction(input: unknown) {
     if (!parsed.success) return { ok: false, error: "invalid" } as const;
     return run(async () =>
         (await service()).queueImage(parsed.data.targetId, parsed.data.applicationId, user.id)
+    );
+}
+
+export async function serverImagesAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.targetInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await service()).serverImages(parsed.data.targetId));
+}
+
+export async function scanServerImageAction(input: unknown) {
+    const user = await requireSecurityUser();
+    const parsed = schemas.serverImageInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).queueServerImage(parsed.data.targetId, parsed.data.imageId, user.id)
     );
 }
 

@@ -70,7 +70,8 @@
         "trafficFailed": "No se pudo cambiar adónde va el tráfico",
         "restartFailed": "No se pudo reiniciar el despliegue",
         "updateFailed": "No se pudo actualizar el despliegue",
-        "removeFailed": "No se pudo quitar el despliegue"
+        "removeFailed": "No se pudo quitar el despliegue",
+        "overrideFailed": "No se pudo desplegar esa versión igualmente"
     },
     "domains": {
         "portRequired": "Falta un puerto de destino válido",
@@ -362,5 +363,8 @@
         "restartFailed": "El ajuste de GPU está guardado, pero el servicio no se ha podido reiniciar con él. Se aplicará en su próximo despliegue o reinicio.",
         "noGpu": "Su servidor no tiene ninguna tarjeta NVIDIA que Polaris pueda ver, así que no puede recibir una.",
         "swarm": "Un servicio en un clúster swarm no puede recibir una tarjeta."
+    },
+    "dependencies": {
+        "loadFailed": "No se cargaron las dependencias"
     }
 }

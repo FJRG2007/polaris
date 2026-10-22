@@ -16,6 +16,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
+    ownVulnerabilitiesAction: async () => null,
     checkUpdatesAction: async () => null,
     saveAutoUpdateAction: async () => ({}),
     saveLegalContactAction: async () => ({}),

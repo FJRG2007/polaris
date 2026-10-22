@@ -50,6 +50,16 @@ export const filesInput = z.object({
 
 export const imageInput = z.object({ targetId: id, applicationId: id });
 
+/** One image a server runs, by its id. */
+export const serverImageInput = z.object({
+    targetId: id,
+    imageId: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .regex(/^sha256:[0-9a-f]{64}$/)
+});
+
 export const findingInput = z.object({ findingId: id });
 
 export const quarantineInput = z.object({ quarantineId: id, op: z.enum(["restore", "delete"]) });
@@ -69,7 +79,7 @@ export const scheduleInput = z.object({
 
 export const scanListInput = z.object({
     targetId: id,
-    kind: z.enum(["malware", "files", "audit", "image"]).optional()
+    kind: z.enum(["malware", "files", "audit", "image", "deps"]).optional()
 });
 
 export const scanInput = z.object({ scanId: id });

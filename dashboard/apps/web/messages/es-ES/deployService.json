@@ -780,5 +780,49 @@
             "forbidden": "No puedes desplegar este servicio.",
             "notFound": "Ese hook de deploy ya no existe."
         }
+    },
+    "security": {
+        "chip": "Vulnerable",
+        "chipHeld": "Retenida",
+        "chipTitle": "{count, plural, one {# vulnerabilidad crítica} other {# vulnerabilidades críticas}} con arreglo conocido en la imagen de esta versión",
+        "found": "{count, plural, one {# vulnerabilidad crítica} other {# vulnerabilidades críticas}} con arreglo conocido:",
+        "where": "en {package}, arreglada en {fixedIn}",
+        "refused": "Este servicio bloquea esas versiones, así que esta no se publicó.",
+        "overridden": "Desplegada igualmente, pese al aviso.",
+        "deployAnyway": "Desplegar así",
+        "confirmTitle": "¿Desplegar esta versión igualmente?",
+        "confirmBody": "El mismo commit se publica con las vulnerabilidades que encontró el análisis de su imagen. Tu nombre y la hora quedan en el nuevo despliegue.",
+        "failed": "No se pudo iniciar el despliegue",
+        "blockTitle": "Bloquear versiones vulnerables",
+        "blockShort": "Retiene una versión cuya imagen tiene una vulnerabilidad crítica con arreglo conocido.",
+        "blockHint": "Se comprueba con el último análisis de la misma imagen en este servidor. Desactivado, esa versión se publica igualmente con un aviso. Una versión retenida se puede desplegar así desde su fila, y queda registrado quién lo hizo.",
+        "blockFailed": "No se pudo guardar este ajuste"
+    },
+    "dependencies": {
+        "title": "Dependencias",
+        "readFrom": "Leídas de {files}, {when}",
+        "notYet": "Sin comprobar aún. El próximo despliegue desde el repositorio lee sus lockfiles.",
+        "checking": "Comprobando los lockfiles del último despliegue.",
+        "scanFailed": "La última comprobación de sus lockfiles no terminó. El próximo despliegue lo reintenta.",
+        "failed": "No se cargaron las dependencias. Reintenta.",
+        "tryAgain": "Reintentar",
+        "none": "No hay vulnerabilidades conocidas en sus dependencias.",
+        "filters": "Filtrar hallazgos",
+        "fixedOnly": "Con arreglo",
+        "vulnerability": "Vulnerabilidad",
+        "severity": "Gravedad",
+        "package": "Paquete",
+        "fix": "Arreglo",
+        "noMatch": "Ningún hallazgo con estos filtros.",
+        "noFix": "Sin parche",
+        "openAdvisory": "Abrir el aviso de {id}",
+        "level": {
+            "critical": "Crítica",
+            "high": "Alta",
+            "medium": "Media",
+            "low": "Baja",
+            "negligible": "Mínima",
+            "unknown": "Sin datos"
+        }
     }
 }

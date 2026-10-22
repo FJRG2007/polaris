@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
+    ownVulnerabilitiesAction: async () => null,
     checkUpdatesAction: async () => ({}),
     saveAutoUpdateAction: async () => ({}),
     saveLegalContactAction: async () => ({}),

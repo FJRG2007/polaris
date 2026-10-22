@@ -962,6 +962,36 @@ export async function rollbackDeploymentAction(
     }
 }
 
+/**
+ * Deploy again a release the vulnerability check refused, letting this one
+ * through - see `deployAnyway`. Asks what a redeploy asks, because it is one,
+ * and records who let it through on the new deployment and in the audit trail.
+ */
+export async function deployAnywayAction(
+    deploymentId: unknown
+): Promise<{ error?: string; deploymentId?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const id = z.string().uuid().safeParse(deploymentId);
+    if (!id.success) return { error: await reply("deployment.overrideFailed") };
+    try {
+        const access = await requireDeploymentAccess(id.data, user.id, "deploy.run");
+        const started = await deployService.deployAnyway(id.data, access.ownerId, user.id);
+        await recordServiceEvent(
+            user.id,
+            started.applicationId,
+            "deploy.app.securityOverride",
+            "deployed"
+        );
+        revalidatePath(DEPLOY_PATH);
+        return { deploymentId: started.deploymentId };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error ? caught.message : await reply("deployment.overrideFailed")
+        };
+    }
+}
+
 /** Keep a release's image past the rollback window, or give it back to it. */
 export async function pinDeploymentAction(
     deploymentId: string,

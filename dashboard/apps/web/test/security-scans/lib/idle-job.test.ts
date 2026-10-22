@@ -70,16 +70,23 @@ describe("security scans job with nothing configured", () => {
         expect(dialled).toEqual([]);
         expect(writes).toEqual([]);
         // And the releases that went live lately, every few minutes, to scan a
-        // new image once it runs.
+        // new image once it runs; and the servers, whose images are listed every
+        // few hours (none here, so nothing is dialled).
         expect(new Set(reads)).toEqual(
-            new Set(["securityScan", "securitySetting", "securityQuarantine", "deployment"])
+            new Set([
+                "securityScan",
+                "securitySetting",
+                "securityQuarantine",
+                "deployment",
+                "deployTarget"
+            ])
         );
     });
 
-    it("never lists the servers when no image scan ran on any of them", async () => {
+    it("never looks for leftover exports when no image scan ran on any server", async () => {
         await tick();
         await tick();
-        expect(reads).not.toContain("deployTarget");
+        expect(dialled).not.toContain("listExports");
         expect(dialled).toEqual([]);
     });
 });

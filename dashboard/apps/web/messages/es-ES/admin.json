@@ -3285,7 +3285,11 @@
             "lastChecked": "Última prueba",
             "never": "nunca",
             "viewChanges": "<link>Mira los cambios</link> antes de instalar, o actualiza ya: el panel sigue funcionando durante el relevo.",
-            "updateNow": "Actualizar"
+            "updateNow": "Actualizar",
+            "ownVulns": "Los últimos análisis de las imágenes de Polaris ({images}) hallaron {critical} críticas y {high} altas.",
+            "ownVulnsNone": "Los últimos análisis de las imágenes de Polaris ({images}) no hallaron nada crítico ni alto.",
+            "ownVulnsUpdate": "Actualizar instala imágenes recién creadas sobre bases parcheadas.",
+            "ownVulnsLink": "Ver hallazgos"
         },
         "run": {
             "starting": "La actualización está empezando; esperando a que informe.",

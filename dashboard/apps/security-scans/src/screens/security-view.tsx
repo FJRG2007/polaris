@@ -10,6 +10,8 @@
 import * as actions from "../actions/security";
 import { hostUi } from "@polaris/app-host/client";
 import { securityCatalogs } from "../../messages";
+import { FindingsTable } from "./findings-table";
+import { ImagesPanel } from "./images-panel";
 import type { SecurityTranslator } from "../lib/i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bug, FileDiff, Package, ServerCog, ShieldCheck } from "lucide-react";
@@ -216,7 +218,12 @@ export function SecurityView() {
                     ) : tab === "host" ? (
                         <HostPanel t={t} targetId={current} server={server} submit={submit} />
                     ) : (
-                        <ImagesPanel t={t} overview={overview} targetId={current} submit={submit} />
+                        <ImagesPanel
+                            t={t}
+                            apps={overview.apps}
+                            targetId={current}
+                            submit={submit}
+                        />
                     )}
                     <History t={t} scans={scans} submit={submit} />
                 </>
@@ -548,51 +555,6 @@ function HostPanel({
     );
 }
 
-function ImagesPanel({
-    t,
-    overview,
-    targetId,
-    submit
-}: {
-    t: SecurityTranslator;
-    overview: Overview;
-    targetId: string;
-    submit: Submit;
-}) {
-    return (
-        <Card>
-            <CardBody className="flex flex-col gap-2">
-                <p className="text-sm text-muted-foreground">{t("images.hint")}</p>
-                <ul className="flex flex-col gap-1">
-                    {overview.apps.map((app) => (
-                        <li key={app.id} className="flex min-w-0 items-center gap-2 text-sm">
-                            <span className="min-w-0 flex-1 truncate" title={app.name}>
-                                {app.name}
-                            </span>
-                            <Button
-                                size="xs"
-                                variant="outline"
-                                onClick={() =>
-                                    void submit(
-                                        () =>
-                                            actions.scanImageAction({
-                                                targetId,
-                                                applicationId: app.id
-                                            }),
-                                        t("queued")
-                                    )
-                                }
-                            >
-                                {t("images.run")}
-                            </Button>
-                        </li>
-                    ))}
-                </ul>
-            </CardBody>
-        </Card>
-    );
-}
-
 function summaryLine(t: SecurityTranslator, scan: Scan): string {
     const s = scan.summary as Record<string, number | string | boolean | null>;
     if (scan.state !== "done") return scan.error ? t(`errors.${scan.error}` as never) : "";
@@ -609,20 +571,36 @@ function summaryLine(t: SecurityTranslator, scan: Scan): string {
     if (scan.kind === "audit") {
         return `${t("host.score")}: ${String(s.score)} / 100, ${t("host.warnings", { count: Number(s.warnings ?? 0) })}`;
     }
-    return (["critical", "high", "medium", "low"] as const)
+    const counts = (["critical", "high", "medium", "low"] as const)
         .map((sev) => `${t(`images.severity.${sev}`)} ${Number(s[sev] ?? 0)}`)
         .join(", ");
+    const files = (scan.summary as { files?: unknown }).files;
+    if (scan.kind === "deps" && Array.isArray(files) && files.length > 0) {
+        return `${counts}. ${t("deps.files", {
+            files: files
+                .filter((f) => typeof f === "string")
+                .slice(0, 6)
+                .join(", ")
+        })}`;
+    }
+    return counts;
 }
 
 function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; submit: Submit }) {
     const [open, setOpen] = useState<string | null>(null);
     const [findings, setFindings] = useState<Finding[] | null>(null);
+    const [findingsFailed, setFindingsFailed] = useState(false);
+    const read = async (scanId: string) => {
+        setFindings(null);
+        setFindingsFailed(false);
+        const result = await actions.findingsAction({ scanId });
+        if (!result.ok) return setFindingsFailed(true);
+        setFindings(result.data);
+    };
     const show = async (scanId: string) => {
         if (open === scanId) return setOpen(null);
         setOpen(scanId);
-        setFindings(null);
-        const result = await actions.findingsAction({ scanId });
-        setFindings(result.ok ? result.data : []);
+        await read(scanId);
     };
     return (
         <section className="flex flex-col gap-2">
@@ -638,7 +616,11 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                     className="min-w-0 flex-1 truncate font-medium"
                                     title={scan.label}
                                 >
-                                    {scan.kind === "audit" ? t("thisServer") : scan.label}
+                                    {scan.kind === "audit"
+                                        ? t("thisServer")
+                                        : scan.kind === "deps"
+                                          ? t("deps.label", { app: scan.label })
+                                          : scan.label}
                                 </span>
                                 <span className="text-muted-foreground">
                                     {t(`state.${scan.state}` as never)}
@@ -666,8 +648,19 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                 ) : null}
                             </div>
                             <p className="text-muted-foreground">{summaryLine(t, scan)}</p>
-                            {open === scan.id ? (
-                                findings === null ? (
+                            {open === scan.id && (scan.kind === "image" || scan.kind === "deps") ? (
+                                <div className="mt-2">
+                                    <FindingsTable
+                                        t={t}
+                                        findings={findings}
+                                        failed={findingsFailed}
+                                        onRetry={() => void read(scan.id)}
+                                    />
+                                </div>
+                            ) : open === scan.id ? (
+                                findingsFailed ? (
+                                    <p className="mt-2 text-danger">{t("findings.failed")}</p>
+                                ) : findings === null ? (
                                     <Skeleton className="mt-2 h-16 w-full" />
                                 ) : findings.length === 0 ? (
                                     <p className="mt-2">{t("noFindings")}</p>

@@ -83,7 +83,21 @@
             "negligible": "Mínima",
             "unknown": "Sin datos"
         },
-        "layer": "Capa {layer}"
+        "layer": "Capa {layer}",
+        "allHint": "Cada imagen que ejecuta este servidor, una sola vez aunque la usen varios contenedores. Las nuevas se revisan solas y cada una de nuevo en una semana.",
+        "none": "Este servidor aún no ejecuta contenedores.",
+        "image": "Imagen",
+        "who": "Usada por",
+        "lastScan": "Análisis",
+        "notScanned": "Sin analizar",
+        "clean": "Sin fallos",
+        "listUnavailable": "Este servidor no pudo listar sus contenedores; las apps se revisan una a una.",
+        "source": {
+            "polaris": "Polaris",
+            "app": "App",
+            "agent": "Agente",
+            "other": "Otra"
+        }
     },
     "history": "Recientes",
     "noScans": "Aún no hay análisis.",
@@ -119,5 +133,22 @@
     "alerts": {
         "title": "{count, plural, one {Una vulnerabilidad grave nueva en {app}} other {# vulnerabilidades graves nuevas en {app}}}",
         "body": "{id} ({severity}) en {package}. {fix}."
+    },
+    "findings": {
+        "filters": "Filtrar hallazgos",
+        "fixedOnly": "Con arreglo",
+        "vulnerability": "Vulnerabilidad",
+        "severity": "Gravedad",
+        "package": "Paquete",
+        "fix": "Arreglo",
+        "layer": "Capa",
+        "openAdvisory": "Abrir el aviso de {id}",
+        "none": "No hay vulnerabilidades conocidas.",
+        "noMatch": "Ningún hallazgo con estos filtros.",
+        "failed": "No se cargaron los hallazgos. Reintenta."
+    },
+    "deps": {
+        "label": "Dependencias de {app}",
+        "files": "Leídas de {files}"
     }
 }

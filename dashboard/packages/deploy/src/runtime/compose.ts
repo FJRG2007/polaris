@@ -11,7 +11,7 @@ import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
-import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
+import { RELEASE_IMAGE_GONE, askBeforeServe, pinRelease, rollbackImageOf } from "./release.js";
 import { tailIntoLog, waitUntilListening, waitUntilServing } from "./readiness.js";
 import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
 import {
@@ -416,6 +416,8 @@ export class ComposeRuntime implements RuntimeDriver {
             imageTag = await pinRelease(imageTag, plan, ctx);
         }
 
+        const refused = await askBeforeServe(imageTag, plan, ctx);
+        if (refused) return fail(ctx, refused);
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
         // One service per copy, since compose cannot scale a named container, and
         // beside each the port-80 forwarder when it has one - sending to the port
