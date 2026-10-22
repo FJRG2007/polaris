@@ -285,7 +285,7 @@ export function VoiceNote({
                         // Nothing selects and nothing scrolls under the finger:
                         // a drag along a waveform on a phone is a drag along a
                         // waveform, not a scroll of the conversation.
-                        className="flex h-7 w-44 max-w-[45vw] shrink-0 touch-none select-none items-end gap-px"
+                        className="flex h-7 w-44 max-w-[45vw] shrink-0 touch-none select-none items-center gap-px"
                     >
                         {bars.map((level, index) => (
                             <span
