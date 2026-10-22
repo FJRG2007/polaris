@@ -39,7 +39,7 @@ import Link from "next/link";
 import { Badge, Button, cn } from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CameraView } from "../lib/cameras";
-import { Camera, Maximize2, VideoOff } from "lucide-react";
+import { Camera, Eye, EyeOff, Maximize2, VideoOff } from "lucide-react";
 import type { LiveBox } from "@polaris/core";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
@@ -120,7 +120,8 @@ export function CameraTile({
     boxes,
     canControl,
     idle,
-    onOpen
+    onOpen,
+    onPrivacy
 }: {
     camera: CameraView;
     /** Whether the relay is serving this camera at all. */
@@ -144,6 +145,8 @@ export function CameraTile({
      * pretend it is live.
      */
     idle: boolean;
+    /** Turn its privacy on or off. Absent for somebody who may not. */
+    onPrivacy?: (wanted: boolean) => void;
     /** Open it big. */
     onOpen: () => void;
 }) {
@@ -205,7 +208,7 @@ export function CameraTile({
      */
     const battery = drawsFromBattery(camera.power);
 
-    const showing = camera.enabled && live;
+    const showing = camera.enabled && !camera.privacy && live;
     // `drawn` is null only until the first frame settles, so a battery camera
     // asks once - whether that frame arrived or not - and then leaves the camera
     // alone rather than retrying on a timer nobody asked for.
@@ -558,7 +561,24 @@ export function CameraTile({
                             {t("camera.quiet")}
                         </Badge>
                     ) : null}
-                    {camera.recording !== "off" ? (
+                    {camera.privacy ? <Badge variant="neutral">{t("privacy.on")}</Badge> : null}
+                    {canControl && onPrivacy ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-pressed={camera.privacy}
+                            aria-label={camera.privacy ? t("privacy.turnOff") : t("privacy.turnOn")}
+                            title={camera.privacy ? t("privacy.turnOff") : t("privacy.turnOn")}
+                            onClick={() => onPrivacy(!camera.privacy)}
+                        >
+                            {camera.privacy ? (
+                                <Eye className="size-4 shrink-0" />
+                            ) : (
+                                <EyeOff className="size-4 shrink-0" />
+                            )}
+                        </Button>
+                    ) : null}
+                    {camera.recording !== "off" && !camera.privacy ? (
                         <Badge variant="danger" title={t("camera.recording")}>
                             {t("camera.rec")}
                         </Badge>
@@ -600,6 +620,13 @@ function Unavailable({
     since: string | null;
 }) {
     const t = usePlacesT();
+    if (camera.privacy)
+        return (
+            <Placeholder
+                icon={<EyeOff className="size-5 shrink-0" />}
+                label={camera.privacyNative ? t("privacy.tileNative") : t("privacy.tile")}
+            />
+        );
     if (!camera.enabled)
         return (
             <Placeholder

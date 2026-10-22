@@ -79,3 +79,38 @@ export function groupState(rows: readonly Pick<CameraPrivacy, "private">[]): {
 export function nextPrivacy(rows: readonly Pick<CameraPrivacy, "private">[]): boolean {
     return !groupState(rows).all;
 }
+
+/** The wall's cameras the moment a switch is pressed, before any camera has
+ *  answered: the ones switched show the new state at once. */
+export function applyPrivacy<T extends { id: string; privacy: boolean }>(
+    cameras: readonly T[],
+    ids: readonly string[],
+    wanted: boolean
+): T[] {
+    const switched = new Set(ids);
+    return cameras.map((camera) => (switched.has(camera.id) ? { ...camera, privacy: wanted } : camera));
+}
+
+/** The wall's cameras once they answered: each takes its own answer, so one
+ *  that refused goes back to what it was while the rest keep the change. */
+export function settlePrivacy<T extends { id: string; privacy: boolean }>(
+    cameras: readonly T[],
+    results: readonly Pick<CameraPrivacy, "cameraId" | "private">[]
+): T[] {
+    const answers = new Map(results.map((row) => [row.cameraId, row.private]));
+    return cameras.map((camera) => {
+        const answer = answers.get(camera.id);
+        return answer === undefined ? camera : { ...camera, privacy: answer };
+    });
+}
+
+/** Put cameras back to how they were before a switch nobody answered. */
+export function rollbackPrivacy<T extends { id: string; privacy: boolean }>(
+    cameras: readonly T[],
+    before: ReadonlyMap<string, boolean>
+): T[] {
+    return cameras.map((camera) => {
+        const was = before.get(camera.id);
+        return was === undefined ? camera : { ...camera, privacy: was };
+    });
+}
