@@ -6,6 +6,7 @@
 
 import type { WordKey } from "./words";
 import type { KeyFace } from "./render";
+import { DOUBLE_MS, HOLD_MS, windowMs, type Gesture, type GestureSet } from "./presses";
 import type { DeckAction, DeckState, Link } from "./polaris";
 
 /** A setting value, as the inspector writes it. */
@@ -20,7 +21,54 @@ export type KeySettings = {
     options?: { [name: string]: OptionValue };
     /** A name of the person's own, drawn instead of the action's. */
     label?: string;
+    /** Another catalogue entry run by a double press. */
+    double?: Binding;
+    /** Another catalogue entry run by holding the key. */
+    hold?: Binding;
+    /** Set, the key alternates: one press runs `action`, the next this. */
+    alternate?: Binding;
+    /** Which of the two an alternating key runs next. */
+    side?: "a" | "b";
+    /** How long after a press a second one counts as a double press. */
+    doubleMs?: number;
+    /** How long a key is held before it counts as a hold. */
+    holdMs?: number;
 };
+
+/** One more catalogue entry a key runs, and its settings. */
+export type Binding = {
+    action?: string;
+    options?: { [name: string]: OptionValue };
+};
+
+/** Which gestures a key has an action for, with its windows. */
+export function gesturesOf(settings: KeySettings): GestureSet {
+    return {
+        double: Boolean(settings.double?.action),
+        hold: Boolean(settings.hold?.action),
+        doubleMs: windowMs(settings.doubleMs, DOUBLE_MS),
+        holdMs: windowMs(settings.holdMs, HOLD_MS)
+    };
+}
+
+/** Whether a key alternates between two actions. A key whose action is a
+ *  real toggle never does: Polaris reads the device, and the key follows it
+ *  instead of guessing from the last press. */
+export function alternates(settings: KeySettings, entry: DeckAction | undefined): boolean {
+    return Boolean(settings.alternate?.action) && entry?.kind !== "toggle";
+}
+
+/** What a gesture runs: null for the key's own action, as it is set. */
+export function bindingFor(
+    settings: KeySettings,
+    entry: DeckAction | undefined,
+    gesture: Gesture
+): Binding | null {
+    if (gesture === "double") return settings.double?.action ? settings.double : null;
+    if (gesture === "hold") return settings.hold?.action ? settings.hold : null;
+    if (alternates(settings, entry) && settings.side === "b") return settings.alternate!;
+    return null;
+}
 
 export function faceFor(
     link: Link,
@@ -40,6 +88,11 @@ export function faceFor(
     }
     const label = settings.label?.trim() || entry.label;
     if (link !== "online") return { icon: entry.icon, tone: "off", label: words.offline };
+    if (alternates(settings, entry)) {
+        // On once the first of the two has run, until the second puts it back.
+        const on = settings.side === "b";
+        return { icon: entry.icon, tone: on ? "ok" : "idle", on, label };
+    }
     if (!state) return { icon: entry.icon, tone: "idle", label };
     return {
         icon: entry.icon,
@@ -70,8 +123,23 @@ export function watchOptions(
     return options;
 }
 
-/** One dial turn, five points a tick, held between 1 and 100. */
-export function turnLevel(level: unknown, ticks: number): number {
-    const from = typeof level === "number" && Number.isFinite(level) ? level : 50;
-    return Math.min(100, Math.max(1, Math.round(from + ticks * 5)));
+/** How a dial's value moves: Polaris sends it for a temperature, say; a
+ *  brightness is the default. */
+export interface DialRange {
+    readonly min: number;
+    readonly max: number;
+    readonly step: number;
+}
+
+const LEVEL: DialRange = { min: 1, max: 100, step: 5 };
+
+/** One dial turn, `step` a tick, held inside the range: five points a tick
+ *  between 1 and 100 when the entry names no range. A dial never turned
+ *  starts in the middle. */
+export function turnLevel(level: unknown, ticks: number, range: DialRange = LEVEL): number {
+    const middle = range === LEVEL ? 50 : (range.min + range.max) / 2;
+    const from = typeof level === "number" && Number.isFinite(level) ? level : middle;
+    const moved = Math.min(range.max, Math.max(range.min, from + ticks * range.step));
+    // Whole numbers stay whole; a half-degree step keeps one decimal.
+    return Number.isInteger(range.step) ? Math.round(moved) : Number(moved.toFixed(1));
 }

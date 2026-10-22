@@ -42,6 +42,18 @@
             minutes: "Minutes",
             timerHint:
                 "Press to start or pause, hold to reset. On a dial, turn to set the minutes.",
+            gestures: "More presses",
+            gesturesHint:
+                "Optional. A press runs the action above at once unless a double press is set here.",
+            doublePress: "Double press",
+            doubleWindow: "Double press window (ms)",
+            holdPress: "Hold",
+            holdWindow: "Hold after (ms)",
+            alternate: "Every other press",
+            alternateHint:
+                "Set, presses alternate: the action above, then this one, like on and off. The key shows which ran last.",
+            realToggle: "This action already switches on and off, following what Polaris reads.",
+            confirmHint: "This cannot be undone: press twice within 2 seconds to run it.",
             areas: {
                 chat: "Chat",
                 status: "Status",
@@ -87,6 +99,18 @@
             minutes: "Minutos",
             timerHint:
                 "Pulsa para iniciar o pausar, mantén para reiniciar. En un dial, gira para fijar los minutos.",
+            gestures: "Más pulsaciones",
+            gesturesHint:
+                "Opcional. Una pulsación ejecuta la acción de arriba al momento, salvo con doble pulsación.",
+            doublePress: "Doble pulsación",
+            doubleWindow: "Margen doble pulsación (ms)",
+            holdPress: "Mantener",
+            holdWindow: "Mantener tras (ms)",
+            alternate: "Pulsación alterna",
+            alternateHint:
+                "Si se elige, alterna: la acción de arriba y luego esta, como encender y apagar. La tecla indica cuál fue.",
+            realToggle: "Esta acción ya enciende y apaga según lo que Polaris lee del aparato.",
+            confirmHint: "No se puede deshacer: pulsa dos veces en menos de 2 segundos.",
             areas: {
                 chat: "Chat",
                 status: "Estado",

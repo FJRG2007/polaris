@@ -217,21 +217,7 @@
             return box;
         }
 
-        const select = el("select", {}, [el("option", { value: "", text: words.pickAction })]);
-        const areas = new Map();
-        for (const entry of catalogue) {
-            if (!areas.has(entry.area)) {
-                const group = el("optgroup", { label: words.areas[entry.area] ?? entry.area });
-                areas.set(entry.area, group);
-                select.append(group);
-            }
-            const option = el("option", {
-                value: entry.id,
-                text: entry.label,
-                selected: settings.action === entry.id
-            });
-            areas.get(entry.area).append(option);
-        }
+        const select = actionPicker(catalogue, settings.action);
         select.addEventListener("change", () => {
             save({ ...settings, action: select.value || undefined, options: {} }, true);
             render();
@@ -248,6 +234,7 @@
             });
             box.append(row(field.label, control, null, field.required));
         }
+        if (entry?.confirm) box.append(el("p", { class: "hint", text: words.confirmHint }));
 
         const name = el("input", { type: "text", maxlength: 40, value: settings.label ?? "" });
         name.addEventListener("input", () =>
@@ -263,6 +250,88 @@
                 })
             ])
         );
+        return box;
+    }
+
+    /** The catalogue as a picker, grouped by area. */
+    function actionPicker(catalogue, current) {
+        const select = el("select", {}, [el("option", { value: "", text: words.pickAction })]);
+        const areas = new Map();
+        for (const entry of catalogue) {
+            if (!areas.has(entry.area)) {
+                const group = el("optgroup", { label: words.areas[entry.area] ?? entry.area });
+                areas.set(entry.area, group);
+                select.append(group);
+            }
+            areas.get(entry.area).append(
+                el("option", { value: entry.id, text: entry.label, selected: current === entry.id })
+            );
+        }
+        return select;
+    }
+
+    /** One more action a gesture runs: its picker and its fields, under `key`
+     *  of the settings ("double", "hold", "alternate"). */
+    function bindingRows(box, catalogue, key, label) {
+        const binding = settings[key] ?? {};
+        const select = actionPicker(catalogue, binding.action);
+        select.dataset.binding = key;
+        select.addEventListener("change", () => {
+            const next = { ...settings };
+            if (select.value) next[key] = { action: select.value, options: {} };
+            else delete next[key];
+            if (key === "alternate") delete next.side;
+            save(next, true);
+            render();
+        });
+        box.append(row(label, select, null, false));
+        const entry = catalogue.find((candidate) => candidate.id === binding.action);
+        for (const field of entry?.options ?? []) {
+            const control = fieldControl(field, binding.options?.[field.name], (value) => {
+                const options = { ...((settings[key] ?? {}).options ?? {}) };
+                if (value === null) delete options[field.name];
+                else options[field.name] = value;
+                save({ ...settings, [key]: { ...(settings[key] ?? {}), options } });
+            });
+            box.append(row(field.label, control, null, field.required));
+        }
+    }
+
+    /** A window in milliseconds, saved only while it is inside the limits. */
+    function windowRow(name, label, fallback) {
+        const input = el("input", {
+            type: "number",
+            min: 150,
+            max: 2000,
+            step: 50,
+            value: settings[name] ?? fallback
+        });
+        input.dataset.window = name;
+        input.addEventListener("input", () => {
+            const value = Math.round(Number(input.value));
+            if (Number.isFinite(value) && value >= 150 && value <= 2000)
+                save({ ...settings, [name]: value });
+        });
+        return row(label, input, null, false);
+    }
+
+    /** Double press, hold and alternating, for a key. */
+    function gesturesSection() {
+        const box = el("section", { class: "gestures" }, [el("h2", { text: words.gestures })]);
+        const catalogue = (status?.catalogue ?? []).filter((entry) => entry.kind !== "dial");
+        const main = catalogue.find((candidate) => candidate.id === settings.action);
+        box.append(el("p", { class: "hint", text: words.gesturesHint }));
+        bindingRows(box, catalogue, "double", words.doublePress);
+        if (settings.double?.action) box.append(windowRow("doubleMs", words.doubleWindow, 300));
+        bindingRows(box, catalogue, "hold", words.holdPress);
+        if (settings.hold?.action) box.append(windowRow("holdMs", words.holdWindow, 500));
+        if (main?.kind === "toggle") {
+            // Polaris reads the device: the key follows it, nothing to alternate.
+            box.append(el("p", { class: "hint", text: words.realToggle }));
+        } else {
+            bindingRows(box, catalogue, "alternate", words.alternate);
+            box.append(el("p", { class: "hint", text: words.alternateHint }));
+        }
         return box;
     }
 
@@ -306,9 +375,13 @@
             root.replaceChildren(timerSection());
             return;
         }
+        const online = status?.link === "online";
         root.replaceChildren(
             connectionSection(),
-            status?.link === "online" ? actionSection() : document.createTextNode("")
+            online ? actionSection() : document.createTextNode(""),
+            online && screen === "key" && settings.action
+                ? gesturesSection()
+                : document.createTextNode("")
         );
     }
 

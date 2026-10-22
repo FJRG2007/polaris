@@ -11,14 +11,16 @@ const WORDS = {
         offline: "Offline",
         signIn: "Sign in",
         pick: "Pick one",
-        done: "Done"
+        done: "Done",
+        again: "Again?"
     },
     es: {
         connect: "Conectar",
         offline: "Sin red",
         signIn: "Entrar",
         pick: "Elegir",
-        done: "Hecho"
+        done: "Hecho",
+        again: "¿Otra?"
     }
 } as const;
 
