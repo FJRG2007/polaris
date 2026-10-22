@@ -33,7 +33,9 @@ vi.mock("@polaris-app/places/src/lib/access", () => ({
     homeInstall: async () => ({ id: "install-1" })
 }));
 vi.mock("@polaris-app/places/src/lib/sharing", () => ({
-    roomContents: async () => ({ devices: new Map(), cameras: roomCameras })
+    roomContents: async () => ({ devices: new Map(), cameras: roomCameras }),
+    isThingId: (value: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }));
 vi.mock("@polaris-app/places/src/lib/cameras", () => ({
     getCamera: async (_install: string, id: string) =>
@@ -212,6 +214,45 @@ describe("the access log of a camera link", () => {
         });
         roomCameras = new Map([[YARD, "room-1"]]);
         expect((await openGuestWatch("t", "1.2.3.4", Date.now(), YARD)).ok).toBe(true);
+    });
+
+    it("shows none of a room's cameras when the room was lent without watch", async () => {
+        const door = { ...live("place.room"), subjectId: "room-1" };
+        reach = { ...door, grant: { ...door.grant, actions: ["open"] } };
+        roomCameras = new Map([[YARD, "room-1"]]);
+        expect(await openGuestWatch("t", "1.2.3.4", Date.now(), YARD)).toEqual({
+            ok: false,
+            error: "closed"
+        });
+        expect(spendGrant).not.toHaveBeenCalled();
+    });
+
+    it("stops a room's picture once watch is taken off the room's key", async () => {
+        const room = { ...live("place.room"), subjectId: "room-1" };
+        roomCameras = new Map([[YARD, "room-1"]]);
+        reach = room;
+        paid = room;
+        const opened = await openGuestWatch("t", "1.2.3.4", Date.now(), YARD);
+        const watch = opened.ok ? opened.watch : "";
+        expect(await guestWatchCamera("t", watch)).not.toBeNull();
+        paid = { ...room, grant: { ...room.grant, actions: ["open"] } };
+        expect(await guestWatchCamera("t", watch)).toBeNull();
+    });
+
+    it("logs a refused link only for a camera it holds, and only within the rate limit", async () => {
+        reach = { ...live("place.room"), subjectId: "room-1", standing: "expired" };
+        roomCameras = new Map([[YARD, "room-1"]]);
+        await openGuestWatch("t", "1.2.3.4", Date.now(), "not-an-id");
+        await openGuestWatch("t", "1.2.3.4", Date.now(), "00000000-0000-4000-8000-0000000000c2");
+        expect(recordGrantUse).not.toHaveBeenCalled();
+        await openGuestWatch("t", "1.2.3.4", Date.now(), YARD);
+        expect(recordGrantUse).toHaveBeenCalledTimes(1);
+        limited = { ok: false, retryAfterMs: 1000 };
+        expect(await openGuestWatch("t", "1.2.3.4", Date.now(), YARD)).toEqual({
+            ok: false,
+            error: "tooMany"
+        });
+        expect(recordGrantUse).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -673,6 +673,16 @@
             "onlyKey": "Solo usos de {name}.",
             "everyKey": "Ver todo",
             "ofKey": "Usos de {name}",
+            "reasons": {
+                "waiting": "aún no",
+                "expired": "caducado",
+                "closed": "fuera de hora",
+                "spent": "sin usos",
+                "notThat": "no permitido",
+                "notNearby": "lejos",
+                "failed": "falló",
+                "private": "privada"
+            },
             "actions": {
                 "open": "abrió",
                 "close": "cerró",

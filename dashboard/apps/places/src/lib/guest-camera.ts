@@ -28,15 +28,8 @@
  */
 
 import { getCamera } from "./cameras";
-import { roomContents } from "./sharing";
-
-/** Whether a link reaches a camera: its own, or one in the room it names. */
-async function linkCovers(subjectType: string, subjectId: string, cameraId: string) {
-    if (subjectType === "place.camera") return subjectId === cameraId;
-    if (subjectType !== "place.room") return false;
-    return (await roomContents([subjectId])).cameras.has(cameraId);
-}
 import { homeInstall } from "./access";
+import { isThingId, roomContents } from "./sharing";
 import { host } from "@polaris/app-host";
 import { randomBytes } from "node:crypto";
 import type * as core from "@polaris/core";
@@ -61,6 +54,28 @@ interface Watch {
 }
 
 const watches = new Map<string, Watch>();
+
+/** Whether a link's subject holds a camera: is it, or is the room it is in. */
+async function subjectHolds(subjectType: string, subjectId: string, cameraId: string) {
+    if (subjectType === "place.camera") return subjectId === cameraId;
+    if (subjectType !== "place.room" || !isThingId(cameraId)) return false;
+    return (await roomContents([subjectId])).cameras.has(cameraId);
+}
+
+/**
+ * Whether a link reaches a camera: its own, or one in the room it names when
+ * the room was lent with `watch` - a room lent for its door alone shows none
+ * of its cameras.
+ */
+async function linkCovers(
+    subjectType: string,
+    subjectId: string,
+    actions: readonly string[],
+    cameraId: string
+): Promise<boolean> {
+    if (subjectType === "place.room" && !actions.includes("watch")) return false;
+    return subjectHolds(subjectType, subjectId, cameraId);
+}
 
 /** What the guest page draws, and nothing more. */
 export type GuestCamera =
@@ -123,19 +138,24 @@ export async function openGuestWatch(
             outcome,
             reason
         });
-    if (reached.standing !== "live") {
-        if (cameraId) await log("refused", reached.standing);
-        return { ok: false, error: "closed" };
-    }
-    if (!cameraId || !(await linkCovers(reached.subjectType, reached.subjectId, cameraId))) {
-        return { ok: false, error: "closed" };
-    }
     const limited = await host.rateLimitService.rateLimit(
-        `guest-watch:${reached.grant.id}:${ip}`,
+        `guest-watch:${reached.standing === "live" ? reached.grant.id : reached.subjectId}:${ip}`,
         OPENS_PER_MINUTE,
         60_000
     );
     if (!limited.ok) return { ok: false, error: "tooMany" };
+    if (reached.standing !== "live") {
+        if (await subjectHolds(reached.subjectType, reached.subjectId, cameraId)) {
+            await log("refused", reached.standing);
+        }
+        return { ok: false, error: "closed" };
+    }
+    if (
+        !cameraId ||
+        !(await linkCovers(reached.subjectType, reached.subjectId, reached.grant.actions, cameraId))
+    ) {
+        return { ok: false, error: "closed" };
+    }
     const install = await homeInstall();
     const camera = install ? await getCamera(install.id, cameraId).catch(() => null) : null;
     if (!camera) return { ok: false, error: "closed" };
@@ -221,7 +241,12 @@ export async function guestWatchState(
         !reached ||
         reached.standing !== "live" ||
         reached.grant.id !== held.grantId ||
-        !(await linkCovers(reached.subjectType, reached.subjectId, held.cameraId))
+        !(await linkCovers(
+            reached.subjectType,
+            reached.subjectId,
+            reached.grant.actions,
+            held.cameraId
+        ))
     ) {
         return gone;
     }

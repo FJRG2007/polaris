@@ -42,7 +42,7 @@ export default async function GuestKeyPage({
                 <h1 className="min-w-0 truncate text-lg font-medium" title={room.name}>
                     {room.name}
                 </h1>
-                {room.devices.map(({ device }) => (
+                {room.devices.map((device) => (
                     <GuestKeyView
                         key={device.id}
                         token={token}

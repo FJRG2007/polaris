@@ -177,4 +177,18 @@ describe("the access log of a link", () => {
             expect.objectContaining({ outcome: "refused", reason: "expired", grantId: null })
         );
     });
+    it("logs no refusal past the rate limit, nor for an id the link does not hold", async () => {
+        reach = { ...live(["open"]), standing: "expired" };
+        limited = { ok: false, retryAfterMs: 1000 };
+        await expect(pressGuestKey("t", "unlock", null, "1.2.3.4")).rejects.toThrow(/Too many/);
+        limited = { ok: true, retryAfterMs: 0 };
+        reach = {
+            ...live(["open"]),
+            subjectType: "place.room",
+            subjectId: PLACE,
+            standing: "expired"
+        };
+        await expect(pressGuestKey("t", "unlock", null, "1.2.3.4", "not-an-id")).rejects.toThrow();
+        expect(recordGrantUse).not.toHaveBeenCalled();
+    });
 });

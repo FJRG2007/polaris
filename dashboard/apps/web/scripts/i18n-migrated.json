@@ -2287,6 +2287,11 @@
         "../packages/ui/src/downloads/account/model-marks.tsx",
         "../packages/ui/src/downloads/account/platform-select.tsx",
         "../packages/ui/src/image-viewer/flight.ts",
-        "../packages/ui/src/image-viewer/image-viewer.tsx"
+        "../packages/ui/src/image-viewer/image-viewer.tsx",
+        "web/src/components/access/access-log.tsx",
+        "web/src/app/k/[[...path]]/status-guest.tsx",
+        "web/src/app/k/[[...path]]/guest-when.tsx",
+        "places/src/screens/guest/guest-camera-view.tsx",
+        "places/src/screens/guest/room-footer.tsx"
     ]
 }

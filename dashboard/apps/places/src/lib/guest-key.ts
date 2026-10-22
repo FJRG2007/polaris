@@ -18,7 +18,7 @@ import type { AppHostTypes } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import { homeInstall } from "./access";
 import { requireNearby } from "./nearby";
-import { countDeviceUse, roomContents } from "./sharing";
+import { countDeviceUse, isThingId, roomContents } from "./sharing";
 import { getCamera } from "./cameras";
 import { actionsFor, grantActionFor, type DeviceAction, type DeviceView } from "./device-kinds";
 
@@ -81,10 +81,8 @@ export type GuestRoom =
     | {
           readonly standing: "live";
           readonly name: string;
-          readonly devices: readonly {
-              readonly device: DeviceView;
-              readonly actions: readonly DeviceAction[];
-          }[];
+          readonly devices: readonly DeviceView[];
+          /** Empty unless the room was lent with `watch`. */
           readonly cameras: readonly {
               readonly id: string;
               readonly name: string;
@@ -110,6 +108,7 @@ export async function guestRoom(token: string): Promise<GuestRoom | null> {
     });
     if (!room) return null;
     const inside = await roomContents([reached.subjectId]);
+    const watches = reached.grant.actions.includes("watch");
     const [found, cameras] = await Promise.all([
         Promise.all(
             [...inside.devices.keys()].map((id) =>
@@ -117,15 +116,15 @@ export async function guestRoom(token: string): Promise<GuestRoom | null> {
             )
         ),
         Promise.all(
-            [...inside.cameras.keys()].map((id) => getCamera(install.id, id).catch(() => null))
+            (watches ? [...inside.cameras.keys()] : []).map((id) =>
+                getCamera(install.id, id).catch(() => null)
+            )
         )
     ]);
     return {
         standing: "live",
         name: room.name,
-        devices: found
-            .filter((device): device is DeviceView => device !== null)
-            .map((device) => ({ device, actions: allowedActions(device, reached.grant) })),
+        devices: found.filter((device): device is DeviceView => device !== null),
         cameras: cameras.flatMap((camera) =>
             camera ? [{ id: camera.id, name: camera.name, private: camera.privacy }] : []
         ),
@@ -167,22 +166,20 @@ export async function pressGuestKey(
             outcome,
             reason
         });
-    if (reached.standing !== "live") {
-        if (targetId) await log("refused", reached.standing);
-        throw new HomeError("This link does not open anything right now");
-    }
-    if (room) {
-        const inside = await roomContents([reached.subjectId]);
-        if (!targetId || !inside.devices.has(targetId)) {
-            throw new HomeError("This link does not allow that");
-        }
-    }
     const limited = await host.rateLimitService.rateLimit(
-        `guest-key:${reached.grant.id}:${ip}`,
+        `guest-key:${reached.standing === "live" ? reached.grant.id : reached.subjectId}:${ip}`,
         PRESSES_PER_MINUTE,
         60_000
     );
     if (!limited.ok) throw new HomeError("Too many presses. Wait a minute and try again");
+    const held =
+        !room ||
+        (isThingId(targetId) && (await roomContents([reached.subjectId])).devices.has(targetId));
+    if (reached.standing !== "live") {
+        if (held) await log("refused", reached.standing);
+        throw new HomeError("This link does not open anything right now");
+    }
+    if (!held) throw new HomeError("This link does not allow that");
     const install = await homeInstall();
     if (!install) throw new HomeError("This link does not open anything right now");
     const grant = reached.grant;

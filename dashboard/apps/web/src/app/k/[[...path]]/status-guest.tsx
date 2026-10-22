@@ -6,6 +6,7 @@
 
 import type { GuestStatusView } from "@/lib/access/guest-status";
 import { getTranslations } from "@/lib/i18n/request";
+import { GuestWhen } from "./guest-when";
 import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
 /** Seconds as the largest two units that say anything: "3 d 4 h", "12 min". */
@@ -44,19 +45,9 @@ export async function StatusGuest({ view }: { view: GuestStatusView }) {
                     </p>
                 ) : null}
                 {view.checkedAt ? (
-                    <p>
-                        {t("guestStatus.checked", {
-                            when: new Date(view.checkedAt).toISOString().slice(0, 16).replace("T", " ")
-                        })}
-                    </p>
+                    <GuestWhen at={view.checkedAt} message="guestStatus.checked" />
                 ) : null}
-                {view.until ? (
-                    <p>
-                        {t("guestLink.until", {
-                            when: new Date(view.until).toISOString().slice(0, 16).replace("T", " ")
-                        })}
-                    </p>
-                ) : null}
+                {view.until ? <GuestWhen at={view.until} message="guestLink.until" /> : null}
                 <p className="text-xs">{t("guestStatus.seeOnly")}</p>
             </CardBody>
         </Card>

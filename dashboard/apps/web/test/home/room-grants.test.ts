@@ -121,6 +121,18 @@ describe("a room lent as one key", () => {
         cameraZones["cam-hall"] = { placeId: PLACE, zone: "Lobby" };
         expect(await sharing.mayWatchCamera(GUEST, "cam-hall")).toBe(false);
     });
+
+    it("shows none of its cameras when the room was lent without watch", async () => {
+        lent[`place.room:${ROOM}`] = [
+            { id: "g-room", capability: "control", counted: false, actions: ["open"] }
+        ];
+        const reach = await sharing.placesReach(GUEST);
+        expect(reach.cameras.has("cam-hall")).toBe(false);
+        expect(reach.devices.has("door-12")).toBe(true);
+        expect(await sharing.mayWatchCamera(GUEST, "cam-hall")).toBe(false);
+        await sharing.logCameraWatch(GUEST, "cam-hall");
+        expect(recordGrantUse).not.toHaveBeenCalled();
+    });
 });
 
 describe("check-in and check-out", () => {

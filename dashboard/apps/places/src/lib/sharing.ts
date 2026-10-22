@@ -81,6 +81,12 @@ export async function roomsOfCamera(cameraId: string): Promise<string[]> {
     return rooms.map((room) => room.id);
 }
 
+/** Whether a value can be a device's or a camera's id at all: a link's
+ *  `?camera=` or `deviceId` is whatever its holder sent. */
+export function isThingId(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
 /** What one room covers right now: its devices and its cameras, by id. */
 export async function roomContents(
     roomIds: readonly string[]
@@ -128,6 +134,11 @@ export async function roomContents(
         if (room) cameras.set(camera.id, room.id);
     }
     return { devices, cameras };
+}
+
+/** A room grant that shows the room's cameras: one lent with `watch`. */
+function watchesRoom(grant: LentGrant): boolean {
+    return grant.actions.includes("watch");
 }
 
 /** Live grants over any of these rooms, each tagged with its room. */
@@ -210,8 +221,9 @@ export async function placesReach(user: SessionUser): Promise<PlacesReach> {
                 ...new Set([...(deviceActions.get(deviceId) ?? []), ...actions])
             ]);
         }
-        for (const [cameraId] of inside.cameras) {
-            if (!cameras.has(cameraId)) cameras.set(cameraId, "view");
+        for (const [cameraId, roomId] of inside.cameras) {
+            const watches = (roomActions.get(roomId) ?? []).includes("watch");
+            if (watches && !cameras.has(cameraId)) cameras.set(cameraId, "view");
         }
     }
     return { everything: false, cameras, devices, deviceActions, upses };
@@ -289,7 +301,7 @@ export function onlyReachable<T extends { id: string }>(
 export async function mayWatchCamera(user: SessionUser, cameraId: string): Promise<boolean> {
     if (await sessionCan(user, "home.read")) return true;
     if ((await liveGrants(user.id, "place.camera", cameraId)).length > 0) return true;
-    return (await roomGrants(user.id, await roomsOfCamera(cameraId))).length > 0;
+    return (await roomGrants(user.id, await roomsOfCamera(cameraId))).some(watchesRoom);
 }
 
 /**
@@ -302,7 +314,7 @@ export async function logCameraWatch(user: SessionUser, cameraId: string): Promi
     const direct = await liveGrants(user.id, "place.camera", cameraId);
     const grant: LentGrant | undefined = direct[0]
         ? { ...direct[0], subjectType: "place.camera", subjectId: cameraId }
-        : (await roomGrants(user.id, await roomsOfCamera(cameraId)))[0];
+        : (await roomGrants(user.id, await roomsOfCamera(cameraId))).find(watchesRoom);
     if (!grant) return;
     await host.accessGrants.recordGrantUse({
         grantId: grant.id,

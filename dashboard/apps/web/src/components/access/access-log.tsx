@@ -20,6 +20,17 @@ type Outcome = "all" | "done" | "refused";
 
 const KNOWN_ACTIONS = new Set(["open", "close", "operate", "watch", "command"]);
 
+const KNOWN_REASONS = new Set([
+    "waiting",
+    "expired",
+    "closed",
+    "spent",
+    "notThat",
+    "notNearby",
+    "failed",
+    "private"
+]);
+
 export function AccessLog({
     subject,
     subjectId,
@@ -64,6 +75,12 @@ export function AccessLog({
         KNOWN_ACTIONS.has(action)
             ? t(`share.log.actions.${action}` as NamespaceKey<"components">)
             : action;
+    const refusal = (reason: string) =>
+        KNOWN_REASONS.has(reason)
+            ? t("share.log.refusedWhy", {
+                  why: t(`share.log.reasons.${reason}` as NamespaceKey<"components">)
+              })
+            : t("share.log.refused");
     const who = (use: GrantUseView) =>
         use.link
             ? use.linkNote
@@ -144,9 +161,7 @@ export function AccessLog({
                             <Badge variant={use.outcome === "done" ? "success" : "warning"}>
                                 {use.outcome === "done"
                                     ? t("share.log.done")
-                                    : use.reason
-                                      ? t("share.log.refusedWhy", { why: use.reason })
-                                      : t("share.log.refused")}
+                                    : refusal(use.reason)}
                             </Badge>
                         </li>
                     ))}
