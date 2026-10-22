@@ -9,20 +9,27 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-const { deploymentFindMany, deploymentFindUnique } = vi.hoisted(() => ({
-    deploymentFindMany: vi.fn(),
-    deploymentFindUnique: vi.fn()
-}));
+const { applicationFindMany, deploymentFindMany, deploymentFindUnique, getPorts, releaseBusy } =
+    vi.hoisted(() => ({
+        applicationFindMany: vi.fn(),
+        deploymentFindMany: vi.fn(),
+        deploymentFindUnique: vi.fn(),
+        getPorts: vi.fn(),
+        releaseBusy: vi.fn()
+    }));
 vi.mock("@polaris/db", () => ({
-    prisma: { deployment: { findMany: deploymentFindMany, findUnique: deploymentFindUnique } }
+    prisma: {
+        application: { findMany: applicationFindMany },
+        deployment: { findMany: deploymentFindMany, findUnique: deploymentFindUnique }
+    }
 }));
 // The engine's pure parts, from source, so the test reads the code under change.
 vi.mock("@polaris/deploy", async () => import("../../../../packages/deploy/src/index"));
-vi.mock("../../src/lib/deploy/runtime", () => ({ getPorts: vi.fn() }));
+vi.mock("../../src/lib/deploy/runtime", () => ({ getPorts }));
+vi.mock("../../src/lib/deploy-service", () => ({ releaseBusy }));
 
-const { downSupersededReleases, keptProjects, sweepServices } = await import(
-    "../../src/lib/deploy/release-sweep"
-);
+const { downSupersededReleases, keptProjects, sweepOrphanReleases, sweepServices } =
+    await import("../../src/lib/deploy/release-sweep");
 const { releaseRef, serviceRef, markerOf } = await import("../../src/lib/deploy/releases");
 
 const APP = "019f8506-683f-7dd0-9c13-1e9ee9237fe3";
@@ -89,12 +96,14 @@ describe("after a promotion", () => {
         deploymentFindMany.mockResolvedValue([row(NEW, { isolated: true, cutover: true })]);
         const removeContainer = vi.fn().mockResolvedValue(undefined);
         const ports = {
-            releaseContainers: vi.fn().mockResolvedValue([
-                containerIn(base.project, base.name, "aaaaaaaaaaaa"),
-                containerIn(cutover.project, cutover.name, "bbbbbbbbbbbb"),
-                containerIn(cutover.project, `${cutover.name}-p80`, "cccccccccccc"),
-                containerIn("polaris-3f0d2a11", "portfolio", "dddddddddddd")
-            ]),
+            releaseContainers: vi
+                .fn()
+                .mockResolvedValue([
+                    containerIn(base.project, base.name, "aaaaaaaaaaaa"),
+                    containerIn(cutover.project, cutover.name, "bbbbbbbbbbbb"),
+                    containerIn(cutover.project, `${cutover.name}-p80`, "cccccccccccc"),
+                    containerIn("polaris-3f0d2a11", "portfolio", "dddddddddddd")
+                ]),
             removeContainer,
             stackDown: vi.fn()
         };
@@ -117,7 +126,9 @@ describe("what the sweep may judge", () => {
     const serving = new Map([[APP, { ...cutover, portSubject: APP, address: base.name }]]);
 
     it("maps a settled service to the projects it keeps", () => {
-        const services = sweepServices([app], serving, [row(NEW, { isolated: true, cutover: true })]);
+        const services = sweepServices([app], serving, [
+            row(NEW, { isolated: true, cutover: true })
+        ]);
         expect([...services.keys()]).toEqual([base.project]);
         expect([...(services.get(base.project) ?? [])]).toEqual([cutover.project]);
     });
@@ -131,5 +142,98 @@ describe("what the sweep may judge", () => {
         ).toBe(0);
         expect(sweepServices([{ ...app, busy: true }], serving, []).size).toBe(0);
         expect(sweepServices([{ ...app, currentDeploymentId: null }], serving, []).size).toBe(0);
+    });
+});
+
+describe("the hourly sweep", () => {
+    const BUSY = "019f8506-0000-7000-8000-aaaabbbbcccc";
+    const OTHER = "019f8506-1111-7000-8000-aaaabbbbcccc";
+    const target = (id: string) => ({
+        id,
+        kind: "ssh",
+        hostId: null,
+        runtime: "compose",
+        proxyNetwork: null
+    });
+    const owned = (id: string, slug: string, targetId: string) => ({
+        id,
+        slug,
+        currentDeploymentId: `${id}-current`,
+        environment: { project: { slug, ownerId: "owner" } },
+        target: target(targetId)
+    });
+    const busyBase = serviceRef("busy", "busy", BUSY);
+
+    it("removes only an old release no settled service runs, and skips a machine it cannot list", async () => {
+        const now = Date.now();
+        deploymentFindMany.mockReset();
+        applicationFindMany.mockResolvedValue([
+            {
+                ...app,
+                environment: { project: { slug: "hmars", ownerId: "owner" } },
+                target: target("t1")
+            },
+            owned(BUSY, "busy", "t1"),
+            owned(OTHER, "other", "t2")
+        ]);
+        releaseBusy.mockImplementation((id: string) => id === BUSY);
+        deploymentFindMany.mockImplementation(async (args: { where: { status?: unknown } }) =>
+            args.where.status
+                ? [
+                      row(NEW, { isolated: true, cutover: true }),
+                      { ...row("x", {}), deployableId: OTHER }
+                  ]
+                : [
+                      { id: NEW, commitSha: "ba791a7aaaaaaa", isolated: true, cutover: true },
+                      { id: `${BUSY}-current`, commitSha: null, isolated: false, cutover: false },
+                      { id: `${OTHER}-current`, commitSha: null, isolated: false, cutover: false }
+                  ]
+        );
+        const removeContainer = vi.fn().mockResolvedValue(undefined);
+        const fresh = {
+            ...containerIn(base.project, `${base.name}-fresh`, "eeeeeeeeeeee"),
+            createdAt: now
+        };
+        const listed = {
+            releaseContainers: vi
+                .fn()
+                .mockResolvedValue([
+                    containerIn(base.project, base.name, "aaaaaaaaaaaa"),
+                    containerIn(cutover.project, cutover.name, "bbbbbbbbbbbb"),
+                    fresh,
+                    containerIn(`${busyBase.project}-old1`, busyBase.name, "cccccccccccc"),
+                    containerIn("polaris-3f0d2a11", "portfolio", "dddddddddddd")
+                ]),
+            removeContainer,
+            stackDown: vi.fn(),
+            dispose: vi.fn().mockResolvedValue(undefined)
+        };
+        const unlisted = {
+            releaseContainers: vi.fn().mockRejectedValue(new Error("unreachable")),
+            removeContainer: vi.fn(),
+            stackDown: vi.fn(),
+            dispose: vi.fn().mockResolvedValue(undefined)
+        };
+        getPorts.mockImplementation(async (row: { id: string }) =>
+            row.id === "t1" ? listed : unlisted
+        );
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+        const swept = await sweepOrphanReleases(now);
+
+        expect(removeContainer.mock.calls).toEqual([["aaaaaaaaaaaa"]]);
+        expect(unlisted.removeContainer).not.toHaveBeenCalled();
+        expect(swept).toEqual([
+            { targetId: "t1", removed: [{ name: base.name, project: base.project }] }
+        ]);
+        expect(listed.dispose).toHaveBeenCalled();
+        expect(unlisted.dispose).toHaveBeenCalled();
+        const kept = deploymentFindMany.mock.calls
+            .map(([args]) => args.where)
+            .filter((where: { status?: unknown }) => where.status);
+        expect(kept.map((where: { deployableId: unknown }) => where.deployableId)).toEqual([
+            { in: [APP, BUSY] }
+        ]);
+        expect(kept[0].status.in).toContain("running");
     });
 });

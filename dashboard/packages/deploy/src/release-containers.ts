@@ -30,6 +30,9 @@ export const STACK_NAMESPACE_LABEL = "com.docker.stack.namespace";
  *  and Polaris's own stack all fail it on purpose. */
 const RELEASE_PROJECT = /^(polaris-[0-9a-f]{8})(?:-([a-z0-9]{1,8}))?$/;
 
+/** A container id as the engine lists it; the only shape a removal accepts. */
+export const CONTAINER_ID = /^[0-9a-f]{12,64}$/;
+
 /** One container that belongs to a service release, as the engine labels it. */
 export interface ReleaseContainer {
     readonly id: string;

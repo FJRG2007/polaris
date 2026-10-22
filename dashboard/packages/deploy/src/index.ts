@@ -17,6 +17,7 @@ export {
 export { RELEASE_IMAGE_GONE } from "./runtime/release.js";
 export {
     COMPOSE_PROJECT_LABEL,
+    CONTAINER_ID,
     RELEASE_PS_FORMAT,
     STACK_NAMESPACE_LABEL,
     orphanedReleaseContainers,

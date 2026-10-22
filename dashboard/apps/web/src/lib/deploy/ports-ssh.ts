@@ -18,6 +18,7 @@ import {
     withImageUse
 } from "@/lib/deploy/image-store-lock";
 import {
+    CONTAINER_ID,
     cutLinkNetworkScript,
     ensurePrivateNetworksScript,
     forCompose,
@@ -575,22 +576,26 @@ export class SshPorts implements RuntimePorts {
         });
     }
 
-    /** `docker ps` by the compose and swarm labels, names only. The project name
-     *  is quoted like every other value that reaches the remote shell. */
+    /** Every release-shaped container on the machine, running or not, by its engine labels. */
     public async releaseContainers(): Promise<ReleaseContainer[]> {
         let out = "";
-        await this.run(`docker ps -a --no-trunc --format ${quoteArg(RELEASE_PS_FORMAT)}`, (chunk) => {
-            out += chunk.toString("utf8");
-        });
+        await this.run(
+            `docker ps -a --no-trunc --format ${quoteArg(RELEASE_PS_FORMAT)}`,
+            (chunk) => {
+                out += chunk.toString("utf8");
+            }
+        );
         return releaseContainersFromPs(out);
     }
 
     /** `rm -f` stops a running one first; without `-v`, so no volume goes with it. */
     public async removeContainer(id: string): Promise<void> {
-        if (!/^[0-9a-f]{12,64}$/.test(id)) throw new Error("not a container id");
+        if (!CONTAINER_ID.test(id)) throw new Error("not a container id");
         await this.run(`docker rm -f ${quoteArg(id)}`);
     }
 
+    /** `docker ps` by the compose and swarm labels, names only. The project name
+     *  is quoted like every other value that reaches the remote shell. */
     public async listContainers(project: string): Promise<string[]> {
         const names = new Set<string>();
         for (const label of [
