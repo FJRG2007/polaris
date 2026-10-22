@@ -62,7 +62,7 @@ import {
 } from "./call-signals";
 import { useToast } from "@polaris/ui";
 import { useVoiceGate } from "./voice-gate";
-import { playClip, stopClips } from "./soundboard-player";
+import { ownEcho, playClip, stopClips } from "./soundboard-player";
 import { soundboardPrefs } from "./soundboard-prefs";
 import {
     playbackVolume,
@@ -2376,6 +2376,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 sound: { emoji: played.emoji, name: played.name, ref: played.sound }
             });
             if (deafenedRef.current || forced.current.serverDeafened) return;
+            // The reader's own press, already sounding here since the click.
+            if (ownEcho(played.from, played.sound)) return;
             const prefs = soundboardPrefs();
             const volume = playbackVolume(played, {
                 volume: prefs.volume,

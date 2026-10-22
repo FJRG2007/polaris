@@ -29,9 +29,10 @@ import * as rules from "@/lib/chat/soundboard";
 import {
     clipsPlaying,
     onClipsChanged,
-    playClip,
+    playOwnClip,
     previewSound,
-    stopClips
+    stopClips,
+    warmClips
 } from "./soundboard-player";
 import type { SoundView } from "@/lib/chat/soundboard-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -57,6 +58,8 @@ interface Tile {
     readonly emoji: string;
     /** The space it belongs to, or null for a default. */
     readonly spaceId: string | null;
+    /** Its own volume, which the room plays it at times each listener's. */
+    readonly volume: number;
 }
 
 /** The label a default sound is shown under, in the reader's language. */
@@ -203,6 +206,20 @@ export function SoundboardButton({ meetingId, call }: { meetingId: string; call:
     useEffect(() => {
         if (open) load();
     }, [open, load]);
+
+    // The sounds a press is most likely to be, fetched while nobody is waiting:
+    // the defaults, this call's space, and the reader's favourites. The rest
+    // follow when the picker opens.
+    useEffect(() => {
+        if (!board) return;
+        const here = board.groups.filter((group) => group.here);
+        warmClips([
+            ...board.favorites,
+            ...rules.DEFAULT_SOUNDS.map((sound) => rules.defaultRef(sound.id)),
+            ...here.flatMap((group) => group.sounds.map((sound) => sound.id))
+        ]);
+        if (open) warmClips(board.groups.flatMap((group) => group.sounds.map((sound) => sound.id)));
+    }, [board, open]);
 
     const refusal = localRefusal(call) ?? board?.refusal ?? null;
     const reason = refusal ? t(REFUSAL_KEY[refusal]) : null;
@@ -377,7 +394,8 @@ export function SoundboardPanel({
                 ref: rules.defaultRef(sound.id),
                 name: "",
                 emoji: sound.emoji,
-                spaceId: null
+                spaceId: null,
+                volume: 1
             })),
         []
     );
@@ -389,7 +407,8 @@ export function SoundboardPanel({
                     ref: sound.id,
                     name: sound.name,
                     emoji: sound.emoji,
-                    spaceId: sound.spaceId
+                    spaceId: sound.spaceId,
+                    volume: sound.volume
                 }))
             })),
         [board]
@@ -465,26 +484,28 @@ export function SoundboardPanel({
         if (cooling || busy) return;
         setBusy(tile.ref);
         setError(null);
+        // Heard here on the click, the way Discord does it, at the volume the
+        // room's copy would have arrived at - which is then not played again.
+        // Taken back if the server refuses the play.
+        const own = playOwnClip(tile.ref, {
+            volume: rules.playbackVolume(
+                { volume: tile.volume, userId: "" },
+                { volume, muted: new Set() }
+            ),
+            channel: selfId ?? "self"
+        });
         const answer = await runAction(
             () => playSoundAction({ meetingId, sound: tile.ref }),
             setError
         );
         setBusy(null);
-        if (!answer) return;
-        if (answer.error) {
-            setError(answer.error);
+        if (!answer || answer.error) {
+            own.undo();
+            if (answer?.error) setError(answer.error);
             return;
         }
-        // Nobody else is connected, so the room never carries it back: sounded
-        // here instead, at the volume it would have arrived at.
-        if (answer.alone) {
-            const played = answer.alone;
-            void playClip(played.sound, {
-                url: played.url ?? null,
-                volume: rules.playbackVolume(played, { volume, muted: new Set() }),
-                channel: played.from
-            });
-        }
+        // Nobody else is connected, so the room never carries a copy back.
+        if (answer.alone) own.settle();
         rememberPlayed(tile.ref);
         setPlayedAt(Date.now());
         setCoolUntil(Date.now() + cooldownMs);
@@ -591,11 +612,7 @@ export function SoundboardPanel({
                                                     aria-hidden
                                                     className="flex size-5 shrink-0 items-center justify-center text-base leading-none"
                                                 >
-                                                    {busy === tile.ref ? (
-                                                        <Loader2 className="size-4 animate-spin" />
-                                                    ) : (
-                                                        tile.emoji || SOUND_GLYPH
-                                                    )}
+                                                    {tile.emoji || SOUND_GLYPH}
                                                 </span>
                                                 <span className="min-w-0 truncate">{name}</span>
                                             </button>
