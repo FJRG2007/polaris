@@ -9,6 +9,7 @@ import es from "@/messages/es.json";
 import { readFileSync } from "node:fs";
 import type { Metadata, Viewport } from "next";
 import type { SiteData, SiteLocale } from "@/data/builders";
+import type { SearchRecord } from "@/components/docs-search";
 
 export type Words = typeof en;
 
@@ -96,4 +97,31 @@ export function pageMetadata(
             images: image ? [image] : undefined
         }
     };
+}
+
+/** What the docs search looks through: every guide's sections and every API operation. */
+export function searchRecords(locale: SiteLocale): SearchRecord[] {
+    const { docs, api } = siteData();
+    const records: SearchRecord[] = [];
+    for (const page of docs[locale]) {
+        const at = asset(href(locale, `docs/${page.slug}/`));
+        records.push({ title: page.title, section: page.summary, href: at, text: page.text[""] ?? "" });
+        for (const heading of page.headings)
+            records.push({
+                title: heading.text,
+                section: page.title,
+                href: `${at}#${heading.id}`,
+                text: page.text[heading.id] ?? ""
+            });
+    }
+    const reference = asset(href(locale, "docs/api/"));
+    for (const group of api.groups)
+        for (const op of group.operations)
+            records.push({
+                title: op.summary || op.path,
+                section: `${op.method} ${op.path}`,
+                href: `${reference}#${op.id}`,
+                text: `${group.tag} ${op.description}`
+            });
+    return records;
 }

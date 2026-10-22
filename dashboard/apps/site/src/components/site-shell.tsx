@@ -14,6 +14,7 @@ const PAGES = [
     { key: "home", page: "" },
     { key: "marketplace", page: "marketplace/" },
     { key: "downloads", page: "downloads/" },
+    { key: "docs", page: "docs/" },
     { key: "api", page: "docs/api/" }
 ] as const;
 
@@ -43,6 +44,8 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
                             <NavLink
                                 key={entry.key}
                                 href={href(locale, entry.page)}
+                                section={entry.key === "docs"}
+                                except={href(locale, "docs/api/")}
                                 className="shrink-0 rounded-md px-2.5 py-1.5 text-muted-foreground hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground"
                             >
                                 {t.nav[entry.key]}

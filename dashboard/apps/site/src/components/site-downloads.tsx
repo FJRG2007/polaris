@@ -10,6 +10,7 @@
 
 import type { ReactNode } from "react";
 import type { DownloadsData } from "@/data/builders";
+import { EXAMPLE_ORIGIN } from "@/lib/example-origin";
 import type { Locale, Namespaces } from "@polaris/core";
 import { I18nContext, useTranslations } from "@polaris/ui/i18n";
 import { AppHrefProvider } from "@polaris/ui/account-downloads/app-link";
@@ -19,9 +20,6 @@ import {
     DesktopFilesOffer,
     ExtensionFilesOffer
 } from "@polaris/ui/account-downloads/app-download-offers";
-
-/** Where Polaris will answer once it is installed: a placeholder, as fixture text. */
-const EXAMPLE_ADDRESS = "https://polaris.example.com";
 
 const nowhere = () => null;
 
@@ -60,12 +58,12 @@ export function SiteDownloads({
             <AppHrefProvider value={nowhere}>
                 <DownloadsPage
                     repo={repo}
-                    serverUrl={EXAMPLE_ADDRESS}
+                    serverUrl={EXAMPLE_ORIGIN}
                     webApp={<BrowserInstall />}
                     extensionFiles={<ExtensionFilesOffer download={files.extension} />}
                     deck={
                         <DeckCard
-                            address={EXAMPLE_ADDRESS}
+                            address={EXAMPLE_ORIGIN}
                             repo={repo}
                             storeUrl={data.storeUrl}
                             pluginFile={

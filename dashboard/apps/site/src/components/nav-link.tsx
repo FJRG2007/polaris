@@ -14,13 +14,22 @@ const trim = (path: string) => path.replace(/\/+$/, "");
 export function NavLink({
     href,
     className,
+    section,
+    except,
     children
 }: {
     href: string;
     className: string;
+    /** Also current on every page under this one ("docs/" for each guide). */
+    section?: boolean;
+    /** A page under it that has its own entry in the bar. */
+    except?: string;
     children: ReactNode;
 }) {
-    const current = trim(usePathname() ?? "") === trim(href);
+    const path = trim(usePathname() ?? "");
+    const current =
+        path === trim(href) ||
+        (section === true && path.startsWith(`${trim(href)}/`) && (!except || !path.startsWith(trim(except))));
     return (
         <Link href={href} className={className} aria-current={current ? "page" : undefined}>
             {children}

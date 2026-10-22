@@ -6,6 +6,7 @@
  * sources and the tests feed them fixtures. Nothing here fetches or reads files.
  */
 import type { InventoryRoute } from "@/data/api-inventory";
+import type { DocPage } from "@/data/docs";
 import type { AppDownload } from "@polaris/ui/account-downloads/app-releases";
 
 export type SiteLocale = "en" | "es";
@@ -534,6 +535,8 @@ export interface SiteData {
         readonly streamdeck: { macos: string; windows: string };
     };
     readonly locales: Readonly<Record<SiteLocale, LocaleData>>;
+    /** The feature guides from `docs/features`, rendered per locale. */
+    readonly docs: Readonly<Record<SiteLocale, readonly DocPage[]>>;
     readonly downloads: readonly DownloadEntry[];
     readonly downloadsPage: DownloadsData;
     readonly api: {

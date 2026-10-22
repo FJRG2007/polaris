@@ -3,6 +3,7 @@
         "home": "Resumen",
         "marketplace": "Tienda",
         "downloads": "Descargas",
+        "docs": "Docs",
         "api": "API",
         "github": "GitHub",
         "language": "English",
@@ -13,7 +14,8 @@
         "marketplace": "Todas las apps que puedes añadir a Polaris, con capturas de cada una.",
         "downloads": "La extensión del navegador, la CLI, el plugin de Stream Deck y la app de escritorio de Polaris.",
         "api": "Todas las rutas de Polaris que puedes llamar con una clave de API, con ejemplos en curl, JavaScript y Python.",
-        "ogAlt": "La interfaz de Polaris"
+        "ogAlt": "La interfaz de Polaris",
+        "docs": "Cómo funciona cada parte de Polaris, con las pantallas que vas a ver."
     },
     "home": {
         "eyebrow": "Código abierto. En tu servidor. Una instalación.",
@@ -95,7 +97,13 @@
         "params": "Parámetros",
         "body": "Cuerpo",
         "responses": "Respuestas",
-        "required": "obligatorio"
+        "required": "obligatorio",
+        "examples": "Petición de ejemplo",
+        "copy": "Copiar",
+        "authTitle": "Autenticación",
+        "auth": "Crea una clave en Cuenta > Claves de API en tu Polaris y envíala en la cabecera Authorization de cada petición. Una clave solo llega a lo que alcanza su dueño, acotado por los permisos que le diste.",
+        "undocumented": "También accesibles con una clave",
+        "undocumentedHint": "Estas rutas aceptan una clave de API pero aún no están en el documento OpenAPI, así que la forma de sus peticiones y respuestas puede cambiar."
     },
     "footer": {
         "license": "Código abierto con licencia AGPL-3.0.",
@@ -110,5 +118,20 @@
         "next": "Imagen siguiente",
         "position": "{index} de {count}",
         "open": "Ampliar"
+    },
+    "docs": {
+        "title": "Documentación",
+        "intro": "Cómo funciona cada parte de Polaris, con las pantallas que vas a ver. La búsqueda cubre las guías y la referencia de la API.",
+        "search": "Buscar en las guías y la API",
+        "empty": "Nada coincide con eso.",
+        "guides": "Guías",
+        "onThisPage": "En esta página",
+        "apiHint": "Cada ruta que puede llamar una clave de API, con ejemplos en curl, JavaScript y Python.",
+        "source": "Editar esta página en GitHub"
+    },
+    "notFound": {
+        "title": "Página no encontrada",
+        "intro": "No hay nada en esta dirección. Puede que se moviera al rehacer el sitio.",
+        "home": "Ir a la portada"
     }
 }

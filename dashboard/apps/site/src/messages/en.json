@@ -3,6 +3,7 @@
         "home": "Overview",
         "marketplace": "Marketplace",
         "downloads": "Downloads",
+        "docs": "Docs",
         "api": "API",
         "github": "GitHub",
         "language": "Español",
@@ -13,7 +14,8 @@
         "marketplace": "Every app you can add to Polaris, with screenshots of each one.",
         "downloads": "The browser extension, the CLI, the Stream Deck plugin and the desktop app for Polaris.",
         "api": "Every Polaris route you can call with an API key, with examples in curl, JavaScript and Python.",
-        "ogAlt": "The Polaris interface"
+        "ogAlt": "The Polaris interface",
+        "docs": "How each part of Polaris works, with the screens you will see."
     },
     "home": {
         "eyebrow": "Open source. Self-hosted. One install.",
@@ -95,7 +97,13 @@
         "params": "Parameters",
         "body": "Request body",
         "responses": "Responses",
-        "required": "required"
+        "required": "required",
+        "examples": "Example request",
+        "copy": "Copy",
+        "authTitle": "Authentication",
+        "auth": "Create a key in Account > API keys on your Polaris, then send it in the Authorization header of every request. A key only reaches what its owner can, narrowed by the scopes you gave it.",
+        "undocumented": "Also reachable with a key",
+        "undocumentedHint": "These routes accept an API key but are not in the OpenAPI document yet, so their request and response shapes may change."
     },
     "footer": {
         "license": "Open source under the AGPL-3.0 license.",
@@ -110,5 +118,20 @@
         "next": "Next picture",
         "position": "{index} of {count}",
         "open": "Enlarge"
+    },
+    "docs": {
+        "title": "Documentation",
+        "intro": "How each part of Polaris works, with the screens you will see. Search covers the guides and the API reference.",
+        "search": "Search the docs and the API",
+        "empty": "Nothing matches that.",
+        "guides": "Guides",
+        "onThisPage": "On this page",
+        "apiHint": "Every route an API key can call, with examples in curl, JavaScript and Python.",
+        "source": "Edit this page on GitHub"
+    },
+    "notFound": {
+        "title": "Page not found",
+        "intro": "Nothing lives at this address. It may have moved when the site was rebuilt.",
+        "home": "Go to the overview"
     }
 }

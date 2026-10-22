@@ -38,6 +38,9 @@ import {
     writeFileSync
 } from "node:fs";
 import * as site from "../src/data/builders";
+import * as docs from "../src/data/docs";
+import { marked } from "marked";
+import { highlight, type CodeLanguage } from "../src/lib/highlight";
 import { apiInventory, type ModuleSource, type RouteSource } from "../src/data/api-inventory";
 
 const siteDir = process.env.POLARIS_SITE_DIR ?? join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -183,6 +186,73 @@ const [desktop, extension, streamdeck, companion] = await Promise.all(
     )
 );
 
+// The feature guides, one page each, in both languages.
+const featuresDir = join(root, "docs", "features");
+const featureFiles = readdirSync(featuresDir)
+    .filter((file) => file.endsWith(".md") && !file.endsWith(".es.md"))
+    .sort();
+const docSlugs = new Set(featureFiles.map(docs.docSlug));
+const docMedia = new Set<string>();
+const escapeHtml = (text: string) =>
+    text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+async function renderDoc(slug: string, markdown: string): Promise<docs.DocPage> {
+    const { title, body } = docs.splitDoc(markdown);
+    const tokens = marked.lexer(body);
+    // Code is highlighted the way every other block on the site is.
+    const highlighted = new Map<string, string>();
+    const blocks: { text: string; lang: string }[] = [];
+    marked.walkTokens(tokens, (token) => {
+        if (token.type === "code") blocks.push({ text: token.text, lang: token.lang || "text" });
+    });
+    for (const block of blocks) {
+        const html = await highlight(block.text, block.lang as CodeLanguage).catch(() =>
+            highlight(block.text, "text" as CodeLanguage)
+        );
+        highlighted.set(block.text, html);
+    }
+    const headings: docs.DocHeading[] = [];
+    const used = new Set<string>();
+    const renderer = new marked.Renderer();
+    renderer.heading = (text, level, raw) => {
+        let id = docs.headingId(raw) || "section";
+        for (let n = 2; used.has(id); n++) id = `${docs.headingId(raw)}-${n}`;
+        used.add(id);
+        if (level <= 3) headings.push({ id, text: docs.plainText(text) });
+        return `<h${level} id="${id}">${text}</h${level}>\n`;
+    };
+    renderer.code = (code) => {
+        const html = highlighted.get(code) ?? `<pre><code>${escapeHtml(code)}</code></pre>`;
+        return `<div class="code-block">${html}</div>\n`;
+    };
+    const rendered = marked.parser(tokens, { renderer, async: false }) as string;
+    const { html, media: pictures } = docs.rewriteDocLinks(rendered, {
+        slugs: docSlugs,
+        repo,
+        dir: "docs/features"
+    });
+    for (const picture of pictures) docMedia.add(picture);
+    // The text under each heading, so search can land on the section.
+    const text: Record<string, string> = {};
+    const parts = html.split(/<h[1-6] id="([^"]+)">/);
+    text[""] = docs.plainText(parts[0] ?? "");
+    for (let at = 1; at < parts.length; at += 2) text[parts[at]!] = docs.plainText(parts[at + 1] ?? "");
+    const summary = docs.plainText(/<p>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? "");
+    return { slug, title, summary, headings, html, text };
+}
+
+async function guides(spanish: boolean): Promise<docs.DocPage[]> {
+    const pages = await Promise.all(
+        featureFiles.map((file) => {
+            const slug = docs.docSlug(file);
+            const own = join(featuresDir, `${slug}.es.md`);
+            return renderDoc(slug, read(spanish && existsSync(own) ? own : join(featuresDir, file)));
+        })
+    );
+    return pages.sort((a, b) => a.title.localeCompare(b.title));
+}
+const [docsEn, docsEs] = await Promise.all([guides(false), guides(true)]);
+
 const data: site.SiteData = {
     repo,
     install: site.parseInstallLines(readmeEn),
@@ -215,6 +285,7 @@ const data: site.SiteData = {
             guide: guide("es-ES")
         }
     },
+    docs: { en: docsEn, es: docsEs },
     downloads: site.downloadEntries(await releases(), repo),
     downloadsPage: {
         files: { desktop, extension, streamdeck, companion },
@@ -243,6 +314,7 @@ for (const locale of Object.values(data.locales))
     for (const section of locale.showcase)
         for (const item of section.items)
             for (const file of [item.dark, item.light]) if (file) pictures.add(file);
+for (const file of docMedia) pictures.add(file);
 for (const file of pictures)
     copyFileSync(join(media, file), join(siteDir, "public", "media", file));
 for (const file of logos)
@@ -289,5 +361,5 @@ for (const app of catalog)
 const operations = data.api.groups.reduce((sum, group) => sum + group.operations.length, 0);
 const released = data.downloads.filter((entry) => entry.released).length;
 console.log(
-    `[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} documented API operations, ${inventory.routes.length} key-reachable of ${routeSources.length} route files, ${released} released products`
+    `[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} documented API operations, ${inventory.routes.length} key-reachable of ${routeSources.length} route files, ${released} released products, ${docsEn.length} guides`
 );
