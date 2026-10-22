@@ -20,6 +20,12 @@ import "@/components/app-host/client";
 let cameras: CameraView[] = [];
 let served: string[][] = [];
 const liveCalls = vi.fn();
+const routeCalls = vi.fn();
+
+/** Each ask takes the next answer, and keeps the last one once they run out. */
+function nextServed(): string[] {
+    return served.length > 1 ? served.shift()! : (served[0] ?? []);
+}
 
 vi.mock("@/app/(app)/access-actions", () => ({
     listGrantsAction: async () => ({ grants: [], candidates: [] }),
@@ -32,10 +38,9 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
     listCamerasAction: async () => ({ cameras }),
     listCameraSetsAction: async () => ({ sets: [] }),
     listRoomsAction: async () => ({ rooms: [] }),
-    // Each ask takes the next answer, and keeps the last one once they run out.
     liveCamerasAction: async () => {
         liveCalls();
-        return { live: served.length > 1 ? served.shift()! : (served[0] ?? []) };
+        return { live: nextServed() };
     },
     cameraPrivacyAction: async () => ({
         results: [{ cameraId: "cam", name: "Front door", native: true, private: false }]
@@ -94,6 +99,19 @@ async function wait(ms: number): Promise<void> {
 beforeEach(() => {
     vi.useFakeTimers();
     liveCalls.mockClear();
+    routeCalls.mockClear();
+    // The wall's rechecks are a route, never an action: an update renames every
+    // action under a tab left open.
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url !== "/api/home/cameras/live") return new Response(null, { status: 404 });
+            liveCalls();
+            routeCalls();
+            return Response.json({ live: nextServed() });
+        })
+    );
     globalThis.IntersectionObserver = class {
         observe() {}
         disconnect() {}
@@ -105,6 +123,7 @@ beforeEach(() => {
 
 afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
 });
 
@@ -124,6 +143,19 @@ describe("the wall after privacy is turned off", () => {
         expect(screen.getByText("Starting")).toBeTruthy();
 
         await settle(2_000);
+        expect(screen.queryByText("Starting")).toBeNull();
+        expect(screen.getByRole("img", { name: "Front door" })).toBeTruthy();
+        expect(routeCalls).toHaveBeenCalled();
+    });
+
+    it("keeps asking through a failed answer", async () => {
+        cameras = [camera({})];
+        served = [[]];
+        render(<Wall canManage canControl />);
+        await settle();
+        vi.mocked(fetch).mockResolvedValueOnce(new Response("Unavailable", { status: 503 }));
+        served = [["cam"]];
+        await wait(10_000);
         expect(screen.queryByText("Starting")).toBeNull();
         expect(screen.getByRole("img", { name: "Front door" })).toBeTruthy();
     });

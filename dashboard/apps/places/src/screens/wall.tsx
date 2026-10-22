@@ -238,16 +238,25 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         const next = () => {
             if (current) setRecheck((value) => value + 1);
         };
+        const controller = new AbortController();
         const timer = setTimeout(
             () =>
-                void actions.liveCamerasAction().then((status) => {
-                    if (current && status.live) setLive(new Set(status.live));
-                    next();
-                }, next),
+                void fetch("/api/home/cameras/live", {
+                    signal: controller.signal,
+                    cache: "no-store"
+                })
+                    .then((response): Promise<{ live?: string[] }> =>
+                        response.ok ? response.json() : Promise.resolve({})
+                    )
+                    .then((status) => {
+                        if (current && status.live) setLive(new Set(status.live));
+                        next();
+                    }, next),
             LIVE_RECHECK_MS[Math.min(recheck, LIVE_RECHECK_MS.length - 1)]
         );
         return () => {
             current = false;
+            controller.abort();
             clearTimeout(timer);
         };
     }, [waiting, opened, recheck]);

@@ -17,6 +17,7 @@
 
 import type { z } from "zod";
 import * as ptz from "../lib/ptz";
+import * as live from "../lib/live";
 import { cookies } from "next/headers";
 import * as relay from "../lib/relay";
 import { revalidatePath } from "next/cache";
@@ -1230,23 +1231,11 @@ export async function liveCamerasAction(): Promise<{ live?: string[]; error?: st
     // camera is a caller here. A permission check would redirect them, and a
     // redirect from an action navigates the screen that asked - out of Places.
     const { install, reach } = await requireHomeShared();
-    const result = await guard(async () => {
-        const all = onlyReachable(
-            await cameras.listCameras(install.id),
-            reach.everything || reach.cameras
-        );
-        const servers = [...new Set(all.map((camera) => relay.relayServerFor(camera.reachVia)))];
-        const names = await Promise.all(
-            servers.map(async (server) => {
-                const endpoint = await relay.relayEndpoint(server);
-                return endpoint ? ((await relay.publishedStreams(endpoint)) ?? []) : [];
-            })
-        );
-        const published = new Set(names.flat());
-        return all
-            .filter((camera) => published.has(relay.streamName(camera.id, "main")))
-            .map((camera) => camera.id);
-    });
+    const result = await guard(async () =>
+        live.servedCameraIds(
+            onlyReachable(await cameras.listCameras(install.id), reach.everything || reach.cameras)
+        )
+    );
     return result.error ? { error: result.error } : { live: result.value };
 }
 // ---------------------------------------------------------------------------
