@@ -28,6 +28,7 @@ import {
     FolderOpen,
     FolderPlus,
     Link2,
+    Loader2,
     MoreHorizontal,
     Pencil,
     Pin,
@@ -64,6 +65,8 @@ import {
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { projectList, type PolarSidebar } from "@/components/polar/use-polar-sidebar";
+import type { PolarRunMarks } from "@/components/polar/polar-runs";
+import type { PolarRunView } from "@/lib/polar/runs";
 import * as polarShared from "@/lib/polar/shared";
 import {
     PolarShareDialog,
@@ -120,6 +123,7 @@ type RowActions = {
 export function PolarThreads({
     sidebar,
     activeId,
+    runs = {},
     onOpen,
     onNew,
     hide,
@@ -128,6 +132,8 @@ export function PolarThreads({
 }: {
     sidebar: PolarSidebar;
     activeId: string;
+    /** The chats answering, waiting for an approval, or finished unseen. */
+    runs?: PolarRunMarks;
     onOpen: (id: string) => void;
     /** A new chat, filed under the project when one is given. */
     onNew: (projectId: string | null) => void;
@@ -168,7 +174,13 @@ export function PolarThreads({
         onMoveToNew: (row) => setProjectForm({ project: null, moving: row })
     };
     const item = (row: PolarThreadRow) => (
-        <ThreadItem key={row.id} row={row} active={row.id === activeId} actions={actions} />
+        <ThreadItem
+            key={row.id}
+            row={row}
+            active={row.id === activeId}
+            run={runs[row.id] ?? null}
+            actions={actions}
+        />
     );
     const codeSection = code ? <CodeSection code={code} /> : null;
 
@@ -600,13 +612,55 @@ function ProjectItem({
     );
 }
 
+/** A chat's run as a mark beside its name; nothing for one at rest. */
+function RunMark({ run, active }: { run: PolarRunView | null; active: boolean }) {
+    const t = useTranslations("polar");
+    if (!run) return null;
+    const label =
+        run.state === "running"
+            ? t("history.running")
+            : run.state === "approval"
+              ? t("history.waiting")
+              : // The open chat is being read: an unread mark there says nothing.
+                run.unread && !active
+                ? t("history.unread")
+                : null;
+    if (!label) return null;
+    return (
+        <span
+            role="img"
+            aria-label={label}
+            title={label}
+            className="flex shrink-0 items-center px-1"
+        >
+            {run.state === "running" ? (
+                <Loader2 aria-hidden className="size-3.5 text-primary motion-safe:animate-spin" />
+            ) : (
+                <span
+                    aria-hidden
+                    className={cn(
+                        "size-2 rounded-full",
+                        run.state === "approval"
+                            ? "bg-warning"
+                            : run.state === "failed"
+                              ? "bg-danger"
+                              : "bg-primary"
+                    )}
+                />
+            )}
+        </span>
+    );
+}
+
 function ThreadItem({
     row,
     active,
+    run,
     actions
 }: {
     row: PolarThreadRow;
     active: boolean;
+    run: PolarRunView | null;
     actions: RowActions;
 }) {
     const t = useTranslations("polar");
@@ -672,6 +726,7 @@ function ThreadItem({
                     {row.title}
                 </button>
             )}
+            {renaming ? null : <RunMark run={run} active={active} />}
             {renaming ? null : (
                 <span className="mr-1 flex shrink-0 items-center">
                     <button

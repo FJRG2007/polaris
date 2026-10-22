@@ -101,6 +101,7 @@ export const NOTIFICATION_GROUPS = [
     "network",
     "people",
     "agents",
+    "polar",
     "system"
 ] as const;
 
@@ -118,6 +119,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     network: "Network",
     people: "People",
     agents: "Agents",
+    polar: "Polar",
     system: "Polaris"
 };
 
@@ -974,6 +976,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description: "A scheduled or automatic update ran, and how it went.",
         level: "success",
         defaults: { inapp: true, email: true }
+    },
+    {
+        id: "polar.chatReady",
+        group: "polar",
+        label: "Chat answered while away",
+        description: "A Polar chat you left finished its answer, or is waiting for your approval.",
+        // Only the bell: the person was in Polaris a moment ago, and an answer
+        // they walked away from is not worth a mail.
+        level: "info",
+        defaults: { inapp: true, email: false }
     }
 ] as const;
 

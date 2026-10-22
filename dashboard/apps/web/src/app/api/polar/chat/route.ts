@@ -75,6 +75,8 @@ import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
 import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
+import { POLAR_RUNS_MAX, beginPolarRun } from "@/lib/polar/runs";
+import { noticePolarRunEnd } from "@/lib/polar/run-notices";
 import {
     FAILURE_PART,
     classifyProviderFailure,
@@ -363,6 +365,19 @@ export async function POST(request: Request): Promise<Response> {
         return refusedTurn(messages, { code: "file_unreadable", name: unreadable[0] }, save);
     }
 
+    // The answer runs on its own, not on this request: leaving the chat leaves
+    // it answering, and only its stop (`chat/[id]/stream`) ends it.
+    const modelMessages = await convertToModelMessages(withScreenNotes(withoutFailures(sendable)));
+    const run = beginPolarRun(user.id, body.data.threadId, (end) => void noticePolarRunEnd(end));
+    if (run === "busy") return refuse("running", 409);
+    if (run === "too_many") {
+        return refusedTurn(messages, { code: "too_many_runs", max: POLAR_RUNS_MAX }, save);
+    }
+    run.watch(request.signal);
+    // A new question is kept now, so the chat opened again mid-answer shows it;
+    // a turn that continues an answer is already stored.
+    if (messages.at(-1)?.role === "user") await save(messages);
+
     const startedAt = Date.now();
     let spent: ReturnType<typeof answerUsage> | undefined;
     // The newest step's own counts: what the conversation measures now, for
@@ -386,7 +401,7 @@ export async function POST(request: Request): Promise<Response> {
                 .join("\n\n"),
             providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } }
         },
-        messages: await convertToModelMessages(withScreenNotes(withoutFailures(sendable))),
+        messages: modelMessages,
         tools,
         activeTools: activeFor(new Set()),
         // A tool find_tools turned up is sent from the next step on, and the
@@ -405,7 +420,7 @@ export async function POST(request: Request): Promise<Response> {
             resolved.automatic === "fast" ? "fast" : choice.intelligence,
             resolved.option
         ),
-        abortSignal: request.signal
+        abortSignal: run.signal
     });
 
     const answer = result.toUIMessageStream({
@@ -517,5 +532,5 @@ export async function POST(request: Request): Promise<Response> {
             );
         }
     });
-    return createUIMessageStreamResponse({ stream });
+    return createUIMessageStreamResponse({ stream, consumeSseStream: run.consume });
 }

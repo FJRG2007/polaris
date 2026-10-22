@@ -84,6 +84,14 @@ beforeEach(() => {
                 method,
                 body: init?.body ? JSON.parse(String(init.body)) : undefined
             });
+            if (url === "/api/polar/runs")
+                return Response.json({
+                    runs: [
+                        { threadId: RECENT.id, state: "running", unread: false, startedAt: 2 },
+                        { threadId: PINNED.id, state: "approval", unread: false, startedAt: 1 }
+                    ]
+                });
+            if (url.endsWith("/stream")) return new Response(null, { status: 204 });
             if (url === "/api/polar/models")
                 return Response.json({ providers: [], tools: {}, isAdmin: false });
             if (url === "/api/polar/threads")
@@ -141,6 +149,16 @@ function openMenu(title: string) {
         pointerType: "mouse"
     });
 }
+
+describe("chats answering elsewhere", () => {
+    it("marks a chat that is answering, and one waiting for an approval", async () => {
+        await mountPage();
+        const recent = screen.getByTitle("Recent chat").parentElement as HTMLElement;
+        expect(await within(recent).findByRole("img", { name: "Answering now" })).toBeTruthy();
+        const waiting = screen.getByTitle("Pinned chat").parentElement as HTMLElement;
+        expect(within(waiting).getByRole("img", { name: "Needs your approval" })).toBeTruthy();
+    });
+});
 
 describe("the sections", () => {
     it("lists pinned chats under Pinned and the rest under Recents", async () => {
