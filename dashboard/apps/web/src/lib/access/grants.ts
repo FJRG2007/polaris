@@ -733,12 +733,14 @@ const LINK_TOKEN = /^[A-Za-z0-9_-]{43}$/;
  * counted against the same ceiling.
  */
 export async function writeGrantLink(
-    subject: (typeof core.GRANT_LINK_SUBJECTS)[number],
+    subject: core.GrantLinkSubject,
     subjectId: string,
     input: core.GrantLinkInput,
     grantedById: string
 ): Promise<{ id: string; token: string }> {
-    const allowed = core.GRANT_CAPABILITIES[subject] as readonly string[];
+    // Narrower than a person's: a NAS, a server or a domain is only ever seen
+    // through a link, whatever a person could be given.
+    const allowed = core.linkCapabilities(subject);
     if (!allowed.includes(input.capability)) {
         throw new GrantError("That is not something this can be shared as");
     }
@@ -797,12 +799,27 @@ export type LinkReach =
  * or taken back. A malformed token is refused before the database is asked.
  */
 export async function linkReach(token: string, now = new Date()): Promise<LinkReach | null> {
+    return judgeLink(token, now, false);
+}
+
+/**
+ * The same, for a use that has already been paid for: a camera's live view is
+ * counted once when it is opened, and the stream it then pulls for minutes
+ * must not be cut because that open was the last use. Dates, hours and
+ * revocation still apply to every request; only the count is set aside.
+ */
+export async function linkReachPaid(token: string, now = new Date()): Promise<LinkReach | null> {
+    return judgeLink(token, now, true);
+}
+
+async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkReach | null> {
     if (!LINK_TOKEN.test(token)) return null;
-    const row = await prisma.accessGrant.findFirst({
+    const found = await prisma.accessGrant.findFirst({
         where: { principalType: core.LINK_PRINCIPAL, principalId: linkPrincipalId(token) },
         select: { ...GRANT_FIELDS, note: true }
     });
-    if (!row) return null;
+    if (!found) return null;
+    const row = paid ? { ...found, maxUses: null } : found;
     const zone = await houseZone([row]);
     const verdict = core.judgeGrant(row, now, zone);
     const base = { subjectType: row.subjectType, subjectId: row.subjectId, note: row.note };

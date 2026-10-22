@@ -71,6 +71,21 @@ describe("making a link", () => {
         ).rejects.toThrow();
     });
 
+    it("lets a camera, a NAS, a server and a domain be linked, but only to watch", async () => {
+        const NAS = "00000000-0000-4000-8000-0000000000a1";
+        for (const subject of ["place.camera", "place.nas", "place.server", "place.domain"] as const) {
+            await expect(
+                writeGrantLink(subject, NAS, link({ capability: "view", actions: [] }), "owner")
+            ).resolves.toHaveProperty("token");
+        }
+        await expect(
+            writeGrantLink("place.nas", NAS, link({ capability: "control", actions: [] }), "owner")
+        ).rejects.toThrow();
+        expect(core.linkCapabilities("place.nas")).toEqual(["view"]);
+        expect(core.linkCapabilities("place.ups")).toEqual(["view", "control"]);
+        expect(core.isGrantLinkSubject("chat.space")).toBe(false);
+    });
+
     it("keeps its fence and its limits", async () => {
         await writeGrantLink(
             "place.device",
