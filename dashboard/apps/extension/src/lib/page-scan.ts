@@ -77,6 +77,61 @@ export function scanInputs(doc: Document, opener?: ShadowOpener): Scan {
     return { inputs, trees, frames };
 }
 
+/**
+ * How much looking a burst of page changes calls for.
+ *
+ * A page that never stops changing - a video player, a feed, a clock - would
+ * otherwise have the whole tree walked several times a second for as long as
+ * it is open, which is what made a streaming site stutter as the browser's side
+ * panel slid in and the page re-laid itself out around it. Most of those
+ * changes cannot bring a box: a class flipped on a progress bar, a subtitle
+ * line swapped. Only something added or taken away that is, or holds, a box,
+ * a frame, or a component that may keep one in its shadow root needs the walk
+ * again; a style or class changing can only show or hide a box already found,
+ * and re-reading those few is enough.
+ */
+export type Change = "none" | "reread" | "rescan";
+
+/** Whether a node added to or taken from the page can be, or hold, a box. */
+function mayHoldBox(node: Node): boolean {
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const element = node as Element;
+    if (holdsDirectly(element)) return true;
+    if (element.querySelector("input, iframe, frame")) return true;
+    for (const inner of element.getElementsByTagName("*")) {
+        if (inner.localName.includes("-")) return true;
+    }
+    return false;
+}
+
+function holdsDirectly(element: Element): boolean {
+    const name = element.nodeName;
+    return (
+        name === "INPUT" || name === "IFRAME" || name === "FRAME" || element.localName.includes("-")
+    );
+}
+
+/** What `records` call for, given how many boxes the last walk found. Nodes
+ *  `ours` claims are the script's own marks and never count. */
+export function changeNeeds(
+    records: readonly MutationRecord[],
+    ours: (node: Node) => boolean,
+    known: number
+): Change {
+    let needs: Change = "none";
+    for (const record of records) {
+        if (ours(record.target)) continue;
+        if (record.type === "childList") {
+            for (const node of [...record.addedNodes, ...record.removedNodes]) {
+                if (!ours(node) && mayHoldBox(node)) return "rescan";
+            }
+        } else if (known > 0) {
+            needs = "reread";
+        }
+    }
+    return needs;
+}
+
 /** A closed root, or null where the browser refuses to say. */
 function closedRoot(opener: ShadowOpener, element: Element): ShadowRoot | null {
     try {

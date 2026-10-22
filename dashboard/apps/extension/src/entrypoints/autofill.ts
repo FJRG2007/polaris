@@ -50,11 +50,13 @@ import { emptyProfile, PROFILE_PARTS, readForm, type PageFields } from "@/lib/fi
 import { wholeName } from "@/lib/identity";
 import { enterSendsLogin } from "@/lib/enter-submit";
 import {
+    changeNeeds,
     describeInput,
     frameOffset,
     isInput,
     scanInputs,
     upFrom,
+    type Change,
     type ShadowOpener
 } from "@/lib/page-scan";
 import { CLIPBOARD_CLEAR_MS } from "@/lib/generator";
@@ -79,6 +81,9 @@ import { ENGLISH, type Words } from "@/lib/words";
  *  arrive late on most sites now - a form is rendered after the framework has
  *  fetched something - so one look at load would miss them. */
 const SETTLE_MS = 400;
+
+/** How long a page that keeps changing goes between whole walks at most. */
+const FULL_LOOK_MS = 5_000;
 
 /** How long after the last keystroke a password is asked about. Long enough that
  *  typing one does not make a request per character. */
@@ -198,16 +203,30 @@ async function start(): Promise<void> {
     // after the first change rather than after the last: a page with a spinner
     // or a clock on it never stops changing, and a wait for quiet on one of
     // those never ends.
+    //
+    // And only as much looking as the burst calls for (`changeNeeds`): a style
+    // or class changing re-reads the boxes already found instead of walking the
+    // whole page again, which on a video player is several walks a second. The
+    // whole walk still comes round now and then, for a component that grew its
+    // shadow root without anything around it changing.
     let settling: number | null = null;
-    const again = (): void => {
+    let pending: Change = "none";
+    let walkedAt = 0;
+    const again = (needs: Change = "rescan"): void => {
+        if (needs === "none") return;
+        if (needs === "rescan") pending = "rescan";
+        else if (pending === "none") pending = "reread";
         if (settling !== null) return;
         settling = window.setTimeout(() => {
             settling = null;
-            refresh();
+            const level = Date.now() - walkedAt > FULL_LOOK_MS ? "rescan" : pending;
+            pending = "none";
+            refresh(level);
         }, SETTLE_MS);
     };
+    const rescan = (): void => again("rescan");
     const observer = new MutationObserver((records) => {
-        if (!onlyOurs(records)) again();
+        again(changeNeeds(records, (node) => drawn.has(node), seen.inputs.length));
     });
     const WATCH: MutationObserverInit = {
         childList: true,
@@ -233,10 +252,11 @@ async function start(): Promise<void> {
     const watchFrame = (frame: HTMLIFrameElement): void => {
         if (frames.has(frame)) return;
         frames.add(frame);
-        frame.addEventListener("load", again);
+        frame.addEventListener("load", rescan);
     };
 
     const look = (): void => {
+        walkedAt = Date.now();
         const scan = scanInputs(document, opener);
         seen = { fields: readForm(scan.inputs.map(describeInput)), inputs: scan.inputs };
         for (const tree of scan.trees) watchTree(tree);
@@ -268,8 +288,9 @@ async function start(): Promise<void> {
 
     /** Look again at what the page is asking for, and put a mark on each box that
      *  Polaris has something to offer for. */
-    const refresh = (): void => {
-        look();
+    const refresh = (level: Change = "rescan"): void => {
+        if (level === "rescan") look();
+        else seen = { fields: readForm(seen.inputs.map(describeInput)), inputs: seen.inputs };
         const { fields } = seen;
         noticeGone();
         // The login mark sits on the name where there is one and on the password
@@ -545,8 +566,8 @@ async function start(): Promise<void> {
     window.addEventListener("resize", place, { passive: true });
     // A single-page app moving on changes the address without loading anything,
     // which is often the only sign a sign-in went through.
-    window.addEventListener("popstate", again);
-    window.addEventListener("hashchange", again);
+    window.addEventListener("popstate", rescan);
+    window.addEventListener("hashchange", rescan);
 
     /**
      * Hand the worker what was just typed, at the moment the form goes.
@@ -929,16 +950,6 @@ function ourHost(): HTMLElement {
     const host = document.createElement("div");
     drawn.add(host);
     return host;
-}
-
-/** Whether a change the page made is only one of ours moving or appearing. */
-function onlyOurs(records: readonly MutationRecord[]): boolean {
-    return records.every(
-        (record) =>
-            drawn.has(record.target) ||
-            (record.type === "childList" &&
-                [...record.addedNodes, ...record.removedNodes].every((node) => drawn.has(node)))
-    );
 }
 
 /** The mark that sits in the corner of a box Polaris has something for. */

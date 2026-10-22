@@ -27,6 +27,22 @@ const CHAT_SCOPE = storage.defineItem<polar.ChatScope>(polar.CHAT_SCOPE_KEY, {
     fallback: "shared"
 });
 
+/**
+ * The Polaris the last panel showed. A panel opens on it straight away while the
+ * worker is asked again and the server is checked, instead of drawing nothing
+ * until both answer: the chat frame is most of the wait, and it starts loading
+ * the moment it has an address.
+ */
+const LAST_SERVER = storage.defineItem<string | null>("local:polar.lastServer", {
+    fallback: null
+});
+
+/** How long a page read stays good for another hand-over to the frame. Opening
+ *  the panel hands the page over up to three times in a second (the tab in
+ *  front, the frame loading, the chat saying it is listening), and a read is
+ *  the whole page's text - a layout of all of it, mid-animation, each time. */
+const PAGE_READ_MS = 1_500;
+
 /** This browser run's mark, made by the first panel to open in it. */
 const BROWSER_RUN = storage.defineItem<string | null>(polar.BROWSER_RUN_KEY, { fallback: null });
 
@@ -174,10 +190,17 @@ export function Panel(): React.JSX.Element {
 
     const connect = useCallback(async () => {
         setReach("asking");
+        const kept = await LAST_SERVER.getValue().catch(() => null);
+        if (kept) {
+            setServer(kept);
+            setReach("ready");
+        }
         const reply = await askBackground({ kind: "status" });
         const origin = reply.ok && "status" in reply ? reply.status.server : null;
         setServer(origin);
+        void LAST_SERVER.setValue(origin).catch(() => undefined);
         if (!origin) return setReach("none");
+        setReach("ready");
         try {
             const answer = await fetch(new URL("/api/health", origin), {
                 credentials: "omit",
@@ -239,17 +262,29 @@ export function Panel(): React.JSX.Element {
     }, [look]);
 
     const shared = front.site !== null && allowed.includes(front.site);
+    const lastRead = useRef<{
+        tabId: number;
+        at: number;
+        page: Promise<polar.SharedPage | null>;
+    } | null>(null);
+    const readFront = useCallback((tabId: number): Promise<polar.SharedPage | null> => {
+        const held = lastRead.current;
+        if (held && held.tabId === tabId && Date.now() - held.at < PAGE_READ_MS) return held.page;
+        const page = readTab(tabId);
+        lastRead.current = { tabId, at: Date.now(), page };
+        return page;
+    }, []);
 
     // Hand the page to the frame - or nothing, for a site not allowed - and
     // only ever to the deployment's origin.
     const send = useCallback(async () => {
         const target = frame.current?.contentWindow;
         if (!target || !server) return;
-        const page = shared && front.tabId !== null ? await readTab(front.tabId) : null;
+        const page = shared && front.tabId !== null ? await readFront(front.tabId) : null;
         // Read from a tab that has since moved to another site: not this one's.
         const still = page && polar.siteOf(page.url, server) === front.site ? page : null;
         target.postMessage(polar.pageMessage(still), new URL(server).origin);
-    }, [front, shared, server]);
+    }, [front, shared, server, readFront]);
 
     useEffect(() => {
         void send();
