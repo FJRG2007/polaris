@@ -16,6 +16,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { repairStillStreams } from "./still-streams";
 import {
     publishedStreams,
     relayEndpoint,
@@ -28,7 +29,8 @@ import {
     type StreamTraffic,
     warmPlan,
     warmStream,
-    warmStreams
+    warmStreams,
+    keepsWarm
 } from "./relay";
 
 /** What each relay was receiving at the last pass, and its last restart: when,
@@ -67,7 +69,15 @@ export async function sweepWarmCameras(): Promise<{
     restarted: number;
 }> {
     const cameras = await prisma.camera.findMany({
-        select: { id: true, enabled: true, power: true, vendor: true, reachVia: true }
+        select: {
+            id: true,
+            installedAppId: true,
+            enabled: true,
+            power: true,
+            vendor: true,
+            reachVia: true,
+            subPath: true
+        }
     });
     const byServer = new Map<string, typeof cameras>();
     for (const camera of cameras) {
@@ -98,6 +108,7 @@ export async function sweepWarmCameras(): Promise<{
         const plan = warmPlan(onServer, published, warm);
         for (const name of plan.add) if (await warmStream(endpoint, name, true)) warmed += 1;
         for (const name of plan.drop) if (await warmStream(endpoint, name, false)) released += 1;
+        await repairStillStreams(endpoint, onServer, keepsWarm);
     }
     return { warmed, released, restarted };
 }

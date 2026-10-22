@@ -299,6 +299,34 @@ export interface MediaProfile {
     /** Pixels across, when the camera says. What separates the stream worth
      *  watching from the one worth analyzing. */
     readonly width: number;
+    /** The video encoding as the camera names it - "H264", "H265", "JPEG" -
+     *  or "" when it does not say. */
+    readonly encoding: string;
+}
+
+/**
+ * The profiles in a GetProfiles answer, widest first. Pure for the test.
+ *
+ * Each profile is read from its own element. Reading the whole answer at once
+ * pairs the n-th token with the n-th name and width, and a profile carries
+ * several of each - its source's, its encoder's - so the pairs drift.
+ */
+export function parseProfiles(xml: string): MediaProfile[] {
+    const blocks = xml.split(/<(?:[A-Za-z0-9._-]+:)?Profiles\b/).slice(1);
+    return blocks
+        .map((block) => {
+            const token = /^[^>]*?\btoken="([^"]+)"/.exec(block)?.[1] ?? "";
+            const encoder = tagValue(block, "VideoEncoderConfiguration") ?? block;
+            const width = Number.parseInt(tagValue(encoder, "Width") ?? "", 10);
+            return {
+                token,
+                name: tagValue(block, "Name") ?? token,
+                width: Number.isFinite(width) ? width : 0,
+                encoding: (tagValue(encoder, "Encoding") ?? "").toUpperCase()
+            };
+        })
+        .filter((profile) => profile.token !== "")
+        .sort((left, right) => right.width - left.width);
 }
 
 /** The streams this camera publishes, widest first, so the first is the main one
@@ -309,16 +337,27 @@ export async function getProfiles(endpoint: OnvifEndpoint): Promise<MediaProfile
         (await getServices(endpoint)).media,
         '<GetProfiles xmlns="http://www.onvif.org/ver10/media/wsdl"/>'
     );
-    const tokens = attrValues(xml, "Profiles", "token");
-    const names = tagValues(xml, "Name");
-    const widths = tagValues(xml, "Width").map((value) => Number.parseInt(value, 10));
-    return tokens
-        .map((token, index) => ({
-            token,
-            name: names[index] ?? token,
-            width: Number.isFinite(widths[index]) ? (widths[index] as number) : 0
-        }))
-        .sort((left, right) => right.width - left.width);
+    return parseProfiles(xml);
+}
+
+/**
+ * The profile to watch and the one to analyze. Pure for the test.
+ *
+ * Only video profiles count. A Tapo C210 publishes a third one, a 640x360 JPEG
+ * still at one frame a second on /stream8, and as the narrowest it used to be
+ * picked as the small stream: the wall's thumbnails came out gray or empty,
+ * because the relay was decoding stills from a stream meant for something else.
+ */
+export function pickProfiles(profiles: readonly MediaProfile[]): {
+    main: MediaProfile | undefined;
+    sub: MediaProfile | undefined;
+} {
+    const video = profiles.filter((profile) => profile.encoding !== "JPEG");
+    const usable = video.length > 0 ? video : profiles;
+    return {
+        main: usable[0],
+        sub: usable.length > 1 ? usable[usable.length - 1] : undefined
+    };
 }
 
 /**
@@ -601,8 +640,7 @@ export interface CameraProbe {
 export async function probeCamera(endpoint: OnvifEndpoint): Promise<CameraProbe> {
     const device = await getDeviceInformation(endpoint);
     const profiles = await getProfiles(endpoint).catch(() => [] as MediaProfile[]);
-    const main = profiles[0];
-    const sub = profiles.length > 1 ? profiles[profiles.length - 1] : undefined;
+    const { main, sub } = pickProfiles(profiles);
     const [mainUrl, subUrl] = await Promise.all([
         main ? getStreamUri(endpoint, main.token).catch(() => null) : Promise.resolve(null),
         sub ? getStreamUri(endpoint, sub.token).catch(() => null) : Promise.resolve(null)
