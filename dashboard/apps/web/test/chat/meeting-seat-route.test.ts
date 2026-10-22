@@ -20,11 +20,13 @@ const backgroundUser = vi.fn(
     async () => ({ id: "u1", name: "Ada" }) as { id: string; name: string } | null
 );
 const sessionCan = vi.fn(async () => true);
+const noteControls = vi.fn(async () => undefined);
 
 vi.mock("@/lib/chat/meeting-seat", () => ({ resolveSeat }));
 vi.mock("@/lib/chat/meetings", () => ({ keepSeat, leave, retakeSeat }));
 vi.mock("@/lib/session", () => ({ backgroundUser, sessionCan }));
 vi.mock("@/lib/chat/call-server", () => ({ callsUnavailable: async () => null }));
+vi.mock("@/lib/chat/call-remote-service", () => ({ noteControls }));
 
 const route = await import("../../src/app/api/chat/meetings/[meetingId]/seat/route");
 const params = (meetingId: string) => ({ params: Promise.resolve({ meetingId }) });
@@ -51,11 +53,36 @@ describe("keeping a seat", () => {
         expect(keepSeat).toHaveBeenCalledWith(SEAT, { muted: true, deafened: false });
     });
 
+    it("notes the camera and recording for a deck, and keeps them off the seat row", async () => {
+        const body = JSON.stringify({
+            muted: false,
+            deafened: false,
+            camera: true,
+            recording: true
+        });
+        const response = await route.POST(request("POST", body), params(MEETING));
+        expect(response.status).toBe(204);
+        expect(keepSeat).toHaveBeenCalledWith(SEAT, { muted: false, deafened: false });
+        expect(noteControls).toHaveBeenCalledWith("p1", {
+            muted: false,
+            deafened: false,
+            camera: true,
+            recording: true
+        });
+    });
+
+    it("notes nothing for a beat that says nothing", async () => {
+        await route.POST(request("POST"), params(MEETING));
+        expect(noteControls).not.toHaveBeenCalled();
+    });
+
     it("refuses a state that is not the expected shape", async () => {
         for (const body of [
             "{",
             JSON.stringify({ muted: "yes", deafened: false }),
-            JSON.stringify({ muted: true, deafened: false, admin: true })
+            JSON.stringify({ muted: true, deafened: false, admin: true }),
+            JSON.stringify({ muted: true, deafened: false, camera: "on" }),
+            JSON.stringify({ muted: true, deafened: false, recording: 1 })
         ]) {
             const response = await route.POST(request("POST", body), params(MEETING));
             expect(response.status).toBe(400);
