@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let checkRefused = true;
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
+    ownVulnerabilitiesAction: async () => null,
     checkUpdatesAction: async () => {
         if (checkRefused) throw new Error('Server Action "x" was not found on the server');
         return null;
