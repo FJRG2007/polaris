@@ -54,17 +54,23 @@ function Press({ text }: { text: string }) {
     return <b className="font-medium text-foreground">{text}</b>;
 }
 
-export function ExtensionSteps() {
+export function ExtensionSteps({
+    initial
+}: {
+    /** The browser whose row opened these steps; detected when left out. */
+    initial?: BrowserId;
+} = {}) {
     // Detected in an effect, not during render: this is rendered on the server
     // too, where there is no navigator, and seeding from one would have the
     // browser hydrate something the HTML does not contain.
     const t = useTranslations("account");
-    const [browser, setBrowser] = useState<BrowserId>("chrome");
+    const [browser, setBrowser] = useState<BrowserId>(initial ?? "chrome");
     const [detected, setDetected] = useState<BrowserId | null | undefined>(undefined);
     // A browser the reader picked outranks the one that was detected. They may
     // be following these steps for a different browser than the one they are
     // reading in, which is exactly what the picker is for.
-    const picked = useRef(false);
+    // A browser's own row is a choice already made.
+    const picked = useRef(initial !== undefined);
 
     useEffect(() => {
         let alive = true;

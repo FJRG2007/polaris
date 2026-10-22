@@ -10,10 +10,11 @@
  * one was hiding behind. There is now one answer to that question, and the two
  * screens point here.
  *
- * **Ordered by what exists.** What can be installed right now is at the top, and
- * what is coming is a short list underneath rather than four more cards with a
- * disabled button in each - a page of things you cannot have is a worse answer
- * than a page that says plainly which two you can.
+ * **A card per thing, rows per place it runs.** Each card says what the thing
+ * does, lists where it can be installed with the one thing to press beside each,
+ * and ends on a drawing of it in use. The long step-by-step instructions open
+ * from a row rather than filling the card. What can be installed right now comes
+ * first; what is coming says so, with no button that implies a file.
  *
  * Everything that waits on GitHub waits behind its own boundary: the cards, the
  * headings and the instructions are drawn before the release lookup has answered,
@@ -21,25 +22,30 @@
  * what the versions are.
  */
 
-import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { listApiKeys } from "@polaris/auth";
-import { requireUser } from "@/lib/session";
-import { companionDownload, streamDeckDownload } from "@/lib/app-releases";
-import { publicAppUrl } from "@/lib/domain-service";
+import { Badge, Skeleton } from "@polaris/ui";
 import { CliSection } from "./cli-section";
-import { ExtensionSteps } from "./extension-steps";
+import { requireUser } from "@/lib/session";
+import { ExtensionCard } from "./extension-card";
+import { AssistantsCard } from "./assistants-card";
+import { Monitor, Smartphone } from "lucide-react";
+import { SystemMark } from "@/components/client-marks";
+import { publicAppUrl } from "@/lib/domain-service";
 import { getTranslations } from "@/lib/i18n/request";
-import { DeckInstallSteps } from "./deck-install-steps";
-import { DeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
-import { ExtensionCommand } from "./extension-command";
-import { InstallAppCard } from "@/components/installed-app";
-import { Puzzle, Smartphone } from "lucide-react";
+import { InstallAppOffer, NativeAppOffer } from "@/components/installed-app";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
-import { Badge, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
+import { companionDownload, streamDeckDownload } from "@/lib/app-releases";
+import { DeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
+import { DownloadCard, DownloadRow, DownloadRows } from "./download-card";
+import { DesktopPreview, PhonePreview, WebAppPreview } from "./download-previews";
 
 export const dynamic = "force-dynamic";
+
+/** The phone systems the mobile card names; product names, the same in every language. */
+// i18n-ignore systems' names
+const MOBILE_SYSTEMS = ["iOS", "Android"] as const;
 
 /** The Stream Deck plugin's installer, once GitHub has answered. */
 async function StreamDeckRelease({ repo }: { repo: string }) {
@@ -82,8 +88,9 @@ function FilesSkeleton() {
 
 export default async function DownloadsPage() {
     const user = await requireUser();
-    const [t, serverUrl, decks] = await Promise.all([
+    const [t, tc, serverUrl, decks] = await Promise.all([
         getTranslations("account"),
+        getTranslations("components"),
         // The address the CLI signs in to. Null falls back to the one this page
         // is open on, which the reader has just proven reaches this Polaris.
         publicAppUrl().catch(() => null),
@@ -92,118 +99,102 @@ export default async function DownloadsPage() {
     const repo = loadEnv().POLARIS_REPO;
 
     return (
-        <div className="mx-auto flex max-w-2xl flex-col gap-4">
-            <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+            <div className="flex flex-col items-center gap-1 text-center">
+                <h1 className="text-[17px] font-semibold tracking-tight">
                     {t("downloads.page.title")}
                 </h1>
                 <p className="text-sm text-muted-foreground">{t("downloads.page.intro")}</p>
             </div>
 
-            {/* The PWA install and the native builds, in the card that already held
-                both. The per-platform list is the only thing here that waits. */}
-            <InstallAppCard
-                nativeApp={
-                    <Suspense fallback={<FilesSkeleton />}>
-                        <DesktopFiles repo={repo} />
-                    </Suspense>
-                }
-            />
+            <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+                {/* The one thing everybody can have right now, wide, with the
+                    browser's own install offer. Nothing in it waits. */}
+                <DownloadCard
+                    id="app"
+                    tint="violet"
+                    className="lg:col-span-2"
+                    icon={<Monitor className="size-4 shrink-0" />}
+                    title={t("downloads.web.title")}
+                    description={tc("installApp.intro")}
+                    side={<WebAppPreview />}
+                >
+                    <InstallAppOffer />
+                </DownloadCard>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Puzzle className="size-4" />
-                        {t("downloads.extension.title")}
-                    </CardTitle>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-4 text-sm">
-                    <p className="text-muted-foreground">{t("downloads.extension.description")}</p>
-
-                    <div className="flex flex-col gap-2">
-                        <p className="flex items-center gap-2 font-medium">
-                            {t("downloads.extension.store")}
-                            <Badge variant="neutral">{t("downloads.extension.notYet")}</Badge>
-                        </p>
-                        <p className="text-muted-foreground">
-                            {t("downloads.extension.storeHint")}
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
-                        <p className="font-medium">{t("downloads.extension.loadYourself")}</p>
-                        {/* First, because it is the only way on this screen that
-                            keeps itself current afterward - the line sets up a
-                            job that swaps in new releases and the extension
-                            restarts into them on its own. The zip and the steps
-                            stay under it for anybody who would rather do it by
-                            hand, with nothing keeping that copy current. */}
-                        <ExtensionCommand repo={repo} />
+                {/* Everything that waits on GitHub waits behind its own boundary:
+                    the cards, their rows and the steps draw before the release
+                    lookup has answered. */}
+                <ExtensionCard
+                    repo={repo}
+                    files={
                         <Suspense fallback={<FilesSkeleton />}>
                             <ExtensionFiles repo={repo} />
                         </Suspense>
-                        {/* Guided rather than described, like the router steps in
-                            the domain setup: this is somebody working in a window
-                            that is not this one, where every value has to be
-                            exact and a paragraph holding five of them is a
-                            paragraph they lose their place in. */}
-                        <ExtensionSteps />
-                    </div>
+                    }
+                />
 
-                    <p className="border-t border-border/60 pt-4 text-muted-foreground">
-                        {t.rich("downloads.extension.alreadyHave", {
-                            link: (chunks) => (
-                                <Link key="link" className="underline" href="/account/extension">
-                                    {chunks}
-                                </Link>
-                            )
-                        })}
-                    </p>
-                </CardBody>
-            </Card>
+                <StreamDeckSection
+                    decks={decks}
+                    repo={repo}
+                    address={serverUrl?.replace(/\/+$/, "") ?? null}
+                    pluginFile={
+                        <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                            <StreamDeckRelease repo={repo} />
+                        </Suspense>
+                    }
+                    moduleFile={
+                        <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                            <CompanionRelease repo={repo} />
+                        </Suspense>
+                    }
+                />
 
-            <CliSection repo={repo} serverUrl={serverUrl} />
+                <CliSection repo={repo} serverUrl={serverUrl} />
 
-            <StreamDeckSection
-                decks={decks}
-                install={
-                    <DeckInstallSteps
-                        address={serverUrl?.replace(/\/+$/, "") ?? null}
-                        repo={repo}
-                        pluginFile={
-                            <Suspense fallback={<Skeleton className="h-9 w-48" />}>
-                                <StreamDeckRelease repo={repo} />
-                            </Suspense>
-                        }
-                        moduleFile={
-                            <Suspense fallback={<Skeleton className="h-9 w-48" />}>
-                                <CompanionRelease repo={repo} />
-                            </Suspense>
-                        }
-                    />
-                }
-            />
+                <AssistantsCard />
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t("downloads.later.title")}</CardTitle>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-4 text-sm">
-                    {/* Present, unlinked and honest. Each of these is a real plan with
-                        nothing built, and saying so is the only thing that can be said
-                        about it - a disabled button implies a file that is nearly
-                        ready, which would be a different and untrue statement. */}
-                    <div className="flex items-start gap-3">
-                        <Smartphone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                        <div>
-                            <p className="font-medium">{t("downloads.later.mobile")}</p>
-                            <p className="text-muted-foreground">
-                                {t("downloads.later.mobileHint")}
-                            </p>
-                        </div>
-                    </div>
-                </CardBody>
-            </Card>
+                <DownloadCard
+                    id="desktop"
+                    tint="slate"
+                    icon={<Monitor className="size-4 shrink-0" />}
+                    title={tc("installApp.title")}
+                    description={t("downloads.desktop.description")}
+                    preview={<DesktopPreview />}
+                >
+                    <NativeAppOffer>
+                        <Suspense fallback={<FilesSkeleton />}>
+                            <DesktopFiles repo={repo} />
+                        </Suspense>
+                    </NativeAppOffer>
+                </DownloadCard>
+
+                {/* Present, unlinked and honest. A real plan with nothing built,
+                    and saying so is the only thing that can be said about it - a
+                    disabled button implies a file that is nearly ready, which
+                    would be a different and untrue statement. */}
+                <DownloadCard
+                    id="mobile"
+                    tint="rose"
+                    icon={<Smartphone className="size-4 shrink-0" />}
+                    title={t("downloads.later.mobile")}
+                    description={t("downloads.later.mobileHint")}
+                    preview={<PhonePreview />}
+                >
+                    <DownloadRows label={t("downloads.later.title")}>
+                        {MOBILE_SYSTEMS.map((os) => (
+                            <DownloadRow
+                                key={os}
+                                mark={<SystemMark os={os} />}
+                                name={os}
+                                action={
+                                    <Badge variant="neutral">{t("downloads.mobile.planned")}</Badge>
+                                }
+                            />
+                        ))}
+                    </DownloadRows>
+                </DownloadCard>
+            </div>
         </div>
     );
 }

@@ -11,18 +11,17 @@
  * Browsers without the event (Safari, Firefox) install from their own menu, and
  * the card says where.
  *
- * The same card mentions the native desktop app (`desktop/` in the repository).
- * Whether there is one to download is a question for GitHub, so the offer is
- * handed in as `nativeApp` - the page streams it in behind a boundary of its own,
- * and nothing here waits on it. Inside that app the card says so instead of
- * offering to install anything.
+ * The native desktop app (`desktop/` in the repository) is offered beside it on
+ * the downloads page. Whether there is one to download is a question for GitHub,
+ * so that list streams in behind a boundary of its own and nothing here waits on
+ * it. Inside that app the offer says so instead of offering to install anything.
  */
 
 import { Download } from "lucide-react";
 import { listenToWorker } from "@/lib/desktop-notify";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Button } from "@polaris/ui";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
 /** The event Chromium browsers fire when Polaris can be installed. Not in the DOM
@@ -68,7 +67,31 @@ function runningInstalled(): boolean {
     return typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
 }
 
-export function InstallAppCard({ nativeApp }: { nativeApp: ReactNode }) {
+/** What the page says inside the desktop app instead of offering to install it. */
+function UsingDesktop({ version }: { version: string }) {
+    const t = useTranslations("components");
+    return (
+        <p className="text-sm">
+            {version
+                ? t("installApp.usingDesktopVersion", { version })
+                : t("installApp.usingDesktop")}
+        </p>
+    );
+}
+
+/** The native app's downloads, or inside that app, that it is the one in use. */
+export function NativeAppOffer({ children }: { children: ReactNode }) {
+    const desktop = useDesktopBridge();
+    return desktop ? <UsingDesktop version={desktop.version} /> : <>{children}</>;
+}
+
+/**
+ * The offer to install Polaris as an app, or what is true instead: that this is
+ * the desktop app, that it is installed already, or where the browser keeps its
+ * own install entry. Nothing in it waits on the network, so it draws with the
+ * page; the native builds are listed by the downloads page beside it.
+ */
+export function InstallAppOffer() {
     const t = useTranslations("components");
     const prompt = useSyncExternalStore(
         subscribe,
@@ -89,39 +112,15 @@ export function InstallAppCard({ nativeApp }: { nativeApp: ReactNode }) {
         }
     };
 
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{t("installApp.title")}</CardTitle>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-3">
-                {desktop ? (
-                    <p className="text-sm">
-                        {desktop.version
-                            ? t("installApp.usingDesktopVersion", { version: desktop.version })
-                            : t("installApp.usingDesktop")}
-                    </p>
-                ) : (
-                    <>
-                        <p className="text-sm text-muted-foreground">{t("installApp.intro")}</p>
-                        {installed ? (
-                            <p className="text-sm">{t("installApp.installed")}</p>
-                        ) : prompt ? (
-                            <div>
-                                <Button onClick={() => void install()}>
-                                    <Download className="size-4" /> {t("installApp.install")}
-                                </Button>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">{t("installApp.fromMenu")}</p>
-                        )}
-                        <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
-                            <p className="text-sm text-muted-foreground">{t("installApp.native")}</p>
-                            {nativeApp}
-                        </div>
-                    </>
-                )}
-            </CardBody>
-        </Card>
-    );
+    if (desktop) return <UsingDesktop version={desktop.version} />;
+    if (installed) return <p className="text-sm">{t("installApp.installed")}</p>;
+    if (prompt)
+        return (
+            <div>
+                <Button onClick={() => void install()}>
+                    <Download className="size-4" /> {t("installApp.install")}
+                </Button>
+            </div>
+        );
+    return <p className="text-sm text-muted-foreground">{t("installApp.fromMenu")}</p>;
 }

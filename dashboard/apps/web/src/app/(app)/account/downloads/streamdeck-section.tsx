@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * The Stream Deck on the downloads screen: how to install it, what it does, and the
- * decks connected to this account with the button that disconnects each.
+ * The Stream Deck card on the downloads screen: what it does, the Marketplace
+ * row, one row per app a deck runs on with its steps a press away, and the decks
+ * connected to this account with the button that disconnects each.
  *
  * A connected deck is an API key of kind "streamdeck", so disconnecting is the
  * API keys screen's own revoke - the same write, the same audit line.
@@ -18,7 +19,11 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { revokeApiKeyAction } from "../api-keys/actions";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Badge, Button } from "@polaris/ui";
+import { StepsDialog } from "./steps-dialog";
+import { DeckPreview } from "./download-previews";
+import { DownloadCard, DownloadRow, DownloadRows } from "./download-card";
+import { DECK_HOSTS, DeckHostMark, DeckInstallSteps, HOST_LABELS } from "./deck-install-steps";
 
 /** One connected deck, in the fields the list draws. */
 export interface ConnectedDeck {
@@ -61,11 +66,20 @@ export function DeckFile({ download, suffix }: { download: AppDownload | null; s
 
 export function StreamDeckSection({
     decks,
-    install
+    address,
+    repo,
+    pluginFile,
+    moduleFile
 }: {
     decks: readonly ConnectedDeck[];
-    /** The install steps, whose downloads wait on GitHub in their own boundaries. */
-    install: React.ReactNode;
+    /** This Polaris's address for the steps, or null to use the one the page is on. */
+    address: string | null;
+    /** The repository the plugin's releases and install scripts come from. */
+    repo: string;
+    /** The plugin's download, which waits on GitHub in a boundary of its own. */
+    pluginFile: React.ReactNode;
+    /** The Companion module's download, in a boundary of its own. */
+    moduleFile: React.ReactNode;
 }) {
     const t = useTranslations("account");
     const [list, setList] = useState(decks);
@@ -95,28 +109,26 @@ export function StreamDeckSection({
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Grid3x3 className="size-4" />
-                    {t("downloads.streamdeck.title")}
-                </CardTitle>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-4 text-sm">
-                <p className="text-muted-foreground">{t("downloads.streamdeck.description")}</p>
-
-                {/* The same row the extension has: the store first, and plainly
-                    not there yet until Elgato approves the listing. */}
-                <div className="flex flex-col gap-2">
-                    <p className="flex flex-wrap items-center gap-2 font-medium">
-                        {t("downloads.streamdeck.store")}
-                        {STREAMDECK_MARKETPLACE_URL ? null : (
-                            <Badge variant="neutral">{t("downloads.extension.notYet")}</Badge>
-                        )}
-                    </p>
-                    {STREAMDECK_MARKETPLACE_URL ? (
-                        <div>
-                            <Button asChild variant="secondary">
+        <DownloadCard
+            id="streamdeck"
+            tint="amber"
+            icon={<Grid3x3 className="size-4 shrink-0" />}
+            title={t("downloads.streamdeck.title")}
+            description={t("downloads.streamdeck.description")}
+            preview={<DeckPreview />}
+        >
+            {/* The store first, and plainly not there yet until Elgato
+                approves the listing - the same row the extension has. */}
+            <DownloadRows>
+                <DownloadRow
+                    mark={<DeckHostMark host="streamdeck" />}
+                    name={t("downloads.streamdeck.store")}
+                    detail={
+                        STREAMDECK_MARKETPLACE_URL ? undefined : t("downloads.streamdeck.storeHint")
+                    }
+                    action={
+                        STREAMDECK_MARKETPLACE_URL ? (
+                            <Button asChild variant="secondary" size="sm">
                                 <a
                                     href={STREAMDECK_MARKETPLACE_URL}
                                     target="_blank"
@@ -126,67 +138,87 @@ export function StreamDeckSection({
                                     {t("downloads.streamdeck.openStore")}
                                 </a>
                             </Button>
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">
-                            {t("downloads.streamdeck.storeHint")}
-                        </p>
-                    )}
-                </div>
+                        ) : (
+                            <Badge variant="neutral">{t("downloads.extension.notYet")}</Badge>
+                        )
+                    }
+                />
+            </DownloadRows>
 
-                <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
-                    <p className="font-medium">{t("downloads.streamdeck.installYourself")}</p>
-                    {install}
-                </div>
+            <DownloadRows label={t("downloads.streamdeck.installYourself")}>
+                {DECK_HOSTS.map((host) => (
+                    <DownloadRow
+                        key={host}
+                        mark={<DeckHostMark host={host} />}
+                        name={HOST_LABELS[host]}
+                        detail={t(`downloads.streamdeck.hosts.${host}`)}
+                        action={
+                            <StepsDialog
+                                label={t("downloads.cards.install")}
+                                title={t("downloads.cards.installIn", { name: HOST_LABELS[host] })}
+                            >
+                                <DeckInstallSteps
+                                    initial={host}
+                                    address={address}
+                                    repo={repo}
+                                    pluginFile={pluginFile}
+                                    moduleFile={moduleFile}
+                                />
+                            </StepsDialog>
+                        }
+                    />
+                ))}
+            </DownloadRows>
 
-                <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
-                    <p className="font-medium">{t("downloads.streamdeck.connected")}</p>
-                    {list.length === 0 ? (
-                        <p className="text-muted-foreground">
-                            {t("downloads.streamdeck.noneConnected")}
-                        </p>
-                    ) : (
-                        <ul className="flex flex-col divide-y divide-border/60">
-                            {list.map((deck) => (
-                                <li key={deck.id} className="flex items-center gap-3 py-2">
-                                    <div className="min-w-0 flex-1">
-                                        <Link
-                                            href={`/account/api-keys/${deck.id}`}
-                                            className="block truncate font-medium"
-                                            title={deck.name}
-                                        >
-                                            {deck.name}
-                                        </Link>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {deck.lastUsedAt
-                                                ? t.rich("downloads.streamdeck.lastUsed", {
-                                                      time: () => (
-                                                          <RelativeTime
-                                                              key="time"
-                                                              iso={deck.lastUsedAt!}
-                                                          />
-                                                      )
-                                                  })
-                                                : t("downloads.streamdeck.notUsedYet")}
-                                        </p>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        disabled={busy === deck.id}
-                                        onClick={() => void disconnect(deck)}
+            <div className="flex min-w-0 flex-col gap-1">
+                <p className="text-xs font-medium text-muted-foreground">
+                    {t("downloads.streamdeck.connected")}
+                </p>
+                {list.length === 0 ? (
+                    <p className="text-muted-foreground">
+                        {t("downloads.streamdeck.noneConnected")}
+                    </p>
+                ) : (
+                    <ul className="flex flex-col divide-y divide-border/60 border-y border-border/60">
+                        {list.map((deck) => (
+                            <li key={deck.id} className="flex min-w-0 items-center gap-3 py-2">
+                                <div className="min-w-0 flex-1">
+                                    <Link
+                                        href={`/account/api-keys/${deck.id}`}
+                                        className="block truncate font-medium"
+                                        title={deck.name}
                                     >
-                                        <Unplug className="size-4" />
-                                        {t("downloads.streamdeck.disconnect")}
-                                    </Button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                    {error ? <p className="text-xs text-danger">{error}</p> : null}
-                </div>
-            </CardBody>
+                                        {deck.name}
+                                    </Link>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {deck.lastUsedAt
+                                            ? t.rich("downloads.streamdeck.lastUsed", {
+                                                  time: () => (
+                                                      <RelativeTime
+                                                          key="time"
+                                                          iso={deck.lastUsedAt!}
+                                                      />
+                                                  )
+                                              })
+                                            : t("downloads.streamdeck.notUsedYet")}
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={busy === deck.id}
+                                    onClick={() => void disconnect(deck)}
+                                >
+                                    <Unplug className="size-4" />
+                                    {t("downloads.streamdeck.disconnect")}
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
+            </div>
             {confirmElement}
-        </Card>
+        </DownloadCard>
     );
 }

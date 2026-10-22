@@ -1231,7 +1231,9 @@
             "notYet": "Not there yet",
             "storeHint": "Loading it yourself below keeps it just as current now, so there is no need to wait for the store.",
             "loadYourself": "Load it yourself",
-            "alreadyHave": "Already have it? <link>Connect it to this account</link>. Your vault is the second step, from the extension itself."
+            "alreadyHave": "Already have it? <link>Connect it to this account</link>. Your vault is the second step, from the extension itself.",
+            "rowChromium": "Keeps itself up to date",
+            "rowFirefox": "Until Firefox closes"
         },
         "later": {
             "title": "Not here yet",
@@ -1262,12 +1264,12 @@
             "title": "Command line",
             "description": "Deploy, read logs and restart your apps from a terminal. Sign in once from your browser; every command after that uses that sign-in.",
             "install": "Install",
-            "system": "Which system you are installing on",
-            "hint": "Paste it into {shell}. Needs Node.js 20 or newer. Installs the latest release from GitHub as plr and polaris; plr update keeps it current.",
+            "hint": "Paste the line for your system. Needs Node.js 20 or newer. Installs the latest release from GitHub as plr and polaris; plr update keeps it current.",
             "signIn": "Sign in",
             "signInHint": "Points the CLI at this Polaris and opens it in your browser to approve. With no browser, it shows a code to enter here.",
             "server": "It will not install on a computer that runs a Polaris server: both answer to plr and polaris.",
-            "next": "Try"
+            "next": "Try",
+            "unixSystems": "macOS and Linux"
         },
         "streamdeck": {
             "title": "Stream Deck",
@@ -1307,7 +1309,39 @@
             "command": {
                 "title": "One line, and it keeps itself up to date",
                 "hint": "Paste it into {shell} on the computer the deck is plugged into. It installs the plugin, restarts the Stream Deck app if it is open, and checks for a new version every 6 hours. No administrator rights, and nothing else to run."
+            },
+            "hosts": {
+                "streamdeck": "Windows and macOS",
+                "opendeck": "Linux, Windows and macOS",
+                "companion": "Companion 5.0 or newer"
             }
+        },
+        "web": {
+            "title": "Polaris as an app"
+        },
+        "desktop": {
+            "description": "A native app for Windows, macOS and Linux: it pushes a build from your own computer and follows a service's logs in a window of its own."
+        },
+        "cards": {
+            "install": "Install",
+            "installIn": "Install in {name}"
+        },
+        "assistants": {
+            "title": "AI assistants",
+            "description": "Connect Claude, ChatGPT or another assistant to this Polaris. Each one signs in here and asks before it gets anything.",
+            "setUp": "Connect",
+            "setUpIn": "Connect {name}",
+            "all": "See all {count} assistants"
+        },
+        "mobile": {
+            "planned": "Planned"
+        },
+        "preview": {
+            "fill": "Fill in",
+            "signedIn": "Signed in to Polaris",
+            "running": "running",
+            "ask": "Restart the shop app",
+            "answer": "Done. shop is running again."
         }
     },
     "cli": {
