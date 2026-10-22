@@ -153,6 +153,9 @@ export const cameraSetInputSchema = z.object({
 
 export type CameraSetInput = z.infer<typeof cameraSetInputSchema>;
 
+/** The cameras an action names by id, as many as a set can hold. */
+export const cameraIdsSchema = z.array(z.string().trim().toLowerCase().pipe(uuid)).min(1).max(CAMERA_SET_LIMIT);
+
 /** What grouping needs of a camera. */
 export interface GroupedCamera {
     readonly id: string;

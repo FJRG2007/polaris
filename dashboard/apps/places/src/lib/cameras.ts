@@ -310,9 +310,10 @@ export async function updateCamera(
 ): Promise<CameraView> {
     const existing = await prisma.camera.findFirst({
         where: { id, installedAppId },
-        select: { id: true, placeId: true }
+        select: { id: true, placeId: true, address: true, vendor: true }
     });
     if (!existing) throw new HomeError("Camera not found");
+    const moved = existing.address !== input.address || existing.vendor !== input.vendor;
     const roomId = await settledRoom(installedAppId, input, existing.placeId);
     const vendor = cameraVendor(input.vendor);
     const paths = resolvePaths(input);
@@ -332,6 +333,7 @@ export async function updateCamera(
         where: { id },
         data: {
             ...(battery ? { offlineSince: null } : {}),
+            ...(moved ? { controlPin: null } : {}),
             placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,

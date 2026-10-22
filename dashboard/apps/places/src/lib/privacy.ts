@@ -132,7 +132,7 @@ async function followRelay(installedAppId: string, row: Row, isPrivate: boolean)
         const target = await cameraTarget(installedAppId, row.id);
         if (target)
             await relay.publishCamera(endpoint, target, row.vendor, {
-                warm: relay.keepsWarm(row)
+                warm: relay.keepsWarm({ ...row, privacy: false })
             });
     } catch (caught) {
         console.warn("[places] privacy: relay did not follow", row.id, (caught as Error).name);
@@ -214,6 +214,17 @@ export async function groupPrivacy(
         }
     }
     return results;
+}
+
+/** Take the certificate each of these cameras answers with next on trust, as
+ *  the first sign-in did: for a camera that was replaced or reset, whose new
+ *  certificate is the one now refused. */
+export async function trustCamerasAgain(installedAppId: string, cameraIds: readonly string[]): Promise<void> {
+    if (cameraIds.length === 0) return;
+    await prisma.camera.updateMany({
+        where: { installedAppId, id: { in: [...cameraIds] } },
+        data: { controlPin: null }
+    });
 }
 
 /** Switch every camera a target names, each answering for itself. */

@@ -2730,6 +2730,7 @@
         "locked": "Muchos intentos. Espera {seconds} s.",
         "unsupported": "Este firmware pide un acceso que Polaris aún no conoce.",
         "certificate": "Respondió otro aparato en esta dirección.",
+        "trustAgain": "Confiar en la cámara",
         "unreachable": "La cámara no respondió.",
         "failed": "La cámara rechazó el cambio.",
         "badTarget": "No es cámara, sala, grupo, zona ni lugar."

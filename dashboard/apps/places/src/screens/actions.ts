@@ -35,6 +35,7 @@ import * as cameras from "../lib/cameras";
 import * as privacy from "../lib/privacy";
 import * as cameraSets from "../lib/camera-sets";
 import {
+    cameraIdsSchema,
     cameraSetInputSchema,
     normalizeCameraSetInput,
     parseTarget,
@@ -1096,6 +1097,29 @@ export async function cameraPrivacyAction(
     const parsed = parseTarget(target);
     if (!parsed) return { error: await say("privacy.badTarget") };
     const result = await guard(() => privacy.switchPrivacy(install.id, parsed, wanted));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { results: result.value };
+}
+
+/**
+ * Accept the certificate these cameras answer with next, then switch them
+ * again. `home.manage`: trusting a device at an address is arranging the house,
+ * not using it.
+ */
+export async function trustCamerasAgainAction(
+    cameraIds: unknown,
+    target: string,
+    wanted: boolean
+): Promise<{ results?: CameraPrivacy[]; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const parsed = parseTarget(target);
+    const ids = cameraIdsSchema.safeParse(cameraIds);
+    if (!parsed || !ids.success) return { error: await say("privacy.badTarget") };
+    const result = await guard(async () => {
+        await privacy.trustCamerasAgain(install.id, ids.data);
+        return privacy.switchPrivacy(install.id, parsed, wanted);
+    });
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
     return { results: result.value };

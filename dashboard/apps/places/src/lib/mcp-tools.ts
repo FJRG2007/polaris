@@ -674,7 +674,7 @@ const privacyReadInput = z.object({
         .max(300)
         .optional()
         .describe(
-            "camera:<id>, zone:<placeId>:<zone name> or place:<id>. Without it, lists every target with its privacy."
+            "camera:<id>, room:<id>, set:<id>, zone:<placeId>:<zone name> or place:<id>. Without it, lists every target with its privacy."
         )
 });
 

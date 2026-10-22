@@ -2730,6 +2730,7 @@
         "locked": "Too many tries. Wait {seconds} s.",
         "unsupported": "This firmware asks for a sign-in step Polaris lacks.",
         "certificate": "A different device answered at this address.",
+        "trustAgain": "Trust this camera",
         "unreachable": "The camera did not answer.",
         "failed": "The camera refused the change.",
         "badTarget": "That is not a camera, room, set, zone or place."

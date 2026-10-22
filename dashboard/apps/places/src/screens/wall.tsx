@@ -63,6 +63,12 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
     // Every camera on the wall, in one ask. Stopped while one is open: the wall
     // behind a dialog is standing still, and the viewer asks for its own.
     const [privacyError, setPrivacyError] = useState<string | null>(null);
+    const [untrusted, setUntrusted] = useState<{
+        target: PrivacyTarget;
+        ids: readonly string[];
+        cameraIds: readonly string[];
+        wanted: boolean;
+    } | null>(null);
     const placeId = cameras?.[0]?.placeId ?? "";
     const [rooms] = usePlaceRooms(placeId);
     const [sets, setSets] = useState<CameraSetView[]>([]);
@@ -89,14 +95,23 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
      * answer replaces it: one that refused goes back on its own, and a call that
      * failed outright puts every camera back.
      */
-    async function switchPrivacy(target: PrivacyTarget, ids: readonly string[], wanted: boolean) {
+    async function switchPrivacy(
+        target: PrivacyTarget,
+        ids: readonly string[],
+        wanted: boolean,
+        trusting: readonly string[] = []
+    ) {
         const list = cameras ?? [];
         const before = new Map(
             list.filter((camera) => ids.includes(camera.id)).map((camera) => [camera.id, camera.privacy])
         );
         setPrivacyError(null);
+        setUntrusted(null);
         setCameras((current) => applyPrivacy(current ?? [], ids, wanted));
-        const result = await actions.cameraPrivacyAction(targetKey(target), wanted);
+        const result =
+            trusting.length > 0
+                ? await actions.trustCamerasAgainAction(trusting, targetKey(target), wanted)
+                : await actions.cameraPrivacyAction(targetKey(target), wanted);
         if (result.error || !result.results) {
             setCameras((current) => rollbackPrivacy(current ?? [], before));
             setPrivacyError(result.error ?? t("privacy.failed"));
@@ -116,6 +131,8 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         const failed = results.filter((row) => row.failure);
         if (failed.length === 0) return;
         const first = failed[0];
+        const refused = failed.filter((row) => row.failure === "certificate").map((row) => row.cameraId);
+        if (canManage && refused.length > 0) setUntrusted({ target, ids, cameraIds: refused, wanted });
         const reason =
             first?.failure === "locked"
                 ? t("privacy.locked", { seconds: first.waitSeconds ?? 0 })
@@ -248,6 +265,24 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                         <p role="alert" className="min-w-0 flex-1 text-[0.75rem] text-danger">
                             {privacyError}
                         </p>
+                    ) : null}
+                    {privacyError && untrusted ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="min-w-0 max-w-48"
+                            title={t("privacy.trustAgain")}
+                            onClick={() =>
+                                void switchPrivacy(
+                                    untrusted.target,
+                                    untrusted.ids,
+                                    untrusted.wanted,
+                                    untrusted.cameraIds
+                                )
+                            }
+                        >
+                            <span className="truncate">{t("privacy.trustAgain")}</span>
+                        </Button>
                     ) : null}
                     {groupSwitch(
                         t("privacy.allCameras"),
