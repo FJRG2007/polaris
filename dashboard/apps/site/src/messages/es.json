@@ -1,0 +1,78 @@
+{
+    "nav": {
+        "home": "Resumen",
+        "marketplace": "Tienda",
+        "downloads": "Descargas",
+        "api": "API",
+        "github": "GitHub",
+        "language": "English",
+        "skip": "Ir al contenido"
+    },
+    "meta": {
+        "description": "Plataforma autoalojada para llevar tus servidores y tu equipo desde un sitio."
+    },
+    "home": {
+        "title": "Tus servidores y tu equipo, en un sitio",
+        "intro": "Despliega apps y bases de datos en tus máquinas, gestiona archivos de cada NAS y nube, aloja servidores de juegos y trabaja en equipo con chat, llamadas, tareas, calendario, correo y documentos.",
+        "install": "Instalar",
+        "installHint": "Ejecuta una línea en la máquina que lo alojará. Después, las actualizaciones y ajustes se hacen desde la web.",
+        "unix": "macOS y Linux",
+        "windows": "Windows",
+        "replacesTitle": "Si ya pagas por estas",
+        "replacesIntro": "Lo que Polaris sustituye, en tu propio hardware y con una sola cuenta.",
+        "today": "Lo que usas hoy",
+        "instead": "Lo que Polaris ejecuta",
+        "lookTitle": "Un vistazo",
+        "lookIntro": "Capturas de la interfaz real con datos de ejemplo.",
+        "seeApps": "Ver todas las apps"
+    },
+    "market": {
+        "title": "Tienda",
+        "intro": "Cada app del catálogo, como la lista el panel. Las integradas vienen en cada instalación; el resto se instala pulsando un botón.",
+        "search": "Buscar apps",
+        "all": "Todas",
+        "builtin": "Integrada",
+        "optional": "Opcional",
+        "soon": "Próximamente",
+        "empty": "Ninguna app coincide.",
+        "count": "{n} apps"
+    },
+    "downloads": {
+        "title": "Descargas",
+        "intro": "Las apps que llevan Polaris más allá de la pestaña. Cada una se conecta a tu servidor.",
+        "version": "Versión {version}",
+        "notes": "Novedades",
+        "download": "Descargar",
+        "none": "Aún sin versión",
+        "noneHint": "Aún no se ha publicado nada. La página de versiones lo mostrará cuando salga.",
+        "releases": "Ver versiones",
+        "cliHint": "Instala el comando plr; entra con plr login --url y la dirección de tu servidor.",
+        "products": {
+            "extension": "Extensión del navegador",
+            "streamdeck": "Plugin de Stream Deck",
+            "companion": "Módulo de Companion",
+            "cli": "Línea de comandos",
+            "desktop": "App de escritorio"
+        },
+        "about": {
+            "extension": "Rellena los accesos desde tu bóveda en Chrome, Edge, Brave y Firefox.",
+            "streamdeck": "Teclas para despliegues, llamadas y efectos en un Stream Deck u OpenDeck.",
+            "companion": "Las mismas acciones para decks que usan Bitfocus Companion.",
+            "cli": "Despliega, lee registros y reinicia desde un terminal.",
+            "desktop": "Polaris en su propia ventana en Windows, macOS y Linux."
+        }
+    },
+    "api": {
+        "title": "Referencia de la API",
+        "intro": "Cada llamada que puede hacer una clave de API, generada del mismo documento que sirve cada Polaris en /api/openapi.json.",
+        "download": "Bajar openapi.json",
+        "params": "Parámetros",
+        "body": "Cuerpo",
+        "responses": "Respuestas",
+        "required": "obligatorio"
+    },
+    "footer": {
+        "license": "Código abierto con licencia AGPL-3.0.",
+        "source": "Código fuente"
+    }
+}

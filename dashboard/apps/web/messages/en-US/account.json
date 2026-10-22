@@ -1342,6 +1342,44 @@
             "running": "running",
             "ask": "Restart the shop app",
             "answer": "Done. shop is running again."
+        },
+        "guide": {
+            "title": "Install and open it",
+            "description": "The download should have started. If not, <link>download it again</link>.",
+            "step": "Step {n}",
+            "done": "Done",
+            "steps": {
+                "open": "Open",
+                "install": "Install",
+                "use": "Use"
+            },
+            "items": {
+                "streamdeck": {
+                    "open": "Open {file} from your browser's download list.",
+                    "install": "The Stream Deck app opens and installs Polaris.",
+                    "use": "Find Polaris in the actions list, drag it to a key."
+                },
+                "companion": {
+                    "open": "Keep {file} as it is; Companion reads it packed.",
+                    "install": "In Companion, open Modules and import the package.",
+                    "use": "Add a Polaris connection with your server's address."
+                },
+                "extension-chromium": {
+                    "open": "Unzip {file} into a folder you will keep.",
+                    "install": "On the extensions page, turn on Developer mode, press Load unpacked.",
+                    "use": "Pin Polaris from the puzzle icon to keep it in reach."
+                },
+                "extension-firefox": {
+                    "open": "Keep {file} zipped; Firefox loads it as it is.",
+                    "install": "In about:debugging, open This Firefox, press Load Temporary Add-on.",
+                    "use": "Pin Polaris from the extensions button in the toolbar."
+                },
+                "desktop": {
+                    "open": "Open {file} from your browser's download list.",
+                    "install": "Follow the installer until it says it is done.",
+                    "use": "Start Polaris and sign in to your server."
+                }
+            }
         }
     },
     "cli": {

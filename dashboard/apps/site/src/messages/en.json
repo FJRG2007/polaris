@@ -1,0 +1,78 @@
+{
+    "nav": {
+        "home": "Overview",
+        "marketplace": "Marketplace",
+        "downloads": "Downloads",
+        "api": "API",
+        "github": "GitHub",
+        "language": "Español",
+        "skip": "Skip to content"
+    },
+    "meta": {
+        "description": "Self-hosted platform to run your servers and your team from one place."
+    },
+    "home": {
+        "title": "Your servers and your team, in one place",
+        "intro": "Deploy apps and databases to your own machines, manage files across every NAS and cloud drive, host game servers, and work together with chat, calls, tasks, calendar, mail and documents.",
+        "install": "Install",
+        "installHint": "Run one line on the machine that will host it. Updates and settings are handled from the web interface afterwards.",
+        "unix": "macOS and Linux",
+        "windows": "Windows",
+        "replacesTitle": "If you already pay for these",
+        "replacesIntro": "What Polaris replaces, on your own hardware and with one account.",
+        "today": "What you use today",
+        "instead": "What Polaris runs instead",
+        "lookTitle": "A look inside",
+        "lookIntro": "Screenshots of the real interface with sample data.",
+        "seeApps": "See every app"
+    },
+    "market": {
+        "title": "Marketplace",
+        "intro": "Every app in the catalogue, as the dashboard lists it. Built-in apps come with every install; the rest install with one press.",
+        "search": "Search apps",
+        "all": "All",
+        "builtin": "Built in",
+        "optional": "Optional",
+        "soon": "Coming soon",
+        "empty": "No app matches that search.",
+        "count": "{n} apps"
+    },
+    "downloads": {
+        "title": "Downloads",
+        "intro": "The apps that take Polaris beyond the browser tab. Each one connects to your own server.",
+        "version": "Version {version}",
+        "notes": "Release notes",
+        "download": "Download",
+        "none": "Not released yet",
+        "noneHint": "Nothing has been published for this one. The release page lists it once it is.",
+        "releases": "Open releases",
+        "cliHint": "Installs the plr command; sign in with plr login --url and your server's address.",
+        "products": {
+            "extension": "Browser extension",
+            "streamdeck": "Stream Deck plugin",
+            "companion": "Bitfocus Companion module",
+            "cli": "Command line",
+            "desktop": "Desktop app"
+        },
+        "about": {
+            "extension": "Fills sign-in forms from your vault in Chrome, Edge, Brave and Firefox.",
+            "streamdeck": "Keys for your deploys, calls and soundboard on a Stream Deck or OpenDeck.",
+            "companion": "The same actions for decks driven by Bitfocus Companion.",
+            "cli": "Deploy, read logs and restart from a terminal.",
+            "desktop": "Polaris in its own window on Windows, macOS and Linux."
+        }
+    },
+    "api": {
+        "title": "API reference",
+        "intro": "Every call an API key can make, generated from the same document each Polaris serves at /api/openapi.json.",
+        "download": "Download openapi.json",
+        "params": "Parameters",
+        "body": "Request body",
+        "responses": "Responses",
+        "required": "required"
+    },
+    "footer": {
+        "license": "Open source under the AGPL-3.0 license.",
+        "source": "Source code"
+    }
+}
