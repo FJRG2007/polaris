@@ -280,8 +280,7 @@ export function readText(
 
 /** What a click or a type came to, before it is a protocol answer. */
 export type ActOutcome =
-    | { ok: true }
-    | { ok: false; refusal: "unknown-ref" | "password-field" | "failed" };
+    { ok: true } | { ok: false; refusal: "unknown-ref" | "password-field" | "failed" };
 
 /** Click the element a ref names. */
 export function clickRef(refs: RefTable, ref: string): ActOutcome {
