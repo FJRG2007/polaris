@@ -122,6 +122,9 @@
     "models": {
         "brandOther": "Otra",
         "conditionalNote": "Esta solo responde por RTSP cuando está conectada a la corriente, tiene el puente puesto y está configurada para no dormirse en la app de Tapo. Con batería no publica nada, y Polaris llega a ella por el protocolo propio de TP-Link.",
+        "tips": {
+            "frameRate25": "Recomendado: en la app de Tapo, en los ajustes de la cámara, apartado de vídeo, pon la frecuencia de imagen en 25 fps. Con los 15 de serie se ve a saltos en Polaris."
+        },
         "names": {
             "amcrest-other": "Cualquier Amcrest",
             "dahua-other": "Cualquier Dahua",

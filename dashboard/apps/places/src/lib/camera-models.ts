@@ -84,7 +84,17 @@ export interface CameraModel {
     /** What its owner has to know that is true of this model and not of the
      *  make. */
     readonly note?: string;
+    /** A setting on the camera itself that makes it look better in Polaris, as
+     *  a key of `models.tips`. Only what someone has seen work on that model. */
+    readonly tip?: ModelTip;
 }
+
+/** The camera-side settings worth recommending. */
+export type ModelTip = "frameRate25";
+
+/** Per model, from what its owners measured: a C210 left on its default 15 fps
+ *  stutters in Polaris and runs smoothly at 25. */
+const TAPO_TIPS: Partial<Record<string, ModelTip>> = { C210: "frameRate25" };
 
 /**
  * TP-Link's own list of which of its cameras answer RTSP and ONVIF. These get
@@ -171,6 +181,7 @@ function tapo(
         // Nobody looking for one of these types "Tapo" first. The box says
         // TP-Link and so does the invoice.
         search: ["tp-link", "tplink", "tp link"],
+        ...(TAPO_TIPS[name] ? { tip: TAPO_TIPS[name] } : {}),
         ...extra
     };
 }
@@ -248,6 +259,11 @@ export function brandName(brand: string, t: PlacesTranslator = englishPlaces): s
  *  note so far is the conditional-RTSP one. */
 export function modelNote(model: CameraModel, t: PlacesTranslator = englishPlaces): string | null {
     return model.note === CONDITIONAL_NOTE ? t("models.conditionalNote") : (model.note ?? null);
+}
+
+/** The camera-side setting recommended for this model, in the reader's words. */
+export function modelTip(model: CameraModel, t: PlacesTranslator = englishPlaces): string | null {
+    return model.tip ? t(`models.tips.${model.tip}`) : null;
 }
 
 /** One model by id, or null for an id from before this list existed. */
@@ -387,6 +403,13 @@ export function vendorForModel(
     if (!model) return current || "generic";
     if (current && model.connections.includes(current)) return current;
     return model.connections[0] ?? "generic";
+}
+
+/** A model change in the form. Another model starts on its own recommended way
+ *  in (an empty make, which `vendorForModel` resolves to its first), not on the
+ *  one picked for the model before it; the same model keeps the pick. */
+export function withModel(current: { modelId: string; vendor: string }, modelId: string) {
+    return { modelId, vendor: modelId === current.modelId ? current.vendor : "" };
 }
 
 /** The ways this model can be reached, for the picker that offers them. Empty

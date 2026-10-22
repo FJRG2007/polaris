@@ -35,11 +35,13 @@ import {
     BATTERY_COST_WARNING,
     POWER_SOURCES,
     modelNote,
+    modelTip,
     askPowerFor,
     cameraModel,
     connectionsFor,
     drawsFromBattery,
     vendorForModel,
+    withModel,
     type PowerSource
 } from "../../lib/camera-models";
 import {
@@ -126,7 +128,9 @@ function initial(
         zone: camera?.zone ?? "",
         // The make is still carried, because a camera added before the model
         // list existed has one and no model, and it is what keeps working.
-        vendor: camera?.vendor ?? prefill?.vendor ?? "tapo-cloud",
+        // A new one names none, so the model it gets settles on the way in
+        // marked recommended rather than on whichever make was typed here.
+        vendor: camera?.vendor ?? prefill?.vendor ?? "",
         brand: cameraModel(camera?.modelId)?.brand ?? "",
         modelId: camera?.modelId ?? "",
         power: (camera?.power as PowerSource) ?? "mains",
@@ -483,10 +487,12 @@ export function CameraDialog({
                                         brand,
                                         // A model from the brand that was just
                                         // left is not a model of this one.
-                                        modelId:
+                                        ...withModel(
+                                            current,
                                             cameraModel(current.modelId)?.brand === brand
                                                 ? current.modelId
                                                 : ""
+                                        )
                                     }))
                                 }
                             />
@@ -498,7 +504,7 @@ export function CameraDialog({
                                 onChange={(modelId) =>
                                     setForm((current) => ({
                                         ...current,
-                                        modelId,
+                                        ...withModel(current, modelId),
                                         // Picking through a search that crossed
                                         // makes moves the make to match, rather
                                         // than leaving the two disagreeing.
@@ -535,6 +541,13 @@ export function CameraDialog({
                         {model && modelNote(model, t) ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                                 {modelNote(model, t)}
+                            </p>
+                        ) : null}
+                        {/* A setting on the camera that its owners found makes
+                            it look better here. */}
+                        {model && modelTip(model, t) ? (
+                            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
+                                {modelTip(model, t)}
                             </p>
                         ) : null}
                         {askPower ? (

@@ -122,6 +122,9 @@
     "models": {
         "brandOther": "Other",
         "conditionalNote": "This one answers RTSP only when it is wired for power, has the jumper fitted, and is set to stay awake in the Tapo app. On its battery it publishes nothing, and Polaris reaches it over TP-Link's own protocol instead.",
+        "tips": {
+            "frameRate25": "Recommended: in the Tapo app, open the camera's Device Settings > Video & Display and set Frame Rate to 25 fps. At its default 15 the picture stutters in Polaris."
+        },
         "names": {
             "amcrest-other": "Any Amcrest camera",
             "dahua-other": "Any Dahua camera",
