@@ -10,6 +10,7 @@
 import * as actions from "../actions/security";
 import { hostUi } from "@polaris/app-host/client";
 import { securityCatalogs } from "../../messages";
+import { FindingsTable } from "./findings-table";
 import type { SecurityTranslator } from "../lib/i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bug, FileDiff, Package, ServerCog, ShieldCheck } from "lucide-react";
@@ -617,12 +618,18 @@ function summaryLine(t: SecurityTranslator, scan: Scan): string {
 function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; submit: Submit }) {
     const [open, setOpen] = useState<string | null>(null);
     const [findings, setFindings] = useState<Finding[] | null>(null);
+    const [findingsFailed, setFindingsFailed] = useState(false);
+    const read = async (scanId: string) => {
+        setFindings(null);
+        setFindingsFailed(false);
+        const result = await actions.findingsAction({ scanId });
+        if (!result.ok) return setFindingsFailed(true);
+        setFindings(result.data);
+    };
     const show = async (scanId: string) => {
         if (open === scanId) return setOpen(null);
         setOpen(scanId);
-        setFindings(null);
-        const result = await actions.findingsAction({ scanId });
-        setFindings(result.ok ? result.data : []);
+        await read(scanId);
     };
     return (
         <section className="flex flex-col gap-2">
@@ -666,8 +673,19 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                 ) : null}
                             </div>
                             <p className="text-muted-foreground">{summaryLine(t, scan)}</p>
-                            {open === scan.id ? (
-                                findings === null ? (
+                            {open === scan.id && scan.kind === "image" ? (
+                                <div className="mt-2">
+                                    <FindingsTable
+                                        t={t}
+                                        findings={findings}
+                                        failed={findingsFailed}
+                                        onRetry={() => void read(scan.id)}
+                                    />
+                                </div>
+                            ) : open === scan.id ? (
+                                findingsFailed ? (
+                                    <p className="mt-2 text-danger">{t("findings.failed")}</p>
+                                ) : findings === null ? (
                                     <Skeleton className="mt-2 h-16 w-full" />
                                 ) : findings.length === 0 ? (
                                     <p className="mt-2">{t("noFindings")}</p>

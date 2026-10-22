@@ -119,5 +119,18 @@
     "alerts": {
         "title": "{count, plural, one {A new serious vulnerability in {app}} other {# new serious vulnerabilities in {app}}}",
         "body": "{id} ({severity}) in {package}. {fix}."
+    },
+    "findings": {
+        "filters": "Filter findings",
+        "fixedOnly": "Has a fix",
+        "vulnerability": "Vulnerability",
+        "severity": "Severity",
+        "package": "Package",
+        "fix": "Fixed in",
+        "layer": "Layer",
+        "openAdvisory": "Open the advisory for {id}",
+        "none": "No known vulnerabilities in this image.",
+        "noMatch": "No findings match these filters.",
+        "failed": "Could not load the findings. Try again."
     }
 }

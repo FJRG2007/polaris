@@ -119,5 +119,18 @@
     "alerts": {
         "title": "{count, plural, one {Una vulnerabilidad grave nueva en {app}} other {# vulnerabilidades graves nuevas en {app}}}",
         "body": "{id} ({severity}) en {package}. {fix}."
+    },
+    "findings": {
+        "filters": "Filtrar hallazgos",
+        "fixedOnly": "Con arreglo",
+        "vulnerability": "Vulnerabilidad",
+        "severity": "Gravedad",
+        "package": "Paquete",
+        "fix": "Arreglo",
+        "layer": "Capa",
+        "openAdvisory": "Abrir el aviso de {id}",
+        "none": "No hay vulnerabilidades conocidas.",
+        "noMatch": "Ningún hallazgo con estos filtros.",
+        "failed": "No se cargaron los hallazgos. Reintenta."
     }
 }
