@@ -15,7 +15,11 @@
     const { fill, wordsFor } = window.PolarisWords;
     const screen = document.body.dataset.screen; // "key" | "dial" | "timer"
     let socket = null;
+    // The action's own id, to tell its settings apart from another key's.
     let context = "";
+    // This screen's id. Everything it sends is signed with it: the app drops a
+    // message signed with the action's id as coming "from the wrong context".
+    let inspector = "";
     let actionUuid = "";
     let settings = {};
     let words = wordsFor("en");
@@ -28,7 +32,7 @@
             JSON.stringify({
                 event,
                 action: actionUuid,
-                context,
+                context: inspector,
                 ...(payload === undefined ? {} : { payload })
             })
         );
@@ -309,6 +313,7 @@
     }
 
     window.connectElgatoStreamDeckSocket = (port, uuid, registerEvent, info, actionInfo) => {
+        inspector = uuid;
         try {
             words = wordsFor(JSON.parse(info)?.application?.language);
             const parsed = JSON.parse(actionInfo);
