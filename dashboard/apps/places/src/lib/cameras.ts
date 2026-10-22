@@ -16,7 +16,7 @@ import { loadEnv } from "@polaris/config";
 import { cameraVendor, hasNativePrivacy, rtspUrl, usesAccountPassword } from "./vendors";
 import { drawsFromBattery, modelCanPan } from "./camera-models";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { detectionSettingsSchema, type CameraInput } from "./schemas";
+import { detectionSettingsSchema, type CameraInput, type CameraSwitch } from "./schemas";
 import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "./detection";
 import { host } from "@polaris/app-host";
 import * as rooms from "./rooms";
@@ -381,6 +381,28 @@ export async function deleteCamera(installedAppId: string, id: string): Promise<
     // than by foreign key, so nothing takes them away on the camera's behalf.
     await dropGrantsFor("place.camera", id);
     await prisma.camera.delete({ where: { id } });
+}
+
+/** Flip a camera on or off, or change what it keeps, leaving the rest of it as
+ *  it is. Returns the camera as it now stands. */
+export async function switchCamera(
+    installedAppId: string,
+    id: string,
+    change: CameraSwitch
+): Promise<CameraView> {
+    const existing = await prisma.camera.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
+    if (!existing) throw new HomeError("Camera not found");
+    const row = await prisma.camera.update({
+        where: { id },
+        data: {
+            ...(change.enabled !== undefined ? { enabled: change.enabled } : {}),
+            ...(change.recording !== undefined ? { recording: change.recording } : {})
+        }
+    });
+    return toView(row);
 }
 
 /** The stored password, or null when the camera needs none. Throws only when the

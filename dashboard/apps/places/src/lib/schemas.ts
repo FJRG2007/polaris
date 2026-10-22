@@ -103,6 +103,26 @@ function settledDetector(vendor: string, detector: Detector): Detector {
 }
 
 /** What the database will accept where it wants a uuid. */
+/** What a camera may keep: nothing, the moments something moved, or everything. */
+export const RECORDING_MODES = ["off", "motion", "continuous"] as const;
+
+/**
+ * The two switches a camera is flipped by from the wall or the list, without
+ * opening its form: whether Polaris uses it at all, and what it keeps. At least
+ * one of them, and nothing else - the form is where the rest of a camera changes.
+ */
+export const cameraSwitchSchema = z
+    .object({
+        enabled: z.boolean().optional(),
+        recording: z.enum(RECORDING_MODES).optional()
+    })
+    .strict()
+    .refine((value) => value.enabled !== undefined || value.recording !== undefined, {
+        message: "Nothing to change"
+    });
+
+export type CameraSwitch = z.infer<typeof cameraSwitchSchema>;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A host or address, once normalized. Deliberately permissive about shape - a
@@ -194,7 +214,7 @@ const cameraFieldsSchema = z.object({
         .nullable()
         .default(null),
     detection: detectionSettingsSchema,
-    recording: z.enum(["off", "motion", "continuous"]).default("motion"),
+    recording: z.enum(RECORDING_MODES).default("motion"),
     /** A storage connection id, "local", or empty for the instance default. The
      *  value is checked against what this instance actually has before it is
      *  stored - an id in a form is a request, not a destination. */
