@@ -15,15 +15,18 @@ import { wordsFor } from "./words";
 import { keyImage } from "./render";
 import { backoffMs } from "./backoff";
 import { joinPath, normalizeAddress } from "./address";
+import { InFlight } from "./optimistic";
 import { faceFor, runOptions, watchOptions, type Binding, type KeySettings } from "./face";
 import streamDeck, { type DialAction, type KeyAction } from "@elgato/streamdeck";
 import {
     PolarisClient,
     readCredentials,
     Throttled,
+    TimedOut,
     Unauthorized,
     type Credentials,
     type DeckAction,
+    type DeckLocked,
     type DeckReleases,
     type DeckState,
     type Link,
@@ -59,6 +62,10 @@ class Hub {
     catalogue: DeckAction[] = [];
     /** The newest releases this Polaris knows of, from the last catalogue. */
     latest: DeckReleases | null = null;
+    /** What connecting the deck again would allow, from the last catalogue. */
+    locked: readonly DeckLocked[] = [];
+    /** Keys with a press on its way. */
+    readonly inFlight = new InFlight();
     #catalogueAt = 0;
     readonly #instances = new Map<string, Instance>();
     readonly #states = new Map<string, DeckState>();
@@ -102,6 +109,7 @@ class Hub {
     detach(id: string): void {
         this.#instances.delete(id);
         this.#states.delete(id);
+        this.inFlight.forget(id);
         this.#watchChanged();
     }
 
@@ -131,7 +139,8 @@ class Hub {
             instance.settings,
             this.entry(instance.settings),
             this.#states.get(id),
-            this.words
+            this.words,
+            this.locked.some((row) => row.id === instance.settings.action)
         );
         const shown = this.armed.has(id)
             ? { ...face, tone: "warn" as const, label: this.words.again }
@@ -161,6 +170,7 @@ class Hub {
             const listing = await this.client.listing(credentials);
             this.catalogue = listing.actions;
             this.latest = listing.latest;
+            this.locked = listing.locked;
             this.link = "online";
         } catch (caught) {
             this.#failed(caught);
@@ -213,6 +223,12 @@ class Hub {
             if (!result.ok) streamDeck.logger.info(`Polaris refused ${action}: ${result.message}`);
             return result;
         } catch (caught) {
+            // No answer in time is this press failing, not Polaris being gone:
+            // the key goes back, and the stream says what really happened.
+            if (caught instanceof TimedOut) {
+                streamDeck.logger.warn(`Polaris did not answer ${action} in time`);
+                return { ok: false, message: "timeout" };
+            }
             this.#failed(caught);
             this.#redrawAll();
             return caught instanceof Throttled ? { ok: false, message: caught.message } : null;
@@ -279,7 +295,9 @@ class Hub {
                         this.link = "online";
                         this.#redrawAll();
                     }
-                    for (const reading of readings) this.setState(reading.key, reading.state);
+                    for (const reading of readings)
+                        if (!this.inFlight.hold(reading.key, reading.state))
+                            this.setState(reading.key, reading.state);
                 },
                 controller.signal
             );
@@ -368,6 +386,7 @@ class Hub {
         this.link = "unset";
         this.catalogue = [];
         this.latest = null;
+        this.locked = [];
         this.#states.clear();
         await streamDeck.settings.setGlobalSettings({});
         this.#redrawAll();
