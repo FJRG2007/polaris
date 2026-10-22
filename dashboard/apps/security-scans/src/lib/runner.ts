@@ -16,6 +16,7 @@ import {
     parseDfFree,
     type HostAction
 } from "../model/specs";
+import * as images from "../model/images";
 import {
     parseContainerState,
     quoteArgv,
@@ -224,5 +225,45 @@ export async function removeExport(target: ScanTarget, volume: string): Promise<
     await withSsh(target, async (client) => {
         const result = await sshRun(client, quoteArgv(exportArgv("unused", volume).remove));
         if (result.code !== 0) throw new Error(`volume removal exited ${result.code}`);
+    });
+}
+
+/**
+ * Every container on a server with the image it runs, or null when the server
+ * cannot be asked. Locally the daemon's allowlisted `GET /containers/json`
+ * (no new route needed); over SSH `docker ps` and one `docker inspect` of the
+ * ids it printed, each an argument list quoted word by word.
+ */
+export async function listContainers(target: ScanTarget): Promise<images.ListedContainer[] | null> {
+    if (target.kind === "local" || !target.hostId) {
+        const client = new HostdClient();
+        if (!(await client.configured())) return null;
+        const reply = await client.dockerRequest("GET", "/containers/json?all=1").catch(() => null);
+        if (!reply || reply.status !== 200) return null;
+        try {
+            return images.fromDaemonListing(JSON.parse(reply.body));
+        } catch {
+            return null;
+        }
+    }
+    return withSsh(target, async (client) => {
+        const ps = await sshRun(
+            client,
+            quoteArgv(["docker", "ps", "-a", "--no-trunc", "--format", images.PS_FORMAT])
+        );
+        if (ps.code !== 0) return null;
+        const ids = ps.output
+            .split("\n")
+            .map((line) => line.split("\t")[0]?.trim() ?? "")
+            .filter((id) => /^[0-9a-f]{64}$/.test(id))
+            .slice(0, 500);
+        if (ids.length === 0) return [];
+        const inspect = await sshRun(
+            client,
+            quoteArgv(["docker", "inspect", "--format", images.INSPECT_FORMAT, ...ids])
+        );
+        // A container removed between the two calls fails the inspect for that one
+        // id only; what it printed for the rest still holds.
+        return inspect.output ? images.fromCliListing(ps.output, inspect.output) : null;
     });
 }

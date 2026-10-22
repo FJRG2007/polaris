@@ -11,12 +11,14 @@ import { prisma } from "@polaris/db";
 import { promisify } from "node:util";
 import * as parse from "../model/parse";
 import * as specs from "../model/specs";
+import * as images from "../model/images";
 import { gunzip, gzip } from "node:zlib";
 import { shortHash } from "@polaris/deploy";
 import { host } from "@polaris/app-host";
 import { securityTFor } from "./i18n";
 import {
     exportImage,
+    listContainers,
     listExports,
     portsFor,
     removeExport,
@@ -229,10 +231,19 @@ export async function enqueue(
     kind: ScanKind,
     label: string,
     input: unknown,
-    requestedById: string | null
+    requestedById: string | null,
+    image?: { imageId: string; source: images.ImageSource }
 ): Promise<string> {
     const scan = await prisma.securityScan.create({
-        data: { targetId, kind, label, input: JSON.stringify(input), requestedById },
+        data: {
+            targetId,
+            kind,
+            label,
+            input: JSON.stringify(input),
+            requestedById,
+            imageId: image?.imageId ?? null,
+            source: image?.source ?? null
+        },
         select: { id: true }
     });
     void drain().catch((caught) => console.error("polaris: security scans:", caught));
@@ -283,6 +294,77 @@ export async function queueImage(targetId: string, applicationId: string, userId
     // already scanned (see `planNewImages`).
     const image = await imageOf(applicationId);
     return enqueue(targetId, "image", app.name, { applicationId, image }, userId);
+}
+
+/** The app names a server's containers are listed under, by compose project. */
+async function appNamesOf(targetId: string): Promise<Map<string, string>> {
+    const apps = await appsOf(targetId);
+    return new Map(apps.map((app) => [`polaris-${shortHash(app.id, 8)}`, app.name]));
+}
+
+/** Every image a server runs right now, one per image id; null when it cannot be asked. */
+async function imagesOn(target: ScanTarget): Promise<images.ServerImage[] | null> {
+    const containers = await listContainers(target).catch((caught) => {
+        console.error(`polaris: security scans could not list containers on ${target.id}:`, caught);
+        return null;
+    });
+    if (!containers) return null;
+    return images.groupImages(containers, await appNamesOf(target.id));
+}
+
+/**
+ * Every image on a server - Polaris's own, apps, agent sessions, the rest -
+ * with its newest scan. `available` is false where the server cannot be
+ * asked (no host daemon here, an unreachable machine): the screen then falls
+ * back to scanning apps one by one.
+ */
+export async function serverImages(targetId: string) {
+    const target = await targetRow(targetId);
+    const found = await imagesOn(target);
+    if (!found) return { available: false as const, images: [] };
+    const scans = await prisma.securityScan.findMany({
+        where: { targetId, kind: "image", imageId: { in: found.map((image) => image.imageId) } },
+        orderBy: { createdAt: "desc" },
+        take: Math.min(found.length * 4, 800),
+        select: { id: true, imageId: true, state: true, summary: true, error: true, createdAt: true }
+    });
+    const latest = new Map<string, (typeof scans)[number]>();
+    for (const scan of scans) {
+        if (scan.imageId && !latest.has(scan.imageId)) latest.set(scan.imageId, scan);
+    }
+    return {
+        available: true as const,
+        images: found.map((image) => {
+            const scan = latest.get(image.imageId);
+            return { ...image, scan: scan ? { ...scan, summary: safeJson(scan.summary) } : null };
+        })
+    };
+}
+
+/** Queue a scan of one image a server runs, by its id - checked against the
+ *  server's own listing, never taken from the screen on trust. */
+export async function queueServerImage(
+    targetId: string,
+    imageId: string,
+    userId: string | null,
+    known?: images.ServerImage
+): Promise<string> {
+    const image =
+        known ?? (await imagesOn(await targetRow(targetId)))?.find((i) => i.imageId === imageId);
+    if (!image) throw new ScanFailure("imageMissing");
+    const pending = await prisma.securityScan.findFirst({
+        where: { targetId, imageId, state: { in: ["queued", "running"] } },
+        select: { id: true }
+    });
+    if (pending) return pending.id;
+    return enqueue(
+        targetId,
+        "image",
+        image.ref,
+        { imageId: image.imageId, ref: image.ref, users: image.users },
+        userId,
+        { imageId: image.imageId, source: image.source }
+    );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -612,8 +694,11 @@ async function runImage(
     input: Record<string, unknown>,
     scanId: string
 ): Promise<ScanResult> {
-    // Only the image this app's own running release names is ever exported.
-    const image = await imageOf(String(input.applicationId ?? ""));
+    // Only an image this server listed (by its id) or the image this app's own
+    // running release names is ever exported.
+    const byId = typeof input.imageId === "string" ? input.imageId : null;
+    if (byId !== null && !images.IMAGE_ID.test(byId)) throw new ScanFailure("imageMissing");
+    const image = byId ?? (await imageOf(String(input.applicationId ?? "")));
     if (!image) throw new ScanFailure("notRunning");
     if (!parse.isImageRef(image)) throw new ScanFailure("imageMissing");
     const volume = specs.exportVolumeName(scanId);
@@ -864,6 +949,69 @@ async function planNewImages(now: Date): Promise<void> {
     }
 }
 
+/** How often each server's images are listed by the job, in this process. */
+const SERVER_IMAGES_EVERY_MS = 6 * 60 * 60_000;
+/** An image nobody scanned in this long is scanned again on its own. */
+const SERVER_IMAGE_RESCAN_MS = 7 * 24 * 60 * 60_000;
+/** New scans one pass queues per server; the queue runs one at a time anyway. */
+const SERVER_IMAGES_PER_PASS = 3;
+const serverImagesListedAt = new Map<string, number>();
+
+/**
+ * Every image on every server, not only Deploy apps: each server's containers
+ * are listed every few hours and an image nobody scanned in the last week -
+ * a new one first of all - is queued, a few per pass. An app image the
+ * release path already scanned by its tag counts as scanned.
+ */
+async function planServerImages(now: Date): Promise<void> {
+    const targets = await prisma.deployTarget.findMany({
+        select: TARGET_SELECT,
+        orderBy: { createdAt: "asc" },
+        take: 100
+    });
+    for (const target of targets) {
+        if (now.getTime() - (serverImagesListedAt.get(target.id) ?? 0) < SERVER_IMAGES_EVERY_MS) {
+            continue;
+        }
+        serverImagesListedAt.set(target.id, now.getTime());
+        const found = await imagesOn(target);
+        if (!found || found.length === 0) continue;
+        const since = new Date(now.getTime() - SERVER_IMAGE_RESCAN_MS);
+        const recent = new Set(
+            (
+                await prisma.securityScan.findMany({
+                    where: {
+                        targetId: target.id,
+                        imageId: { in: found.map((image) => image.imageId) },
+                        createdAt: { gt: since },
+                        state: { not: "failed" }
+                    },
+                    select: { imageId: true },
+                    take: 1000
+                })
+            ).map((row) => row.imageId)
+        );
+        let queued = 0;
+        for (const image of found) {
+            if (queued >= SERVER_IMAGES_PER_PASS || recent.has(image.imageId)) continue;
+            if (image.source === "app") {
+                const byTag = await prisma.securityScan.findFirst({
+                    where: {
+                        targetId: target.id,
+                        kind: "image",
+                        createdAt: { gt: since },
+                        input: { contains: JSON.stringify(image.ref) }
+                    },
+                    select: { id: true }
+                });
+                if (byTag) continue;
+            }
+            await queueServerImage(target.id, image.imageId, null, image).catch(() => undefined);
+            queued += 1;
+        }
+    }
+}
+
 /** Keep the newest scans per server and kind, and nothing older than the window. */
 async function prune(now: Date): Promise<void> {
     await prisma.securityScan.deleteMany({
@@ -958,6 +1106,9 @@ export async function tick(): Promise<void> {
     });
     await planSchedules(now);
     await planNewImages(now);
+    await planServerImages(now).catch((caught) =>
+        console.error("polaris: security scans could not plan server images:", caught)
+    );
     await drain();
     await prune(now);
     await sweepExports(now);

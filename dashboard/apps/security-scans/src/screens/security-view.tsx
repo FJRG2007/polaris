@@ -11,6 +11,7 @@ import * as actions from "../actions/security";
 import { hostUi } from "@polaris/app-host/client";
 import { securityCatalogs } from "../../messages";
 import { FindingsTable } from "./findings-table";
+import { ImagesPanel } from "./images-panel";
 import type { SecurityTranslator } from "../lib/i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bug, FileDiff, Package, ServerCog, ShieldCheck } from "lucide-react";
@@ -217,7 +218,7 @@ export function SecurityView() {
                     ) : tab === "host" ? (
                         <HostPanel t={t} targetId={current} server={server} submit={submit} />
                     ) : (
-                        <ImagesPanel t={t} overview={overview} targetId={current} submit={submit} />
+                        <ImagesPanel t={t} apps={overview.apps} targetId={current} submit={submit} />
                     )}
                     <History t={t} scans={scans} submit={submit} />
                 </>
@@ -544,51 +545,6 @@ function HostPanel({
                         }}
                     />
                 </div>
-            </CardBody>
-        </Card>
-    );
-}
-
-function ImagesPanel({
-    t,
-    overview,
-    targetId,
-    submit
-}: {
-    t: SecurityTranslator;
-    overview: Overview;
-    targetId: string;
-    submit: Submit;
-}) {
-    return (
-        <Card>
-            <CardBody className="flex flex-col gap-2">
-                <p className="text-sm text-muted-foreground">{t("images.hint")}</p>
-                <ul className="flex flex-col gap-1">
-                    {overview.apps.map((app) => (
-                        <li key={app.id} className="flex min-w-0 items-center gap-2 text-sm">
-                            <span className="min-w-0 flex-1 truncate" title={app.name}>
-                                {app.name}
-                            </span>
-                            <Button
-                                size="xs"
-                                variant="outline"
-                                onClick={() =>
-                                    void submit(
-                                        () =>
-                                            actions.scanImageAction({
-                                                targetId,
-                                                applicationId: app.id
-                                            }),
-                                        t("queued")
-                                    )
-                                }
-                            >
-                                {t("images.run")}
-                            </Button>
-                        </li>
-                    ))}
-                </ul>
             </CardBody>
         </Card>
     );

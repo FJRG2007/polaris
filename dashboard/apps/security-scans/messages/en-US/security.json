@@ -83,7 +83,21 @@
             "negligible": "Negligible",
             "unknown": "Unknown"
         },
-        "layer": "Layer {layer}"
+        "layer": "Layer {layer}",
+        "allHint": "Every image this server runs, once each however many containers use it. New images are checked on their own, and each one again within a week.",
+        "none": "This server runs no containers yet.",
+        "image": "Image",
+        "who": "Run by",
+        "lastScan": "Last scan",
+        "notScanned": "Not scanned yet",
+        "clean": "No known issues",
+        "listUnavailable": "This server could not list its containers, so apps are checked one by one.",
+        "source": {
+            "polaris": "Polaris",
+            "app": "App",
+            "agent": "Agent",
+            "other": "Other"
+        }
     },
     "history": "Recent scans",
     "noScans": "No scans yet.",

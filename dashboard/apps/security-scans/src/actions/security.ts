@@ -82,6 +82,22 @@ export async function scanImageAction(input: unknown) {
     );
 }
 
+export async function serverImagesAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.targetInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await service()).serverImages(parsed.data.targetId));
+}
+
+export async function scanServerImageAction(input: unknown) {
+    const user = await requireSecurityUser();
+    const parsed = schemas.serverImageInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).queueServerImage(parsed.data.targetId, parsed.data.imageId, user.id)
+    );
+}
+
 export async function quarantineAction(input: unknown) {
     await requireSecurityUser();
     const parsed = schemas.findingInput.safeParse(input);

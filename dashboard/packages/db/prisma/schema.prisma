@@ -14287,6 +14287,11 @@ model SecurityScan {
     // A message key, never a container's raw output.
     error         String?
     requestedById String?   @db.Uuid
+    // An image scanned by its id (`sha256:...`) rather than through an app:
+    // one image behind several containers is one scan.
+    imageId       String?
+    // Who runs that image: polaris | app | agent | other.
+    source        String?
     createdAt     DateTime  @default(now())
     startedAt     DateTime?
     finishedAt    DateTime?
@@ -14296,6 +14301,8 @@ model SecurityScan {
 
     @@index([targetId, kind, createdAt(sort: Desc)])
     @@index([state, createdAt])
+    @@index([targetId, imageId, createdAt(sort: Desc)])
+    @@index([source, createdAt(sort: Desc)])
 }
 
 model SecurityFinding {
