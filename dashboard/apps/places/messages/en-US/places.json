@@ -2775,5 +2775,12 @@
         "removeQuestion": "Remove {name}?",
         "removeBody": "Its cameras stay as they are.",
         "removeConfirm": "Remove"
+    },
+    "guestCamera": {
+        "closed": "This link does not show anything right now.",
+        "tooMany": "Opened too often. Wait a minute and try again.",
+        "offline": "The camera is not answering right now.",
+        "opening": "Opening the camera",
+        "live": "{name}, live"
     }
 }
