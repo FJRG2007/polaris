@@ -1444,7 +1444,10 @@ export function CallRoom({
                     aria-label={t("callRoom.leaveTheCall")}
                     title={t("callRoom.leaveTheCall")}
                     onClick={() => {
-                        playCallSound("hangUp");
+                        // A held call sounds it as the provider lets go (`leave`
+                        // in `call-session`), whichever control hung up; the
+                        // guest page has no provider, so it is sounded here.
+                        if (!held) playCallSound("hangUp");
                         onLeave();
                     }}
                 >

@@ -71,9 +71,18 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
      * what would carry on being written is a black rectangle and silence.
      * Stopping keeps what was made, and the panel that offers it is drawn from
      * here - which is why it survives the room unmounting.
+     *
+     * Every way of hanging up comes through here - the room's button, the bar
+     * over other screens, ending a meeting, a deck key - so the hang-up sound
+     * is played here, once, and the reader hears they left whichever they
+     * pressed.
      */
+    const inSession = useRef(false);
+    inSession.current = session !== null;
     const leave = useCallback(() => {
         if (recorder.current.running) recorder.current.stop();
+        if (inSession.current) playCallSound("hangUp");
+        inSession.current = false;
         setSession(null);
     }, []);
     // A deck key's mute, camera, record or hang-up, done in this tab.
