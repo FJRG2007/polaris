@@ -241,21 +241,6 @@ export function ConnectChannelDialog({
                                 {t("inbox.connect.addDescription")}
                             </DialogDescription>
                         </DialogHeader>
-                        {!bridgeReady && (
-                            <p className="text-sm text-danger">
-                                {t.rich("inbox.connect.bridgeMissing", {
-                                    link: (chunks) => (
-                                        <a
-                                            key="link"
-                                            className="underline"
-                                            href="/admin/apps?app=messaging-bridge"
-                                        >
-                                            {chunks}
-                                        </a>
-                                    )
-                                })}
-                            </p>
-                        )}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {platforms.map((item) => {
                                 const Logo = item.Logo;

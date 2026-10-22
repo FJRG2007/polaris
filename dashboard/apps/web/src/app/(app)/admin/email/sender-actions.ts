@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Email-channel actions. Separate from the messaging actions next door because
+ * Email-sender actions. Apart from the Inbox's messaging actions because
  * nothing here touches the bridge: mail is sent by this process, so a channel is
  * stored, its credentials checked, and a test message put through, all in the
  * request that asked for it.
@@ -59,7 +59,11 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
     const user = await requirePermission("inbox.manage");
     const parsed = channelInputSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("inboxChannels.errors.checkForm") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("admin"))("inboxChannels.errors.checkForm")
+        };
     }
     const result = await createEmailChannel(user.id, parsed.data);
     if (result.channel) {
@@ -70,18 +74,22 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
             targetId: result.channel.id,
             metadata: { provider: result.channel.provider }
         });
-        revalidatePath("/admin/inbox/channels");
+        revalidatePath("/admin/email");
     }
     return result;
 }
 
-export async function updateEmailChannelAction(channelId: unknown, input: unknown): Promise<ChannelResult> {
+export async function updateEmailChannelAction(
+    channelId: unknown,
+    input: unknown
+): Promise<ChannelResult> {
     const user = await requirePermission("inbox.manage");
     const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     const parsed = channelInputSchema.safeParse(input);
     if (!id.success || !parsed.success) return { error: t("inboxChannels.errors.checkForm") };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
+    if (!(await requireOwnedChannel(user.id, id.data)))
+        return { error: t("inboxChannels.errors.gone") };
     const result = await updateEmailChannel(id.data, parsed.data);
     if (result.channel) {
         await recordAudit({
@@ -90,7 +98,7 @@ export async function updateEmailChannelAction(channelId: unknown, input: unknow
             targetType: "channel",
             targetId: id.data
         });
-        revalidatePath("/admin/inbox/channels");
+        revalidatePath("/admin/email");
     }
     return result;
 }
@@ -100,7 +108,8 @@ export async function deleteEmailChannelAction(channelId: unknown): Promise<{ er
     const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     if (!id.success) return { error: t("inboxChannels.errors.unknown") };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
+    if (!(await requireOwnedChannel(user.id, id.data)))
+        return { error: t("inboxChannels.errors.gone") };
     await deleteEmailChannel(id.data);
     await recordAudit({
         actorId: user.id,
@@ -108,7 +117,7 @@ export async function deleteEmailChannelAction(channelId: unknown): Promise<{ er
         targetType: "channel",
         targetId: id.data
     });
-    revalidatePath("/admin/inbox/channels");
+    revalidatePath("/admin/email");
     return {};
 }
 
@@ -118,9 +127,10 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
     const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     if (!id.success) return { error: t("inboxChannels.errors.unknown") };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
+    if (!(await requireOwnedChannel(user.id, id.data)))
+        return { error: t("inboxChannels.errors.gone") };
     const result = await recheckEmailChannel(id.data);
-    revalidatePath("/admin/inbox/channels");
+    revalidatePath("/admin/email");
     return result;
 }
 
@@ -130,19 +140,25 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
  * the reason mail does not arrive is almost always that the provider has not
  * been told the From address belongs to you.
  */
-export async function sendTestEmailAction(channelId: unknown, to: unknown): Promise<{ error?: string }> {
+export async function sendTestEmailAction(
+    channelId: unknown,
+    to: unknown
+): Promise<{ error?: string }> {
     const user = await requirePermission("inbox.manage");
     const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     const address = emailField.safeParse(to);
     if (!id.success) return { error: t("inboxChannels.errors.unknown") };
     if (!address.success) return { error: t("inboxChannels.errors.testAddress") };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
+    if (!(await requireOwnedChannel(user.id, id.data)))
+        return { error: t("inboxChannels.errors.gone") };
 
     const throttle = await rateLimit(`email-test:${user.id}`, TEST_LIMIT, TEST_WINDOW_MS);
     if (!throttle.ok) {
         return {
-            error: t("inboxChannels.errors.tooManyTests", { minutes: Math.ceil(throttle.retryAfterMs / 60000) })
+            error: t("inboxChannels.errors.tooManyTests", {
+                minutes: Math.ceil(throttle.retryAfterMs / 60000)
+            })
         };
     }
 
@@ -151,6 +167,6 @@ export async function sendTestEmailAction(channelId: unknown, to: unknown): Prom
         subject: t("inboxChannels.email.testSubject"),
         text: t("inboxChannels.email.testBody")
     });
-    revalidatePath("/admin/inbox/channels");
+    revalidatePath("/admin/email");
     return result;
 }

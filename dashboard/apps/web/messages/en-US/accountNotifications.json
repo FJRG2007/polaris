@@ -151,7 +151,7 @@
         "switchOn": "Switch on",
         "test": "Send a test",
         "remove": "Remove",
-        "smsNotReady": "Texts will not send until an SMS sender is connected under <link>Channels</link>.",
+        "smsNotReady": "Texts will not send until an SMS sender is connected under <link>Email & SMS</link>.",
         "testSent": "Test alert sent.",
         "lastUsed": "Last used {time}",
         "checkForm": "Check the form",

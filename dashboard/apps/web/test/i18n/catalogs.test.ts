@@ -141,11 +141,17 @@ describe("the navigation catalog", () => {
 
     it("describes every app exactly as the catalogue does", () => {
         const apps = english.apps as Readonly<
-            Record<string, { description: string; guestDescription?: string }>
+            Record<
+                string,
+                { description: string; guestDescription?: string; otherwiseDescription?: string }
+            >
         >;
         for (const app of nav.POLARIS_APPS) {
             expect(apps[app.id]?.description, app.id).toBe(app.description);
             expect(apps[app.id]?.guestDescription, app.id).toBe(app.guest?.description);
+            expect(apps[app.id]?.otherwiseDescription, app.id).toBe(
+                app.guest?.otherwise?.description
+            );
         }
         expect(Object.keys(apps).sort()).toEqual(nav.POLARIS_APPS.map((app) => app.id).sort());
     });

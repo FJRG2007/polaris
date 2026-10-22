@@ -2,41 +2,35 @@
 
 /**
  * The marketplace grid. Every entry is a card in the same shape the Integrations
- * page uses, and picking one opens that channel's own connect flow - the
- * messaging dialog for a platform, the sender dialog for a mail provider. Both
- * land back on the channels list once the channel exists.
- *
- * Messaging entries are disabled while the bridge is missing, rather than hidden:
- * a platform that quietly is not on the page reads as unsupported.
+ * page uses, and picking one opens that platform's connect dialog, which lands
+ * back on the channels list once the channel exists.
  */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactElement } from "react";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { EmailChannelView } from "@/lib/mail-service";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
-import { EmailChannelDialog } from "../email-channel-dialog";
-import { EMAIL_CHANNEL_MARK } from "@/app/(app)/admin/inbox/platform-meta";
 import { ConnectChannelDialog } from "@/app/(app)/admin/inbox/connect-channel-dialog";
 import { channelCatalog, type ChannelKind } from "@/app/(app)/admin/inbox/channel-catalog";
-import { MAIL_PROVIDER_INFO, MAIL_PROVIDERS, type MailProvider } from "@polaris/core";
 
-export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
+export function ConnectChannelView({
+    bridgeReady,
+    bridgeHref
+}: {
+    bridgeReady: boolean;
+    /** The installed bridge's own page, where it is started, when it is stopped
+     *  and this viewer can open it. */
+    bridgeHref?: string;
+}) {
     const t = useTranslations("admin");
     const router = useRouter();
     const [kind, setKind] = useState<ChannelKind | null>(null);
-    const [provider, setProvider] = useState<MailProvider | null>(null);
-    // The sender that was just added, so the dialog stays on it: a sender is not
-    // proven until a test message arrives, and that is the step worth not skipping.
-    const [added, setAdded] = useState<EmailChannelView | null>(null);
 
     /** Everything is set up to be used, so a finished connect goes to the list. */
     function done() {
         setKind(null);
-        setProvider(null);
-        setAdded(null);
         router.push("/admin/inbox/channels");
     }
 
@@ -63,20 +57,21 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
                         {t("inboxChannels.connectPage.messaging")}
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                        {bridgeReady
-                            ? t("inboxChannels.connectPage.messagingHint")
-                            : t.rich("inboxChannels.connectPage.messagingHintNoBridge", {
-                                  link: (chunks) => (
-                                      <Link
-                                          key="link"
-                                          href="/admin/apps?app=messaging-bridge"
-                                          className="text-primary hover:underline"
-                                      >
-                                          {chunks}
-                                      </Link>
-                                  )
-                              })}
+                        {t("inboxChannels.connectPage.messagingHint")}
                     </p>
+                    {bridgeReady ? null : (
+                        <p className="mt-1 text-xs text-warning">
+                            {bridgeHref
+                                ? t.rich("inboxChannels.connectPage.bridgeStopped", {
+                                      link: (chunks) => (
+                                          <Link key="link" href={bridgeHref} className="underline">
+                                              {chunks}
+                                          </Link>
+                                      )
+                                  })
+                                : t("inboxChannels.connectPage.bridgeStoppedNoAccess")}
+                        </p>
+                    )}
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {channelCatalog(t).map((entry) => (
@@ -94,49 +89,12 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
                 </div>
             </section>
 
-            <section className="flex flex-col gap-3">
-                <div>
-                    <h2 className="text-sm font-medium">{t("inboxChannels.connectPage.email")}</h2>
-                    <p className="text-xs text-muted-foreground">
-                        {t("inboxChannels.connectPage.emailHint")}
-                    </p>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {MAIL_PROVIDERS.map((id) => {
-                        const info = MAIL_PROVIDER_INFO[id];
-                        return (
-                            <MarketplaceCard
-                                key={id}
-                                Logo={EMAIL_CHANNEL_MARK.Logo}
-                                color={EMAIL_CHANNEL_MARK.color}
-                                name={info.label}
-                                summary={info.summary}
-                                docsUrl={info.docsUrl}
-                                onPick={() => setProvider(id)}
-                            />
-                        );
-                    })}
-                </div>
-            </section>
-
             {kind && (
                 <ConnectChannelDialog
                     bridgeReady={bridgeReady}
                     initialKind={kind}
                     onClose={() => setKind(null)}
                     onConnected={done}
-                />
-            )}
-            {provider && (
-                <EmailChannelDialog
-                    channel={added}
-                    initialProvider={provider}
-                    onClose={() => (added ? done() : setProvider(null))}
-                    onSaved={setAdded}
-                    onRemoved={() => {
-                        setProvider(null);
-                        setAdded(null);
-                    }}
                 />
             )}
         </div>
@@ -149,7 +107,6 @@ function MarketplaceCard({
     name,
     badge,
     summary,
-    docsUrl,
     disabled,
     onPick
 }: {
@@ -158,7 +115,6 @@ function MarketplaceCard({
     name: string;
     badge?: string;
     summary: string;
-    docsUrl?: string;
     disabled?: boolean;
     onPick: () => void;
 }) {
@@ -182,17 +138,6 @@ function MarketplaceCard({
                     </div>
                 </div>
                 <div className="flex items-center justify-end gap-2">
-                    {docsUrl ? (
-                        <a
-                            href={docsUrl}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            className="mr-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                        >
-                            {t("inboxChannels.connectPage.docs")}
-                            <ExternalLink className="size-3" />
-                        </a>
-                    ) : null}
                     <Button size="sm" variant="secondary" onClick={onPick} disabled={disabled}>
                         {t("inboxChannels.connectPage.setUp")}
                     </Button>

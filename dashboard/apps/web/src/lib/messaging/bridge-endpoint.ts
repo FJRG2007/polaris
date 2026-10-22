@@ -48,6 +48,16 @@ function fromEnv(): BridgeEndpoint | null {
     };
 }
 
+/** The id of the installed bridge, running or not, or null when none is installed. */
+export async function bridgeInstallId(): Promise<string | null> {
+    const installed = await prisma.installedApp.findFirst({
+        where: { catalogId: "messaging-bridge", status: { not: "removed" } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true }
+    });
+    return installed?.id ?? null;
+}
+
 /** Derive the endpoint from a marketplace-installed, running bridge, or null. */
 async function fromInstall(): Promise<BridgeEndpoint | null> {
     const installed = await prisma.installedApp.findFirst({
@@ -69,7 +79,7 @@ async function fromInstall(): Promise<BridgeEndpoint | null> {
     const dialHost =
         application.target.kind === "local"
             ? await getPublicIp()
-            : application.target.host?.address?.trim() ?? null;
+            : (application.target.host?.address?.trim() ?? null);
     if (!dialHost) return null;
 
     let secrets: BridgeSecrets;

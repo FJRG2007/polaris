@@ -43,7 +43,7 @@ import {
     deleteEmailChannelAction,
     sendTestEmailAction,
     updateEmailChannelAction
-} from "./email-actions";
+} from "./sender-actions";
 
 const PROVIDER_OPTIONS = MAIL_PROVIDERS.map((id) => ({
     value: id,

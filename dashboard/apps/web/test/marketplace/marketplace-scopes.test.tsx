@@ -7,7 +7,7 @@
  * no way to remove it.
  */
 
-import { APP_SECTIONS } from "@/lib/apps";
+import { APP_SUBAPPS } from "@/lib/apps";
 import { MessagesWrapper } from "../setup/i18n";
 import { SERVICE_TEMPLATES } from "@polaris/core";
 import { appsByCategory } from "@/lib/apps/catalog";
@@ -67,8 +67,9 @@ describe("which marketplace lists an app", () => {
         expect(storeHome("deployable")).toBe("/apps/marketplace");
     });
 
-    it("lists the admin screen under Administration, for admins only", () => {
-        const entry = APP_SECTIONS.admin.find((section) => section.href === "/admin/apps");
+    it("lists the admin screen under Management's Platform area, for admins only", () => {
+        const platform = APP_SUBAPPS.find((subapp) => subapp.id === "admin-platform");
+        const entry = platform?.sections.find((section) => section.href === "/admin/apps");
         expect(entry).toMatchObject({ label: "Polaris apps", adminOnly: true });
     });
 });

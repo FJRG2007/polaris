@@ -1172,17 +1172,28 @@
         "certificateContactLink": "Check the certificate contact"
     },
     "email": {
-        "title": "Account mail",
-        "description": "The email channel Polaris sends account messages through.",
+        "title": "Email & SMS",
+        "description": "The senders Polaris sends mail and texts through, and the one that carries account mail.",
         "none": "Do not send account mail",
         "channel": "{name} - {provider}",
         "channelBroken": "{name} - {provider} (not working)",
         "saved": "Saved.",
-        "empty": "No email channel has been set up yet. Add one under <link>Inbox > Channels</link>, then come back and pick it here.",
+        "empty": "No email sender has been added yet. Add one above, then pick it here.",
         "sendThrough": "Send through",
         "hint": "Address verification, password resets and emailed sign-in codes all go through this channel. With none chosen, Polaris sends no mail and those are unavailable.",
         "errors": {
             "unknownChannel": "Unknown channel."
+        },
+        "readOnly": "Only members who manage the Inbox can add or change senders.",
+        "senders": {
+            "title": "Email senders",
+            "hint": "The accounts Polaris sends its mail through. Send a test message after adding one.",
+            "add": "Add email sender",
+            "empty": "No email senders yet. Add one to let Polaris send mail."
+        },
+        "accountMail": {
+            "title": "Account mail",
+            "hint": "Which sender carries address checks, password resets and sign-in codes."
         }
     },
     "evidence": {
@@ -1325,7 +1336,6 @@
             "qrWaiting": "Waiting for the scan...",
             "addTitle": "Add a channel",
             "addDescription": "Pick a platform, then how to connect it. Add as many as you like and handle them all from one inbox.",
-            "bridgeMissing": "The messaging bridge is not installed yet. Install it from <link>Polaris apps</link> to enable channels.",
             "connectTitle": "Connect {name}",
             "variantDescription": "Pick how to connect {name}.",
             "back": "Back",
@@ -1457,10 +1467,9 @@
     },
     "inboxChannels": {
         "title": "Channels",
-        "intro": "Everything Polaris talks through: the messaging channels the Inbox and Watch alerts send over, and the senders that carry its mail.",
+        "intro": "The messaging channels the Inbox and Watch alerts send over.",
         "connect": "Connect a channel",
-        "bridgeMissing": "The messaging bridge is not running yet. Install it from <link>Polaris apps</link> to connect messaging channels. Email senders work without it.",
-        "empty": "Nothing connected yet. Connect a messaging channel to start chatting, or an email sender so Polaris can send sign-in mail.",
+        "empty": "Nothing connected yet. Connect a messaging channel to start chatting.",
         "status": "{status, select, connected {connected} connecting {connecting} qr {qr} error {error} disconnected {disconnected} ready {ready} other {{status}}}",
         "connected": "Connected",
         "readyToSend": "Ready to send",
@@ -1488,11 +1497,9 @@
             "intro": "Pick what to connect. Add as many as you like and handle them all from one inbox.",
             "messaging": "Messaging",
             "messagingHint": "Two-way chat in the Inbox, and where Watch sends its alerts.",
-            "messagingHintNoBridge": "Two-way chat in the Inbox, and where Watch sends its alerts. Needs the messaging bridge, which installs from <link>Polaris apps</link>.",
-            "email": "Email",
-            "emailHint": "How Polaris sends its own mail: address verification, password resets, sign-in links and codes.",
-            "docs": "Docs",
-            "setUp": "Set up"
+            "setUp": "Set up",
+            "bridgeStopped": "The messaging bridge is not running. <link>Open it</link> to start it.",
+            "bridgeStoppedNoAccess": "The messaging bridge is not running. Your administrators can start it."
         },
         "email": {
             "saveFailed": "Could not save the channel.",
@@ -2300,8 +2307,8 @@
                 "description": "Message and file limits, how long one stays editable, and what a deleted one leaves."
             },
             "email": {
-                "title": "Email",
-                "description": "Who Polaris sends mail as, and the channel that carries sign-in messages."
+                "title": "Email & SMS",
+                "description": "The senders for mail and texts, and the one that carries sign-in messages."
             },
             "domains": {
                 "title": "Domains",

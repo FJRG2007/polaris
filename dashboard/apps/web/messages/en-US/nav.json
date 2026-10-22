@@ -151,7 +151,8 @@
         },
         "admin": {
             "description": "Users, access, domains & updates",
-            "guestDescription": "Customer conversations across every channel"
+            "guestDescription": "Customer conversations across every channel",
+            "otherwiseDescription": "The senders your mail and texts go out through"
         },
         "account": {
             "description": "Profile, security & API keys"
@@ -225,7 +226,6 @@
         "Drafts": "Drafts",
         "Drive": "Drive",
         "Drop points": "Drop points",
-        "Email": "Email",
         "Events": "Events",
         "Everything": "Everything",
         "Evidence": "Evidence",
@@ -238,7 +238,6 @@
         "Game servers": "Game servers",
         "Goals": "Goals",
         "Get started": "Get started",
-        "General": "General",
         "Groups": "Groups",
         "How it works": "How it works",
         "Inbox": "Inbox",
@@ -368,7 +367,11 @@
         "Polar": "Polar",
         "Query log": "Query log",
         "Lists": "Lists",
-        "Local DNS": "Local DNS"
+        "Local DNS": "Local DNS",
+        "Email & SMS": "Email & SMS",
+        "People & access": "People & access",
+        "Platform": "Platform",
+        "Areas": "Areas"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

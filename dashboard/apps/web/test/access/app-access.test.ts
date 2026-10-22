@@ -111,13 +111,24 @@ describe("the Inbox door inside Management", () => {
     it("marks the guest entry for the switcher, and only the guest one", async () => {
         expect(await reachableAppNav(holding("inbox.read"))).toEqual({
             ids: ["overview", "polar", "admin"],
-            guestIds: ["admin"]
+            guestIds: ["admin"],
+            otherwiseIds: []
         });
         expect((await reachableAppNav(ADMIN)).guestIds).toEqual([]);
     });
 
     it("gives nothing to somebody who holds neither", async () => {
         expect(await reachableAppIds(holding("drive.read"))).not.toContain("admin");
+    });
+
+    it("opens the member's senders instead while the messaging bridge is not installed", async () => {
+        const input = { ...holding("inbox.read"), isInstalled: async () => false };
+        const app = (await reachableApps(input)).find((entry) => entry.id === "admin");
+        expect(app?.label).toBe("Email & SMS");
+        expect(app?.href).toBe("/admin/email");
+        const navIds = await reachableAppNav(input);
+        expect(navIds.guestIds).toEqual([]);
+        expect(navIds.otherwiseIds).toEqual(["admin"]);
     });
 });
 
