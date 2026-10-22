@@ -24,6 +24,7 @@ import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { VariablesEditor } from "./variables-editor";
 import { SecurityChip, SecurityNote } from "./deployment-security";
+import { DependenciesPanel } from "./dependencies-panel";
 import { LinkedGroupsPanel } from "./variable-groups";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
@@ -1081,6 +1082,11 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Built from a repository: its lockfiles are what a deploy reads. */}
+            {(app.sourceType === "dockerfile" || app.sourceType === "nixpacks") && (
+                <DependenciesPanel applicationId={app.id} />
             )}
 
             <ServiceActivity applicationId={app.id} />

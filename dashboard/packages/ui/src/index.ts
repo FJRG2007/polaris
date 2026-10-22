@@ -54,6 +54,15 @@ export {
 export { Card, CardHeader, CardTitle, CardBody } from "./components/card";
 export { Skeleton } from "./components/skeleton";
 export { EmptyState } from "./components/empty-state";
+export {
+    arrangeFindings,
+    SEVERITY_ORDER,
+    splitPackage,
+    VulnerabilityTable,
+    type ImageFinding,
+    type SortKey,
+    type VulnerabilityTableLabels
+} from "./components/vulnerability-table";
 export { ResizeHandle } from "./components/resize-handle";
 export { ScrollRow } from "./components/scroll-row";
 export {

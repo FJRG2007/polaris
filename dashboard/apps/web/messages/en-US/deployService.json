@@ -797,5 +797,32 @@
         "blockShort": "Hold back a release whose image has a critical vulnerability with a known fix.",
         "blockHint": "Checked against the latest scan of the same image on this server. Off, such a release still goes live and carries a warning. A held-back release can be deployed anyway from its row, and who did it is recorded.",
         "blockFailed": "Could not save this setting"
+    },
+    "dependencies": {
+        "title": "Dependencies",
+        "readFrom": "Read from {files}, {when}",
+        "notYet": "Not checked yet. The next deploy from the repository reads its lockfiles.",
+        "checking": "Checking the lockfiles of the latest deploy.",
+        "scanFailed": "The last check of its lockfiles did not finish. The next deploy tries again.",
+        "failed": "Could not load the dependencies. Try again.",
+        "tryAgain": "Try again",
+        "none": "No known vulnerabilities in its dependencies.",
+        "filters": "Filter findings",
+        "fixedOnly": "Has a fix",
+        "vulnerability": "Vulnerability",
+        "severity": "Severity",
+        "package": "Package",
+        "fix": "Fixed in",
+        "noMatch": "No findings match these filters.",
+        "noFix": "No fix yet",
+        "openAdvisory": "Open the advisory for {id}",
+        "level": {
+            "critical": "Critical",
+            "high": "High",
+            "medium": "Medium",
+            "low": "Low",
+            "negligible": "Negligible",
+            "unknown": "Unknown"
+        }
     }
 }
