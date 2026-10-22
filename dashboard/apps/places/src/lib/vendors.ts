@@ -337,3 +337,13 @@ export function relaySource(
             : camera.mainPath || vendor.mainPath;
     return rtspUrl(camera, path ?? "", auth);
 }
+
+/**
+ * Whether Polaris switches this camera's own privacy mode, rather than only
+ * leaving it alone. Tapo's local API carries it (`setLensMaskConfig`, see
+ * docs/camera-privacy.md); a battery Tapo is left out because it sleeps and is
+ * woken only to be watched. Every other make is private in Polaris alone.
+ */
+export function hasNativePrivacy(vendorId: string): boolean {
+    return vendorId === "tapo" || vendorId === "tapo-cloud";
+}

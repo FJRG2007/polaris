@@ -2687,5 +2687,24 @@
             "title": "{name} se ha parado por un fallo",
             "body": "Ha dicho: {fault}"
         }
+    },
+    "privacy": {
+        "on": "Privada",
+        "tile": "Privada: Polaris no la mira",
+        "tileNative": "Privada: cámara apagada",
+        "turnOn": "Activar privacidad",
+        "turnOff": "Quitar privacidad",
+        "groupOn": "Privacidad en {group}",
+        "groupOff": "Sin privacidad {group}",
+        "allCameras": "Todas",
+        "failedSome": "{count} de {total} no cambiaron: {names}",
+        "password": "Falta la clave de la app Tapo en una Tapo.",
+        "account": "Usa la clave de la app Tapo, no la de cámara.",
+        "locked": "Muchos intentos. Espera {seconds} s.",
+        "unsupported": "Este firmware aún no admite el modo privado.",
+        "certificate": "Respondió otro aparato en esta dirección.",
+        "unreachable": "La cámara no respondió.",
+        "failed": "La cámara rechazó el cambio.",
+        "badTarget": "No es una cámara, zona ni lugar."
     }
 }

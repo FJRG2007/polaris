@@ -2687,5 +2687,24 @@
             "title": "{name} stopped on a fault",
             "body": "It reported: {fault}"
         }
+    },
+    "privacy": {
+        "on": "Private",
+        "tile": "Private - Polaris is not watching",
+        "tileNative": "Private - the camera is off",
+        "turnOn": "Turn privacy on",
+        "turnOff": "Turn privacy off",
+        "groupOn": "Privacy on for {group}",
+        "groupOff": "Privacy off for {group}",
+        "allCameras": "All cameras",
+        "failedSome": "{count} of {total} did not switch: {names}",
+        "password": "Needs the Tapo app password on a Tapo camera.",
+        "account": "Use the Tapo app password, not the camera account.",
+        "locked": "Too many tries. Wait {seconds} s.",
+        "unsupported": "This firmware's privacy switch is not supported yet.",
+        "certificate": "A different device answered at this address.",
+        "unreachable": "The camera did not answer.",
+        "failed": "The camera refused the change.",
+        "badTarget": "That is not a camera, zone or place."
     }
 }

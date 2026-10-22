@@ -75,7 +75,7 @@ export async function recordClip(
     seconds: number
 ): Promise<ClipView | null> {
     const camera = await getCamera(installedAppId, cameraId);
-    if (!camera || !camera.enabled) return null;
+    if (!camera || !camera.enabled || camera.privacy) return null;
     const endpoint = await relayEndpoint(relayServerFor(camera.reachVia));
     if (!endpoint) return null;
 

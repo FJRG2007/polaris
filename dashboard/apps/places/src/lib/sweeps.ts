@@ -33,7 +33,7 @@ const EVENT_DAYS = 90;
  */
 export async function sweepContinuousRecording(): Promise<{ started: number }> {
     const cameras = await prisma.camera.findMany({
-        where: { enabled: true, recording: "continuous" },
+        where: { enabled: true, privacy: false, recording: "continuous" },
         select: { id: true, installedAppId: true }
     });
     let started = 0;

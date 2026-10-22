@@ -328,7 +328,7 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
         // that is the thing that decides it: several of these models are sold
         // with a battery and run just as happily on a cable, and one on a cable
         // is a camera this pass should be watching like any other.
-        where: { enabled: true, power: { notIn: [...BATTERY_POWER] } },
+        where: { enabled: true, privacy: false, power: { notIn: [...BATTERY_POWER] } },
         select: {
             id: true,
             name: true,

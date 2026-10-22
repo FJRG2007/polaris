@@ -13,7 +13,7 @@
 import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { loadEnv } from "@polaris/config";
-import { cameraVendor, rtspUrl, usesAccountPassword } from "./vendors";
+import { cameraVendor, hasNativePrivacy, rtspUrl, usesAccountPassword } from "./vendors";
 import { drawsFromBattery, modelCanPan } from "./camera-models";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput } from "./schemas";
@@ -64,6 +64,13 @@ export interface CameraView {
      *  turns a tile that is not drawing into one that says how long it has been
      *  like that. */
     readonly offlineSince: string | null;
+    /** Private: nothing Polaris runs reads a frame from it. */
+    readonly privacy: boolean;
+    /** Whether the camera has a privacy mode of its own that Polaris switches
+     *  (Tapo), rather than only Polaris leaving it alone. */
+    readonly privacyNative: boolean;
+    /** The preset a pan-tilt camera is pointed at when it goes private, or "". */
+    readonly privacyPreset: string;
 }
 
 /** A camera as something that is about to connect to it sees it. */
@@ -128,7 +135,10 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         // keeps its arrows, having never answered ONVIF to be asked.
         ptz: row.onvifPort !== null || modelCanPan(row.modelId),
         lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
-        offlineSince: row.offlineSince?.toISOString() ?? null
+        offlineSince: row.offlineSince?.toISOString() ?? null,
+        privacy: row.privacy,
+        privacyNative: hasNativePrivacy(row.vendor),
+        privacyPreset: row.privacyPreset ?? ""
     };
 }
 
@@ -387,10 +397,42 @@ export async function cameraTarget(
     };
 }
 
+/**
+ * The sign-ins a camera's own control API may take, best first, password
+ * included. Server-only, like `cameraTarget`.
+ *
+ * Tapo control wants the TP-Link account (user `admin`, the app password): the
+ * camera account made for RTSP signs in as a third party and is refused on
+ * current firmware. So the account password goes first - this camera's when
+ * it is reached with it, otherwise one stored for another camera of the house,
+ * since it is one password per account - and the camera's own account second,
+ * for old firmware that takes it.
+ */
+export async function controlCredentials(
+    installedAppId: string,
+    id: string
+): Promise<{ username: string; password: string }[]> {
+    const row = await prisma.camera.findFirst({ where: { id, installedAppId } });
+    if (!row) return [];
+    const own = await cameraPassword(row);
+    const tried: { username: string; password: string }[] = [];
+    let account = usesAccountPassword(row.vendor) ? own : null;
+    if (!account) {
+        const shared = await sharedSecret(installedAppId, "tapo-cloud");
+        account = shared ? await cameraPassword({ ...row, ...shared }) : null;
+    }
+    if (account) tried.push({ username: "admin", password: account });
+    if (own && row.username && !usesAccountPassword(row.vendor))
+        tried.push({ username: row.username, password: own });
+    return tried;
+}
+
 /** Every enabled camera as a connection target, for the relay's configuration.
  *  One pass rather than a query per camera - the relay is written whole. */
 export async function cameraTargets(installedAppId: string): Promise<CameraTarget[]> {
-    const rows = await prisma.camera.findMany({ where: { installedAppId, enabled: true } });
+    const rows = await prisma.camera.findMany({
+        where: { installedAppId, enabled: true, privacy: false }
+    });
     return Promise.all(
         rows.map(async (row) => {
             const password = await cameraPassword(row);

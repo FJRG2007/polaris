@@ -230,7 +230,12 @@ async function reconcile(): Promise<void> {
     const cameras = !(await isAppInstalled("home"))
         ? []
         : await prisma.camera.findMany({
-              where: { enabled: true, detector: { notIn: ["none"] }, onvifPort: { not: null } },
+              where: {
+                  enabled: true,
+                  privacy: false,
+                  detector: { notIn: ["none"] },
+                  onvifPort: { not: null }
+              },
               select: {
                   id: true,
                   address: true,

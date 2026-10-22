@@ -32,6 +32,8 @@ import * as automations from "../lib/automations";
 import * as devices from "../lib/devices";
 import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
+import * as privacy from "../lib/privacy";
+import { parseTarget, type CameraPrivacy } from "../lib/privacy-kinds";
 import * as schemas from "../lib/schemas";
 import { probeCamera } from "../lib/onvif";
 import { streamPathOf } from "../lib/stream-path";
@@ -1050,6 +1052,38 @@ export async function ptzGoToAction(cameraId: string, preset: string): Promise<{
     const { install } = await requireHome("home.control");
     const result = await guard(() => ptz.goTo(install.id, cameraId, preset));
     return result.error ? { error: result.error } : {};
+}
+
+/**
+ * Turn privacy on or off for a camera, a zone or a whole place.
+ *
+ * `home.control`, the same as pointing a camera: somebody a camera was lent to
+ * sees that it is private and cannot switch it. Every camera answers for
+ * itself, so a group that half-switched says which ones did not.
+ */
+export async function cameraPrivacyAction(
+    target: string,
+    wanted: boolean
+): Promise<{ results?: CameraPrivacy[]; error?: string }> {
+    const { install } = await requireHome("home.control");
+    const parsed = parseTarget(target);
+    if (!parsed) return { error: await say("privacy.badTarget") };
+    const result = await guard(async () => {
+        const ids = await privacy.camerasFor(install.id, parsed);
+        return privacy.groupPrivacy(ids, (id) => privacy.cameraPrivacy(install.id, id, wanted));
+    });
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { results: result.value };
+}
+
+/** What one camera's privacy is now, read from the camera where it can say. */
+export async function readCameraPrivacyAction(
+    cameraId: string
+): Promise<{ result?: CameraPrivacy; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => privacy.cameraPrivacy(install.id, cameraId, null));
+    return result.error ? { error: result.error } : { result: result.value };
 }
 
 export async function listClipsAction(input: {
