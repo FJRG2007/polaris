@@ -12,7 +12,7 @@
 
 import type { CameraView } from "@polaris-app/places/src/lib/cameras";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { Wall } from "@polaris-app/places/src/screens/wall";
+import { CamerasView } from "@polaris-app/places/src/screens/cameras/cameras-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The dashboard's pieces the screen takes, as the layout provides them.
 import "@/components/app-host/client";
@@ -38,6 +38,9 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
     listCamerasAction: async () => ({ cameras }),
     listCameraSetsAction: async () => ({ sets: [] }),
     listRoomsAction: async () => ({ rooms: [] }),
+    listServersAction: async () => ({ servers: [] }),
+    listStorageOptionsAction: async () => ({ options: [] }),
+    detectionDefaultsAction: async () => ({ defaults: null }),
     liveCamerasAction: async () => {
         liveCalls();
         return { live: nextServed() };
@@ -98,6 +101,11 @@ async function wait(ms: number): Promise<void> {
 
 beforeEach(() => {
     vi.useFakeTimers();
+    // The wall is the page's default; this jsdom has no working storage.
+    Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        value: { getItem: () => null, setItem: () => undefined }
+    });
     liveCalls.mockClear();
     routeCalls.mockClear();
     // The wall's rechecks are a route, never an action: an update renames every
@@ -133,7 +141,7 @@ describe("the wall after privacy is turned off", () => {
         // At load the camera is private, so the relay holds nothing. Right after
         // the switch it still holds nothing; a moment later it serves it.
         served = [[], [], ["cam"]];
-        render(<Wall canManage canControl />);
+        render(<CamerasView canManage canControl openId={null} header={null} />);
         await settle();
         expect(screen.getAllByText(/^Private/).length).toBeGreaterThan(0);
 
@@ -151,7 +159,7 @@ describe("the wall after privacy is turned off", () => {
     it("keeps asking through a failed answer", async () => {
         cameras = [camera({})];
         served = [[]];
-        render(<Wall canManage canControl />);
+        render(<CamerasView canManage canControl openId={null} header={null} />);
         await settle();
         vi.mocked(fetch).mockResolvedValueOnce(new Response("Unavailable", { status: 503 }));
         served = [["cam"]];
@@ -163,7 +171,7 @@ describe("the wall after privacy is turned off", () => {
     it("stops asking once every camera is served", async () => {
         cameras = [camera({})];
         served = [["cam"]];
-        render(<Wall canManage canControl />);
+        render(<CamerasView canManage canControl openId={null} header={null} />);
         await settle();
         const asked = liveCalls.mock.calls.length;
         await wait(60_000);
@@ -173,7 +181,7 @@ describe("the wall after privacy is turned off", () => {
     it("backs off for a camera the relay never serves", async () => {
         cameras = [camera({})];
         served = [[]];
-        render(<Wall canManage canControl />);
+        render(<CamerasView canManage canControl openId={null} header={null} />);
         await settle();
         await wait(10 * 60_000);
         // Quick at first, then once every half a minute: about twenty asks in

@@ -105,6 +105,18 @@ function Subtitle({ camera }: { camera: CameraView }) {
  */
 const ALL_AREAS = "*";
 
+/**
+ * How long to wait before asking the relay again about a camera it is not
+ * serving yet, by how many times it has been asked since.
+ *
+ * Quick at first: a camera that just came back from privacy, or was switched
+ * back on, is published again within a second or two, and a single ask the
+ * moment the switch answered lands before the relay has picked it up - the tile
+ * then said "Starting" until the page was reloaded. Slower after that, so a
+ * camera that is really down costs the relay one question every half a minute.
+ */
+const LIVE_RECHECK_MS = [2_000, 2_000, 3_000, 5_000, 10_000, 30_000];
+
 /** Where this browser remembers whether the wall or the list was last chosen. */
 export const CAMERAS_VIEW_KEY = "polaris.places.cameras.view";
 
@@ -138,6 +150,10 @@ export function CamerasView({
     /** Which cameras the relay is serving, which only the wall reads. */
     const [live, setLive] = useState<ReadonlySet<string>>(() => new Set());
     const [layout, setLayout] = useState<CamerasLayout>("wall");
+    /** How many times the relay has been asked again since the last change. */
+    const [recheck, setRecheck] = useState(0);
+    /** Whether a camera is open in the viewer, which asks for its own stream. */
+    const [watchingOne, setWatchingOne] = useState(false);
     const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
     const [storage, setStorage] = useState<{ id: string; label: string }[]>([]);
     const [defaults, setDefaults] = useState<{
@@ -183,13 +199,46 @@ export function CamerasView({
         }
     };
 
-    const refreshLive = () =>
-        void actions.liveCamerasAction().then(
-            (status) => {
-                if (status.live) setLive(new Set(status.live));
-            },
-            () => undefined
+    /** A camera on its way back to the relay: ask again from the quick end
+     *  until it is served. */
+    const refreshLive = () => setRecheck(0);
+
+    // A camera that should be on the relay and is not is asked about again
+    // until it is, rather than left on "Starting" until a reload. Only for the
+    // wall, which is what draws it, and stopped while one camera is open.
+    const waiting = (cameras ?? []).some(
+        (camera) => camera.enabled && !camera.privacy && !live.has(camera.id)
+    );
+    useEffect(() => {
+        if (!waiting || watchingOne || layout !== "wall") return;
+        let current = true;
+        const next = () => {
+            if (current) setRecheck((value) => value + 1);
+        };
+        // A route rather than an action: an update renames every action under a
+        // tab left open, and this one is asked for as long as the tab is.
+        const controller = new AbortController();
+        const timer = setTimeout(
+            () =>
+                void fetch("/api/home/cameras/live", {
+                    signal: controller.signal,
+                    cache: "no-store"
+                })
+                    .then((response): Promise<{ live?: string[] }> =>
+                        response.ok ? response.json() : Promise.resolve({})
+                    )
+                    .then((status) => {
+                        if (current && status.live) setLive(new Set(status.live));
+                        next();
+                    }, next),
+            LIVE_RECHECK_MS[Math.min(recheck, LIVE_RECHECK_MS.length - 1)]
         );
+        return () => {
+            current = false;
+            controller.abort();
+            clearTimeout(timer);
+        };
+    }, [waiting, watchingOne, layout, recheck]);
 
     useEffect(() => {
         let cancelled = false;
@@ -509,6 +558,7 @@ export function CamerasView({
                     live={live}
                     canControl={canControl}
                     privacy={privacy}
+                    onWatching={setWatchingOne}
                     menuFor={
                         canManage
                             ? (camera) => <CameraMenu camera={camera} manage={manage} full />

@@ -230,6 +230,7 @@ export function Wall({
     canControl,
     privacy,
     menuFor,
+    onWatching,
     onPrivacyPreset
 }: {
     /** Every camera in the place, for the zone switches. */
@@ -242,11 +243,14 @@ export function Wall({
     /** What a camera's tile offers to manage it, or nothing for a reader who
      *  may not. */
     menuFor?: (camera: CameraView) => ReactNode;
+    /** Told whether a camera is open in the viewer, while the wall stands still. */
+    onWatching?: (watching: boolean) => void;
     /** Told a camera's stored privacy position once the viewer changed it. */
     onPrivacyPreset: (cameraId: string, preset: string) => void;
 }) {
     const t = usePlacesT();
     const [opened, setOpened] = useState<string | null>(null);
+    useEffect(() => onWatching?.(opened !== null), [opened, onWatching]);
 
     // Every camera on the wall, in one ask. Stopped while one is open: the wall
     // behind a dialog is standing still, and the viewer asks for its own.
