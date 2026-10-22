@@ -745,5 +745,24 @@
         "noAgentMatch": "No agents match",
         "noFiles": "An agent session can't take attached files yet",
         "noVoice": "Voice talks to Polar's chat, not to an agent"
+    },
+    "compare": {
+        "open": "Ask several models",
+        "title": "Ask several models at once",
+        "intro": "Each model answers in a chat of its own, side by side. Polaris tools stay off, so nothing is done twice.",
+        "add": "Add a model",
+        "remove": "Remove this model",
+        "cancel": "Cancel",
+        "send": "Send to all",
+        "needText": "Write the question first.",
+        "noFiles": "Files go to one model at a time. Remove them to ask several.",
+        "sameModel": "Pick a different model for each one.",
+        "noRoom": "Only {room} more chats can answer right now ({max} at once). Wait for one to finish, stop one, or ask fewer models.",
+        "close": "Close comparison",
+        "answers": "Answers",
+        "resize": "Resize columns",
+        "answering": "Answering",
+        "approval": "This answer is waiting for your approval. Continue with this chat to answer it.",
+        "continue": "Continue with this one"
     }
 }
