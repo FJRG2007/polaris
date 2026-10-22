@@ -155,7 +155,7 @@
         const input = el("input", {
             type: "text",
             maxlength: 300,
-            placeholder: "polaris.example.com",
+            placeholder: "https://polaris.example.com",
             value: status.address ?? "",
             autocomplete: "url"
         });

@@ -13,6 +13,7 @@ import { PolarisClient, readCredentials, Throttled, Unauthorized, userAgent } fr
 describe("normalizeAddress", () => {
     it("takes a bare host as https and keeps only scheme, host and port", () => {
         expect(normalizeAddress(" polaris.example.com/ ")).toBe("https://polaris.example.com");
+        expect(normalizeAddress("https://polaris.example.com")).toBe("https://polaris.example.com");
         expect(normalizeAddress("http://10.0.0.5:3000/home")).toBe("http://10.0.0.5:3000");
     });
 

@@ -10,7 +10,7 @@
         en: {
             connection: "Polaris",
             address: "Address",
-            addressHint: "The address you open Polaris at, for example polaris.example.com.",
+            addressHint: "The address you open Polaris at, for example https://polaris.example.com (https:// is optional).",
             connect: "Connect",
             cancel: "Cancel",
             disconnect: "Disconnect",
@@ -54,7 +54,7 @@
         es: {
             connection: "Polaris",
             address: "Dirección",
-            addressHint: "La dirección en la que abres Polaris, por ejemplo polaris.example.com.",
+            addressHint: "La dirección en la que abres Polaris, por ejemplo https://polaris.example.com (https:// es opcional).",
             connect: "Conectar",
             cancel: "Cancelar",
             disconnect: "Desconectar",
