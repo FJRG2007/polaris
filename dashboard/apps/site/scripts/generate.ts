@@ -13,7 +13,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildOpenApi } from "@/lib/api-docs/openapi";
 import { renderToStaticMarkup } from "react-dom/server";
+import { installCommand } from "@/lib/install-command";
 import { cliInstallLine } from "@/lib/cli/install-line";
+import { deckInstallCommand } from "@/lib/deck-install-command";
 import { AppMark } from "@/components/app-mark";
 import { initialsInk, tintFor } from "@polaris/core";
 import { appPreview } from "@/lib/apps/app-screenshots";
@@ -127,6 +129,16 @@ const data: site.SiteData = {
     cli: {
         unix: cliInstallLine("linux", repo).command,
         windows: cliInstallLine("windows", repo).command
+    },
+    lines: {
+        extension: {
+            unix: installCommand("unix", repo).command,
+            windows: installCommand("windows", repo).command
+        },
+        streamdeck: {
+            macos: deckInstallCommand("macos", repo).command,
+            windows: deckInstallCommand("windows", repo).command
+        }
     },
     locales: {
         en: {
