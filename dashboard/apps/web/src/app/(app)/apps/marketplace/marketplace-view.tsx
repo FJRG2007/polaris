@@ -67,9 +67,9 @@ import {
     OverflowMenu,
     PrimaryActionButton,
     StatusBadge,
-    StoreCardFrame,
     type OverflowEntry
 } from "./store-card";
+import * as store from "@polaris/ui/store-card";
 import {
     AppLogo,
     Badge,
@@ -82,8 +82,7 @@ import {
     EmptyState,
     Input,
     PageHeader,
-    Select,
-    cn
+    Select
 } from "@polaris/ui";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { categoryLabel } from "@/lib/apps/app-words";
@@ -597,8 +596,9 @@ function StoreCard({
         });
 
     return (
-        <StoreCardFrame
+        <store.StoreCard
             muted={app.comingSoon}
+            featured={featured}
             preview={
                 // The name below is the link a keyboard reaches; the picture is
                 // the same destination for a pointer.
@@ -611,58 +611,50 @@ function StoreCard({
                     <AppPreview app={app} shot={appPreview(app.id, locale)} eager={featured} />
                 </Link>
             }
-        >
-            <div className="flex min-w-0 items-start gap-3">
-                <AppMark app={app} size={40} />
-                <div className="min-w-0 flex-1">
-                    <Link
-                        href={detailHref}
-                        className="block truncate text-sm font-medium hover:underline"
-                        title={app.name}
-                    >
-                        {app.name}
-                    </Link>
-                    <p className="text-muted-foreground truncate text-xs" title={by(t, from)}>
-                        {by(t, from)}
+            mark={<AppMark app={app} size={40} />}
+            title={
+                <Link
+                    href={detailHref}
+                    className="block truncate text-sm font-medium hover:underline"
+                    title={app.name}
+                >
+                    {app.name}
+                </Link>
+            }
+            byline={by(t, from)}
+            summary={app.summary}
+            badges={
+                <>
+                    <Badge>{categoryLabel(words, app.category, navLabel)}</Badge>
+                    {app.capabilities.map((capability) => (
+                        <Badge key={capability} className="text-muted-foreground">
+                            {t(CAPABILITY_KEYS[capability])}
+                        </Badge>
+                    ))}
+                </>
+            }
+            note={
+                app.consent && (
+                    <p className="text-xs text-muted-foreground">
+                        {t.rich("card.consent", {
+                            label: app.consent.label,
+                            link: (chunks) => (
+                                <a
+                                    key="consent"
+                                    href={app.consent?.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="underline underline-offset-2 hover:text-foreground"
+                                >
+                                    {chunks}
+                                </a>
+                            )
+                        })}
                     </p>
-                </div>
-            </div>
-            <p
-                className={cn(
-                    "text-sm text-muted-foreground",
-                    featured ? "line-clamp-3" : "line-clamp-2"
-                )}
-            >
-                {app.summary}
-            </p>
-            <div className="flex min-w-0 flex-wrap gap-1">
-                <Badge>{categoryLabel(words, app.category, navLabel)}</Badge>
-                {app.capabilities.map((capability) => (
-                    <Badge key={capability} className="text-muted-foreground">
-                        {t(CAPABILITY_KEYS[capability])}
-                    </Badge>
-                ))}
-            </div>
-            {app.consent && (
-                <p className="text-xs text-muted-foreground">
-                    {t.rich("card.consent", {
-                        label: app.consent.label,
-                        link: (chunks) => (
-                            <a
-                                key="consent"
-                                href={app.consent?.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline underline-offset-2 hover:text-foreground"
-                            >
-                                {chunks}
-                            </a>
-                        )
-                    })}
-                </p>
-            )}
-            <div className="mt-auto flex min-w-0 items-center justify-between gap-2 pt-1">
-                <div className="flex min-w-0 items-center gap-1.5">
+                )
+            }
+            status={
+                <>
                     {badge?.kind === "status" && (
                         <StatusBadge status={badge.status} label={statusLabel(t, badge.status)} />
                     )}
@@ -672,17 +664,19 @@ function StoreCard({
                             {t("card.installedCount", { count: installs.length })}
                         </span>
                     )}
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
+                </>
+            }
+            actions={
+                <>
                     <PrimaryActionButton
                         action={action}
                         onInstall={onInstall}
                         disabled={disabled}
                     />
                     <OverflowMenu label={t("card.more", { name: app.name })} entries={entries} />
-                </div>
-            </div>
-        </StoreCardFrame>
+                </>
+            }
+        />
     );
 }
 

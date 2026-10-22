@@ -15,13 +15,19 @@ const app = (id: string, extra: Partial<site.CatalogInput> = {}): site.CatalogIn
     summary: `${id} summary`,
     description: `${id} description`,
     installMethod: "compose-template",
-    icon: "<svg></svg>",
+    mark: "<svg></svg>",
+    markLarge: "<svg></svg>",
+    tint: "#123456",
+    ink: "#ffffff",
+    developer: "Polaris",
+    distributor: "Polaris",
+    shots: { en: null, es: null },
     ...extra
 });
 
 describe("siteApps", () => {
     it("lists every catalogue app, so a new one appears with no edit to the site", () => {
-        const apps = site.siteApps([app("b"), app("a", { installMethod: "builtin" }), app("c", { comingSoon: true })]);
+        const apps = site.siteApps([app("b"), app("a", { installMethod: "builtin" }), app("c", { comingSoon: true })], "en");
         expect(apps.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
         expect(apps[0]!.builtin).toBe(true);
         expect(apps[1]!.builtin).toBe(false);
@@ -29,14 +35,14 @@ describe("siteApps", () => {
     });
 
     it("takes a locale's words and falls back to the catalogue's own", () => {
-        const [entry] = site.siteApps([app("a")], { apps: { a: { name: "Uno" } }, categories: { Tools: "Herramientas" } });
+        const [entry] = site.siteApps([app("a", { distributor: "Docker Hub" })], "es", { card: { by: "De {developer}", byImage: "De {developer}, imagen de {distributor}", preview: "Vista de {name}" }, apps: { a: { name: "Uno" } }, categories: { Tools: "Herramientas" } });
         expect(entry!.name).toBe("Uno");
         expect(entry!.summary).toBe("a summary");
         expect(entry!.categoryLabel).toBe("Herramientas");
     });
 
     it("filters by text and category", () => {
-        const apps = site.siteApps([app("chat", { category: "Messaging" }), app("notes")]);
+        const apps = site.siteApps([app("chat", { category: "Messaging" }), app("notes")], "en");
         expect(apps.filter((entry) => site.matchesApp(entry, "cha", "")).map((entry) => entry.id)).toEqual(["chat"]);
         expect(apps.filter((entry) => site.matchesApp(entry, "", "Tools")).map((entry) => entry.id)).toEqual(["notes"]);
         expect(site.siteCategories(apps).map((entry) => entry.id)).toEqual(["Messaging", "Tools"]);

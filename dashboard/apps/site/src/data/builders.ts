@@ -23,14 +23,31 @@ export interface CatalogInput {
     readonly description: string;
     readonly installMethod: string;
     readonly comingSoon?: boolean;
-    /** The app's mark, already rendered to SVG markup by the build script. */
-    readonly icon: string;
+    /** The app's mark, already rendered to markup by the build script, at 40px and at 44px. */
+    readonly mark: string;
+    readonly markLarge: string;
+    /** The placeholder preview's colour and the text colour on it. */
+    readonly tint: string;
+    readonly ink: string;
+    /** Who makes it, and who publishes the image it runs, as the dashboard reads them. */
+    readonly developer: string;
+    readonly distributor: string;
+    /** The app's first capture, per language, as the dashboard's marketplace shows it. */
+    readonly shots: Readonly<Record<SiteLocale, StoreShot | null>>;
+}
+
+/** An app's capture, per theme, for a desktop and a phone (as `@polaris/ui/store-card` takes it). */
+export interface StoreShot {
+    readonly dark: { readonly desktop: string; readonly mobile: string };
+    readonly light: { readonly desktop: string; readonly mobile: string };
 }
 
 /** A locale's words for the catalogue: per-app overrides and category names. */
 export interface CatalogWords {
     readonly apps?: Readonly<Record<string, { name?: string; summary?: string; description?: string }>>;
     readonly categories?: Readonly<Record<string, string>>;
+    /** The dashboard marketplace's card words: `card.by`, `card.byImage`, `card.preview`. */
+    readonly card?: { readonly by: string; readonly byImage: string; readonly preview: string };
 }
 
 export interface SiteApp {
@@ -43,27 +60,43 @@ export interface SiteApp {
     /** Part of every install, rather than installed from the marketplace. */
     readonly builtin: boolean;
     readonly comingSoon: boolean;
-    readonly icon: string;
+    readonly mark: string;
+    readonly markLarge: string;
+    readonly tint: string;
+    readonly ink: string;
+    readonly byline: string;
+    /** What the preview shows, for a screen reader. */
+    readonly alt: string;
+    readonly shot: StoreShot | null;
 }
 
 /**
  * Every offered app in one locale, sorted by name. A word the locale has not
  * translated falls back to the catalogue's own English, as the dashboard does.
  */
-export function siteApps(catalog: readonly CatalogInput[], words: CatalogWords = {}): SiteApp[] {
+export function siteApps(catalog: readonly CatalogInput[], locale: SiteLocale, words: CatalogWords = {}): SiteApp[] {
+    const card = words.card ?? { by: "By {developer}", byImage: "By {developer} - image by {distributor}", preview: "{name} preview" };
     return catalog
         .map((app) => {
             const own = words.apps?.[app.id] ?? {};
+            const name = own.name ?? app.name;
+            const from = { developer: app.developer, distributor: app.distributor };
             return {
                 id: app.id,
-                name: own.name ?? app.name,
+                name,
                 category: app.category,
                 categoryLabel: words.categories?.[app.category] ?? app.category,
                 summary: own.summary ?? app.summary,
                 description: own.description ?? app.description,
                 builtin: app.installMethod === "builtin",
                 comingSoon: app.comingSoon === true,
-                icon: app.icon
+                mark: app.mark,
+                markLarge: app.markLarge,
+                tint: app.tint,
+                ink: app.ink,
+                byline: fill(from.developer === from.distributor ? card.by : card.byImage, from),
+                alt: fill(card.preview, { name }),
+                shot: app.shots[locale]
             };
         })
         .sort((a, b) => a.name.localeCompare(b.name));

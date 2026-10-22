@@ -6,8 +6,22 @@
  */
 
 import { useState } from "react";
+import * as store from "@polaris/ui/store-card";
 import { Badge, Input, SegmentedControl } from "@polaris/ui";
 import { fill, matchesApp, siteCategories, type SiteApp } from "@/data/builders";
+
+/** The mark the build rendered from the dashboard's own component; no input reaches it. */
+function Markup({ html }: { html: string }) {
+    return <span className="contents" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/** The capture's paths under the base path Pages serves the site from. */
+function withBase(shot: store.StoreShot | null): store.StoreShot | null {
+    if (!shot) return null;
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    const theme = (entry: store.StoreShot["dark"]) => ({ desktop: base + entry.desktop, mobile: base + entry.mobile });
+    return { dark: theme(shot.dark), light: theme(shot.light) };
+}
 
 export interface MarketWords {
     readonly search: string;
@@ -45,23 +59,33 @@ export function MarketplaceGrid({ apps, t }: { apps: readonly SiteApp[]; t: Mark
             ) : (
                 <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {shown.map((app) => (
-                        <li key={app.id} id={app.id} className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-4">
-                            <div className="flex min-w-0 items-center gap-3">
-                                <span
-                                    className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-surface text-foreground"
-                                    // Rendered by the build from the catalogue's own icon; no input reaches it.
-                                    dangerouslySetInnerHTML={{ __html: app.icon }}
-                                />
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate font-semibold" title={app.name}>{app.name}</p>
-                                    <p className="truncate text-xs text-muted-foreground">{app.categoryLabel}</p>
-                                </div>
-                            </div>
-                            <p className="text-sm text-muted-foreground">{app.summary}</p>
-                            <div className="mt-auto flex flex-wrap gap-1.5">
-                                <Badge variant="neutral">{app.builtin ? t.builtin : t.optional}</Badge>
-                                {app.comingSoon ? <Badge variant="neutral">{t.soon}</Badge> : null}
-                            </div>
+                        <li key={app.id} id={app.id} className="min-w-0">
+                            <store.StoreCard
+                                muted={app.comingSoon}
+                                preview={
+                                    <store.StorePreview
+                                        className="border-b border-border"
+                                        name={app.name}
+                                        summary={app.summary}
+                                        mark={<Markup html={app.markLarge} />}
+                                        tint={app.tint}
+                                        ink={app.ink}
+                                        shot={withBase(app.shot)}
+                                        alt={app.alt}
+                                    />
+                                }
+                                mark={<Markup html={app.mark} />}
+                                title={
+                                    <p className="truncate text-sm font-medium" title={app.name}>
+                                        {app.name}
+                                    </p>
+                                }
+                                byline={app.byline}
+                                summary={app.summary}
+                                badges={<Badge>{app.categoryLabel}</Badge>}
+                                status={<Badge>{app.builtin ? t.builtin : t.optional}</Badge>}
+                                actions={app.comingSoon ? <Badge className="text-muted-foreground">{t.soon}</Badge> : null}
+                            />
                         </li>
                     ))}
                 </ul>

@@ -21,7 +21,8 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
     const { repo } = siteData();
     const other: SiteLocale = locale === "en" ? "es" : "en";
     return (
-        <html lang={locale}>
+        // "system": the dashboard's theme class that follows the reader's machine.
+        <html lang={locale} className="system">
             <body className="min-h-screen bg-background text-foreground antialiased">
                 <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4">
                     {t.nav.skip}

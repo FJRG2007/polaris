@@ -25,8 +25,22 @@ await build({
     target: "node20",
     jsx: "automatic",
     tsconfig: join(site, "..", "web", "tsconfig.json"),
-    // Third-party and workspace packages load from node_modules as they are.
-    packages: "external",
+    // Packages load from node_modules as they are, except the UI package, which
+    // ships its TypeScript sources and so has to be bundled.
+    plugins: [
+        {
+            name: "external-packages",
+            setup(builder) {
+                // esbuild filters are Go regular expressions, which have no lookahead,
+                // so the choice is made here instead.
+                builder.onResolve({ filter: /.*/ }, (args) => {
+                    const bare = !/^(\.|\/|[A-Za-z]:|@\/)/.test(args.path);
+                    const ui = args.path === "@polaris/ui" || args.path.startsWith("@polaris/ui/");
+                    return bare && !ui ? { path: args.path, external: true } : undefined;
+                });
+            }
+        }
+    ],
     logLevel: "warning"
 });
 

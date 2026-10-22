@@ -10,13 +10,14 @@
  */
 
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { AppMark } from "@/components/app-mark";
 import { initialsInk, tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
-import styles from "./[appId]/screenshots.module.css";
 import { Loader2, Lock, MoreHorizontal } from "lucide-react";
 import type { AppScreenshot } from "@/lib/apps/app-screenshots";
+import { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame, StorePreview } from "@polaris/ui/store-card";
+
+export { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame };
 import type { PrimaryAction } from "@/lib/apps/marketplace-store";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -25,22 +26,8 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger,
-    cn
+    DropdownMenuTrigger
 } from "@polaris/ui";
-
-/**
- * The preview's height: 16:10 of its width, rounded down to a whole pixel.
- *
- * A plain `aspect-[16/10]` gives a fractional height for almost every column
- * width (a 415px card is 259.375px tall), and every card body and every row
- * below it then starts between two pixels. A browser that scrolls in
- * fractions of a pixel snaps each line of text to the pixel grid on its own,
- * so while the page moves the text steps up and down against the borders
- * around it. `round()` against the container's width keeps the height whole;
- * a browser without `round()` drops the declaration and keeps the ratio.
- */
-export const PREVIEW_HEIGHT = "aspect-[16/10] h-[round(down,calc(100cqw*10/16),1px)]";
 
 /**
  * A 16:10 preview: the capture in the reader's theme (picked by CSS, so the
@@ -58,50 +45,19 @@ export function AppPreview({
     eager?: boolean;
 }) {
     const t = useTranslations("marketplace");
-    const box = cn("overflow-hidden [container-type:inline-size]", className);
-    const frame = cn("relative w-full overflow-hidden bg-surface", PREVIEW_HEIGHT);
-    if (shot) {
-        return (
-            <div className={box}>
-                <div className={frame}>
-                    {(["dark", "light"] as const).map((theme) => (
-                        <picture key={theme} className={styles[theme]}>
-                            <source media="(max-width: 640px)" srcSet={shot[theme].mobile} />
-                            {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
-                            <img
-                                src={shot[theme].desktop}
-                                alt={t("card.preview", { name: app.name })}
-                                loading={eager ? "eager" : "lazy"}
-                                className="size-full object-cover object-top"
-                            />
-                        </picture>
-                    ))}
-                </div>
-            </div>
-        );
-    }
     const tint = tintFor(app.id);
     return (
-        <div className={box}>
-            <div
-                className={cn(
-                    frame,
-                    "flex flex-col items-center justify-center gap-2 p-4 text-center"
-                )}
-                style={{ backgroundColor: tint, color: initialsInk(tint) }}
-                data-preview="placeholder"
-                role="img"
-                aria-label={t("card.preview", { name: app.name })}
-            >
-                <span className="rounded-xl bg-background/90 p-2 shadow-sm">
-                    <AppMark app={app} size={44} />
-                </span>
-                <span className="max-w-full truncate text-sm font-semibold" title={app.name}>
-                    {app.name}
-                </span>
-                <span className="line-clamp-2 max-w-[28ch] text-xs opacity-80">{app.summary}</span>
-            </div>
-        </div>
+        <StorePreview
+            name={app.name}
+            summary={app.summary}
+            mark={<AppMark app={app} size={44} />}
+            tint={tint}
+            ink={initialsInk(tint)}
+            shot={shot}
+            alt={t("card.preview", { name: app.name })}
+            className={className}
+            eager={eager}
+        />
     );
 }
 
@@ -164,20 +120,6 @@ export function PrimaryActionButton({
     }
 }
 
-/** Running, stopped, failed or installing, in the colour the rest of Polaris uses. */
-export function StatusBadge({ status, label }: { status: string; label: string }) {
-    return (
-        <Badge
-            className={cn(
-                status === "failed" && "border-danger-edge text-danger",
-                status === "running" && "border-success-edge text-success"
-            )}
-        >
-            {label}
-        </Badge>
-    );
-}
-
 export interface OverflowEntry {
     readonly key: string;
     readonly label: string;
@@ -212,28 +154,5 @@ export function OverflowMenu({ label, entries }: { label: string; entries: Overf
                 ))}
             </DropdownMenuContent>
         </DropdownMenu>
-    );
-}
-
-/** A card's frame: the preview on top, the body below, the whole height of its row. */
-export function StoreCardFrame({
-    preview,
-    children,
-    muted
-}: {
-    preview: ReactNode;
-    children: ReactNode;
-    muted?: boolean;
-}) {
-    return (
-        <article
-            className={cn(
-                "flex h-full min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card",
-                muted && "opacity-75"
-            )}
-        >
-            {preview}
-            <div className="flex min-w-0 flex-1 flex-col gap-3 p-4">{children}</div>
-        </article>
     );
 }

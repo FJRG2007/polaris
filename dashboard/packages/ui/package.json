@@ -62,6 +62,10 @@
         "./install-guide-steps": {
             "types": "./src/downloads/install-guide-steps.ts",
             "import": "./src/downloads/install-guide-steps.ts"
+        },
+        "./store-card": {
+            "types": "./src/marketplace/store-card.tsx",
+            "import": "./src/marketplace/store-card.tsx"
         }
     },
     "scripts": {
