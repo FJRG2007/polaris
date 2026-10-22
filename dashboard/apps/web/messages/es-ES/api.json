@@ -317,6 +317,11 @@
                 "on": "Grabando",
                 "off": "Grabar"
             },
+            "share": {
+                "on": "En vivo",
+                "off": "Emitir",
+                "asked": "Elige pantalla"
+            },
             "errors": {
                 "notInCall": "Ahora mismo no estás en una llamada.",
                 "mayNotRecord": "Solo el anfitrión graba esta llamada."

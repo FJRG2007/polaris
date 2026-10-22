@@ -16,7 +16,7 @@
     },
     "io.github.fjrg2007.polaris.call": {
         "Name": "Llamada",
-        "Tooltip": "Silencia, ensordece, cámara, graba o cuelga la llamada en la que estás en Polaris."
+        "Tooltip": "Silencia, ensordece, cámara, graba, comparte pantalla o cuelga la llamada en la que estás en Polaris."
     },
     "io.github.fjrg2007.polaris.sound": {
         "Name": "Sonidos",

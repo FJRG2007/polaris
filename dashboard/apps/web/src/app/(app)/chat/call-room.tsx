@@ -112,6 +112,7 @@ import {
     EyeOff,
     Hand,
     HeadphoneOff,
+    Headphones,
     ImagePlus,
     Link2,
     Loader2,
@@ -156,6 +157,7 @@ import {
     useShortcutHint
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import { useShareAsked } from "./call-share-ask";
 
 /**
  * The room.
@@ -236,6 +238,11 @@ export function CallRoom({
     const deafenKey = useShortcutHint("chat.toggleDeafen");
     const withKey = (label: string) =>
         deafenKey ? ts("withKey", { action: label, keys: deafenKey }) : label;
+    const deafenTitle = call.moderation.serverDeafened
+        ? t("callRoom.aModeratorDeafenedYou")
+        : call.deafened
+          ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
+          : withKey(t("callRoom.silenceEverybodyAndYourselfWith"));
     // Said over the microphone only when somebody talks into it while it is
     // off - see `muted-speech`. Muted and deafened on their own are already the
     // buttons' red; a word standing over each read as a tooltip stuck open.
@@ -244,6 +251,9 @@ export function CallRoom({
     const micHint: ControlHintText | null = talkingMuted
         ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
         : null;
+    // A deck key asked to share: the button is pointed at, and kept on the bar
+    // even where it would fold into the menu - see `call-share-ask`.
+    const shareAsked = useShareAsked() && !call.sharing;
     // Everything the call has to say, weighed once: the strip draws it, and the
     // microphone button carries whichever of it is about the microphone.
     const notices = useCallNotices(call);
@@ -1208,9 +1218,7 @@ export function CallRoom({
                                   : undefined
                         }
                         icon={
-                            call.deafened ? (
-                                <HeadphoneOff className="size-4" />
-                            ) : call.micOn ? (
+                            call.micOn && !call.deafened ? (
                                 <Mic className="size-4" />
                             ) : (
                                 <MicOff className="size-4" />
@@ -1243,14 +1251,35 @@ export function CallRoom({
                         deafen={{
                             on: call.deafened,
                             toggle: call.toggleDeafen,
-                            title: call.moderation.serverDeafened
-                                ? t("callRoom.aModeratorDeafenedYou")
-                                : call.deafened
-                                  ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
-                                  : withKey(t("callRoom.silenceEverybodyAndYourselfWith"))
+                            title: deafenTitle
                         }}
                         voiceSettings={Boolean(viewerId)}
                     />
+
+                    {/* Deafening, beside the microphone where voice clients put
+                        it, rather than only in the microphone's menu and on a
+                        key nobody can find. A moderator's deafen is drawn locked,
+                        with who did it; the title is on a wrapper because a
+                        disabled button gets no hover. */}
+                    <span title={deafenTitle} className="inline-flex">
+                        <Button
+                            size="icon"
+                            variant="secondary"
+                            onClick={call.toggleDeafen}
+                            disabled={call.moderation.serverDeafened}
+                            aria-pressed={call.deafened}
+                            aria-label={
+                                call.deafened ? t("callRoom.undeafen") : t("callRoom.deafen")
+                            }
+                            className={cn(call.deafened && TINTS.danger)}
+                        >
+                            {call.deafened ? (
+                                <HeadphoneOff className="size-4" />
+                            ) : (
+                                <Headphones className="size-4" />
+                            )}
+                        </Button>
+                    </span>
 
                     <Split
                         label={call.cameraOn ? t("callRoom.stopVideo") : t("callRoom.startVideo")}
@@ -1292,8 +1321,13 @@ export function CallRoom({
                         than offered and answered with an error. A share already
                         running is always given its stop. On a narrow bar it
                         moves into the menu at the end of this group. */}
-                    {!narrow && (screenShareable || call.sharing) && (
+                    {(!narrow || shareAsked) && (screenShareable || call.sharing) && (
                         <Split
+                            hint={
+                                shareAsked
+                                    ? { text: t("callRoom.hints.shareAsked"), tone: "warn" }
+                                    : null
+                            }
                             label={
                                 call.sharing ? t("callRoom.stopSharing") : t("callRoom.shareScreen")
                             }
@@ -1349,7 +1383,7 @@ export function CallRoom({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" side="top" className="w-72">
-                                {narrow && (screenShareable || call.sharing) && (
+                                {narrow && !shareAsked && (screenShareable || call.sharing) && (
                                     <DropdownMenuItem onSelect={call.toggleShare}>
                                         {call.sharing ? (
                                             <MonitorX className="size-4 shrink-0" />
@@ -1419,7 +1453,10 @@ export function CallRoom({
                     aria-label={t("callRoom.leaveTheCall")}
                     title={t("callRoom.leaveTheCall")}
                     onClick={() => {
-                        playCallSound("hangUp");
+                        // A held call sounds it as the provider lets go (`leave`
+                        // in `call-session`), whichever control hung up; the
+                        // guest page has no provider, so it is sounded here.
+                        if (!held) playCallSound("hangUp");
                         onLeave();
                     }}
                 >

@@ -20,7 +20,7 @@ import { soundPlayedSchema } from "./soundboard";
 
 /** The switches a command sets. `on` is where the switch should end up, never
  *  "flip": a press read twice is then still one press. */
-export const CALL_SWITCHES = ["mic", "deafen", "camera", "record"] as const;
+export const CALL_SWITCHES = ["mic", "deafen", "camera", "record", "share"] as const;
 
 export type CallSwitch = (typeof CALL_SWITCHES)[number];
 
@@ -58,6 +58,10 @@ export interface RemoteControls {
     readonly recording: boolean;
     /** Whether this browser can record at all. */
     readonly canRecord: boolean;
+    /** Whether this tab is sharing its screen. Absent is not sharing. */
+    readonly sharing?: boolean;
+    /** Whether this browser can share a screen at all. Absent is that it can. */
+    readonly canShare?: boolean;
 }
 
 export type RemoteStep =
@@ -66,6 +70,8 @@ export type RemoteStep =
     | "toggleCamera"
     | "startRecording"
     | "stopRecording"
+    | "startShare"
+    | "stopShare"
     | "hangup"
     | "sound";
 
@@ -89,6 +95,10 @@ export function remoteStep(command: CallRemoteCommand, now: RemoteControls): Rem
             if (command.on === now.recording) return null;
             if (command.on && !now.canRecord) return null;
             return command.on ? "startRecording" : "stopRecording";
+        case "share":
+            if (command.on === Boolean(now.sharing)) return null;
+            if (command.on && now.canShare === false) return null;
+            return command.on ? "startShare" : "stopShare";
         case "hangup":
             return "hangup";
         case "sound":

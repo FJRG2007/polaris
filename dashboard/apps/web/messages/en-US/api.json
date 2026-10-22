@@ -317,6 +317,11 @@
                 "on": "Recording",
                 "off": "Record"
             },
+            "share": {
+                "on": "Live",
+                "off": "Share",
+                "asked": "Pick a screen"
+            },
             "errors": {
                 "notInCall": "You are not in a call right now.",
                 "mayNotRecord": "Only the host can record this call."

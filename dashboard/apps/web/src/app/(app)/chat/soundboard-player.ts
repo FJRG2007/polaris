@@ -12,10 +12,17 @@
  * default from the files Polaris ships (`defaultSoundUrl`). Both become the
  * same thing: a WAV behind an object URL, played by an audio element so
  * `setSinkId` can send it to the chosen speaker.
+ *
+ * A press has to sound the moment it lands, the way Discord's does, so nothing
+ * between the click and the speaker waits on anything: the clips a call can
+ * play are fetched ahead (`warmClips`), each one keeps an element already
+ * loaded and already pointed at the speaker, and the person who pressed hears
+ * it here at once (`playOwnClip`) rather than when the room carries it back.
  */
 
-import { defaultSoundUrl, parseSoundRef } from "@/lib/chat/soundboard";
+import { speakerDevice } from "@/lib/speaker-choice";
 import { playThroughChosenSpeaker } from "./speaker-device";
+import { defaultSoundUrl, parseSoundRef } from "@/lib/chat/soundboard";
 
 /** Every clip this tab has, by reference, as an object URL. */
 const clips = new Map<string, Promise<string>>();
@@ -30,6 +37,7 @@ function remember(ref: string, made: Promise<string>): Promise<string> {
         const [oldest] = clips;
         if (oldest) {
             clips.delete(oldest[0]);
+            ready.delete(oldest[0]);
             void oldest[1].then((url) => URL.revokeObjectURL(url)).catch(() => undefined);
         }
     }
@@ -58,6 +66,51 @@ function clipFor(ref: string, url: string | null): Promise<string> | null {
             return URL.createObjectURL(await answer.blob());
         })
     );
+}
+
+/**
+ * Fetch these clips now, so the first press of each sounds at once.
+ *
+ * Called when a call opens and again when the picker does. A clip this browser
+ * may not read (a sound from a space the reader is not in) fails here quietly
+ * and is fetched again from the address a play carries, as before.
+ */
+export function warmClips(refs: Iterable<string>): void {
+    if (typeof window === "undefined") return;
+    let left = KEEP;
+    for (const ref of refs) {
+        if (left-- <= 0) return;
+        const clip = clipFor(ref, null);
+        if (clip) void clip.then((src) => prepare(ref, src)).catch(() => undefined);
+    }
+}
+
+/** An element per clip, loaded and pointed at the speaker before it is needed. */
+const ready = new Map<string, Promise<HTMLAudioElement>>();
+
+type Routed = HTMLAudioElement & { sinkId?: string };
+
+function prepare(ref: string, src: string): Promise<HTMLAudioElement> {
+    const existing = ready.get(ref);
+    if (existing) return existing;
+    const element = new Audio(src);
+    element.preload = "auto";
+    const made = playThroughChosenSpeaker(element).then(() => element);
+    ready.set(ref, made);
+    return made;
+}
+
+/** The ready element for a clip, handed over once; the next one is made behind it. */
+async function take(ref: string, src: string): Promise<HTMLAudioElement> {
+    const made = prepare(ref, src);
+    ready.delete(ref);
+    void prepare(ref, src);
+    const element = await made;
+    // The speaker was changed since it was made: moved now, before it plays.
+    const chosen = speakerDevice();
+    const sink = (element as Routed).sinkId;
+    if (chosen && sink !== undefined && sink !== chosen) await playThroughChosenSpeaker(element);
+    return element;
 }
 
 /**
@@ -98,14 +151,21 @@ export function stopClips(channel?: string): void {
 
 export async function playClip(
     ref: string,
-    { url = null, volume, channel }: { url?: string | null; volume: number; channel: string }
+    options: { url?: string | null; volume: number; channel: string }
 ): Promise<void> {
-    if (volume <= 0) return;
+    await start(ref, options);
+}
+
+async function start(
+    ref: string,
+    { url = null, volume, channel }: { url?: string | null; volume: number; channel: string }
+): Promise<HTMLAudioElement | null> {
+    if (volume <= 0) return null;
     const clip = clipFor(ref, url);
-    if (!clip) return;
+    if (!clip) return null;
     const src = await clip;
+    const element = await take(ref, src);
     playing.get(channel)?.pause();
-    const element = new Audio(src);
     element.volume = Math.min(1, Math.max(0, volume));
     playing.set(channel, element);
     changed();
@@ -116,8 +176,73 @@ export async function playClip(
     };
     element.addEventListener("ended", done);
     element.addEventListener("error", done);
-    await playThroughChosenSpeaker(element).catch(() => undefined);
-    await element.play().catch(() => undefined);
+    const played = await element.play().then(
+        () => true,
+        () => false
+    );
+    if (played) return element;
+    done();
+    return null;
+}
+
+/**
+ * Plays this browser started itself and is waiting for the room to carry back,
+ * by seat and sound, each until when it is still expected.
+ */
+const echoes = new Map<string, number>();
+
+/** Longer than any round trip a play makes; past it, an echo is a new play. */
+const ECHO_MS = 10_000;
+
+const echoKey = (channel: string, ref: string) => `${channel} ${ref}`;
+
+/**
+ * Sound the reader's own press here, now, and expect the room's copy of it.
+ *
+ * At the volume the room's copy would have arrived at, so nothing changes but
+ * when it is heard. Returns the way to take it back: the server refused the
+ * play (a cooldown, a permission), so it stops and nothing is expected.
+ */
+export function playOwnClip(
+    ref: string,
+    { volume, channel }: { volume: number; channel: string }
+): { readonly settle: () => void; readonly undo: () => void } {
+    const key = echoKey(channel, ref);
+    const until = Date.now() + ECHO_MS;
+    echoes.set(key, until);
+    const started = start(ref, { volume, channel }).catch(() => null);
+    // Nothing sounded here, so the room's copy is what the reader hears.
+    void started.then((element) => {
+        if (!element && echoes.get(key) === until) echoes.delete(key);
+    });
+    return {
+        // Nobody else is connected, so no copy is coming back.
+        settle: () => echoes.delete(key),
+        undo: () => {
+            echoes.delete(key);
+            void started.then((element) => {
+                if (!element || playing.get(channel) !== element) return;
+                element.pause();
+                playing.delete(channel);
+                changed();
+            });
+        }
+    };
+}
+
+/**
+ * Whether a play the room carried is this browser's own, already sounding.
+ *
+ * Matched on the seat and the sound together: somebody else pressing the same
+ * sound a moment later is a different seat and is heard as usual. Each press
+ * swallows one copy.
+ */
+export function ownEcho(from: string, ref: string): boolean {
+    const key = echoKey(from, ref);
+    const until = echoes.get(key);
+    if (until === undefined) return false;
+    echoes.delete(key);
+    return until >= Date.now();
 }
 
 /** Hear a sound here, before playing it to anybody. */

@@ -1,6 +1,12 @@
 /**
- * Your own call on a deck: mute, deafen, the camera, recording, hanging up and
- * the soundboard - Discord's Stream Deck keys, for a Polaris call.
+ * Your own call on a deck: mute, deafen, the camera, recording, sharing your
+ * screen, hanging up and the soundboard - Discord's Stream Deck keys, for a
+ * Polaris call.
+ *
+ * Sharing is the one a key can only half do. A browser opens its screen picker
+ * only from a press on the page itself, so a key stops a share at once, and to
+ * start one it puts the share button in front of the person, one click away
+ * (`call-remote-hook`) - the key says so rather than claiming it went live.
  *
  * Nothing here touches a microphone. The call is in the person's browser; a
  * press finds the seat they are sitting in and asks that tab to do it
@@ -40,7 +46,11 @@ const LOOKS: Readonly<
         off: { icon: "headphones", tone: "idle" }
     },
     camera: { on: { icon: "video", tone: "ok" }, off: { icon: "video-off", tone: "idle" } },
-    record: { on: { icon: "circle-dot", tone: "bad" }, off: { icon: "circle-dot", tone: "idle" } }
+    record: { on: { icon: "circle-dot", tone: "bad" }, off: { icon: "circle-dot", tone: "idle" } },
+    share: {
+        on: { icon: "screen-share", tone: "ok" },
+        off: { icon: "screen-share", tone: "idle" }
+    }
 };
 
 function api(caller: DeckCaller) {
@@ -58,6 +68,8 @@ export function switchOn(which: CallSwitch, controls: remote.SeatControls): bool
             return controls.camera;
         case "record":
             return controls.recording;
+        case "share":
+            return controls.sharing;
     }
 }
 
@@ -97,6 +109,16 @@ function switchAction(which: CallSwitch, icon: string): CoreDeckAction {
         run: async (_options, caller) => {
             const sent = await remote.flipCallSwitch(caller.userId, which);
             if (!sent.ok) return refusal(caller, sent.refusal);
+            // A share is not started from here: the tab offers its button.
+            if (which === "share" && sent.on) {
+                return {
+                    ok: true,
+                    state: {
+                        ...switchState(which, false, caller.locale),
+                        detail: api(caller)("deck.call.share.asked")
+                    }
+                };
+            }
             // Where it was asked to go; the tab's next word on the seat confirms it.
             const on = which === "mic" ? !sent.on : sent.on;
             return { ok: true, state: switchState(which, on, caller.locale) };
@@ -117,6 +139,7 @@ export function callDeckActions(): readonly CoreDeckAction[] {
         switchAction("deafen", "headphones"),
         switchAction("camera", "video"),
         switchAction("record", "circle-dot"),
+        switchAction("share", "screen-share"),
         {
             id: "call.hangup",
             kind: "run",

@@ -6,7 +6,13 @@
 import type { DeckCaller } from "@/lib/deck/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-type Controls = { muted: boolean; deafened: boolean; camera: boolean; recording: boolean };
+type Controls = {
+    muted: boolean;
+    deafened: boolean;
+    camera: boolean;
+    recording: boolean;
+    sharing: boolean;
+};
 
 let live: { controls: Controls; mayRecord: boolean } | null = null;
 const flipCallSwitch = vi.fn();
@@ -41,7 +47,13 @@ const caller = (locale: DeckCaller["locale"] = "en-US"): DeckCaller => ({
 
 const action = (id: string) => callDeckActions().find((entry) => entry.id === id)!;
 
-const QUIET: Controls = { muted: false, deafened: false, camera: false, recording: false };
+const QUIET: Controls = {
+    muted: false,
+    deafened: false,
+    camera: false,
+    recording: false,
+    sharing: false
+};
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -56,6 +68,7 @@ describe("the call keys", () => {
             "call.deafen",
             "call.camera",
             "call.record",
+            "call.share",
             "call.hangup",
             "call.sound"
         ]);
@@ -108,7 +121,7 @@ describe("in a call", () => {
 
     it("shows deafen, camera and recording as the seat last said", async () => {
         live = {
-            controls: { muted: false, deafened: true, camera: true, recording: true },
+            controls: { ...QUIET, deafened: true, camera: true, recording: true },
             mayRecord: true
         };
         expect(await action("call.deafen").read!({}, caller())).toMatchObject({
@@ -158,6 +171,33 @@ describe("in a call", () => {
         });
     });
 
+    it("shows a share lit while the seat is sharing its screen", async () => {
+        live = { controls: { ...QUIET, sharing: true }, mayRecord: false };
+        expect(await action("call.share").read!({}, caller())).toEqual({
+            tone: "ok",
+            on: true,
+            icon: "screen-share",
+            detail: "Live"
+        });
+    });
+
+    it("stopping a share answers with the key off", async () => {
+        flipCallSwitch.mockResolvedValue({ ok: true, on: false });
+        expect(await action("call.share").run!({}, caller())).toEqual({
+            ok: true,
+            state: switchState("share", false, "en-US")
+        });
+        expect(flipCallSwitch).toHaveBeenCalledWith("u1", "share");
+    });
+
+    it("starting a share says a screen is to be picked, not that it went live", async () => {
+        flipCallSwitch.mockResolvedValue({ ok: true, on: true });
+        expect(await action("call.share").run!({}, caller("es-ES"))).toEqual({
+            ok: true,
+            state: { ...switchState("share", false, "es-ES"), detail: "Elige pantalla" }
+        });
+    });
+
     it("hanging up leaves the key out of a call", async () => {
         hangUpCall.mockResolvedValue({ ok: true });
         expect(await action("call.hangup").run!({}, caller())).toEqual({
@@ -178,8 +218,14 @@ describe("in a call", () => {
 
 describe("switchOn", () => {
     it("reads each switch from the seat's controls", () => {
-        const all: Controls = { muted: true, deafened: true, camera: true, recording: true };
-        for (const which of ["mic", "deafen", "camera", "record"] as const) {
+        const all: Controls = {
+            muted: true,
+            deafened: true,
+            camera: true,
+            recording: true,
+            sharing: true
+        };
+        for (const which of ["mic", "deafen", "camera", "record", "share"] as const) {
             expect(switchOn(which, all)).toBe(true);
             expect(switchOn(which, QUIET)).toBe(false);
         }
