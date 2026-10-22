@@ -53,6 +53,14 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/dashboard-publish.yml"
+  # Weekly, every image is rebuilt from the same commit. Each one starts FROM a
+  # base tag (node:22-bookworm-slim, alpine, debian), and an image whose own files
+  # never change otherwise keeps the base it was first built on - with whatever
+  # CVE that base has since been patched for. The sidecars kept a vulnerable Node
+  # for exactly that reason after the web image had been fixed. A scheduled run
+  # rebuilds all, the same as a manual one, so a patched base reaches every image.
+  schedule:
+    - cron: "23 3 * * 1"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -101,7 +109,8 @@ env:
 
 jobs:
   # Decide which images need rebuilding from the paths that changed in this push.
-  # A workflow_dispatch, an unknown base, or a change to this file rebuilds all.
+  # A workflow_dispatch, the weekly schedule, an unknown base, or a change to this
+  # file rebuilds all.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -158,7 +167,7 @@ jobs:
             echo "Measuring from the last published commit $LAST (push base was ${BEFORE:-none})."
             BEFORE="$LAST"
           fi
-          if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
+          if [ "$EVENT" = "workflow_dispatch" ] || [ "$EVENT" = "schedule" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             all; exit 0
@@ -241,7 +250,7 @@ jobs:
   # filter anyway.
   dashboard-ci:
     needs: changes
-    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.extension == 'true' || needs.changes.outputs.bridge == 'true' || needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.extension == 'true' || needs.changes.outputs.bridge == 'true' || needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     uses: ./.github/workflows/dashboard-ci.yml
     with:
       # The web image builds the same app from the same commit; building it twice
@@ -250,7 +259,7 @@ jobs:
 
   rust-ci:
     needs: changes
-    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     uses: ./.github/workflows/ci.yml
 
   # Next.js dashboard. amd64 only (the runtime servers are x86). Layer caching in
@@ -269,7 +278,7 @@ jobs:
   # deleted after every publish. polaris-buildcache is not in its list.
   web:
     needs: changes
-    if: ${{ needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     outputs:
@@ -338,7 +347,7 @@ jobs:
 
   mdns:
     needs: changes
-    if: ${{ needs.changes.outputs.mdns == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.mdns == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -369,7 +378,7 @@ jobs:
   # have spoken commits to nothing.
   hostd:
     needs: changes
-    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     strategy:
       fail-fast: false
       matrix:
@@ -429,7 +438,7 @@ jobs:
   # up by ghcr-prune.yml.
   hostd-manifest:
     needs: [changes, rust-ci, hostd]
-    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -457,7 +466,7 @@ jobs:
   # One-shot self-update runner spawned by hostd's /v1/update.
   updater:
     needs: changes
-    if: ${{ needs.changes.outputs.updater == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.updater == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -487,7 +496,7 @@ jobs:
   # is the dashboard root so the workspace and @polaris/messaging are available.
   bridge:
     needs: changes
-    if: ${{ needs.changes.outputs.bridge == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.bridge == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
@@ -527,7 +536,7 @@ jobs:
   # dashboard writes edge routes that name the guard's listeners.
   guard:
     needs: changes
-    if: ${{ needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
@@ -567,7 +576,7 @@ jobs:
   # runs them, which is also why this image is tiny and changes rarely.
   hytale:
     needs: changes
-    if: ${{ needs.changes.outputs.hytale == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.hytale == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
@@ -600,7 +609,7 @@ jobs:
   # a camera.
   relay:
     needs: changes
-    if: ${{ needs.changes.outputs.relay == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.relay == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
@@ -640,7 +649,7 @@ jobs:
   # first time somebody links a lock.
   broker:
     needs: changes
-    if: ${{ needs.changes.outputs.broker == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.broker == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
@@ -678,7 +687,7 @@ jobs:
   # could pull until they did. ghcr-prune.yml keeps what that tag names.
   dnsblock:
     needs: changes
-    if: ${{ needs.changes.outputs.dnsblock == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.dnsblock == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
@@ -710,7 +719,7 @@ jobs:
   # people.
   vision:
     needs: changes
-    if: ${{ needs.changes.outputs.vision == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.vision == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
@@ -751,7 +760,7 @@ jobs:
   # weights - and rebuilt only when its own directory changes.
   face:
     needs: changes
-    if: ${{ needs.changes.outputs.face == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.face == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:

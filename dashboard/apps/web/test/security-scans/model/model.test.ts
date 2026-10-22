@@ -179,7 +179,8 @@ describe("image vulnerabilities", () => {
         ]);
         expect(report.items[1]!.fixedIn).toBe("1.2.4");
         expect(report.items[0]!.fixedIn).toBeNull();
-        expect(report.items[0]!.url).toBeNull();
+        // An unsafe link is dropped and the advisory page for the id stands in.
+        expect(report.items[0]!.url).toBe("https://nvd.nist.gov/vuln/detail/CVE-2024-0002");
         expect(report.items[1]!.url).toMatch(/^https:/);
     });
 

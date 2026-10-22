@@ -245,8 +245,7 @@ export interface UpdatesReport {
 
 export function parseUpdatesLog(text: string): UpdatesReport {
     const state = /POLARIS_UPDATES=(on|off|unsupported)/.exec(text)?.[1] as
-        | UpdatesState
-        | undefined;
+        UpdatesState | undefined;
     const distro = /POLARIS_DISTRO id=([A-Za-z0-9._-]*)/.exec(text)?.[1];
     return { state: state ?? null, distro: distro ? distro : null };
 }
@@ -265,6 +264,9 @@ export interface Vulnerability {
     readonly version: string;
     readonly fixedIn: string | null;
     readonly url: string | null;
+    /** The image layer the package came in with (`sha256:...`), when the
+     *  matcher could tell. */
+    readonly layer: string | null;
 }
 
 export interface VulnReport {
@@ -272,6 +274,8 @@ export interface VulnReport {
     /** Worst first, capped. */
     readonly items: Vulnerability[];
     readonly total: number;
+    /** Every critical and high finding, uncapped, for the alerts. */
+    readonly alerting: Vulnerability[];
 }
 
 /** The JSON a container printed, from its first brace to its last. */
@@ -329,12 +333,65 @@ export function parseVulnJson(value: unknown, cap = 500): VulnReport | null {
             packageName: name,
             version,
             fixedIn: fixed ? fixed.slice(0, 200) : null,
-            url: httpsLink(vuln.dataSource)
+            url: httpsLink(vuln.dataSource) ?? advisoryLink(id),
+            layer: layerOf(artifact.locations)
         });
     }
     const rank = (s: Severity) => SEVERITIES.indexOf(s);
     items.sort((a, b) => rank(a.severity) - rank(b.severity) || a.id.localeCompare(b.id));
-    return { counts, items: items.slice(0, cap), total: items.length };
+    return {
+        counts,
+        items: items.slice(0, cap),
+        total: items.length,
+        alerting: items.filter((item) => ALERT_SEVERITIES.includes(item.severity))
+    };
+}
+
+const LAYER = /^sha256:[0-9a-f]{64}$/;
+
+/** The first location's layer digest, only when it is one. */
+function layerOf(locations: unknown): string | null {
+    if (!Array.isArray(locations)) return null;
+    for (const location of locations) {
+        const id = (location as { layerID?: unknown } | null)?.layerID;
+        if (typeof id === "string" && LAYER.test(id)) return id;
+    }
+    return null;
+}
+
+/** The public advisory for an id the matcher gave no link for. Only the id
+ *  shapes whose page is known are linked; anything else gets none. */
+export function advisoryLink(id: string): string | null {
+    if (/^CVE-\d{4}-\d{4,}$/.test(id)) return `https://nvd.nist.gov/vuln/detail/${id}`;
+    if (/^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/.test(id))
+        return `https://github.com/advisories/${id}`;
+    if (/^[A-Z]+-[A-Za-z0-9:._-]{1,80}$/.test(id))
+        return `https://osv.dev/vulnerability/${encodeURIComponent(id)}`;
+    return null;
+}
+
+/** The severities that raise an alert on their own. */
+export const ALERT_SEVERITIES: readonly Severity[] = ["critical", "high"];
+
+/** What makes one finding the same finding on the next scan: the advisory and
+ *  the package it is in, not the version (a rebuild that bumps the package but
+ *  not past the fix is still the same problem). */
+export function alertKey(item: Pick<Vulnerability, "id" | "packageName">): string {
+    return `${item.id}|${item.packageName}`.slice(0, 400);
+}
+
+/** The critical and high findings not alerted on before, once each. */
+export function freshAlerts<T extends Pick<Vulnerability, "id" | "packageName" | "severity">>(
+    items: readonly T[],
+    alreadyAlerted: ReadonlySet<string>
+): T[] {
+    const out = new Map<string, T>();
+    for (const item of items) {
+        if (!ALERT_SEVERITIES.includes(item.severity)) continue;
+        const key = alertKey(item);
+        if (!alreadyAlerted.has(key) && !out.has(key)) out.set(key, item);
+    }
+    return [...out.values()];
 }
 
 /** Only an https link is kept: it is drawn as a link. */

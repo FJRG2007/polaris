@@ -381,6 +381,10 @@
             "label": "Una cámara ha visto algo",
             "description": "Una persona, un vehículo, un animal o un paquete ha entrado en el campo de una cámara."
         },
+        "securityVulnerability": {
+            "label": "Vulnerabilidad grave en una imagen activa",
+            "description": "Un análisis halló una vulnerabilidad crítica o alta nueva en una imagen de tus servidores."
+        },
         "placesAlert": {
             "label": "Ha saltado una alerta tuya",
             "description": "Ha pasado algo de lo que preguntaba una de tus alertas."

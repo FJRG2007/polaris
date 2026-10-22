@@ -702,6 +702,16 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                                     <span className="text-muted-foreground">
                                                         {f.location}
                                                     </span>
+                                                    {f.layer ? (
+                                                        <span
+                                                            className="ml-2 font-mono text-xs text-muted-foreground"
+                                                            title={f.layer}
+                                                        >
+                                                            {t("images.layer", {
+                                                                layer: f.layer.slice(7, 19)
+                                                            })}
+                                                        </span>
+                                                    ) : null}
                                                 </span>
                                                 {scan.kind === "image" ? (
                                                     <span className="shrink-0 text-muted-foreground">

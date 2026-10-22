@@ -4768,6 +4768,7 @@ model DeployTarget {
     volumes      Volume[]
 
     securityScans      SecurityScan[]
+    securityAlerts     SecurityAlert[]
     securityQuarantine SecurityQuarantine[]
     securityBaselines  SecurityBaseline[]
     securitySetting    SecuritySetting?
@@ -5633,6 +5634,8 @@ model Deployment {
     @@index([deployableType, deployableId, status])
     @@index([deployableType, deployableId, createdAt])
     @@index([targetId])
+    // The releases that went live lately, which security scans checks once each.
+    @@index([status, createdAt])
 }
 
 model Domain {
@@ -14309,11 +14312,27 @@ model SecurityFinding {
     volumeId String? @db.Uuid
     fixedIn  String?
     url      String?
+    // The image layer a vulnerable package came in with (`sha256:...`).
+    layer    String?
     position Int
 
     scan SecurityScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
 
     @@index([scanId, position])
+}
+
+// A critical or high image vulnerability somebody was already told about, per
+// server: the advisory and the package (see `alertKey`). A rescan that finds it
+// again says nothing; one that finds a new one rings the bell once.
+model SecurityAlert {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    targetId  String   @db.Uuid
+    key       String
+    createdAt DateTime @default(now())
+
+    target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@unique([targetId, key])
 }
 
 model SecurityQuarantine {

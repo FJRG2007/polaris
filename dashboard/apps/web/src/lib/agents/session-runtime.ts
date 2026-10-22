@@ -22,6 +22,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { execCommand } from "@polaris/ssh";
 import * as commands from "./session-commands";
+import { upWithFreshImage } from "./session-image";
 import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
@@ -412,49 +413,54 @@ export async function startSession(session: SessionView, token: string): Promise
 
 async function startLocally(session: SessionView, boot: Bootstrap): Promise<void> {
     const name = commands.sessionContainerName(session.id);
-    await new HostdPorts().composeUp({
-        project: name,
-        services: [
-            {
-                name,
-                image: commands.SESSION_IMAGE,
-                env: bootEnv(boot),
-                ports: [],
-                // The one thing that outlives the session. See `AGENT_HOME`:
-                // the sign-in, the installed tools and Enigma's own settings
-                // live here, per account, so the second session starts signed in
-                // and in seconds rather than minutes.
-                volumes: [
-                    {
-                        // The machine everybody shares, or this account's own.
-                        // Which of the two was settled when the session was
-                        // created and is stored on it, so it cannot change
-                        // under a session that is already running.
-                        //
-                        // Otherwise: whoever started it, which is whose
-                        // credentials the session spends. A session from before
-                        // that was recorded gets a home of its own rather than
-                        // joining a shared one - an empty key would put every
-                        // such session in the same directory, which is one
-                        // person's sign-in in another person's terminal.
-                        source: session.sharedHome
-                            ? commands.SHARED_HOME_SOURCE
-                            : commands.agentHomeSource(session.ownerId ?? `session-${session.id}`),
-                        target: commands.AGENT_HOME,
-                        kind: "bind" as const
-                    }
-                ],
-                labels: { [LABEL_KEY]: session.id },
-                command: commands.bootArgv(commands.SESSION_BOOT),
-                networks: [],
-                // Never restarted. A session that came back would re-clone over its
-                // own worktree and lose whatever the agent had not committed.
-                restart: "no"
-            }
-        ],
-        volumes: [],
-        networks: []
-    });
+    await upWithFreshImage((pullPolicy) =>
+        new HostdPorts().composeUp({
+            project: name,
+            services: [
+                {
+                    name,
+                    image: commands.SESSION_IMAGE,
+                    pullPolicy,
+                    env: bootEnv(boot),
+                    ports: [],
+                    // The one thing that outlives the session. See `AGENT_HOME`:
+                    // the sign-in, the installed tools and Enigma's own settings
+                    // live here, per account, so the second session starts signed in
+                    // and in seconds rather than minutes.
+                    volumes: [
+                        {
+                            // The machine everybody shares, or this account's own.
+                            // Which of the two was settled when the session was
+                            // created and is stored on it, so it cannot change
+                            // under a session that is already running.
+                            //
+                            // Otherwise: whoever started it, which is whose
+                            // credentials the session spends. A session from before
+                            // that was recorded gets a home of its own rather than
+                            // joining a shared one - an empty key would put every
+                            // such session in the same directory, which is one
+                            // person's sign-in in another person's terminal.
+                            source: session.sharedHome
+                                ? commands.SHARED_HOME_SOURCE
+                                : commands.agentHomeSource(
+                                      session.ownerId ?? `session-${session.id}`
+                                  ),
+                            target: commands.AGENT_HOME,
+                            kind: "bind" as const
+                        }
+                    ],
+                    labels: { [LABEL_KEY]: session.id },
+                    command: commands.bootArgv(commands.SESSION_BOOT),
+                    networks: [],
+                    // Never restarted. A session that came back would re-clone over its
+                    // own worktree and lose whatever the agent had not committed.
+                    restart: "no"
+                }
+            ],
+            volumes: [],
+            networks: []
+        })
+    );
 }
 
 /**

@@ -381,6 +381,10 @@
             "label": "A camera saw something",
             "description": "Somebody, a vehicle, an animal or a parcel came into view of a camera."
         },
+        "securityVulnerability": {
+            "label": "A serious vulnerability in a running image",
+            "description": "A scan found a new critical or high vulnerability in an image one of your servers runs."
+        },
         "placesAlert": {
             "label": "An alert you wrote went off",
             "description": "Something one of your alerts asked about happened."

@@ -13,6 +13,8 @@ import * as parse from "../model/parse";
 import * as specs from "../model/specs";
 import { gunzip, gzip } from "node:zlib";
 import { shortHash } from "@polaris/deploy";
+import { host } from "@polaris/app-host";
+import { securityTFor } from "./i18n";
 import {
     exportImage,
     listExports,
@@ -192,7 +194,8 @@ export async function scanFindings(scanId: string) {
             location: true,
             volumeId: true,
             fixedIn: true,
-            url: true
+            url: true,
+            layer: true
         }
     });
 }
@@ -276,7 +279,10 @@ export async function queueImage(targetId: string, applicationId: string, userId
         select: { name: true }
     });
     if (!app) throw new ScanFailure("noApp");
-    return enqueue(targetId, "image", app.name, { applicationId }, userId);
+    // The image is recorded so a new release's image is told apart from one
+    // already scanned (see `planNewImages`).
+    const image = await imageOf(applicationId);
+    return enqueue(targetId, "image", app.name, { applicationId, image }, userId);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -354,7 +360,13 @@ async function startFree(): Promise<void> {
 async function execute(scanId: string): Promise<void> {
     const scan = await prisma.securityScan.findUniqueOrThrow({
         where: { id: scanId },
-        select: { id: true, kind: true, input: true, target: { select: TARGET_SELECT } }
+        select: {
+            id: true,
+            kind: true,
+            label: true,
+            input: true,
+            target: { select: TARGET_SELECT }
+        }
     });
     try {
         const input = safeJson(scan.input);
@@ -384,6 +396,14 @@ async function execute(scanId: string): Promise<void> {
                 }
             })
         ]);
+        if (result.alerts?.length) {
+            await alertNew(scan.target, scan.label, scanId, result.alerts).catch((caught) =>
+                console.error(
+                    `polaris: security scan ${scanId} could not raise its alerts:`,
+                    caught
+                )
+            );
+        }
     } catch (caught) {
         const code = caught instanceof ScanFailure ? caught.code : "failed";
         if (!(caught instanceof ScanFailure))
@@ -402,12 +422,79 @@ interface FindingRow {
     volumeId?: string | null;
     fixedIn?: string | null;
     url?: string | null;
+    layer?: string | null;
 }
 
 interface ScanResult {
     findings: FindingRow[];
     summary: Record<string, unknown>;
     payload?: Buffer;
+    /** Every finding that may ring the bell, before the cap on stored rows. */
+    alerts?: parse.Vulnerability[];
+}
+
+/** The page an image's findings are on. */
+const SECURITY_HREF = "/apps/servers/security";
+
+/**
+ * Ring the bell once for each critical or high finding this server has not
+ * alerted on before. The keys are claimed first, so two scans finishing together
+ * can never both announce the same one. Who is told: the server's owner and
+ * whoever asked for the scan - the people who can see that server.
+ */
+async function alertNew(
+    target: { id: string; ownerId: string | null },
+    label: string,
+    scanId: string,
+    items: readonly parse.Vulnerability[]
+): Promise<void> {
+    const candidates = parse.freshAlerts(items, new Set());
+    if (candidates.length === 0) return;
+    const keys = candidates.map(parse.alertKey);
+    const known = new Set(
+        (
+            await prisma.securityAlert.findMany({
+                where: { targetId: target.id, key: { in: keys } },
+                select: { key: true }
+            })
+        ).map((row) => row.key)
+    );
+    const fresh = parse.freshAlerts(candidates, known);
+    if (fresh.length === 0) return;
+    const claimed = await prisma.securityAlert.createMany({
+        data: fresh.map((item) => ({ targetId: target.id, key: parse.alertKey(item) })),
+        skipDuplicates: true
+    });
+    if (claimed.count === 0) return;
+    const requester = await prisma.securityScan.findUnique({
+        where: { id: scanId },
+        select: { requestedById: true }
+    });
+    const recipients = [
+        ...new Set([target.ownerId, requester?.requestedById].filter((id): id is string => !!id))
+    ];
+    const worst = fresh[0]!;
+    await Promise.allSettled(
+        recipients.map(async (userId) => {
+            const t = await securityTFor(userId);
+            return host.notificationsDispatch.notify({
+                userId,
+                event: "security.vulnerability",
+                level: worst.severity === "critical" ? "danger" : "warning",
+                title: t("alerts.title", { app: label, count: fresh.length }),
+                body: t("alerts.body", {
+                    id: worst.id,
+                    severity: t(`images.severity.${worst.severity}`),
+                    package: `${worst.packageName} ${worst.version}`.trim(),
+                    fix: worst.fixedIn
+                        ? t("images.fixedIn", { version: worst.fixedIn })
+                        : t("images.noFix")
+                }),
+                href: SECURITY_HREF,
+                metadata: { scanId, targetId: target.id, ids: fresh.slice(0, 20).map((i) => i.id) }
+            });
+        })
+    );
 }
 
 async function runMalware(target: ScanTarget, input: Record<string, unknown>): Promise<ScanResult> {
@@ -554,8 +641,10 @@ async function runImage(
             title: item.id,
             location: `${item.packageName} ${item.version}`.trim(),
             fixedIn: item.fixedIn,
-            url: item.url
+            url: item.url,
+            layer: item.layer
         })),
+        alerts: report.alerting,
         summary: {
             ...report.counts,
             total: report.total,
@@ -726,6 +815,55 @@ async function planSchedules(now: Date): Promise<void> {
     }
 }
 
+/** How long one image is not scanned again on its own. */
+const IMAGE_RESCAN_MS = 24 * 60 * 60_000;
+/** How often the job looks for new releases, in this process. */
+const NEW_IMAGES_EVERY_MS = 10 * 60_000;
+let newImagesCheckedAt = 0;
+
+/**
+ * Queue a scan for every app that started running an image nobody scanned in
+ * the last day - a new release is checked once it is live, with no schedule
+ * set. Bounded: the newest releases of the last two days, a few at a time;
+ * the queue still runs one scan per server.
+ */
+async function planNewImages(now: Date): Promise<void> {
+    if (now.getTime() - newImagesCheckedAt < NEW_IMAGES_EVERY_MS) return;
+    newImagesCheckedAt = now.getTime();
+    const releases = await prisma.deployment.findMany({
+        where: {
+            deployableType: "application",
+            status: "running",
+            imageTag: { not: null },
+            createdAt: { gt: new Date(now.getTime() - 2 * IMAGE_RESCAN_MS) }
+        },
+        orderBy: { createdAt: "desc" },
+        select: { targetId: true, deployableId: true, imageTag: true },
+        take: 50
+    });
+    const seen = new Set<string>();
+    let queued = 0;
+    for (const release of releases) {
+        if (queued >= 10 || seen.has(release.deployableId) || !release.imageTag) continue;
+        seen.add(release.deployableId);
+        const done = await prisma.securityScan.findFirst({
+            where: {
+                targetId: release.targetId,
+                kind: "image",
+                createdAt: { gt: new Date(now.getTime() - IMAGE_RESCAN_MS) },
+                input: { contains: JSON.stringify(release.imageTag) }
+            },
+            select: { id: true }
+        });
+        if (done) continue;
+        if ((await imageOf(release.deployableId)) !== release.imageTag) continue;
+        const scanId = await queueImage(release.targetId, release.deployableId, null).catch(
+            () => null
+        );
+        if (scanId) queued += 1;
+    }
+}
+
 /** Keep the newest scans per server and kind, and nothing older than the window. */
 async function prune(now: Date): Promise<void> {
     await prisma.securityScan.deleteMany({
@@ -819,6 +957,7 @@ export async function tick(): Promise<void> {
         data: { state: "failed", finishedAt: now, error: "lost" }
     });
     await planSchedules(now);
+    await planNewImages(now);
     await drain();
     await prune(now);
     await sweepExports(now);
