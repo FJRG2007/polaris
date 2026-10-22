@@ -323,7 +323,10 @@ export async function configureBuild(
 export function gitBuildContext(
     source: GitSource,
     onOutput: (chunk: Buffer) => void,
-    commands?: BuildCommands
+    commands?: BuildCommands,
+    /** Shown the checkout at the deployed commit before it is packed and
+     *  removed (the dependency scan copies its lockfiles). Never fails it. */
+    onCheckout?: (dir: string) => Promise<void>
 ): () => Promise<BuildContext> {
     if (!isCloneableUrl(source.repoUrl)) {
         throw new Error("Only http(s)/git repository URLs are supported");
@@ -376,6 +379,7 @@ export function gitBuildContext(
             }
         }
 
+        if (onCheckout) await onCheckout(dir).catch(() => undefined);
         return contextFromDirectory(dir, onOutput, commands);
     };
 }

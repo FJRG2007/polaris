@@ -566,9 +566,14 @@ function summaryLine(t: SecurityTranslator, scan: Scan): string {
     if (scan.kind === "audit") {
         return `${t("host.score")}: ${String(s.score)} / 100, ${t("host.warnings", { count: Number(s.warnings ?? 0) })}`;
     }
-    return (["critical", "high", "medium", "low"] as const)
+    const counts = (["critical", "high", "medium", "low"] as const)
         .map((sev) => `${t(`images.severity.${sev}`)} ${Number(s[sev] ?? 0)}`)
         .join(", ");
+    const files = (scan.summary as { files?: unknown }).files;
+    if (scan.kind === "deps" && Array.isArray(files) && files.length > 0) {
+        return `${counts}. ${t("deps.files", { files: files.filter((f) => typeof f === "string").slice(0, 6).join(", ") })}`;
+    }
+    return counts;
 }
 
 function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; submit: Submit }) {
@@ -601,7 +606,11 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                     className="min-w-0 flex-1 truncate font-medium"
                                     title={scan.label}
                                 >
-                                    {scan.kind === "audit" ? t("thisServer") : scan.label}
+                                    {scan.kind === "audit"
+                                        ? t("thisServer")
+                                        : scan.kind === "deps"
+                                          ? t("deps.label", { app: scan.label })
+                                          : scan.label}
                                 </span>
                                 <span className="text-muted-foreground">
                                     {t(`state.${scan.state}` as never)}
@@ -629,7 +638,7 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                 ) : null}
                             </div>
                             <p className="text-muted-foreground">{summaryLine(t, scan)}</p>
-                            {open === scan.id && scan.kind === "image" ? (
+                            {open === scan.id && (scan.kind === "image" || scan.kind === "deps") ? (
                                 <div className="mt-2">
                                     <FindingsTable
                                         t={t}

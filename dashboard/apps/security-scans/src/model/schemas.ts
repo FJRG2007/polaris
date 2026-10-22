@@ -79,7 +79,7 @@ export const scheduleInput = z.object({
 
 export const scanListInput = z.object({
     targetId: id,
-    kind: z.enum(["malware", "files", "audit", "image"]).optional()
+    kind: z.enum(["malware", "files", "audit", "image", "deps"]).optional()
 });
 
 export const scanInput = z.object({ scanId: id });

@@ -47,6 +47,11 @@ export const PROJECTS = {
     images: "polaris-secscan-images"
 } as const;
 
+/** The throwaway image a dependency scan builds on a server: the scanner with
+ *  the deployed commit's lockfiles in `/src`. One name per server, replaced by
+ *  the next scan there (scans on one server run one at a time). */
+export const DEPS_IMAGE = "polaris-secscan/deps:scan";
+
 const LABELS = { "polaris.security-scan": "true" };
 
 /** A volume as a scan mounts it. */
@@ -333,6 +338,29 @@ export function vulnSpec(volume: string): ComposeSpec {
         GRYPE_DB_CACHE_DIR: "/cache/vulnerabilities",
         GRYPE_CHECK_FOR_APP_UPDATE: "false"
     });
+}
+
+/** Vulnerabilities of the lockfiles in the deps image, as JSON: Grype's own
+ *  directory catalogers read them (`dir:` source), offline once its database
+ *  is in the shared cache. */
+export function depsSpec(): ComposeSpec {
+    // The image scans' project, so the vulnerability database in its cache is
+    // the one already downloaded there.
+    return spec(
+        PROJECTS.images,
+        service("polaris-secscan-deps", DEPS_IMAGE, {
+            pullPolicy: "never",
+            command: ["dir:/src", "-o", "json", "-q"],
+            env: {
+                GRYPE_DB_CACHE_DIR: "/cache/vulnerabilities",
+                GRYPE_CHECK_FOR_APP_UPDATE: "false"
+            },
+            volumes: [{ source: "cache", target: "/cache", kind: "volume" }],
+            memoryMb: 1024
+        }),
+        ["cache"],
+        []
+    );
 }
 
 /** An exported image's bill of materials, as CycloneDX JSON. */

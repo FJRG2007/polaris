@@ -13,7 +13,8 @@ import * as parse from "../model/parse";
 import * as specs from "../model/specs";
 import * as images from "../model/images";
 import { gunzip, gzip } from "node:zlib";
-import { shortHash } from "@polaris/deploy";
+import { Readable } from "node:stream";
+import { decodeLockfiles, dependencyContext, shortHash } from "@polaris/deploy";
 import { host } from "@polaris/app-host";
 import { securityTFor } from "./i18n";
 import {
@@ -32,7 +33,7 @@ import {
 const zip = promisify(gzip);
 const unzip = promisify(gunzip);
 
-export type ScanKind = "malware" | "files" | "audit" | "image";
+export type ScanKind = "malware" | "files" | "audit" | "image" | "deps";
 
 const MAX_FINDINGS = 500;
 const KEEP_PER_KIND = 30;
@@ -459,7 +460,9 @@ async function execute(scanId: string): Promise<void> {
                   ? await runFiles(scan.target, input)
                   : scan.kind === "audit"
                     ? await runAudit(scan.target)
-                    : await runImage(scan.target, input, scan.id);
+                    : scan.kind === "deps"
+                      ? await runDeps(scan.target, scan.id)
+                      : await runImage(scan.target, input, scan.id);
         await prisma.$transaction([
             prisma.securityFinding.createMany({
                 data: result.findings.slice(0, MAX_FINDINGS).map((finding, position) => ({
@@ -492,7 +495,8 @@ async function execute(scanId: string): Promise<void> {
             console.error(`polaris: security scan ${scanId}:`, caught);
         await prisma.securityScan.update({
             where: { id: scanId },
-            data: { state: "failed", finishedAt: new Date(), error: code }
+            // A deps scan's stored lockfiles go with it either way.
+            data: { state: "failed", finishedAt: new Date(), error: code, payload: null }
         });
     }
 }
@@ -737,6 +741,44 @@ async function runImage(
             sbom: Boolean(payload && payload.length <= MAX_PAYLOAD)
         },
         payload: payload && payload.length <= MAX_PAYLOAD ? payload : undefined
+    };
+}
+
+/**
+ * A deployed commit's dependencies, Dependabot-style: the lockfiles the deploy
+ * copied out of its clone (see the dashboard's lib/security/lockfiles.ts) are
+ * put on top of the pinned scanner's image on this server - one small build,
+ * no repository fetched again - and Grype reads them as a directory. The
+ * stored lockfiles are dropped once the scan is done.
+ */
+async function runDeps(target: ScanTarget, scanId: string): Promise<ScanResult> {
+    const row = await prisma.securityScan.findUnique({
+        where: { id: scanId },
+        select: { payload: true }
+    });
+    if (!row?.payload) throw new ScanFailure("scanError");
+    const files = decodeLockfiles(await unzip(Buffer.from(row.payload)));
+    if (files.length === 0) throw new ScanFailure("scanError");
+    const ports = await portsFor(target);
+    await ports.build({
+        tag: specs.DEPS_IMAGE,
+        dockerfile: "Dockerfile",
+        contextTar: Readable.from(dependencyContext(files, specs.VULN_IMAGE)),
+        builder: "docker"
+    });
+    const vuln = await runOneShot(ports, specs.depsSpec());
+    const report = parse.parseVulnJson(parse.jsonOf(vuln.log));
+    if (!report) throw new ScanFailure("scanError");
+    return {
+        findings: report.items.map((item) => ({
+            severity: item.severity,
+            title: item.id,
+            location: `${item.packageName} ${item.version}`.trim(),
+            fixedIn: item.fixedIn,
+            url: item.url
+        })),
+        alerts: report.alerting,
+        summary: { ...report.counts, total: report.total, files: files.map((f) => f.path) }
     };
 }
 

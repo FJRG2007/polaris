@@ -146,5 +146,9 @@
         "none": "No known vulnerabilities in this image.",
         "noMatch": "No findings match these filters.",
         "failed": "Could not load the findings. Try again."
+    },
+    "deps": {
+        "label": "{app} dependencies",
+        "files": "Read from {files}"
     }
 }

@@ -5386,7 +5386,11 @@ export async function executeDeployment(
         const buildContext = buildSource
             ? "archive" in buildSource
                 ? sourceUpload.uploadedBuildContext(buildSource.archive, log, buildCommands)
-                : gitBuildContext(buildSource, log, buildCommands)
+                : gitBuildContext(buildSource, log, buildCommands, (dir) =>
+                      queuedRow.deployableType === "application"
+                          ? queueDependencyScan(deploymentId, dir)
+                          : Promise.resolve()
+                  )
             : undefined;
         // Authenticate to any private registry whose image this deploy pulls, so the
         // pull below (inside the driver) is authorized. A login failure is logged but

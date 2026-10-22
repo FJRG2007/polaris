@@ -187,3 +187,15 @@ export { nixpacksConfig, type NixpacksConfig } from "./nixpacks.js";
 export { INSTALL_ENV } from "./install-env.js";
 export { generateDockerfile, GENERATED_DOCKERFILE, type DockerfilePlan } from "./dockerfile.js";
 export type { BuildContext } from "./build-context.js";
+export {
+    decodeLockfiles,
+    dependencyContext,
+    encodeLockfiles,
+    isLockfilePath,
+    lockfileDirs,
+    LOCKFILE_NAMES,
+    MAX_LOCKFILE_BYTES,
+    MAX_STORED_BYTES,
+    MAX_TOTAL_BYTES,
+    type Lockfile
+} from "./lockfiles.js";

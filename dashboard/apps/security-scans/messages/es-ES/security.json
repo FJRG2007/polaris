@@ -146,5 +146,9 @@
         "none": "No hay vulnerabilidades conocidas.",
         "noMatch": "Ningún hallazgo con estos filtros.",
         "failed": "No se cargaron los hallazgos. Reintenta."
+    },
+    "deps": {
+        "label": "Dependencias de {app}",
+        "files": "Leídas de {files}"
     }
 }
