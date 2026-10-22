@@ -313,7 +313,9 @@
         "and": " y ",
         "trackers": "Los rastreadores de {named} se sirvieron a través de Polaris, así que no supieron nada de ti.",
         "opening": "Abriendo el mensaje",
-        "frameTitle": "Mensaje"
+        "frameTitle": "Mensaje",
+        "showTrimmed": "Ver contenido recortado",
+        "hideTrimmed": "Ocultar lo recortado"
     },
     "address": {
         "copyRefused": "Este navegador no dejó que Polaris lo copiara.",

@@ -33,6 +33,8 @@ import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { ShieldCheck } from "lucide-react";
 import { cleanedAlready, sanitizeMail } from "./sanitize";
+import { TrimmedPill } from "./trimmed-pill";
+import { trimReceivedHtml, trimReceivedText } from "./trimmed-content";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -73,6 +75,20 @@ export function MessageBody({
     const inForce = paper ?? guessed;
     const t = useTranslations("mail");
 
+    /**
+     * The message without the copy of the conversation it quotes, the way Gmail
+     * trims it; null when there is nothing to trim. Cut before the sanitizer
+     * rather than after, so whatever is drawn - trimmed or whole - is exactly
+     * what the sanitizer handed back.
+     */
+    const trimmedHtml = useMemo(() => {
+        if (html.trim()) return trimReceivedHtml(html);
+        const fresh = trimReceivedText(text);
+        return fresh === null ? null : core.textToHtml(fresh);
+    }, [html, text]);
+    const [showTrimmed, setShowTrimmed] = useState(false);
+    const shown = trimmedHtml !== null && !showTrimmed ? trimmedHtml : drawn;
+
     return (
         <div className="min-w-0">
             {trackerVendors.length > 0 ? (
@@ -84,7 +100,15 @@ export function MessageBody({
 
             {drawn.trim() ? (
                 <>
-                    <SandboxedHtml html={drawn} showRemote={remoteAllowed} paper={inForce} />
+                    <SandboxedHtml html={shown} showRemote={remoteAllowed} paper={inForce} />
+                    {trimmedHtml !== null ? (
+                        <TrimmedPill
+                            className="mt-1 flex"
+                            label={showTrimmed ? t("body.hideTrimmed") : t("body.showTrimmed")}
+                            expanded={showTrimmed}
+                            onToggle={() => setShowTrimmed((open) => !open)}
+                        />
+                    ) : null}
                     <button
                         type="button"
                         className="mt-2 text-[12px] text-foreground-subtle underline hover:text-foreground"
