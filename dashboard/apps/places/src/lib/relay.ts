@@ -206,8 +206,13 @@ export async function publishCamera(
  * the battery, so those are never kept - they wake when somebody opens them, as
  * the maker's own app does. A camera that is switched off is not kept either.
  */
-export function keepsWarm(camera: { enabled: boolean; power: string; vendor: string }): boolean {
-    if (!camera.enabled) return false;
+export function keepsWarm(camera: {
+    enabled: boolean;
+    power: string;
+    vendor: string;
+    privacy?: boolean;
+}): boolean {
+    if (!camera.enabled || camera.privacy) return false;
     if (drawsFromBattery(camera.power)) return false;
     return cameraVendor(camera.vendor).battery !== true;
 }

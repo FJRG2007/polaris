@@ -63,6 +63,7 @@ async function relayForCamera(
     const camera = await getCamera(installedAppId, cameraId);
     if (!camera) throw new CameraOfflineError("No such camera");
     if (!camera.enabled) throw new CameraOfflineError("This camera is switched off");
+    if (camera.privacy) throw new CameraOfflineError("This camera is private");
     const endpoint = await relayEndpoint(relayServerFor(camera.reachVia));
     if (!endpoint) throw new CameraOfflineError("The camera relay is still starting");
     return { endpoint, cameraId: camera.id };

@@ -13,12 +13,13 @@
 import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { loadEnv } from "@polaris/config";
-import { cameraVendor, rtspUrl, usesAccountPassword } from "./vendors";
+import { cameraVendor, hasNativePrivacy, rtspUrl, usesAccountPassword } from "./vendors";
 import { drawsFromBattery, modelCanPan } from "./camera-models";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput } from "./schemas";
 import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "./detection";
 import { host } from "@polaris/app-host";
+import * as rooms from "./rooms";
 
 const { dropGrantsFor } = host.accessGrants;
 
@@ -28,6 +29,8 @@ export interface CameraView {
     readonly name: string;
     readonly placeId: string;
     readonly zone: string;
+    /** The room of its place it is in, or "" for none. */
+    readonly roomId: string;
     readonly vendor: string;
     readonly model: string | null;
     /** The catalog model its owner picked, or "" on one added before the list. */
@@ -64,6 +67,13 @@ export interface CameraView {
      *  turns a tile that is not drawing into one that says how long it has been
      *  like that. */
     readonly offlineSince: string | null;
+    /** Private: nothing Polaris runs reads a frame from it. */
+    readonly privacy: boolean;
+    /** Whether the camera has a privacy mode of its own that Polaris switches
+     *  (Tapo), rather than only Polaris leaving it alone. */
+    readonly privacyNative: boolean;
+    /** The preset a pan-tilt camera is pointed at when it goes private, or "". */
+    readonly privacyPreset: string;
 }
 
 /** A camera as something that is about to connect to it sees it. */
@@ -104,6 +114,7 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         name: row.name,
         placeId: row.placeId ?? "",
         zone: row.zone ?? "",
+        roomId: row.roomId ?? "",
         vendor: row.vendor,
         model: row.model,
         modelId: row.modelId ?? "",
@@ -128,7 +139,10 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         // keeps its arrows, having never answered ONVIF to be asked.
         ptz: row.onvifPort !== null || modelCanPan(row.modelId),
         lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
-        offlineSince: row.offlineSince?.toISOString() ?? null
+        offlineSince: row.offlineSince?.toISOString() ?? null,
+        privacy: row.privacy,
+        privacyNative: hasNativePrivacy(row.vendor),
+        privacyPreset: row.privacyPreset ?? ""
     };
 }
 
@@ -228,6 +242,30 @@ async function sharedSecret(installedAppId: string, vendor: string) {
     return null;
 }
 
+/**
+ * The room a save leaves the camera in. A room is one of its place's: one at
+ * another place is refused. Absent keeps the one it has, unless the camera
+ * moved to another place, where that room is not; null or "" is none.
+ */
+async function settledRoom(
+    installedAppId: string,
+    input: { readonly roomId?: string | null; readonly placeId?: string | null },
+    placeBefore: string | null | undefined
+): Promise<string | null | undefined> {
+    const wanted = input.roomId;
+    if (wanted) {
+        const room = await rooms.requireRoom(installedAppId, wanted);
+        if (room.placeId !== (input.placeId || null))
+            throw new HomeError("That room is at another place");
+        return room.id;
+    }
+    if (wanted === undefined)
+        return placeBefore !== undefined && placeBefore !== (input.placeId || null)
+            ? null
+            : undefined;
+    return null;
+}
+
 export async function createCamera(
     installedAppId: string,
     input: CameraInput
@@ -236,12 +274,14 @@ export async function createCamera(
     const paths = resolvePaths(input);
     const secret =
         secretColumns(input.password) ?? (await sharedSecret(installedAppId, input.vendor));
+    const roomId = await settledRoom(installedAppId, input, undefined);
     const row = await prisma.camera.create({
         data: {
             installedAppId,
             placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,
+            roomId: roomId ?? null,
             vendor: input.vendor,
             modelId: input.modelId || null,
             power: input.power,
@@ -274,9 +314,11 @@ export async function updateCamera(
 ): Promise<CameraView> {
     const existing = await prisma.camera.findFirst({
         where: { id, installedAppId },
-        select: { id: true }
+        select: { id: true, placeId: true, address: true, vendor: true }
     });
     if (!existing) throw new HomeError("Camera not found");
+    const moved = existing.address !== input.address || existing.vendor !== input.vendor;
+    const roomId = await settledRoom(installedAppId, input, existing.placeId);
     const vendor = cameraVendor(input.vendor);
     const paths = resolvePaths(input);
     // A battery camera is not dialled by the availability pass, and that pass is
@@ -295,9 +337,11 @@ export async function updateCamera(
         where: { id },
         data: {
             ...(battery ? { offlineSince: null } : {}),
+            ...(moved ? { controlPin: null } : {}),
             placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,
+            ...(roomId !== undefined ? { roomId } : {}),
             vendor: input.vendor,
             modelId: input.modelId || null,
             power: input.power,
@@ -387,10 +431,42 @@ export async function cameraTarget(
     };
 }
 
+/**
+ * The sign-ins a camera's own control API may take, best first, password
+ * included. Server-only, like `cameraTarget`.
+ *
+ * Tapo control wants the TP-Link account (user `admin`, the app password): the
+ * camera account made for RTSP signs in as a third party and is refused on
+ * current firmware. So the account password goes first - this camera's when
+ * it is reached with it, otherwise one stored for another camera of the house,
+ * since it is one password per account - and the camera's own account second,
+ * for old firmware that takes it.
+ */
+export async function controlCredentials(
+    installedAppId: string,
+    id: string
+): Promise<{ username: string; password: string }[]> {
+    const row = await prisma.camera.findFirst({ where: { id, installedAppId } });
+    if (!row) return [];
+    const own = await cameraPassword(row);
+    const tried: { username: string; password: string }[] = [];
+    let account = usesAccountPassword(row.vendor) ? own : null;
+    if (!account) {
+        const shared = await sharedSecret(installedAppId, "tapo-cloud");
+        account = shared ? await cameraPassword({ ...row, ...shared }) : null;
+    }
+    if (account) tried.push({ username: "admin", password: account });
+    if (own && row.username && !usesAccountPassword(row.vendor))
+        tried.push({ username: row.username, password: own });
+    return tried;
+}
+
 /** Every enabled camera as a connection target, for the relay's configuration.
  *  One pass rather than a query per camera - the relay is written whole. */
 export async function cameraTargets(installedAppId: string): Promise<CameraTarget[]> {
-    const rows = await prisma.camera.findMany({ where: { installedAppId, enabled: true } });
+    const rows = await prisma.camera.findMany({
+        where: { installedAppId, enabled: true, privacy: false }
+    });
     return Promise.all(
         rows.map(async (row) => {
             const password = await cameraPassword(row);

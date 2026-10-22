@@ -291,6 +291,13 @@ export interface EnginePorts {
     /** Whether the owner still holds a right: "run" is keeping automations at
      *  all, "control" is operating the devices a step names. */
     readonly mayOperate: (ownerId: string, right: "run" | "control") => Promise<boolean>;
+    /** Switch camera privacy for a target; answers each camera's result. Absent,
+     *  a privacy step fails rather than claiming it switched anything. */
+    readonly cameraPrivacy?: (
+        installedAppId: string,
+        target: string,
+        on: boolean
+    ) => Promise<readonly { readonly failure?: string }[]>;
     readonly notify: (
         automation: AutomationRecord,
         message: string,
@@ -1308,6 +1315,37 @@ export function createEngine(ports: EnginePorts) {
                         steps,
                         "step"
                     );
+                    return;
+                }
+                log("ok");
+            }
+
+            if (step.kind === "privacy") {
+                // Asked for every step, as for a device: the owner may have lost
+                // the right to control the cameras since the run started.
+                if (!(await ports.mayOperate(automation.ownerId, "control"))) {
+                    log("refused", { code: "owner" });
+                    await finish(run, "refused", steps, "step");
+                    return;
+                }
+                let results: readonly { readonly failure?: string }[] | null = null;
+                try {
+                    results = ports.cameraPrivacy
+                        ? await ports.cameraPrivacy(automation.installedAppId, step.target, step.on)
+                        : null;
+                } catch (error) {
+                    fault(`automation ${automation.id} could not switch camera privacy`, error);
+                }
+                if (!results || results.length === 0) {
+                    log("failed", { code: results ? "camerasGone" : "privacyFailed" });
+                    await finish(run, "failed", steps, "step");
+                    return;
+                }
+                // Every camera is switched on its own; one that refused fails the
+                // step, so nobody reads "done" over a camera still streaming.
+                if (results.some((row) => row.failure)) {
+                    log("failed", { code: "privacyFailed" });
+                    await finish(run, "failed", steps, "step");
                     return;
                 }
                 log("ok");

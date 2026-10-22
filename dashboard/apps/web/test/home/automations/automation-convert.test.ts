@@ -352,6 +352,15 @@ const STEPS: { name: string; step: Record<string, unknown> }[] = [
     {
         name: "run another",
         step: { id: "step01", kind: "run", automationId: "22222222-2222-4222-8222-222222222222" }
+    },
+    {
+        name: "camera privacy",
+        step: {
+            id: "step01",
+            kind: "privacy",
+            target: "camera:22222222-2222-4222-8222-222222222222",
+            on: true
+        }
     }
 ];
 

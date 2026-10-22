@@ -79,6 +79,7 @@ export async function sweepWarmCameras(): Promise<{
             id: true,
             installedAppId: true,
             enabled: true,
+            privacy: true,
             power: true,
             vendor: true,
             reachVia: true,

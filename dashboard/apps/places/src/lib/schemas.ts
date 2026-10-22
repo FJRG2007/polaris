@@ -152,6 +152,9 @@ const cameraFieldsSchema = z.object({
      *  stored - an id in a form is a request, not a fact. */
     placeId: z.string().trim().max(64).default(""),
     zone: z.string().trim().max(64).default(""),
+    /** Which of its place's rooms it is in; null or "" is none. Absent leaves it
+     *  as it is, so a caller from before rooms saves without losing one. */
+    roomId: z.string().trim().max(64).nullable().optional(),
     vendor: z.string().trim().min(1).max(32),
     /** The catalog model, when one was picked. Empty is allowed and means the
      *  make alone decides, which is what a camera added before the list existed

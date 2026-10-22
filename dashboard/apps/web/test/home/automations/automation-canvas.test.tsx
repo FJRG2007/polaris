@@ -132,9 +132,8 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     runAutomationAction: async () => ({})
 }));
 
-const { AutomationEditor } = await import(
-    "@polaris-app/places/src/screens/automations/automation-editor"
-);
+const { AutomationEditor } =
+    await import("@polaris-app/places/src/screens/automations/automation-editor");
 
 class Observer {
     observe(): void {}
@@ -413,7 +412,8 @@ describe("the palette", () => {
             "Wait a while",
             "Wait for a device",
             "Notify me",
-            "Run an automation"
+            "Run an automation",
+            "Camera privacy"
         ]);
     });
 

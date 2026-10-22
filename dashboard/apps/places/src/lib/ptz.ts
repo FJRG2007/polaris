@@ -16,12 +16,16 @@
  * Server-only.
  */
 
+import { prisma } from "@polaris/db";
 import { cameraTarget } from "./cameras";
 import { HomeError } from "./home-error";
+import { hasNativePrivacy } from "./vendors";
 import {
     getPresets,
     getProfiles,
     gotoPreset,
+    removePreset,
+    setPreset,
     ptzMove,
     ptzStop,
     OnvifError,
@@ -171,4 +175,65 @@ export async function goTo(
     const controls = await controlsFor(installedAppId, cameraId);
     if (!controls) throw new HomeError("This camera does not move");
     await gotoPreset(controls.endpoint, controls.profileToken, preset);
+}
+
+/** The name the privacy position is saved under on the camera, so it is
+ *  recognisable in the camera's own app. */
+const PRIVACY_PRESET_NAME = "Polaris privacy";
+
+async function privacyRow(installedAppId: string, cameraId: string) {
+    const row = await prisma.camera.findFirst({
+        where: { id: cameraId, installedAppId },
+        select: { vendor: true, privacyPreset: true }
+    });
+    if (!row) throw new HomeError("Camera not found");
+    // A camera with a privacy mode of its own is switched itself; Polaris never
+    // points it anywhere for privacy.
+    if (hasNativePrivacy(row.vendor)) throw new HomeError("This camera has its own privacy mode");
+    return row;
+}
+
+/**
+ * Where the camera points now becomes where it turns when it goes private:
+ * saved as a preset on the camera (the one saved before is moved, not
+ * duplicated) and its token stored. Answers the token.
+ */
+export async function savePrivacyPosition(
+    installedAppId: string,
+    cameraId: string
+): Promise<string> {
+    const row = await privacyRow(installedAppId, cameraId);
+    const controls = await controlsFor(installedAppId, cameraId);
+    if (!controls) throw new HomeError("This camera does not move");
+    let token: string;
+    try {
+        token = await setPreset(
+            controls.endpoint,
+            controls.profileToken,
+            PRIVACY_PRESET_NAME,
+            row.privacyPreset
+        );
+    } catch (error) {
+        if (error instanceof OnvifError && error.failure !== "refused")
+            throw new HomeError("Could not reach the camera to move it");
+        throw new HomeError("The camera would not save that position");
+    }
+    await prisma.camera.update({ where: { id: cameraId }, data: { privacyPreset: token } });
+    return token;
+}
+
+/** Forget the privacy position. The preset is taken off the camera too, best
+ *  effort: a camera that cannot be reached still stops being turned. */
+export async function clearPrivacyPosition(
+    installedAppId: string,
+    cameraId: string
+): Promise<void> {
+    const row = await privacyRow(installedAppId, cameraId);
+    if (!row.privacyPreset) return;
+    const controls = await controlsFor(installedAppId, cameraId).catch(() => null);
+    if (controls)
+        await removePreset(controls.endpoint, controls.profileToken, row.privacyPreset).catch(
+            () => undefined
+        );
+    await prisma.camera.update({ where: { id: cameraId }, data: { privacyPreset: null } });
 }

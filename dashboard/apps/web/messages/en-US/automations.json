@@ -291,6 +291,8 @@
         "answerTooLarge": "The answer was too large",
         "announceLimited": "Too many announcements",
         "announceFailed": "The announcement was not sent",
+        "privacyFailed": "A camera did not switch privacy",
+        "camerasGone": "Those cameras are no longer here",
         "valuesTooLarge": "The values were too large",
         "messageEmpty": "The message came out empty",
         "messageRefused": "The channel did not take the message",
@@ -793,6 +795,7 @@
         "homeWait": "Places: wait for a device",
         "homeNotify": "Places: tell somebody",
         "homeRun": "Places: run another",
+        "homePrivacy": "Places: camera privacy",
         "missing": "Needs an app that is not installed here, so it cannot be changed or run.",
         "install": "Install the app"
     },

@@ -22,6 +22,8 @@ export interface DeviceLookup {
     (id: string): { readonly name: string; readonly kind: string } | undefined;
     /** A room's or a floor's name, where the screen has the place's rooms. */
     readonly place?: (kind: "room" | "floor", id: string) => string | undefined;
+    /** A camera privacy target's name, where the screen has the targets. */
+    readonly privacy?: (target: string) => string | undefined;
 }
 
 /** A lookup over a place's devices and, where given, its rooms and floors. */
@@ -32,8 +34,10 @@ export function lookupOf(
         readonly name: string;
         readonly floor: string;
         readonly floorId?: string;
-    }[] = []
+    }[] = [],
+    privacyTargets: readonly { readonly target: string; readonly label: string }[] = []
 ): DeviceLookup {
+    const targetNames = new Map(privacyTargets.map((row) => [row.target, row.label]));
     const byId = new Map(devices.map((device) => [device.id, device]));
     const roomNames = new Map(rooms.map((room) => [room.id, room.name]));
     const floorNames = new Map(
@@ -41,7 +45,8 @@ export function lookupOf(
     );
     return Object.assign((id: string) => byId.get(id), {
         place: (kind: "room" | "floor", id: string) =>
-            (kind === "room" ? roomNames : floorNames).get(id)
+            (kind === "room" ? roomNames : floorNames).get(id),
+        privacy: (target: string) => targetNames.get(target)
     });
 }
 
@@ -451,6 +456,12 @@ export function describeStep(
             return t("automations.say.run", {
                 name: automationName(step.automationId) ?? t("automations.missingAutomation")
             });
+        case "privacy": {
+            const target = lookup.privacy?.(step.target) ?? t("automations.say.someCameras");
+            return step.on
+                ? t("automations.say.privacyOn", { target })
+                : t("automations.say.privacyOff", { target });
+        }
     }
 }
 
@@ -535,6 +546,8 @@ const NOTES = [
     "loop",
     "failed",
     "notifyFailed",
+    "privacyFailed",
+    "camerasGone",
     "automationGone",
     "automationOff",
     "automationHeld",

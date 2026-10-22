@@ -10873,6 +10873,7 @@ model Place {
     automations PlaceAutomation[]
     rooms       PlaceRoom[]
     floors      PlaceFloor[]
+    cameraSets  CameraSet[]
 
     @@index([installedAppId])
 }
@@ -10924,6 +10925,7 @@ model PlaceRoom {
     place      Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
     placeFloor PlaceFloor?   @relation(fields: [floorId], references: [id], onDelete: SetNull)
     devices    PlaceDevice[]
+    cameras    Camera[]
 
     @@index([placeId])
     @@index([installedAppId])
@@ -10956,6 +10958,9 @@ model Camera {
     /// grouping the wall has - a table of zones would be a second thing to
     /// maintain for a list that is read once per screen.
     zone           String?
+    /// Which of the place's rooms it is in, the same rooms its devices are in.
+    /// Null until somebody says; deleting the room leaves the camera in none.
+    roomId         String? @db.Uuid
     /// tapo | reolink | hikvision | dahua | onvif | generic - what it is, which
     /// decides the stream paths and how it is controlled when it was not probed.
     vendor         String  @default("generic")
@@ -11037,10 +11042,24 @@ model Camera {
     /// passes the grace window, and the event is closed when it clears.
     offlineSince DateTime?
 
+    /// Privacy: nothing Polaris runs reads a frame from it while this is on -
+    /// relay, recording, watcher, detection and stills all leave it alone. On a
+    /// camera with a privacy mode of its own (Tapo) it is read back from the
+    /// camera rather than assumed.
+    privacy          Boolean   @default(false)
+    privacyChangedAt DateTime?
+    /// An ONVIF preset to point a pan-tilt camera at when it goes private, for
+    /// cameras with no privacy mode of their own. Null sends nothing.
+    privacyPreset    String?
+    /// SHA-256 fingerprint of the certificate the camera's own control API
+    /// presented on the first privacy call; later calls must present the same.
+    controlPin       String?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
     place  Place?        @relation(fields: [placeId], references: [id], onDelete: SetNull)
+    room   PlaceRoom?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
     events CameraEvent[]
     clips  CameraClip[]
     zones  CameraZone[]
@@ -11048,6 +11067,27 @@ model Camera {
     @@index([installedAppId])
     @@index([placeId])
     @@index([installedAppId, zone])
+    @@index([roomId])
+}
+
+// A named group of cameras somebody picked by hand ("Upstairs at night"), for
+// switching privacy on all of them at once from the wall, a deck key or an
+// automation. The ids are a plain list rather than a join table: a camera that
+// was removed simply stops matching, and a set is read whole every time.
+model CameraSet {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to, per the InstalledApp precedent.
+    installedAppId String   @db.Uuid
+    placeId        String   @db.Uuid
+    name           String
+    cameraIds      String[] @db.Uuid
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+    @@index([installedAppId, placeId])
 }
 
 // Something a camera saw.

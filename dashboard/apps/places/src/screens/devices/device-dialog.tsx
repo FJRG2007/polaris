@@ -19,7 +19,7 @@
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { deviceEditSchema, normalizeRoomInput, roomInputSchema } from "../../lib/schemas";
-import { floorNames, type RoomView } from "../../lib/room-kinds";
+import { floorNames } from "../../lib/room-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceView } from "../../lib/device-kinds";
 import {
@@ -37,6 +37,7 @@ import {
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
+import { usePlaceRooms } from "../use-place-rooms";
 import { placesRefusalText } from "../../lib/refusal-text";
 
 const { runAction } = hostUi.runAction;
@@ -61,7 +62,8 @@ export function DeviceDialog({
     const [placeId, setPlaceId] = useState("");
     const [controllable, setControllable] = useState(true);
     const [roomId, setRoomId] = useState("");
-    const [rooms, setRooms] = useState<RoomView[] | null>(null);
+    // The rooms of the place it is at, read again when another place is picked.
+    const [rooms, setRooms] = usePlaceRooms(device ? placeId : "");
     const [roomName, setRoomName] = useState("");
     const [floor, setFloor] = useState("");
     const [saving, setSaving] = useState(false);
@@ -78,27 +80,6 @@ export function DeviceDialog({
         setFloor("");
         setError("");
     }, [device]);
-
-    // The rooms of the place it is at, read again when another place is picked.
-    useEffect(() => {
-        if (!device || !placeId) {
-            setRooms([]);
-            return;
-        }
-        let current = true;
-        setRooms(null);
-        void actions.listRoomsAction(placeId).then(
-            (result) => {
-                if (current) setRooms(result.rooms ?? []);
-            },
-            () => {
-                if (current) setRooms([]);
-            }
-        );
-        return () => {
-            current = false;
-        };
-    }, [device, placeId]);
 
     const issue = name.trim()
         ? (deviceEditSchema.shape.name.safeParse(name).error?.issues[0]?.message ?? null)

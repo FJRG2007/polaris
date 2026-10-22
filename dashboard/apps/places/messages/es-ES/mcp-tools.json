@@ -3,5 +3,7 @@
     "places_device_control": "Usar un dispositivo",
     "places_routines": "Ver rutinas",
     "places_routine_run": "Lanzar una rutina",
-    "places_camera_snapshot": "Foto de una cámara"
+    "places_camera_snapshot": "Foto de una cámara",
+    "places_camera_privacy": "Cámaras privadas",
+    "places_camera_privacy_set": "Cambiar privacidad"
 }

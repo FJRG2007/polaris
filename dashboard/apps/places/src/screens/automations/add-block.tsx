@@ -42,6 +42,7 @@ import {
     Sun,
     Timer,
     Unplug,
+    EyeOff,
     Workflow,
     Zap
 } from "lucide-react";
@@ -123,7 +124,8 @@ const VOCABULARY: {
         wait: { group: "devices", icon: <Hourglass /> },
         delay: { group: "time", icon: <Timer /> },
         notify: { group: "other", icon: <Bell /> },
-        run: { group: "other", icon: <Workflow /> }
+        run: { group: "other", icon: <Workflow /> },
+        privacy: { group: "devices", icon: <EyeOff /> }
     }
 };
 

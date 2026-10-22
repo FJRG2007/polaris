@@ -26,6 +26,8 @@
 import { z } from "zod";
 import * as places from "./places";
 import * as devices from "./devices";
+import * as privacyLib from "./privacy";
+import { groupState, parseTarget, privacyGroups } from "./privacy-kinds";
 import { homeInstall } from "./access";
 import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
@@ -662,12 +664,174 @@ const snapshotTool = () =>
         }
     });
 
+// ---------------------------------------------------------------------------
+// Camera privacy
+// ---------------------------------------------------------------------------
+
+const privacyReadInput = z.object({
+    target: z
+        .string()
+        .max(300)
+        .optional()
+        .describe(
+            "camera:<id>, room:<id>, set:<id>, zone:<placeId>:<zone name> or place:<id>. Without it, lists every target with its privacy."
+        )
+});
+
+const privacySetInput = z.object({
+    target: z
+        .string()
+        .max(300)
+        .describe("camera:<id>, room:<id>, set:<id>, zone:<placeId>:<zone name> or place:<id>."),
+    private: z.boolean().describe("true turns privacy on, false turns it off.")
+});
+
+/** One camera's privacy as a tool row. */
+function privacyRow(camera: {
+    id: string;
+    name: string;
+    privacy: boolean;
+    privacyNative: boolean;
+}) {
+    return {
+        id: camera.id,
+        name: camera.name,
+        private: camera.privacy,
+        native: camera.privacyNative
+    };
+}
+
+/** The cameras this person may see, every target they make up, and each
+ *  target's privacy as stored - the camera's own answer from its last switch. */
+async function privacyTargets(caller: McpCaller) {
+    const { user, install } = await contextFor(caller);
+    const cameras = await import("./cameras");
+    const rooms = await import("./rooms");
+    const cameraSets = await import("./camera-sets");
+    const reach = await placesReach(user);
+    const [list, placeList, setList] = await Promise.all([
+        cameras.listCameras(install.id),
+        places.listPlaces(install.id),
+        cameraSets.listCameraSets(install.id)
+    ]);
+    const roomList = placeList.length
+        ? await rooms.listRooms(
+              install.id,
+              placeList.map((place) => place.id)
+          )
+        : [];
+    const seen = onlyReachable(list, reach.everything || reach.cameras);
+    const names = new Map(placeList.map((place) => [place.id, place.name]));
+    const groups = privacyGroups(seen, {
+        places: names,
+        rooms: new Map(roomList.map((room) => [room.id, room.name])),
+        sets: setList
+    });
+    return {
+        user,
+        install,
+        targets: groups.map((group) => ({
+            target: group.target,
+            label: group.label,
+            ...groupState(group.cameras.map((camera) => ({ private: camera.privacy }))),
+            cameras: group.cameras.map(privacyRow)
+        }))
+    };
+}
+
+const privacyTool = () =>
+    host.mcp.defineTool({
+        name: "places_camera_privacy",
+        // i18n-ignore shown by the calling client, which has no locale to ask for
+        title: "Camera privacy",
+        description:
+            // i18n-ignore read by the calling model, not shown to a person
+            "Whether cameras are private (not streaming or recording). Without target, lists every camera, room, set, zone and place with how many of its cameras are private. Read-only.",
+        input: privacyReadInput,
+        category: "home",
+        scope: "places.read",
+        readOnly: true,
+        async run(input, caller) {
+            const { targets } = await privacyTargets(caller);
+            const shown = input.target
+                ? targets.filter((row) => row.target === input.target)
+                : targets;
+            if (input.target && shown.length === 0)
+                refuse("No cameras you can see are in that target.");
+            return {
+                text:
+                    shown
+                        .map(
+                            (row) =>
+                                `${row.target}  ${row.label}: ${row.some} of ${row.total} private`
+                        )
+                        .join("\n") || "No cameras.",
+                structured: { targets: shown }
+            };
+        }
+    });
+
+const privacySetTool = () =>
+    host.mcp.defineTool({
+        name: "places_camera_privacy_set",
+        // i18n-ignore shown by the calling client, which has no locale to ask for
+        title: "Switch camera privacy",
+        description:
+            // i18n-ignore read by the calling model, not shown to a person
+            "Turn privacy on or off for one camera, a room, a set of cameras, a zone or a place. A Tapo camera is switched itself and reports back; other cameras are left alone by Polaris (no stream, recording or detection). Answers each camera's result; some may fail while others switch.",
+        input: privacySetInput,
+        category: "home",
+        scope: "places.control",
+        readOnly: false,
+        async target(input, caller) {
+            const { install, user } = await contextFor(caller);
+            if (!(await host.session.sessionCan(user, "home.control")))
+                refuse(
+                    "Only somebody who may control the house's cameras can switch their privacy."
+                );
+            const parsed = parseTarget(input.target);
+            if (!parsed) refuse("That is not a camera, room, set, zone or place.");
+            const ids = await privacyLib.camerasFor(install.id, parsed);
+            return {
+                id: input.target,
+                name: `${ids.length} camera(s)`,
+                action: input.private ? "privacy on" : "privacy off"
+            };
+        },
+        async run(input, caller) {
+            const { user, install } = await contextFor(caller);
+            if (!(await host.session.sessionCan(user, "home.control")))
+                refuse(
+                    "Only somebody who may control the house's cameras can switch their privacy."
+                );
+            const parsed = parseTarget(input.target);
+            if (!parsed) refuse("That is not a camera, room, set, zone or place.");
+            const results = await privacyLib.switchPrivacy(install.id, parsed, input.private);
+            if (results.length === 0) refuse("There are no cameras in that target.");
+            const failed = results.filter((row) => row.failure);
+            return {
+                text:
+                    `${results.length - failed.length} of ${results.length} switched.` +
+                    failed.map((row) => `\n${row.name || row.cameraId}: ${row.failure}`).join(""),
+                structured: { target: input.target, ...groupState(results), results }
+            };
+        }
+    });
+
 /** Built when the app is first asked for its tools, not when this module
  *  loads: `defineTool` is the host's, and a module of this app can be loaded
  *  before the dashboard has provided it (test/home/cold-start). */
 let built: readonly McpTool[] | undefined;
 
 export function placesMcpTools(): readonly McpTool[] {
-    built ??= [devicesTool, controlTool, routinesTool, runTool, snapshotTool].map((tool) => tool());
+    built ??= [
+        devicesTool,
+        controlTool,
+        routinesTool,
+        runTool,
+        snapshotTool,
+        privacyTool,
+        privacySetTool
+    ].map((tool) => tool());
     return built;
 }

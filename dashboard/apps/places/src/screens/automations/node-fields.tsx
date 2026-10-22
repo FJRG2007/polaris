@@ -39,6 +39,7 @@ interface Listing {
     readonly devices: DeviceView[];
     readonly rooms: RoomView[];
     readonly siblings: { id: string; name: string }[];
+    readonly privacyTargets: { target: string; label: string }[];
 }
 
 const NO_ROOMS: RoomView[] = [];
@@ -71,7 +72,8 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
                 placeId: result.context.placeId,
                 devices: result.context.devices,
                 rooms: result.context.rooms ?? NO_ROOMS,
-                siblings: result.context.siblings
+                siblings: result.context.siblings,
+                privacyTargets: result.context.privacyTargets ?? []
             });
         })();
         return () => {
@@ -168,6 +170,7 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
                 canControl
                 byId={byId}
                 siblings={listing.siblings}
+                privacyTargets={listing.privacyTargets}
                 disabled={disabled}
                 onChange={(next) => setConfig(configOf(next, placeId))}
                 onRemove={ignore}

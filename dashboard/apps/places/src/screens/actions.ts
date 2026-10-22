@@ -32,6 +32,16 @@ import * as automations from "../lib/automations";
 import * as devices from "../lib/devices";
 import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
+import * as privacy from "../lib/privacy";
+import * as cameraSets from "../lib/camera-sets";
+import {
+    cameraIdsSchema,
+    cameraSetInputSchema,
+    normalizeCameraSetInput,
+    parseTarget,
+    type CameraPrivacy,
+    type CameraSetView
+} from "../lib/privacy-kinds";
 import * as schemas from "../lib/schemas";
 import { probeCamera } from "../lib/onvif";
 import { streamPathOf } from "../lib/stream-path";
@@ -1050,6 +1060,110 @@ export async function ptzGoToAction(cameraId: string, preset: string): Promise<{
     const { install } = await requireHome("home.control");
     const result = await guard(() => ptz.goTo(install.id, cameraId, preset));
     return result.error ? { error: result.error } : {};
+}
+
+/** Where the camera points now becomes where it turns when it goes private.
+ *  For a camera that pans and has no privacy mode of its own. */
+export async function savePrivacyPositionAction(
+    cameraId: string
+): Promise<{ privacyPreset?: string; error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => ptz.savePrivacyPosition(install.id, String(cameraId)));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { privacyPreset: result.value };
+}
+
+export async function clearPrivacyPositionAction(cameraId: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => ptz.clearPrivacyPosition(install.id, String(cameraId)));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return {};
+}
+
+/**
+ * Turn privacy on or off for a camera, a zone or a whole place.
+ *
+ * `home.control`, the same as pointing a camera: somebody a camera was lent to
+ * sees that it is private and cannot switch it. Every camera answers for
+ * itself, so a group that half-switched says which ones did not.
+ */
+export async function cameraPrivacyAction(
+    target: string,
+    wanted: boolean
+): Promise<{ results?: CameraPrivacy[]; error?: string }> {
+    const { install } = await requireHome("home.control");
+    const parsed = parseTarget(target);
+    if (!parsed) return { error: await say("privacy.badTarget") };
+    const result = await guard(() => privacy.switchPrivacy(install.id, parsed, wanted));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { results: result.value };
+}
+
+/**
+ * Accept the certificate these cameras answer with next, then switch them
+ * again. `home.manage`: trusting a device at an address is arranging the house,
+ * not using it.
+ */
+export async function trustCamerasAgainAction(
+    cameraIds: unknown,
+    target: string,
+    wanted: boolean
+): Promise<{ results?: CameraPrivacy[]; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const parsed = parseTarget(target);
+    const ids = cameraIdsSchema.safeParse(cameraIds);
+    if (!parsed || !ids.success) return { error: await say("privacy.badTarget") };
+    const result = await guard(async () => {
+        await privacy.trustCamerasAgain(install.id, ids.data);
+        return privacy.switchPrivacy(install.id, parsed, wanted);
+    });
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { results: result.value };
+}
+
+/** The camera sets of a place (the current one when none is named). */
+export async function listCameraSetsAction(
+    placeId?: string | null
+): Promise<{ sets?: CameraSetView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const id = placeId ? String(placeId) : (await currentPlace(install.id)).current.id;
+        return cameraSets.listCameraSets(install.id, id);
+    });
+    return result.error ? { error: result.error } : { sets: result.value };
+}
+
+/** A new camera set (no id), or a set's new name and cameras. Arranging the
+ *  house is `home.manage`; switching the set is `home.control`. */
+export async function saveCameraSetAction(
+    id: string | null,
+    input: unknown
+): Promise<{ set?: CameraSetView; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const parsed = cameraSetInputSchema.safeParse(
+        normalizeCameraSetInput((input ?? {}) as Record<string, unknown>)
+    );
+    if (!parsed.success) {
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.someWrong") };
+    }
+    const result = await guard(() =>
+        cameraSets.saveCameraSet(install.id, id ? String(id) : null, parsed.data)
+    );
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { set: result.value };
+}
+
+export async function deleteCameraSetAction(id: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => cameraSets.deleteCameraSet(install.id, String(id)));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return {};
 }
 
 export async function listClipsAction(input: {

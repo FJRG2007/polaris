@@ -525,6 +525,47 @@ export async function gotoPreset(
     );
 }
 
+/** The SOAP body of a PTZ `SetPreset`: save where the camera points now. With a
+ *  token, that preset is moved here rather than a new one made. Pure for the
+ *  test. */
+export function setPresetBody(profileToken: string, name: string, token?: string | null): string {
+    return (
+        `<SetPreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken>` +
+        `<PresetName>${escapeXml(name)}</PresetName>` +
+        (token ? `<PresetToken>${escapeXml(token)}</PresetToken>` : "") +
+        `</SetPreset>`
+    );
+}
+
+/** Save the current position as a preset; answers the camera's token for it. */
+export async function setPreset(
+    endpoint: OnvifEndpoint,
+    profileToken: string,
+    name: string,
+    token?: string | null
+): Promise<string> {
+    const xml = await call(
+        endpoint,
+        (await getServices(endpoint)).ptz,
+        setPresetBody(profileToken, name, token)
+    );
+    const saved = tagValue(xml, "PresetToken") ?? token ?? null;
+    if (!saved) throw new OnvifError("SetPreset answered no token", "refused");
+    return saved;
+}
+
+export async function removePreset(
+    endpoint: OnvifEndpoint,
+    profileToken: string,
+    token: string
+): Promise<void> {
+    await call(
+        endpoint,
+        (await getServices(endpoint)).ptz,
+        `<RemovePreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken><PresetToken>${escapeXml(token)}</PresetToken></RemovePreset>`
+    );
+}
+
 /**
  * Ask the camera to hold a mailbox of the things it notices.
  *

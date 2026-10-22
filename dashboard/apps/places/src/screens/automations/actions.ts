@@ -28,6 +28,9 @@ import { guard } from "../../lib/action-guard";
 import * as auto from "../../lib/automation-kinds";
 import * as automations from "../../lib/automations";
 import { currentPlace } from "../../lib/current-place";
+import * as cameras from "../../lib/cameras";
+import * as cameraSets from "../../lib/camera-sets";
+import { privacyGroups } from "../../lib/privacy-kinds";
 import { moveAutomationNow } from "../../lib/automation-move";
 import { draftGraph } from "../../lib/automation-convert";
 import { autoOffName, issueText } from "../../lib/automation-words";
@@ -105,23 +108,34 @@ export interface EditorContext {
     readonly floors?: FloorView[];
     /** Where the place is, for the sun blocks' times. Null until set. */
     readonly location?: Coordinate | null;
+    /** The camera privacy targets of the place - its cameras, zones, rooms,
+     *  sets and the place itself. Absent reads as none. */
+    readonly privacyTargets?: { readonly target: string; readonly label: string }[];
 }
 
 async function editorContext(installedAppId: string, placeId: string): Promise<EditorContext> {
-    const [found, list, roomList, floorList, place] = await Promise.all([
+    const [found, list, roomList, floorList, place, cameraList, setList] = await Promise.all([
         devices.listDevices(installedAppId, placeId),
         automations.listAutomations(installedAppId, placeId),
         rooms.listRooms(installedAppId, placeId),
         rooms.listFloors(installedAppId, placeId),
-        places.getPlace(installedAppId, placeId)
+        places.getPlace(installedAppId, placeId),
+        cameras.listCameras(installedAppId, placeId),
+        cameraSets.listCameraSets(installedAppId, placeId)
     ]);
+    const privacyTargets = privacyGroups(cameraList, {
+        places: new Map(place ? [[place.id, place.name]] : []),
+        rooms: new Map(roomList.map((room) => [room.id, room.name])),
+        sets: setList
+    }).map((group) => ({ target: group.target, label: group.label }));
     return {
         placeId,
         devices: found,
         siblings: list.map((automation) => ({ id: automation.id, name: automation.name })),
         rooms: roomList,
         floors: floorList,
-        location: place?.location ?? null
+        location: place?.location ?? null,
+        privacyTargets
     };
 }
 

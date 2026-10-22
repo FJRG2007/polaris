@@ -158,7 +158,12 @@ function workerReaches(service: { networkUrl: string | null; directUrl: string }
  */
 export async function assignmentsFor(installedAppId: string): Promise<VisionAssignment[]> {
     const cameras = await prisma.camera.findMany({
-        where: { installedAppId, enabled: true, detector: { in: ["motion", "objects", "faces"] } },
+        where: {
+            installedAppId,
+            enabled: true,
+            privacy: false,
+            detector: { in: ["motion", "objects", "faces"] }
+        },
         select: {
             id: true,
             name: true,

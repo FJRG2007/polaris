@@ -357,7 +357,12 @@ export function AutomationEditor({
     const devices = loaded?.context.devices ?? [];
     const byId = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
     const lookup = useMemo<words.DeviceLookup>(
-        () => words.lookupOf(devices, loaded?.context.rooms ?? NO_ROOMS),
+        () =>
+            words.lookupOf(
+                devices,
+                loaded?.context.rooms ?? NO_ROOMS,
+                loaded?.context.privacyTargets ?? []
+            ),
         [devices, loaded]
     );
     const siblings = useMemo(
@@ -852,6 +857,7 @@ export function AutomationEditor({
             canControl={canControl}
             byId={byId}
             siblings={siblings}
+            privacyTargets={loaded?.context.privacyTargets ?? []}
             disabled={readOnly}
             onChange={(next) =>
                 editDefinition((current) => ({
@@ -2110,6 +2116,7 @@ export function StepCard({
     canControl,
     byId,
     siblings,
+    privacyTargets = [],
     disabled,
     plain,
     onChange,
@@ -2125,6 +2132,8 @@ export function StepCard({
     canControl: boolean;
     byId: ReadonlyMap<string, DeviceView>;
     siblings: readonly { id: string; name: string }[];
+    /** The place's camera privacy targets, for a privacy step. */
+    privacyTargets?: readonly { target: string; label: string }[];
     disabled: boolean;
     plain?: boolean;
     onChange: (step: auto.Step) => void;
@@ -2351,6 +2360,63 @@ export function StepCard({
                         onChange={(delivery) => onChange({ ...step, delivery })}
                     />
                 </div>
+            )}
+            {step.kind === "privacy" && (
+                <>
+                    <flow.Field
+                        label={t("automations.fields.privacyCameras")}
+                        path={[...path, "target"]}
+                        required
+                    >
+                        {(id, invalid) =>
+                            privacyTargets.length === 0 && !step.target ? (
+                                <p id={id} className="text-xs text-muted-foreground">
+                                    {t("automations.fields.noCameras")}
+                                </p>
+                            ) : (
+                                <Select
+                                    id={id}
+                                    value={step.target}
+                                    disabled={disabled}
+                                    placeholder={t("automations.fields.chooseCameras")}
+                                    className={invalid ? "border-danger-edge" : undefined}
+                                    options={[
+                                        ...privacyTargets.map((row) => ({
+                                            value: row.target,
+                                            label: row.label
+                                        })),
+                                        // One that is gone stays visible as gone,
+                                        // rather than the field silently emptying.
+                                        ...(step.target &&
+                                        !privacyTargets.some((row) => row.target === step.target)
+                                            ? [
+                                                  {
+                                                      value: step.target,
+                                                      label: t("automations.say.someCameras")
+                                                  }
+                                              ]
+                                            : [])
+                                    ]}
+                                    onValueChange={(next) => onChange({ ...step, target: next })}
+                                />
+                            )
+                        }
+                    </flow.Field>
+                    <flow.Field label={t("automations.fields.privacyState")} path={[...path, "on"]}>
+                        {(id) => (
+                            <Select
+                                id={id}
+                                value={step.on ? "on" : "off"}
+                                disabled={disabled}
+                                options={[
+                                    { value: "on", label: t("automations.fields.privacyOn") },
+                                    { value: "off", label: t("automations.fields.privacyOff") }
+                                ]}
+                                onValueChange={(next) => onChange({ ...step, on: next === "on" })}
+                            />
+                        )}
+                    </flow.Field>
+                </>
             )}
             {step.kind === "run" && (
                 <flow.Field

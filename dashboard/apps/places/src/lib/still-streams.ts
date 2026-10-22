@@ -30,6 +30,7 @@ interface StillCandidate {
     readonly id: string;
     readonly installedAppId: string;
     readonly enabled: boolean;
+    readonly privacy: boolean;
     readonly power: string;
     readonly vendor: string;
     readonly subPath: string | null;
@@ -66,7 +67,7 @@ export async function repairStillStreams(
     let moved = 0;
     for (const camera of cameras) {
         if (Date.now() >= until) break;
-        if (asked.has(camera.id) || !camera.enabled || !camera.subPath) continue;
+        if (asked.has(camera.id) || !camera.enabled || camera.privacy || !camera.subPath) continue;
         // A make with nothing to ask, or one reached over its maker's own
         // protocol, which picks the stream by quality and never reads the path.
         const vendor = cameraVendor(camera.vendor);

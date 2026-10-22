@@ -246,6 +246,7 @@
         "places/src/screens/camera-tile.tsx",
         "places/src/screens/camera-viewer.tsx",
         "places/src/screens/cameras/camera-dialog.tsx",
+        "places/src/screens/cameras/camera-sets-dialog.tsx",
         "places/src/screens/cameras/cameras-view.tsx",
         "places/src/screens/cameras/discover-dialog.tsx",
         "places/src/screens/cameras/model-picker.tsx",
