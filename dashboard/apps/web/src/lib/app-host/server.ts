@@ -127,6 +127,7 @@ const load = {
     chatMeetings: once(() => import("@/lib/chat/meetings")),
     containerFilesService: once(() => import("@/lib/container-files-service")),
     cronOwners: once(() => import("@/lib/cron/owners")),
+    deckLive: once(() => import("@/lib/deck/live")),
     deployDial: once(() => import("@/lib/deploy/dial")),
     deployReleases: once(() => import("@/lib/deploy/releases")),
     deployRuntime: once(() => import("@/lib/deploy/runtime")),
@@ -185,6 +186,11 @@ export const serverHost = {
     },
     apiSession: {
         apiUser: later(load.apiSession, "apiUser")
+    },
+    // Something a deck key shows changed - a Calendar timer paused - so that
+    // account's decks read it now rather than on their next tick.
+    deckLive: {
+        deckChanged: later(load.deckLive, "deckChanged")
     },
     appContainerMetrics: {
         readAppContainerMetricsOrNull: later(

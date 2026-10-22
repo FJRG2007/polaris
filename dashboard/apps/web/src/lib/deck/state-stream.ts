@@ -6,8 +6,10 @@
  * a comment line every so often keeps proxies from closing a quiet stream.
  *
  * What wakes a read: the chat bus, for a key counting unread messages, when a
- * change touches a conversation this person reaches; and a clock for the rest
- * (status, alarms, notifications, Places), which have no bus a deck could hold.
+ * change touches a conversation this person reaches; the deck bus, when a
+ * writer says what one of this person's keys shows moved (a Calendar timer
+ * paused from another device); and a clock for the rest (status, alarms,
+ * notifications, Places), which have no bus a deck could hold.
  * The stream ends itself after a few minutes and the plugin reconnects, so a
  * key that was revoked, or a permission taken away, stops answering within
  * that long without the stream having to check on every tick.
@@ -19,6 +21,7 @@ import type { DeckCaller, DeckState } from "./types";
 import { reachableChannelIds } from "@/lib/chat/access";
 import { subscribeChatChanges, type ChatChange } from "@/lib/chat/live";
 import { onControlsChanged } from "@/lib/chat/call-remote-service";
+import { onDeckChanged } from "./live";
 import { readDeckStates, type DeckWatch, type DeckWords } from "./deck-service";
 
 export const DECK_STREAM = {
@@ -43,6 +46,16 @@ export function chatChangeConcerns(
     return change.channelId !== undefined && reachable.has(change.channelId);
 }
 
+/** Whether a change announced on the deck bus is one this stream shows. */
+export function deckChangeConcerns(
+    watched: DeckWatch,
+    userId: string,
+    changedFor: string,
+    actions: readonly string[]
+): boolean {
+    return changedFor === userId && watched.some((entry) => actions.includes(entry.action));
+}
+
 /** The text of one frame. */
 export function stateFrame(readings: readonly { key: string; state: DeckState }[]): string {
     return `event: state\ndata: ${JSON.stringify({ readings })}\n\n`;
@@ -65,6 +78,7 @@ export function deckStateStream(
     let pending: ReturnType<typeof setTimeout> | null = null;
     let unsubscribe: (() => void) | null = null;
     let offCalls: (() => void) | null = null;
+    let offDeck: (() => void) | null = null;
 
     return new ReadableStream<Uint8Array>({
         async start(controller) {
@@ -84,11 +98,21 @@ export function deckStateStream(
                 if (pending) clearTimeout(pending);
                 unsubscribe?.();
                 offCalls?.();
+                offDeck?.();
                 try {
                     controller.close();
                 } catch {
                     // Already closed by the other side.
                 }
+            }
+
+            // A burst of wakes is one read.
+            function wake(): void {
+                if (pending || closed) return;
+                pending = setTimeout(() => {
+                    pending = null;
+                    void read();
+                }, DECK_STREAM.coalesceMs);
             }
 
             // One read at a time; a wake during one runs once more after it.
@@ -113,22 +137,13 @@ export function deckStateStream(
                     // key a moment after it is pressed, wherever it was pressed.
                     if (call && !offCalls) {
                         offCalls = onControlsChanged((userId) => {
-                            if (userId !== caller.userId || pending || closed) return;
-                            pending = setTimeout(() => {
-                                pending = null;
-                                void read();
-                            }, DECK_STREAM.coalesceMs);
+                            if (userId === caller.userId) wake();
                         });
                     }
                     if (chat && !unsubscribe) {
                         reachable = await reachableChannelIds({ id: caller.userId });
                         unsubscribe = subscribeChatChanges((change) => {
-                            if (!chatChangeConcerns(change, caller.userId, reachable)) return;
-                            if (pending || closed) return;
-                            pending = setTimeout(() => {
-                                pending = null;
-                                void read();
-                            }, DECK_STREAM.coalesceMs);
+                            if (chatChangeConcerns(change, caller.userId, reachable)) wake();
                         });
                     }
                 } catch (caught) {
@@ -143,6 +158,9 @@ export function deckStateStream(
             }
 
             signal?.addEventListener("abort", stop);
+            offDeck = onDeckChanged((userId, actions) => {
+                if (deckChangeConcerns(watched, caller.userId, userId, actions)) wake();
+            });
             write(`retry: 5000\n\n`);
             await read();
             timers.push(
@@ -164,6 +182,7 @@ export function deckStateStream(
             if (pending) clearTimeout(pending);
             unsubscribe?.();
             offCalls?.();
+            offDeck?.();
         }
     });
 }
