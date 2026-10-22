@@ -13,11 +13,21 @@
  * what is already stored, and a card saved says so where the reader is looking.
  */
 
-import { Button, Card, cn, Skeleton } from "@polaris/ui";
+import { Button, Card, cn, Input, Skeleton } from "@polaris/ui";
 import { activeSection, sameSettings, withFields } from "./settings-form";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Check, ChevronRight, Loader2, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { filterSettings, type SettingsIndex } from "./settings-search";
+import { Check, ChevronRight, Loader2, Search, X, type LucideIcon } from "lucide-react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode
+} from "react";
 
 /** One entry of the navigator: the section it scrolls to. */
 export interface SettingsSectionLink {
@@ -25,6 +35,46 @@ export interface SettingsSectionLink {
     readonly label: string;
     readonly icon: LucideIcon;
     readonly danger?: boolean;
+    /** The section key its cards declare in the page's index (the id when absent). */
+    readonly group?: string;
+}
+
+/** What "Filter settings" has narrowed the page to, for the cards and sections
+ *  under it. `visible` is null while nothing is typed. */
+interface SettingsFilterState {
+    readonly visible: { cards: Set<string>; sections: Set<string> } | null;
+    readonly register: (entry: string, text: string) => () => void;
+}
+
+const SettingsFilterContext = createContext<SettingsFilterState | null>(null);
+
+/** Puts a card in the filter's reach by its entry id and the words it shows, and
+ *  says whether the filter hides it. Outside a filtered layout it never does. */
+function useFilteredOut(entry: string | undefined, text: string): boolean {
+    const filter = useContext(SettingsFilterContext);
+    const register = filter?.register;
+    useEffect(() => {
+        if (!register || !entry) return;
+        return register(entry, text);
+    }, [register, entry, text]);
+    if (!filter?.visible || !entry) return false;
+    return !filter.visible.cards.has(entry);
+}
+
+/** The words of a title or description that is plain text; a composed one
+ *  is found by its declared keywords instead. */
+function plainText(...nodes: ReactNode[]): string {
+    return nodes.filter((node) => typeof node === "string" || typeof node === "number").join(" ");
+}
+
+/** Whether a key press is the "/" that jumps to the filter, rather than a
+ *  slash typed into a field. */
+function isFilterShortcut(event: KeyboardEvent): boolean {
+    if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return false;
+    const target = event.target as HTMLElement | null;
+    if (!target) return true;
+    const tag = target.tagName;
+    return !(tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable);
 }
 
 /** How long "Saved" stays beside a card's Save button. */
@@ -53,18 +103,68 @@ function reducedMotion(): boolean {
  * phone). It follows the scroll: the section being read is the one marked.
  */
 export function SettingsLayout({
-    sections,
+    sections: allSections,
+    index,
     children
 }: {
     sections: readonly SettingsSectionLink[];
+    /** Every card's section and keywords: given, the page gets "Filter settings". */
+    index?: SettingsIndex;
     children: ReactNode;
 }) {
     const t = useTranslations("deployService");
     const content = useRef<HTMLDivElement>(null);
     const nav = useRef<HTMLUListElement>(null);
+    const search = useRef<HTMLInputElement>(null);
+    const [query, setQuery] = useState("");
+    const [mounted, setMounted] = useState<ReadonlyMap<string, string>>(new Map());
+    const register = useCallback((entry: string, text: string) => {
+        setMounted((current) =>
+            current.get(entry) === text ? current : new Map(current).set(entry, text)
+        );
+        return () =>
+            setMounted((current) => {
+                if (!current.has(entry)) return current;
+                const next = new Map(current);
+                next.delete(entry);
+                return next;
+            });
+    }, []);
+    const filtering = Boolean(index) && query.trim() !== "";
+    const visible = useMemo(
+        () =>
+            filtering && index
+                ? filterSettings(
+                      index,
+                      [...mounted].map(([entry, text]) => ({ entry, text })),
+                      query
+                  )
+                : null,
+        [filtering, index, mounted, query]
+    );
+    const filter = useMemo<SettingsFilterState | null>(
+        () => (index ? { visible, register } : null),
+        [index, visible, register]
+    );
+    // The rail lists only the sections the filter leaves something in.
+    const sections = visible
+        ? allSections.filter((section) => visible.sections.has(section.group ?? section.id))
+        : allSections;
     const [current, setCurrent] = useState<string | null>(sections[0]?.id ?? null);
     const jumped = useRef<string | null>(null);
     const ids = sections.map((section) => section.id).join(",");
+
+    // "/" anywhere on the page jumps to the filter, as on Railway and GitHub.
+    useEffect(() => {
+        if (!index) return;
+        const onKey = (event: KeyboardEvent) => {
+            if (!isFilterShortcut(event)) return;
+            event.preventDefault();
+            search.current?.focus();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [index]);
 
     useEffect(() => {
         const scroller = scrollerOf(content.current);
@@ -202,7 +302,64 @@ export function SettingsLayout({
                 </ul>
             </nav>
             <div ref={content} className="flex min-w-0 flex-1 flex-col gap-10 pb-16 sm:pt-1">
-                {children}
+                {index && (
+                    <div className="-mb-6 flex flex-col gap-3">
+                        <div className="relative">
+                            <Search
+                                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                                aria-hidden
+                            />
+                            <Input
+                                ref={search}
+                                type="search"
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Escape" && query) {
+                                        event.preventDefault();
+                                        setQuery("");
+                                    }
+                                }}
+                                placeholder={t("kit.filterPlaceholder")}
+                                aria-label={t("kit.filterLabel")}
+                                aria-keyshortcuts="/"
+                                className="pl-8 pr-9"
+                            />
+                            <kbd
+                                className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border px-1.5 font-mono text-[0.6875rem] text-foreground-subtle sm:block"
+                                aria-hidden
+                            >
+                                /
+                            </kbd>
+                        </div>
+                        {visible && visible.cards.size === 0 && (
+                            <div
+                                role="status"
+                                className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-8 text-center"
+                            >
+                                <p className="min-w-0 break-words text-sm font-medium">
+                                    {t("kit.filterEmpty", { query: query.trim() })}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("kit.filterEmptyHint")}
+                                </p>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setQuery("");
+                                        search.current?.focus();
+                                    }}
+                                >
+                                    <X aria-hidden /> {t("kit.filterClear")}
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                )}
+                <SettingsFilterContext.Provider value={filter}>
+                    {children}
+                </SettingsFilterContext.Provider>
             </div>
         </div>
     );
@@ -212,6 +369,7 @@ export function SettingsLayout({
  *  and its cards. */
 export function SettingsSection({
     id,
+    group,
     icon: Icon,
     title,
     intro,
@@ -219,14 +377,24 @@ export function SettingsSection({
     children
 }: {
     id: string;
+    /** The section key its cards declare in the page's index (the id when absent). */
+    group?: string;
     icon: LucideIcon;
     title: string;
     intro: string;
     danger?: boolean;
     children: ReactNode;
 }) {
+    const filter = useContext(SettingsFilterContext);
+    // Hidden rather than unmounted, so a card's unsaved edit survives a search.
+    const hidden = Boolean(filter?.visible && !filter.visible.sections.has(group ?? id));
     return (
-        <section id={id} aria-labelledby={`${id}-title`} className="flex flex-col gap-3">
+        <section
+            id={id}
+            aria-labelledby={`${id}-title`}
+            hidden={hidden}
+            className={cn("flex flex-col gap-3", hidden && "!hidden")}
+        >
             <header className="flex items-start gap-3">
                 <span
                     className={cn(
@@ -265,6 +433,7 @@ export function SettingsSection({
  */
 export function SettingsCard({
     id,
+    entry,
     title,
     description,
     badge,
@@ -276,6 +445,8 @@ export function SettingsCard({
     children
 }: {
     id?: string;
+    /** Its id in the page's settings index, which "Filter settings" finds it by. */
+    entry?: string;
     title: ReactNode;
     description?: ReactNode;
     /** A status chip beside the title. */
@@ -288,11 +459,17 @@ export function SettingsCard({
     busy?: boolean;
     children?: ReactNode;
 }) {
+    const hidden = useFilteredOut(entry, plainText(title, description));
     return (
         <Card
             id={id}
+            hidden={hidden}
             aria-busy={busy || undefined}
-            className={cn("flex min-w-0 scroll-mt-16 flex-col", danger && "border-danger-edge")}
+            className={cn(
+                "flex min-w-0 scroll-mt-16 flex-col",
+                danger && "border-danger-edge",
+                hidden && "!hidden"
+            )}
         >
             <div className="flex min-w-0 flex-col gap-3 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
@@ -458,9 +635,23 @@ export function useSavedFlash(): [boolean, () => void] {
 }
 
 /** A card's shape while its data is on the way. */
-export function CardSkeleton({ title, rows = 2 }: { title?: ReactNode; rows?: number }) {
+export function CardSkeleton({
+    entry,
+    title,
+    rows = 2
+}: {
+    /** The entry of the card it stands in for, so the filter treats it the same. */
+    entry?: string;
+    title?: ReactNode;
+    rows?: number;
+}) {
+    const hidden = useFilteredOut(entry, plainText(title));
     return (
-        <Card aria-busy="true" className="flex flex-col gap-3 p-4">
+        <Card
+            aria-busy="true"
+            hidden={hidden}
+            className={cn("flex flex-col gap-3 p-4", hidden && "!hidden")}
+        >
             {title ? (
                 <h3 className="text-[0.8125rem] font-semibold leading-5">{title}</h3>
             ) : (
@@ -476,17 +667,21 @@ export function CardSkeleton({ title, rows = 2 }: { title?: ReactNode; rows?: nu
 
 /** A card whose data could not be read: why, and the way to ask again. */
 export function CardError({
+    entry,
     title,
     message,
     onRetry
 }: {
+    /** The entry of the card that failed to load, so the filter treats it the same. */
+    entry?: string;
     title?: ReactNode;
     message: string;
     onRetry?: () => void;
 }) {
     const t = useTranslations("deployService");
+    const hidden = useFilteredOut(entry, plainText(title));
     return (
-        <Card className="flex flex-col gap-2 p-4">
+        <Card hidden={hidden} className={cn("flex flex-col gap-2 p-4", hidden && "!hidden")}>
             {title && <h3 className="text-[0.8125rem] font-semibold leading-5">{title}</h3>}
             <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="min-w-0 text-danger-ink">{message}</span>

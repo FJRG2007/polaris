@@ -298,7 +298,6 @@
         "tunnelUrl": "That is a tunnel URL - it is already exposed by its tunnel, so it can't be added as a domain.",
         "connectorToken": "Cloudflare connector token (eyJhIjoi...)",
         "setUpDuckdns": "Set up DuckDNS",
-        "source": "Source",
         "rootDirectory": "Root directory",
         "rootDirectoryHint": "Where this service lives in the repository. The build still gets the whole repository, so shared packages and the lockfile above it are available. Blank = the repository root.",
         "dockerfilePath": "Dockerfile path",
@@ -324,14 +323,14 @@
         "keepReleasesHint": "Keep the last few versions running, each on its own address, while this service's own address stays on the newest. A service with a volume or on another server keeps the history but not the containers.",
         "containerPortShort": "The port the app listens on inside its container. Blank detects it from the image.",
         "portInvalid": "Enter a port from 1 to 65535.",
-        "sourceShort": "Where in the repository this service builds from.",
         "buildShort": "Detected from the repository. Fill one in only to override it.",
         "autoDeployShort": "Deploy each push to the branch, filtered by commit or path.",
         "watchPathsShort": "One glob per line, ! to exclude. Blank means any change.",
         "keepReleasesShort": "Earlier versions keep running, each on its own address.",
         "disableDomainNamed": "Turn off {hostname}",
         "enableDomainNamed": "Turn on {hostname}",
-        "removeDomainNamed": "Remove {hostname}"
+        "removeDomainNamed": "Remove {hostname}",
+        "rootDirectoryShort": "The folder this service lives in, for a repository holding several."
     },
     "exposureHint": {
         "zoneBase": "A hostname straight on {host}, with a Let's Encrypt certificate. This one is not covered by a wildcard, so it needs its own DNS record - Polaris writes it when the domain sits in your connected Cloudflare account, and otherwise tells you the record to add. For a name on a different domain, pick Custom domain.",
@@ -616,11 +615,8 @@
         "discard": "Discard",
         "retry": "Try again",
         "networkingIntro": "Where the service answers, inside the project and on the internet.",
-        "source": "Source & deploys",
         "sourceIntro": "Where the code comes from and when a new version goes out.",
         "scalingIntro": "How many copies run, what each may use, and when it sleeps.",
-        "advanced": "Advanced",
-        "advancedIntro": "Where it runs and builds, and moving it to another provider.",
         "danger": "Danger zone",
         "dangerIntro": "Actions that cannot be undone.",
         "on": "Enabled",
@@ -637,7 +633,21 @@
         "serverShort": "Moving it stops the container here; redeploy to start it there.",
         "move": "Move",
         "disableNamed": "Turn off {name}",
-        "enableNamed": "Turn on {name}"
+        "enableNamed": "Turn on {name}",
+        "sourceTitle": "Source",
+        "securityTitle": "Security & edge",
+        "securityIntro": "What reaches the service, and the rules the edge applies first.",
+        "buildTitle": "Build",
+        "buildIntro": "How the code becomes an image, and where that happens.",
+        "deployTitle": "Deploys",
+        "deployIntro": "What a new version does to the one running, and how to start one.",
+        "otherTitle": "Other",
+        "otherIntro": "Tags, and moving the service to another provider.",
+        "filterPlaceholder": "Filter settings",
+        "filterLabel": "Filter settings",
+        "filterEmpty": "No setting matches \"{query}\"",
+        "filterEmptyHint": "Try another word, in English or Spanish.",
+        "filterClear": "Clear filter"
     },
     "tabIntro": {
         "deployments": "Every build of this service, newest first. Roll back or redeploy from here.",
@@ -824,5 +834,34 @@
             "negligible": "Negligible",
             "unknown": "Unknown"
         }
+    },
+    "sourceCard": {
+        "repository": "Repository",
+        "repositoryShort": "The code this service builds and deploys.",
+        "branch": "Branch",
+        "defaultBranch": "Default branch",
+        "root": "Root directory",
+        "rootNone": "Repository root",
+        "onPush": "Deploy on push",
+        "upload": "Uploaded folder",
+        "uploadShort": "Built from a folder you upload. No repository is connected.",
+        "uploadEmpty": "Nothing uploaded yet. Drop a folder below to deploy it.",
+        "image": "Image",
+        "imageShort": "Runs this image as published. Nothing is built here.",
+        "none": "Source",
+        "noneShort": "No repository, upload or image is connected yet.",
+        "loadFailed": "The source could not be read. Try again in a moment."
+    },
+    "builder": {
+        "title": "Builder",
+        "short": "How the code becomes an image.",
+        "dockerfile": "Dockerfile",
+        "dockerfileShort": "Builds with {path} from the repository.",
+        "auto": "Automatic",
+        "autoShort": "No Dockerfile: the build reads the code to find its language and framework.",
+        "image": "Prebuilt image",
+        "imageShort": "Nothing is built here. The image runs as published.",
+        "other": "Set at creation",
+        "otherShort": "Built the way it was set up when the service was created."
     }
 }
