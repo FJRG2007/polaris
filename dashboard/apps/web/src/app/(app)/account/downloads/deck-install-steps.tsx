@@ -29,7 +29,7 @@ export type DeckHost = "streamdeck" | "opendeck" | "companion";
 export const DECK_HOSTS: readonly DeckHost[] = ["streamdeck", "opendeck", "companion"];
 
 /** Each app's name, which is the same in every language. */
-const HOST_LABELS: Readonly<Record<DeckHost, string>> = {
+export const HOST_LABELS: Readonly<Record<DeckHost, string>> = {
     // i18n-ignore a product's name
     streamdeck: "Stream Deck app",
     // i18n-ignore a product's name
@@ -97,7 +97,8 @@ export function DeckInstallSteps({
     pluginFile,
     moduleFile,
     address,
-    repo
+    repo,
+    initial
 }: {
     /** The `.streamDeckPlugin` button, for the Stream Deck app and OpenDeck. */
     pluginFile: React.ReactNode;
@@ -107,12 +108,15 @@ export function DeckInstallSteps({
     address: string | null;
     /** The repository the plugin's releases and install scripts come from. */
     repo: string;
+    /** The app whose row opened these steps; detected when left out. */
+    initial?: DeckHost;
 }) {
     const t = useTranslations("account");
-    const [host, setHost] = useState<DeckHost>("streamdeck");
+    const [host, setHost] = useState<DeckHost>(initial ?? "streamdeck");
     const [origin, setOrigin] = useState(address ?? "");
     // A choice the reader made outranks the one that was detected.
-    const picked = useRef(false);
+    // An app's own row is a choice already made.
+    const picked = useRef(initial !== undefined);
 
     // Detected in an effect: this renders on the server too, where there is no
     // navigator, and the first paint has to match what the server sent.

@@ -15,8 +15,8 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { CodeView } from "@/components/json-view";
 import { CopyButton } from "@/components/copy-button";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ArrowLeft, ExternalLink, Search, Plug } from "lucide-react";
-import { ClaudeMark, CursorMark, OpenAiMark } from "@/components/model-marks";
+import { ArrowLeft, ExternalLink, Search } from "lucide-react";
+import { LogoTile } from "@/components/client-logo-tile";
 import {
     Button,
     Card,
@@ -24,8 +24,7 @@ import {
     CardHeader,
     CardTitle,
     Input,
-    SegmentedControl,
-    cn
+    SegmentedControl
 } from "@polaris/ui";
 import {
     CLIENT_GUIDES,
@@ -59,38 +58,6 @@ function Copyable({ value, label }: { value: string; label: string }) {
             </code>
             <CopyButton value={value} label={label} />
         </div>
-    );
-}
-
-/** A client's mark on a light tile, so marks drawn in black read in dark mode
- *  without being recoloured. */
-function LogoTile({ logo, className }: { logo: ClientLogo | null; className?: string }) {
-    const mark =
-        logo === null ? (
-            <Plug className="size-5 text-neutral-500" aria-hidden />
-        ) : "mark" in logo ? (
-            logo.mark === "claude" ? (
-                <ClaudeMark className="size-5" />
-            ) : logo.mark === "openai" ? (
-                <OpenAiMark className="size-5" />
-            ) : (
-                <CursorMark className="size-5" />
-            )
-        ) : (
-            // The vendors' own files, served as they ship: their gradients and
-            // clip paths carry ids that would collide inline.
-            <img src={logo.src} alt="" className="size-5 object-contain" />
-        );
-    return (
-        <span
-            className={cn(
-                "grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-white text-neutral-900",
-                className
-            )}
-            aria-hidden
-        >
-            {mark}
-        </span>
     );
 }
 

@@ -9,7 +9,7 @@
 
 import { desktopDownload } from "@/lib/app-releases";
 import { renderToStaticMarkup } from "react-dom/server";
-import { InstallAppCard } from "@/components/installed-app";
+import { InstallAppOffer } from "@/components/installed-app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     arrivedDeployResults,
@@ -137,19 +137,13 @@ describe("desktopDownload", () => {
     });
 });
 
-describe("the install card", () => {
-    it("draws whole while the download is still being looked up", () => {
-        // What lets the offer stream in behind a boundary instead of holding the
-        // page: the card does not wait on it, so everything saying the native app
-        // exists is on screen before GitHub has answered. The two states of the
-        // offer itself are asserted in `app-download`.
-        const html = renderToStaticMarkup(withMessages(<InstallAppCard nativeApp={null} />));
-        expect(html).toContain("There is also a native app");
+describe("the install offer", () => {
+    it("draws at once, with nothing to wait on", () => {
+        // What lets the native builds stream in behind a boundary instead of
+        // holding the page: the offer beside them does not wait on them. The
+        // two states of that list are asserted in `app-download`.
+        const html = renderToStaticMarkup(withMessages(<InstallAppOffer />));
+        expect(html).toContain("Your browser installs it from its own menu");
         expect(html).not.toContain("Download the desktop app");
-    });
-
-    it("draws the offer it is handed", () => {
-        const html = renderToStaticMarkup(withMessages(<InstallAppCard nativeApp={<b>An offer</b>} />));
-        expect(html).toContain("<b>An offer</b>");
     });
 });

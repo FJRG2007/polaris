@@ -46,6 +46,15 @@ const RELEASE: AppDownload = {
     ]
 } as unknown as AppDownload;
 
+/** The card's own props, with stand-ins for the downloads that wait on GitHub. */
+const SECTION = {
+    decks: [],
+    address: "https://polaris.example.com",
+    repo: "example-org/example-repo",
+    pluginFile: <a href="/plugin">plugin file</a>,
+    moduleFile: <a href="/module">module file</a>
+};
+
 function steps(userAgent: string, address: string | null = "https://polaris.example.com") {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue(userAgent);
     render(
@@ -174,7 +183,7 @@ describe("the file each choice downloads", () => {
 
 describe("the Elgato Marketplace row", () => {
     it("says the plugin is not there yet, and links nothing until it is", () => {
-        render(<StreamDeckSection decks={[]} install={null} />, { wrapper: MessagesWrapper });
+        render(<StreamDeckSection {...SECTION} />, { wrapper: MessagesWrapper });
         expect(screen.getByText("From the Elgato Marketplace")).toBeTruthy();
         expect(screen.getByText("Not there yet")).toBeTruthy();
         expect(screen.queryByRole("link", { name: "Open in Marketplace" })).toBeNull();
@@ -183,11 +192,42 @@ describe("the Elgato Marketplace row", () => {
 
     it("links the listing once it has an address", () => {
         marketplace.url = "https://marketplace.example.test/polaris";
-        render(<StreamDeckSection decks={[]} install={null} />, { wrapper: MessagesWrapper });
+        render(<StreamDeckSection {...SECTION} />, { wrapper: MessagesWrapper });
         expect(screen.queryByText("Not there yet")).toBeNull();
         expect(screen.getByRole("link", { name: "Open in Marketplace" }).getAttribute("href")).toBe(
             "https://marketplace.example.test/polaris"
         );
+    });
+});
+
+describe("the Stream Deck card", () => {
+    it("lists each app a deck runs on with its own mark, and opens that app's steps", async () => {
+        render(<StreamDeckSection {...SECTION} />, { wrapper: MessagesWrapper });
+        for (const name of ["Stream Deck app", "OpenDeck", "Bitfocus Companion"])
+            expect(screen.getByText(name)).toBeTruthy();
+        expect(screen.getByText("Linux, Windows and macOS")).toBeTruthy();
+        // Nothing is drawn until a row is pressed: the card stays a list.
+        expect(screen.queryByText("Import module package")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Install in Bitfocus Companion" }));
+        // The row's app is already picked in the steps it opens.
+        expect(await screen.findByText("Import module package")).toBeTruthy();
+        expect(screen.getByRole("link", { name: "module file" })).toBeTruthy();
+        expect(screen.getByText("https://polaris.example.com")).toBeTruthy();
+    });
+
+    it("keeps the connected decks and the button that disconnects each", () => {
+        const deck = { id: "key-1", name: "Office deck", createdAt: "2026-01-01T00:00:00Z", lastUsedAt: null };
+        render(<StreamDeckSection {...SECTION} decks={[deck]} />, { wrapper: MessagesWrapper });
+        expect(screen.getByText("Connected decks")).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Office deck" }).getAttribute("href")).toBe(
+            "/account/api-keys/key-1"
+        );
+        expect(screen.getByRole("button", { name: "Disconnect" })).toBeTruthy();
+    });
+
+    it("says so when no deck is connected", () => {
+        render(<StreamDeckSection {...SECTION} />, { wrapper: MessagesWrapper });
+        expect(screen.getByText("No Stream Deck is connected to this account.")).toBeTruthy();
     });
 });
 

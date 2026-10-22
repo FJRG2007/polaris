@@ -10,17 +10,21 @@
  * deployment and only the sign-in line carries this one's address: the one it is
  * configured to be reached at, or the address this page is open on when none is.
  *
- * Its own component, like the extension's, so the page stays a list of cards.
+ * Both install lines are rows of their own, the reader's system first: somebody
+ * may be setting it up on a machine that is not the one they are reading on, and
+ * two lines read faster than a picker that hides one of them.
  */
 
+import { Skeleton } from "@polaris/ui";
 import { Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
+import { TerminalPreview } from "./download-previews";
 import { CopyButton } from "@/components/copy-button";
-import { PlatformSelect } from "@/components/platform-select";
+import { SystemMark } from "@/components/client-marks";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
+import { DownloadCard, DownloadRow, DownloadRows } from "./download-card";
 import { cliInstallLine, cliLoginLine } from "@/lib/cli/install-line";
-import { detectPlatform, type InstallPlatform } from "@/lib/install-platform";
+import { detectPlatform, PLATFORM_LABELS, type InstallPlatform } from "@/lib/install-platform";
 
 /** A command on a line of its own, with the button that copies it. */
 function CommandLine({ command }: { command: string }) {
@@ -56,55 +60,67 @@ export function CliSection({
         if (!serverUrl) setOrigin(window.location.origin);
     }, [serverUrl]);
 
-    const install = cliInstallLine(platform, repo);
+    const unix = cliInstallLine("linux", repo);
+    const windows = cliInstallLine("windows", repo);
+    const rows = [
+        {
+            key: "unix",
+            line: unix,
+            detail: t("downloads.cli.unixSystems"),
+            mark: (
+                <span className="flex items-center gap-0.5">
+                    <SystemMark os={PLATFORM_LABELS.macos} className="size-3.5" />
+                    <SystemMark os={PLATFORM_LABELS.linux} className="size-3.5" />
+                </span>
+            )
+        },
+        {
+            key: "windows",
+            line: windows,
+            detail: PLATFORM_LABELS.windows,
+            mark: <SystemMark os={PLATFORM_LABELS.windows} />
+        }
+    ];
+    // The reader's own system first.
+    if (platform === "windows") rows.reverse();
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Terminal className="size-4" />
-                    {t("downloads.cli.title")}
-                </CardTitle>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-4 text-sm">
-                <p className="text-muted-foreground">{t("downloads.cli.description")}</p>
+        <DownloadCard
+            id="cli"
+            tint="emerald"
+            icon={<Terminal className="size-4 shrink-0" />}
+            title={t("downloads.cli.title")}
+            description={t("downloads.cli.description")}
+            preview={<TerminalPreview />}
+        >
+            <div className="flex min-w-0 flex-col gap-2">
+                <DownloadRows label={t("downloads.cli.install")}>
+                    {rows.map((row) => (
+                        <DownloadRow key={row.key} mark={row.mark} name={row.line.shell} detail={row.detail}>
+                            <CommandLine command={row.line.command} />
+                        </DownloadRow>
+                    ))}
+                </DownloadRows>
+                <p className="text-xs text-muted-foreground">{t("downloads.cli.hint")}</p>
+            </div>
 
-                <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-medium">{t("downloads.cli.install")}</p>
-                        <PlatformSelect
-                            className="w-44"
-                            value={platform}
-                            label={t("downloads.cli.system")}
-                            onChange={setPlatform}
-                        />
-                    </div>
-                    <CommandLine command={install.command} />
-                    <p className="text-xs text-muted-foreground">
-                        {t("downloads.cli.hint", { shell: install.shell })}
-                    </p>
-                </div>
+            <div className="flex min-w-0 flex-col gap-2">
+                <p className="text-xs font-medium text-muted-foreground">{t("downloads.cli.signIn")}</p>
+                {origin ? (
+                    <CommandLine command={cliLoginLine(origin)} />
+                ) : (
+                    <Skeleton className="h-9 w-full" />
+                )}
+                <p className="text-xs text-muted-foreground">{t("downloads.cli.signInHint")}</p>
+            </div>
 
-                <div className="flex flex-col gap-2">
-                    <p className="font-medium">{t("downloads.cli.signIn")}</p>
-                    {origin ? (
-                        <CommandLine command={cliLoginLine(origin)} />
-                    ) : (
-                        <Skeleton className="h-9 w-full" />
-                    )}
-                    <p className="text-xs text-muted-foreground">{t("downloads.cli.signInHint")}</p>
-                </div>
+            <div className="flex min-w-0 flex-col gap-2">
+                <p className="text-xs font-medium text-muted-foreground">{t("downloads.cli.next")}</p>
+                {/* i18n-ignore commands, typed as they are */}
+                <CommandLine command="plr projects" />
+            </div>
 
-                <div className="flex flex-col gap-2">
-                    <p className="font-medium">{t("downloads.cli.next")}</p>
-                    {/* i18n-ignore commands, typed as they are */}
-                    <CommandLine command="plr projects" />
-                </div>
-
-                <p className="border-t border-border/60 pt-4 text-xs text-muted-foreground">
-                    {t("downloads.cli.server")}
-                </p>
-            </CardBody>
-        </Card>
+            <p className="text-xs text-muted-foreground">{t("downloads.cli.server")}</p>
+        </DownloadCard>
     );
 }

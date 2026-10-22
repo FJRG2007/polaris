@@ -24,6 +24,7 @@ import { describe, expect, it } from "vitest";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 const page = readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8");
+const extensionCard = readFile(`${SRC}app/(app)/account/downloads/extension-card.tsx`, "utf8");
 // The offer is drawn by `app-download-offers` and awaited by `app-download`, and
 // its sentences live in the English catalog, so all three are what it says.
 const files = Promise.all([
@@ -70,10 +71,33 @@ describe("when nothing has been published", () => {
     });
 });
 
+describe("waiting on GitHub", () => {
+    it("holds back only the files, each behind a boundary of its own", async () => {
+        // The cards, their rows and the steps are drawn before any release
+        // lookup answers; only these four wait, each in its own Suspense.
+        const source = flat(await page);
+        for (const lookup of [
+            "<ExtensionFiles repo={repo} />",
+            "<DesktopFiles repo={repo} />",
+            "<StreamDeckRelease repo={repo} />",
+            "<CompanionRelease repo={repo} />"
+        ]) {
+            const at = source.indexOf(lookup);
+            expect(at).toBeGreaterThan(-1);
+            expect(source.slice(0, at).trimEnd().endsWith(">")).toBe(true);
+            expect(source.slice(source.lastIndexOf("<Suspense", at), at)).toContain("fallback=");
+            expect(source.slice(at + lookup.length).trimStart().startsWith("</Suspense>")).toBe(true);
+        }
+    });
+});
+
 describe("loading it by hand", () => {
     it("is a guided sequence, not a paragraph with the steps inside it", async () => {
-        const source = await page;
-        expect(source).toContain("<ExtensionSteps />");
+        // Opened from each browser's row, with that browser already picked.
+        const source = await extensionCard;
+        expect(source).toContain("<ExtensionSteps initial={guide.id} />");
+        expect(source).toContain("<ExtensionCommand repo={repo} />");
+        expect(await page).toContain("<ExtensionCard");
     });
 
     it("no longer writes one browser's steps into the page itself", async () => {
