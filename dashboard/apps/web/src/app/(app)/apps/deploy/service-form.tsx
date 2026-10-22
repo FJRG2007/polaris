@@ -12,13 +12,14 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { Button, Input, Select } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
     dbEngineLabel,
     SERVICE_TEMPLATES,
     serviceTemplate,
     type ServiceTemplate
 } from "@polaris/core";
+import { Field } from "./form-field";
 
 export interface ServerOption {
     id: string;
@@ -242,23 +243,5 @@ export function NewTemplateForm({
                 </Button>
             </div>
         </div>
-    );
-}
-
-export function Field({
-    label,
-    hint,
-    children
-}: {
-    label: string;
-    hint?: string;
-    children: ReactNode;
-}) {
-    return (
-        <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{label}</span>
-            {children}
-            {hint && <span className="text-xs text-muted-foreground/70">{hint}</span>}
-        </label>
     );
 }

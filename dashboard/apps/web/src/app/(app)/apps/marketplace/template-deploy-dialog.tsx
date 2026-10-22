@@ -11,7 +11,8 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Field, NewTemplateForm } from "../deploy/service-form";
+import { Field } from "../deploy/form-field";
+import { NewTemplateForm } from "../deploy/service-form";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { listTemplateTargetsAction, type TemplateTarget } from "../deploy/actions";
 import {
