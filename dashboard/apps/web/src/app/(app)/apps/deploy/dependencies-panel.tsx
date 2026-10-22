@@ -35,7 +35,10 @@ export function DependenciesPanel({ applicationId }: { applicationId: string }) 
                 if (!quiet) setLoaded({ status: "failed" });
                 return;
             }
-            const ok = result as { scan?: DependencyScanView | null; findings?: DependencyFinding[] };
+            const ok = result as {
+                scan?: DependencyScanView | null;
+                findings?: DependencyFinding[];
+            };
             setLoaded({ status: "ready", scan: ok.scan ?? null, findings: ok.findings ?? [] });
         },
         [applicationId]
@@ -92,9 +95,7 @@ export function DependenciesPanel({ applicationId }: { applicationId: string }) 
     } else if (scan.state === "failed") {
         body = <p className="text-xs text-danger-ink">{t("dependencies.scanFailed")}</p>;
     } else {
-        body = (
-            <VulnerabilityTable labels={labels} findings={loaded.findings} showLayer={false} />
-        );
+        body = <VulnerabilityTable labels={labels} findings={loaded.findings} showLayer={false} />;
     }
 
     return (

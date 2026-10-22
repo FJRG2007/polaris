@@ -14,10 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FindingsTable, type ImageFinding } from "./findings-table";
 import { Badge, Button, Card, CardBody, EmptyState, Skeleton } from "@polaris/ui";
 
-type Images = Extract<
-    Awaited<ReturnType<typeof actions.serverImagesAction>>,
-    { ok: true }
->["data"];
+type Images = Extract<Awaited<ReturnType<typeof actions.serverImagesAction>>, { ok: true }>["data"];
 type Submit = (
     work: () => Promise<{ ok: boolean; error?: string }>,
     done?: string
@@ -84,7 +81,8 @@ export function ImagesPanel({
             />
         );
     }
-    if (data && !data.available) return <AppsFallback t={t} apps={apps} targetId={targetId} submit={submit} />;
+    if (data && !data.available)
+        return <AppsFallback t={t} apps={apps} targetId={targetId} submit={submit} />;
 
     return (
         <Card>
@@ -96,10 +94,16 @@ export function ImagesPanel({
                     <table className="w-full text-sm">
                         <thead className="text-muted-foreground">
                             <tr>
-                                <th scope="col" className="w-full max-w-0 px-2 py-1.5 text-left font-medium">
+                                <th
+                                    scope="col"
+                                    className="w-full max-w-0 px-2 py-1.5 text-left font-medium"
+                                >
                                     {t("images.image")}
                                 </th>
-                                <th scope="col" className="hidden px-2 py-1.5 text-left font-medium lg:table-cell">
+                                <th
+                                    scope="col"
+                                    className="hidden px-2 py-1.5 text-left font-medium lg:table-cell"
+                                >
                                     {t("images.who")}
                                 </th>
                                 <th scope="col" className="px-2 py-1.5 text-left font-medium">
@@ -130,27 +134,47 @@ export function ImagesPanel({
                                   ))
                                 : data.images.map((image) => {
                                       const scan = image.scan;
-                                      const counts = scan?.summary as Record<string, unknown> | undefined;
-                                      const expanded = open === image.imageId && scan?.state === "done";
+                                      const counts = scan?.summary as
+                                          Record<string, unknown> | undefined;
+                                      const expanded =
+                                          open === image.imageId && scan?.state === "done";
                                       return [
-                                          <tr key={image.imageId} className="border-t border-border align-top">
+                                          <tr
+                                              key={image.imageId}
+                                              className="border-t border-border align-top"
+                                          >
                                               <td className="w-full max-w-0 px-2 py-1.5">
-                                                  <span className="block truncate font-medium" title={`${image.ref}\n${image.imageId}`}>
+                                                  <span
+                                                      className="block truncate font-medium"
+                                                      title={`${image.ref}\n${image.imageId}`}
+                                                  >
                                                       {image.ref}
                                                   </span>
-                                                  <span className="block truncate text-xs text-muted-foreground" title={image.users.join(", ")}>
-                                                      <span className="lg:hidden">{t(`images.source.${image.source}`)} - </span>
+                                                  <span
+                                                      className="block truncate text-xs text-muted-foreground"
+                                                      title={image.users.join(", ")}
+                                                  >
+                                                      <span className="lg:hidden">
+                                                          {t(`images.source.${image.source}`)}{" "}
+                                                          -{" "}
+                                                      </span>
                                                       {image.users.join(", ")}
                                                   </span>
                                               </td>
                                               <td className="hidden px-2 py-1.5 lg:table-cell">
-                                                  <Badge variant={SOURCE_TONE[image.source] ?? "neutral"}>
+                                                  <Badge
+                                                      variant={
+                                                          SOURCE_TONE[image.source] ?? "neutral"
+                                                      }
+                                                  >
                                                       {t(`images.source.${image.source}`)}
                                                   </Badge>
                                               </td>
                                               <td className="px-2 py-1.5">
                                                   {!scan ? (
-                                                      <span className="text-muted-foreground">{t("images.notScanned")}</span>
+                                                      <span className="text-muted-foreground">
+                                                          {t("images.notScanned")}
+                                                      </span>
                                                   ) : scan.state !== "done" ? (
                                                       <span className="text-muted-foreground">
                                                           {scan.state === "failed" && scan.error
@@ -159,16 +183,31 @@ export function ImagesPanel({
                                                       </span>
                                                   ) : (
                                                       <span className="flex flex-wrap gap-1">
-                                                          {COUNTED.filter((sev) => Number(counts?.[sev] ?? 0) > 0).map((sev) => (
+                                                          {COUNTED.filter(
+                                                              (sev) =>
+                                                                  Number(counts?.[sev] ?? 0) > 0
+                                                          ).map((sev) => (
                                                               <Badge
                                                                   key={sev}
-                                                                  variant={sev === "medium" ? "warning" : sev === "low" ? "neutral" : "danger"}
+                                                                  variant={
+                                                                      sev === "medium"
+                                                                          ? "warning"
+                                                                          : sev === "low"
+                                                                            ? "neutral"
+                                                                            : "danger"
+                                                                  }
                                                               >
-                                                                  {t(`images.severity.${sev}`)} {Number(counts?.[sev])}
+                                                                  {t(`images.severity.${sev}`)}{" "}
+                                                                  {Number(counts?.[sev])}
                                                               </Badge>
                                                           ))}
-                                                          {COUNTED.every((sev) => Number(counts?.[sev] ?? 0) === 0) ? (
-                                                              <Badge variant="success">{t("images.clean")}</Badge>
+                                                          {COUNTED.every(
+                                                              (sev) =>
+                                                                  Number(counts?.[sev] ?? 0) === 0
+                                                          ) ? (
+                                                              <Badge variant="success">
+                                                                  {t("images.clean")}
+                                                              </Badge>
                                                           ) : null}
                                                       </span>
                                                   )}
@@ -191,7 +230,10 @@ export function ImagesPanel({
                                                   <Button
                                                       size="xs"
                                                       variant="outline"
-                                                      disabled={scan?.state === "queued" || scan?.state === "running"}
+                                                      disabled={
+                                                          scan?.state === "queued" ||
+                                                          scan?.state === "running"
+                                                      }
                                                       onClick={() =>
                                                           void submit(
                                                               () =>
@@ -257,7 +299,11 @@ function AppsFallback({
                                 variant="outline"
                                 onClick={() =>
                                     void submit(
-                                        () => actions.scanImageAction({ targetId, applicationId: app.id }),
+                                        () =>
+                                            actions.scanImageAction({
+                                                targetId,
+                                                applicationId: app.id
+                                            }),
                                         t("queued")
                                     )
                                 }

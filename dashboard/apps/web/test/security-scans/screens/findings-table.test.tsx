@@ -101,7 +101,10 @@ describe("findings table", () => {
     });
 
     it("arranges without the screen", () => {
-        expect(splitPackage("fixture-node 22.0.0")).toEqual({ name: "fixture-node", version: "22.0.0" });
+        expect(splitPackage("fixture-node 22.0.0")).toEqual({
+            name: "fixture-node",
+            version: "22.0.0"
+        });
         const fixed = arrangeFindings(FIXTURE, {
             severities: new Set(),
             fixedOnly: true,

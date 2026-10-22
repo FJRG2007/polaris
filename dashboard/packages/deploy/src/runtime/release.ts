@@ -20,14 +20,19 @@ export const RELEASE_IMAGE_GONE =
  * registry that has never heard of it, which reads like an authentication
  * problem. A machine that cannot be asked is taken at its word that it has it.
  */
-export async function rollbackImageOf(plan: AppDeployPlan, ctx: RuntimeContext): Promise<string | null> {
+export async function rollbackImageOf(
+    plan: AppDeployPlan,
+    ctx: RuntimeContext
+): Promise<string | null> {
     const image = plan.build.rollbackImage;
     if (!image) return null;
     if (ctx.ports.hasImage) {
         const present = await ctx.ports.hasImage(image).catch(() => true);
         if (!present) throw new Error(RELEASE_IMAGE_GONE);
     }
-    ctx.log(Buffer.from(`Rolling back to the kept image ${image} - nothing is fetched or built.\n`));
+    ctx.log(
+        Buffer.from(`Rolling back to the kept image ${image} - nothing is fetched or built.\n`)
+    );
     return image;
 }
 
@@ -39,7 +44,11 @@ export async function rollbackImageOf(plan: AppDeployPlan, ctx: RuntimeContext):
  * not be kept is one that cannot be rolled back to instantly, which the log says
  * - not one that must not go live.
  */
-export async function pinRelease(image: string, plan: AppDeployPlan, ctx: RuntimeContext): Promise<string> {
+export async function pinRelease(
+    image: string,
+    plan: AppDeployPlan,
+    ctx: RuntimeContext
+): Promise<string> {
     const release = plan.build.release;
     if (!release) return image;
     let said = "";
@@ -48,7 +57,9 @@ export async function pinRelease(image: string, plan: AppDeployPlan, ctx: Runtim
             {
                 tag: release.image,
                 dockerfile: "Dockerfile",
-                contextTar: Readable.from(singleFileTar("Dockerfile", pinDockerfile(image, release.deploymentId))),
+                contextTar: Readable.from(
+                    singleFileTar("Dockerfile", pinDockerfile(image, release.deploymentId))
+                ),
                 builder: "docker"
             },
             (chunk) => {
@@ -85,7 +96,11 @@ export function isImmutableRef(reference: string | null | undefined): reference 
  * may name a newer image than the one a past scan read, and judging the fixed
  * image by the old one's findings would refuse the very release that fixes them.
  */
-export async function askBeforeServe(image: string, plan: AppDeployPlan, ctx: RuntimeContext): Promise<string | null> {
+export async function askBeforeServe(
+    image: string,
+    plan: AppDeployPlan,
+    ctx: RuntimeContext
+): Promise<string | null> {
     if (!ctx.beforeServe) return null;
     const pulledBy = plan.build.method === "image" ? plan.build.imageRef : undefined;
     const refs = [...new Set([image, pulledBy].filter(isImmutableRef))];

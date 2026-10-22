@@ -218,7 +218,12 @@ export function SecurityView() {
                     ) : tab === "host" ? (
                         <HostPanel t={t} targetId={current} server={server} submit={submit} />
                     ) : (
-                        <ImagesPanel t={t} apps={overview.apps} targetId={current} submit={submit} />
+                        <ImagesPanel
+                            t={t}
+                            apps={overview.apps}
+                            targetId={current}
+                            submit={submit}
+                        />
                     )}
                     <History t={t} scans={scans} submit={submit} />
                 </>
@@ -571,7 +576,12 @@ function summaryLine(t: SecurityTranslator, scan: Scan): string {
         .join(", ");
     const files = (scan.summary as { files?: unknown }).files;
     if (scan.kind === "deps" && Array.isArray(files) && files.length > 0) {
-        return `${counts}. ${t("deps.files", { files: files.filter((f) => typeof f === "string").slice(0, 6).join(", ") })}`;
+        return `${counts}. ${t("deps.files", {
+            files: files
+                .filter((f) => typeof f === "string")
+                .slice(0, 6)
+                .join(", ")
+        })}`;
     }
     return counts;
 }

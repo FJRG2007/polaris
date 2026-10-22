@@ -327,7 +327,14 @@ export async function serverImages(targetId: string) {
         where: { targetId, kind: "image", imageId: { in: found.map((image) => image.imageId) } },
         orderBy: { createdAt: "desc" },
         take: Math.min(found.length * 4, 800),
-        select: { id: true, imageId: true, state: true, summary: true, error: true, createdAt: true }
+        select: {
+            id: true,
+            imageId: true,
+            state: true,
+            summary: true,
+            error: true,
+            createdAt: true
+        }
     });
     const latest = new Map<string, (typeof scans)[number]>();
     for (const scan of scans) {
@@ -1080,7 +1087,8 @@ async function prune(now: Date): Promise<void> {
             take: 5000
         });
         const victims = history.pruneVictims(rows).slice(0, 500);
-        if (victims.length > 0) await prisma.securityScan.deleteMany({ where: { id: { in: victims } } });
+        if (victims.length > 0)
+            await prisma.securityScan.deleteMany({ where: { id: { in: victims } } });
     }
     await prisma.securityQuarantine.deleteMany({
         where: {

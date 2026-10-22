@@ -25,7 +25,11 @@ describe("where a service's lockfiles are looked for", () => {
     it("is the repository root and every folder down to the service's", () => {
         expect(lockfileDirs("")).toEqual([""]);
         expect(lockfileDirs("./services/api/")).toEqual(["", "services", "services/api"]);
-        expect(lockfileDirs(["services", "api"].join(String.fromCharCode(92)))).toEqual(["", "services", "services/api"]);
+        expect(lockfileDirs(["services", "api"].join(String.fromCharCode(92)))).toEqual([
+            "",
+            "services",
+            "services/api"
+        ]);
     });
 
     it("is nowhere for a root directory that leaves the repository", () => {
@@ -37,7 +41,14 @@ describe("a lockfile path", () => {
     it("is a known name inside the repository", () => {
         expect(isLockfilePath("pnpm-lock.yaml")).toBe(true);
         expect(isLockfilePath("services/api/Cargo.lock")).toBe(true);
-        for (const bad of ["../package-lock.json", "a//yarn.lock", "/etc/passwd", "notes.txt", "x/../go.sum", `${"d/".repeat(60)}go.sum`]) {
+        for (const bad of [
+            "../package-lock.json",
+            "a//yarn.lock",
+            "/etc/passwd",
+            "notes.txt",
+            "x/../go.sum",
+            `${"d/".repeat(60)}go.sum`
+        ]) {
             expect(isLockfilePath(bad), bad).toBe(false);
         }
     });
@@ -67,7 +78,9 @@ describe("the scan's build context", () => {
     it("is a tar of a Dockerfile on the pinned scanner and the lockfiles under src", () => {
         const archive = dependencyContext(FILES, SCANNER);
         expect(archive.length % 512).toBe(0);
-        expect(archive.subarray(512, 1024).toString("utf8")).toContain(`FROM ${SCANNER}\nCOPY src /src\n`);
+        expect(archive.subarray(512, 1024).toString("utf8")).toContain(
+            `FROM ${SCANNER}\nCOPY src /src\n`
+        );
         const listed = spawnSync("tar", ["-tf", "-"], { input: archive });
         if (listed.status === 0) {
             expect(listed.stdout.toString().trim().split(/\r?\n/)).toEqual([

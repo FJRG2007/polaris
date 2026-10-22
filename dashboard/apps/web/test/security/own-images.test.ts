@@ -18,9 +18,21 @@ describe("own image vulnerabilities", () => {
 
     it("counts the newest scan of each image once", () => {
         const summary = summarizeOwnScans([
-            { label: "fixture/polaris-web:latest", summary: '{"critical":0,"high":1}', finishedAt: at(9) },
-            { label: "fixture/polaris-sidecar:latest", summary: '{"critical":2,"high":3}', finishedAt: at(8) },
-            { label: "fixture/polaris-web:latest", summary: '{"critical":9,"high":9}', finishedAt: at(1) },
+            {
+                label: "fixture/polaris-web:latest",
+                summary: '{"critical":0,"high":1}',
+                finishedAt: at(9)
+            },
+            {
+                label: "fixture/polaris-sidecar:latest",
+                summary: '{"critical":2,"high":3}',
+                finishedAt: at(8)
+            },
+            {
+                label: "fixture/polaris-web:latest",
+                summary: '{"critical":9,"high":9}',
+                finishedAt: at(1)
+            },
             { label: "fixture/broken", summary: "not json", finishedAt: null }
         ]);
         expect(summary).toEqual({

@@ -16,9 +16,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ExternalLink, Loader2, ShieldAlert } from "lucide-react";
 
-type DeploymentSecurity = Awaited<
-    ReturnType<typeof deployActions.listDeploymentsAction>
->[number];
+type DeploymentSecurity = Awaited<ReturnType<typeof deployActions.listDeploymentsAction>>[number];
 
 /** The chip beside the state badge; nothing when the check found nothing. */
 export function SecurityChip({ deployment }: { deployment: DeploymentSecurity }) {
@@ -84,7 +82,12 @@ export function SecurityNote({
             className={cn("flex min-w-0 flex-col gap-1 text-xs", className)}
             onClick={(event) => event.stopPropagation()}
         >
-            <p className={cn("flex min-w-0 flex-wrap items-center gap-x-1", held ? "text-danger-ink" : "text-warning-ink")}>
+            <p
+                className={cn(
+                    "flex min-w-0 flex-wrap items-center gap-x-1",
+                    held ? "text-danger-ink" : "text-warning-ink"
+                )}
+            >
                 <ShieldAlert className="size-3.5 shrink-0" aria-hidden />
                 <span>{t("security.found", { count: found.count })}</span>
                 {found.url ? (

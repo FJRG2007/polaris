@@ -20,7 +20,10 @@ const DAEMON_FIXTURE = [
         Names: ["/polaris-edge-guard-1"],
         Image: "ghcr.io/example/polaris-edge-guard:fixture",
         ImageID: id("b"),
-        Labels: { "com.docker.compose.project": "polaris", "com.docker.compose.service": "edge-guard" }
+        Labels: {
+            "com.docker.compose.project": "polaris",
+            "com.docker.compose.service": "edge-guard"
+        }
     },
     {
         Names: ["/polaris-0123abcd-web-1"],
@@ -65,7 +68,13 @@ describe("server images", () => {
     it("counts an image Polaris also runs as Polaris's own", () => {
         const shared = images.groupImages(
             [
-                { name: "x", ref: "node:22", imageId: id("f"), project: "polaris-0123abcd", labels: {} },
+                {
+                    name: "x",
+                    ref: "node:22",
+                    imageId: id("f"),
+                    project: "polaris-0123abcd",
+                    labels: {}
+                },
                 { name: "y", ref: "node:22", imageId: id("f"), project: "polaris", labels: {} }
             ],
             new Map()
@@ -76,7 +85,13 @@ describe("server images", () => {
 
     it("never takes a prefix for Polaris's own project", () => {
         expect(
-            images.sourceOf({ name: "", ref: "", imageId: id("1"), project: "polaris-extra", labels: {} })
+            images.sourceOf({
+                name: "",
+                ref: "",
+                imageId: id("1"),
+                project: "polaris-extra",
+                labels: {}
+            })
         ).toBe("other");
     });
 

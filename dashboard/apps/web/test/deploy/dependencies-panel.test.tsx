@@ -74,7 +74,9 @@ describe("a service's Dependencies panel", () => {
     it("says when a clean scan found nothing", async () => {
         action.mockResolvedValue({ scan: scan("done"), findings: [] });
         draw();
-        expect(await screen.findByText("No known vulnerabilities in its dependencies.")).toBeDefined();
+        expect(
+            await screen.findByText("No known vulnerabilities in its dependencies.")
+        ).toBeDefined();
     });
 
     it("says what is going on before there are findings", async () => {
@@ -97,6 +99,8 @@ describe("a service's Dependencies panel", () => {
         draw();
         fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
         await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
-        expect(await screen.findByText("No known vulnerabilities in its dependencies.")).toBeDefined();
+        expect(
+            await screen.findByText("No known vulnerabilities in its dependencies.")
+        ).toBeDefined();
     });
 });
