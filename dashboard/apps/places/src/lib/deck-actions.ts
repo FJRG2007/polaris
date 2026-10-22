@@ -268,6 +268,59 @@ export function naturalState(structured: unknown, locale: Locale) {
     };
 }
 
+const privacyRows = z.object({
+    targets: z.array(
+        z
+            .object({
+                target: z.string(),
+                label: z.string(),
+                all: z.boolean(),
+                some: z.number(),
+                total: z.number()
+            })
+            .passthrough()
+    )
+});
+
+const PRIVATE: Readonly<Record<Locale, string>> = { "en-US": "Private", "es-ES": "Privada" };
+
+/** A privacy key's face: on when every camera of the target is private, a
+ *  count when only some are. */
+export function privacyState(structured: unknown, locale: Locale) {
+    const parsed = privacyRows.safeParse(structured);
+    const row = parsed.success ? parsed.data.targets[0] : undefined;
+    if (!row || row.total === 0) return { tone: "idle" as const, icon: "video" };
+    if (row.all)
+        return { tone: "ok" as const, on: true, icon: "video-off", detail: PRIVATE[locale] };
+    if (row.some > 0)
+        return {
+            tone: "warn" as const,
+            on: false,
+            icon: "video-off",
+            detail: `${row.some}/${row.total}`
+        };
+    return { tone: "idle" as const, on: false, icon: "video" };
+}
+
+/** What a privacy press shows at once: private when not every camera was,
+ *  public otherwise - the same rule the press sends. */
+export function privacyPress(state: DeckState, locale: Locale): DeckPress | undefined {
+    if (state.tone === "bad") return undefined;
+    return state.on
+        ? { face: { tone: "idle", on: false, icon: "video" } }
+        : { face: { tone: "ok", on: true, icon: "video-off", detail: PRIVATE[locale] } };
+}
+
+/** Every camera, zone and place, for the key's target picker. */
+function privacyTargetChoices(structured: unknown) {
+    const parsed = privacyRows.safeParse(structured);
+    if (!parsed.success) return [];
+    return parsed.data.targets.map((row) => ({
+        value: row.target,
+        label: row.target.startsWith("camera:") ? row.label : `${row.label} (${row.total})`
+    }));
+}
+
 /** What a door shows while a command is on its way to it. */
 const UNDER_WAY: Readonly<Record<"open" | "lock" | "unlock", Readonly<Record<Locale, string>>>> = {
     open: { "en-US": "Opening", "es-ES": "Abriendo" },
@@ -798,6 +851,43 @@ export function placesDeckActions(): readonly AppDeckAction[] {
             // Only shown: a press opens Polaris, as any key that shows does.
             run: { tool: "places_devices", input: () => null },
             read: { ...readDevice, pick: readingState }
+        },
+        {
+            id: "places.camera-privacy",
+            kind: "toggle",
+            area: "places",
+            icon: "video-off",
+            label: { "en-US": "Camera privacy", "es-ES": "Privacidad cámaras" },
+            scope: "home.control",
+            options: z.object({ target: z.string().min(1).max(300) }),
+            fields: [
+                {
+                    name: "target",
+                    type: "choice",
+                    label: { "en-US": "Cameras", "es-ES": "Cámaras" },
+                    required: true,
+                    choices: {
+                        tool: "places_camera_privacy",
+                        input: {},
+                        pick: privacyTargetChoices
+                    }
+                }
+            ],
+            // Private unless every camera already is, so a half-private zone
+            // is made whole rather than flipped both ways.
+            run: {
+                tool: "places_camera_privacy_set",
+                input: (options, press) => ({
+                    target: options.target,
+                    private: !press.current?.on
+                })
+            },
+            read: {
+                tool: "places_camera_privacy",
+                input: (options) => ({ target: options.target }),
+                pick: privacyState,
+                press: (state, _options, _structured, locale) => privacyPress(state, locale)
+            }
         },
         {
             id: "places.routine-run",
