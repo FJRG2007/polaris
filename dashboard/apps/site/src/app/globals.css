@@ -1,0 +1,12 @@
+/* The dashboard's tokens first, so the site has its surfaces, text steps and
+   both themes, then Tailwind. In CSS the order is the meaning. */
+@import "@polaris/ui/styles.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+}

@@ -1,0 +1,82 @@
+name: Site
+
+# Builds the public website (dashboard/apps/site) and publishes it to GitHub
+# Pages. It is rebuilt whenever something it is made from changes: the app
+# catalogue, the API document, the README and its pictures, the shared UI
+# package, the site itself, or a new release of any app.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "README.md"
+      - "README.es.md"
+      - "docs/assets/**"
+      - "dashboard/apps/site/**"
+      - "dashboard/packages/ui/**"
+      - "dashboard/apps/web/src/lib/apps/**"
+      - "dashboard/apps/web/src/lib/api-docs/**"
+      - "dashboard/apps/web/src/lib/deploy/api/**"
+      - "dashboard/apps/web/messages/*/catalog.json"
+      - "dashboard/apps/web/messages/*/account.json"
+      - ".github/workflows/site.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: dashboard
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+  PUPPETEER_SKIP_DOWNLOAD: "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci --prefer-offline
+      - run: npm run db:generate
+      - run: npm run build:packages
+      - run: npm run test -w @polaris/site
+      - name: Build
+        run: npm run build -w @polaris/site
+        env:
+          # Read-only release lookup at build time; never written to the output.
+          GITHUB_TOKEN: ${{ github.token }}
+          # Served at https://<owner>.github.io/<repo>/ unless Pages has a custom domain.
+          SITE_BASE_PATH: ${{ vars.SITE_BASE_PATH != '' && vars.SITE_BASE_PATH || format('/{0}', github.event.repository.name) }}
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: dashboard/apps/site/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

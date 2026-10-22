@@ -1,0 +1,8 @@
+# Written by `npm run generate` from the catalogue, the README and the releases.
+/generated/
+/public/media/
+/public/logos/
+/public/openapi.json
+/.next/
+/out/
+/next-env.d.ts
