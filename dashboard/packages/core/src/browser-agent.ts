@@ -24,39 +24,46 @@ export const BROWSER_ELEMENTS_MOST = 200;
 /** The most characters typed into one box in one call. */
 export const BROWSER_TYPE_MOST = 4_000;
 
-const tab = z.number().int().nonnegative();
-const ref = z.string().regex(/^e\d{1,6}$/, "A ref from browser_find, like e12.");
+/** A tab Polar opened, by the number the browser gave it. */
+export const browserTab = z.number().int().nonnegative();
+/** An element, by the ref a snapshot handed out. */
+export const browserRef = z.string().regex(/^e\d{1,6}$/, "A ref from browser_find, like e12.");
 /** The site an action is approved for, as the card names it: a bare host. */
-const site = z
+export const browserSite = z
     .string()
     .trim()
     .toLowerCase()
     .regex(/^[a-z0-9.-]+(:\d{1,5})?$/, "A site, like github.com.");
-const address = z
+/** An address Polar may open: http or https only. */
+export const browserAddress = z
     .string()
     .trim()
     .max(2048)
     .refine((value) => /^https?:\/\//i.test(value), "An http or https address.");
+/** A CSS selector a read narrows to. */
+export const browserSelector = z.string().trim().min(1).max(300);
+/** Words a snapshot narrows to. */
+export const browserQuery = z.string().trim().max(200);
 
 /** What the dashboard asks the extension to do. */
 export const browserCommand = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("open"), url: address }),
+    z.object({ kind: z.literal("open"), url: browserAddress }),
     z.object({
         kind: z.literal("read"),
-        tab,
-        selector: z.string().trim().min(1).max(300).optional()
+        tab: browserTab,
+        selector: browserSelector.optional()
     }),
-    z.object({ kind: z.literal("find"), tab, query: z.string().trim().max(200).optional() }),
-    z.object({ kind: z.literal("click"), tab, ref, site }),
+    z.object({ kind: z.literal("find"), tab: browserTab, query: browserQuery.optional() }),
+    z.object({ kind: z.literal("click"), tab: browserTab, ref: browserRef, site: browserSite }),
     z.object({
         kind: z.literal("type"),
-        tab,
-        ref,
-        site,
+        tab: browserTab,
+        ref: browserRef,
+        site: browserSite,
         text: z.string().max(BROWSER_TYPE_MOST),
         submit: z.boolean().optional()
     }),
-    z.object({ kind: z.literal("close"), tab })
+    z.object({ kind: z.literal("close"), tab: browserTab })
 ]);
 export type BrowserCommand = z.infer<typeof browserCommand>;
 
@@ -82,7 +89,7 @@ export const BROWSER_REFUSALS = [
 export type BrowserRefusal = (typeof BROWSER_REFUSALS)[number];
 
 const element = z.object({
-    ref,
+    ref: browserRef,
     role: z.string().max(40),
     name: z.string().max(200),
     /** A box's current value. A password box never carries one. */
@@ -96,7 +103,7 @@ export type BrowserElement = z.infer<typeof element>;
 export const browserResult = z.union([
     z.object({
         ok: z.literal(true),
-        tab,
+        tab: browserTab,
         url: z.string().max(4096),
         title: z.string().max(500),
         /** A read's text, as Markdown-like lines. */

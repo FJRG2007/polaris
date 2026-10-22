@@ -270,6 +270,18 @@ button.ghost:hover:not(:disabled) {
     border-color: hsl(var(--border-strong));
 }
 
+button.link {
+    flex-shrink: 0;
+    padding: 0;
+    background: transparent;
+    color: hsl(var(--foreground));
+    font-size: inherit;
+    font-weight: inherit;
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--primary));
+    text-underline-offset: 2px;
+}
+
 /*
  * The search box, which stays where it is.
  *

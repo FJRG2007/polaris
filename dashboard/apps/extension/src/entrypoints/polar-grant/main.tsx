@@ -23,10 +23,8 @@ function Ask({ id, site }: { id: string; site: string }): React.JSX.Element {
         if (grant !== "deny" && browser.permissions?.request) {
             // Chromium already holds every page; Firefox asks here, in the click.
             const origins = [`https://${site}/*`, `http://${site}/*`];
-            const held = await browser.permissions.contains({ origins }).catch(() => false);
-            if (!held && !(await browser.permissions.request({ origins }).catch(() => false))) {
-                grant = "deny";
-            }
+            const granted = browser.permissions.request({ origins }).catch(() => false);
+            if (!(await granted)) grant = "deny";
         }
         await askBackground({ kind: "polarBrowserGrant", id, grant }).catch(() => undefined);
         window.close();

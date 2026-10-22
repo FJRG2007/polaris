@@ -57,6 +57,8 @@ interface RelayState {
     /** userId -> command ids not yet handed to a browser, oldest first. */
     readonly queued: Map<string, string[]>;
     readonly inFlight: Map<string, InFlight>;
+    /** When `seen` was last cleared of browsers that stopped polling. */
+    sweptAt: number;
 }
 
 const KEY = Symbol.for("polaris.polarBrowserRelay");
@@ -68,7 +70,8 @@ function state(): RelayState {
         pinned: new Map(),
         waiting: new Map(),
         queued: new Map(),
-        inFlight: new Map()
+        inFlight: new Map(),
+        sweptAt: 0
     };
     return holder[KEY];
 }
@@ -82,12 +85,18 @@ export type RelayOutcome =
 
 /** The connections of this account that polled within `PRESENT_MS`, newest first. */
 function presentConnections(userId: string, now: number): string[] {
-    const seen = state().seen.get(userId);
+    const relay = state();
+    const seen = relay.seen.get(userId);
     if (!seen) return [];
-    return [...seen.entries()]
-        .filter(([, at]) => now - at <= PRESENT_MS)
-        .sort((a, b) => b[1] - a[1])
-        .map(([id]) => id);
+    for (const [id, at] of seen) if (now - at > PRESENT_MS) seen.delete(id);
+    if (seen.size === 0) {
+        relay.seen.delete(userId);
+        relay.pinned.delete(userId);
+        return [];
+    }
+    const pinned = relay.pinned.get(userId);
+    if (pinned && !seen.has(pinned)) relay.pinned.delete(userId);
+    return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }
 
 /** Whether this account has a browser Polar can use right now. */
@@ -105,6 +114,10 @@ function chosenConnection(userId: string, now: number): string | null {
 
 function markSeen(userId: string, connectionId: string, now: number): void {
     const relay = state();
+    if (now - relay.sweptAt > PRESENT_MS) {
+        relay.sweptAt = now;
+        for (const user of [...relay.seen.keys()]) presentConnections(user, now);
+    }
     let seen = relay.seen.get(userId);
     if (!seen) {
         seen = new Map();
@@ -123,6 +136,7 @@ function dispatch(userId: string, now: number): void {
     const index = polls.findIndex((poll) => poll.connectionId === target);
     if (index === -1) return;
     const id = queue.shift();
+    if (queue.length === 0) relay.queued.delete(userId);
     const flight = id ? relay.inFlight.get(id) : undefined;
     if (!id || !flight) return dispatch(userId, now);
     const [poll] = polls.splice(index, 1);
@@ -156,6 +170,7 @@ export function nextCommand(
             const polls = relay.waiting.get(userId);
             const at = polls?.findIndex((poll) => poll.hand === finish) ?? -1;
             if (polls && at !== -1) polls.splice(at, 1);
+            if (polls?.length === 0) relay.waiting.delete(userId);
             // Seen at the end of the hold too, so a browser that is waiting is
             // never counted as gone in the middle of its own poll.
             markSeen(userId, connectionId, Date.now());
@@ -212,6 +227,7 @@ export function runInBrowser(
             const waiting = relay.queued.get(userId);
             const at = waiting?.indexOf(id) ?? -1;
             if (waiting && at !== -1) waiting.splice(at, 1);
+            if (waiting?.length === 0) relay.queued.delete(userId);
             resolve({ kind: "timeout" });
         }, timeoutMs);
         relay.inFlight.set(id, {

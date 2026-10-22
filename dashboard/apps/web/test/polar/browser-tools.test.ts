@@ -82,11 +82,27 @@ describe("the relay", () => {
 
     it("stops counting a browser that stopped polling", async () => {
         vi.useFakeTimers();
-        await nextCommand("u1", "c1", 10).catch(() => null);
-        vi.advanceTimersByTime(10);
+        const poll = nextCommand("u1", "c1", 10);
+        await vi.advanceTimersByTimeAsync(10);
+        await expect(poll).resolves.toBeNull();
         expect(browserPresent("u1")).toBe(true);
         vi.advanceTimersByTime(60_000);
         expect(browserPresent("u1")).toBe(false);
+    });
+
+    it("forgets a browser that stopped polling once another one polls", async () => {
+        vi.useFakeTimers();
+        const gone = nextCommand("u1", "c1", 10);
+        await vi.advanceTimersByTimeAsync(10);
+        await gone;
+        vi.advanceTimersByTime(60_000);
+        const fresh = nextCommand("u2", "c2", 10);
+        await vi.advanceTimersByTimeAsync(10);
+        await fresh;
+        const relay = (globalThis as Record<symbol, { seen: Map<string, unknown> }>)[
+            Symbol.for("polaris.polarBrowserRelay")
+        ];
+        expect([...relay.seen.keys()]).toEqual(["u2"]);
     });
 });
 
@@ -122,6 +138,35 @@ describe("the tools", () => {
         );
         expect(answer).toMatchObject({ ok: false });
         expect(answer.ok ? "" : answer.text).toMatch(/password/i);
+    });
+
+    it("never send a command the extension would drop, and say why", async () => {
+        const run = vi.fn();
+        for (const command of [
+            { kind: "open", url: "github.com/acme/app" },
+            { kind: "click", tab: 2, ref: "e3", site: "https://github.com" },
+            { kind: "read", tab: 2, selector: "   " },
+            { kind: "find", tab: 2, query: "x".repeat(201) }
+        ]) {
+            const answer = await runBrowserTool("u1", command as never, run);
+            expect(answer).toMatchObject({ ok: false });
+            expect(answer.ok ? "" : answer.text).toMatch(/^That was not sent to the browser/);
+        }
+        expect(run).not.toHaveBeenCalled();
+    });
+
+    it("send the site as the card names it", async () => {
+        const run = vi.fn(async () => ({
+            kind: "answered" as const,
+            result: { ok: true as const, tab: 2, url: "https://github.com/", title: "" }
+        }));
+        await runBrowserTool("u1", { kind: "click", tab: 2, ref: "e3", site: " GitHub.com " }, run);
+        expect(run).toHaveBeenCalledWith("u1", {
+            kind: "click",
+            tab: 2,
+            ref: "e3",
+            site: "github.com"
+        });
     });
 
     it("refuse an answer the browser sent in a shape nobody checked", async () => {

@@ -286,10 +286,8 @@ export class PolarBrowser {
     private async page(tab: number, op: AgentOp | null): Promise<BrowserResult> {
         if (!(await this.inject(tab))) return { ok: false, refusal: "unscriptable" };
         const [text, stop] = await Promise.all([this.deps.say("bar"), this.deps.say("stop")]);
-        await this.ask(tab, { op: "banner", text, stop });
-        const reply = op
-            ? await this.ask(tab, op)
-            : await this.ask(tab, { op: "snapshot", query: "\u0000" });
+        const banner = await this.ask(tab, { op: "banner", text, stop });
+        const reply = op ? await this.ask(tab, op) : banner;
         if (!reply) return { ok: false, refusal: "failed" };
         if (!reply.ok)
             return {

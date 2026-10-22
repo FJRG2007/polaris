@@ -31,7 +31,14 @@ import { runInBrowser, type RelayOutcome } from "@/lib/polar/browser-relay";
 import { BROWSER_TOOLS } from "@/lib/polar/browser-steps";
 import {
     BROWSER_TYPE_MOST,
+    browserRef,
+    browserTab,
+    browserSite,
+    browserQuery,
     browserResult,
+    browserAddress,
+    browserCommand,
+    browserSelector,
     type BrowserCommand,
     type BrowserElement,
     type BrowserRefusal
@@ -40,16 +47,11 @@ import {
 /** Where the extension is installed from, for the sentence that offers it. */
 export const EXTENSION_DOWNLOADS = "/account/downloads";
 
-const tab = z.number().int().nonnegative().describe("The tab number browser_open returned.");
-const ref = z
-    .string()
-    .regex(/^e\d{1,6}$/)
-    .describe("The element's ref from browser_find, like e12.");
-const site = z
-    .string()
-    .describe(
-        "The site the tab is on, as browser_find reported it, like github.com. Shown to the person when they approve."
-    );
+const tab = browserTab.describe("The tab number browser_open returned.");
+const ref = browserRef.describe("The element's ref from browser_find, like e12.");
+const site = browserSite.describe(
+    "The site the tab is on, as browser_find reported it, like github.com. Shown to the person when they approve."
+);
 const element = z
     .string()
     .min(1)
@@ -57,19 +59,17 @@ const element = z
     .describe('What the element is, in a few words the person will recognise: "Sign in button".');
 
 const openInput = z.object({
-    url: z.string().describe("The full http or https address to open.")
+    url: browserAddress.describe("The full http or https address to open.")
 });
 const readInput = z.object({
     tab,
-    selector: z
-        .string()
+    selector: browserSelector
         .optional()
         .describe("A CSS selector to read only part of the page. Leave it out to read it all.")
 });
 const findInput = z.object({
     tab,
-    query: z
-        .string()
+    query: browserQuery
         .optional()
         .describe("Words to narrow the list to elements and links whose name contains them.")
 });
@@ -108,6 +108,15 @@ export function refusalSentence(refusal: BrowserRefusal, detail?: string): strin
         default:
             return `The browser could not do that${detail ? `: ${detail}` : "."}`;
     }
+}
+
+/** The sentence for a command that was never sent because it is malformed. Pure. */
+export function commandSentence(error: z.ZodError): string {
+    const issues = error.issues
+        .slice(0, 3)
+        .map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`)
+        .join("; ");
+    return `That was not sent to the browser, because ${issues}. Fix it and call the tool again.`;
 }
 
 /** The sentence for a command that never got an answer. Pure. */
@@ -149,7 +158,9 @@ export async function runBrowserTool(
     command: BrowserCommand,
     run: typeof runInBrowser = runInBrowser
 ): Promise<BrowserToolResult> {
-    const outcome = await run(userId, command);
+    const valid = browserCommand.safeParse(command);
+    if (!valid.success) return { ok: false, text: commandSentence(valid.error) };
+    const outcome = await run(userId, valid.data);
     if (outcome.kind !== "answered") {
         return {
             ok: false,
@@ -216,7 +227,7 @@ export function polarBrowserTools(userId: string): ToolSet {
                 "Click an element from browser_find. The person approves every click first. Only click when the person asked for what it does.",
             inputSchema: schema(clickInput),
             execute: ({ tab: id, ref: target, site: where }) =>
-                go({ kind: "click", tab: id, ref: target, site: where.trim().toLowerCase() })
+                go({ kind: "click", tab: id, ref: target, site: where })
         }),
         [BROWSER_TOOLS.type]: tool({
             description:
@@ -227,7 +238,7 @@ export function polarBrowserTools(userId: string): ToolSet {
                     kind: "type",
                     tab: id,
                     ref: target,
-                    site: where.trim().toLowerCase(),
+                    site: where,
                     text,
                     ...(submit ? { submit } : {})
                 })
