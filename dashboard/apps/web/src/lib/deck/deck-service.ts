@@ -12,6 +12,9 @@
 
 import { z } from "zod";
 import { callTool } from "./tool-call";
+import { isDeckScope } from "./scopes";
+import { scopesAvailableTo } from "@polaris/auth";
+import { translatorFor } from "@/lib/i18n/translate";
 import { appDeckActions } from "@/lib/app-extensions/registry";
 import {
     deckTools,
@@ -26,6 +29,7 @@ import type {
     AppDeckAction,
     DeckActionView,
     DeckCaller,
+    DeckLockedAction,
     DeckOptionField,
     DeckRunResult,
     DeckState
@@ -49,6 +53,49 @@ const CHOICE_LIMIT = 100;
 
 function allowed(scope: string | null, caller: DeckCaller): boolean {
     return scope === null || caller.scopes.includes(scope);
+}
+
+/**
+ * The scopes a deck's key lacks though its owner holds them - a deck connected
+ * before the scope was offered, or approved with it unticked. Connecting again
+ * is what allows them, and a key set to one says so instead of failing
+ * silently. Read once per request, lazily.
+ */
+function reconnectable(caller: DeckCaller): (scope: string | null) => Promise<boolean> {
+    let held: Promise<Set<string>> | null = null;
+    return async (scope) => {
+        if (scope === null || caller.scopes.includes(scope) || !isDeckScope(scope)) return false;
+        held ??= scopesAvailableTo(caller.userId, caller.isAdmin)
+            .then((scopes) => new Set<string>(scopes))
+            .catch(() => new Set<string>());
+        return (await held).has(scope);
+    };
+}
+
+/** "Reconnect this deck to allow: Control places and cameras." */
+function reconnectMessage(scope: string, caller: DeckCaller, words: DeckWords): string {
+    const scopes = translatorFor(caller.locale, "mcp") as unknown as DeckWords;
+    return words("deck.errors.reconnect", { what: scopes(`scopes.${scope.replace(".", "_")}`) });
+}
+
+/** The actions a key could be set to once the deck is connected again. */
+export async function lockedActions(
+    caller: DeckCaller,
+    words: DeckWords
+): Promise<DeckLockedAction[]> {
+    const may = reconnectable(caller);
+    const locked: DeckLockedAction[] = [];
+    for (const action of await everyAction(words, caller, false)) {
+        if (!action.scope || !(await may(action.scope))) continue;
+        locked.push({
+            id: action.id,
+            label: action.core
+                ? words(`deck.actions.${action.id.replace(".", "_")}`)
+                : action.app!.label[caller.locale],
+            message: reconnectMessage(action.scope, caller, words)
+        });
+    }
+    return locked;
 }
 
 /** Every action there is right now: core's and the apps' before the key's
@@ -192,7 +239,13 @@ export async function runDeckAction(
     );
     if (!action) return { ok: false, message: words("deck.errors.unknownAction") };
     if (!allowed(action.scope, caller))
-        return { ok: false, message: words("deck.errors.notAllowed") };
+        return {
+            ok: false,
+            message:
+                action.scope && (await reconnectable(caller)(action.scope))
+                    ? reconnectMessage(action.scope, caller, words)
+                    : words("deck.errors.notAllowed")
+        };
 
     if (action.core) {
         const core = action.core;
@@ -222,7 +275,11 @@ export async function runDeckAction(
     const raw = app.read
         ? await callTool(caller, app.read.tool, app.read.input(options.data))
         : null;
-    const current = app.read && raw ? pickState(app, raw, caller) : undefined;
+    const current =
+        app.read && raw ? withPress(app, pickState(app, raw, caller), options.data, raw, caller) : undefined;
+    // Already where the press would put it: nothing is sent, and the key is
+    // told what it is.
+    if (current?.press?.noop && !input.push) return { ok: true, state: current };
     const sent = app.run.input(options.data, {
         step: input.step,
         push: input.push,
@@ -242,7 +299,26 @@ async function readApp(
     caller: DeckCaller
 ): Promise<DeckState> {
     const read = app.read!;
-    return pickState(app, await callTool(caller, read.tool, read.input(options)), caller);
+    const outcome = await callTool(caller, read.tool, read.input(options));
+    return withPress(app, pickState(app, outcome, caller), options, outcome, caller);
+}
+
+/** The state with what a press would do from it, when the action knows. */
+function withPress(
+    app: AppDeckAction,
+    state: DeckState,
+    options: Record<string, unknown>,
+    outcome: Awaited<ReturnType<typeof callTool>>,
+    caller: DeckCaller
+): DeckState {
+    const press = app.read?.press;
+    if (!press || !outcome.ok) return state;
+    try {
+        const next = press(state, options, outcome.structured, caller.locale);
+        return next ? { ...state, press: next } : state;
+    } catch {
+        return state;
+    }
 }
 
 function pickState(
@@ -308,11 +384,18 @@ export async function readDeckStates(
     );
     let chat = false;
     let call = false;
+    const may = reconnectable(caller);
     const readings = await Promise.all(
         watched.map(async (entry): Promise<DeckReading> => {
             const action = actions.get(entry.action);
-            if (!action || !allowed(action.scope, caller))
-                return { key: entry.key, state: { tone: "idle" } };
+            if (!action) return { key: entry.key, state: { tone: "idle" } };
+            if (!allowed(action.scope, caller))
+                return {
+                    key: entry.key,
+                    state: (await may(action.scope))
+                        ? { tone: "bad", detail: words("deck.status.reconnect") }
+                        : { tone: "idle" }
+                };
             if (action.core?.read) {
                 const options = action.core.options.safeParse(entry.options);
                 if (!options.success) return { key: entry.key, state: { tone: "idle" } };

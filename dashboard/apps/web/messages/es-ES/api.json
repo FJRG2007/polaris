@@ -245,7 +245,8 @@
             "notAllowed": "Este deck no puede hacer eso. Vuelve a conectarlo o pide acceso a un administrador.",
             "badOptions": "Esta tecla no está configurada del todo. Abre sus ajustes.",
             "notRunnable": "Esta tecla solo muestra un valor.",
-            "refused": "Polaris no ha podido hacerlo ahora."
+            "refused": "Polaris no ha podido hacerlo ahora.",
+            "reconnect": "Vuelve a conectar este deck para permitir: {what}."
         },
         "fields": {
             "conversationId": "Conversación",
@@ -294,7 +295,8 @@
             "cancelled": "Cancelado",
             "rolled_back": "Revertido",
             "stopped": "Parado",
-            "removed": "Eliminado"
+            "removed": "Eliminado",
+            "reconnect": "Reconectar"
         },
         "call": {
             "none": "Colgado",

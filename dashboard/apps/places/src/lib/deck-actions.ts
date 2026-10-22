@@ -16,6 +16,8 @@ import type { Locale } from "@polaris/core";
 import type { AppHostTypes } from "@polaris/app-host";
 
 type AppDeckAction = AppHostTypes["AppDeckAction"];
+type DeckState = ReturnType<NonNullable<AppDeckAction["read"]>["pick"]>;
+type DeckPress = NonNullable<DeckState["press"]>;
 
 const OFFLINE: Readonly<Record<Locale, string>> = {
     "en-US": "Offline",
@@ -41,13 +43,15 @@ const routineRows = z.object({
     routines: z.array(z.object({ id: z.string(), name: z.string() }).passthrough())
 });
 
-/** The devices that take an action, for a picker. */
-function devicesTaking(action: string) {
+/** The devices that take any of these actions, for a picker. The actions are
+ *  the ones `places_devices` lists, by their spoken names: a door's Open
+ *  button is `open`, and an opener takes nothing else. */
+export function devicesTaking(...actions: readonly string[]) {
     return (structured: unknown) => {
         const parsed = deviceRows.safeParse(structured);
         if (!parsed.success) return [];
         return parsed.data.devices
-            .filter((device) => device.actions.includes(action))
+            .filter((device) => actions.some((action) => device.actions.includes(action)))
             .map((device) => ({ value: device.id, label: device.name }));
     };
 }
@@ -180,12 +184,12 @@ function operableDevices(structured: unknown) {
         .map((device) => ({ value: device.id, label: device.name }));
 }
 
-const deviceField = (action: string) => ({
+const deviceField = (...actions: readonly string[]) => ({
     name: "deviceId",
     type: "choice" as const,
     label: { "en-US": "Device", "es-ES": "Dispositivo" },
     required: true,
-    choices: { tool: "places_devices", input: {}, pick: devicesTaking(action) }
+    choices: { tool: "places_devices", input: {}, pick: devicesTaking(...actions) }
 });
 
 const readDevice = {
@@ -264,6 +268,106 @@ export function naturalState(structured: unknown, locale: Locale) {
     };
 }
 
+/** What a door shows while a command is on its way to it. */
+const UNDER_WAY: Readonly<Record<"open" | "lock" | "unlock", Readonly<Record<Locale, string>>>> = {
+    open: { "en-US": "Opening", "es-ES": "Abriendo" },
+    lock: { "en-US": "Locking", "es-ES": "Cerrando" },
+    unlock: { "en-US": "Unlocking", "es-ES": "Soltando" }
+};
+
+/**
+ * What a key shows the moment a command is pressed, before Polaris answers:
+ * a switch already on or off, a door saying it is opening or locking. Nothing
+ * for a command whose result a key cannot draw ahead of the device. `noop`
+ * when the device already is where the command would put it - a lock pressed
+ * to lock while locked - so nothing is sent. Opening a door is never one: it
+ * shuts again behind whoever went through.
+ */
+export function commandPress(
+    state: DeckState,
+    command: string | null,
+    locale: Locale
+): DeckPress | undefined {
+    if (!command || state.tone === "bad") return undefined;
+    const bolt =
+        state.detail === BOLT.locked[locale]
+            ? "locked"
+            : state.detail === BOLT.unlocked[locale]
+              ? "unlocked"
+              : null;
+    if (command === "turn-on" || command === "turn-off") {
+        const on = command === "turn-on";
+        if (bolt === null && state.on === on) return { noop: true };
+        const { value: _value, ...rest } = state;
+        return { face: { ...(on ? state : rest), tone: on ? "ok" : "idle", on } };
+    }
+    if (command === "lock" || command === "unlock" || command === "open") {
+        if (command === "lock" && bolt === "locked") return { noop: true };
+        if (command === "unlock" && bolt === "unlocked") return { noop: true };
+        return {
+            face: {
+                tone: "warn",
+                on: command === "lock",
+                icon: command === "open" ? "door-open" : command === "lock" ? "lock" : "lock-open",
+                detail: UNDER_WAY[command][locale]
+            }
+        };
+    }
+    return undefined;
+}
+
+/** A thermostat's key, set to a new temperature: the number at once, and
+ *  nothing sent when it already is set to it. */
+export function targetPress(state: DeckState, target: number | null): DeckPress | undefined {
+    if (target === null || !Number.isFinite(target) || state.tone === "bad") return undefined;
+    if (state.value === `${target}°`) return { noop: true };
+    return { face: { ...state, value: `${target}°` } };
+}
+
+const readingRows = z.object({
+    devices: z.array(
+        z
+            .object({
+                id: z.string(),
+                name: z.string(),
+                online: z.boolean(),
+                reading: z.object({ value: z.string(), unit: z.string() }).nullish()
+            })
+            .passthrough()
+    )
+});
+
+/** Every device that reports a reading - a sensor, a plug's power - for a key
+ *  that only shows it. */
+export function readingDevices(structured: unknown) {
+    const parsed = readingRows.safeParse(structured);
+    if (!parsed.success) return [];
+    return parsed.data.devices
+        .filter((device) => device.reading)
+        .map((device) => ({ value: device.id, label: device.name }));
+}
+
+/** A reading as a key draws it. */
+export function readingState(structured: unknown, locale: Locale): DeckState {
+    const parsed = readingRows.safeParse(structured);
+    const device = parsed.success ? parsed.data.devices[0] : undefined;
+    if (!device) return { tone: "idle" };
+    if (!device.online) return { tone: "bad", detail: OFFLINE[locale] };
+    return device.reading
+        ? { tone: "ok", value: `${device.reading.value}${device.reading.unit}` }
+        : { tone: "idle" };
+}
+
+/** The settings an air conditioner or a purifier is told by name. */
+const SETTING_COMMANDS = ["set-mode", "set-fan"] as const;
+
+const SETTING_WORDS: Readonly<
+    Record<(typeof SETTING_COMMANDS)[number], Readonly<Record<Locale, string>>>
+> = {
+    "set-mode": { "en-US": "Mode", "es-ES": "Modo" },
+    "set-fan": { "en-US": "Fan speed", "es-ES": "Ventilador" }
+};
+
 export function placesDeckActions(): readonly AppDeckAction[] {
     return [
         {
@@ -295,7 +399,22 @@ export function placesDeckActions(): readonly AppDeckAction[] {
                     return action ? { deviceId: options.deviceId, action } : null;
                 }
             },
-            read: { ...readDevice, pick: naturalState }
+            read: {
+                ...readDevice,
+                pick: naturalState,
+                press: (state, _options, structured, locale) => {
+                    const parsed = naturalRows.safeParse(structured);
+                    const device = parsed.success ? parsed.data.devices[0] : undefined;
+                    const press = commandPress(
+                        state,
+                        device ? naturalAction(device) : null,
+                        locale
+                    );
+                    // What its own key does follows the device, so it is never
+                    // already done.
+                    return press?.noop ? undefined : press;
+                }
+            }
         },
         {
             id: "places.door",
@@ -310,12 +429,19 @@ export function placesDeckActions(): readonly AppDeckAction[] {
             }),
             // The doors this person may work: the tool checks it again, as the
             // device panel does, on every press.
-            fields: [deviceField("lock"), commandField(DOOR_COMMANDS)],
+            // A lock and an opener both: an opener takes only Open, and the
+            // tool refuses it a lock, in words, as the panel would.
+            fields: [deviceField("lock", "open"), commandField(DOOR_COMMANDS)],
             run: {
                 tool: "places_device_control",
                 input: (options) => ({ deviceId: options.deviceId, action: options.command })
             },
-            read: { ...readDevice, pick: lockState }
+            read: {
+                ...readDevice,
+                pick: lockState,
+                press: (state, options, _structured, locale) =>
+                    commandPress(state, String(options.command ?? "open"), locale)
+            }
         },
         {
             id: "places.device-command",
@@ -342,7 +468,12 @@ export function placesDeckActions(): readonly AppDeckAction[] {
                 tool: "places_device_control",
                 input: (options) => ({ deviceId: options.deviceId, action: options.command })
             },
-            read: { ...readDevice, pick: deviceState }
+            read: {
+                ...readDevice,
+                pick: deviceState,
+                press: (state, options, _structured, locale) =>
+                    commandPress(state, String(options.command ?? ""), locale)
+            }
         },
         {
             id: "places.temperature-step",
@@ -380,7 +511,18 @@ export function placesDeckActions(): readonly AppDeckAction[] {
                     };
                 }
             },
-            read: { ...readDevice, pick: climateState }
+            read: {
+                ...readDevice,
+                pick: climateState,
+                press: (state, options, structured) => {
+                    const climate = climateOf(structured)?.climate;
+                    if (typeof climate?.target !== "number") return undefined;
+                    return targetPress(
+                        state,
+                        clampTarget(climate.target + Number(options.change), climate)
+                    );
+                }
+            }
         },
         {
             id: "places.temperature-set",
@@ -412,7 +554,15 @@ export function placesDeckActions(): readonly AppDeckAction[] {
                     target: clampTarget(Number(options.target), climateOf(press.read)?.climate)
                 })
             },
-            read: { ...readDevice, pick: climateState }
+            read: {
+                ...readDevice,
+                pick: climateState,
+                press: (state, options, structured) =>
+                    targetPress(
+                        state,
+                        clampTarget(Number(options.target), climateOf(structured)?.climate)
+                    )
+            }
         },
         {
             id: "places.climate",
@@ -445,7 +595,17 @@ export function placesDeckActions(): readonly AppDeckAction[] {
                               )
                           }
             },
-            read: { ...readDevice, pick: climateState }
+            read: {
+                ...readDevice,
+                pick: climateState,
+                // A turn landing on the temperature it is already set to sends
+                // nothing; a push is on or off, and always does something.
+                press: (state, options, structured) =>
+                    targetPress(
+                        state,
+                        clampTarget(Number(options.level), climateOf(structured)?.climate)
+                    )
+            }
         },
         {
             id: "places.device-toggle",
@@ -466,7 +626,11 @@ export function placesDeckActions(): readonly AppDeckAction[] {
             read: {
                 tool: "places_devices",
                 input: (options) => ({ deviceId: options.deviceId }),
-                pick: deviceState
+                pick: deviceState,
+                press: (state, _options, _structured, locale) =>
+                    typeof state.on === "boolean"
+                        ? commandPress(state, state.on ? "turn-off" : "turn-on", locale)
+                        : undefined
             }
         },
         {
@@ -496,6 +660,141 @@ export function placesDeckActions(): readonly AppDeckAction[] {
                 input: (options) => ({ deviceId: options.deviceId }),
                 pick: deviceState
             }
+        },
+        {
+            id: "places.light-white",
+            kind: "run",
+            area: "places",
+            icon: "sun",
+            label: { "en-US": "Light warmth", "es-ES": "Tono de una luz" },
+            scope: "home.control",
+            options: z.object({
+                deviceId: z.string().uuid(),
+                kelvin: z.number().int().min(1000).max(12000).default(2700)
+            }),
+            fields: [
+                deviceField("set-color-temp"),
+                {
+                    name: "kelvin",
+                    type: "number",
+                    label: { "en-US": "Kelvin (2700 warm)", "es-ES": "Kelvin (2700 cálida)" },
+                    required: true,
+                    min: 1000,
+                    max: 12000
+                }
+            ],
+            // A bulb outside its own range is refused by the tool, in words.
+            run: {
+                tool: "places_device_control",
+                input: (options) => ({
+                    deviceId: options.deviceId,
+                    action: "set-color-temp",
+                    kelvin: options.kelvin
+                })
+            },
+            read: { ...readDevice, pick: deviceState }
+        },
+        {
+            id: "places.light-color",
+            kind: "run",
+            area: "places",
+            icon: "lightbulb",
+            label: { "en-US": "Light colour", "es-ES": "Color de una luz" },
+            scope: "home.control",
+            options: z.object({
+                deviceId: z.string().uuid(),
+                hue: z.number().min(0).max(360).default(0),
+                saturation: z.number().min(0).max(100).default(100)
+            }),
+            fields: [
+                deviceField("set-color"),
+                {
+                    name: "hue",
+                    type: "number",
+                    label: { "en-US": "Hue (0 to 360)", "es-ES": "Tono (0 a 360)" },
+                    required: true,
+                    min: 0,
+                    max: 360
+                },
+                {
+                    name: "saturation",
+                    type: "number",
+                    label: { "en-US": "Saturation (%)", "es-ES": "Saturación (%)" },
+                    required: true,
+                    min: 0,
+                    max: 100
+                }
+            ],
+            run: {
+                tool: "places_device_control",
+                input: (options) => ({
+                    deviceId: options.deviceId,
+                    action: "set-color",
+                    hue: options.hue,
+                    saturation: options.saturation
+                })
+            },
+            read: { ...readDevice, pick: deviceState }
+        },
+        {
+            id: "places.device-setting",
+            kind: "run",
+            area: "places",
+            icon: "fan",
+            label: { "en-US": "Set a mode or fan", "es-ES": "Fijar modo o ventilador" },
+            scope: "home.control",
+            options: z.object({
+                deviceId: z.string().uuid(),
+                command: z.enum(SETTING_COMMANDS),
+                value: z.string().trim().min(1).max(40)
+            }),
+            fields: [
+                deviceField(...SETTING_COMMANDS),
+                {
+                    name: "command",
+                    type: "choice",
+                    label: { "en-US": "Setting", "es-ES": "Ajuste" },
+                    required: true,
+                    fixed: SETTING_COMMANDS.map((value) => ({ value, label: SETTING_WORDS[value] }))
+                },
+                {
+                    name: "value",
+                    type: "text",
+                    label: { "en-US": "Value (cool, auto, high)", "es-ES": "Valor (cool, auto, high)" },
+                    required: true
+                }
+            ],
+            // The device names its own modes and speeds; one it lacks is
+            // refused by the tool in words.
+            run: {
+                tool: "places_device_control",
+                input: (options) =>
+                    options.command === "set-fan"
+                        ? { deviceId: options.deviceId, action: "set-fan", fan: options.value }
+                        : { deviceId: options.deviceId, action: "set-mode", mode: options.value }
+            },
+            read: { ...readDevice, pick: deviceState }
+        },
+        {
+            id: "places.reading",
+            kind: "state",
+            area: "places",
+            icon: "thermometer",
+            label: { "en-US": "A sensor's reading", "es-ES": "Lectura de un sensor" },
+            scope: "home.read",
+            options: z.object({ deviceId: z.string().uuid() }),
+            fields: [
+                {
+                    name: "deviceId",
+                    type: "choice",
+                    label: { "en-US": "Device", "es-ES": "Dispositivo" },
+                    required: true,
+                    choices: { tool: "places_devices", input: {}, pick: readingDevices }
+                }
+            ],
+            // Only shown: a press opens Polaris, as any key that shows does.
+            run: { tool: "places_devices", input: () => null },
+            read: { ...readDevice, pick: readingState }
         },
         {
             id: "places.routine-run",

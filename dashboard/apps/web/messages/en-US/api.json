@@ -245,7 +245,8 @@
             "notAllowed": "This deck cannot do that. Connect it again, or ask an administrator for access.",
             "badOptions": "This key is not set up completely. Open its settings.",
             "notRunnable": "This key only shows a value.",
-            "refused": "Polaris could not do that just now."
+            "refused": "Polaris could not do that just now.",
+            "reconnect": "Reconnect this deck to allow: {what}."
         },
         "fields": {
             "conversationId": "Conversation",
@@ -294,7 +295,8 @@
             "cancelled": "Cancelled",
             "rolled_back": "Rolled back",
             "stopped": "Stopped",
-            "removed": "Removed"
+            "removed": "Removed",
+            "reconnect": "Reconnect"
         },
         "call": {
             "none": "No call",
