@@ -6,6 +6,7 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
+import { checkReleaseImage } from "@/lib/security/deploy-gate";
 import {
     parsePrivateAccess,
     storePrivateAccess,
@@ -4785,9 +4786,21 @@ function runDeployment(
                 ctx.log(Buffer.from(`==> Failed: ${refused}\n`));
                 return { ok: false, error: refused };
             }
+            // A scale step runs the release already serving; only a new one is checked.
+            const checked = scaling
+                ? ctx
+                : {
+                      ...ctx,
+                      beforeServe: (refs: readonly string[]) =>
+                          checkReleaseImage({
+                              deploymentId,
+                              targetId: target.id,
+                              refs
+                          })
+                  };
             const result = await driver.deployApplication(
                 plan,
-                scaling ? ctx : await sharedVolumesFreedBeforeUp(deploymentId, plan, ctx)
+                scaling ? checked : await sharedVolumesFreedBeforeUp(deploymentId, plan, checked)
             );
             if (result.ok && result.detectedPort) {
                 await rememberDetectedPort(deploymentId, result.detectedPort);

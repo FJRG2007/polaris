@@ -416,6 +416,14 @@ export class ComposeRuntime implements RuntimeDriver {
             imageTag = await pinRelease(imageTag, plan, ctx);
         }
 
+        if (ctx.beforeServe) {
+            const refused = await ctx.beforeServe(
+                [imageTag, plan.build.method === "image" ? plan.build.imageRef : undefined].filter(
+                    (ref): ref is string => typeof ref === "string" && ref.length > 0
+                )
+            );
+            if (refused) return fail(ctx, refused);
+        }
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
         // One service per copy, since compose cannot scale a named container, and
         // beside each the port-80 forwarder when it has one - sending to the port

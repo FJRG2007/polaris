@@ -5116,6 +5116,10 @@ model Application {
     // Keep previous deployments running (Railway-style multi-version). Off by
     // default: a new deploy replaces the old container.
     keepReleases        Boolean   @default(false)
+    // Refuse to start a release whose image a scan found a critical, fixable
+    // vulnerability in (see lib/security/deploy-gate.ts). Off by default: such a
+    // release then only carries a warning.
+    blockVulnerableDeploys Boolean @default(false)
     // Whether the container port is published on the host's interfaces, so the
     // service answers on the machine's IP and a port with no proxy in the way.
     // True for every service that existed before this could be switched off, so
@@ -5569,6 +5573,13 @@ model Deployment {
     // queued | building | deploying | running | failed | cancelled | rolled_back
     status         String    @default("queued")
     imageTag       String?
+    // JSON {count, id, package, fixedIn, scanId}: the critical vulnerabilities
+    // with a known fix a scan of this release's image found before it started.
+    securityWarning      String?
+    // Who let this one deployment through a service that blocks vulnerable
+    // releases, and when - recorded, never implied.
+    securityOverrideById String?   @db.Uuid
+    securityOverrideAt   DateTime?
     commitSha      String?
     // Head commit message when known (auto-deploy webhook / resolved on deploy).
     commitMessage  String?

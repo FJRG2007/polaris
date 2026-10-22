@@ -37,6 +37,13 @@ export interface RuntimeContext {
      *  root, whatever the service's own root directory says. */
     readonly buildContext?: () => Promise<BuildContext>;
     /**
+     * Asked once the release's image is ready and before its containers start:
+     * a sentence refuses the release (it fails with it), null lets it go on.
+     * `refs` are the image's names - the release tag and, for a pulled image,
+     * the reference it was pulled by. Optional: nothing asks by default.
+     */
+    readonly beforeServe?: (refs: readonly string[]) => Promise<string | null>;
+    /**
      * The machine a source build runs on, when it is not the one that runs the
      * service. The image is built and kept there, then carried here (see `ship`).
      * Absent builds where it runs, as every deploy did before.
