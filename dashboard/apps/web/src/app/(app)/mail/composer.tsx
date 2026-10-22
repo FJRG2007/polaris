@@ -268,7 +268,8 @@ export function Composer() {
         };
     }, [composing]);
 
-    const dirty = to.length > 0 || subject.trim() !== "" || message.trim() !== "" || files.length > 0;
+    const dirty =
+        to.length > 0 || subject.trim() !== "" || message.trim() !== "" || files.length > 0;
 
     // The draft, a few seconds after typing stops. Skipped while nothing has been
     // typed - an opened-and-closed composer should not leave an empty draft.

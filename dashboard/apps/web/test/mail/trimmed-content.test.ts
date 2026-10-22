@@ -43,7 +43,9 @@ describe("the composer's trimmed quote", () => {
     it("trims a fresh reply to the empty line above the quote", () => {
         const split = trimComposerBody(replyBody(), false);
         expect(split?.head).toBe("\n\n");
-        expect(split?.tail.startsWith("On 2026-10-20 10:00 UTC, Ann Example <ann@example.test> wrote:")).toBe(true);
+        expect(
+            split?.tail.startsWith("On 2026-10-20 10:00 UTC, Ann Example <ann@example.test> wrote:")
+        ).toBe(true);
     });
 
     it("sends exactly what it always did while the quote stays folded", () => {
@@ -85,9 +87,10 @@ describe("the composer's trimmed quote", () => {
         const split = trimComposerBody(forwardSeed(message, QUOTED).body, false);
         expect(split?.tail.startsWith("---------- Forwarded message ----------")).toBe(true);
         // What the editor writes back for that line once it has been through it.
-        expect(trimComposerBody("FYI\n\n\\---------- Forwarded message ----------\nFrom: x", true)?.head).toBe(
-            "FYI\n\n"
-        );
+        expect(
+            trimComposerBody("FYI\n\n\\---------- Forwarded message ----------\nFrom: x", true)
+                ?.head
+        ).toBe("FYI\n\n");
     });
 
     it("folds a reopened draft again while its quote is only the quote", () => {
@@ -192,9 +195,15 @@ describe("the reader's trimmed history", () => {
         const html =
             '<div>FYI</div><div class="gmail_quote"><div class="gmail_attr">---------- Forwarded message ---------<br>From: Ann</div><div>The report</div></div>';
         expect(trimReceivedHtml(html)).toBeNull();
-        expect(trimReceivedText("FYI\n\n---------- Forwarded message ---------\nOn Mon, Ann wrote:\n> x")).toBeNull();
         expect(
-            trimReceivedText("FYI\n\nFrom: Ann\nSent: Monday\nTo: Me\nSubject: FW: The report\n\nThe report")
+            trimReceivedText(
+                "FYI\n\n---------- Forwarded message ---------\nOn Mon, Ann wrote:\n> x"
+            )
+        ).toBeNull();
+        expect(
+            trimReceivedText(
+                "FYI\n\nFrom: Ann\nSent: Monday\nTo: Me\nSubject: FW: The report\n\nThe report"
+            )
         ).toBeNull();
     });
 
@@ -208,19 +217,25 @@ describe("the reader's trimmed history", () => {
     });
 
     it("trims a plain-text reply's quote and its attribution", () => {
-        const text = "Friday works.\n\nOn Mon, 20 Oct 2026 at 10:00, Ann <ann@example.test> wrote:\n> Shall we meet?\n>\n> Ann\n";
+        const text =
+            "Friday works.\n\nOn Mon, 20 Oct 2026 at 10:00, Ann <ann@example.test> wrote:\n> Shall we meet?\n>\n> Ann\n";
         expect(trimReceivedText(text)).toBe("Friday works.");
     });
 
     it("takes an attribution the sender's client wrapped over two lines", () => {
-        const text = "Friday works.\n\nOn Mon, 20 Oct 2026 at 10:00, Ann Example <ann@example.test>\nwrote:\n\n> Shall we meet?";
+        const text =
+            "Friday works.\n\nOn Mon, 20 Oct 2026 at 10:00, Ann Example <ann@example.test>\nwrote:\n\n> Shall we meet?";
         expect(trimReceivedText(text)).toBe("Friday works.");
     });
 
     it("trims Outlook's plain-text dividers", () => {
-        expect(trimReceivedText("Done.\n\n-----Original Message-----\nFrom: Ann\nShall we?")).toBe("Done.");
+        expect(trimReceivedText("Done.\n\n-----Original Message-----\nFrom: Ann\nShall we?")).toBe(
+            "Done."
+        );
         expect(
-            trimReceivedText("Done.\n\n________________________________\nFrom: Ann\nSent: Monday\nTo: Me\nSubject: Plans\n\nShall we?")
+            trimReceivedText(
+                "Done.\n\n________________________________\nFrom: Ann\nSent: Monday\nTo: Me\nSubject: Plans\n\nShall we?"
+            )
         ).toBe("Done.");
     });
 

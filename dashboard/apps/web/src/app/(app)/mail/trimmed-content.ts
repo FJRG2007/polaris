@@ -111,8 +111,7 @@ export function joinComposerBody(head: string, tail: string): string {
 const FORWARDED = /forwarded message|begin forwarded message|mensaje reenviado/i;
 
 /** An Outlook header block's subject line naming a forward. */
-const FORWARDED_SUBJECT =
-    /(?:^|\n)\s*(?:subject|asunto)\s*:\s*(?:fw|fwd|rv)\s*:/i;
+const FORWARDED_SUBJECT = /(?:^|\n)\s*(?:subject|asunto)\s*:\s*(?:fw|fwd|rv)\s*:/i;
 
 /** The line a forward's header opens with, in plain text. */
 const FORWARD_DIVIDER =
@@ -235,7 +234,8 @@ function blank(node: Node): boolean {
 }
 
 /** The elements that start a line of their own. */
-const BLOCK = "address, article, blockquote, div, dl, h1, h2, h3, h4, h5, h6, hr, li, ol, p, pre, section, table, ul";
+const BLOCK =
+    "address, article, blockquote, div, dl, h1, h2, h3, h4, h5, h6, hr, li, ol, p, pre, section, table, ul";
 
 /** Whether a node ends the line before it. */
 function breaksLine(node: Node): boolean {
@@ -278,19 +278,35 @@ function attributionNodes(node: Node): Node[] | null {
         while (start > 0 && !breaksLine(children[start - 1] as Node)) start -= 1;
         line = children.slice(start, end + 1);
         // An attribution the sender's client wrapped over two lines.
-        const said = line.map((one) => one.textContent ?? "").join("").trim();
-        if (!ATTRIBUTION_OPENS.test(said) && start > 0 && (children[start - 1] as Element).matches("br")) {
+        const said = line
+            .map((one) => one.textContent ?? "")
+            .join("")
+            .trim();
+        if (
+            !ATTRIBUTION_OPENS.test(said) &&
+            start > 0 &&
+            (children[start - 1] as Element).matches("br")
+        ) {
             let above = start - 1;
             while (above > 0 && !breaksLine(children[above - 1] as Node)) above -= 1;
             const opening = children.slice(above, start - 1);
-            const text = opening.map((one) => one.textContent ?? "").join("").trim();
+            const text = opening
+                .map((one) => one.textContent ?? "")
+                .join("")
+                .trim();
             if (ATTRIBUTION_OPENS.test(text)) {
                 line = children.slice(above, end + 1);
                 start = above;
             }
         }
     }
-    if (line.map((one) => one.textContent ?? "").join("").trim().length >= 400) return null;
+    if (
+        line
+            .map((one) => one.textContent ?? "")
+            .join("")
+            .trim().length >= 400
+    )
+        return null;
 
     const before = children.slice(0, start);
     if (before.every(blank)) return [node];
@@ -338,9 +354,7 @@ export function trimReceivedHtml(html: string): string | null {
             markers.push({ element, divider: true });
         }
     }
-    markers.sort((one, other) =>
-        one.element.compareDocumentPosition(other.element) & 4 ? -1 : 1
-    );
+    markers.sort((one, other) => (one.element.compareDocumentPosition(other.element) & 4 ? -1 : 1));
 
     for (const { element, divider } of markers) {
         const lead = extendUp(element);
