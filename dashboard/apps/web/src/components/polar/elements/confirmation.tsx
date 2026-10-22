@@ -63,6 +63,8 @@ export function Confirmation({
     tool,
     onApprove,
     onReject,
+    site,
+    onAlwaysSite,
     className
 }: {
     state: ToolState;
@@ -78,6 +80,10 @@ export function Confirmation({
     tool?: string;
     onApprove: () => void;
     onReject: () => void;
+    /** A browser call's site. Given with `onAlwaysSite`, the card asks for
+     *  the site the way Claude in Chrome does: once, always, or not. */
+    site?: string;
+    onAlwaysSite?: () => void;
     className?: string;
 }) {
     const t = useTranslations("polar");
@@ -152,6 +158,11 @@ export function Confirmation({
             )}
         >
             <p className="font-medium text-foreground">{t("approval.question", { action })}</p>
+            {site && onAlwaysSite ? (
+                <p className="min-w-0 break-words text-xs text-muted-foreground">
+                    {t("approval.siteAsk", { site })}
+                </p>
+            ) : null}
             {summary ? (
                 <p className="min-w-0 break-words text-sm text-foreground">{summary}</p>
             ) : affects.length > 0 ? (
@@ -214,6 +225,18 @@ export function Confirmation({
                     <Button type="button" variant="outline" size="sm" onClick={onReject}>
                         {t("approval.deny")}
                     </Button>
+                    {site && onAlwaysSite ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-w-0 max-w-full"
+                            title={t("approval.siteAlways", { site })}
+                            onClick={onAlwaysSite}
+                        >
+                            <span className="truncate">{t("approval.siteAlways", { site })}</span>
+                        </Button>
+                    ) : null}
                     {asking && read?.scope !== "none" ? (
                         <Button
                             type="button"
@@ -232,7 +255,7 @@ export function Confirmation({
                         size="sm"
                         onClick={onApprove}
                     >
-                        {t("approval.run")}
+                        {site && onAlwaysSite ? t("approval.siteOnce") : t("approval.run")}
                     </Button>
                 </div>
             ) : null}

@@ -44,8 +44,8 @@ import {
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import { polarVisualTools } from "@/lib/polar/visual-tool";
 import { polarRepoTools } from "@/lib/polar/code-host-tools";
-import { browserPresent } from "@/lib/polar/browser-relay";
-import { BROWSER_APPROVAL, polarBrowserTools } from "@/lib/polar/browser-tools";
+import { BROWSER_TOOL, isBrowserTool } from "@/lib/polar/browser-steps";
+import { browserApprovalFor, polarBrowserTools } from "@/lib/polar/browser-tools";
 import { aboutRepository } from "@/lib/polar/code-host";
 import {
     NATIVE_SEARCH_STAND_INS,
@@ -295,9 +295,10 @@ export async function POST(request: Request): Promise<Response> {
     // Reading a repository is reading the web, under the same switch. Always
     // registered; sent while the page shared or the conversation names one.
     const repoOffered = web && aboutRepository(body.data.context?.site?.url, messages);
-    // The person's own browser, under the same switch, while its extension is
-    // polling - the tools say so themselves if it goes away mid-turn.
-    const browserOffered = web && browserPresent(user.id);
+    // The person's own browser, under the same switch: one tool, in every
+    // turn, so Polar never answers that it has no way to scroll a page. With
+    // no extension connected it answers with the step that connects one.
+    const browserOffered = web;
     const tools = {
         ...screenTools,
         ...Object.fromEntries(Object.entries(toolset.tools).filter(([name]) => !off.has(name))),
@@ -322,13 +323,19 @@ export async function POST(request: Request): Promise<Response> {
         ...Object.keys(remembers ? memoryTools : {}),
         ...Object.keys(webTools),
         ...(repoOffered ? Object.keys(repoTools) : []),
-        ...(browserOffered ? Object.keys(browserTools) : []),
+        ...(browserOffered ? [BROWSER_TOOL] : []),
         // A connector is one the person added on purpose: its tools are always sent.
         ...(body.data.connectors
             ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))
             : [])
     ];
-    const used = usedInMessages(messages as never);
+    // The six browser_* tools `browser` replaced stay registered for old turns
+    // but are never sent again.
+    const used = new Set(
+        [...usedInMessages(messages as never)].filter(
+            (name) => !isBrowserTool(name) || name === BROWSER_TOOL
+        )
+    );
     const activeFor = (found: ReadonlySet<string>) =>
         activeToolNames(
             catalog,
@@ -426,7 +433,7 @@ export async function POST(request: Request): Promise<Response> {
             ...(body.data.connectors ? connectorSet.approval : {}),
             ...(remembers ? MEMORY_APPROVAL : {}),
             ...(web ? WEB_APPROVAL : {}),
-            ...(web ? BROWSER_APPROVAL : {})
+            ...(web ? browserApprovalFor(user.id) : {})
         },
         stopWhen: isStepCount(STEP_MAX),
         // Automatic sends a quick question at the lowest effort.

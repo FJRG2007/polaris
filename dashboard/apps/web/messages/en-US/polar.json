@@ -259,7 +259,10 @@
         "alwaysRevoke": "Undo it in Polar permissions.",
         "alwaysBack": "Back",
         "alwaysConfirm": "Allow and run",
-        "alwaysFailed": "Couldn't save that, so nothing ran. Try again."
+        "alwaysFailed": "Couldn't save that, so nothing ran. Try again.",
+        "siteAsk": "Polar wants to use {site} in your browser.",
+        "siteOnce": "Allow once",
+        "siteAlways": "Always for {site}"
     },
     "page": {
         "title": "Polar"
@@ -604,18 +607,30 @@
         "snowballing": "Snowballing"
     },
     "web": {
-        "browserOpen": "Opening {site} in your browser",
-        "browserRead": "Reading {site} in your browser",
-        "browserFind": "Looking over {site}",
-        "browserClick": "Click {element} on {site}",
-        "browserType": "Type into {element} on {site}",
         "browserClose": "Closing a tab",
         "toggle": "Search the web",
         "searching": "Searching: {query}",
         "searched": "Searched the web",
         "reading": "Reading {site}",
         "sources": "Sources",
-        "calls": "{searches, plural, one {# search} other {# searches}} - {pages, plural, one {# page read} other {# pages read}}"
+        "calls": "{searches, plural, one {# search} other {# searches}} - {pages, plural, one {# page read} other {# pages read}}",
+        "browserMissing": "Polar needs the Polaris extension connected in this browser.",
+        "browserConnect": "Get the extension",
+        "browserSteps": {
+            "open": "Opening {site} in your browser",
+            "read": "Reading {site} in your browser",
+            "find": "Looking over {site}",
+            "click": "Click {element} on {site}",
+            "type": "Type into {element} on {site}",
+            "key": "Press keys on {site}",
+            "scroll": "Scrolling {site}",
+            "hover": "Point at {element} on {site}",
+            "select": "Pick in {element} on {site}",
+            "back": "Going back on {site}",
+            "forward": "Going forward on {site}",
+            "reload": "Reloading {site}",
+            "wait": "Waiting for the page"
+        }
     },
     "repo": {
         "overview": "Looking at {repo}",

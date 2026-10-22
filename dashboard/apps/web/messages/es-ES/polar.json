@@ -259,7 +259,10 @@
         "alwaysRevoke": "Deshazlo en Permisos de Polar.",
         "alwaysBack": "Volver",
         "alwaysConfirm": "Permitir y hacer",
-        "alwaysFailed": "No se guardó y no se ejecutó nada. Reinténtalo."
+        "alwaysFailed": "No se guardó y no se ejecutó nada. Reinténtalo.",
+        "siteAsk": "Polar quiere usar {site} en tu navegador.",
+        "siteOnce": "Solo esta vez",
+        "siteAlways": "Siempre en {site}"
     },
     "page": {
         "title": "Polar"
@@ -604,18 +607,30 @@
         "snowballing": "Amasando nieve"
     },
     "web": {
-        "browserOpen": "Abriendo {site} en tu navegador",
-        "browserRead": "Leyendo {site} en tu navegador",
-        "browserFind": "Revisando {site}",
-        "browserClick": "Pulsar {element} en {site}",
-        "browserType": "Escribir en {element} en {site}",
         "browserClose": "Cerrando pestaña",
         "toggle": "Buscar en la web",
         "searching": "Buscando: {query}",
         "searched": "Buscó en la web",
         "reading": "Leyendo {site}",
         "sources": "Fuentes",
-        "calls": "{searches, plural, one {# búsqueda} other {# búsquedas}} - {pages, plural, one {# página leída} other {# páginas leídas}}"
+        "calls": "{searches, plural, one {# búsqueda} other {# búsquedas}} - {pages, plural, one {# página leída} other {# páginas leídas}}",
+        "browserMissing": "Polar necesita la extensión de Polaris conectada aquí.",
+        "browserConnect": "Obtener extensión",
+        "browserSteps": {
+            "open": "Abriendo {site} en tu navegador",
+            "read": "Leyendo {site} en tu navegador",
+            "find": "Revisando {site}",
+            "click": "Pulsar {element} en {site}",
+            "type": "Escribir en {element} en {site}",
+            "key": "Pulsar teclas en {site}",
+            "scroll": "Desplazando {site}",
+            "hover": "Señalar {element} en {site}",
+            "select": "Elegir en {element} en {site}",
+            "back": "Volviendo atrás en {site}",
+            "forward": "Avanzando en {site}",
+            "reload": "Recargando {site}",
+            "wait": "Esperando a la página"
+        }
     },
     "repo": {
         "overview": "Viendo {repo}",

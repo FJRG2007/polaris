@@ -1,8 +1,8 @@
 /**
  * The road between Polar and the person's own browser.
  *
- * Nothing can push to a browser extension, so the extension asks: while the
- * person has "Polar can use this browser" switched on, its worker holds one
+ * Nothing can push to a browser extension, so the extension asks: while it is
+ * connected to this Polaris, its worker holds one
  * long poll open here (`/api/extension/browser/next`) with its connection's
  * token, picks up a command when Polar has one for that account, runs it in the
  * browser and posts the answer back (`/api/extension/browser/result`). A
@@ -22,7 +22,11 @@
  */
 
 import { randomBytes } from "node:crypto";
-import type { BrowserCommand, BrowserResult } from "@polaris/core/browser-agent";
+import {
+    browserSite,
+    type BrowserCommand,
+    type BrowserResult
+} from "@polaris/core/browser-agent";
 
 /** How long a browser counts as there after its last poll. A poll is held for
  *  `POLL_HOLD_MS`, so this is a little over two of them. */
@@ -57,6 +61,8 @@ interface RelayState {
     /** userId -> command ids not yet handed to a browser, oldest first. */
     readonly queued: Map<string, string[]>;
     readonly inFlight: Map<string, InFlight>;
+    /** connectionId -> the sites that browser says the person allowed always. */
+    readonly sites: Map<string, readonly string[]>;
     /** When `seen` was last cleared of browsers that stopped polling. */
     sweptAt: number;
 }
@@ -71,6 +77,7 @@ function state(): RelayState {
         waiting: new Map(),
         queued: new Map(),
         inFlight: new Map(),
+        sites: new Map(),
         sweptAt: 0
     };
     return holder[KEY];
@@ -102,6 +109,33 @@ function presentConnections(userId: string, now: number): string[] {
 /** Whether this account has a browser Polar can use right now. */
 export function browserPresent(userId: string, now = Date.now()): boolean {
     return presentConnections(userId, now).length > 0;
+}
+
+/** The most sites one browser reports. */
+export const SITES_MOST = 200;
+
+/** What a poll says the person allowed always in that browser. It only ever
+ *  saves a question in the chat: the extension still decides each command. */
+export function noteSites(connectionId: string, sites: readonly string[]): void {
+    state().sites.set(connectionId, sites.slice(0, SITES_MOST));
+}
+
+/** The sites a poll reports, each checked; the rest dropped. */
+export function sitesHeader(value: string | null): string[] {
+    if (!value) return [];
+    return value
+        .split(",")
+        .slice(0, SITES_MOST)
+        .flatMap((entry) => {
+            const site = browserSite.safeParse(entry);
+            return site.success && site.data ? [site.data] : [];
+        });
+}
+
+/** The sites the browser commands go to says are allowed always. */
+export function grantedSites(userId: string, now = Date.now()): readonly string[] {
+    const target = chosenConnection(userId, now);
+    return (target && state().sites.get(target)) || [];
 }
 
 /** The connection commands go to: the pinned one while it is there. */

@@ -27,7 +27,7 @@ export const BROWSER_TYPE_MOST = 4_000;
 /** A tab Polar opened, by the number the browser gave it. */
 export const browserTab = z.number().int().nonnegative();
 /** An element, by the ref a snapshot handed out. */
-export const browserRef = z.string().regex(/^e\d{1,6}$/, "A ref from browser_find, like e12.");
+export const browserRef = z.string().regex(/^e\d{1,6}$/, "A ref from the find action, like e12.");
 /** The site an action is approved for, as the card names it: a bare host. */
 export const browserSite = z
     .string()
@@ -45,25 +45,66 @@ export const browserSelector = z.string().trim().min(1).max(300);
 /** Words a snapshot narrows to. */
 export const browserQuery = z.string().trim().max(200);
 
+/** Keys pressed in one call: "Enter", "Escape", "PageDown", "Control+a". */
+export const browserKeys = z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    .regex(/^[A-Za-z0-9+ ]+$/, 'Keys like "Enter", "PageDown" or "Control+a".');
+/** The grant the chat's card already asked for, so the extension's own
+ *  question opens on the same answer. The extension still asks: the server can
+ *  never grant itself a site. */
+export const browserGrantHint = z.enum(["once", "always"]);
+
+/** The tab an action is on: one Polar opened or adopted, or left out for the
+ *  tab the person has in front. */
+const onTab = { tab: browserTab.optional(), grant: browserGrantHint.optional() };
+/** An action that changes a page names the site it was approved for. */
+const acting = { ...onTab, site: browserSite };
+
 /** What the dashboard asks the extension to do. */
 export const browserCommand = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("open"), url: browserAddress }),
+    z.object({ kind: z.literal("open"), url: browserAddress, grant: browserGrantHint.optional() }),
     z.object({
         kind: z.literal("read"),
-        tab: browserTab,
+        ...onTab,
+        site: browserSite.optional(),
         selector: browserSelector.optional()
     }),
-    z.object({ kind: z.literal("find"), tab: browserTab, query: browserQuery.optional() }),
-    z.object({ kind: z.literal("click"), tab: browserTab, ref: browserRef, site: browserSite }),
+    z.object({
+        kind: z.literal("find"),
+        ...onTab,
+        site: browserSite.optional(),
+        query: browserQuery.optional()
+    }),
+    z.object({ kind: z.literal("click"), ...acting, ref: browserRef }),
     z.object({
         kind: z.literal("type"),
-        tab: browserTab,
+        ...acting,
         ref: browserRef,
-        site: browserSite,
         text: z.string().max(BROWSER_TYPE_MOST),
         submit: z.boolean().optional()
     }),
-    z.object({ kind: z.literal("close"), tab: browserTab })
+    z.object({ kind: z.literal("key"), ...acting, keys: browserKeys }),
+    z.object({
+        kind: z.literal("scroll"),
+        ...acting,
+        /** Scrolls this element into view instead of by an amount. */
+        ref: browserRef.optional(),
+        direction: z.enum(["up", "down", "left", "right"]).optional(),
+        /** Screens to scroll, 1 by default. */
+        amount: z.number().min(0.1).max(10).optional()
+    }),
+    z.object({ kind: z.literal("hover"), ...acting, ref: browserRef }),
+    z.object({ kind: z.literal("select"), ...acting, ref: browserRef, value: z.string().max(200) }),
+    z.object({ kind: z.literal("back"), ...acting }),
+    z.object({ kind: z.literal("forward"), ...acting }),
+    z.object({ kind: z.literal("reload"), ...acting }),
+    z.object({ kind: z.literal("wait"), seconds: z.number().min(0.2).max(10) }),
+    z.object({ kind: z.literal("close"), tab: browserTab }),
+    /** Withdraws an "always" grant. Only ever narrows what Polar may do. */
+    z.object({ kind: z.literal("forget"), site: browserSite })
 ]);
 export type BrowserCommand = z.infer<typeof browserCommand>;
 
@@ -71,7 +112,7 @@ export type BrowserCommand = z.infer<typeof browserCommand>;
 export const BROWSER_REFUSALS = [
     /** The person said no to this site in the extension, or did not answer. */
     "site-denied",
-    /** Polar may only touch tabs it opened itself. */
+    /** Polar may only touch tabs it opened or was shown, and this one is gone. */
     "unknown-tab",
     /** The ref is not one the last snapshot of that tab handed out. */
     "unknown-ref",
@@ -79,7 +120,7 @@ export const BROWSER_REFUSALS = [
     "wrong-site",
     /** A password box: never read, never typed into. */
     "password-field",
-    /** The person pressed Stop, or switched Polar's browser use off. */
+    /** The person pressed Stop on the bar Polar shows in the tab. */
     "stopped",
     /** The page cannot be scripted (a browser page, a store, a PDF viewer). */
     "unscriptable",
@@ -137,9 +178,29 @@ export const browserAnswer = z.object({
 });
 export type BrowserAnswer = z.infer<typeof browserAnswer>;
 
-/** Whether a command changes anything on the page, so it needs the card. */
+/** Whether a command changes anything on the page. */
 export function browserCommandWrites(command: Pick<BrowserCommand, "kind">): boolean {
-    return command.kind === "click" || command.kind === "type";
+    return ["click", "type", "key", "select"].includes(command.kind);
+}
+
+/** Words on an element or in a typed text that mean the action sends, pays,
+ *  deletes or touches a secret - English and Spanish, the languages Polaris
+ *  speaks. */
+const RISKY =
+    /(submit|send|post|publish|tweet|reply|buy|purchase|order|pay|payment|checkout|check out|card|cvv|iban|transfer|donate|subscribe|delete|remove|erase|destroy|cancel|unsubscribe|confirm|accept|sign out|log out|password|passcode|pin|enviar|env[ií]a|publicar|responder|comprar|compra|pedido|pagar|pago|tarjeta|transferir|transferencia|donar|suscribw*|borrar|elimina|eliminar|quitar|cancelar|confirmar|aceptar|cerrar sesi[oó]n|contrase[nñ]a)/i;
+
+/**
+ * Whether an action is one the person approves every time, whatever site they
+ * allowed: it submits, sends, buys, deletes or touches a password or a card.
+ * The rule Claude in Chrome applies to high-risk actions. Pure.
+ */
+export function browserHighRisk(command: BrowserCommand, element = ""): boolean {
+    if (!browserCommandWrites(command)) return false;
+    if (command.kind === "type" && command.submit) return true;
+    if (command.kind === "key" && /enter/i.test(command.keys)) return true;
+    if (RISKY.test(element)) return true;
+    if (command.kind === "select") return RISKY.test(command.value);
+    return false;
 }
 
 /** The site of an address as the grant and the card name it: the host,
