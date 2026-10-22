@@ -96,7 +96,12 @@ export function CliSection({
             <div className="flex min-w-0 flex-col gap-2">
                 <DownloadRows label={t("downloads.cli.install")}>
                     {rows.map((row) => (
-                        <DownloadRow key={row.key} mark={row.mark} name={row.line.shell} detail={row.detail}>
+                        <DownloadRow
+                            key={row.key}
+                            mark={row.mark}
+                            name={row.line.shell}
+                            detail={row.detail}
+                        >
                             <CommandLine command={row.line.command} />
                         </DownloadRow>
                     ))}
@@ -105,7 +110,9 @@ export function CliSection({
             </div>
 
             <div className="flex min-w-0 flex-col gap-2">
-                <p className="text-xs font-medium text-muted-foreground">{t("downloads.cli.signIn")}</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                    {t("downloads.cli.signIn")}
+                </p>
                 {origin ? (
                     <CommandLine command={cliLoginLine(origin)} />
                 ) : (
@@ -115,7 +122,9 @@ export function CliSection({
             </div>
 
             <div className="flex min-w-0 flex-col gap-2">
-                <p className="text-xs font-medium text-muted-foreground">{t("downloads.cli.next")}</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                    {t("downloads.cli.next")}
+                </p>
                 {/* i18n-ignore commands, typed as they are */}
                 <CommandLine command="plr projects" />
             </div>

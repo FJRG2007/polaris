@@ -216,7 +216,12 @@ describe("the Stream Deck card", () => {
     });
 
     it("keeps the connected decks and the button that disconnects each", () => {
-        const deck = { id: "key-1", name: "Office deck", createdAt: "2026-01-01T00:00:00Z", lastUsedAt: null };
+        const deck = {
+            id: "key-1",
+            name: "Office deck",
+            createdAt: "2026-01-01T00:00:00Z",
+            lastUsedAt: null
+        };
         render(<StreamDeckSection {...SECTION} decks={[deck]} />, { wrapper: MessagesWrapper });
         expect(screen.getByText("Connected decks")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Office deck" }).getAttribute("href")).toBe(

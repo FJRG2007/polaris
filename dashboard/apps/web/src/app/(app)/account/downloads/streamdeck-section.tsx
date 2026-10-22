@@ -123,11 +123,17 @@ export function StreamDeckSection({
                 <DownloadRow
                     mark={<DeckHostMark host="streamdeck" />}
                     name={t("downloads.streamdeck.store")}
-                    detail={STREAMDECK_MARKETPLACE_URL ? undefined : t("downloads.streamdeck.storeHint")}
+                    detail={
+                        STREAMDECK_MARKETPLACE_URL ? undefined : t("downloads.streamdeck.storeHint")
+                    }
                     action={
                         STREAMDECK_MARKETPLACE_URL ? (
                             <Button asChild variant="secondary" size="sm">
-                                <a href={STREAMDECK_MARKETPLACE_URL} target="_blank" rel="noreferrer">
+                                <a
+                                    href={STREAMDECK_MARKETPLACE_URL}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
                                     <ExternalLink className="size-4" />
                                     {t("downloads.streamdeck.openStore")}
                                 </a>
@@ -169,7 +175,9 @@ export function StreamDeckSection({
                     {t("downloads.streamdeck.connected")}
                 </p>
                 {list.length === 0 ? (
-                    <p className="text-muted-foreground">{t("downloads.streamdeck.noneConnected")}</p>
+                    <p className="text-muted-foreground">
+                        {t("downloads.streamdeck.noneConnected")}
+                    </p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border/60 border-y border-border/60">
                         {list.map((deck) => (
@@ -186,7 +194,10 @@ export function StreamDeckSection({
                                         {deck.lastUsedAt
                                             ? t.rich("downloads.streamdeck.lastUsed", {
                                                   time: () => (
-                                                      <RelativeTime key="time" iso={deck.lastUsedAt!} />
+                                                      <RelativeTime
+                                                          key="time"
+                                                          iso={deck.lastUsedAt!}
+                                                      />
                                                   )
                                               })
                                             : t("downloads.streamdeck.notUsedYet")}

@@ -86,7 +86,12 @@ describe("waiting on GitHub", () => {
             expect(at).toBeGreaterThan(-1);
             expect(source.slice(0, at).trimEnd().endsWith(">")).toBe(true);
             expect(source.slice(source.lastIndexOf("<Suspense", at), at)).toContain("fallback=");
-            expect(source.slice(at + lookup.length).trimStart().startsWith("</Suspense>")).toBe(true);
+            expect(
+                source
+                    .slice(at + lookup.length)
+                    .trimStart()
+                    .startsWith("</Suspense>")
+            ).toBe(true);
         }
     });
 });
@@ -112,7 +117,7 @@ describe("loading it by hand", () => {
 describe("when there is a version", () => {
     it("names it, and links what changed in it", async () => {
         const source = await files;
-        expect(source).toContain("<Badge variant=\"neutral\">{download.version}</Badge>");
+        expect(source).toContain('<Badge variant="neutral">{download.version}</Badge>');
         expect(source).toContain("What changed");
     });
 });
