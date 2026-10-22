@@ -265,7 +265,7 @@ La interfaz está en español e inglés, y cada cuenta elige la suya.
 | Extensión para Chrome y Firefox: rellena formularios de inicio de sesión desde tu vault | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=extension))  |
 | Servidor MCP para Claude, ChatGPT, Cursor, VS Code y otros clientes de IA               | Disponible ([configuración](docs/connecting-ai-assistants.md))                      |
 | CLI para desarrolladores (`plr`): despliegues, logs, reinicios                          | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=cli))        |
-| Plugin de Stream Deck (app de Stream Deck, OpenDeck) y módulo de Bitfocus Companion     | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=streamdeck)) |
+| Plugin de Stream Deck (app de Stream Deck, OpenDeck) y módulo de Bitfocus Companion     | Disponible ([Stream Deck](https://github.com/FJRG2007/polaris/releases?q=streamdeck), [Companion](https://github.com/FJRG2007/polaris/releases?q=companion)) |
 | App de escritorio para Windows, macOS y Linux                                           | Próximamente: en el repositorio, sin versión publicada                              |
 | Apps para iOS y Android                                                                 | Próximamente                                                                        |
 

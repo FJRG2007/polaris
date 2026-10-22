@@ -401,7 +401,7 @@ The interface is in English and Spanish ([en español](README.es.md)), and each 
 | Browser extension for Chrome and Firefox: fills sign-in forms from your vault | Available ([releases](https://github.com/FJRG2007/polaris/releases?q=extension))  |
 | MCP server for Claude, ChatGPT, Cursor, VS Code and other AI clients          | Available ([setup](docs/connecting-ai-assistants.md))                             |
 | Developer CLI (`plr`): deploy, logs, restarts                                 | Available ([releases](https://github.com/FJRG2007/polaris/releases?q=cli))        |
-| Stream Deck plugin (Stream Deck app, OpenDeck) and Bitfocus Companion module  | Available ([releases](https://github.com/FJRG2007/polaris/releases?q=streamdeck)) |
+| Stream Deck plugin (Stream Deck app, OpenDeck) and Bitfocus Companion module  | Available ([Stream Deck](https://github.com/FJRG2007/polaris/releases?q=streamdeck), [Companion](https://github.com/FJRG2007/polaris/releases?q=companion)) |
 | Desktop app for Windows, macOS and Linux                                      | Coming: in the repo, not released yet                                             |
 | iOS and Android apps                                                          | Coming                                                                            |
 
