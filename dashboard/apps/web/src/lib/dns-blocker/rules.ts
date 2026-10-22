@@ -25,14 +25,36 @@ export function ruleKind(rule: string): DnsRuleKind {
  * A stored rule as the engine reads it in a list. The engine has exact names,
  * `*.name` and `/regex/` (Go RE2, matched anywhere in the name unless
  * anchored), but nothing for "any ending", so `google.*` is written as an
- * anchored pattern: the name itself or anything under it, then one or two
- * labels - `.com`, `.es`, `.co.uk`.
+ * anchored pattern: the name itself or anything under it, then one label -
+ * `.com`, `.es` - or a two-part ending whose first part is one registries hand
+ * out - `.co.uk`, `.com.br` - so `google.evil.com` is not covered.
  */
 export function engineRule(rule: string): string {
     if (ruleKind(rule) !== "anyEnding") return rule;
     const name = rule.slice(0, -2).replaceAll(".", "\\.");
-    return `/^(.+\\.)?${name}(\\.[a-z0-9-]+){1,2}$/`;
+    return `/^(.+\\.)?${name}(\\.(${SECOND_LEVELS}))?\\.[a-z0-9-]+$/`;
 }
+
+/** The first part of the two-part endings registries hand out (`co.uk`,
+ *  `com.br`, `gob.es`), the only label "any ending" takes before the last. */
+const SECOND_LEVELS = [
+    "ac",
+    "co",
+    "com",
+    "edu",
+    "gob",
+    "gov",
+    "ltd",
+    "mil",
+    "ne",
+    "net",
+    "nic",
+    "nom",
+    "or",
+    "org",
+    "plc",
+    "sch"
+].join("|");
 
 /** What a rule covers, as the key the screen says it with and the name in it. */
 export function ruleCoverage(rule: string): { key: DnsRuleKind; name: string } {

@@ -39,6 +39,7 @@ import {
 } from "@polaris/ui";
 import { editDnsRuleAction } from "./actions";
 import * as rules from "@/lib/dns-blocker/rules";
+import * as dns from "@/lib/dns-blocker/settings";
 import { useDnsBlocker } from "./dns-blocker-context";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -323,7 +324,8 @@ export function RuleDialog({
     const invalid = from
         ? !incomplete && !parsed.success
         : entries.some((entry) => entry.problem === "invalidRule");
-    const ready = from ? parsed.success : adding.length > 0;
+    const overLimit = !from && existing[action].length + adding.length > dns.DNS_LIMITS.rules;
+    const ready = from ? parsed.success : adding.length > 0 && !overLimit;
     const only = !from && entries.length === 1 ? entries[0]! : null;
 
     async function submit() {
@@ -431,6 +433,11 @@ export function RuleDialog({
                                 }
                             >
                                 {t(`rules.problem.${only.problem}`)}
+                            </span>
+                        ) : null}
+                        {overLimit && !refusal ? (
+                            <span role="alert" className="text-xs text-danger">
+                                {t("rules.refusal.tooMany")}
                             </span>
                         ) : null}
                         {refusal ? (

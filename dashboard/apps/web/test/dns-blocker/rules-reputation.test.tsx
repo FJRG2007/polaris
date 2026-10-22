@@ -303,6 +303,21 @@ describe("the rules editor", () => {
         });
     });
 
+    it("says a paste is more than the list has room for instead of sending it", async () => {
+        const full = Array.from({ length: dns.DNS_LIMITS.rules - 1 }, (_, at) => `n${at}.example`);
+        await draw({ deny: full });
+        fireEvent.click(screen.getAllByRole("button", { name: "Add rule" })[0]!);
+        const field = await screen.findByPlaceholderText("ads.example.com");
+        fireEvent.change(field, { target: { value: "one.example two.example" } });
+        expect(screen.getByText("That is as many rules as one list holds.")).toBeTruthy();
+        const add = screen.getByRole("button", { name: "Add 2 rules" });
+        expect(add.getAttribute("aria-disabled")).toBe("true");
+        fireEvent.click(add);
+        expect(editDnsRuleAction).not.toHaveBeenCalled();
+        fireEvent.change(field, { target: { value: "one.example" } });
+        expect(screen.queryByText("That is as many rules as one list holds.")).toBeNull();
+    });
+
     it("says in words what a pattern covers", async () => {
         await draw({ deny: ["google.*", "*.tracker.example"] });
         expect(

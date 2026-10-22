@@ -371,8 +371,10 @@ export async function editDnsRuleAction(
     const user = await requireAdmin();
     try {
         const edit = dnsRuleEditSchema.parse(input);
+        let before = 0;
         const outcome = await blocker
             .editSettings((current) => {
+                if (edit.op === "addMany") before = current[edit.next.action].length;
                 const rules = applyRuleEdit(current, edit);
                 return typeof rules === "string" ? rules : { ...current, ...rules };
             }, user.id)
@@ -392,7 +394,9 @@ export async function editDnsRuleAction(
             targetId: DNS_BLOCKER_APP,
             metadata: {
                 rule: edit.op,
-                ...(edit.op === "addMany" ? { count: edit.next.rules.length } : {})
+                ...(edit.op === "addMany" && !(outcome instanceof blocker.DnsBlockerRefusal)
+                    ? { count: outcome[edit.next.action].length - before }
+                    : {})
             }
         });
         refresh();
