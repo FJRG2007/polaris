@@ -23,11 +23,13 @@ export async function POST(
     const asked = new URL(request.url).searchParams.get("camera") ?? undefined;
     const opened = await openGuestWatch(String((await params).token), ip, Date.now(), asked);
     if (opened.ok) return Response.json({ watch: opened.watch });
+    const words = {
+        tooMany: t("guestCamera.tooMany"),
+        private: t("guestCamera.private"),
+        closed: t("guestCamera.closed")
+    } as const;
     return Response.json(
-        {
-            error:
-                opened.error === "tooMany" ? t("guestCamera.tooMany") : t("guestCamera.closed")
-        },
-        { status: opened.error === "tooMany" ? 429 : 404 }
+        { error: words[opened.error], code: opened.error },
+        { status: opened.error === "tooMany" ? 429 : opened.error === "private" ? 423 : 404 }
     );
 }

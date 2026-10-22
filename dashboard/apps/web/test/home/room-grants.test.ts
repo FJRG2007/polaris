@@ -13,7 +13,7 @@ const PLACE = "00000000-0000-4000-8000-0000000000a1";
 
 /** Which room each device is in, as the database would answer now. */
 let deviceRooms: Record<string, string | null> = {};
-let cameraZones: Record<string, { placeId: string; zone: string }> = {};
+let cameraZones: Record<string, { placeId: string; zone: string; roomId?: string | null }> = {};
 let lent: Record<string, { id: string; capability: string; counted: boolean; actions: string[] }[]> =
     {};
 const recordGrantUse = vi.fn(async (_use: Record<string, unknown>) => undefined);
@@ -51,8 +51,12 @@ vi.mock("@polaris/db", () => ({
             findUnique: async ({ where }: { where: { id: string } }) => cameraZones[where.id] ?? null,
             findMany: async () =>
                 Object.entries(cameraZones)
-                    .filter(([, camera]) => camera.zone.toLowerCase() === "suite 12")
-                    .map(([id, camera]) => ({ id, ...camera }))
+                    .filter(
+                        ([, camera]) =>
+                            camera.roomId === ROOM ||
+                            (!camera.roomId && camera.zone.toLowerCase() === "suite 12")
+                    )
+                    .map(([id, camera]) => ({ roomId: null, ...camera, id }))
         },
         placeRoom: {
             findMany: async ({ where }: { where: { name?: { equals: string } } }) =>
@@ -173,5 +177,19 @@ describe("a visitor watching a camera", () => {
                 outcome: "done"
             })
         );
+    });
+});
+
+describe("a camera put in the room itself", () => {
+    it("is covered by its room column, whatever its zone says", async () => {
+        cameraZones["cam-desk"] = { placeId: PLACE, zone: "Front desk", roomId: ROOM };
+        expect((await sharing.placesReach(GUEST)).cameras.has("cam-desk")).toBe(true);
+        expect(await sharing.mayWatchCamera(GUEST, "cam-desk")).toBe(true);
+    });
+
+    it("is not covered by a zone that names the room once it is in another", async () => {
+        cameraZones["cam-hall"] = { placeId: PLACE, zone: "suite 12", roomId: "another-room" };
+        expect((await sharing.placesReach(GUEST)).cameras.has("cam-hall")).toBe(false);
+        expect(await sharing.mayWatchCamera(GUEST, "cam-hall")).toBe(false);
     });
 });

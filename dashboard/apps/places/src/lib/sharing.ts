@@ -59,14 +59,18 @@ async function roomsOfDevice(deviceId: string): Promise<string[]> {
 }
 
 /**
- * The rooms a camera is in. A camera has no room column: its `zone` is the
- * free text that says where in the place it points, so a camera is in a room
- * of the same place whose name its zone repeats (ignoring case).
+ * The rooms a camera is in: the room it was put in, or - for a camera never
+ * put in one - a room of the same place whose name its free-text `zone`
+ * repeats (ignoring case), which is how cameras were grouped before rooms.
  */
 export async function roomsOfCamera(cameraId: string): Promise<string[]> {
     const camera = await prisma.camera
-        .findUnique({ where: { id: cameraId }, select: { placeId: true, zone: true } })
+        .findUnique({
+            where: { id: cameraId },
+            select: { placeId: true, zone: true, roomId: true }
+        })
         .catch(() => null);
+    if (camera?.roomId) return [camera.roomId];
     const zone = camera?.zone?.trim();
     if (!camera?.placeId || !zone) return [];
     const rooms = await prisma.placeRoom.findMany({
@@ -97,17 +101,25 @@ export async function roomContents(
         }),
         prisma.camera.findMany({
             where: {
-                OR: rooms.map((room) => ({
-                    placeId: room.placeId,
-                    zone: { equals: room.name, mode: "insensitive" as const }
-                }))
+                OR: [
+                    { roomId: { in: rooms.map((room) => room.id) } },
+                    ...rooms.map((room) => ({
+                        roomId: null,
+                        placeId: room.placeId,
+                        zone: { equals: room.name, mode: "insensitive" as const }
+                    }))
+                ]
             },
-            select: { id: true, placeId: true, zone: true },
+            select: { id: true, placeId: true, zone: true, roomId: true },
             take: 2000
         })
     ]);
     for (const device of deviceRows) if (device.roomId) devices.set(device.id, device.roomId);
     for (const camera of cameraRows) {
+        if (camera.roomId) {
+            if (rooms.some((one) => one.id === camera.roomId)) cameras.set(camera.id, camera.roomId);
+            continue;
+        }
         const room = rooms.find(
             (one) =>
                 one.placeId === camera.placeId &&

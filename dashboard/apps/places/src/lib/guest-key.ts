@@ -85,7 +85,11 @@ export type GuestRoom =
               readonly device: DeviceView;
               readonly actions: readonly DeviceAction[];
           }[];
-          readonly cameras: readonly { readonly id: string; readonly name: string }[];
+          readonly cameras: readonly {
+              readonly id: string;
+              readonly name: string;
+              readonly private: boolean;
+          }[];
           readonly allowed: readonly string[];
           readonly nearbyMeters: number | null;
           readonly until: string | null;
@@ -122,7 +126,9 @@ export async function guestRoom(token: string): Promise<GuestRoom | null> {
         devices: found
             .filter((device): device is DeviceView => device !== null)
             .map((device) => ({ device, actions: allowedActions(device, reached.grant) })),
-        cameras: cameras.flatMap((camera) => (camera ? [{ id: camera.id, name: camera.name }] : [])),
+        cameras: cameras.flatMap((camera) =>
+            camera ? [{ id: camera.id, name: camera.name, private: camera.privacy }] : []
+        ),
         allowed: reached.grant.actions,
         nearbyMeters: reached.grant.nearbyMeters ?? null,
         until: reached.grant.until?.toISOString() ?? null,

@@ -17,7 +17,7 @@ function prefersHls(): boolean {
     return document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
 }
 
-type Opened = { watch?: string; error?: string };
+type Opened = { watch?: string; error?: string; code?: string };
 
 /** One open per token for the life of this page, so an effect run twice (React
  *  does that in development) never spends two uses. */
@@ -42,8 +42,11 @@ export function GuestCameraView({
     until,
     note,
     cameraId,
-    onPress = false
+    onPress = false,
+    initiallyPrivate = false
 }: {
+    /** In privacy mode when the page was drawn: nothing is opened. */
+    initiallyPrivate?: boolean;
     token: string;
     name: string;
     until: string | null;
@@ -60,15 +63,17 @@ export function GuestCameraView({
     const [error, setError] = useState("");
     const [hls, setHls] = useState(false);
     const [failed, setFailed] = useState(false);
+    const [isPrivate, setPrivate] = useState(initiallyPrivate);
 
     useEffect(() => {
-        if (!started) return;
+        if (!started || initiallyPrivate) return;
         let gone = false;
         setHls(prefersHls());
         void (async () => {
             const body = await openWatch(token, cameraId);
             if (gone) return;
             if (body.watch) setWatch(body.watch);
+            else if (body.code === "private") setPrivate(true);
             // The server's sentence is already in the reader's language; a
             // missing one is said here, at render.
             else setError(body.error ?? "closed");
@@ -78,7 +83,28 @@ export function GuestCameraView({
         };
         // Once per page: every run is one use of the link, so this must not
         // depend on anything that changes while the page is open.
-    }, [token, cameraId, started]);
+    }, [token, cameraId, started, initiallyPrivate]);
+
+    /** The picture stopped: ask why before saying anything, so a camera gone
+     *  private says so rather than looking broken. */
+    async function stopped(): Promise<void> {
+        if (base) {
+            const answer = (await fetch(base, { cache: "no-store" })
+                .then((response) => response.json())
+                .catch(() => ({}))) as { state?: string };
+            if (answer.state === "private") {
+                setPrivate(true);
+                return;
+            }
+            if (answer.state === "gone") {
+                setError("closed");
+                return;
+            }
+        }
+        // The other whole-file format once, then a sentence.
+        if (!hls) setHls(true);
+        else setFailed(true);
+    }
 
     const base = watch ? `/api/home/keys/${token}/watch/${watch}` : null;
     const src = base ? (hls ? `${base}/hls/stream.m3u8?q=main` : `${base}/stream?q=main`) : null;
@@ -90,7 +116,14 @@ export function GuestCameraView({
             </h1>
             {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
             <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
-                {src && !failed ? (
+                {isPrivate ? (
+                    <p
+                        role="status"
+                        className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-white"
+                    >
+                        {t("guestCamera.private")}
+                    </p>
+                ) : src && !failed && !error ? (
                     <video
                         key={src}
                         className="size-full object-contain"
@@ -101,11 +134,8 @@ export function GuestCameraView({
                         playsInline
                         controls
                         aria-label={t("guestCamera.live", { name })}
-                        onError={() => {
-                            // The other whole-file format once, then a sentence.
-                            if (!hls) setHls(true);
-                            else setFailed(true);
-                        }}
+                        onError={() => void stopped()}
+                        onEnded={() => void stopped()}
                     />
                 ) : error || failed ? (
                     <p

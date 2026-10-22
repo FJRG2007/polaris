@@ -15,6 +15,7 @@ const spendGrant = vi.fn(async () => true);
 const recordAudit = vi.fn(async () => undefined);
 const recordGrantUse = vi.fn(async (_use: Record<string, unknown>) => undefined);
 let roomCameras = new Map<string, string>();
+let yardPrivate = false;
 
 vi.mock("@polaris/app-host", () => ({
     host: {
@@ -36,13 +37,16 @@ vi.mock("@polaris-app/places/src/lib/sharing", () => ({
 }));
 vi.mock("@polaris-app/places/src/lib/cameras", () => ({
     getCamera: async (_install: string, id: string) =>
-        id === YARD ? { id: YARD, name: "Yard", address: "rtsp://10.0.0.9/live" } : null
+        id === YARD
+            ? { id: YARD, name: "Yard", address: "rtsp://10.0.0.9/live", privacy: yardPrivate }
+            : null
 }));
 
 const {
     forgetWatches,
     guestCamera,
     guestWatchCamera,
+    guestWatchState,
     openGuestWatch,
     RECHECK_MS,
     WATCH_TTL_MS,
@@ -64,6 +68,7 @@ beforeEach(() => {
     paid = null;
     limited = { ok: true, retryAfterMs: 0 };
     forgetWatches();
+    yardPrivate = false;
     vi.clearAllMocks();
 });
 
@@ -207,5 +212,61 @@ describe("the access log of a camera link", () => {
         });
         roomCameras = new Map([[YARD, "room-1"]]);
         expect((await openGuestWatch("t", "1.2.3.4", Date.now(), YARD)).ok).toBe(true);
+    });
+});
+
+describe("a camera in privacy mode", () => {
+    it("is shown as private, on its own link and in a room's", async () => {
+        reach = live();
+        yardPrivate = true;
+        expect(await guestCamera("t")).toMatchObject({ standing: "live", private: true });
+    });
+
+    it("opens nothing, spends no use, and logs why", async () => {
+        reach = live();
+        yardPrivate = true;
+        expect(await openGuestWatch("t", "1.2.3.4")).toEqual({ ok: false, error: "private" });
+        expect(spendGrant).not.toHaveBeenCalled();
+        expect(recordGrantUse).toHaveBeenLastCalledWith(
+            expect.objectContaining({ outcome: "refused", reason: "private" })
+        );
+        reach = { ...live("place.room"), subjectId: "room-1" };
+        roomCameras = new Map([[YARD, "room-1"]]);
+        expect(await openGuestWatch("t", "1.2.3.4", Date.now(), YARD)).toEqual({
+            ok: false,
+            error: "private"
+        });
+    });
+
+    it("serves no picture once it goes private, and says so", async () => {
+        reach = live();
+        paid = live();
+        const opened = await openGuestWatch("t", "1.2.3.4");
+        const watch = opened.ok ? opened.watch : "";
+        expect(await guestWatchCamera("t", watch)).not.toBeNull();
+        yardPrivate = true;
+        expect(await guestWatchCamera("t", watch)).toBeNull();
+        expect(await guestWatchState("t", watch)).toEqual({ state: "private" });
+        paid = null;
+        expect(await guestWatchState("t", watch)).toEqual({ state: "gone" });
+    });
+
+    it("cuts a stream already playing when privacy turns on", async () => {
+        reach = live();
+        paid = live();
+        const opened = await openGuestWatch("t", "1.2.3.4");
+        const watch = opened.ok ? opened.watch : "";
+        vi.useFakeTimers();
+        const upstream = new ReadableStream<Uint8Array>({
+            pull: (controller) => controller.enqueue(new Uint8Array([1]))
+        });
+        const reader = whileLinkHolds(new Response(upstream), "t", watch).body!.getReader();
+        expect((await reader.read()).done).toBe(false);
+        yardPrivate = true;
+        await vi.advanceTimersByTimeAsync(RECHECK_MS + 1);
+        let done = false;
+        for (let i = 0; i < 50 && !done; i += 1) done = (await reader.read()).done;
+        expect(done).toBe(true);
+        vi.useRealTimers();
     });
 });

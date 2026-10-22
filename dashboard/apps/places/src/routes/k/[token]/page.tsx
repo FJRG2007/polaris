@@ -30,6 +30,7 @@ export default async function GuestKeyPage({
                 name={camera.name}
                 until={camera.until}
                 note={camera.note}
+                initiallyPrivate={camera.private}
             />
         );
     }
@@ -62,6 +63,7 @@ export default async function GuestKeyPage({
                         until={null}
                         note=""
                         onPress
+                        initiallyPrivate={camera.private}
                     />
                 ))}
                 <RoomFooter until={room.until} note={room.note} empty={room.devices.length + room.cameras.length === 0} />

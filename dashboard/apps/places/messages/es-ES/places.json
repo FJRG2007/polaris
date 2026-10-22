@@ -2784,6 +2784,7 @@
         "opening": "Abriendo la cámara",
         "live": "{name}, en vivo",
         "watch": "Ver en vivo",
-        "roomEmpty": "Aún no hay nada en esta sala."
+        "roomEmpty": "Aún no hay nada en esta sala.",
+        "private": "Privada ahora mismo."
     }
 }

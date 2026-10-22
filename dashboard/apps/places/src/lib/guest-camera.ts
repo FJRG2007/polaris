@@ -20,6 +20,10 @@
  * Watches live in this process; one lost to a restart is a page that opens the
  * camera again.
  *
+ * **Privacy.** A camera in privacy mode serves a link no picture at all: the
+ * page says it is private right now, opening it spends nothing, and a stream
+ * already playing is cut at its next check (`whileLinkHolds`).
+ *
  * Server-only.
  */
 
@@ -63,6 +67,8 @@ export type GuestCamera =
     | {
           readonly standing: "live";
           readonly name: string;
+          /** In privacy mode right now: nothing to show. */
+          readonly private: boolean;
           readonly until: string | null;
           readonly note: string;
       }
@@ -80,12 +86,13 @@ export async function guestCamera(token: string): Promise<GuestCamera | null> {
     return {
         standing: "live",
         name: camera.name,
+        private: camera.privacy,
         until: reached.grant.until?.toISOString() ?? null,
         note: reached.note
     };
 }
 
-export type OpenRefusal = "closed" | "tooMany";
+export type OpenRefusal = "closed" | "tooMany" | "private";
 
 /**
  * Open the live view once: spend the use and hand back the watch id the
@@ -130,8 +137,12 @@ export async function openGuestWatch(
     );
     if (!limited.ok) return { ok: false, error: "tooMany" };
     const install = await homeInstall();
-    if (!install || !(await getCamera(install.id, cameraId).catch(() => null))) {
-        return { ok: false, error: "closed" };
+    const camera = install ? await getCamera(install.id, cameraId).catch(() => null) : null;
+    if (!camera) return { ok: false, error: "closed" };
+    // Private is not a use: nothing was seen.
+    if (camera.privacy) {
+        await log("refused", "private");
+        return { ok: false, error: "private" };
     }
     // Spent before the picture is served, and refused if the last use went to
     // somebody else in between: a counted link is a count of views opened. An
@@ -181,9 +192,30 @@ export async function guestWatchCamera(
     watch: string,
     now = Date.now()
 ): Promise<{ installId: string; cameraId: string } | null> {
-    if (!WATCH_ID.test(watch)) return null;
+    const state = await guestWatchState(token, watch, now);
+    return state.state === "live" ? { installId: state.installId, cameraId: state.cameraId } : null;
+}
+
+/** Where one opened view stands: still showing, private right now, or over. */
+export type WatchState =
+    | { readonly state: "live"; readonly installId: string; readonly cameraId: string }
+    | { readonly state: "private" }
+    | { readonly state: "gone" };
+
+/**
+ * The same question, with the answer the page needs when the picture stops:
+ * whether the camera went private (say so) or the link ended (say that).
+ * Asking spends nothing.
+ */
+export async function guestWatchState(
+    token: string,
+    watch: string,
+    now = Date.now()
+): Promise<WatchState> {
+    const gone = { state: "gone" } as const;
+    if (!WATCH_ID.test(watch)) return gone;
     const held = watches.get(watch);
-    if (!held || held.expires <= now) return null;
+    if (!held || held.expires <= now) return gone;
     const reached = await host.accessGrants.linkReachPaid(token, new Date(now));
     if (
         !reached ||
@@ -191,10 +223,14 @@ export async function guestWatchCamera(
         reached.grant.id !== held.grantId ||
         !(await linkCovers(reached.subjectType, reached.subjectId, held.cameraId))
     ) {
-        return null;
+        return gone;
     }
     const install = await homeInstall();
-    return install ? { installId: install.id, cameraId: held.cameraId } : null;
+    if (!install) return gone;
+    const camera = await getCamera(install.id, held.cameraId).catch(() => null);
+    if (!camera) return gone;
+    if (camera.privacy) return { state: "private" };
+    return { state: "live", installId: install.id, cameraId: held.cameraId };
 }
 
 /** How often a stream already flowing asks the link again. */
