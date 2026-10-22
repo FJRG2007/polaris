@@ -437,6 +437,15 @@
         "back": "Back to chat",
         "nav": {
             "permissions": "Permissions and connectors"
+        },
+        "browserSites": {
+            "title": "Your browser",
+            "intro": "Sites Polar may use in your browser without asking. It asks before any other site.",
+            "empty": "No site yet. Polar asks the first time it needs one.",
+            "notConnected": "Your browser is not connected to Polar.",
+            "forget": "Forget",
+            "forgetLabel": "Stop letting Polar use {site}",
+            "forgetFailed": "Could not reach your browser. Try again."
         }
     },
     "temporary": {

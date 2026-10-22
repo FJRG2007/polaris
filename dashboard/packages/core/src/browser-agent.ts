@@ -187,7 +187,7 @@ export function browserCommandWrites(command: Pick<BrowserCommand, "kind">): boo
  *  deletes or touches a secret - English and Spanish, the languages Polaris
  *  speaks. */
 const RISKY =
-    /(submit|send|post|publish|tweet|reply|buy|purchase|order|pay|payment|checkout|check out|card|cvv|iban|transfer|donate|subscribe|delete|remove|erase|destroy|cancel|unsubscribe|confirm|accept|sign out|log out|password|passcode|pin|enviar|env[ií]a|publicar|responder|comprar|compra|pedido|pagar|pago|tarjeta|transferir|transferencia|donar|suscribw*|borrar|elimina|eliminar|quitar|cancelar|confirmar|aceptar|cerrar sesi[oó]n|contrase[nñ]a)/i;
+    /\b(submit|send|post|publish|tweet|reply|buy|purchase|order|pay|payment|checkout|check out|card|cvv|iban|transfer|donate|subscribe|delete|remove|erase|destroy|cancel|unsubscribe|confirm|accept|sign out|log out|password|passcode|pin|enviar|env[ií]a|publicar|responder|comprar|compra|pedido|pagar|pago|tarjeta|transferir|transferencia|donar|suscribw*|borrar|elimina|eliminar|quitar|cancelar|confirmar|aceptar|cerrar sesi[oó]n|contrase[nñ]a)\b/i;
 
 /**
  * Whether an action is one the person approves every time, whatever site they

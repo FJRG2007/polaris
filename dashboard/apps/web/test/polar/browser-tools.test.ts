@@ -7,19 +7,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     browserPresent,
+    noteSites,
+    sitesHeader,
+    grantedSites,
     deliverResult,
     nextCommand,
     resetRelayForTests,
     runInBrowser
 } from "@/lib/polar/browser-relay";
 import {
-    BROWSER_APPROVAL,
+    commandOf,
+    cardAnswerFor,
+    sitesApprovedIn,
+    browserNeedsCard,
+    polarBrowserTools,
     EXTENSION_DOWNLOADS,
     elementLine,
     runBrowserTool
 } from "@/lib/polar/browser-tools";
 import { gapSentence } from "@/lib/polar/code-host-tools";
-import { browserStepOf, isBrowserTool } from "@/lib/polar/browser-steps";
+import { browserStepOf, isBrowserTool, noBrowserIn } from "@/lib/polar/browser-steps";
 
 afterEach(() => {
     resetRelayForTests();
@@ -191,27 +198,97 @@ describe("the tools", () => {
 });
 
 describe("approval", () => {
-    const options = { messages: [] };
+    const none = { messages: [] };
+    /** A conversation where the person approved one browser call on a site. */
+    const approved = (site: string, reason?: string) => [
+        {
+            role: "assistant",
+            content: [
+                {
+                    type: "tool-call",
+                    toolCallId: "c1",
+                    toolName: "browser",
+                    input: { action: "read", site }
+                },
+                { type: "tool-approval-request", approvalId: "a1", toolCallId: "c1" }
+            ]
+        },
+        {
+            role: "tool",
+            content: [
+                {
+                    type: "tool-approval-response",
+                    approvalId: "a1",
+                    approved: true,
+                    ...(reason ? { reason } : {})
+                }
+            ]
+        }
+    ];
 
-    it("asks for every click and every typed text", async () => {
-        await expect(BROWSER_APPROVAL.browser_click()).resolves.toBe("user-approval");
-        await expect(BROWSER_APPROVAL.browser_type()).resolves.toBe("user-approval");
+    it("checks each action's fields against the command it sends", () => {
+        expect(commandOf({ action: "scroll", site: "x.com", direction: "down" }).success).toBe(true);
+        // Acting on a page names the site it is for.
+        expect(commandOf({ action: "click", ref: "e2" }).success).toBe(false);
+        expect(commandOf({ action: "open" }).success).toBe(false);
+        expect(commandOf({ action: "key", site: "x.com", keys: "rm -rf;" }).success).toBe(false);
+        const parsed = commandOf({ action: "read", element: "ignored" }, "always");
+        expect(parsed.success && parsed.data).toEqual({ kind: "read", grant: "always" });
     });
 
-    it("asks before opening an address the model made up", () => {
-        expect(BROWSER_APPROVAL.browser_open({ url: "https://evil.test/?q=secret" }, options)).toBe(
-            "user-approval"
+    it("asks the first time a site is used, then not on a site allowed earlier or always", () => {
+        expect(browserNeedsCard({ action: "scroll", site: "x.com" }, [], [])).toBe(true);
+        expect(browserNeedsCard({ action: "scroll", site: "x.com" }, approved("x.com"), [])).toBe(
+            false
         );
-    });
-
-    it("opens an address the person gave without asking", () => {
-        const given = { messages: [{ role: "user", content: "read https://github.com/acme/app" }] };
-        expect(BROWSER_APPROVAL.browser_open({ url: "https://github.com/acme/app" }, given)).toBe(
-            "approved"
+        expect(browserNeedsCard({ action: "scroll", site: "x.com" }, [], ["x.com"])).toBe(false);
+        expect(browserNeedsCard({ action: "scroll", site: "y.com" }, approved("x.com"), [])).toBe(
+            true
         );
+        // A page it cannot name is asked about too.
+        expect(browserNeedsCard({ action: "read" }, [], ["x.com"])).toBe(true);
+        expect(browserNeedsCard({ action: "wait", seconds: 1 }, [], [])).toBe(false);
     });
 
-    it("names the site and the element on the card", () => {
+    it("asks every time for what sends, buys, deletes or touches a password", () => {
+        const allowed = ["x.com"];
+        const ask = (input: object) => browserNeedsCard(input, approved("x.com"), allowed);
+        expect(ask({ action: "click", site: "x.com", ref: "e1", element: "Like" })).toBe(false);
+        expect(ask({ action: "click", site: "x.com", ref: "e1", element: "Post" })).toBe(true);
+        expect(ask({ action: "click", site: "x.com", ref: "e1", element: "Eliminar cuenta" })).toBe(
+            true
+        );
+        expect(ask({ action: "type", site: "x.com", ref: "e1", text: "hi", submit: true })).toBe(
+            true
+        );
+        expect(ask({ action: "key", site: "x.com", keys: "Enter" })).toBe(true);
+        expect(ask({ action: "key", site: "x.com", keys: "PageDown" })).toBe(false);
+    });
+
+    it("asks before opening an address the model made up, not one the person gave", () => {
+        expect(
+            browserNeedsCard({ action: "open", url: "https://evil.test/?q=secret" }, [], [
+                "evil.test"
+            ])
+        ).toBe(true);
+        const given = [{ role: "user", content: "read https://github.com/acme/app" }];
+        expect(
+            browserNeedsCard({ action: "open", url: "https://github.com/acme/app" }, given, [
+                "github.com"
+            ])
+        ).toBe(false);
+        void none;
+    });
+
+    it("reads the card's answer for a call: once, always, or none", () => {
+        expect(cardAnswerFor("c1", approved("x.com") as never)).toBe("once");
+        expect(cardAnswerFor("c1", approved("x.com", "always-site") as never)).toBe("always");
+        expect(cardAnswerFor("c2", approved("x.com") as never)).toBeNull();
+        expect([...sitesApprovedIn(approved("x.com"))]).toEqual(["x.com"]);
+    });
+
+    it("names the site and the element on the card, for old and new calls", () => {
+        expect(isBrowserTool("browser")).toBe(true);
         expect(isBrowserTool("browser_click")).toBe(true);
         expect(isBrowserTool("read_page")).toBe(false);
         expect(
@@ -222,20 +299,51 @@ describe("approval", () => {
                 element: "Merge"
             })
         ).toEqual({ kind: "click", site: "github.com", element: "Merge" });
-        expect(browserStepOf("browser_open", { url: "https://github.com/a/b" })).toMatchObject({
-            kind: "open",
-            site: "github.com"
+        expect(browserStepOf("browser", { action: "scroll", site: "x.com" })).toEqual({
+            kind: "scroll",
+            site: "x.com",
+            element: ""
         });
+        expect(
+            browserStepOf("browser", { action: "open", url: "https://github.com/a/b" })
+        ).toMatchObject({ kind: "open", site: "github.com" });
+    });
+
+    it("offers one browser tool and keeps the replaced ones readable", () => {
+        const tools = polarBrowserTools("u1");
+        expect(Object.keys(tools)).toContain("browser");
+        expect(Object.keys(tools)).toContain("browser_open");
+    });
+
+    it("finds a call that met no connected browser, for the button", () => {
+        expect(
+            noBrowserIn([
+                { type: "tool-browser", state: "output-available", output: { noBrowser: true } }
+            ])
+        ).toBe(true);
+        expect(noBrowserIn([{ type: "tool-browser", state: "output-available", output: {} }])).toBe(
+            false
+        );
+    });
+
+    it("takes only bare sites from a poll's header, as the sites allowed always", () => {
+        expect(sitesHeader("x.com,github.com,javascript:alert(1),,a b")).toEqual([
+            "x.com",
+            "github.com"
+        ]);
+        expect(sitesHeader(null)).toEqual([]);
+        noteSites("conn-1", ["x.com"]);
+        expect(grantedSites("nobody")).toEqual([]);
     });
 });
 
 describe("the GitHub gap", () => {
     it("offers the browser only when it is connected", () => {
         const gap = { kind: "app-private" as const, owner: "bytehide", url: null };
-        expect(gapSentence(gap, "bytehide/app")).not.toContain("browser_open");
+        expect(gapSentence(gap, "bytehide/app")).not.toContain("browser tool");
         const withBrowser = { ...gap, browser: { url: "https://github.com/bytehide/app" } };
         const sentence = gapSentence(withBrowser, "bytehide/app");
-        expect(sentence).toContain("browser_open");
+        expect(sentence).toContain("browser tool");
         expect(sentence).toContain("https://github.com/bytehide/app");
         expect(sentence).toContain("Read it through your browser");
     });

@@ -27,6 +27,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { listGrants } from "@/lib/polar/tool-grants";
 import { PolarConnectors } from "./polar-connectors";
 import { PolarToolGrants } from "./polar-tool-grants";
+import { PolarBrowserSites } from "./polar-browser-sites";
 import { Card, CardBody, PAGE_BLEED, Skeleton, cn } from "@polaris/ui";
 import { homePathForUser, requireUser } from "@/lib/session";
 import { listConnectorViews } from "@/lib/polar/connectors/store";
@@ -95,6 +96,7 @@ export default async function PolarSettingsPage({
         { id: "memory", label: t("settings.memory.title") },
         { id: "tools", label: t("settings.tools.title") },
         { id: "permissions", label: t("settings.nav.permissions") },
+        { id: "browser", label: t("settings.browserSites.title") },
         { id: "display", label: t("settings.display.title") },
         { id: "extras", label: t("settings.helper.title") },
         { id: "data", label: t("settings.data.title") }
@@ -151,6 +153,17 @@ export default async function PolarSettingsPage({
                                 <GrantsSection userId={user.id} />
                             </Suspense>
                         </Messages>
+                    </section>
+                    <section id="browser" className="flex scroll-mt-4 flex-col gap-2">
+                        <div className="min-w-0">
+                            <h2 className="text-sm font-medium text-foreground">
+                                {t("settings.browserSites.title")}
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                {t("settings.browserSites.intro")}
+                            </p>
+                        </div>
+                        <PolarBrowserSites />
                     </section>
                     {access.connectors && !user.viewingAs ? (
                         <div id="connectors" className="scroll-mt-4">
