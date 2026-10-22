@@ -94,6 +94,11 @@ describe("README", () => {
         expect(site.parseReplaces(README, /nope/, new Set())).toEqual([]);
     });
 
+    it("takes the one logo named after a tool with a suffix", () => {
+        const rows = site.parseReplaces(README, /already pay/i, new Set(["fly-io.svg", "render.svg"]));
+        expect(rows[0]!.tools.map((tool) => tool.logo)).toEqual([null, "render.svg", "fly-io.svg"]);
+    });
+
     it("reads the screenshots by section and the install lines", () => {
         expect(site.parseShowcase(README)).toEqual([
             {

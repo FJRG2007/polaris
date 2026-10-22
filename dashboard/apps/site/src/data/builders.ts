@@ -132,7 +132,7 @@ export interface ReplacesRow {
     readonly instead: string;
 }
 
-/** A tool's name as a logo file name: "Fly" is `fly-io.svg` only if aliased. */
+/** A tool's name as a logo file name: "Google Drive" is `google-drive`. */
 export function logoSlug(name: string): string {
     return name
         .toLowerCase()
@@ -143,7 +143,8 @@ export function logoSlug(name: string): string {
 /**
  * The "what Polaris replaces" table: the first Markdown table under the heading
  * `heading`. Each left cell is split into tools; a tool gets the logo whose name
- * is its slug, or the first of its words that is one, or none.
+ * is its slug, the only one named after it with a suffix ("Fly" is `fly-io.svg`),
+ * or the first of its words that is one, or none.
  */
 export function parseReplaces(markdown: string, heading: RegExp, logos: ReadonlySet<string>): ReplacesRow[] {
     const lines = markdown.split(/\r?\n/);
@@ -178,6 +179,8 @@ const SEPARATOR = /^\|\s*-{3,}/;
 function logoFor(name: string, logos: ReadonlySet<string>): string | null {
     const whole = logoSlug(name);
     if (logos.has(`${whole}.svg`)) return `${whole}.svg`;
+    const suffixed = [...logos].filter((file) => file.startsWith(`${whole}-`) && file.endsWith(".svg"));
+    if (whole && suffixed.length === 1) return suffixed[0] ?? null;
     for (const word of name.split(/\s+/)) {
         const slug = logoSlug(word);
         if (slug && logos.has(`${slug}.svg`)) return `${slug}.svg`;
