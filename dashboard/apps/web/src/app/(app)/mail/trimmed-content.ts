@@ -211,15 +211,6 @@ function isOutlookHeader(element: Element): boolean {
     return /^\s*(?:from|de)\s*:/i.test(element.textContent ?? "");
 }
 
-/** Whether an element is an attribution line standing on its own. */
-function isAttribution(node: Node): boolean {
-    if (node.nodeType !== 1 && node.nodeType !== 3) return false;
-    const element = node as Element;
-    if (node.nodeType === 1 && element.classList.contains("moz-cite-prefix")) return true;
-    const text = (node.textContent ?? "").trim();
-    return text.length < 400 && WROTE.test(text);
-}
-
 /** Whether a node carries something a reader would call content. */
 function meaningful(node: Node): boolean {
     if (node.nodeType === 3) return (node.textContent ?? "").trim() !== "";
@@ -243,18 +234,84 @@ function blank(node: Node): boolean {
     return !meaningful(node) || (node.nodeType === 1 && (node as Element).matches("br, hr"));
 }
 
-/** Where history starts for one marker: the marker, or the attribution line or
- *  Outlook rule standing just above it. */
-function extendUp(marker: Element): Node {
-    let start: Node = marker;
+/** The elements that start a line of their own. */
+const BLOCK = "address, article, blockquote, div, dl, h1, h2, h3, h4, h5, h6, hr, li, ol, p, pre, section, table, ul";
+
+/** Whether a node ends the line before it. */
+function breaksLine(node: Node): boolean {
+    return node.nodeType === 1 && (node as Element).matches(`br, ${BLOCK}`);
+}
+
+/**
+ * The nodes of an attribution line ending `node`, or null when it does not end
+ * in one.
+ *
+ * Usually that is the whole node. Some clients write the new text and the
+ * attribution into one block, a line break apart; then only the attribution's
+ * own line is history, and the writer's words above it stay.
+ */
+function attributionNodes(node: Node): Node[] | null {
+    if (node.nodeType === 3) {
+        const text = (node.textContent ?? "").trim();
+        return text.length < 400 && WROTE.test(text) ? [node] : null;
+    }
+    if (node.nodeType !== 1) return null;
+    const element = node as Element;
+    if (element.classList.contains("moz-cite-prefix")) return [node];
+    if (!WROTE.test((element.textContent ?? "").trim())) return null;
+
+    const children = Array.from(element.childNodes);
+    let end = children.length - 1;
+    while (end >= 0 && blank(children[end] as Node)) end -= 1;
+    if (end < 0) return null;
+    const last = children[end] as Node;
+    let line: Node[];
+    let start: number;
+    if (last.nodeType === 1 && (last as Element).matches(BLOCK)) {
+        const inner = attributionNodes(last);
+        if (!inner) return null;
+        if (inner[0] !== last) return [...inner, ...children.slice(end + 1)];
+        line = [last];
+        start = end;
+    } else {
+        start = end;
+        while (start > 0 && !breaksLine(children[start - 1] as Node)) start -= 1;
+        line = children.slice(start, end + 1);
+        // An attribution the sender's client wrapped over two lines.
+        const said = line.map((one) => one.textContent ?? "").join("").trim();
+        if (!ATTRIBUTION_OPENS.test(said) && start > 0 && (children[start - 1] as Element).matches("br")) {
+            let above = start - 1;
+            while (above > 0 && !breaksLine(children[above - 1] as Node)) above -= 1;
+            const opening = children.slice(above, start - 1);
+            const text = opening.map((one) => one.textContent ?? "").join("").trim();
+            if (ATTRIBUTION_OPENS.test(text)) {
+                line = children.slice(above, end + 1);
+                start = above;
+            }
+        }
+    }
+    if (line.map((one) => one.textContent ?? "").join("").trim().length >= 400) return null;
+
+    const before = children.slice(0, start);
+    if (before.every(blank)) return [node];
+    let lead = start;
+    while (lead > 0 && blank(children[lead - 1] as Node)) lead -= 1;
+    return [...children.slice(lead, start), ...line, ...children.slice(end + 1)];
+}
+
+/** What history takes above one marker: the attribution line or Outlook rule
+ *  standing just above it, and the breaks between them. */
+function extendUp(marker: Element): Node[] {
+    const between: Node[] = [];
     let prev = marker.previousSibling;
     while (prev && blank(prev) && !(prev.nodeType === 1 && (prev as Element).matches("hr"))) {
+        between.unshift(prev);
         prev = prev.previousSibling;
     }
-    if (prev && (isAttribution(prev) || (prev.nodeType === 1 && (prev as Element).matches("hr")))) {
-        start = prev;
-    }
-    return start;
+    if (!prev) return [];
+    if (prev.nodeType === 1 && (prev as Element).matches("hr")) return [prev, ...between];
+    const attribution = attributionNodes(prev);
+    return attribution ? [...attribution, ...between] : [];
 }
 
 /**
@@ -286,11 +343,12 @@ export function trimReceivedHtml(html: string): string | null {
     );
 
     for (const { element, divider } of markers) {
-        const start = extendUp(element);
+        const lead = extendUp(element);
+        const leadText = lead.map((node) => node.textContent ?? "").join("");
         // Only the opening: a reply whose history somewhere deep down holds a
         // forward is still a reply.
         const opening = (element.textContent ?? "").slice(0, 240);
-        if (FORWARDED.test(opening) || FORWARDED.test(start.textContent ?? "")) continue;
+        if (FORWARDED.test(opening) || FORWARDED.test(leadText)) continue;
         if (divider && FORWARDED_SUBJECT.test(opening)) continue;
         // A quote with an answer after it is somebody replying between the
         // lines; only the history at the end of a message is trimmed.
@@ -298,12 +356,7 @@ export function trimReceivedHtml(html: string): string | null {
         if (!divider && after.some(meaningful)) continue;
 
         for (const node of after) node.parentNode?.removeChild(node);
-        // The attribution or rule above it, and the breaks between them.
-        for (let node: Node | null = start; node && node !== element; ) {
-            const next: Node | null = node.nextSibling;
-            node.parentNode?.removeChild(node);
-            node = next;
-        }
+        for (const node of lead) node.parentNode?.removeChild(node);
         element.parentNode?.removeChild(element);
         if (!meaningful(body)) return null;
         return body.innerHTML;

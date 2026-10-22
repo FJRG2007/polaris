@@ -27,7 +27,8 @@ export function TrimmedPill({
             aria-expanded={expanded ?? false}
             onClick={onToggle}
             className={cn(
-                "inline-flex h-4 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground",
+                "relative inline-flex h-4 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground",
+                "after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-['']",
                 "hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 className
             )}

@@ -160,6 +160,27 @@ describe("the reader's trimmed history", () => {
         expect(trimmed).not.toContain("Ann wrote:");
     });
 
+    it("keeps the writer's words that share a block with the attribution", () => {
+        const html =
+            '<img src="cid:logo"><div>Sounds good, Friday works.<br><br>On Mon, Bob &lt;bob@example.test&gt; wrote:</div><blockquote type="cite">Shall we meet?</blockquote>';
+        const trimmed = trimReceivedHtml(html);
+        expect(trimmed).toContain("Sounds good, Friday works.");
+        expect(trimmed).not.toContain("wrote:");
+        expect(trimmed).not.toContain("Shall we meet?");
+
+        const paragraphs =
+            '<div><p>Friday works.</p><p>On Mon, Bob wrote:</p></div><blockquote type="cite">Shall we meet?</blockquote>';
+        const split = trimReceivedHtml(paragraphs);
+        expect(split).toContain("Friday works.");
+        expect(split).not.toContain("wrote:");
+
+        const wrapped =
+            '<div>Friday works.<br>On Mon, 20 Oct 2026 at 10:00, Bob<br>&lt;bob@example.test&gt; wrote:</div><blockquote type="cite">Shall we meet?</blockquote>';
+        const unwrapped = trimReceivedHtml(wrapped);
+        expect(unwrapped).toContain("Friday works.");
+        expect(unwrapped).not.toContain("On Mon");
+    });
+
     it("never trims a message down to nothing", () => {
         const html =
             '<div class="gmail_quote"><div class="gmail_attr">On Mon, Ann wrote:</div><blockquote class="gmail_quote">Only the quote</blockquote></div>';
