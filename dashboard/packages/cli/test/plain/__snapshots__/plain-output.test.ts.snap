@@ -1,0 +1,220 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`output with nobody at the terminal > plr  1`] = `
+{
+  "stderr": "",
+  "stdout": "plr - the Polaris command line (also installed as polaris)
+
+Usage: plr <noun> <verb> [arguments] [flags]
+
+Signing in
+  plr auth login [--url URL] [--profile NAME] [--browserless]
+                         Sign in from your browser, or with a code on another
+                         device
+  plr auth logout        Sign out and revoke this computer's key
+  plr auth whoami        Who you are signed in as, and what you may do
+  plr auth status        CLI version, Polaris, sign-in, and whether an update is
+                         out
+
+Profiles (one per Polaris or account)
+  plr profile list       Every profile, and which is in use
+  plr profile use NAME   Switch to another profile
+  plr profile remove NAME
+                         Sign a profile out and remove it
+
+Projects
+  plr project list|ls    Every service you can reach
+
+Services
+  plr service view SERVICE
+                         Status, source and domains
+  plr service deploy SERVICE [--follow]
+                         Deploy it again, and watch the build
+  plr service logs SERVICE [--follow] [--tail N]
+                         Its runtime log
+  plr service restart SERVICE
+                         Restart it
+
+Deployments
+  plr deployment list|ls SERVICE
+                         Recent deployments
+  plr deployment logs DEPLOYMENT [--follow] [--tail N]
+                         Its build log
+
+Environment variables (values are never shown)
+  plr env list|ls SERVICE
+                         Names, whether each is secret, and when it changed
+  plr env set SERVICE NAME [--from-file PATH] [--plain] [--restart]
+                         Create or replace one; type the value at a hidden
+                         prompt or pipe it in, never on the command line
+  plr env remove|rm SERVICE NAME [--yes] [--restart]
+                         Remove one. --restart redeploys so the change applies
+
+Dashboard
+  plr dashboard open [home|deploy|keys|downloads]
+                         Open the dashboard in your browser
+
+This CLI
+  plr cli update [--url URL]
+                         Get the newest CLI, or the one a Polaris serves
+  plr cli uninstall [--yes]
+                         Sign out everywhere and remove the CLI
+
+Shortcuts
+  plr login              plr auth login
+  plr logout             plr auth logout
+
+SERVICE is project/service, project/environment/service, or its id.
+--json prints read commands as JSON. --profile (or POLARIS_PROFILE) picks a
+profile for one command. POLARIS_TOKEN with POLARIS_URL uses an API key instead
+of a sign-in, for CI.
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr auth whoami --json 1`] = `
+{
+  "stderr": "",
+  "stdout": "{
+  "url": "https://polaris.example.com",
+  "profile": null,
+  "user": {
+    "id": "u1",
+    "name": "Ada",
+    "email": "ada@example.com"
+  },
+  "key": {
+    "id": "k1",
+    "scopes": [
+      "deploy.read",
+      "deploy.manage"
+    ]
+  }
+}
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr auth whoami 1`] = `
+{
+  "stderr": "",
+  "stdout": "Ada <ada@example.com>
+Polaris: https://polaris.example.com
+Allowed to: deploy.read, deploy.manage
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr deployment list shop/web 1`] = `
+{
+  "stderr": "",
+  "stdout": "DEPLOYMENT  STATUS  CREATED                   COMMIT   MESSAGE
+d1          ready*  2026-10-04T10:00:00.000Z  abcdef0  Ship it
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr env list shop/web 1`] = `
+{
+  "stderr": "",
+  "stdout": "NAME          SECRET  UPDATED
+DATABASE_URL  yes     2026-10-04T10:00:00.000Z
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr env remove shop/web DATABASE_URL --yes 1`] = `
+{
+  "stderr": "",
+  "stdout": "Removed DATABASE_URL from shop/production/web. The service drops it on its next deploy (or run again with --restart).
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr project list --json 1`] = `
+{
+  "stderr": "",
+  "stdout": "[
+  {
+    "id": "p1",
+    "name": "Shop",
+    "slug": "shop",
+    "role": "owner",
+    "environments": [
+      {
+        "id": "e1",
+        "name": "Production",
+        "slug": "production",
+        "isDefault": true,
+        "services": [
+          {
+            "id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+            "name": "Web",
+            "slug": "web",
+            "status": "running"
+          }
+        ]
+      }
+    ]
+  }
+]
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr project list 1`] = `
+{
+  "stderr": "",
+  "stdout": "SERVICE              STATUS   ID
+shop/production/web  running  0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr service deploy shop/web --json 1`] = `
+{
+  "stderr": "",
+  "stdout": "{
+  "deploymentId": "d2"
+}
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr service deploy shop/web 1`] = `
+{
+  "stderr": "",
+  "stdout": "Deploying shop/production/web: deployment d2.
+Watch it with plr deployment logs d2 --follow
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr service logs shop/web 1`] = `
+{
+  "stderr": "",
+  "stdout": "2026-10-04T10:00:00Z ready
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr service restart shop/web 1`] = `
+{
+  "stderr": "",
+  "stdout": "Restarted shop/production/web.
+",
+}
+`;
+
+exports[`output with nobody at the terminal > plr service view shop/web 1`] = `
+{
+  "stderr": "",
+  "stdout": "shop/production/web  (0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b)
+Status:      running
+Source:      acme/shop#main
+Auto-deploy: on
+Deployment:  d1
+Domain:      shop.example.com -> :3000 (up)
+",
+}
+`;
