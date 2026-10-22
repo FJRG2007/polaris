@@ -24,7 +24,11 @@ import {
     normalizeRoomInput,
     roomInputSchema
 } from "../../lib/schemas";
-import { defaultBatteryLine, makerFlagsBattery } from "../../lib/automation-kinds";
+import {
+    hasBattery as reportsBattery,
+    defaultBatteryLine,
+    makerFlagsBattery
+} from "../../lib/automation-kinds";
 import { floorNames } from "../../lib/room-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceView } from "../../lib/device-kinds";
@@ -100,7 +104,7 @@ export function DeviceDialog({
         : null;
     const roomIssue = roomIssueRaw ? placesRefusalText(t, roomIssueRaw) : null;
     // Only a device that reports a battery is asked where it is low.
-    const hasBattery = device !== null && (device.batteryPercent !== null || device.batteryCritical);
+    const hasBattery = device !== null && reportsBattery(device);
     const lineTyped = batteryLine.trim();
     const lineValue = lineTyped ? Number(lineTyped) : null;
     const lineIssueRaw =

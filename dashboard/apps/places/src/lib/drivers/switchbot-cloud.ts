@@ -158,8 +158,7 @@ function rowsOf(
         firmware: status ? text(status.version) || null : null,
         doorState: "none" as DeviceSnapshot["doorState"],
         batteryPercent: battery,
-        // Their battery is reported in four steps, the lowest of them 9 or 10.
-        batteryCritical: battery !== null && battery <= 10,
+        batteryCritical: false,
         online: status !== null
     };
     if (kind !== "sensor") {

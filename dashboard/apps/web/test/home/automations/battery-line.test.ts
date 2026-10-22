@@ -54,6 +54,26 @@ describe("a battery's low line", () => {
         expect(auto.batteryWord(device("switch", { batteryPercent: 18 }))).toBe("ok");
     });
 
+    it("keeps a sensor's line when its reading goes missing, so a safety sensor never drops", () => {
+        const smoke = device("sensor", {
+            batteryPercent: 25,
+            reading: { value: "Smoke", unit: "" }
+        });
+        expect(auto.batteryWord(smoke)).toBe("low");
+        expect(auto.batteryWord({ ...smoke, reading: null })).toBe("low");
+        expect(auto.defaultBatteryLine({ ...smoke, reading: { value: "", unit: "" } })).toBe(30);
+    });
+
+    it("reads a vendor's share against the device's line, not a flag the driver set", () => {
+        const set = device("sensor", {
+            vendor: "tuya",
+            batteryPercent: 12,
+            batteryLowPercent: 5,
+            reading: { value: "21", unit: "C" }
+        });
+        expect(auto.batteryWord(set)).toBe("ok");
+    });
+
     it("is the device's own when one is set, and its kind's when it is cleared", () => {
         const set = device("lock", { batteryPercent: 45, batteryLowPercent: 50 });
         expect(auto.batteryLine(set)).toBe(50);
@@ -130,7 +150,9 @@ describe("an automation saved before the line", () => {
             placeId: "place-1",
             definition: {
                 timeZone: "Europe/Madrid",
-                triggers: [purposes.purposeTrigger("batteryLow", device("lock", { batteryPercent: 50 }))],
+                triggers: [
+                    purposes.purposeTrigger("batteryLow", device("lock", { batteryPercent: 50 }))
+                ],
                 conditions: { match: "all", groups: [] },
                 actions: [{ id: "step01", kind: "device", deviceId: "plug", do: "turn-off" }]
             }

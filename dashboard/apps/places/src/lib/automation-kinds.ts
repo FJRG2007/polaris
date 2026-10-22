@@ -97,8 +97,8 @@ export interface BatteryReport {
 export function defaultBatteryLine(device: BatteryReport): number {
     if (!device.kind) return BATTERY_LOW_PERCENT;
     const kind = kinds.deviceKind(device.kind);
-    if (kind === "sensor" && SAFETY_READINGS.includes(device.reading?.value ?? ""))
-        return 30;
+    const reading = device.reading?.value ?? "";
+    if (kind === "sensor" && (reading === "" || SAFETY_READINGS.includes(reading))) return 30;
     return KIND_LINES[kind] ?? BATTERY_LOW_PERCENT;
 }
 
@@ -114,7 +114,9 @@ function validLine(value: number | null | undefined): value is number {
 /** At or under this share the device's battery reads as low: its own line, or
  *  its kind's. */
 export function batteryLine(device: BatteryReport): number {
-    return validLine(device.batteryLowPercent) ? device.batteryLowPercent : defaultBatteryLine(device);
+    return validLine(device.batteryLowPercent)
+        ? device.batteryLowPercent
+        : defaultBatteryLine(device);
 }
 
 /** Whether the device's maker raises a critical flag of its own, which counts as

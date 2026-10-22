@@ -179,7 +179,10 @@ describe("what comes back", () => {
             ["BULB1", "light", "unknown", null, false]
         ]);
         expect(found.find((row) => row.externalId === "LOCK1")?.doorState).toBe("open");
-        expect(found.find((row) => row.externalId === "DOOR1")?.batteryCritical).toBe(true);
+        expect(found.find((row) => row.externalId === "DOOR1")).toMatchObject({
+            batteryPercent: 10,
+            batteryCritical: false
+        });
     });
 
     it("marks one device offline without failing the account", async () => {
