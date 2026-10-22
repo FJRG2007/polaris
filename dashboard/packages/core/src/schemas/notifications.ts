@@ -386,6 +386,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "security.vulnerability",
+        group: "security",
+        label: "A serious vulnerability in a running image",
+        description:
+            "A scan found a new critical or high vulnerability in an image one of your servers runs.",
+        level: "danger",
+        // The bell only: each finding rings once, on the scan that first finds it.
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "account.signin",
         group: "security",
         label: "Sign-in waiting for approval",

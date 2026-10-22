@@ -82,7 +82,8 @@
             "low": "Baja",
             "negligible": "Mínima",
             "unknown": "Sin datos"
-        }
+        },
+        "layer": "Capa {layer}"
     },
     "history": "Recientes",
     "noScans": "Aún no hay análisis.",
@@ -114,5 +115,9 @@
         "updatesFailed": "No se pudieron leer ni cambiar las actualizaciones automáticas en este servidor.",
         "imageMissing": "La imagen que ejecuta esta app ya no está en el servidor. Vuelve a desplegar la app y analiza de nuevo.",
         "noRoom": "No hay espacio libre suficiente en el servidor para comprobar esta imagen. Libera espacio e inténtalo de nuevo."
+    },
+    "alerts": {
+        "title": "{count, plural, one {Una vulnerabilidad grave nueva en {app}} other {# vulnerabilidades graves nuevas en {app}}}",
+        "body": "{id} ({severity}) en {package}. {fix}."
     }
 }

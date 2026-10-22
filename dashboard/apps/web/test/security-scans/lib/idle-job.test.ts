@@ -69,8 +69,10 @@ describe("security scans job with nothing configured", () => {
         await tick();
         expect(dialled).toEqual([]);
         expect(writes).toEqual([]);
+        // And the releases that went live lately, every few minutes, to scan a
+        // new image once it runs.
         expect(new Set(reads)).toEqual(
-            new Set(["securityScan", "securitySetting", "securityQuarantine"])
+            new Set(["securityScan", "securitySetting", "securityQuarantine", "deployment"])
         );
     });
 
