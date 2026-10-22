@@ -228,7 +228,7 @@ export default class PolarisInstance extends InstanceBase<Schema> {
                     type: "boolean",
                     name: `${entry.area}: ${entry.label} is on`,
                     options: mapping.feedbackOptions(entry),
-                    defaultStyle: { bgcolor: mapping.COLORS.ok, color: mapping.COLORS.white },
+                    defaultStyle: mapping.onStyle(entry),
                     callback: (feedback) => {
                         this.#watchFeedback(
                             feedback.id,
