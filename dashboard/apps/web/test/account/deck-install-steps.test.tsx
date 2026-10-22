@@ -10,7 +10,11 @@ import type { AppDownload } from "@/lib/app-releases";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { DeckFile, StreamDeckSection } from "@/app/(app)/account/downloads/streamdeck-section";
-import { DeckHostMark, DeckInstallSteps, detectDeckHost } from "@/app/(app)/account/downloads/deck-install-steps";
+import {
+    DeckHostMark,
+    DeckInstallSteps,
+    detectDeckHost
+} from "@/app/(app)/account/downloads/deck-install-steps";
 
 // The section's disconnect button reaches the API keys' server action, which
 // these tests never press.
@@ -197,7 +201,9 @@ describe("DeckHostMark", () => {
             </>
         );
         expect(container.querySelector("svg path")).toBeTruthy();
-        const sources = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+        const sources = [...container.querySelectorAll("img")].map((img) =>
+            img.getAttribute("src")
+        );
         expect(sources).toEqual(["/logos/opendeck.webp", "/logos/bitfocus-companion.webp"]);
     });
 });
