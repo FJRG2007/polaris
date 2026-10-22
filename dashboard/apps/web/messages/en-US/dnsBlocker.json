@@ -102,13 +102,23 @@
         "add": "Add rule",
         "addTitle": "Add a rule",
         "editTitle": "Edit rule",
-        "syntax": "A name, *.name for everything under it, or /regex/ between slashes.",
+        "syntax": "A name, *.name for everything under it, name.* for every ending, or /regex/. Several at once: separate them with commas.",
         "actionLabel": "Action",
         "value": "Name or pattern",
+        "valueMany": "Names or patterns",
         "detected": "Read as: {kind}",
         "cancel": "Cancel",
         "addRule": "Add rule",
         "saveRule": "Save rule",
+        "addMany": "{count, plural, one {Add # rule} other {Add # rules}}",
+        "preview": "{count, plural, one {# rule to add} other {# rules to add}}",
+        "skipped": "{count, plural, one {# entry left out} other {# entries left out}}",
+        "more": "+{count} more",
+        "problem": {
+            "invalidRule": "not a name, *.name, name.* or /regex/",
+            "repeated": "repeated in this list",
+            "present": "already a rule for this action"
+        },
         "search": "Search rules",
         "filter": "Show",
         "filterAll": "All rules",
@@ -124,7 +134,13 @@
         "kind": {
             "exact": "Exact",
             "wildcard": "Wildcard",
+            "anyEnding": "Any ending",
             "regex": "Regex"
+        },
+        "covers": {
+            "wildcard": "{name} and everything under it",
+            "anyEnding": "{name} with any ending, like .com or .co.uk, and what is under it",
+            "regex": "Names that match this pattern"
         },
         "refusal": {
             "duplicate": "That rule is already in the list.",
@@ -162,7 +178,7 @@
     },
     "validation": {
         "invalidUrl": "Enter an http or https address.",
-        "invalidRule": "Not a name, *.name or /regex/:",
+        "invalidRule": "Not a name, *.name, name.* or /regex/:",
         "invalidUpstream": "Not a resolver address:",
         "upstreamMissing": "Add at least one resolver.",
         "tooMany": "Keep each list to {max} rules.",

@@ -276,10 +276,38 @@ describe("the rules editor", () => {
         await draw({});
         fireEvent.click(screen.getAllByRole("button", { name: "Add rule" })[0]!);
         const field = await screen.findByPlaceholderText("ads.example.com");
-        fireEvent.change(field, { target: { value: "bad name" } });
+        fireEvent.change(field, { target: { value: "bad_name" } });
         expect(field.getAttribute("aria-invalid")).toBe("true");
         fireEvent.change(field, { target: { value: "*.ads.example" } });
         expect(field.getAttribute("aria-invalid")).toBe("false");
         expect(screen.getByText("Read as: Wildcard")).toBeTruthy();
+    });
+
+    it("adds several pasted at once, naming the ones left out and why", async () => {
+        await draw({ deny: ["kept.example"] });
+        fireEvent.click(screen.getAllByRole("button", { name: "Add rule" })[0]!);
+        const field = await screen.findByPlaceholderText("ads.example.com");
+        fireEvent.change(field, {
+            target: { value: "google.*, https://ads.example/x\nbad_name kept.example ADS.example" }
+        });
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+        expect(screen.getByText("2 rules to add")).toBeTruthy();
+        expect(screen.getByText("3 entries left out")).toBeTruthy();
+        expect(screen.getByText("not a name, *.name, name.* or /regex/")).toBeTruthy();
+        expect(screen.getByText("already a rule for this action")).toBeTruthy();
+        expect(screen.getByText("repeated in this list")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Add 2 rules" }));
+        expect(editDnsRuleAction).toHaveBeenCalledWith({
+            op: "addMany",
+            next: { action: "deny", rules: ["google.*", "ads.example"] }
+        });
+    });
+
+    it("says in words what a pattern covers", async () => {
+        await draw({ deny: ["google.*", "*.tracker.example"] });
+        expect(
+            screen.getByText("google with any ending, like .com or .co.uk, and what is under it")
+        ).toBeTruthy();
+        expect(screen.getByText("tracker.example and everything under it")).toBeTruthy();
     });
 });

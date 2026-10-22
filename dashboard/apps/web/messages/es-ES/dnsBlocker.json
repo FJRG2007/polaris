@@ -102,13 +102,23 @@
         "add": "Nueva regla",
         "addTitle": "Añadir regla",
         "editTitle": "Editar regla",
-        "syntax": "Un nombre, *.nombre para todo lo que cuelga de él, o /regex/ entre barras.",
+        "syntax": "Un nombre, *.nombre para todo lo que cuelga de él, nombre.* para cualquier final, o /regex/. Varios a la vez: sepáralos con comas.",
         "actionLabel": "Acción",
         "value": "Nombre o patrón",
+        "valueMany": "Nombres o patrones",
         "detected": "Se lee como: {kind}",
         "cancel": "Cancelar",
         "addRule": "Añadir",
         "saveRule": "Guardar",
+        "addMany": "{count, plural, one {Añadir # regla} other {Añadir # reglas}}",
+        "preview": "{count, plural, one {# regla por añadir} other {# reglas por añadir}}",
+        "skipped": "{count, plural, one {# entrada se queda fuera} other {# entradas se quedan fuera}}",
+        "more": "+{count} más",
+        "problem": {
+            "invalidRule": "no es un nombre, *.nombre, nombre.* ni /regex/",
+            "repeated": "repetida en esta lista",
+            "present": "ya es una regla de esta acción"
+        },
         "search": "Buscar reglas",
         "filter": "Mostrar",
         "filterAll": "Todas",
@@ -124,7 +134,13 @@
         "kind": {
             "exact": "Exacta",
             "wildcard": "Comodín",
+            "anyEnding": "Final libre",
             "regex": "Regex"
+        },
+        "covers": {
+            "wildcard": "{name} y todo lo que cuelga de él",
+            "anyEnding": "{name} con cualquier final, como .com o .co.uk, y lo que cuelga",
+            "regex": "Nombres que encajan con el patrón"
         },
         "refusal": {
             "duplicate": "Esa regla ya está en la lista.",
@@ -162,7 +178,7 @@
     },
     "validation": {
         "invalidUrl": "Escribe una dirección http o https.",
-        "invalidRule": "No es un nombre, *.nombre ni /regex/:",
+        "invalidRule": "No es un nombre, *.nombre, nombre.* ni /regex/:",
         "invalidUpstream": "No es la dirección de un resolutor:",
         "upstreamMissing": "Añade al menos un resolutor.",
         "tooMany": "Deja cada lista en {max} reglas como mucho.",
