@@ -56,7 +56,7 @@ describe("the settings screen", () => {
                 payload: { type: "status", link: "unset", address: null, account: null, connecting: { phase: "idle" }, update: null, catalogue: [] }
             })
         });
-        const input = dom.window.document.querySelector("input") as HTMLInputElement;
+        const input = dom.window.document.querySelector("input");
         input.value = "polaris.example.com";
         input.dispatchEvent(new dom.window.Event("input"));
         const button = [...dom.window.document.querySelectorAll("button")].find((b) => !b.disabled);
@@ -76,7 +76,7 @@ describe("the settings screen", () => {
 
     it("saves a new timer length signed with its own id", async () => {
         const { dom, sent, action } = openScreen("timer");
-        const minutes = dom.window.document.querySelector('input[type="number"]') as HTMLInputElement;
+        const minutes = dom.window.document.querySelector('input[type="number"]');
         minutes.value = "12";
         minutes.dispatchEvent(new dom.window.Event("input"));
         // Saved a moment after the last keystroke.
