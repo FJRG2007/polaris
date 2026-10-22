@@ -649,14 +649,15 @@
         "nearbyMeters": "Within (metres)",
         "nearbyHint": "Each press asks the browser where it is. A browser location can be faked, so treat this as a convenience, not a lock.",
         "nearbyNoPlace": "The place has no location yet. Set it on the place first, or this will refuse every press.",
-        "linkTitle": "Or a link, no account needed",
         "linkHint": "Anyone with the link can use it, within the limits above. It is shown once.",
         "makeLink": "Make link",
         "linkMade": "Copy this link now. It will not be shown again.",
         "copyLink": "Copy link",
         "copied": "Link copied",
         "linkName": "Link",
-        "needAction": "Allow at least one thing."
+        "needAction": "Allow at least one thing.",
+        "linkChoice": "A link (no account)",
+        "linkSeeOnly": "A link can only see this. Control needs an account."
     },
     "environments": {
         "homeNat": {
