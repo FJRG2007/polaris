@@ -13,7 +13,7 @@ function InstallLine({ label, command }: { label: string; command: string }) {
         <div className="flex min-w-0 flex-col gap-1">
             <p className="text-xs text-muted-foreground">{label}</p>
             <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-                <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs">
+                <code className="min-w-0 flex-1 whitespace-pre-wrap break-all text-xs">
                     {command}
                 </code>
                 <CopyButton value={command} />
@@ -33,7 +33,7 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
                     {t.title}
                 </h1>
                 <p className="max-w-2xl text-pretty text-muted-foreground">{t.intro}</p>
-                <div className="flex w-full max-w-2xl flex-col gap-3">
+                <div className="flex w-full max-w-4xl flex-col gap-3">
                     {data.install.unix ? (
                         <InstallLine label={t.unix} command={data.install.unix} />
                     ) : null}

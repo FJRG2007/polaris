@@ -153,7 +153,7 @@ function CommandRows({
             {lines.map(({ system, command }) => (
                 <DownloadRow key={command} mark={<span className="text-xs">$</span>} name={system}>
                     <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-                        <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs">
+                        <code className="min-w-0 flex-1 whitespace-pre-wrap break-all text-xs">
                             {command}
                         </code>
                         <CopyButton value={command} />
