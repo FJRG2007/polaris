@@ -4,6 +4,7 @@
  * can be in is tested without a Stream Deck.
  */
 
+import { ICONS } from "./icons";
 import type { WordKey } from "./words";
 import type { KeyFace } from "./render";
 import { DOUBLE_MS, HOLD_MS, windowMs, type Gesture, type GestureSet } from "./presses";
@@ -95,7 +96,9 @@ export function faceFor(
     }
     if (!state) return { icon: entry.icon, tone: "idle", label };
     return {
-        icon: entry.icon,
+        // The state's own icon when this plugin can draw it; a name newer than
+        // the plugin keeps the action's.
+        icon: state.icon && ICONS[state.icon] ? state.icon : entry.icon,
         tone: state.tone,
         ...(state.value === undefined ? {} : { value: state.value }),
         ...(state.on === undefined ? {} : { on: state.on }),

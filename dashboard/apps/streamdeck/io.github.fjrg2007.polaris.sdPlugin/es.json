@@ -1,6 +1,6 @@
 {
     "Name": "Polaris",
-    "Description": "Teclas y diales para tu Polaris: envía un mensaje, cambia tu estado, mira mensajes sin leer, alarmas y despliegues, y maneja los dispositivos de tus lugares.",
+    "Description": "Teclas y diales para tu Polaris: envía un mensaje, cambia tu estado, silencia o cuelga tu llamada, pon un sonido, mira mensajes sin leer, alarmas y despliegues, y maneja los dispositivos de tus lugares.",
     "Category": "Polaris",
     "io.github.fjrg2007.polaris.key": {
         "Name": "Acción",
@@ -13,6 +13,22 @@
     "io.github.fjrg2007.polaris.timer": {
         "Name": "Temporizador",
         "Tooltip": "Cuenta atrás o cronómetro. Pulsa para iniciar o pausar, mantén para reiniciar."
+    },
+    "io.github.fjrg2007.polaris.call": {
+        "Name": "Llamada",
+        "Tooltip": "Silencia, ensordece, cámara, graba o cuelga la llamada en la que estás en Polaris."
+    },
+    "io.github.fjrg2007.polaris.sound": {
+        "Name": "Sonidos",
+        "Tooltip": "Pone uno de tus sonidos en la llamada en la que estás."
+    },
+    "io.github.fjrg2007.polaris.places": {
+        "Name": "Aparato de Lugares",
+        "Tooltip": "Un aparato de tus lugares en su propia tecla: lo muestra, y lo enciende, abre o cierra."
+    },
+    "io.github.fjrg2007.polaris.places-dial": {
+        "Name": "Dial de Lugares",
+        "Tooltip": "Fija el brillo de una luz o la temperatura de un aire acondicionado."
     },
     "Localization": {}
 }

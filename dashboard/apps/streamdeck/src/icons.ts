@@ -7,6 +7,40 @@
  * else falls back to a question mark.
  */
 
+/**
+ * Drawn for this plugin rather than taken from Lucide: the call's switches,
+ * the soundboard and the kinds of device in a place, in the same 24 grid and
+ * 2 stroke so they sit beside the rest. A crossed-out one is its shape with
+ * one diagonal through it.
+ */
+const SLASH = '<path d="m3 3 18 18"/>';
+const MIC =
+    '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/>';
+const HEADPHONES =
+    '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3.5" y="14" width="4" height="6.5" rx="1.5"/><rect x="16.5" y="14" width="4" height="6.5" rx="1.5"/>';
+const VIDEO =
+    '<rect x="2.5" y="6.5" width="13" height="11" rx="2"/><path d="m15.5 10.5 6-3.5v10l-6-3.5"/>';
+const OWN_ICONS: Readonly<Record<string, string>> = {
+    mic: MIC,
+    "mic-off": MIC + SLASH,
+    headphones: HEADPHONES,
+    "headphone-off": HEADPHONES + SLASH,
+    video: VIDEO,
+    "video-off": VIDEO + SLASH,
+    "circle-dot":
+        '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.5"/>',
+    "phone-off":
+        '<path d="M5 3.5h3.5l1.8 4.5-2.3 1.5a11 11 0 0 0 6.5 6.5l1.5-2.3 4.5 1.8V19a2 2 0 0 1-2 2A16.5 16.5 0 0 1 3 5.5a2 2 0 0 1 2-2z"/><path d="M21 3 3 21"/>',
+    "volume-2":
+        '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/><path d="M18 7a7 7 0 0 1 0 10"/>',
+    house: '<path d="M3.5 11 12 4.5l8.5 6.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>',
+    "lock-open":
+        '<rect x="3.5" y="11" width="17" height="10" rx="2"/><path d="M7.5 11V7.5a4.5 4.5 0 0 1 8.7-1.6"/>',
+    snowflake:
+        '<path d="M12 2.5v19"/><path d="m3.8 7.25 16.4 9.5"/><path d="m3.8 16.75 16.4-9.5"/><path d="m9.5 4 2.5 2 2.5-2"/><path d="m9.5 20 2.5-2 2.5 2"/>',
+    fan: '<circle cx="12" cy="12" r="2"/><path d="M12 10c-.8-3.5.3-6.5 3-6.5s3 3.5-1.5 6.5"/><path d="M14 12c3.5-.8 6.5.3 6.5 3s-3.5 3-6.5-1.5"/><path d="M12 14c.8 3.5-.3 6.5-3 6.5s-3-3.5 1.5-6.5"/><path d="M10 12c-3.5.8-6.5-.3-6.5-3s3.5-3 6.5 1.5"/>'
+};
+
 export const ICONS: Readonly<Record<string, string>> = {
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
     "message-circle": '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
@@ -37,7 +71,8 @@ export const ICONS: Readonly<Record<string, string>> = {
         '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
     pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
     "circle-alert":
-        '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>'
+        '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+    ...OWN_ICONS
 };
 
 /** The markup for an icon name, or the fallback. */

@@ -3,7 +3,7 @@
     "Name": "Polaris",
     "Version": "0.1.0.0",
     "Author": "Polaris",
-    "Description": "Keys and dials for your Polaris: send a message, set your status, see unread messages, alarms and deployments, and switch the devices in your places.",
+    "Description": "Keys and dials for your Polaris: send a message, set your status, mute or hang up your call, play a sound, see unread messages, alarms and deployments, and switch the devices in your places.",
     "Icon": "imgs/plugin/marketplace",
     "Category": "Polaris",
     "CategoryIcon": "imgs/plugin/category-icon",
@@ -83,6 +83,70 @@
                 {
                     "Image": "imgs/actions/timer/key",
                     "ShowTitle": false
+                }
+            ]
+        },
+        {
+            "Name": "Call",
+            "UUID": "io.github.fjrg2007.polaris.call",
+            "Icon": "imgs/actions/call/icon",
+            "Tooltip": "Mute, deafen, camera, record or hang up the call you are on in Polaris.",
+            "PropertyInspectorPath": "ui/call.html",
+            "Controllers": ["Keypad"],
+            "States": [
+                {
+                    "Image": "imgs/actions/call/key",
+                    "ShowTitle": false
+                }
+            ]
+        },
+        {
+            "Name": "Soundboard",
+            "UUID": "io.github.fjrg2007.polaris.sound",
+            "Icon": "imgs/actions/sound/icon",
+            "Tooltip": "Plays one of your sounds into the call you are on.",
+            "PropertyInspectorPath": "ui/sound.html",
+            "Controllers": ["Keypad"],
+            "States": [
+                {
+                    "Image": "imgs/actions/sound/key",
+                    "ShowTitle": false
+                }
+            ]
+        },
+        {
+            "Name": "Places device",
+            "UUID": "io.github.fjrg2007.polaris.places",
+            "Icon": "imgs/actions/places/icon",
+            "Tooltip": "A device of your places on its own key: shows it, and switches, opens or locks it.",
+            "PropertyInspectorPath": "ui/places.html",
+            "Controllers": ["Keypad"],
+            "States": [
+                {
+                    "Image": "imgs/actions/places/key",
+                    "ShowTitle": false
+                }
+            ]
+        },
+        {
+            "Name": "Places dial",
+            "UUID": "io.github.fjrg2007.polaris.places-dial",
+            "Icon": "imgs/actions/places-dial/icon",
+            "Tooltip": "Sets a light's brightness or an air conditioner's temperature.",
+            "PropertyInspectorPath": "ui/places-dial.html",
+            "Controllers": ["Encoder"],
+            "Encoder": {
+                "layout": "$B1",
+                "Icon": "imgs/actions/places-dial/encoder",
+                "TriggerDescription": {
+                    "Rotate": "Adjust",
+                    "Push": "On or off",
+                    "Touch": "Apply"
+                }
+            },
+            "States": [
+                {
+                    "Image": "imgs/actions/places-dial/key"
                 }
             ]
         }
