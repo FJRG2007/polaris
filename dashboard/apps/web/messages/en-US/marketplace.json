@@ -44,6 +44,11 @@
         "shelves": {
             "polaris": "Polaris apps",
             "community": "From other developers"
+        },
+        "empty": {
+            "title": "Nothing to deploy yet",
+            "body": "Apps from other developers that Polaris can run for you will be listed here.",
+            "polaris": "Open Polaris apps"
         }
     },
     "uninstall": {
@@ -63,6 +68,7 @@
         "consent": "Installing accepts the <link>{label}</link>.",
         "installedCount": "{count} installed",
         "open": "Open",
+        "deploy": "Deploy",
         "configureHint": "Choose the server, storage and settings first",
         "configure": "Configure",
         "installing": "Installing",
@@ -91,6 +97,8 @@
     },
     "detail": {
         "back": "All apps",
+        "replaces": "Replaces",
+        "needsProject": "A Deploy project to run it in, and permission to manage apps there.",
         "screenshots": "Screenshots",
         "screenshotAlt": "{name}, screenshot {index}",
         "about": "About",
@@ -128,5 +136,22 @@
         "needsSettings": "Settings you fill in: {fields}.",
         "needsOnce": "One install serves everyone on this Polaris.",
         "needsPermission": "Installing it needs permission to manage apps."
+    },
+    "templateDeploy": {
+        "title": "Deploy {name}",
+        "description": "Choose the project it goes into. It is added there as a service.",
+        "failed": "Your projects could not be read. Try again.",
+        "noProjects": "It is deployed into a project, and you have none yet.",
+        "newProject": "Create a project",
+        "project": "Project",
+        "projectSearch": "Search projects",
+        "projectNone": "No project matches",
+        "environment": "Environment",
+        "next": "Continue"
+    },
+    "polaris": {
+        "title": "Polaris apps",
+        "description": "Switch on Polaris's own apps for everybody here.",
+        "builtIn": "Built in"
     }
 }

@@ -22,6 +22,8 @@ import { appName } from "@/lib/apps/app-words";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { gameForCatalogId, isGameServersApp } from "@/lib/apps/games-catalog";
+import { findApp } from "@/lib/apps/catalog";
+import { DEPLOYABLE_APPS_PATH, POLARIS_APPS_PATH, storeScope } from "@/lib/apps/marketplace-store";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { Badge, Button, Card, CardBody, PageHeader, cn } from "@polaris/ui";
 import {
@@ -127,9 +129,13 @@ export function InstalledAppDashboard({
     // a server or the manager that creates them - is the Game servers page rather
     // than the marketplace it was installed from.
     const isGame = gameForCatalogId(app.catalogId) !== undefined || isGameServersApp(app.catalogId);
-    const backHref = isGame ? "/apps/games" : "/apps/marketplace";
+    const manifest = findApp(app.catalogId);
+    const polarisApp = manifest !== undefined && storeScope(manifest) === "polaris";
+    const backHref = isGame ? "/apps/games" : polarisApp ? POLARIS_APPS_PATH : DEPLOYABLE_APPS_PATH;
     // i18n-ignore: the rail's own labels, translated by navLabel where drawn
-    const backLabel = navLabel(isGame ? "Game servers" : "Marketplace");
+    const backLabel = navLabel(
+        isGame ? "Game servers" : polarisApp ? "Polaris apps" : "Marketplace"
+    );
 
     function run(action: () => Promise<{ error?: string }>) {
         setError(null);

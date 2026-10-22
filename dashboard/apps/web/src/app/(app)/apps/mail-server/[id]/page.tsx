@@ -13,7 +13,7 @@ import { notFound } from "next/navigation";
 import { ServerView } from "./server-view";
 import { requireServer } from "@/lib/mail-server/access";
 import { MailServerInstallState } from "../install-state";
-import { requirePermission, sessionCan } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { adoptMailServerApp } from "@/lib/mail-server/app-install";
 import { getTranslations } from "@/lib/i18n/request";
 
@@ -30,11 +30,8 @@ export default async function MailServerDetailPage({
         const t = await getTranslations("mailServer");
         return (
             <div className="mx-auto flex w-full max-w-5xl flex-col">
-                <PageHeader
-                    title={t("page.title")}
-                    description={t("page.description")}
-                />
-                <MailServerInstallState canInstall={await sessionCan(user, "deploy.manage")} />
+                <PageHeader title={t("page.title")} description={t("page.description")} />
+                <MailServerInstallState canInstall={user.isAdmin} canBrowse={user.isAdmin} />
             </div>
         );
     }

@@ -87,8 +87,7 @@ export async function requireHomeUser(permission: Permission): Promise<{
 }> {
     const user = await requirePermission(permission);
     const install = await homeInstall();
-    if (!install)
-        redirect(user.isAdmin ? "/apps/marketplace?app=home" : await homePathForUser(user));
+    if (!install) redirect(user.isAdmin ? "/admin/apps?app=home" : await homePathForUser(user));
     const [canControl, canManage] = await Promise.all([
         sessionCanAny(user, "home.control"),
         sessionCanAny(user, "home.manage")
@@ -144,8 +143,7 @@ export async function requireHomeReach(): Promise<{
         redirect(`${await homePathForUser(user)}?denied=1`);
     }
     const install = await homeInstall();
-    if (!install)
-        redirect(user.isAdmin ? "/apps/marketplace?app=home" : await homePathForUser(user));
+    if (!install) redirect(user.isAdmin ? "/admin/apps?app=home" : await homePathForUser(user));
     // A visitor holds neither, whatever they were lent: those two are what the
     // house's own people hold, and a lent door is not a standing over the house.
     const [canControl, canManage] = reach.everything

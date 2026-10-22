@@ -2,12 +2,13 @@
 
 /**
  * Marketplace server actions. Browsing needs deploy.read; installing an app
- * provisions a container and so needs deploy.manage. Input is re-validated
- * server-side against the shared install schema.
+ * provisions a container and so needs deploy.manage, and a Polaris app is
+ * instance-wide, so installing one also needs the admin flag. Input is
+ * re-validated server-side against the shared install schema.
  */
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/session";
+import { requireAdmin, requirePermission } from "@/lib/session";
 import { listHosts } from "@/lib/host-service";
 import { listConnections } from "@/lib/storage-service";
 import { recordAudit } from "@/lib/audit-service";
@@ -18,9 +19,11 @@ import {
     type AppInstallInput
 } from "@/lib/apps/install-schema";
 import { getTranslations } from "@/lib/i18n/request";
+import { findStoreApp, storeScope } from "@/lib/apps/marketplace-store";
 import { validationMessage } from "@/components/i18n/validation-message";
 
 const MARKETPLACE_PATH = "/apps/marketplace";
+const POLARIS_APPS_PATH = "/admin/apps";
 
 export interface InstallTarget {
     id: string;
@@ -74,6 +77,8 @@ export async function installAppAction(
                     : validationMessage(await getTranslations("validation"), message)
         };
     }
+    const manifest = findStoreApp(parsed.data.catalogId);
+    if (manifest && storeScope(manifest) === "polaris") await requireAdmin();
     try {
         const result = await installApp(user.id, user.id, parsed.data);
         await recordAudit({
@@ -83,6 +88,7 @@ export async function installAppAction(
             targetId: result.installedAppId
         });
         revalidatePath(MARKETPLACE_PATH);
+        revalidatePath(POLARIS_APPS_PATH);
         return { installedAppId: result.installedAppId };
     } catch (caught) {
         return {

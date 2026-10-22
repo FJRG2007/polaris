@@ -188,7 +188,7 @@
         "notYourOrg": "No puedes gestionar los servidores de correo de esta organización.",
         "noAdmin": "Este servidor de correo aún no tiene credencial de administrador. Vuelve a ejecutar la instalación.",
         "notInstalled": "El servidor de correo no está instalado.",
-        "notInstalledHint": "El servidor de correo no está instalado. Instálalo antes desde el Marketplace.",
+        "notInstalledHint": "El servidor de correo no está instalado. Instálalo antes desde Apps de Polaris.",
         "uninstallOwner": "Solo quien instaló el servidor de correo, o un administrador, puede desinstalarlo.",
         "notRunning": "Este servidor de correo aún no está en marcha. Termina antes de instalarlo.",
         "reportTooBig": "Ese informe se descomprime en más de lo que ocupa cualquier informe real.",
@@ -349,7 +349,7 @@
     "uninstall": {
         "title": "Desinstalar el servidor",
         "removeFirst": "Quita antes tus servidores de correo. La página de cada uno tiene Quitar de Polaris al final de su resumen.",
-        "body": "Desaparece del menú y de la búsqueda. No tiene nada en marcha, así que no se detiene nada, y puedes volver a instalarlo desde el Marketplace.",
+        "body": "Desaparece del menú y de la búsqueda. No tiene nada en marcha, así que no se detiene nada, y puedes volver a instalarlo desde Apps de Polaris.",
         "open": "Abrir",
         "close": "Cerrar",
         "pending": "Desinstalando"
@@ -366,12 +366,13 @@
         "submit": "Instalarlo"
     },
     "install": {
-        "title": "Instala el servidor de correo desde el Marketplace",
+        "title": "Instala el servidor de correo desde Apps de Polaris",
         "body": "Correo en tus propios dominios: SPF, DKIM y DMARC escritos y comprobados, buzones y alias. Instalarlo no descarga nada: el servidor solo se instala cuando eliges una máquina para él.",
-        "bodyAsk": "Correo en tus propios dominios: SPF, DKIM y DMARC escritos y comprobados, buzones y alias. Pide a alguien que pueda instalar apps que lo añada.",
+        "titleAsk": "Servidor de correo sin instalar",
+        "bodyAsk": "Correo en tus propios dominios: SPF, DKIM y DMARC escritos y comprobados, buzones y alias. Pide a un administrador que lo añada.",
         "pending": "Instalando",
         "install": "Instalar",
-        "view": "Ver en el Marketplace"
+        "view": "Ver en Apps de Polaris"
     },
     "page": {
         "title": "Servidor de correo",

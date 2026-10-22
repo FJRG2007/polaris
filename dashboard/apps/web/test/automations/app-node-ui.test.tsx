@@ -59,7 +59,7 @@ describe("an app's node in the central editor", () => {
         );
         expect(screen.getByRole("link", { name: "Install the app" })).toHaveProperty(
             "href",
-            expect.stringContaining("/apps/marketplace/home")
+            expect.stringContaining("/admin/apps/home")
         );
         expect(drawn.slots).toEqual([]);
     });

@@ -248,7 +248,7 @@ export function ConnectChannelDialog({
                                         <a
                                             key="link"
                                             className="underline"
-                                            href="/apps/marketplace"
+                                            href="/admin/apps?app=messaging-bridge"
                                         >
                                             {chunks}
                                         </a>

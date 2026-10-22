@@ -329,7 +329,8 @@ Each app is enabled per account and per role.
   terminal, files, metrics and Docker engine from here.
 - **Containers** and **Backups** - what is running on every host, and scheduled
   backups of it with restore.
-- **Marketplace** - one-click installs of self-hosted apps.
+- **Marketplace** - one-click installs: Polaris's own apps from Management >
+  Polaris apps, other developers' software from Apps > Marketplace.
 - **Game servers** - Minecraft, ARK and FiveM, with worlds, mods, resources,
   players, schedules, crash detection, and Minecraft challenges (daily, weekly,
   season pass, bingo and community goals). Worlds can live on a NAS.

@@ -350,6 +350,19 @@ export async function deleteEnvironmentAction(input: {
     }
 }
 
+export interface TemplateTarget {
+    id: string;
+    name: string;
+    environments: { id: string; name: string; isDefault: boolean }[];
+}
+
+/** The projects, with their environments, a template from the marketplace can go
+ *  into: the shelf that is open, as the projects page lists it. */
+export async function listTemplateTargetsAction(): Promise<TemplateTarget[]> {
+    const user = await requirePermission("deploy.manage");
+    return deployService.listProjectTargets(user.id, await scopeOrgIdFor(user.id));
+}
+
 /**
  * Servers a service can deploy to: the local host (where Polaris runs) plus any
  * connected SSH hosts. The local option is always present and first, so a
