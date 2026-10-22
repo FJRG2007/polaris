@@ -237,6 +237,22 @@ export interface Watched {
     readonly options: Record<string, unknown>;
 }
 
+/**
+ * The stream keys showing the same thing a press changes: every feedback set
+ * to that action with those settings, and the action's variable when it is
+ * watched with them. A press is drawn on all of them at once.
+ */
+export function keysShowing(
+    entry: DeckAction,
+    options: Record<string, unknown>,
+    watched: readonly Watched[]
+): string[] {
+    const same = JSON.stringify(options);
+    return watched
+        .filter((item) => item.action === entry.id && JSON.stringify(item.options) === same)
+        .map((item) => item.key);
+}
+
 /** The stream key a variable is read under. */
 export function variableKey(entry: DeckAction): string {
     return `var:${companionId(entry.id)}`;
