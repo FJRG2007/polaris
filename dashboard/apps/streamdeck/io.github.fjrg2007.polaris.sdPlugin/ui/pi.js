@@ -369,7 +369,83 @@
 
     // --- timer ------------------------------------------------------------------------
 
+    /** Where the timer is kept: here, or in Polaris. Absent is here, which
+     *  is what every timer key set before Polaris timers keeps. */
+    function sourceRow() {
+        const source = el("select", {}, [
+            el("option", {
+                value: "deck",
+                text: words.sourceDeck,
+                selected: settings.source !== "polaris"
+            }),
+            el("option", {
+                value: "polaris",
+                text: words.sourcePolaris,
+                selected: settings.source === "polaris"
+            })
+        ]);
+        source.addEventListener("change", () => save({ ...settings, source: source.value }, true));
+        return row(words.source, source, null, true);
+    }
+
+    /** One of the account's Calendar timers, a new one, or the focus cycle. */
+    function polarisTimerSection() {
+        const box = el("section", {}, [sourceRow()]);
+        if (status?.link !== "online") {
+            box.append(connectionSection());
+            return box;
+        }
+        const entry = (status.catalogue ?? []).find((item) => item.id === "calendar.timer");
+        const locked = (status.locked ?? []).find((item) => item.id === "calendar.timer");
+        if (!entry) {
+            box.append(el("p", { class: "notice", text: locked?.message ?? words.noTimers }));
+            return box;
+        }
+        const field = (entry.options ?? []).find((option) => option.name === "timer");
+        const picked = settings.polarisTimer || "new";
+        const timer = fieldControl(field ?? { type: "choice", choices: [] }, picked, (value) =>
+            save({ ...settings, polarisTimer: value ?? "new" }, true)
+        );
+        box.append(
+            row(field?.label ?? words.timer, timer, null, true),
+            el("div", { class: "buttons" }, [
+                el("button", {
+                    type: "button",
+                    text: words.refresh,
+                    on: { click: () => toPlugin({ type: "refresh" }) }
+                })
+            ])
+        );
+        if (picked === "new") {
+            const name = el("input", {
+                type: "text",
+                maxlength: 60,
+                value: settings.polarisName ?? ""
+            });
+            name.addEventListener("input", () => save({ ...settings, polarisName: name.value }));
+            box.append(row(words.timerName, name, words.timerNameHint, true), minutesRow());
+        }
+        box.append(el("p", { class: "hint", text: words.polarisTimerHint }));
+        return box;
+    }
+
+    function minutesRow() {
+        const minutes = el("input", {
+            type: "number",
+            min: 1,
+            max: 1440,
+            value: settings.minutes ?? 5
+        });
+        minutes.addEventListener("input", () => {
+            const value = Math.round(Number(minutes.value));
+            if (Number.isFinite(value) && value >= 1 && value <= 1440)
+                save({ ...settings, minutes: value });
+        });
+        return row(words.minutes, minutes, null, true);
+    }
+
     function timerSection() {
+        if (settings.source === "polaris") return polarisTimerSection();
         const mode = el("select", {}, [
             el("option", {
                 value: "countdown",
@@ -382,21 +458,11 @@
                 selected: settings.mode === "stopwatch"
             })
         ]);
-        const minutes = el("input", {
-            type: "number",
-            min: 1,
-            max: 1440,
-            value: settings.minutes ?? 5
-        });
         mode.addEventListener("change", () => save({ ...settings, mode: mode.value }, true));
-        minutes.addEventListener("input", () => {
-            const value = Math.round(Number(minutes.value));
-            if (Number.isFinite(value) && value >= 1 && value <= 1440)
-                save({ ...settings, minutes: value });
-        });
         return el("section", {}, [
+            sourceRow(),
             row(words.mode, mode, null, true),
-            row(words.minutes, minutes, null, true),
+            minutesRow(),
             el("p", { class: "hint", text: words.timerHint })
         ]);
     }
@@ -433,7 +499,7 @@
         socket = new WebSocket(`ws://127.0.0.1:${port}`);
         socket.addEventListener("open", () => {
             socket.send(JSON.stringify({ event: registerEvent, uuid }));
-            if (screen !== "timer") toPlugin({ type: "hello" });
+            toPlugin({ type: "hello" });
         });
         socket.addEventListener("message", (message) => {
             let data;

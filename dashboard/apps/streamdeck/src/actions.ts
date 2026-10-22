@@ -7,7 +7,8 @@
  *   turned on the Stream Deck +; the level lands once the turning stops.
  * - **Call**, **Soundboard**, **Places device** and **Places dial**: the same
  *   key and dial, offering only that part of the catalogue.
- * - **Timer**: a countdown or stopwatch kept in the plugin, on a key or a dial.
+ * - **Timer**: a countdown or stopwatch kept in the plugin, on a key or a dial;
+ *   or, with its source set to Polaris, one of the account's Calendar timers.
  */
 
 import streamDeck, {
@@ -25,16 +26,18 @@ import streamDeck, {
 } from "@elgato/streamdeck";
 import { hub } from "./hub";
 import * as timers from "./timer";
+import * as polarisTimers from "./polaris-timer";
 import { keyImage } from "./render";
 import { fromInspector, tellInspector } from "./inspector";
 import { DIAL_UUID, KEY_UUID, TIMER_UUID, surfaceOf, type Surface } from "./surfaces";
-import { CONFIRM_MS, Confirmations, PressTimer, type Gesture } from "./presses";
+import { CONFIRM_MS, Confirmations, DOUBLE_MS, PressTimer, type Gesture } from "./presses";
 import { DialBurst, predict } from "./optimistic";
 import {
     alternates,
     bindingFor,
     gesturesOf,
     drawsOwnState,
+    faceFor,
     runOptions,
     turnLevel,
     type KeySettings
@@ -276,9 +279,7 @@ export class PolarisDial extends SingletonAction<KeySettings> {
     }
 }
 
-type TimerSettings = {
-    mode?: "countdown" | "stopwatch";
-    minutes?: number;
+type TimerSettings = polarisTimers.TimerKeySettings & {
     timer?: {
         mode: "countdown" | "stopwatch";
         durationMs: number;
@@ -287,11 +288,29 @@ type TimerSettings = {
     };
 };
 
+/** The key settings the hub watches and runs a Polaris timer key with. */
+function asKey(settings: TimerSettings): KeySettings {
+    return {
+        action: polarisTimers.CALENDAR_TIMER,
+        options: polarisTimers.polarisOptions(settings)
+    };
+}
+
+/** A Polaris timer key tells every gesture apart: a double press adds a
+ *  minute and a hold resets. */
+const TIMER_GESTURES = { double: true, hold: true, doubleMs: DOUBLE_MS, holdMs: LONG_PRESS_MS };
+
 export class TimerAction extends SingletonAction<TimerSettings> {
     override readonly manifestId = TIMER_UUID;
     readonly #timers = new Map<string, timers.TimerState>();
+    /** The keys whose timer is kept in Polaris, with their settings. */
+    readonly #remote = new Map<string, TimerSettings>();
     readonly #pressedAt = new Map<string, number>();
     readonly #alerted = new Set<string>();
+    readonly #presses = new PressTimer((id, gesture) => void this.#remoteGesture(id, gesture));
+    /** A dial's ticks, gathered into one change of minutes. */
+    readonly #ticks = new Map<string, number>();
+    readonly #burst = new DialBurst(DIAL_SETTLE_MS, (id) => void this.#remoteShift(id));
     #ticker: ReturnType<typeof setInterval> | null = null;
 
     #read(settings: TimerSettings): timers.TimerState {
@@ -309,6 +328,10 @@ export class TimerAction extends SingletonAction<TimerSettings> {
     }
 
     #draw(id: string): void {
+        if (this.#remote.has(id)) {
+            this.#drawRemote(id);
+            return;
+        }
         const timer = this.#timers.get(id);
         const action = streamDeck.actions.getActionById(id);
         if (!timer || !action) return;
@@ -339,32 +362,84 @@ export class TimerAction extends SingletonAction<TimerSettings> {
         }
     }
 
+    /** A Polaris timer: what a key set to it would show, with the time ticked
+     *  on from the last reading. */
+    #drawRemote(id: string): void {
+        const action = streamDeck.actions.getActionById(id);
+        const settings = this.#remote.get(id);
+        if (!action || !settings) return;
+        const key = asKey(settings);
+        const state = hub.state(id);
+        const face = faceFor(
+            hub.link,
+            key,
+            hub.entry(key),
+            state,
+            hub.words,
+            hub.locked.some((row) => row.id === polarisTimers.CALENDAR_TIMER)
+        );
+        const countdown = hub.link === "online" ? state?.countdown : undefined;
+        let shown = face;
+        let percent = 0;
+        if (countdown) {
+            const now = Date.now();
+            const skew = polarisTimers.skewOf(countdown, hub.stateAt.get(id) ?? now);
+            const left = polarisTimers.remainingAt(countdown, now, skew);
+            const done = polarisTimers.finishedAt(countdown, now, skew);
+            if (done && !this.#alerted.has(id)) {
+                this.#alerted.add(id);
+                if (action.isKey() || action.isDial()) void action.showAlert();
+            } else if (!done) this.#alerted.delete(id);
+            percent = countdown.durationMs ? Math.round((left / countdown.durationMs) * 100) : 0;
+            shown = done
+                ? { ...face, icon: "bell-ring", tone: "bad", value: "0:00", label: hub.words.done }
+                : { ...face, value: polarisTimers.timeText(left) };
+        }
+        if (action.isKey()) void action.setImage(keyImage(shown));
+        else if (action.isDial())
+            void action.setFeedback({
+                title: shown.label ?? "",
+                value: shown.value ?? "",
+                indicator: percent
+            });
+    }
+
     #tick(): void {
         if (this.#ticker) return;
         this.#ticker = setInterval(() => {
-            for (const id of this.#timers.keys()) this.#draw(id);
-            if (this.#timers.size === 0 && this.#ticker) {
+            for (const id of [...this.#timers.keys(), ...this.#remote.keys()]) this.#draw(id);
+            if (this.#timers.size === 0 && this.#remote.size === 0 && this.#ticker) {
                 clearInterval(this.#ticker);
                 this.#ticker = null;
             }
         }, 500);
     }
 
-    override onWillAppear(ev: WillAppearEvent<TimerSettings>): void {
-        this.#timers.set(ev.action.id, this.#read(ev.payload.settings));
-        this.#draw(ev.action.id);
-        this.#tick();
-    }
-
-    override onWillDisappear(ev: WillDisappearEvent<TimerSettings>): void {
-        this.#timers.delete(ev.action.id);
-    }
-
-    override onDidReceiveSettings(ev: DidReceiveSettingsEvent<TimerSettings>): void {
-        const before = this.#timers.get(ev.action.id);
-        const read = this.#read(ev.payload.settings);
+    /** Follow the key's source: a timer kept here, or one Polaris keeps. */
+    #place(
+        action: WillAppearEvent<TimerSettings>["action"],
+        settings: TimerSettings,
+        first: boolean
+    ): void {
+        const id = action.id;
+        if (polarisTimers.sourceOf(settings) === "polaris") {
+            this.#timers.delete(id);
+            const known = this.#remote.has(id);
+            this.#remote.set(id, settings);
+            if (known && !first) hub.update(id, asKey(settings));
+            else if (action.isKey() || action.isDial())
+                hub.attach({
+                    action: action as never,
+                    settings: asKey(settings),
+                    surface: "timer"
+                });
+            return;
+        }
+        if (this.#remote.delete(id)) hub.detach(id);
+        const before = this.#timers.get(id);
+        const read = this.#read(settings);
         // A new length set while stopped takes effect at once.
-        const minutes = ev.payload.settings.minutes;
+        const minutes = settings.minutes;
         const timer =
             before &&
             !timers.running(read) &&
@@ -372,8 +447,27 @@ export class TimerAction extends SingletonAction<TimerSettings> {
             read.mode === "countdown"
                 ? { ...read, durationMs: timers.newTimer("countdown", minutes * 60_000).durationMs }
                 : read;
-        this.#timers.set(ev.action.id, timer);
+        this.#timers.set(id, timer);
+    }
+
+    override onWillAppear(ev: WillAppearEvent<TimerSettings>): void {
+        this.#place(ev.action, ev.payload.settings, true);
         this.#draw(ev.action.id);
+        this.#tick();
+    }
+
+    override onWillDisappear(ev: WillDisappearEvent<TimerSettings>): void {
+        this.#timers.delete(ev.action.id);
+        this.#presses.forget(ev.action.id);
+        this.#burst.forget(ev.action.id);
+        this.#ticks.delete(ev.action.id);
+        if (this.#remote.delete(ev.action.id)) hub.detach(ev.action.id);
+    }
+
+    override onDidReceiveSettings(ev: DidReceiveSettingsEvent<TimerSettings>): void {
+        this.#place(ev.action, ev.payload.settings, false);
+        this.#draw(ev.action.id);
+        this.#tick();
     }
 
     #toggle(id: string): void {
@@ -392,12 +486,83 @@ export class TimerAction extends SingletonAction<TimerSettings> {
         this.#draw(id);
     }
 
+    /** Run an operation on a Polaris timer, showing its result at once and
+     *  putting the key back if Polaris refuses or does not answer. */
+    async #remoteRun(id: string, op: polarisTimers.TimerOp, step?: number): Promise<boolean> {
+        const settings = this.#remote.get(id);
+        if (!settings || !hub.credentials) return false;
+        const key = asKey(settings);
+        if (!hub.entry(key)) return false;
+        const before = hub.state(id);
+        const beforeAt = hub.stateAt.get(id);
+        const now = Date.now();
+        const skew = polarisTimers.skewOf(before?.countdown, beforeAt ?? now);
+        const guess = polarisTimers.predictTimer(before, op, now, skew, step);
+        hub.inFlight.begin(id, before);
+        if (guess) hub.setState(id, guess);
+        this.#alerted.delete(id);
+        this.#draw(id);
+        const result = await hub.run(id, step, {
+            action: key.action,
+            options: { ...key.options, op }
+        });
+        const ok = result?.ok === true;
+        const settled = hub.inFlight.settle(id, ok, result?.ok ? result.state : undefined);
+        if (settled) {
+            hub.setState(id, settled);
+            // Put back as it was, with the clock it was read by.
+            if (settled === before && beforeAt !== undefined) hub.stateAt.set(id, beforeAt);
+        }
+        this.#draw(id);
+        return ok;
+    }
+
+    async #remoteGesture(id: string, gesture: Gesture): Promise<void> {
+        const settings = this.#remote.get(id);
+        if (!settings) return;
+        const op = polarisTimers.opFor(gesture, polarisTimers.polarisOptions(settings).timer);
+        if (await this.#remoteRun(id, op)) return;
+        const action = streamDeck.actions.getActionById(id);
+        if (action?.isKey() || action?.isDial()) await action.showAlert();
+    }
+
+    /** A burst of turns is over: the timer moves by that many minutes. A new
+     *  timer not made yet has nothing to move, so the turn sets its length. */
+    async #remoteShift(id: string): Promise<void> {
+        const ticks = Math.max(-50, Math.min(50, this.#ticks.get(id) ?? 0));
+        this.#ticks.delete(id);
+        const settings = this.#remote.get(id);
+        if (!settings || ticks === 0) return;
+        const options = polarisTimers.polarisOptions(settings);
+        const unmade = options.timer === "new" && hub.state(id)?.countdown?.state === "idle";
+        if (await this.#remoteRun(id, "shift", ticks)) return;
+        const action = streamDeck.actions.getActionById(id);
+        if (!action) return;
+        if (unmade) {
+            const minutes = polarisTimers.minutesOf({ minutes: options.minutes + ticks });
+            const next: TimerSettings = { ...settings, minutes };
+            this.#remote.set(id, next);
+            hub.update(id, asKey(next));
+            await action.setSettings(next as never);
+            return;
+        }
+        if (action.isKey() || action.isDial()) await action.showAlert();
+    }
+
     override onKeyDown(ev: KeyDownEvent<TimerSettings>): void {
+        if (this.#remote.has(ev.action.id)) {
+            this.#presses.down(ev.action.id, TIMER_GESTURES);
+            return;
+        }
         this.#pressedAt.set(ev.action.id, Date.now());
     }
 
     /** A press starts or pauses; held, it resets. */
     override onKeyUp(ev: KeyUpEvent<TimerSettings>): void {
+        if (this.#remote.has(ev.action.id)) {
+            this.#presses.up(ev.action.id);
+            return;
+        }
         const at = this.#pressedAt.get(ev.action.id) ?? Date.now();
         this.#pressedAt.delete(ev.action.id);
         if (Date.now() - at >= LONG_PRESS_MS) this.#reset(ev.action.id);
@@ -405,17 +570,44 @@ export class TimerAction extends SingletonAction<TimerSettings> {
     }
 
     override onDialRotate(ev: DialRotateEvent<TimerSettings>): void {
-        const timer = this.#timers.get(ev.action.id);
+        const id = ev.action.id;
+        if (this.#remote.has(id)) {
+            // The face follows each tick; the change is sent once it settles.
+            this.#ticks.set(id, (this.#ticks.get(id) ?? 0) + ev.payload.ticks);
+            const state = hub.state(id);
+            const at = hub.stateAt.get(id);
+            const now = Date.now();
+            const skew = polarisTimers.skewOf(state?.countdown, at ?? now);
+            const guess = polarisTimers.predictTimer(state, "shift", now, skew, ev.payload.ticks);
+            if (guess && !hub.inFlight.busy(id)) hub.setState(id, guess);
+            this.#burst.turn(id, 0);
+            this.#draw(id);
+            return;
+        }
+        const timer = this.#timers.get(id);
         if (!timer) return;
-        void this.#store(ev.action.id, timers.adjust(timer, ev.payload.ticks));
-        this.#draw(ev.action.id);
+        void this.#store(id, timers.adjust(timer, ev.payload.ticks));
+        this.#draw(id);
     }
 
     override onDialDown(ev: DialDownEvent<TimerSettings>): void {
-        this.#toggle(ev.action.id);
+        if (this.#remote.has(ev.action.id)) void this.#remoteGesture(ev.action.id, "press");
+        else this.#toggle(ev.action.id);
     }
 
     override onTouchTap(ev: TouchTapEvent<TimerSettings>): void {
-        this.#reset(ev.action.id);
+        if (this.#remote.has(ev.action.id)) void this.#remoteGesture(ev.action.id, "hold");
+        else this.#reset(ev.action.id);
+    }
+
+    override async onPropertyInspectorDidAppear(
+        _ev: PropertyInspectorDidAppearEvent<TimerSettings>
+    ): Promise<void> {
+        await hub.refreshCatalogue(false);
+        await tellInspector("timer");
+    }
+
+    override async onSendToPlugin(ev: SendToPluginEvent<never, TimerSettings>): Promise<void> {
+        await fromInspector(ev.payload, "timer");
     }
 }

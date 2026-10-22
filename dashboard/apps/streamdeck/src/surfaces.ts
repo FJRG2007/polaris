@@ -19,8 +19,9 @@ export const SOUND_UUID = `${PLUGIN_UUID}.sound`;
 export const PLACES_UUID = `${PLUGIN_UUID}.places`;
 export const PLACES_DIAL_UUID = `${PLUGIN_UUID}.places-dial`;
 
-/** Which catalogue entries an action of the plugin can be set to. */
-export type Surface = "key" | "dial" | "call" | "sound" | "places" | "places-dial";
+/** Which catalogue entries an action of the plugin can be set to. The timer
+ *  takes only Calendar's timers, for a timer kept in Polaris. */
+export type Surface = "key" | "dial" | "call" | "sound" | "places" | "places-dial" | "timer";
 
 const SURFACES: Readonly<Record<string, Surface>> = {
     [KEY_UUID]: "key",
@@ -28,11 +29,12 @@ const SURFACES: Readonly<Record<string, Surface>> = {
     [CALL_UUID]: "call",
     [SOUND_UUID]: "sound",
     [PLACES_UUID]: "places",
-    [PLACES_DIAL_UUID]: "places-dial"
+    [PLACES_DIAL_UUID]: "places-dial",
+    [TIMER_UUID]: "timer"
 };
 
-/** The surface a manifest action id stands for, or null for one that has no
- *  catalogue (the timer). */
+/** The surface a manifest action id stands for, or null for one it does not
+ *  know. */
 export function surfaceOf(manifestId: string): Surface | null {
     return SURFACES[manifestId] ?? null;
 }
@@ -54,6 +56,8 @@ export function offered(catalogue: readonly DeckAction[], surface: Surface): Dec
                 return entry.area === "places" && !dial;
             case "places-dial":
                 return entry.area === "places" && dial;
+            case "timer":
+                return entry.id === "calendar.timer";
         }
     });
 }

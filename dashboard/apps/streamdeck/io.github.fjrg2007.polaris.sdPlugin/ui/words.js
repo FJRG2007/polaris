@@ -50,6 +50,15 @@
             minutes: "Minutes",
             timerHint:
                 "Press to start or pause, hold to reset. On a dial, turn to set the minutes.",
+            source: "Kept",
+            sourceDeck: "On this deck",
+            sourcePolaris: "In Polaris",
+            timer: "Timer",
+            timerName: "Name",
+            timerNameHint: "The Calendar timer it makes on its first press.",
+            polarisTimerHint:
+                "Press to start or pause, double press for +1 min or the next phase, hold to reset.",
+            noTimers: "This Polaris has no Calendar timers for this deck.",
             gestures: "More presses",
             gesturesHint:
                 "Optional. A press runs the action above at once unless a double press is set here.",
@@ -119,6 +128,15 @@
             minutes: "Minutos",
             timerHint:
                 "Pulsa para iniciar o pausar, mantén para reiniciar. En un dial, gira para fijar los minutos.",
+            source: "Dónde",
+            sourceDeck: "En este deck",
+            sourcePolaris: "En Polaris",
+            timer: "Temporizador",
+            timerName: "Nombre",
+            timerNameHint: "El de Calendario que crea al pulsar la primera vez.",
+            polarisTimerHint:
+                "Pulsa para iniciar o pausar, doble para +1 min o la fase siguiente, mantén para reiniciar.",
+            noTimers: "Este Polaris no ofrece temporizadores de Calendario a este deck.",
             gestures: "Más pulsaciones",
             gesturesHint:
                 "Opcional. Una pulsación ejecuta la acción de arriba al momento, salvo con doble pulsación.",
