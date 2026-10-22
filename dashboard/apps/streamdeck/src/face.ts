@@ -71,6 +71,16 @@ export function bindingFor(
     return null;
 }
 
+/** Whether a gesture's run is what the key's state is read for: the key's own
+ *  action with the same options. A lock key held to unlock is not. */
+export function drawsOwnState(settings: KeySettings, binding: Binding | null): boolean {
+    if (!binding) return true;
+    if (binding.action !== settings.action) return false;
+    const sorted = (options: Record<string, unknown>) =>
+        JSON.stringify(Object.entries(options).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    return sorted(runOptions(binding)) === sorted(watchOptions(settings, "key"));
+}
+
 export function faceFor(
     link: Link,
     settings: KeySettings,

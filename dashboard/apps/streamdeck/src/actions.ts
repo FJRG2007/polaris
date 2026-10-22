@@ -34,6 +34,7 @@ import {
     alternates,
     bindingFor,
     gesturesOf,
+    drawsOwnState,
     runOptions,
     turnLevel,
     type KeySettings
@@ -114,17 +115,12 @@ export class PolarisKey extends SingletonAction<KeySettings> {
         }
         // The key shows what the press does at once, and is put back if
         // Polaris refuses or does not answer. Only its own action's: another
-        // gesture's state is not what this key draws.
-        const own = !binding || binding.action === settings.action;
+        // gesture's state is not what this key draws. One already done is
+        // still sent: Polaris reads it again, and this reading may be old.
         const before = hub.state(id);
-        const guess = own ? predict(entry, before) : null;
-        if (guess && "noop" in guess) {
-            // Already so: nothing to send.
-            await action.showOk();
-            return;
-        }
+        const guess = drawsOwnState(settings, binding) ? predict(entry, before) : null;
         hub.inFlight.begin(id, before);
-        if (guess) hub.setState(id, guess.face);
+        if (guess && "face" in guess) hub.setState(id, guess.face);
         const result = await hub.run(id, undefined, binding);
         const settled = hub.inFlight.settle(id, result?.ok === true, result?.ok ? result.state : undefined);
         if (settled) hub.setState(id, settled);

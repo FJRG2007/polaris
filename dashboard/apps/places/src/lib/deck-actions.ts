@@ -62,7 +62,7 @@ function deviceState(structured: unknown, locale: Locale) {
     const device = parsed.success ? parsed.data.devices[0] : undefined;
     if (!device) return { tone: "idle" as const };
     if (!device.online) return { tone: "bad" as const, detail: OFFLINE[locale] };
-    const on = device.state === "on";
+    const on = device.state === "on" ? true : device.state === "off" ? false : undefined;
     return { tone: on ? ("ok" as const) : ("idle" as const), on };
 }
 

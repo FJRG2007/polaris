@@ -18,7 +18,8 @@ vi.mock("@polaris/db", () => ({
     prisma: { user: { findUnique: async () => ({ isAdmin: false }) } }
 }));
 vi.mock("@polaris/auth", () => ({
-    revokeApiKey: async (userId: string, id: string) => void revoked.push({ userId, id })
+    revokeApiKey: async (userId: string, id: string) => void revoked.push({ userId, id }),
+    scopesAvailableTo: async () => []
 }));
 vi.mock("@polaris/config", async (original) => ({
     ...(await original<typeof import("@polaris/config")>()),
@@ -130,7 +131,8 @@ describe("deck routes", () => {
         expect(response.headers.get("cache-control")).toBe("no-store");
         expect(await response.json()).toEqual({
             actions: [{ id: "chat.unread" }],
-            latest: { streamdeck: "0.1.4", companion: null, downloadsPath: "/account/downloads" }
+            latest: { streamdeck: "0.1.4", companion: null, downloadsPath: "/account/downloads" },
+            locked: []
         });
         expect(buckets).toEqual(["deck-call:k1"]);
     });

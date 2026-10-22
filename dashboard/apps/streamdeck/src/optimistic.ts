@@ -5,7 +5,8 @@
  * pressed, and the command goes out behind it. What Polaris answers then wins:
  * the state it returns replaces the guess, and a refusal or no answer at all
  * puts back the face the key had. A press whose result is already there - a
- * lock pressed to lock while locked - sends nothing.
+ * lock pressed to lock while locked - keeps its face; Polaris reads the device
+ * again and does nothing.
  *
  * Shared with the Companion module. SDK-free and pure, so the tests reach it.
  */

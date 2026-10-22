@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-const { placesDeckActions, clampTarget, naturalAction, naturalState } =
+const { placesDeckActions, clampTarget, commandPress, naturalAction, naturalState, targetPress } =
     await import("@polaris-app/places/src/lib/deck-actions");
 
 const toggle = placesDeckActions().find((action) => action.id === "places.device-toggle")!;
@@ -301,9 +301,6 @@ describe("every device kind has a key", () => {
 });
 
 describe("what a press shows before Polaris answers", () => {
-    const { commandPress, targetPress } = await import(
-        "@polaris-app/places/src/lib/deck-actions"
-    );
     const locked = { tone: "ok" as const, on: true, detail: "Locked" };
     const unlocked = { tone: "warn" as const, on: false, detail: "Unlocked" };
 
@@ -326,6 +323,15 @@ describe("what a press shows before Polaris answers", () => {
             face: { tone: "ok", on: true }
         });
         expect(commandPress({ tone: "ok", on: true }, "turn-on", "en-US")).toEqual({ noop: true });
+    });
+
+    it("never skips turning off a device whose state is not known", () => {
+        const command = action("places.device-command");
+        for (const state of ["unknown", "moving"]) {
+            const shown = command.read!.pick(device(true, state), "en-US");
+            expect(shown.on).toBeUndefined();
+            expect(commandPress(shown, "turn-off", "en-US")?.noop).toBeUndefined();
+        }
     });
 
     it("draws nothing ahead for an offline device or a command it cannot draw", () => {

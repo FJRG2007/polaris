@@ -151,7 +151,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
      * A button pressed: what it does shows at once on every feedback and
      * variable watching the same thing, the command goes out, and what Polaris
      * answers wins - its state, or the faces from before when it refuses or
-     * does not answer. Already done, nothing is sent.
+     * does not answer. Already done, it is still sent: Polaris reads it again
+     * and does nothing.
      */
     async #press(entry: DeckAction, options: Record<string, unknown>): Promise<void> {
         const keys = mapping.keysShowing(
@@ -160,9 +161,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
             mapping.watchList(this.#connection.catalogue, this.#feedbacks)
         );
         const guess = predict(entry, keys.length ? this.#states.get(keys[0]!) : undefined);
-        if (guess && "noop" in guess) return;
         for (const key of keys) this.#inFlight.begin(key, this.#states.get(key));
-        if (guess) this.#show(keys.map((key) => ({ key, state: guess.face })));
+        if (guess && "face" in guess) this.#show(keys.map((key) => ({ key, state: guess.face })));
         const result = await this.#connection.run(entry.id, options);
         const ok = result?.ok === true;
         const returned = result?.ok ? result.state : undefined;
