@@ -100,7 +100,8 @@ export {
     type ComposeSpecService,
     type ComposeSpecPort,
     type ComposeSpecVolume,
-    type ComposeSpecHealth
+    type ComposeSpecHealth,
+    type ComposePullPolicy
 } from "./compose-spec.js";
 export {
     NETWORK_MODES,

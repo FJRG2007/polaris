@@ -245,8 +245,7 @@ export interface UpdatesReport {
 
 export function parseUpdatesLog(text: string): UpdatesReport {
     const state = /POLARIS_UPDATES=(on|off|unsupported)/.exec(text)?.[1] as
-        | UpdatesState
-        | undefined;
+        UpdatesState | undefined;
     const distro = /POLARIS_DISTRO id=([A-Za-z0-9._-]*)/.exec(text)?.[1];
     return { state: state ?? null, distro: distro ? distro : null };
 }
