@@ -133,10 +133,10 @@
             sourcePolaris: "En Polaris",
             timer: "Temporizador",
             timerName: "Nombre",
-            timerNameHint: "El de Calendario que crea al pulsar la primera vez.",
+            timerNameHint: "Lo crea en Calendario la primera pulsación.",
             polarisTimerHint:
-                "Pulsa para iniciar o pausar, doble para +1 min o la fase siguiente, mantén para reiniciar.",
-            noTimers: "Este Polaris no ofrece temporizadores de Calendario a este deck.",
+                "Pulsa: iniciar o pausar; doble: +1 min o fase siguiente; mantén: reiniciar.",
+            noTimers: "Polaris no tiene temporizadores de Calendario aquí.",
             gestures: "Más pulsaciones",
             gesturesHint:
                 "Opcional. Una pulsación ejecuta la acción de arriba al momento, salvo con doble pulsación.",
