@@ -9,7 +9,7 @@
 
 import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
-import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
+import { RELEASE_IMAGE_GONE, askBeforeServe, pinRelease, rollbackImageOf } from "./release.js";
 import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, forSwarm } from "../compose-spec.js";
 import type {
@@ -79,6 +79,13 @@ export class SwarmRuntime implements RuntimeDriver {
             }
         } else if (!kept) {
             imageTag = await pinRelease(imageTag, plan, ctx);
+        }
+        // The same check the compose runtime asks, at the same point.
+        const refused = await askBeforeServe(imageTag, plan, ctx);
+        if (refused) {
+            ctx.log(Buffer.from(`==> Failed: ${refused}
+`));
+            return { ok: false, error: refused };
         }
         const spec = forSwarm(appComposeSpec(plan, imageTag, ctx.target.proxyNetwork));
         try {

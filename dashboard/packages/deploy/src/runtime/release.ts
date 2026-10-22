@@ -69,3 +69,16 @@ export async function pinRelease(image: string, plan: AppDeployPlan, ctx: Runtim
     ctx.log(Buffer.from(`Kept this release as ${release.image}, so it can be rolled back to.\n`));
     return release.image;
 }
+
+/**
+ * Ask the context's `beforeServe` about a release whose image is ready, once,
+ * in both runtimes at the same point: after the image is built or pulled and
+ * pinned, and before anything of it starts. Answers the sentence it was refused
+ * with, or null to go on (also when nothing asks).
+ */
+export async function askBeforeServe(image: string, plan: AppDeployPlan, ctx: RuntimeContext): Promise<string | null> {
+    if (!ctx.beforeServe) return null;
+    const pulledBy = plan.build.method === "image" ? plan.build.imageRef : undefined;
+    const refs = [image, pulledBy].filter((ref): ref is string => typeof ref === "string" && ref.length > 0);
+    return ctx.beforeServe(refs);
+}
