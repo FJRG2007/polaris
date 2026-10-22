@@ -82,6 +82,31 @@
 
     // --- connection -----------------------------------------------------------------
 
+    /** A newer plugin is out: install it now when the install line put this copy
+     *  in, otherwise point at Downloads. */
+    function updateNotice(update) {
+        const downloads = el("div", { class: "buttons" }, [
+            el("button", {
+                type: "button",
+                text: words.getUpdate,
+                on: { click: () => send("openUrl", { url: update.url }) }
+            })
+        ]);
+        if (!update.now) return [el("p", { class: "notice", text: fill(words.update, update) }), downloads];
+        if (update.updating === "started") return [el("p", { class: "notice", text: words.updateStarted })];
+        if (update.updating === "failed") return [el("p", { class: "notice", text: words.updateFailed }), downloads];
+        return [
+            el("p", { class: "notice", text: fill(words.updateNow, update) }),
+            el("div", { class: "buttons" }, [
+                el("button", {
+                    type: "button",
+                    text: words.updateNowButton,
+                    on: { click: () => toPlugin({ type: "updateNow" }) }
+                })
+            ])
+        ];
+    }
+
     function connectionSection() {
         const box = el("section", {}, [el("h2", { text: words.connection })]);
         if (!status) return box;
@@ -118,17 +143,7 @@
             );
             if (status.link === "offline")
                 box.append(el("p", { class: "notice", text: words.offline }));
-            if (status.update)
-                box.append(
-                    el("p", { class: "notice", text: fill(words.update, status.update) }),
-                    el("div", { class: "buttons" }, [
-                        el("button", {
-                            type: "button",
-                            text: words.getUpdate,
-                            on: { click: () => send("openUrl", { url: status.update.url }) }
-                        })
-                    ])
-                );
+            if (status.update) box.append(...updateNotice(status.update));
             box.append(
                 el("div", { class: "buttons" }, [
                     el("button", {
