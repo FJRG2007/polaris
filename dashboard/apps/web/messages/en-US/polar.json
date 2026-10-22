@@ -5,7 +5,15 @@
         "waitingTitle": "Polar is waiting: {title}",
         "waitingBody": "A step in this chat needs your approval to go on.",
         "failedTitle": "Polar stopped: {title}",
-        "failedBody": "The answer ended early. Open the chat to see why."
+        "failedBody": "The answer ended early. Open the chat to see why.",
+        "failed": {
+            "key": "The model did not answer ({where}): the key was refused. Check the key or pick another model.",
+            "credit": "The model did not answer ({where}): the account is out of credit. Add credit or pick another model.",
+            "rate": "The model did not answer ({where}): too many requests for now. Ask again in a minute or pick another model.",
+            "down": "The model did not answer ({where}): the provider is having trouble. Ask again later or pick another model.",
+            "model": "The model did not answer ({where}). Ask again or pick another model.",
+            "other": "The model did not answer ({where}). Ask again or pick another model."
+        }
     },
     "toggle": {
         "title": "Ask Polar ({keys})",

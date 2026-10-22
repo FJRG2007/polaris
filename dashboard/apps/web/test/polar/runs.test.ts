@@ -3,6 +3,8 @@ import {
     POLAR_RUNS_MAX,
     beginPolarRun,
     chunkType,
+    chunkFailure,
+    WATCH_GRACE_MS,
     listPolarRuns,
     replayPolarRun,
     resetPolarRuns,
@@ -131,10 +133,49 @@ describe("polar runs", () => {
         const { run, controller } = started(onEnd);
         const screen = new AbortController();
         run.watch(screen.signal);
+        const left = Date.now();
         screen.abort();
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(left + WATCH_GRACE_MS + 1_000);
         controller.close();
         await settle();
+        vi.useRealTimers();
         expect(onEnd).toHaveBeenCalledWith(expect.objectContaining({ watched: false }));
+    });
+
+    it("counts a screen that hung up on the failure it was shown as watching", async () => {
+        const onEnd = vi.fn();
+        const { run, controller } = started(onEnd);
+        const screen = new AbortController();
+        run.watch(screen.signal);
+        // The chat reads its copy first and hangs up on the error; this copy
+        // reaches the failure and the end only afterwards.
+        screen.abort();
+        controller.enqueue(
+            sse({
+                type: "data-polar-failure",
+                data: { code: "provider", kind: "model", provider: "OpenRouter" }
+            })
+        );
+        controller.enqueue(sse({ type: "error", errorText: "x" }));
+        controller.close();
+        await settle();
+        expect(onEnd).toHaveBeenCalledWith(
+            expect.objectContaining({
+                state: "failed",
+                watched: true,
+                failure: { code: "provider", kind: "model", provider: "OpenRouter" }
+            })
+        );
+        expect(listPolarRuns(USER)).toEqual([]);
+    });
+
+    it("reads a failure chunk and ignores anything else", () => {
+        expect(
+            chunkFailure(sse({ type: "data-polar-failure", data: { code: "provider", kind: "down" } }))
+        ).toEqual({ code: "provider", kind: "down" });
+        expect(chunkFailure(sse({ type: "text-delta", delta: "a" }))).toBeNull();
+        expect(chunkFailure(sse({ type: "data-polar-failure", data: {} }))).toBeNull();
     });
 
     it("does not count a resume whose request was already gone as watching", async () => {

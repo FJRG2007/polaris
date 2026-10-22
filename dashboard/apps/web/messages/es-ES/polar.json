@@ -5,7 +5,15 @@
         "waitingTitle": "Polar te espera: {title}",
         "waitingBody": "Un paso de este chat espera tu aprobación.",
         "failedTitle": "Polar se paró: {title}",
-        "failedBody": "La respuesta acabó antes. Abre el chat para ver por qué."
+        "failedBody": "La respuesta acabó antes. Abre el chat para ver por qué.",
+        "failed": {
+            "key": "El modelo no respondió ({where}): rechazó la clave. Revisa la clave o elige otro modelo.",
+            "credit": "El modelo no respondió ({where}): la cuenta no tiene saldo. Añade saldo o elige otro modelo.",
+            "rate": "El modelo no respondió ({where}): demasiadas peticiones. Pregunta en un minuto o elige otro modelo.",
+            "down": "El modelo no respondió ({where}): el proveedor tiene problemas. Pregunta luego o elige otro modelo.",
+            "model": "El modelo no respondió ({where}). Pregunta otra vez o elige otro modelo.",
+            "other": "El modelo no respondió ({where}). Pregunta otra vez o elige otro modelo."
+        }
     },
     "toggle": {
         "title": "Pide a Polar ({keys})",

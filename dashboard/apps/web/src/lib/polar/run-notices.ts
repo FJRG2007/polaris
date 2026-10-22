@@ -5,6 +5,11 @@
  * already saw it, and one the person stopped needs no telling. The words are
  * the person's language, read when the bell is written (`chat/text.ts` does
  * the same for a missed call).
+ *
+ * A failed run says why in the bell itself - which provider and model did not
+ * answer, and what to do - rather than sending the reader to the chat to find
+ * out. And once the same chat answers afterwards (a retry, another model), the
+ * failure is old news: its bell is marked read.
  */
 
 import { prisma } from "@polaris/db";
@@ -21,11 +26,29 @@ type Notice = {
     actionRequired: boolean;
 };
 
+/** The failure kinds the bell has its own sentence for. */
+const FAILURE_KINDS = new Set(["key", "credit", "rate", "down", "model"]);
+
+/** Why a failed run stopped, in a sentence: the provider's failure when the
+ *  answer carried one, otherwise the plain fact that it ended early. Pure. */
+export function failedBody(
+    t: NamespaceTranslator<"polar">,
+    failure: PolarRunEnd["failure"],
+    model: string | null
+): string {
+    if (failure?.code !== "provider") return t("notices.failedBody");
+    const kind = failure.kind && FAILURE_KINDS.has(failure.kind) ? failure.kind : "other";
+    const where = [failure.provider, model].filter(Boolean).join(", ");
+    return t(`notices.failed.${kind as "other"}`, { where: where || "?" });
+}
+
 /** What the bell says, by how the run ended. */
 export function runNotice(
     t: NamespaceTranslator<"polar">,
     state: Exclude<PolarRunEnd["state"], "stopped">,
-    title: string
+    title: string,
+    failure: PolarRunEnd["failure"] = null,
+    model: string | null = null
 ): Notice {
     if (state === "approval")
         return {
@@ -37,7 +60,7 @@ export function runNotice(
     if (state === "failed")
         return {
             title: t("notices.failedTitle", { title }),
-            body: t("notices.failedBody"),
+            body: failedBody(t, failure, model),
             level: "danger",
             actionRequired: false
         };
@@ -58,8 +81,39 @@ async function wordsFor(userId: string): Promise<NamespaceTranslator<"polar">> {
     }
 }
 
-/** Sends the bell for a run that ended unwatched; never throws. */
-export async function noticePolarRunEnd(end: PolarRunEnd): Promise<void> {
+/** What a failed run's bell is stored with, so a later answer can find it. */
+function failedMark(threadId: string): string {
+    return `"threadId":${JSON.stringify(threadId)},"state":"failed"`;
+}
+
+/** Marks read the bells this chat's failed runs left, now that it answered. */
+export async function withdrawFailedNotices(userId: string, threadId: string): Promise<number> {
+    const { count } = await prisma.notification.updateMany({
+        where: {
+            userId,
+            type: "polar.chatReady",
+            readAt: null,
+            metadata: { contains: failedMark(threadId) }
+        },
+        data: { readAt: new Date() }
+    });
+    return count;
+}
+
+/**
+ * Sends the bell for a run that ended unwatched, and withdraws an older
+ * failure's once the chat answers; never throws. `model` names the model the
+ * run used, for a failure's sentence.
+ */
+export async function noticePolarRunEnd(
+    end: PolarRunEnd,
+    model: string | null = null
+): Promise<void> {
+    if (end.state === "done" || end.state === "approval") {
+        await withdrawFailedNotices(end.userId, end.threadId).catch((error: unknown) =>
+            console.error("polar: could not withdraw a failed chat's notice", error)
+        );
+    }
     if (end.watched || end.state === "stopped") return;
     try {
         const thread = await prisma.polarThread.findFirst({
@@ -68,7 +122,13 @@ export async function noticePolarRunEnd(end: PolarRunEnd): Promise<void> {
         });
         // A temporary chat is gone once it is left; there is nothing to open.
         if (!thread || thread.temporary) return;
-        const notice = runNotice(await wordsFor(end.userId), end.state, thread.title);
+        const notice = runNotice(
+            await wordsFor(end.userId),
+            end.state,
+            thread.title,
+            end.failure ?? null,
+            model
+        );
         await notify({
             userId: end.userId,
             event: "polar.chatReady",

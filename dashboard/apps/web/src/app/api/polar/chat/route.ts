@@ -377,7 +377,11 @@ export async function POST(request: Request): Promise<Response> {
     // The answer runs on its own, not on this request: leaving the chat leaves
     // it answering, and only its stop (`chat/[id]/stream`) ends it.
     const modelMessages = await convertToModelMessages(withScreenNotes(withoutFailures(sendable)));
-    const run = beginPolarRun(user.id, body.data.threadId, (end) => void noticePolarRunEnd(end));
+    const run = beginPolarRun(
+        user.id,
+        body.data.threadId,
+        (end) => void noticePolarRunEnd(end, resolved.option.name)
+    );
     if (run === "busy") return refuse("running", 409);
     if (run === "too_many") {
         return refusedTurn(messages, { code: "too_many_runs", max: POLAR_RUNS_MAX }, save);

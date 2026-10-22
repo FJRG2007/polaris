@@ -458,8 +458,8 @@
             "description": "A scheduled or automatic update ran, and how it went."
         },
         "polarChatReady": {
-            "label": "Chat answered while away",
-            "description": "A Polar chat you left finished its answer, or is waiting for your approval."
+            "label": "Polar finished while you were away",
+            "description": "A Polar answer finished, stopped or needs you while you were elsewhere."
         },
         "storageUnreachable": {
             "label": "Upload storage is not reachable",

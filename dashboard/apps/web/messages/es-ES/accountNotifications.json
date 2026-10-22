@@ -458,8 +458,8 @@
             "description": "Se ha ejecutado una actualización programada o automática, y cómo ha ido."
         },
         "polarChatReady": {
-            "label": "Chat listo en segundo plano",
-            "description": "Un chat de Polar que dejaste terminó su respuesta o espera tu aprobación."
+            "label": "Polar acabó mientras no estabas",
+            "description": "Una respuesta de Polar acabó, se paró o te necesita mientras estabas fuera."
         },
         "storageUnreachable": {
             "label": "El almacenamiento no responde",
