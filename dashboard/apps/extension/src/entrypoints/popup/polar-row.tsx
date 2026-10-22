@@ -79,13 +79,13 @@ export function PolarRow({
 }
 
 /**
- * Whether Polar may use this browser: open and read pages signed in as the
- * person, through `lib/polar-browser.ts`. Off until switched on here, and the
- * sites allowed "always" can be forgotten in one press.
+ * The sites Polar may always use in this browser (`lib/polar-browser.ts`),
+ * each withdrawn in one press. Nothing to switch on: Polar asks for a site the
+ * first time it needs it. Hidden while no site is allowed always.
  */
 export function PolarBrowserRow(): React.JSX.Element | null {
     const t = useWords();
-    const [state, setState] = useState<{ on: boolean; sites: readonly string[] } | null>(null);
+    const [state, setState] = useState<{ sites: readonly string[] } | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -99,7 +99,7 @@ export function PolarBrowserRow(): React.JSX.Element | null {
     /** Sends a change; on a refusal or no answer, puts `previous` back and says why. */
     const send = (
         request: Parameters<typeof askBackground>[0],
-        previous: { on: boolean; sites: readonly string[] }
+        previous: { sites: readonly string[] }
     ) => {
         setError(null);
         void askBackground(request)
@@ -114,43 +114,47 @@ export function PolarBrowserRow(): React.JSX.Element | null {
             });
     };
 
-    if (!state) return null;
+    if (!state || state.sites.length === 0) return null;
     return (
         <li className="section-row">
-            <button
-                className="section"
-                role="switch"
-                aria-checked={state.on}
-                onClick={() => {
-                    // Shown at once, put back if the worker did not take it.
-                    setState({ ...state, on: !state.on });
-                    send({ kind: "setPolarBrowser", on: !state.on }, state);
-                }}
-            >
-                <span className="section-text">
-                    <span className="strong">{t("polar.browserUse")}</span>
-                    <span className="muted small">{t("polar.browserUseHint")}</span>
-                </span>
-                <span className="muted small">
-                    {state.on ? t("polar.browserOn") : t("polar.browserOff")}
-                </span>
-            </button>
-            {state.sites.length > 0 ? (
-                <div
-                    className="muted small"
-                    style={{ display: "flex", gap: 8, padding: "0 12px 8px" }}
-                >
-                    <span style={{ minWidth: 0, flex: 1 }} title={state.sites.join(", ")}>
-                        {t("polar.browserSites", { count: state.sites.length })}
-                    </span>
-                    <button
-                        className="link"
-                        onClick={() => send({ kind: "forgetPolarSites" }, state)}
+            <div className="section-text" style={{ padding: "8px 12px 4px" }}>
+                <span className="strong">{t("polar.browserSitesTitle")}</span>
+                <span className="muted small">{t("polar.browserSitesHint")}</span>
+            </div>
+            <ul style={{ listStyle: "none", margin: 0, padding: "0 12px 8px" }}>
+                {state.sites.map((site) => (
+                    <li
+                        key={site}
+                        className="small"
+                        style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 28 }}
                     >
-                        {t("polar.browserForget")}
-                    </button>
-                </div>
-            ) : null}
+                        <span
+                            style={{
+                                minWidth: 0,
+                                flex: 1,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap"
+                            }}
+                            title={site}
+                        >
+                            {site}
+                        </span>
+                        <button
+                            className="link"
+                            aria-label={t("polar.browserForgetSite", { site })}
+                            title={t("polar.browserForgetSite", { site })}
+                            onClick={() => {
+                                // Gone at once, put back if the worker did not take it.
+                                setState({ sites: state.sites.filter((entry) => entry !== site) });
+                                send({ kind: "forgetPolarSites", site }, state);
+                            }}
+                        >
+                            {t("polar.browserForget")}
+                        </button>
+                    </li>
+                ))}
+            </ul>
             {error ? (
                 <p
                     className="muted small"

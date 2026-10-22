@@ -5,7 +5,18 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { RefTable, clickRef, readText, snapshot, typeRef } from "../src/lib/page-agent";
+import { vi } from "vitest";
+import {
+    RefTable,
+    clickRef,
+    readText,
+    snapshot,
+    typeRef,
+    hoverRef,
+    pressKeys,
+    selectRef,
+    scrollPage
+} from "../src/lib/page-agent";
 
 function page(html: string): Document {
     document.body.innerHTML = html;
@@ -113,5 +124,55 @@ describe("acting", () => {
         const [button] = snapshot(doc, refs);
         doc.body.innerHTML = "";
         expect(clickRef(refs, button!.ref)).toEqual({ ok: false, refusal: "unknown-ref" });
+    });
+});
+
+describe("scrolling, keys, pointing and picking", () => {
+    it("scrolls the page by screens, the way a key never would from a script", () => {
+        const doc = page("<p>long</p>");
+        const scrollBy = vi.fn();
+        window.scrollBy = scrollBy as never;
+        Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+        expect(scrollPage(doc, new RefTable(), "down", 2)).toEqual({ ok: true });
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1600, left: 0 });
+        expect(pressKeys(doc, "PageUp")).toEqual({ ok: true });
+        expect(scrollBy).toHaveBeenLastCalledWith({ top: -720, left: 0 });
+    });
+
+    it("scrolls to a ref, and refuses one the snapshot never gave", () => {
+        const doc = page("<button>Load more</button>");
+        const refs = new RefTable();
+        const [entry] = snapshot(doc, refs);
+        const into = vi.fn();
+        (doc.querySelector("button") as HTMLElement).scrollIntoView = into;
+        expect(scrollPage(doc, refs, "down", 1, entry!.ref)).toEqual({ ok: true });
+        expect(into).toHaveBeenCalled();
+        expect(scrollPage(doc, refs, "down", 1, "e999")).toEqual({
+            ok: false,
+            refusal: "unknown-ref"
+        });
+    });
+
+    it("never presses keys into a password box", () => {
+        const doc = page('<input type="password" id="p">');
+        (doc.getElementById("p") as HTMLInputElement).focus();
+        expect(pressKeys(doc, "Enter")).toEqual({ ok: false, refusal: "password-field" });
+    });
+
+    it("picks an option by its text, and hovers with the events a menu waits for", () => {
+        const doc = page(
+            '<label for="s">Sort</label><select id="s"><option value="new">Newest</option><option value="top">Top</option></select><a href="#" id="m">Menu</a>'
+        );
+        const refs = new RefTable();
+        const found = snapshot(doc, refs);
+        const select = found.find((entry) => entry.name === "Sort")!;
+        expect(selectRef(refs, select.ref, "Top")).toEqual({ ok: true });
+        expect((doc.getElementById("s") as HTMLSelectElement).value).toBe("top");
+        expect(selectRef(refs, select.ref, "Oldest")).toEqual({ ok: false, refusal: "failed" });
+        const link = found.find((entry) => entry.name === "Menu")!;
+        const seen: string[] = [];
+        doc.getElementById("m")!.addEventListener("mouseover", () => seen.push("over"));
+        expect(hoverRef(refs, link.ref)).toEqual({ ok: true });
+        expect(seen).toEqual(["over"]);
     });
 });

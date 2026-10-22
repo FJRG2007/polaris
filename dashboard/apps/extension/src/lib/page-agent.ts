@@ -327,3 +327,137 @@ export function typeRef(refs: RefTable, ref: string, text: string, submit = fals
     }
     return { ok: true };
 }
+/** Keys a page scrolls by on its own, as the share of a screen they move. */
+const SCROLL_KEYS: Record<string, { x: number; y: number }> = {
+    pagedown: { x: 0, y: 0.9 },
+    pageup: { x: 0, y: -0.9 },
+    space: { x: 0, y: 0.9 },
+    arrowdown: { x: 0, y: 0.1 },
+    arrowup: { x: 0, y: -0.1 },
+    arrowright: { x: 0.1, y: 0 },
+    arrowleft: { x: -0.1, y: 0 }
+};
+
+/** The element a scroll moves: the one under the page's middle that scrolls,
+ *  or the page itself - X and most feeds scroll the page, chats scroll a box. */
+function scroller(doc: Document): Element {
+    const view = doc.defaultView;
+    let element = view
+        ? doc.elementFromPoint?.(view.innerWidth / 2, view.innerHeight / 2)
+        : null;
+    while (element && element !== doc.documentElement) {
+        const style = view?.getComputedStyle(element);
+        const scrolls = /(auto|scroll)/.test(`${style?.overflowY ?? ""}${style?.overflowX ?? ""}`);
+        if (scrolls && element.scrollHeight > element.clientHeight + 1) return element;
+        element = element.parentElement;
+    }
+    return doc.scrollingElement ?? doc.documentElement;
+}
+
+/**
+ * Scroll by screens in a direction, or bring a ref into view. Script-made key
+ * events never scroll a page, so this moves it directly, the way Playwright's
+ * mouse wheel and Claude in Chrome's scroll action do.
+ */
+export function scrollPage(
+    doc: Document,
+    refs: RefTable,
+    direction: "up" | "down" | "left" | "right",
+    amount: number,
+    ref?: string
+): ActOutcome {
+    if (ref) {
+        const element = refs.lookup(ref);
+        if (!element) return { ok: false, refusal: "unknown-ref" };
+        (element as HTMLElement).scrollIntoView?.({ block: "center" });
+        return { ok: true };
+    }
+    const view = doc.defaultView;
+    const target = scroller(doc);
+    const height = view?.innerHeight ?? 800;
+    const width = view?.innerWidth ?? 1200;
+    const sign = direction === "up" || direction === "left" ? -1 : 1;
+    const vertical = direction === "up" || direction === "down";
+    const top = vertical ? sign * height * amount : 0;
+    const left = vertical ? 0 : sign * width * amount;
+    if (target === doc.scrollingElement || target === doc.documentElement)
+        view?.scrollBy({ top, left });
+    else target.scrollBy?.({ top, left });
+    return { ok: true };
+}
+
+/**
+ * Press keys on the focused element, as a person would: "Enter", "Escape",
+ * "Control+a". Keys a page scrolls by (PageDown, arrows, Space) scroll it, and
+ * Enter in a form box submits the form, since a script's key events alone do
+ * neither.
+ */
+export function pressKeys(doc: Document, keys: string): ActOutcome {
+    const parts = keys.split("+").map((part) => part.trim()).filter(Boolean);
+    const key = parts.at(-1) ?? "";
+    const held = new Set(parts.slice(0, -1).map((part) => part.toLowerCase()));
+    const target = (doc.activeElement as HTMLElement | null) ?? doc.body;
+    if (isPasswordBox(target)) return { ok: false, refusal: "password-field" };
+    const named = key === " " ? "Space" : key;
+    const init = {
+        key: named === "Space" ? " " : named,
+        code: named.length === 1 ? `Key${named.toUpperCase()}` : named,
+        bubbles: true,
+        cancelable: true,
+        ctrlKey: held.has("control") || held.has("ctrl"),
+        shiftKey: held.has("shift"),
+        altKey: held.has("alt"),
+        metaKey: held.has("meta") || held.has("cmd")
+    };
+    const handled = !target.dispatchEvent(new KeyboardEvent("keydown", init));
+    target.dispatchEvent(new KeyboardEvent("keyup", init));
+    if (handled) return { ok: true };
+    const scroll = SCROLL_KEYS[named.toLowerCase()];
+    const typing = target.matches?.("input, textarea, [contenteditable=''], [contenteditable='true']");
+    if (scroll && !typing) {
+        const view = doc.defaultView;
+        view?.scrollBy({
+            top: scroll.y * (view.innerHeight ?? 800),
+            left: scroll.x * (view.innerWidth ?? 1200)
+        });
+    } else if (/^end$/i.test(named) && !typing) {
+        doc.defaultView?.scrollTo({ top: doc.documentElement.scrollHeight });
+    } else if (/^home$/i.test(named) && !typing) {
+        doc.defaultView?.scrollTo({ top: 0 });
+    } else if (/^enter$/i.test(named)) {
+        const form = (target as HTMLInputElement).form;
+        if (form?.requestSubmit) form.requestSubmit();
+    }
+    return { ok: true };
+}
+
+/** Point at the element a ref names: the events a menu that opens on hover listens for. */
+export function hoverRef(refs: RefTable, ref: string): ActOutcome {
+    const element = refs.lookup(ref);
+    if (!element) return { ok: false, refusal: "unknown-ref" };
+    (element as HTMLElement).scrollIntoView?.({ block: "center" });
+    for (const type of ["pointerover", "pointerenter", "mouseover", "mouseenter", "mousemove"]) {
+        const Event = type.startsWith("pointer") && typeof PointerEvent !== "undefined"
+            ? PointerEvent
+            : MouseEvent;
+        element.dispatchEvent(new Event(type, { bubbles: type.endsWith("over") || type === "mousemove" }));
+    }
+    return { ok: true };
+}
+
+/** Pick an option, by its text or value, in the list box a ref names. */
+export function selectRef(refs: RefTable, ref: string, value: string): ActOutcome {
+    const element = refs.lookup(ref);
+    if (!element) return { ok: false, refusal: "unknown-ref" };
+    const Select = element.ownerDocument.defaultView?.HTMLSelectElement;
+    if (!Select || !(element instanceof Select)) return { ok: false, refusal: "failed" };
+    const wanted = value.trim().toLowerCase();
+    const option = [...element.options].find(
+        (entry) => entry.value.toLowerCase() === wanted || entry.text.trim().toLowerCase() === wanted
+    );
+    if (!option) return { ok: false, refusal: "failed" };
+    element.value = option.value;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+    return { ok: true };
+}

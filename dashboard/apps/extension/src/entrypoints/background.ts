@@ -3014,7 +3014,7 @@ async function checkForUpdate(): Promise<void> {
     }
 }
 
-/** Polar using this browser (`lib/polar-browser.ts`): off until the popup switches it on. */
+/** Polar using this browser (`lib/polar-browser.ts`): asks for each site when it first needs it. */
 const polarBrowser = new PolarBrowser({
     api: browser as unknown as BrowserApi,
     link: async () => ({ origin: await currentOrigin(), token: await LINK_TOKEN.getValue() }),
@@ -3648,12 +3648,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "polarBrowser":
                 return { ok: true, polarBrowser: await polarBrowser.status() };
 
-            case "setPolarBrowser":
-                await polarBrowser.setOn(request.on === true);
-                return { ok: true, polarBrowser: await polarBrowser.status() };
-
             case "forgetPolarSites":
-                await polarBrowser.forgetSites();
+                await polarBrowser.forgetSites(
+                    typeof request.site === "string" ? request.site : undefined
+                );
                 return { ok: true, polarBrowser: await polarBrowser.status() };
 
             case "polarBrowserGrant":

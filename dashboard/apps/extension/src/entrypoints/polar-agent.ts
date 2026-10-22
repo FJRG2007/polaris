@@ -1,6 +1,7 @@
 /**
- * Polar's hands inside one tab it opened: injected by the worker
- * (`lib/polar-browser.ts`) into that tab only, never registered on any site.
+ * Polar's hands inside one tab it opened, or the tab in front once the person
+ * allowed its site: injected by the worker (`lib/polar-browser.ts`) into that
+ * tab only, never registered on any site.
  *
  * It answers the worker and nobody else - a message from a page or another
  * content script carries a tab, the worker's does not - and it draws the bar
@@ -78,6 +79,14 @@ export default defineUnlistedScript({
                     return agent.clickRef(refs, op.ref);
                 case "type":
                     return agent.typeRef(refs, op.ref, op.text, op.submit);
+                case "key":
+                    return agent.pressKeys(document, op.keys);
+                case "scroll":
+                    return agent.scrollPage(document, refs, op.direction, op.amount, op.ref);
+                case "hover":
+                    return agent.hoverRef(refs, op.ref);
+                case "select":
+                    return agent.selectRef(refs, op.ref, op.value);
             }
         };
 

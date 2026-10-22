@@ -14,7 +14,17 @@ import { ACCOUNT_LOCALE, currentLocale } from "@/lib/locale-store";
 
 type Grant = "once" | "always" | "deny";
 
-function Ask({ id, site }: { id: string; site: string }): React.JSX.Element {
+function Ask({
+    id,
+    site,
+    hint
+}: {
+    id: string;
+    site: string;
+    /** The answer the person already gave in Polar's chat card, which this
+     *  window opens on. It still has to be clicked here. */
+    hint: "once" | "always" | null;
+}): React.JSX.Element {
     const t = useWords();
     const [busy, setBusy] = useState(false);
 
@@ -39,10 +49,20 @@ function Ask({ id, site }: { id: string; site: string }): React.JSX.Element {
                 {t("polar.browserAskBody")}
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <button className="primary" disabled={busy} onClick={() => void decide("once")}>
+                <button
+                    className={hint === "always" ? undefined : "primary"}
+                    disabled={busy}
+                    autoFocus={hint !== "always"}
+                    onClick={() => void decide("once")}
+                >
                     {t("polar.browserOnce")}
                 </button>
-                <button disabled={busy} onClick={() => void decide("always")}>
+                <button
+                    className={hint === "always" ? "primary" : undefined}
+                    disabled={busy}
+                    autoFocus={hint === "always"}
+                    onClick={() => void decide("always")}
+                >
                     {t("polar.browserAlways")}
                 </button>
                 <button disabled={busy} onClick={() => void decide("deny")}>
@@ -57,11 +77,13 @@ const root = document.getElementById("root");
 const query = new URLSearchParams(location.search);
 const id = query.get("id") ?? "";
 const site = query.get("site") ?? "";
+const asked = query.get("hint");
+const hint = asked === "once" || asked === "always" ? asked : null;
 if (root && id && site) {
     void currentLocale().then((locale) =>
         createRoot(root).render(
             <WordsProvider initial={locale} follow={(onChange) => ACCOUNT_LOCALE.watch(onChange)}>
-                <Ask id={id} site={site} />
+                <Ask id={id} site={site} hint={hint} />
             </WordsProvider>
         )
     );

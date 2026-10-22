@@ -16,7 +16,16 @@ export type AgentOp =
           readonly ref: string;
           readonly text: string;
           readonly submit?: boolean;
-      };
+      }
+    | { readonly op: "key"; readonly keys: string }
+    | {
+          readonly op: "scroll";
+          readonly ref?: string;
+          readonly direction: "up" | "down" | "left" | "right";
+          readonly amount: number;
+      }
+    | { readonly op: "hover"; readonly ref: string }
+    | { readonly op: "select"; readonly ref: string; readonly value: string };
 
 export type AgentReply = (
     | {
