@@ -375,7 +375,7 @@ export async function grantPageAction(
             kind,
             String(subjectId),
             { links: query.links === true, search, cursor },
-            { id: user.id }
+            { id: user.id, isAdmin: user.isAdmin }
         );
         return { page };
     } catch (caught) {

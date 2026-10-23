@@ -586,7 +586,7 @@ export async function listSubjectGrantPage(
     subject: core.GrantSubject,
     subjectId: string,
     query: GrantPageQuery,
-    viewer: { id: string } | null,
+    viewer: { id: string; isAdmin: boolean } | null,
     now = new Date()
 ): Promise<GrantPage> {
     const limit = Math.min(Math.max(query.limit ?? core.GRANT_PAGE_SIZE, 1), core.GRANT_PAGE_SIZE);
@@ -643,7 +643,7 @@ type StoredGrant = Awaited<ReturnType<typeof prisma.accessGrant.findMany>>[numbe
 async function viewsOf(
     rows: readonly StoredGrant[],
     now: Date,
-    viewer: { id: string } | null
+    viewer: { id: string; isAdmin: boolean } | null
 ): Promise<GrantView[]> {
     if (rows.length === 0) return [];
     const zone = await houseZone(rows);
@@ -745,7 +745,7 @@ async function idsIn<T>(ids: string[], read: (ids: string[]) => Promise<T[]>): P
  * rather than at the top - this module sits on the access path of four apps.
  */
 async function contactsOf(
-    viewer: { id: string },
+    viewer: { id: string; isAdmin: boolean },
     rows: readonly { principalType: string; principalId: string }[]
 ): Promise<Map<string, string>> {
     const ids = [

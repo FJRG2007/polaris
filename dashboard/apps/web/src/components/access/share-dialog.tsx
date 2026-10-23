@@ -3,27 +3,27 @@
 /**
  * Handing one thing over, from wherever it is being handed over.
  *
- * One dialog for a conversation, a space and a front door, because it is one
- * question with one shape: who, what may they do, and - for the things where it
- * means anything - when. A door lent to a visitor is the case that needs the
- * hours and the count; a conversation handed to the support team is the case
- * that must not be asked about them, so the whole "only sometimes" half of the
- * form is absent rather than empty for it.
+ * The shape every widely used share dialog converged on (Google Drive's, and
+ * Notion's and Figma's after it): one box that finds anybody it may go to,
+ * "People with access" underneath with a role on every row, and "General access"
+ * for the link. Picking somebody stages them; Share writes them all at once.
  *
- * What is already shared is the top of the dialog rather than a second screen.
- * Taking a key back is the urgent thing somebody comes here to do, and it should
- * never be more than opening this and pressing once.
+ * Built to be shared with thousands: the list is paged and searched on the
+ * server, drawn virtualized, and a team or a role is one row however many people
+ * it reaches. The "only sometimes" half - days, hours, uses - exists only where
+ * it means anything (`bounded`), and is reached from a row's role menu.
  */
 
 import * as core from "@polaris/core";
-import type { GrantView } from "@/lib/access/grants";
+import type { GrantPage, GrantView } from "@/lib/access/grants";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { GrantCandidate } from "@/lib/access/sharing-service";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { AccessLog } from "@/components/access/access-log";
+import { Avatar } from "@/components/avatar";
 import {
     EMPTY_LINK_ADVANCED,
     LinkAdvancedFields,
@@ -31,23 +31,39 @@ import {
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import {
-    CalendarClock,
+    EMPTY_LIMITS,
+    LimitsFields,
+    badFence,
+    boundsOf,
+    describeGrant,
+    limitsOf,
+    type LimitsValue
+} from "@/components/access/share-limits";
+import {
+    ArrowLeft,
+    Building2,
     Copy,
+    Globe,
     History,
     Link2,
     Loader2,
-    MapPin,
+    Lock,
     Search,
-    Trash2,
-    UserRound,
-    Users
+    Shield,
+    Users,
+    X
 } from "lucide-react";
 import {
-    findSharePeopleAction,
-    listGrantsAction,
+    findShareTargetsAction,
+    grantPageAction,
     revokeShareAction,
-    shareAction,
-    shareLinkAction
+    setLinkAudienceAction,
+    shareLinkAction,
+    shareManyAction,
+    shareSetupAction,
+    updateShareAction,
+    type ShareSetup,
+    type ShareTarget
 } from "@/app/(app)/access-actions";
 import {
     Badge,
@@ -59,10 +75,9 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    SegmentedControl,
     Select,
     Skeleton,
-    Switch,
+    Textarea,
     cn,
     useToast
 } from "@polaris/ui";
@@ -70,16 +85,25 @@ import {
 /** The capabilities this dialog has words for, as `share.capabilities.<id>`. */
 const CAPABILITIES = new Set(["guest", "member", "admin", "view", "control", "edit"]);
 
-/** What a standing looks like beside a row. Only `live` is quiet: the other four
- *  are the reason somebody is looking. */
+/** What a standing looks like beside a row. Only `live` is quiet. */
 const STANDING_TONE: Record<core.GrantStanding, "success" | "warning" | "neutral"> = {
     live: "success",
     waiting: "neutral",
     expired: "neutral",
     closed: "warning",
     spent: "neutral",
-    elsewhere: "warning"
+    elsewhere: "warning",
+    signin: "neutral",
+    denied: "warning"
 };
+
+/** One row of "People with access", in pixels, for the virtualizer. */
+const ROW_HEIGHT = 56;
+/** Values the role menu uses for what is not a role. */
+const LIMITS = "__limits";
+const REMOVE = "__remove";
+
+const AUDIENCE_ICON = { restricted: Lock, org: Building2, anyone: Globe } as const;
 
 export function ShareDialog({
     open,
@@ -100,240 +124,231 @@ export function ShareDialog({
     /** Whether hours, dates and a number of uses mean anything here. They do for
      *  a door and a camera; they do not for a conversation. */
     bounded?: boolean;
-    /** Who it may be shared with, where the app keeps the others itself - a
-     *  calendar's people and teams live in the Calendar's own share list. */
+    /** Who it may be shared with, where the app keeps the others itself. */
     principals?: readonly core.GrantPrincipal[];
-    /**
-     * Anything the thing being shared has of its own, under the grants.
-     *
-     * Office fills it with the links a document is handed out on. A slot rather
-     * than a branch here, because this dialog is chat's and tasks' and Places'
-     * as well, and it has no business knowing what a document is.
-     */
+    /** Anything the thing being shared has of its own, under the grants. */
     extra?: ReactNode;
 }) {
     const toast = useToast();
-    const format = useDisplayFormat();
     const t = useTranslations("components");
     const locale = useLocale();
+    const format = useDisplayFormat();
+    const dayNames = useMemo(() => core.weekdayNames(locale, "short"), [locale]);
+    const weekOrder = useMemo(() => core.weekOrderFrom(format.weekStartsOn), [format.weekStartsOn]);
+    const [confirm, confirmDialog] = useConfirm();
     const capabilityLabel = (one: string) =>
         CAPABILITIES.has(one)
             ? t(`share.capabilities.${one}.label` as NamespaceKey<"components">)
             : one;
-    const capabilityHint = (one: string) =>
-        CAPABILITIES.has(one)
-            ? t(`share.capabilities.${one}.hint` as NamespaceKey<"components">)
-            : "";
-    const dayNames = useMemo(() => core.weekdayNames(locale, "short"), [locale]);
-    // The reader's own week, so Monday-first and Sunday-first both draw the days
-    // in the order the person expects to read them in.
-    const weekOrder = useMemo(() => core.weekOrderFrom(format.weekStartsOn), [format.weekStartsOn]);
-    const [grants, setGrants] = useState<GrantView[] | null>(null);
-    const [candidates, setCandidates] = useState<GrantCandidate[]>([]);
-    const [busy, setBusy] = useState(false);
-    const [confirm, confirmDialog] = useConfirm();
-
+    const actionLabel = (one: string) => t(`share.actions.${one}` as NamespaceKey<"components">);
     const capabilities = core.GRANT_CAPABILITIES[subject] as readonly string[];
-    // The weakest by default, everywhere. Sharing is a thing people do quickly,
-    // and the cost of the default being too generous is somebody having more of
-    // your house than you meant.
+    const linkable = core.isGrantLinkSubject(subject);
+    const linkCapabilities: readonly string[] = linkable ? core.linkCapabilities(subject) : [];
+
+    const [setup, setSetup] = useState<ShareSetup | null>(null);
+    const [history, setHistory] = useState(false);
+    const [logGrant, setLogGrant] = useState<GrantView | null>(null);
+
+    // --- People with access: paged, searched, virtualized ---------------------
+    const [rows, setRows] = useState<GrantView[] | null>(null);
+    const [total, setTotal] = useState(0);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [filter, setFilter] = useState("");
+    const [paging, setPaging] = useState(false);
+    const [pageFailed, setPageFailed] = useState(false);
+    const generation = useRef(0);
+
+    const loadPeople = useCallback(
+        async (search: string, after: string | null) => {
+            const mine = after ? generation.current : ++generation.current;
+            setPaging(true);
+            const answer = await grantPageAction(subject, subjectId, { search, cursor: after });
+            // A newer search has been typed since: this answer is for a list
+            // nobody is looking at any more.
+            if (mine !== generation.current) return;
+            setPaging(false);
+            if (answer.error || !answer.page) {
+                setPageFailed(true);
+                if (!after) setRows([]);
+                return;
+            }
+            const page: GrantPage = answer.page;
+            setPageFailed(false);
+            setRows((held) => (after ? [...(held ?? []), ...page.grants] : page.grants));
+            setTotal(page.total);
+            setCursor(page.nextCursor);
+        },
+        [subject, subjectId]
+    );
+
+    // --- General access: the links ---------------------------------------------
+    const [links, setLinks] = useState<GrantView[] | null>(null);
+    const loadLinks = useCallback(async () => {
+        if (!linkable) return setLinks([]);
+        const answer = await grantPageAction(subject, subjectId, { links: true });
+        setLinks(answer.page?.grants ?? []);
+    }, [linkable, subject, subjectId]);
+
+    useEffect(() => {
+        if (!open) return;
+        setSetup(null);
+        setRows(null);
+        setLinks(null);
+        setFilter("");
+        setHistory(false);
+        void shareSetupAction(subject, subjectId).then((answer) => {
+            if (answer.error) toast.show({ title: answer.error });
+            setSetup(answer.setup ?? null);
+        });
+        void loadPeople("", null);
+        void loadLinks();
+    }, [open, subject, subjectId, loadPeople, loadLinks, toast]);
+
+    // Searching who has access is on the server, after a beat.
+    const firstFilter = useRef(true);
+    useEffect(() => {
+        if (!open) return;
+        if (firstFilter.current) {
+            firstFilter.current = false;
+            return;
+        }
+        const timer = setTimeout(() => void loadPeople(filter, null), 250);
+        return () => clearTimeout(timer);
+    }, [filter, open, loadPeople]);
+
+    // --- The add box -------------------------------------------------------------
+    const [query, setQuery] = useState("");
+    const [found, setFound] = useState<ShareTarget[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [active, setActive] = useState(0);
+    const [staged, setStaged] = useState<ShareTarget[]>([]);
     const [capability, setCapability] = useState(capabilities[0] ?? "");
-    // Which of the subject's actions the grant allows (open, close, operate;
-    // watch, control). All of what the capability reaches until narrowed.
     const reachable = core.grantActions(subject, capability, []);
     const [actions, setActions] = useState<string[]>(reachable);
+    const [limits, setLimits] = useState<LimitsValue>(EMPTY_LIMITS);
+    const [notify, setNotify] = useState(true);
+    const [message, setMessage] = useState("");
+    const [busy, setBusy] = useState(false);
+    const searchSeq = useRef(0);
     const pickCapability = (next: string): void => {
         setCapability(next);
         setActions(core.grantActions(subject, next, []));
     };
-    // A grant that allows nothing is a "no" that looks like a "yes".
     const noAction = reachable.length > 0 && !reachable.some((one) => actions.includes(one));
-    const actionLabel = (one: string) => t(`share.actions.${one}` as NamespaceKey<"components">);
-    // Who it goes to: a person, a team, a role - or, for what may be handed out
-    // that way, a link anybody can open with no account.
-    const [kind, setKind] = useState<core.GrantPrincipal | "link">(principals[0] ?? "user");
-    const [principalId, setPrincipalId] = useState("");
-    const [query, setQuery] = useState("");
-    const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
-    const [note, setNote] = useState("");
-    const [limited, setLimited] = useState(false);
-    const [startsAt, setStartsAt] = useState("");
-    const [endsAt, setEndsAt] = useState("");
-    // Check-in and check-out: the time on the first and the last day. Empty is
-    // the whole day, which is what a share without a stay means.
-    const [checkIn, setCheckIn] = useState("");
-    const [checkOut, setCheckOut] = useState("");
-    const [days, setDays] = useState(core.EVERY_DAY);
-    const [hours, setHours] = useState({ from: "", to: "" });
-    const [maxUses, setMaxUses] = useState("");
-    // Only near the place, and how near. Offered where an act happens at a
-    // place - a door, a UPS - and nowhere else.
-    const fenceable =
-        subject === "place.device" || subject === "place.ups" || subject === "place.room";
-    const linkable = core.isGrantLinkSubject(subject);
-    // What a link may carry here: a NAS, a server or a domain is only ever seen
-    // through one, whatever a person could be given.
-    const linkCapabilities: readonly string[] = linkable ? core.linkCapabilities(subject) : [];
-    const linkNarrower = linkable && linkCapabilities.length < capabilities.length;
-    const [nearby, setNearby] = useState(false);
-    const [nearbyMeters, setNearbyMeters] = useState("100");
-    const [located, setLocated] = useState<boolean | null>(null);
-    /** The key whose uses the log below is narrowed to, if any. */
-    const [logGrant, setLogGrant] = useState<GrantView | null>(null);
-    /** A link just made: shown once, since only its hash is kept. */
-    const [madeLink, setMadeLink] = useState<string | null>(null);
-    /** Who a link opens for, by address and region: the same Advanced section
-     *  every link in Polaris has. Its dates and uses are the grant's own. */
-    const [linkRules, setLinkRules] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
-
-    const load = useCallback(async () => {
-        const answer = await listGrantsAction(subject, subjectId);
-        if (answer.error) {
-            toast.show({ title: answer.error });
-            setGrants([]);
-            return;
-        }
-        setGrants(answer.grants ?? []);
-        setCandidates(answer.candidates ?? []);
-        setLocated(answer.located ?? null);
-    }, [subject, subjectId, toast]);
 
     useEffect(() => {
-        if (!open) return;
-        setGrants(null);
-        setMadeLink(null);
-        void load();
-    }, [open, load]);
-
-    // Looked up as they type, after a beat: a search on every keystroke is a
-    // query per letter, and the answer to "ma" is not worth the round trip.
-    useEffect(() => {
-        if (kind !== "user" || query.trim().length < 2) {
-            setPeople([]);
+        const term = query.trim();
+        if (term.length < 2) {
+            setFound([]);
+            setSearching(false);
             return;
         }
+        setSearching(true);
+        const mine = ++searchSeq.current;
         const timer = setTimeout(async () => {
-            const found = await findSharePeopleAction(subject, subjectId, query);
-            setPeople(found.people ?? []);
+            const answer = await findShareTargetsAction(subject, subjectId, term);
+            if (mine !== searchSeq.current) return;
+            setSearching(false);
+            setActive(0);
+            setFound(
+                (answer.targets ?? []).filter(
+                    (one) =>
+                        principals.includes(one.type) &&
+                        !staged.some((held) => held.type === one.type && held.id === one.id)
+                )
+            );
         }, 250);
         return () => clearTimeout(timer);
-    }, [kind, query, subject, subjectId]);
+    }, [query, subject, subjectId, principals, staged]);
 
-    const groups = useMemo(() => candidates.filter((one) => one.type === kind), [candidates, kind]);
-    const asLink = kind === "link";
-    /** Ready to send: somebody picked, or a link, which names nobody. */
-    const ready = asLink || Boolean(principalId);
-
-    const reset = (): void => {
-        setLinkRules(EMPTY_LINK_ADVANCED);
-        setPrincipalId("");
+    const stage = (target: ShareTarget): void => {
+        setStaged((held) => [...held, target]);
         setQuery("");
-        setPeople([]);
-        setNote("");
-        setLimited(false);
-        setStartsAt("");
-        setEndsAt("");
-        setCheckIn("");
-        setCheckOut("");
-        setDays(core.EVERY_DAY);
-        setHours({ from: "", to: "" });
-        setMaxUses("");
-        setNearby(false);
-        setNearbyMeters("100");
+        setFound([]);
+    };
+    const unstageAll = (): void => {
+        setStaged([]);
+        setLimits(EMPTY_LIMITS);
+        setMessage("");
+        setNotify(true);
+        pickCapability(capabilities[0] ?? "");
     };
 
-    /** What bounds the grant, the same for a person and for a link. */
-    const bounds = () => ({
-        capability,
-        actions: reachable.filter((one) => actions.includes(one)),
-        note,
-        nearbyMeters: fenceable && nearby ? Number(nearbyMeters) : null,
-        ...(limited
-            ? {
-                  // The picked day, in the reader's own zone, and the last
-                  // one lent whole: sent as a bare date these are both
-                  // midnight UTC, which begins a grant early and ends it a
-                  // day short.
-                  startsAt: (checkIn
-                      ? core.dayAt(startsAt, checkIn)
-                      : core.dayBegins(startsAt)
-                  )?.toISOString(),
-                  endsAt: (checkOut
-                      ? core.dayAt(endsAt, checkOut)
-                      : core.dayEnds(endsAt)
-                  )?.toISOString(),
-                  days,
-                  startMinute: core.clockMinute(hours.from),
-                  endMinute: core.clockMinute(hours.to),
-                  maxUses: maxUses ? Number(maxUses) : null
-              }
-            : {})
-    });
-    const metres = Number(nearbyMeters);
-    const badFence =
-        fenceable &&
-        nearby &&
-        (!Number.isInteger(metres) || metres < core.NEARBY_MIN_M || metres > core.NEARBY_MAX_M);
-
-    const makeLink = async (): Promise<void> => {
-        if (noAction || badFence) return;
+    const share = async (): Promise<void> => {
+        if (staged.length === 0 || noAction || badFence(subject, limits)) return;
         setBusy(true);
-        const answer = await shareLinkAction(subject, subjectId, {
-            ...bounds(),
-            ...linkAddressRules(linkRules)
+        const answer = await shareManyAction(subject, subjectId, {
+            targets: staged.map((one) => ({ principalType: one.type, principalId: one.id })),
+            grant: {
+                capability,
+                actions: reachable.filter((one) => actions.includes(one)),
+                ...boundsOf(subject, limits)
+            },
+            notify,
+            message
         });
         setBusy(false);
-        if (answer.error || !answer.link) {
-            toast.show({ title: answer.error ?? t("share.needAction") });
+        if (answer.error) {
+            toast.show({ title: answer.error });
             return;
         }
-        setGrants(answer.grants ?? []);
-        setMadeLink(answer.link);
-        reset();
+        unstageAll();
+        toast.show({ title: t("share.shared") });
+        void loadPeople(filter, null);
     };
 
-    const copyLink = async (): Promise<void> => {
-        if (!madeLink) return;
-        try {
-            await navigator.clipboard.writeText(madeLink);
-            toast.show({ title: t("share.copied") });
-        } catch {
-            // A browser that refuses the clipboard still shows the link,
-            // selected, for copying by hand.
+    // --- A row's role, limits and removal: optimistic, rolled back -------------
+    const [editing, setEditing] = useState<{ grant: GrantView; value: LimitsValue } | null>(null);
+
+    const replaceRow = (list: GrantView[] | null, next: GrantView) =>
+        (list ?? []).map((one) => (one.id === next.id ? next : one));
+
+    const changeRole = async (grant: GrantView, next: string): Promise<void> => {
+        if (next === grant.capability) return;
+        const isLink = grant.principalType === core.LINK_PRINCIPAL;
+        const before = isLink ? links : rows;
+        const changed = { ...grant, capability: next, actions: [] };
+        (isLink ? setLinks : setRows)((held) => replaceRow(held, changed));
+        const answer = await updateShareAction(subject, subjectId, grant.id, {
+            capability: next,
+            actions: [],
+            note: grant.note,
+            timeZone: grant.schedule.timeZone,
+            ...boundsOf(subject, limitsOf(grant))
+        });
+        if (answer.error) {
+            (isLink ? setLinks : setRows)(before);
+            toast.show({ title: answer.error });
+            return;
         }
+        toast.show({ title: t("share.changed") });
+    };
+
+    const saveLimits = async (): Promise<void> => {
+        if (!editing || badFence(subject, editing.value)) return;
+        const { grant, value } = editing;
+        setBusy(true);
+        const answer = await updateShareAction(subject, subjectId, grant.id, {
+            capability: grant.capability,
+            actions: grant.actions,
+            note: grant.note,
+            timeZone: grant.schedule.timeZone,
+            ...boundsOf(subject, value)
+        });
+        setBusy(false);
+        if (answer.error) {
+            toast.show({ title: answer.error });
+            return;
+        }
+        setEditing(null);
+        toast.show({ title: t("share.changed") });
+        void (grant.principalType === core.LINK_PRINCIPAL ? loadLinks() : loadPeople(filter, null));
     };
 
     /** Who a grant is to, in words: a link has nobody, so it is called one. */
     const who = (grant: GrantView): string =>
-        grant.principalType === "link" ? t("share.linkName") : grant.principalName;
+        grant.principalType === core.LINK_PRINCIPAL ? t("share.linkName") : grant.principalName;
 
-    const add = async (): Promise<void> => {
-        if (kind === "link") return makeLink();
-        if (!principalId || noAction || badFence) return;
-        setBusy(true);
-        const answer = await shareAction(subject, subjectId, {
-            principalType: kind,
-            principalId,
-            ...bounds()
-        });
-        setBusy(false);
-        if (answer.error) {
-            toast.show({ title: answer.error });
-            return;
-        }
-        setGrants(answer.grants ?? []);
-        reset();
-        toast.show({ title: t("share.shared") });
-    };
-
-    /**
-     * Taking somebody's access back.
-     *
-     * Asked first, because the bin icon sits on a row of people and the one
-     * above the one somebody meant is somebody who then cannot open the thing
-     * at all. The row goes on the answer to the question, not on the server's:
-     * a refusal puts it back and says why.
-     */
     const revoke = async (grant: GrantView): Promise<void> => {
         const sure = await confirm({
             title: t("share.stopTitle", { name: who(grant) }),
@@ -342,610 +357,714 @@ export function ShareDialog({
             danger: true
         });
         if (!sure) return;
-        const before = grants;
-        setGrants((held) => (held ?? []).filter((one) => one.id !== grant.id));
+        const isLink = grant.principalType === core.LINK_PRINCIPAL;
+        const before = isLink ? links : rows;
+        const beforeTotal = total;
+        (isLink ? setLinks : setRows)((held) => (held ?? []).filter((one) => one.id !== grant.id));
+        if (!isLink) setTotal((count) => Math.max(0, count - 1));
         const answer = await revokeShareAction(subject, subjectId, grant.id);
         if (answer.error) {
-            setGrants(before);
+            (isLink ? setLinks : setRows)(before);
+            setTotal(beforeTotal);
             toast.show({ title: answer.error });
             return;
         }
-        setGrants(answer.grants ?? []);
         toast.show({ title: t("share.takenBack") });
     };
 
+    const roleMenu = (grant: GrantView) => {
+        const isLink = grant.principalType === core.LINK_PRINCIPAL;
+        const ladder = isLink ? linkCapabilities : capabilities;
+        return (
+            <Select
+                aria-label={t("share.roleOf", { name: who(grant) })}
+                className="w-auto shrink-0"
+                value={grant.capability}
+                onValueChange={(next) => {
+                    if (next === LIMITS) setEditing({ grant, value: limitsOf(grant) });
+                    else if (next === REMOVE) void revoke(grant);
+                    else void changeRole(grant, next);
+                }}
+                options={[
+                    ...ladder.map((one) => ({ value: one, label: capabilityLabel(one) })),
+                    ...(bounded ? [{ value: LIMITS, label: t("share.limits") }] : []),
+                    { value: REMOVE, label: t("share.removeAccess") }
+                ]}
+            />
+        );
+    };
+
+    // --- Virtualized list ----------------------------------------------------------
+    const scroller = useRef<HTMLDivElement>(null);
+    const people = rows ?? [];
+    const virtualizer = useVirtualizer({
+        count: people.length,
+        getScrollElement: () => scroller.current,
+        estimateSize: () => ROW_HEIGHT,
+        overscan: 6,
+        initialRect: { width: 480, height: ROW_HEIGHT * 5 }
+    });
+    const items = virtualizer.getVirtualItems();
+    const lastIndex = items[items.length - 1]?.index ?? -1;
+    useEffect(() => {
+        if (cursor && !paging && lastIndex >= people.length - 5) void loadPeople(filter, cursor);
+    }, [cursor, paging, lastIndex, people.length, filter, loadPeople]);
+
+    // --- Links ------------------------------------------------------------------------
+    const [draftAudience, setDraftAudience] = useState<core.LinkAudience | null>(null);
+    const [linkCapability, setLinkCapability] = useState(linkCapabilities[0] ?? "");
+    const [linkRules, setLinkRules] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
+    const [madeLink, setMadeLink] = useState<string | null>(null);
+    const audiences: core.LinkAudience[] = [
+        "restricted",
+        ...(setup?.org ? (["org"] as const) : []),
+        "anyone"
+    ];
+    const audienceOption = (one: core.LinkAudience) => {
+        const Icon = AUDIENCE_ICON[one];
+        return {
+            value: one,
+            icon: <Icon className="size-4 shrink-0" aria-hidden />,
+            label: t(`share.audiences.${one}.label`, { org: setup?.org?.name ?? "" })
+        };
+    };
+
+    const makeLink = async (): Promise<void> => {
+        if (!draftAudience) return;
+        setBusy(true);
+        const answer = await shareLinkAction(subject, subjectId, {
+            capability: linkCapability,
+            actions: core.grantActions(subject, linkCapability, []),
+            audience: draftAudience,
+            ...(linkRules.expiresAt ? { endsAt: new Date(linkRules.expiresAt).toISOString() } : {}),
+            ...(linkRules.maxUses ? { maxUses: Number(linkRules.maxUses) } : {}),
+            ...linkAddressRules(linkRules)
+        });
+        setBusy(false);
+        if (answer.error || !answer.link) {
+            toast.show({ title: answer.error ?? t("share.needAction") });
+            return;
+        }
+        setMadeLink(answer.link);
+        setDraftAudience(null);
+        setLinkRules(EMPTY_LINK_ADVANCED);
+        void loadLinks();
+    };
+
+    const changeAudience = async (grant: GrantView, next: core.LinkAudience): Promise<void> => {
+        if (next === grant.audience) return;
+        const before = links;
+        setLinks((held) => replaceRow(held, { ...grant, audience: next }));
+        const answer = await setLinkAudienceAction(subject, subjectId, grant.id, next);
+        if (answer.error) {
+            setLinks(before);
+            toast.show({ title: answer.error });
+        }
+    };
+
+    const copy = async (text: string): Promise<void> => {
+        try {
+            await navigator.clipboard.writeText(text);
+            toast.show({ title: t("share.copied") });
+        } catch {
+            // A browser that refuses the clipboard still shows the link.
+        }
+    };
+
+    const describe = (grant: GrantView) => describeGrant(grant, weekOrder, t, dayNames);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            {/* Wider than the default, and deliberately: the form is two columns
-                of times on a laptop and one on a phone, and at the default width
-                it is one column of fourteen rows. */}
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>{t("share.title", { name })}</DialogTitle>
-                    <DialogDescription>
+                    <DialogTitle className="min-w-0 truncate" title={name}>
+                        {t("share.title", { name })}
+                    </DialogTitle>
+                    <DialogDescription className="sr-only">
                         {bounded ? t("share.introBounded") : t("share.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
-                <section className="flex flex-col gap-2" aria-label={t("share.already")}>
-                    {grants === null ? (
-                        <>
-                            <Skeleton className="h-12 w-full" />
-                            <Skeleton className="h-12 w-full" />
-                        </>
-                    ) : grants.length === 0 ? (
-                        <p className="text-[13px] text-muted-foreground">{t("share.none")}</p>
-                    ) : (
-                        <ul className="flex flex-col gap-1">
-                            {grants.map((grant) => (
-                                <li
-                                    key={grant.id}
-                                    className="flex items-start gap-2 rounded-lg border border-border px-3 py-2"
-                                >
-                                    <span className="mt-0.5 text-foreground-subtle">
-                                        {grant.principalType === "link" ? (
-                                            <Link2 className="size-4 shrink-0" aria-hidden />
-                                        ) : grant.principalType === "user" ? (
-                                            <UserRound className="size-4 shrink-0" aria-hidden />
-                                        ) : (
-                                            <Users className="size-4 shrink-0" aria-hidden />
-                                        )}
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="flex flex-wrap items-center gap-2 text-[13px] text-foreground">
-                                            <span className="truncate font-medium">
-                                                {who(grant)}
-                                            </span>
-                                            {grant.orgName ? (
-                                                <span className="text-foreground-subtle">
-                                                    {grant.orgName}
-                                                </span>
-                                            ) : null}
-                                            <Badge variant={STANDING_TONE[grant.standing]}>
-                                                {t(`share.standings.${grant.standing}`)}
-                                            </Badge>
-                                        </p>
-                                        <p className="text-[12px] text-muted-foreground">
-                                            {capabilityLabel(grant.capability)}
-                                            {grant.actions.length > 0 &&
-                                            grant.actions.length <
-                                                core.grantActions(subject, grant.capability, [])
-                                                    .length
-                                                ? ` (${grant.actions.map(actionLabel).join(", ")})`
-                                                : null}
-                                            {describe(grant, weekOrder, t, dayNames) ? (
-                                                <> - {describe(grant, weekOrder, t, dayNames)}</>
-                                            ) : null}
-                                        </p>
-                                        {grant.note ? (
-                                            <p className="truncate text-[12px] text-foreground-subtle">
-                                                {grant.note}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                    {bounded ? (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            aria-label={t("share.log.ofKey", { name: who(grant) })}
-                                            title={t("share.log.ofKey", { name: who(grant) })}
-                                            aria-pressed={logGrant?.id === grant.id}
-                                            onClick={() =>
-                                                setLogGrant((now) =>
-                                                    now?.id === grant.id ? null : grant
-                                                )
-                                            }
-                                        >
-                                            <History className="size-4 shrink-0" aria-hidden />
-                                        </Button>
-                                    ) : null}
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        aria-label={t("share.stopNamed", { name: who(grant) })}
-                                        title={t("share.stopNamed", { name: who(grant) })}
-                                        onClick={() => void revoke(grant)}
-                                    >
-                                        <Trash2 className="size-4 shrink-0" aria-hidden />
-                                    </Button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
-
-                {madeLink ? (
-                    <div
-                        role="status"
-                        className="flex min-w-0 flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3"
-                    >
-                        <p className="text-[12px] text-muted-foreground">{t("share.linkMade")}</p>
-                        <div className="flex min-w-0 items-center gap-2">
-                            <Input
-                                readOnly
-                                value={madeLink}
-                                aria-label={t("share.linkName")}
-                                onFocus={(event) => event.target.select()}
-                                className="min-w-0 flex-1"
-                            />
+                {history ? (
+                    <div className="flex min-w-0 flex-col gap-3">
+                        <Button
+                            variant="ghost"
+                            className="self-start"
+                            onClick={() => {
+                                setHistory(false);
+                                setLogGrant(null);
+                            }}
+                        >
+                            <ArrowLeft className="size-4 shrink-0" aria-hidden />
+                            {t("share.back")}
+                        </Button>
+                        <AccessLog
+                            subject={subject}
+                            subjectId={subjectId}
+                            grantId={logGrant?.id ?? null}
+                            grantLabel={logGrant ? who(logGrant) : ""}
+                            onClearGrant={() => setLogGrant(null)}
+                        />
+                    </div>
+                ) : editing ? (
+                    <section className="flex min-w-0 flex-col gap-3" aria-label={t("share.limitsOf", { name: who(editing.grant) })}>
+                        <p className="truncate text-[13px] font-medium text-foreground">
+                            {t("share.limitsOf", { name: who(editing.grant) })}
+                        </p>
+                        <LimitsFields
+                            subject={subject}
+                            bounded={bounded}
+                            value={{ ...editing.value, limited: true }}
+                            onChange={(value) => setEditing({ ...editing, value })}
+                            located={setup?.located ?? null}
+                            idPrefix="share-edit"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setEditing(null)}>
+                                {t("share.cancel")}
+                            </Button>
                             <Button
-                                size="icon"
-                                variant="outline"
-                                aria-label={t("share.copyLink")}
-                                title={t("share.copyLink")}
-                                onClick={() => void copyLink()}
+                                disabled={busy || badFence(subject, editing.value)}
+                                onClick={() => void saveLimits()}
                             >
-                                <Copy className="size-4 shrink-0" aria-hidden />
+                                {busy ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : null}
+                                {t("share.save")}
                             </Button>
                         </div>
-                    </div>
-                ) : null}
-
-                <section
-                    className="flex flex-col gap-3 border-t border-border pt-4"
-                    aria-label={t("share.more")}
-                >
-                    <SegmentedControl
-                        aria-label={t("share.who")}
-                        size="sm"
-                        value={kind}
-                        onValueChange={(next) => {
-                            setKind(next);
-                            setPrincipalId("");
-                            if (next === "link" && !linkCapabilities.includes(capability)) {
-                                pickCapability(linkCapabilities[0] ?? capability);
-                            }
-                        }}
-                        options={[
-                            ...[
-                                { value: "user" as const, label: t("share.person") },
-                                {
-                                    value: "team" as const,
-                                    label: t("share.team"),
-                                    disabled: !candidates.some((one) => one.type === "team"),
-                                    title: t("share.teamHint")
-                                },
-                                {
-                                    value: "role" as const,
-                                    label: t("share.role"),
-                                    disabled: !candidates.some((one) => one.type === "role"),
-                                    title: t("share.roleHint")
-                                }
-                            ].filter((option) => principals.includes(option.value)),
-                            ...(linkable
-                                ? [
-                                      {
-                                          value: "link" as const,
-                                          label: t("share.linkChoice"),
-                                          title: t("share.linkHint")
-                                      }
-                                  ]
-                                : [])
-                        ]}
-                    />
-
-                    {asLink ? (
-                        <p className="flex items-start gap-2 text-[12px] text-foreground-subtle">
-                            <Link2 className="mt-0.5 size-4 shrink-0" aria-hidden />
-                            {t("share.linkHint")}
-                        </p>
-                    ) : kind === "user" ? (
-                        <div className="flex flex-col gap-1">
-                            <label
-                                className="text-[12px] text-muted-foreground"
-                                htmlFor="share-who"
-                            >
-                                {t("share.search")}
+                    </section>
+                ) : (
+                    <>
+                        {/* The one box: anybody this may go to, in one ranked list. */}
+                        <div className="relative flex min-w-0 flex-col gap-2">
+                            <label className="sr-only" htmlFor="share-add">
+                                {t("share.addLabel")}
                             </label>
-                            <div className="relative">
-                                <Search
-                                    className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-foreground-subtle"
-                                    aria-hidden
-                                />
-                                <Input
-                                    id="share-who"
-                                    className="pl-8"
+                            <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 focus-within:ring-2 focus-within:ring-primary/40">
+                                {staged.map((one) => (
+                                    <span
+                                        key={`${one.type}:${one.id}`}
+                                        className="flex min-w-0 max-w-full items-center gap-1 rounded-full bg-surface-hover py-0.5 pl-1 pr-1.5 text-[12px] text-foreground"
+                                    >
+                                        <TargetFace target={one} size={18} />
+                                        <span className="min-w-0 truncate" title={one.name}>
+                                            {one.name}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            aria-label={t("share.unstage", { name: one.name })}
+                                            title={t("share.unstage", { name: one.name })}
+                                            onClick={() =>
+                                                setStaged((held) => held.filter((x) => x !== one))
+                                            }
+                                            className="rounded-full p-0.5 hover:bg-surface"
+                                        >
+                                            <X className="size-3 shrink-0" aria-hidden />
+                                        </button>
+                                    </span>
+                                ))}
+                                <input
+                                    id="share-add"
+                                    role="combobox"
+                                    aria-expanded={found.length > 0}
+                                    aria-controls="share-add-list"
+                                    aria-autocomplete="list"
+                                    aria-activedescendant={
+                                        found[active] ? `share-add-${active}` : undefined
+                                    }
+                                    autoComplete="off"
+                                    className="min-w-[8rem] flex-1 bg-transparent py-1 text-[13px] text-foreground outline-none placeholder:text-foreground-subtle"
+                                    placeholder={staged.length ? "" : t("share.addPlaceholder")}
                                     value={query}
-                                    placeholder={t("share.searchPlaceholder")}
                                     onChange={(event) => setQuery(event.target.value)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "ArrowDown" && found.length) {
+                                            event.preventDefault();
+                                            setActive((at) => (at + 1) % found.length);
+                                        } else if (event.key === "ArrowUp" && found.length) {
+                                            event.preventDefault();
+                                            setActive((at) => (at - 1 + found.length) % found.length);
+                                        } else if (event.key === "Enter" && found[active]) {
+                                            event.preventDefault();
+                                            stage(found[active]);
+                                        } else if (event.key === "Escape" && found.length) {
+                                            event.stopPropagation();
+                                            setFound([]);
+                                        } else if (
+                                            event.key === "Backspace" &&
+                                            !query &&
+                                            staged.length
+                                        ) {
+                                            setStaged((held) => held.slice(0, -1));
+                                        }
+                                    }}
                                 />
+                                {searching ? (
+                                    <Loader2
+                                        className="size-4 shrink-0 animate-spin text-foreground-subtle"
+                                        aria-label={t("share.searching")}
+                                    />
+                                ) : null}
                             </div>
-                            {people.length > 0 ? (
-                                <ul className="flex flex-col gap-0.5">
-                                    {people.map((person) => (
-                                        <li key={person.id}>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setPrincipalId(person.id);
-                                                    setQuery(person.name);
-                                                    setPeople([]);
-                                                }}
-                                                className={cn(
-                                                    "w-full rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-surface-hover",
-                                                    principalId === person.id && "bg-surface-hover"
-                                                )}
-                                            >
-                                                {person.name}
-                                            </button>
+                            {found.length > 0 ? (
+                                <ul
+                                    id="share-add-list"
+                                    role="listbox"
+                                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-surface-raised p-1 shadow-lg"
+                                >
+                                    {found.map((one, index) => (
+                                        <li
+                                            key={`${one.type}:${one.id}`}
+                                            id={`share-add-${index}`}
+                                            role="option"
+                                            aria-selected={index === active}
+                                            onMouseDown={(event) => event.preventDefault()}
+                                            onClick={() => stage(one)}
+                                            onMouseEnter={() => setActive(index)}
+                                            className={cn(
+                                                "flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1.5",
+                                                index === active && "bg-surface-hover"
+                                            )}
+                                        >
+                                            <TargetFace target={one} size={24} />
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block truncate text-[13px] text-foreground">
+                                                    {one.name}
+                                                </span>
+                                                {one.detail ? (
+                                                    <span className="block truncate text-[12px] text-muted-foreground">
+                                                        {one.detail}
+                                                    </span>
+                                                ) : null}
+                                            </span>
+                                            <span className="shrink-0 text-[11px] text-foreground-subtle">
+                                                {t(`share.kinds.${one.type}`)}
+                                            </span>
                                         </li>
                                     ))}
                                 </ul>
+                            ) : query.trim().length >= 2 && !searching ? (
+                                <p className="text-[12px] text-muted-foreground">{t("share.noMatch")}</p>
                             ) : null}
                         </div>
-                    ) : (
-                        <Select
-                            aria-label={
-                                kind === "team" ? t("share.whichTeam") : t("share.whichRole")
-                            }
-                            value={principalId}
-                            onValueChange={setPrincipalId}
-                            placeholder={
-                                kind === "team" ? t("share.pickTeam") : t("share.pickRole")
-                            }
-                            options={groups.map((one) => ({
-                                value: one.id,
-                                label: one.orgName ? `${one.orgName} - ${one.name}` : one.name
-                            }))}
-                        />
-                    )}
 
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[12px] text-muted-foreground" htmlFor="share-what">
-                            {t("share.can")}
-                        </label>
-                        <Select
-                            id="share-what"
-                            aria-label={t("share.can")}
-                            value={capability}
-                            onValueChange={pickCapability}
-                            options={capabilities.map((one) => ({
-                                value: one,
-                                label: capabilityLabel(one),
-                                disabled: asLink && !linkCapabilities.includes(one)
-                            }))}
-                        />
-                        <p className="text-[12px] text-foreground-subtle">
-                            {capabilityHint(capability)}
-                        </p>
-                        {asLink && linkNarrower ? (
-                            <p className="text-[12px] text-foreground-subtle">
-                                {t("share.linkSeeOnly")}
-                            </p>
-                        ) : null}
-                    </div>
-
-                    {reachable.length > 1 ? (
-                        <fieldset className="flex flex-col gap-1">
-                            <legend className="text-[12px] text-muted-foreground">
-                                {t("share.actionsLabel")}
-                            </legend>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1">
-                                {reachable.map((one) => (
-                                    <label
-                                        key={one}
-                                        className="flex items-center gap-2 text-[13px] text-foreground"
-                                    >
-                                        <Checkbox
-                                            checked={actions.includes(one)}
-                                            onChange={(event) =>
-                                                setActions((now) =>
-                                                    event.target.checked
-                                                        ? [...now, one]
-                                                        : now.filter((held) => held !== one)
-                                                )
-                                            }
-                                        />
-                                        {actionLabel(one)}
+                        {staged.length > 0 ? (
+                            <section className="flex min-w-0 flex-col gap-3" aria-label={t("share.more")}>
+                                <div className="flex min-w-0 flex-col gap-1">
+                                    <label className="text-[12px] text-muted-foreground" htmlFor="share-what">
+                                        {t("share.can")}
                                     </label>
-                                ))}
-                            </div>
-                        </fieldset>
-                    ) : null}
-
-                    {bounded ? (
-                        <div className="flex flex-col gap-3">
-                            <label className="flex items-center justify-between gap-2 text-[13px] text-foreground">
-                                <span className="flex items-center gap-2">
-                                    <CalendarClock
-                                        className="size-4 shrink-0 text-foreground-subtle"
-                                        aria-hidden
+                                    <Select
+                                        id="share-what"
+                                        aria-label={t("share.can")}
+                                        value={capability}
+                                        onValueChange={pickCapability}
+                                        options={capabilities.map((one) => ({
+                                            value: one,
+                                            label: capabilityLabel(one)
+                                        }))}
                                     />
-                                    {t("share.sometimes")}
-                                </span>
-                                <Switch
-                                    checked={limited}
-                                    onChange={setLimited}
-                                    aria-label={t("share.limit")}
-                                />
-                            </label>
-
-                            {limited ? (
-                                <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
-                                    <div className="grid gap-3 sm:grid-cols-2">
-                                        <Field label={t("share.fromDay")} htmlFor="share-from-day">
-                                            <Input
-                                                id="share-from-day"
-                                                type="date"
-                                                value={startsAt}
-                                                onChange={(event) =>
-                                                    setStartsAt(event.target.value)
-                                                }
-                                            />
-                                        </Field>
-                                        <Field label={t("share.toDay")} htmlFor="share-to-day">
-                                            <Input
-                                                id="share-to-day"
-                                                type="date"
-                                                value={endsAt}
-                                                onChange={(event) => setEndsAt(event.target.value)}
-                                            />
-                                        </Field>
-                                        <Field label={t("share.checkIn")} htmlFor="share-check-in">
-                                            <Input
-                                                id="share-check-in"
-                                                type="time"
-                                                value={checkIn}
-                                                disabled={!startsAt}
-                                                onChange={(event) => setCheckIn(event.target.value)}
-                                            />
-                                        </Field>
-                                        <Field
-                                            label={t("share.checkOut")}
-                                            htmlFor="share-check-out"
-                                        >
-                                            <Input
-                                                id="share-check-out"
-                                                type="time"
-                                                value={checkOut}
-                                                disabled={!endsAt}
-                                                onChange={(event) =>
-                                                    setCheckOut(event.target.value)
-                                                }
-                                            />
-                                        </Field>
-                                    </div>
-
+                                </div>
+                                {reachable.length > 1 ? (
                                     <fieldset className="flex flex-col gap-1">
                                         <legend className="text-[12px] text-muted-foreground">
-                                            {t("share.days")}
+                                            {t("share.actionsLabel")}
                                         </legend>
-                                        <div className="flex flex-wrap gap-1">
-                                            {weekOrder.map((day: number) => {
-                                                const on = core.runsOnDay(days, day);
-                                                return (
-                                                    <button
-                                                        key={day}
-                                                        type="button"
-                                                        aria-pressed={on}
-                                                        onClick={() =>
-                                                            setDays(core.toggleDay(days, day))
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                            {reachable.map((one) => (
+                                                <label key={one} className="flex items-center gap-2 text-[13px] text-foreground">
+                                                    <Checkbox
+                                                        checked={actions.includes(one)}
+                                                        onChange={(event) =>
+                                                            setActions((now) =>
+                                                                event.target.checked
+                                                                    ? [...now, one]
+                                                                    : now.filter((held) => held !== one)
+                                                            )
                                                         }
-                                                        className={cn(
-                                                            "rounded-md border px-2 py-1 text-[12px]",
-                                                            on
-                                                                ? "border-primary bg-primary/10 text-foreground"
-                                                                : "border-border text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        {dayNames[day]}
-                                                    </button>
-                                                );
-                                            })}
+                                                    />
+                                                    {actionLabel(one)}
+                                                </label>
+                                            ))}
                                         </div>
                                     </fieldset>
-
-                                    <div className="grid gap-3 sm:grid-cols-2">
-                                        <Field
-                                            label={t("share.fromHour")}
-                                            htmlFor="share-from-hour"
-                                        >
-                                            <Input
-                                                id="share-from-hour"
-                                                type="time"
-                                                value={hours.from}
-                                                onChange={(event) =>
-                                                    setHours({ ...hours, from: event.target.value })
-                                                }
-                                            />
-                                        </Field>
-                                        <Field label={t("share.toHour")} htmlFor="share-to-hour">
-                                            <Input
-                                                id="share-to-hour"
-                                                type="time"
-                                                value={hours.to}
-                                                onChange={(event) =>
-                                                    setHours({ ...hours, to: event.target.value })
-                                                }
-                                            />
-                                        </Field>
-                                    </div>
-
-                                    <Field label={t("share.uses")} htmlFor="share-uses">
-                                        <Input
-                                            id="share-uses"
-                                            type="number"
-                                            min={1}
-                                            inputMode="numeric"
-                                            placeholder={t("share.usesPlaceholder")}
-                                            value={maxUses}
-                                            onChange={(event) => setMaxUses(event.target.value)}
-                                        />
-                                    </Field>
-                                    <p className="text-[12px] text-foreground-subtle">
-                                        {t("share.usesHint")}
-                                    </p>
-                                </div>
-                            ) : null}
-                        </div>
-                    ) : null}
-
-                    {fenceable ? (
-                        <div className="flex flex-col gap-2">
-                            <label className="flex items-center justify-between gap-2 text-[13px] text-foreground">
-                                <span className="flex items-center gap-2">
-                                    <MapPin
-                                        className="size-4 shrink-0 text-foreground-subtle"
-                                        aria-hidden
-                                    />
-                                    {t("share.nearbyLabel")}
-                                </span>
-                                <Switch
-                                    checked={nearby}
-                                    onChange={setNearby}
-                                    aria-label={t("share.nearbyLabel")}
+                                ) : null}
+                                <LimitsFields
+                                    subject={subject}
+                                    bounded={bounded}
+                                    value={limits}
+                                    onChange={setLimits}
+                                    located={setup?.located ?? null}
+                                    idPrefix="share"
                                 />
-                            </label>
-                            {nearby ? (
-                                <>
-                                    <Field label={t("share.nearbyMeters")} htmlFor="share-nearby">
-                                        <Input
-                                            id="share-nearby"
-                                            type="number"
-                                            min={core.NEARBY_MIN_M}
-                                            max={core.NEARBY_MAX_M}
-                                            step={25}
-                                            inputMode="numeric"
-                                            value={nearbyMeters}
-                                            aria-invalid={badFence || undefined}
-                                            onChange={(event) =>
-                                                setNearbyMeters(event.target.value)
-                                            }
-                                        />
-                                    </Field>
-                                    <p className="text-[12px] text-foreground-subtle">
-                                        {t("share.nearbyHint")}
-                                    </p>
-                                    {located === false ? (
+                                {staged.some((one) => one.type === "user") ? (
+                                    <>
+                                        <label className="flex items-center gap-2 text-[13px] text-foreground">
+                                            <Checkbox
+                                                checked={notify}
+                                                onChange={(event) => setNotify(event.target.checked)}
+                                            />
+                                            {t("share.notify")}
+                                        </label>
+                                        {notify ? (
+                                            <Textarea
+                                                aria-label={t("share.message")}
+                                                placeholder={t("share.messagePlaceholder")}
+                                                value={message}
+                                                maxLength={500}
+                                                rows={2}
+                                                onChange={(event) => setMessage(event.target.value)}
+                                            />
+                                        ) : null}
+                                    </>
+                                ) : null}
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" onClick={unstageAll}>
+                                        {t("share.cancel")}
+                                    </Button>
+                                    <Button
+                                        disabled={busy || noAction || badFence(subject, limits)}
+                                        aria-disabled={busy || noAction || badFence(subject, limits)}
+                                        onClick={() => void share()}
+                                    >
+                                        {busy ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : null}
+                                        {t("share.share")}
+                                    </Button>
+                                </div>
+                            </section>
+                        ) : (
+                            <>
+                                <section className="flex min-w-0 flex-col gap-2" aria-label={t("share.peopleWithAccess")}>
+                                    <div className="flex min-w-0 items-center justify-between gap-2">
+                                        <h3 className="truncate text-[13px] font-medium text-foreground">
+                                            {t("share.peopleWithAccess")}
+                                        </h3>
+                                        {rows !== null ? (
+                                            <span className="shrink-0 text-[12px] text-muted-foreground">
+                                                {t("share.peopleCount", { count: total })}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    {total > 5 || filter ? (
+                                        <div className="relative">
+                                            <Search
+                                                className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-foreground-subtle"
+                                                aria-hidden
+                                            />
+                                            <Input
+                                                className="pl-8"
+                                                aria-label={t("share.searchAccess")}
+                                                placeholder={t("share.searchAccess")}
+                                                value={filter}
+                                                onChange={(event) => setFilter(event.target.value)}
+                                            />
+                                        </div>
+                                    ) : null}
+                                    {setup ? (
+                                        <div className="flex min-w-0 items-center gap-3 px-1 py-1">
+                                            <Avatar person={{ id: setup.viewer.id, name: setup.viewer.name }} size={32} status={false} />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-[13px] text-foreground">
+                                                    {t("share.you", { name: setup.viewer.name })}
+                                                </p>
+                                                <p className="truncate text-[12px] text-muted-foreground">
+                                                    {setup.viewer.email}
+                                                </p>
+                                            </div>
+                                            <span className="shrink-0 text-[12px] text-muted-foreground">
+                                                {t("share.youCan")}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <Skeleton className="h-10 w-full" />
+                                    )}
+                                    {rows === null ? (
+                                        <>
+                                            <Skeleton className="h-12 w-full" />
+                                            <Skeleton className="h-12 w-full" />
+                                        </>
+                                    ) : people.length === 0 ? (
+                                        <p className="px-1 text-[13px] text-muted-foreground">
+                                            {filter ? t("share.nobodyMatches") : t("share.none")}
+                                        </p>
+                                    ) : (
+                                        <div
+                                            ref={scroller}
+                                            className="max-h-72 min-w-0 overflow-y-auto"
+                                            role="list"
+                                        >
+                                            <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+                                                {items.map((item) => {
+                                                    const grant = people[item.index];
+                                                    if (!grant) return null;
+                                                    const line = describe(grant);
+                                                    return (
+                                                        <div
+                                                            key={grant.id}
+                                                            role="listitem"
+                                                            data-index={item.index}
+                                                            className="absolute left-0 right-0 flex min-w-0 items-center gap-3 px-1"
+                                                            style={{ top: item.start, height: ROW_HEIGHT }}
+                                                        >
+                                                            <PrincipalFace grant={grant} />
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="flex min-w-0 items-center gap-2 text-[13px] text-foreground">
+                                                                    <span className="min-w-0 truncate" title={who(grant)}>
+                                                                        {who(grant)}
+                                                                    </span>
+                                                                    {grant.standing !== "live" ? (
+                                                                        <Badge variant={STANDING_TONE[grant.standing]}>
+                                                                            {t(`share.standings.${grant.standing}`)}
+                                                                        </Badge>
+                                                                    ) : grant.schedule.endsAt ? (
+                                                                        <Badge variant="neutral">
+                                                                            {t("share.untilOnly", {
+                                                                                to: grant.schedule.endsAt.slice(0, 10)
+                                                                            })}
+                                                                        </Badge>
+                                                                    ) : null}
+                                                                </p>
+                                                                <p
+                                                                    className="truncate text-[12px] text-muted-foreground"
+                                                                    title={[grant.contact || grant.orgName, line].filter(Boolean).join(" - ")}
+                                                                >
+                                                                    {[grant.contact || grant.orgName, line].filter(Boolean).join(" - ")}
+                                                                </p>
+                                                            </div>
+                                                            {bounded ? (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label={t("share.log.ofKey", { name: who(grant) })}
+                                                                    title={t("share.log.ofKey", { name: who(grant) })}
+                                                                    onClick={() => {
+                                                                        setLogGrant(grant);
+                                                                        setHistory(true);
+                                                                    }}
+                                                                >
+                                                                    <History className="size-4 shrink-0" aria-hidden />
+                                                                </Button>
+                                                            ) : null}
+                                                            {roleMenu(grant)}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {pageFailed && rows !== null && rows.length > 0 ? (
                                         <p role="alert" className="text-[12px] text-danger-ink">
-                                            {t("share.nearbyNoPlace")}
+                                            {t("share.loadFailed")}
                                         </p>
                                     ) : null}
-                                </>
-                            ) : null}
-                        </div>
-                    ) : null}
+                                </section>
 
-                    <Field label={t("share.note")} htmlFor="share-note">
-                        <Input
-                            id="share-note"
-                            value={note}
-                            placeholder={t("share.notePlaceholder")}
-                            onChange={(event) => setNote(event.target.value)}
-                        />
-                    </Field>
+                                <section className="flex min-w-0 flex-col gap-2" aria-label={t("share.general")}>
+                                    <h3 className="text-[13px] font-medium text-foreground">{t("share.general")}</h3>
+                                    {links === null ? (
+                                        <Skeleton className="h-12 w-full" />
+                                    ) : (
+                                        <>
+                                            {links.map((grant) => {
+                                                const Icon = AUDIENCE_ICON[grant.audience];
+                                                const line = describe(grant);
+                                                return (
+                                                    <div key={grant.id} className="flex min-w-0 items-start gap-3 px-1 py-1">
+                                                        <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
+                                                            <Icon className="size-4 shrink-0" aria-hidden />
+                                                        </span>
+                                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                                            <Select
+                                                                aria-label={t("share.audienceOf")}
+                                                                className="w-full sm:w-auto"
+                                                                value={grant.audience}
+                                                                onValueChange={(next) =>
+                                                                    void changeAudience(grant, next as core.LinkAudience)
+                                                                }
+                                                                options={audiences.map(audienceOption)}
+                                                            />
+                                                            <p className="truncate text-[12px] text-muted-foreground" title={line}>
+                                                                {t(`share.audiences.${grant.audience}.hint`, { org: setup?.org?.name ?? "" })}
+                                                                {line ? ` - ${line}` : ""}
+                                                            </p>
+                                                            {grant.standing !== "live" ? (
+                                                                <Badge className="self-start" variant={STANDING_TONE[grant.standing]}>
+                                                                    {t(`share.standings.${grant.standing}`)}
+                                                                </Badge>
+                                                            ) : null}
+                                                        </div>
+                                                        {roleMenu(grant)}
+                                                    </div>
+                                                );
+                                            })}
+                                            {links.length === 0 && !draftAudience ? (
+                                                <div className="flex min-w-0 items-start gap-3 px-1 py-1">
+                                                    <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
+                                                        <Lock className="size-4 shrink-0" aria-hidden />
+                                                    </span>
+                                                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                                        {linkable ? (
+                                                            <Select
+                                                                aria-label={t("share.audienceOf")}
+                                                                className="w-full sm:w-auto"
+                                                                value="restricted"
+                                                                onValueChange={(next) =>
+                                                                    next !== "restricted" &&
+                                                                    setDraftAudience(next as core.LinkAudience)
+                                                                }
+                                                                options={audiences.map(audienceOption)}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-[13px] text-foreground">
+                                                                {t("share.audiences.restricted.label")}
+                                                            </p>
+                                                        )}
+                                                        <p className="text-[12px] text-muted-foreground">
+                                                            {linkable ? t("share.audiences.restricted.hint") : t("share.noLinks")}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {linkable && links.length > 0 && !draftAudience ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="self-start"
+                                                    onClick={() => setDraftAudience("anyone")}
+                                                >
+                                                    <Link2 className="size-4 shrink-0" aria-hidden />
+                                                    {t("share.anotherLink")}
+                                                </Button>
+                                            ) : null}
+                                            {draftAudience ? (
+                                                <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border p-3">
+                                                    <Select
+                                                        aria-label={t("share.audienceOf")}
+                                                        value={draftAudience}
+                                                        onValueChange={(next) => setDraftAudience(next as core.LinkAudience)}
+                                                        options={audiences.map(audienceOption)}
+                                                    />
+                                                    <p className="text-[12px] text-muted-foreground">
+                                                        {t(`share.audiences.${draftAudience}.hint`, { org: setup?.org?.name ?? "" })}
+                                                    </p>
+                                                    <Select
+                                                        aria-label={t("share.linkRole")}
+                                                        value={linkCapability}
+                                                        onValueChange={setLinkCapability}
+                                                        options={linkCapabilities.map((one) => ({
+                                                            value: one,
+                                                            label: capabilityLabel(one)
+                                                        }))}
+                                                    />
+                                                    {linkCapabilities.length < capabilities.length ? (
+                                                        <p className="text-[12px] text-foreground-subtle">{t("share.linkSeeOnly")}</p>
+                                                    ) : null}
+                                                    <LinkAdvancedFields
+                                                        value={linkRules}
+                                                        onChange={setLinkRules}
+                                                        omit={["password"]}
+                                                        idPrefix="share-link"
+                                                    />
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button variant="ghost" onClick={() => setDraftAudience(null)}>
+                                                            {t("share.cancel")}
+                                                        </Button>
+                                                        <Button disabled={busy} onClick={() => void makeLink()}>
+                                                            {busy ? (
+                                                                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                                            ) : (
+                                                                <Link2 className="size-4 shrink-0" aria-hidden />
+                                                            )}
+                                                            {t("share.makeLink")}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {madeLink ? (
+                                                <div role="status" className="flex min-w-0 flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                                                    <p className="text-[12px] text-muted-foreground">{t("share.linkMade")}</p>
+                                                    <div className="flex min-w-0 items-center gap-2">
+                                                        <Input
+                                                            readOnly
+                                                            value={madeLink}
+                                                            aria-label={t("share.linkName")}
+                                                            onFocus={(event) => event.target.select()}
+                                                            className="min-w-0 flex-1"
+                                                        />
+                                                        <Button
+                                                            size="icon"
+                                                            variant="outline"
+                                                            aria-label={t("share.copyLink")}
+                                                            title={t("share.copyLink")}
+                                                            onClick={() => void copy(madeLink)}
+                                                        >
+                                                            <Copy className="size-4 shrink-0" aria-hidden />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                        </>
+                                    )}
+                                </section>
+                                {extra}
+                            </>
+                        )}
+                    </>
+                )}
 
-                    {asLink ? (
-                        <LinkAdvancedFields
-                            value={linkRules}
-                            onChange={setLinkRules}
-                            omit={["password", "expiry", "uses"]}
-                            idPrefix="share-link"
-                        />
-                    ) : null}
-
-                    <div className="flex justify-end">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+                    <div className="flex min-w-0 items-center gap-2">
                         <Button
-                            disabled={busy || !ready || noAction || badFence}
-                            aria-disabled={busy || !ready || noAction || badFence}
-                            onClick={() => void add()}
+                            variant="outline"
+                            disabled={!setup?.url}
+                            title={t("share.copyHint")}
+                            onClick={() => setup?.url && void copy(setup.url)}
                         >
-                            {busy ? (
-                                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                            ) : asLink ? (
-                                <Link2 className="size-4 shrink-0" aria-hidden />
-                            ) : null}
-                            {asLink ? t("share.makeLink") : t("share.share")}
+                            <Link2 className="size-4 shrink-0" aria-hidden />
+                            {t("share.copyLink")}
                         </Button>
+                        {bounded && !history ? (
+                            <Button variant="ghost" onClick={() => setHistory(true)}>
+                                <History className="size-4 shrink-0" aria-hidden />
+                                {t("share.history")}
+                            </Button>
+                        ) : null}
                     </div>
-                </section>
-                {bounded && open ? (
-                    <AccessLog
-                        subject={subject}
-                        subjectId={subjectId}
-                        grantId={logGrant?.id ?? null}
-                        grantLabel={logGrant ? who(logGrant) : ""}
-                        onClearGrant={() => setLogGrant(null)}
-                    />
-                ) : null}
-                {extra}
+                    <Button onClick={() => onOpenChange(false)}>{t("share.done")}</Button>
+                </div>
                 {confirmDialog}
             </DialogContent>
         </Dialog>
     );
 }
 
-function Field({
-    label,
-    htmlFor,
-    children
-}: {
-    label: string;
-    htmlFor: string;
-    children: React.ReactNode;
-}) {
+/** A face for somebody found or staged: a person's avatar, a group's icon. */
+function TargetFace({ target, size }: { target: ShareTarget; size: number }) {
+    if (target.type === "user") {
+        return <Avatar person={{ id: target.id, name: target.name }} size={size} status={false} />;
+    }
+    const Icon = target.type === "team" ? Users : Shield;
     return (
-        <div className="flex flex-col gap-1">
-            <label className="text-[12px] text-muted-foreground" htmlFor={htmlFor}>
-                {label}
-            </label>
-            {children}
-        </div>
+        <span
+            className="flex shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle"
+            style={{ width: size, height: size }}
+        >
+            <Icon className="size-3.5 shrink-0" aria-hidden />
+        </span>
     );
 }
 
-/** The bounds of one grant in a line, or "" when it has none. Dates are drawn
- *  through the reader's own format, like every other date here. */
-function describe(
-    grant: GrantView,
-    weekOrder: readonly number[],
-    t: NamespaceTranslator<"components">,
-    dayNames: readonly string[]
-): string {
-    // `core.describeGrant`'s sentence, in the reader's words.
-    const schedule = grant.schedule;
-    // The day, and the time too when the bound is a check-in or a check-out
-    // rather than the whole day.
-    const day = (iso: string) => {
-        const at = new Date(iso);
-        const pad = (n: number) => String(n).padStart(2, "0");
-        const date = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
-        const clock = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
-        return clock === "00:00" || clock === "23:59" ? date : `${date} ${clock}`;
-    };
-    const parts: string[] = [];
-    if (schedule.startsAt && schedule.endsAt) {
-        parts.push(t("share.range", { from: day(schedule.startsAt), to: day(schedule.endsAt) }));
-    } else if (schedule.startsAt) {
-        parts.push(t("share.fromOnly", { from: day(schedule.startsAt) }));
-    } else if (schedule.endsAt) {
-        parts.push(t("share.untilOnly", { to: day(schedule.endsAt) }));
-    }
-    const mask = schedule.days & core.EVERY_DAY;
-    if (mask !== core.EVERY_DAY) {
-        parts.push(
-            mask === core.WEEKDAYS
-                ? t("share.weekdays")
-                : mask === core.WEEKEND
-                  ? t("share.weekends")
-                  : mask === 0
-                    ? t("share.noDays")
-                    : weekOrder
-                          .filter((one) => core.runsOnDay(mask, one))
-                          .map((one) => dayNames[one])
-                          .join(", ")
+/** A row's face: the person's avatar (upload, then Gravatar, then initials) or
+ *  the group's icon. */
+function PrincipalFace({ grant }: { grant: GrantView }) {
+    if (grant.principalType === "user") {
+        return (
+            <Avatar person={{ id: grant.principalId, name: grant.principalName }} size={32} status={false} lazy />
         );
     }
-    if (schedule.startMinute !== null && schedule.endMinute !== null) {
-        parts.push(
-            t("share.range", {
-                from: core.clockTime(schedule.startMinute),
-                to: core.clockTime(schedule.endMinute)
-            })
-        );
-    }
-    if (schedule.maxUses !== null) {
-        parts.push(t("share.usesOf", { uses: schedule.uses, max: schedule.maxUses }));
-    }
-    return parts.join(" - ");
+    const Icon = grant.principalType === "team" ? Users : Shield;
+    return (
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
+            <Icon className="size-4 shrink-0" aria-hidden />
+        </span>
+    );
 }
