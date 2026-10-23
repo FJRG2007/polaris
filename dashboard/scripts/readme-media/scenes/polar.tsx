@@ -11,7 +11,11 @@ export const polar = defineScene({
     id: "polar",
     path: "/polar",
     api: (ctx) => ({
-        "GET /api/polar/models": () => ({ providers: POLAR_PROVIDERS, isAdmin: true, spendsDeployment: true }),
+        "GET /api/polar/models": () => ({
+            providers: POLAR_PROVIDERS,
+            isAdmin: true,
+            spendsDeployment: true
+        }),
         "GET /api/polar/threads": () => ({ threads: polarThreads(ctx), pinned: [], projects: [] }),
         "GET /api/polar/threads/:id": () => ({ thread: polarThread(ctx) }),
         "GET /api/polar/feedback": () => ({ marks: {} }),

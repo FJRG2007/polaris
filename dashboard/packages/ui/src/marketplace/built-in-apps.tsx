@@ -79,11 +79,7 @@ export function ReplacedLogos({
             )}
         >
             {items.map((item) => (
-                <li
-                    key={item.name}
-                    title={item.name}
-                    className="flex min-w-0 items-center gap-1.5"
-                >
+                <li key={item.name} title={item.name} className="flex min-w-0 items-center gap-1.5">
                     {/* eslint-disable-next-line @next/next/no-img-element -- a static SVG tile */}
                     <img
                         src={item.src}

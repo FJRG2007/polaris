@@ -93,7 +93,6 @@ function localize(sections: site.ShowcaseSection[], locale: "en" | "es"): site.S
     }));
 }
 
-
 /**
  * The apps every Polaris comes with, named and described in the dashboard's own
  * words, with what each replaces and every capture that shows it.
@@ -309,7 +308,10 @@ async function guides(spanish: boolean): Promise<docs.DocPage[]> {
 const [docsEn, docsEs] = await Promise.all([guides(false), guides(true)]);
 
 const showcaseEn = localize(site.parseShowcase(readmeEn), "en");
-const showcaseEsLocal = localize(showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn), "es");
+const showcaseEsLocal = localize(
+    showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn),
+    "es"
+);
 
 const data: site.SiteData = {
     repo,

@@ -11,7 +11,14 @@ export const POLAR_PROVIDERS = [
         provider: "mistral",
         name: "Mistral",
         payers: ["instance"],
-        models: [{ provider: "mistral", model: "mistral-medium-2508", name: "Mistral Medium", reasoning: false }]
+        models: [
+            {
+                provider: "mistral",
+                model: "mistral-medium-2508",
+                name: "Mistral Medium",
+                reasoning: false
+            }
+        ]
     }
 ];
 
@@ -85,7 +92,12 @@ export function polarThread(ctx: SceneContext) {
         queue: [],
         choice: CHOICE,
         messages: [
-            { id: question, role: "user", parentId: null, parts: [{ type: "text", text: say(QUESTION) }] },
+            {
+                id: question,
+                role: "user",
+                parentId: null,
+                parts: [{ type: "text", text: say(QUESTION) }]
+            },
             {
                 id: id("polar-message", 2),
                 role: "assistant",

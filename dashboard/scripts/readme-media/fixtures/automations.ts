@@ -65,7 +65,10 @@ const DRAFTS: readonly Draft[] = [
     },
     {
         name: ["Weekly report", "Informe semanal"],
-        description: ["Sends Monday's numbers to the team.", "Envía las cifras del lunes al equipo."],
+        description: [
+            "Sends Monday's numbers to the team.",
+            "Envía las cifras del lunes al equipo."
+        ],
         mode: "single",
         ran: 60 * 24 * 2,
         status: "succeeded"

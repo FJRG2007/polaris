@@ -24,27 +24,39 @@ const OWN: readonly Draft[] = [
     {
         n: 1,
         title: ["Launch checklist", "Lista de lanzamiento"],
-        excerpt: ["Everything that has to be true by Thursday.", "Todo lo que tiene que estar listo el jueves."],
+        excerpt: [
+            "Everything that has to be true by Thursday.",
+            "Todo lo que tiene que estar listo el jueves."
+        ],
         minutes: 6,
         pinned: true
     },
     {
         n: 2,
         title: ["1:1 with Ana", "1:1 con Ana"],
-        excerpt: ["Hiring plan, the on-call rota, her trip in May.", "Plan de contratación, guardias, su viaje en mayo."],
+        excerpt: [
+            "Hiring plan, the on-call rota, her trip in May.",
+            "Plan de contratación, guardias, su viaje en mayo."
+        ],
         minutes: 95,
         parent: 1
     },
     {
         n: 3,
         title: ["Reading list", "Lista de lectura"],
-        excerpt: ["Three books and the two papers Sam sent.", "Tres libros y los dos artículos de Sam."],
+        excerpt: [
+            "Three books and the two papers Sam sent.",
+            "Tres libros y los dos artículos de Sam."
+        ],
         minutes: 60 * 26
     },
     {
         n: 4,
         title: ["Ideas", "Ideas"],
-        excerpt: ["A status page per customer, dark mode for mail.", "Una página de estado por cliente, modo oscuro."],
+        excerpt: [
+            "A status page per customer, dark mode for mail.",
+            "Una página de estado por cliente, modo oscuro."
+        ],
         minutes: 60 * 50
     }
 ];
@@ -53,21 +65,30 @@ const TEAM: readonly Draft[] = [
     {
         n: 11,
         title: ["Weekly sync", "Reunión semanal"],
-        excerpt: ["Agenda, decisions and who owns what.", "Orden del día, decisiones y responsables."],
+        excerpt: [
+            "Agenda, decisions and who owns what.",
+            "Orden del día, decisiones y responsables."
+        ],
         minutes: 60 * 3,
         folder: 1
     },
     {
         n: 12,
         title: ["Retro - March", "Retro - marzo"],
-        excerpt: ["What went well, what did not, what we change.", "Qué fue bien, qué no y qué cambiamos."],
+        excerpt: [
+            "What went well, what did not, what we change.",
+            "Qué fue bien, qué no y qué cambiamos."
+        ],
         minutes: 60 * 28,
         folder: 1
     },
     {
         n: 13,
         title: ["Onboarding", "Incorporación"],
-        excerpt: ["Accounts, laptops and the first week.", "Cuentas, portátiles y la primera semana."],
+        excerpt: [
+            "Accounts, laptops and the first week.",
+            "Cuentas, portátiles y la primera semana."
+        ],
         minutes: 60 * 72
     }
 ];

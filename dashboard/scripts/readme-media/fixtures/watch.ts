@@ -19,7 +19,10 @@ function spark(now: number, base: number, seed: number, climb = 0): SparkPoint[]
         // Noise in proportion to the load, so a quiet machine draws a calm line.
         const wave = (Math.sin((i + seed) * 0.9) * 0.1 + Math.cos((i * seed) % 7) * 0.05) * base;
         const rise = climb && i > POINTS - 8 ? ((i - (POINTS - 8)) / 8) * climb : 0;
-        return { t: now - (POINTS - 1 - i) * BUCKET, v: Math.max(1, Math.round(base + wave + rise)) };
+        return {
+            t: now - (POINTS - 1 - i) * BUCKET,
+            v: Math.max(1, Math.round(base + wave + rise))
+        };
     });
 }
 
@@ -33,7 +36,11 @@ interface Subject {
     readonly alarms?: number;
 }
 
-function cards(ctx: SceneContext, kind: WatchCard["kind"], subjects: readonly Subject[]): WatchCard[] {
+function cards(
+    ctx: SceneContext,
+    kind: WatchCard["kind"],
+    subjects: readonly Subject[]
+): WatchCard[] {
     return subjects.map((subject, n) => {
         const subjectId = id(`watch-${kind}`, n + 1);
         const line = spark(ctx.now, subject.cpu, n + 2, subject.climb);
@@ -63,7 +70,14 @@ export function watchServers(ctx: SceneContext): WatchCard[] {
             cpu: 22,
             mem: [9.4, 32]
         },
-        { name: "orion", detail: "deploy@192.0.2.24", cpu: 61, mem: [27.1, 64], climb: 18, alarms: 1 },
+        {
+            name: "orion",
+            detail: "deploy@192.0.2.24",
+            cpu: 61,
+            mem: [27.1, 64],
+            climb: 18,
+            alarms: 1
+        },
         { name: "vega", detail: "deploy@198.51.100.7", cpu: 9, mem: [2.2, 8] }
     ]);
 }

@@ -23,7 +23,8 @@ function Group({ kind, cards }: { kind: "servers" | "services"; cards: WatchCard
         <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-medium">
-                    {t(`overview.${kind}`)} <span className="text-muted-foreground">({cards.length})</span>
+                    {t(`overview.${kind}`)}{" "}
+                    <span className="text-muted-foreground">({cards.length})</span>
                 </h2>
                 <Link href={`/watch/${kind}`} className="text-xs text-primary hover:underline">
                     {cards.length > shown.length
