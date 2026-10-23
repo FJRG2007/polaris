@@ -576,8 +576,14 @@ async function sendOneCommand(
 ): Promise<string> {
     const argv = forThePlayersIn(install, given);
     assertSafeCommand(argv);
-    const command =
-        install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
+    // rcon-cli reads anything that starts with a dash as one of its own flags, so a
+    // negative coordinate (`tp Steve -555 23 252`) failed with "unknown shorthand
+    // flag" before it reached the game. `--` ends its flags; it is only added when
+    // an argument needs it, so every other command runs exactly as before.
+    const rcon = argv.some((argument) => argument.startsWith("-"))
+        ? ["rcon-cli", "--", ...argv]
+        : ["rcon-cli", ...argv];
+    const command = install.edition === "bedrock" ? ["send-command", ...argv] : rcon;
     const result = await inRconTurn(install.installedAppId, () =>
         withTimeout(
             ports.runIn(install.container, command),

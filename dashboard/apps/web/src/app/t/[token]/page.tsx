@@ -16,6 +16,7 @@ import Link from "next/link";
 import { LogIn } from "lucide-react";
 import * as core from "@polaris/core";
 import { getSession } from "@/lib/session";
+import { signInHref } from "@/lib/safe-redirect";
 import { getTranslations } from "@/lib/i18n/request";
 import { getPublicTask } from "@/lib/tasks/share-service";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
@@ -26,11 +27,14 @@ export const dynamic = "force-dynamic";
 function Shell({
     children,
     signedIn,
-    signInLabel
+    signInLabel,
+    back
 }: {
     children: React.ReactNode;
     signedIn: boolean;
     signInLabel: string;
+    /** This page, for the sign-in screen to return to. */
+    back: string;
 }) {
     return (
         <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-6">
@@ -42,7 +46,7 @@ function Shell({
                 </div>
                 {!signedIn && (
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/oauth/login">
+                        <Link href={signInHref(back)}>
                             <LogIn className="size-4" />
                             {signInLabel}
                         </Link>
@@ -80,24 +84,27 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
 
     if (!task) {
         return (
-            <Shell signedIn={signedIn} signInLabel={t("task.signIn")}>
+            <Shell signedIn={signedIn} signInLabel={t("task.signIn")} back={`/t/${token}`}>
                 <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("task.unavailableTitle")}</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {t("task.unavailable")}
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("task.unavailableTitle")}
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("task.unavailable")}</p>
                 </div>
             </Shell>
         );
     }
 
-    const showDate = (iso: string | null): string => (iso ? (task.timed ? format.dateTime(iso) : format.date(iso)) : "-");
+    const showDate = (iso: string | null): string =>
+        iso ? (task.timed ? format.dateTime(iso) : format.date(iso)) : "-";
 
     return (
-        <Shell signedIn={signedIn} signInLabel={t("task.signIn")}>
+        <Shell signedIn={signedIn} signInLabel={t("task.signIn")} back={`/t/${token}`}>
             <Card>
                 <CardHeader className="flex flex-col gap-1">
-                    <span className="font-mono text-xs text-muted-foreground">{task.reference}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                        {task.reference}
+                    </span>
                     <CardTitle className="text-xl">{task.name}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-6">
@@ -109,12 +116,16 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                     className="size-2.5 rounded-full"
                                     style={{ backgroundColor: task.statusColor }}
                                 />
-                                <span className={task.finished ? "text-muted-foreground" : undefined}>
+                                <span
+                                    className={task.finished ? "text-muted-foreground" : undefined}
+                                >
                                     {task.statusName}
                                 </span>
                             </span>
                         </Row>
-                        {task.assignees.length > 0 && <Row label={tp("props.assignees")}>{task.assignees.join(", ")}</Row>}
+                        {task.assignees.length > 0 && (
+                            <Row label={tp("props.assignees")}>{task.assignees.join(", ")}</Row>
+                        )}
                         {(task.startDate || task.dueDate) && (
                             <Row label={tp("props.dates")}>
                                 {showDate(task.startDate)} - {showDate(task.dueDate)}
@@ -127,7 +138,9 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                 </span>
                             </Row>
                         )}
-                        {task.points !== null && <Row label={tp("props.points")}>{task.points}</Row>}
+                        {task.points !== null && (
+                            <Row label={tp("props.points")}>{task.points}</Row>
+                        )}
                         {task.tags.length > 0 && (
                             <Row label={tp("props.tags")}>
                                 <span className="flex flex-wrap gap-1">
@@ -135,7 +148,10 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                         <Badge
                                             key={tag.name}
                                             className="border-transparent text-[0.6875rem]"
-                                            style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
+                                            style={{
+                                                backgroundColor: `${tag.color}22`,
+                                                color: tag.color
+                                            }}
                                         >
                                             {tag.name}
                                         </Badge>
@@ -159,7 +175,10 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                             <h2 className="text-sm font-medium">{tp("subwork.subtasks")}</h2>
                             <ul className="divide-y divide-border rounded-md border border-border">
                                 {task.subtasks.map((subtask, index) => (
-                                    <li key={index} className="flex items-center gap-2 px-3 py-2 text-sm">
+                                    <li
+                                        key={index}
+                                        className="flex items-center gap-2 px-3 py-2 text-sm"
+                                    >
                                         <span
                                             aria-hidden
                                             className="size-2.5 shrink-0 rounded-full"
@@ -167,12 +186,16 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                         />
                                         <span
                                             className={
-                                                subtask.finished ? "flex-1 text-muted-foreground" : "flex-1"
+                                                subtask.finished
+                                                    ? "flex-1 text-muted-foreground"
+                                                    : "flex-1"
                                             }
                                         >
                                             {subtask.name}
                                         </span>
-                                        <span className="text-xs text-muted-foreground">{subtask.statusName}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {subtask.statusName}
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
@@ -201,7 +224,9 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                             {task.comments.map((comment, index) => (
                                 <div key={index} className="flex flex-col gap-0.5">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium">{comment.author}</span>
+                                        <span className="text-sm font-medium">
+                                            {comment.author}
+                                        </span>
                                         <span className="text-xs text-muted-foreground">
                                             {format.dateTime(comment.createdAt)}
                                         </span>

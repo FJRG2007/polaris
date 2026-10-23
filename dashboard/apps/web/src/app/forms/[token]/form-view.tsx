@@ -14,6 +14,7 @@ import { CircleCheck } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { submitFormAction } from "./actions";
+import { signInHref } from "@/lib/safe-redirect";
 import type { FormField } from "@polaris/core";
 import { Card, Input, Button, Select, CardBody, Textarea } from "@polaris/ui";
 
@@ -72,7 +73,10 @@ export function PublicForm({
                 <CardBody className="flex flex-col gap-3 p-8 text-center">
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">{name}</h1>
                     <p className="text-sm text-muted-foreground">{t("form.accountOnly")}</p>
-                    <a href="/oauth/login" className="text-sm text-primary hover:underline">
+                    <a
+                        href={signInHref(`/forms/${token}`)}
+                        className="text-sm text-primary hover:underline"
+                    >
                         {t("form.signIn")}
                     </a>
                 </CardBody>
@@ -91,7 +95,8 @@ export function PublicForm({
                 {fields.map((field) => {
                     const value = answers[field.id] ?? "";
                     const invalid = touched[field.id] && missing(field);
-                    const set = (next: string) => setAnswers((current) => ({ ...current, [field.id]: next }));
+                    const set = (next: string) =>
+                        setAnswers((current) => ({ ...current, [field.id]: next }));
 
                     return (
                         <label key={field.id} className="flex flex-col gap-1 text-sm">
@@ -99,7 +104,9 @@ export function PublicForm({
                                 {field.label}
                                 {field.required && <span className="ml-1 text-danger">*</span>}
                             </span>
-                            {field.help && <span className="text-xs text-muted-foreground">{field.help}</span>}
+                            {field.help && (
+                                <span className="text-xs text-muted-foreground">{field.help}</span>
+                            )}
 
                             {field.type === "longText" ? (
                                 <Textarea
@@ -107,14 +114,19 @@ export function PublicForm({
                                     rows={4}
                                     aria-invalid={invalid}
                                     onChange={(event) => set(event.target.value)}
-                                    onBlur={() => setTouched((current) => ({ ...current, [field.id]: true }))}
+                                    onBlur={() =>
+                                        setTouched((current) => ({ ...current, [field.id]: true }))
+                                    }
                                     className="w-full resize-y rounded-md border border-border bg-field px-3 py-2 text-sm hover:border-border-strong focus:border-border-strong"
                                 />
                             ) : field.type === "dropdown" ? (
                                 <Select
                                     value={value}
                                     onValueChange={set}
-                                    options={field.options.map((option) => ({ value: option, label: option }))}
+                                    options={field.options.map((option) => ({
+                                        value: option,
+                                        label: option
+                                    }))}
                                     placeholder={t("form.chooseOne")}
                                     aria-label={field.label}
                                 />
@@ -139,17 +151,24 @@ export function PublicForm({
                                     value={value}
                                     aria-invalid={invalid}
                                     onChange={(event) => set(event.target.value)}
-                                    onBlur={() => setTouched((current) => ({ ...current, [field.id]: true }))}
+                                    onBlur={() =>
+                                        setTouched((current) => ({ ...current, [field.id]: true }))
+                                    }
                                 />
                             )}
 
-                            {invalid && <span className="text-xs text-danger">{t("form.required")}</span>}
+                            {invalid && (
+                                <span className="text-xs text-danger">{t("form.required")}</span>
+                            )}
                         </label>
                     );
                 })}
 
                 {error && (
-                    <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                    <p
+                        role="alert"
+                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                    >
                         {error}
                     </p>
                 )}

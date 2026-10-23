@@ -11,7 +11,9 @@
  */
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ArrowUpRight, LogIn } from "lucide-react";
+import { signInHref } from "@/lib/safe-redirect";
 import { Button, Card, CardBody, CardHeader, CardTitle, cn, PolarisMark } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -26,6 +28,7 @@ export function PublicShell({
     className?: string;
 }) {
     const t = useTranslations("components");
+    const pathname = usePathname();
     return (
         <div className={cn("mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 p-6", className)}>
             <header className="flex items-center justify-between gap-2">
@@ -42,7 +45,7 @@ export function PublicShell({
                     </Button>
                 ) : (
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/oauth/login">
+                        <Link href={signInHref(pathname)}>
                             <LogIn className="size-4" />
                             {t("publicShell.signIn")}
                         </Link>

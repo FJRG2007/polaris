@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 import { safeRedirect } from "@/app/oauth/login/post-login-target";
+import { signInHref } from "@/lib/safe-redirect";
 
 describe("where a sign-in may send somebody", () => {
     it("keeps a path on this origin", () => {
@@ -59,5 +60,15 @@ describe("where a sign-in may send somebody", () => {
     it("returns the resolved path, not the raw input", () => {
         expect(safeRedirect("/drive#section")).toBe("/drive#section");
         expect(safeRedirect("/a/../chat")).toBe("/chat");
+    });
+});
+
+describe("a public link that asks for an account", () => {
+    it("sends the reader to sign in and back to the link", () => {
+        expect(signInHref("/r/abc123")).toBe("/oauth/login?redirect=%2Fr%2Fabc123");
+    });
+
+    it("never carries a destination off this origin", () => {
+        expect(signInHref("//evil.example")).toBe("/oauth/login?redirect=%2F");
     });
 });
