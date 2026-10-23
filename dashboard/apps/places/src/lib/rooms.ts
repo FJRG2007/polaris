@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import type { FloorView, RoomView } from "./room-kinds";
 
@@ -147,6 +148,8 @@ export async function updateRoom(
 export async function deleteRoom(installedAppId: string, id: string): Promise<void> {
     await requireRoom(installedAppId, id);
     await prisma.placeRoom.delete({ where: { id } });
+    // The keys to it go with it: a room made later is not the room they opened.
+    await host.accessGrants.dropGrantsFor("place.room", id);
 }
 
 /** A room of this install's, refusing rather than answering when it is not. */

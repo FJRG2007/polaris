@@ -152,7 +152,7 @@ export async function shareAction(
 }
 
 /**
- * Hand a door or a UPS out as a link, for somebody with no account.
+ * Hand something in Places out as a link, for somebody with no account.
  *
  * The same standing as sharing it with a person, the same bounds, and the link
  * comes back once - only its hash is kept, so it cannot be shown again, only
@@ -167,7 +167,7 @@ export async function shareLinkAction(
     try {
         const user = await requireUser();
         const kind = subjectOf(subject);
-        if (!(core.GRANT_LINK_SUBJECTS as readonly string[]).includes(kind)) {
+        if (!core.isGrantLinkSubject(kind)) {
             throw new GrantError("That cannot be shared as a link");
         }
         await requireMayShare(user, kind, String(subjectId));
@@ -179,12 +179,7 @@ export async function shareLinkAction(
                     (await getTranslations("common"))("share.notWritten")
             };
         }
-        const { token } = await writeGrantLink(
-            kind as (typeof core.GRANT_LINK_SUBJECTS)[number],
-            String(subjectId),
-            parsed.data,
-            user.id
-        );
+        const { token } = await writeGrantLink(kind, String(subjectId), parsed.data, user.id);
         await recordAudit({
             actorId: user.id,
             action: "access.linked",

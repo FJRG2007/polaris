@@ -733,12 +733,14 @@ const LINK_TOKEN = /^[A-Za-z0-9_-]{43}$/;
  * counted against the same ceiling.
  */
 export async function writeGrantLink(
-    subject: (typeof core.GRANT_LINK_SUBJECTS)[number],
+    subject: core.GrantLinkSubject,
     subjectId: string,
     input: core.GrantLinkInput,
     grantedById: string
 ): Promise<{ id: string; token: string }> {
-    const allowed = core.GRANT_CAPABILITIES[subject] as readonly string[];
+    // Narrower than a person's: a NAS, a server or a domain is only ever seen
+    // through a link, whatever a person could be given.
+    const allowed = core.linkCapabilities(subject);
     if (!allowed.includes(input.capability)) {
         throw new GrantError("That is not something this can be shared as");
     }
@@ -797,12 +799,27 @@ export type LinkReach =
  * or taken back. A malformed token is refused before the database is asked.
  */
 export async function linkReach(token: string, now = new Date()): Promise<LinkReach | null> {
+    return judgeLink(token, now, false);
+}
+
+/**
+ * The same, for a use that has already been paid for: a camera's live view is
+ * counted once when it is opened, and the stream it then pulls for minutes
+ * must not be cut because that open was the last use. Dates, hours and
+ * revocation still apply to every request; only the count is set aside.
+ */
+export async function linkReachPaid(token: string, now = new Date()): Promise<LinkReach | null> {
+    return judgeLink(token, now, true);
+}
+
+async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkReach | null> {
     if (!LINK_TOKEN.test(token)) return null;
-    const row = await prisma.accessGrant.findFirst({
+    const found = await prisma.accessGrant.findFirst({
         where: { principalType: core.LINK_PRINCIPAL, principalId: linkPrincipalId(token) },
         select: { ...GRANT_FIELDS, note: true }
     });
-    if (!row) return null;
+    if (!found) return null;
+    const row = paid ? { ...found, maxUses: null } : found;
     const zone = await houseZone([row]);
     const verdict = core.judgeGrant(row, now, zone);
     const base = { subjectType: row.subjectType, subjectId: row.subjectId, note: row.note };
@@ -881,4 +898,146 @@ export async function dropGrantsOfGoneDomains(): Promise<void> {
  *  has to do, since nothing here is a foreign key. */
 export async function dropGrantsFor(subject: core.GrantSubject, subjectId: string): Promise<void> {
     await prisma.accessGrant.deleteMany({ where: { subjectType: subject, subjectId } });
+}
+
+// ---------------------------------------------------------------------------
+// The access log
+// ---------------------------------------------------------------------------
+
+/** How long a use is kept: the same 90 days camera events default to. */
+export const GRANT_USE_RETENTION_DAYS = 90;
+
+/** At most one prune per process this often; the writer does it, so there is
+ *  no job to forget to schedule. */
+const PRUNE_EVERY_MS = 60 * 60_000;
+let prunedAt = 0;
+
+/** One use of a grant, to be recorded. */
+export interface GrantUseInput {
+    readonly grantId: string | null;
+    readonly subjectType: string;
+    readonly subjectId: string;
+    readonly targetType: string;
+    readonly targetId: string;
+    /** The person, or null for a link. */
+    readonly userId: string | null;
+    readonly linkNote?: string;
+    readonly action: string;
+    readonly outcome: "done" | "refused";
+    readonly reason?: string;
+}
+
+/**
+ * Write one row of the access log. Never throws: it records something that
+ * already happened (or was already refused), and failing to write it must not
+ * turn into a different answer for the person at the door.
+ */
+export async function recordGrantUse(use: GrantUseInput, now = new Date()): Promise<void> {
+    try {
+        await prisma.grantUse.create({
+            data: {
+                grantId: use.grantId,
+                subjectType: use.subjectType,
+                subjectId: use.subjectId,
+                targetType: use.targetType,
+                targetId: use.targetId,
+                userId: use.userId,
+                linkNote: (use.linkNote ?? "").slice(0, 200),
+                action: use.action.slice(0, 40),
+                outcome: use.outcome,
+                reason: (use.reason ?? "").slice(0, 80),
+                at: now
+            }
+        });
+        if (now.getTime() - prunedAt >= PRUNE_EVERY_MS) {
+            prunedAt = now.getTime();
+            await pruneGrantUses(now);
+        }
+    } catch (caught) {
+        console.error("polaris: a grant use could not be logged:", caught);
+    }
+}
+
+/** Drop what is older than the retention. */
+export async function pruneGrantUses(now = new Date()): Promise<number> {
+    const before = new Date(now.getTime() - GRANT_USE_RETENTION_DAYS * 86_400_000);
+    const { count } = await prisma.grantUse.deleteMany({ where: { at: { lt: before } } });
+    return count;
+}
+
+export const GRANT_USE_OUTCOMES = ["done", "refused"] as const;
+
+/** What the log can be narrowed to. */
+export interface GrantUseQuery {
+    readonly subjectType: string;
+    readonly subjectId: string;
+    readonly grantId?: string | undefined;
+    readonly outcome?: (typeof GRANT_USE_OUTCOMES)[number] | undefined;
+    readonly from?: Date | undefined;
+    readonly to?: Date | undefined;
+    readonly take: number;
+}
+
+/** One row as a manager reads it. */
+export interface GrantUseView {
+    readonly id: string;
+    readonly at: string;
+    readonly grantId: string | null;
+    /** A person's name, or empty for a link (then `linkNote` says which). */
+    readonly who: string;
+    readonly link: boolean;
+    readonly linkNote: string;
+    readonly targetType: string;
+    readonly targetId: string;
+    readonly action: string;
+    readonly outcome: string;
+    readonly reason: string;
+}
+
+/**
+ * The uses of one subject's grants, newest first: the grants over it, and the
+ * grants over a room that reached it. Callers check the reader may share it.
+ */
+export async function listGrantUses(query: GrantUseQuery): Promise<GrantUseView[]> {
+    const rows = await prisma.grantUse.findMany({
+        where: {
+            OR: [
+                { subjectType: query.subjectType, subjectId: query.subjectId },
+                { targetId: query.subjectId }
+            ],
+            ...(query.grantId ? { grantId: query.grantId } : {}),
+            ...(query.outcome ? { outcome: query.outcome } : {}),
+            ...(query.from || query.to
+                ? {
+                      at: {
+                          ...(query.from ? { gte: query.from } : {}),
+                          ...(query.to ? { lte: query.to } : {})
+                      }
+                  }
+                : {})
+        },
+        orderBy: { at: "desc" },
+        take: query.take
+    });
+    const ids = [...new Set(rows.flatMap((row) => (row.userId ? [row.userId] : [])))];
+    const people = ids.length
+        ? await prisma.user.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, name: true }
+          })
+        : [];
+    const names = new Map(people.map((person) => [person.id, person.name]));
+    return rows.map((row) => ({
+        id: row.id,
+        at: row.at.toISOString(),
+        grantId: row.grantId,
+        who: row.userId ? (names.get(row.userId) ?? "") : "",
+        link: row.userId === null,
+        linkNote: row.linkNote,
+        targetType: row.targetType,
+        targetId: row.targetId,
+        action: row.action,
+        outcome: row.outcome,
+        reason: row.reason
+    }));
 }

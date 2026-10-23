@@ -304,5 +304,25 @@
             "nearbyVague": "Tu ubicación no es lo bastante precisa.",
             "nearbyUnplaced": "El lugar aún no tiene ubicación, no se puede comprobar."
         }
+    },
+    "guestStatus": {
+        "state": {
+            "up": "Activo",
+            "down": "Caído",
+            "unknown": "Sin dato"
+        },
+        "kind": {
+            "nas": "Almacén",
+            "server": "Servidor",
+            "domain": "Sitio web"
+        },
+        "upFor": "Activo desde hace {span}.",
+        "checked": "Comprobado el {when} UTC.",
+        "seeOnly": "Este enlace solo muestra cómo está.",
+        "units": {
+            "days": "{n} d",
+            "hours": "{n} h",
+            "minutes": "{n} min"
+        }
     }
 }

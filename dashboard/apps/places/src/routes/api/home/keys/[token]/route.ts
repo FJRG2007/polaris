@@ -19,6 +19,8 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
     action: z.enum(DEVICE_ACTIONS),
+    /** Which device, for a room's link. */
+    deviceId: z.string().uuid().optional(),
     where: z.unknown().optional()
 });
 
@@ -36,7 +38,8 @@ export async function POST(
             String(token),
             body.data.action,
             reportedLocation(body.data.where),
-            ip
+            ip,
+            body.data.deviceId
         );
         return Response.json({ device });
     } catch (caught) {

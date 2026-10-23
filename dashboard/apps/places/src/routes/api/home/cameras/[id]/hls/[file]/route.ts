@@ -10,7 +10,7 @@
 
 import { isHlsFile } from "../../../../../../../lib/relay";
 import { homeInstall } from "../../../../../../../lib/access";
-import { mayWatchCamera } from "../../../../../../../lib/sharing";
+import { logCameraWatch, mayWatchCamera } from "../../../../../../../lib/sharing";
 import { cameraHls, CameraOfflineError } from "../../../../../../../lib/live";
 import { host } from "@polaris/app-host";
 
@@ -32,6 +32,8 @@ export async function GET(
 
     const { id, file } = await context.params;
     if (!(await mayWatchCamera(user, id))) return new Response("Forbidden", { status: 403 });
+    // One row per view opened, never per segment.
+    if (file === "stream.m3u8") void logCameraWatch(user, id).catch(() => undefined);
     if (!isHlsFile(file)) return new Response("Not found", { status: 404 });
 
     const query = new URL(request.url).searchParams;

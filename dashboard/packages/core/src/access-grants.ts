@@ -52,6 +52,7 @@ import { z } from "zod";
 import {
     EVERY_DAY,
     MINUTES_IN_DAY,
+    clockMinute,
     clockTime,
     nameDays,
     weeklyWindow
@@ -75,7 +76,8 @@ export const GRANT_SUBJECTS = [
     "place.ups",
     "place.nas",
     "place.server",
-    "place.domain"
+    "place.domain",
+    "place.room"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -138,7 +140,14 @@ export const GRANT_CAPABILITIES = {
     // its alarm history. Watching only - its shell, files, containers and
     // settings stay with whoever owns it.
     "place.server": ["view"],
-    "place.domain": ["view"]
+    "place.domain": ["view"],
+    // A room: every door, switch and camera in it, as one key. What a hotel
+    // hands a guest at check-in and an office hands a team - the room-level
+    // key Salto and Kisi issue rather than one credential per lock
+    // (https://saltosystems.com/en/solutions/hospitality/,
+    // https://docs.getkisi.com/docs/groups). Devices put in the room later are
+    // covered; ones taken out are not.
+    "place.room": ["view", "control"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -176,7 +185,8 @@ export const GRANT_ACTIONS = {
     "place.ups": ["watch", "control"],
     "place.nas": ["watch", "fan", "backup"],
     "place.server": ["watch"],
-    "place.domain": ["watch"]
+    "place.domain": ["watch"],
+    "place.room": ["watch", "open", "close", "operate"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**
@@ -415,6 +425,20 @@ export function dayBegins(day: string): Date | null {
 }
 
 /**
+ * A day at a wall-clock time in the reader's own zone: a hotel's check-in at
+ * 15:00 and check-out at 11:00, the way a PMS hands a key its stay
+ * (https://www.mews.com/en/blog/keyless-entry-hotels). Null for a day or a
+ * time that does not read.
+ */
+export function dayAt(day: string, clock: string): Date | null {
+    const begins = dayBegins(day);
+    const minute = clockMinute(clock);
+    if (!begins || minute === null) return null;
+    begins.setHours(Math.floor(minute / 60), minute % 60, 0, 0);
+    return begins;
+}
+
+/**
  * And the moment it ends, which is the one that matters.
  *
  * `judgeGrant` expires a grant once now is past `endsAt`, so a door lent "until
@@ -532,19 +556,53 @@ export type AccessGrantInput = z.infer<typeof accessGrantSchema>;
 
 /**
  * A grant handed out as a link, for somebody with no Polaris account: the same
- * bounds, nobody named. Whoever holds the link holds the grant, so it is only
- * offered for what one press does - a door, a UPS - and never for a camera,
- * whose pictures are not a thing to send to an address nobody signed in to.
+ * bounds, nobody named. Whoever holds the link holds the grant, so what a link
+ * may do is narrower than what a person may (`linkCapabilities`).
  */
 export const grantLinkSchema = withGrantRules(grantBounds);
 
 export type GrantLinkInput = z.infer<typeof grantLinkSchema>;
 
-/** What may be handed out as a link. */
+/**
+ * What may be handed out as a link: everything in Places. A door and a UPS may
+ * be driven through one; a camera is only watched (no PTZ, no recordings); the
+ * rest only seen - see `LINK_WATCH_ONLY_SUBJECTS`.
+ */
 export const GRANT_LINK_SUBJECTS = [
     "place.device",
-    "place.ups"
+    "place.camera",
+    "place.ups",
+    "place.nas",
+    "place.server",
+    "place.domain",
+    "place.room"
 ] as const satisfies readonly GrantSubject[];
+
+export type GrantLinkSubject = (typeof GRANT_LINK_SUBJECTS)[number];
+
+export function isGrantLinkSubject(value: unknown): value is GrantLinkSubject {
+    return (GRANT_LINK_SUBJECTS as readonly unknown[]).includes(value);
+}
+
+/**
+ * Subjects a link only ever shows. A NAS's fan and backups, and anything a
+ * server or a domain could ever be given control of, need an account at the
+ * other end: a link cannot be attributed to anybody, and those reach machines
+ * other people depend on.
+ */
+export const LINK_WATCH_ONLY_SUBJECTS = [
+    "place.nas",
+    "place.server",
+    "place.domain"
+] as const satisfies readonly GrantLinkSubject[];
+
+/** The capabilities a link to this subject may carry, weakest first. */
+export function linkCapabilities(subject: GrantLinkSubject): readonly string[] {
+    const ladder = GRANT_CAPABILITIES[subject] as readonly string[];
+    return (LINK_WATCH_ONLY_SUBJECTS as readonly string[]).includes(subject)
+        ? ladder.slice(0, 1)
+        : ladder;
+}
 
 /** The principal a link grant is written under; its id is the link's hash. */
 export const LINK_PRINCIPAL = "link";

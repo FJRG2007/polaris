@@ -1878,7 +1878,8 @@
         "removeFloorBody": "Its rooms stay, on no floor.",
         "removeRoomBody": "Its devices stay at this place, in no room.",
         "removeUsed": "{count, plural, one {# automation names it and will stop acting on it.} other {# automations name it and will stop acting on it.}}",
-        "remove": "Remove"
+        "remove": "Remove",
+        "shareName": "Share {name}"
     },
     "deviceDialog": {
         "connected": "Connected through the account it is on.",
@@ -2775,5 +2776,15 @@
         "removeQuestion": "Remove {name}?",
         "removeBody": "Its cameras stay as they are.",
         "removeConfirm": "Remove"
+    },
+    "guestCamera": {
+        "closed": "This link does not show anything right now.",
+        "tooMany": "Opened too often. Wait a minute and try again.",
+        "offline": "The camera is not answering right now.",
+        "opening": "Opening the camera",
+        "live": "{name}, live",
+        "watch": "Watch live",
+        "roomEmpty": "Nothing is in this room yet.",
+        "private": "Private right now."
     }
 }

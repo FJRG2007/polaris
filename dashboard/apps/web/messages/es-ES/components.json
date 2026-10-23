@@ -649,14 +649,50 @@
         "nearbyMeters": "A menos de (m)",
         "nearbyHint": "Cada pulsación pide al navegador dónde está. Esa ubicación se puede falsear: es una comodidad, no un cerrojo.",
         "nearbyNoPlace": "El lugar aún no tiene ubicación. Ponla primero en el lugar o se rechazará cada pulsación.",
-        "linkTitle": "O un enlace, sin cuenta",
         "linkHint": "Cualquiera con el enlace puede usarlo, dentro de los límites de arriba. Se muestra una vez.",
         "makeLink": "Crear enlace",
         "linkMade": "Copia este enlace ahora. No se volverá a mostrar.",
         "copyLink": "Copiar",
         "copied": "Enlace copiado",
         "linkName": "Enlace",
-        "needAction": "Permite al menos una cosa."
+        "needAction": "Permite al menos una cosa.",
+        "linkChoice": "Un enlace (sin cuenta)",
+        "linkSeeOnly": "Un enlace solo puede verlo. Controlar exige cuenta.",
+        "log": {
+            "title": "Registro",
+            "filter": "Ver",
+            "all": "Todo",
+            "done": "Hecho",
+            "refused": "Negado",
+            "refusedWhy": "Negado: {why}",
+            "export": "Exportar CSV",
+            "none": "Nadie lo ha usado aún.",
+            "unreadable": "No se pudo leer el registro.",
+            "someone": "Alguien",
+            "linkFor": "Enlace: {note}",
+            "onlyKey": "Solo usos de {name}.",
+            "everyKey": "Ver todo",
+            "ofKey": "Usos de {name}",
+            "reasons": {
+                "waiting": "aún no",
+                "expired": "caducado",
+                "closed": "fuera de hora",
+                "spent": "sin usos",
+                "notThat": "no permitido",
+                "notNearby": "lejos",
+                "failed": "falló",
+                "private": "privada"
+            },
+            "actions": {
+                "open": "abrió",
+                "close": "cerró",
+                "operate": "accionó",
+                "watch": "vio",
+                "command": "envió una orden"
+            }
+        },
+        "checkIn": "Acceso desde",
+        "checkOut": "Acceso hasta"
     },
     "environments": {
         "homeNat": {

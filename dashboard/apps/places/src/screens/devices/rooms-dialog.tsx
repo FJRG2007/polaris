@@ -11,7 +11,7 @@
 
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Share2, Trash2 } from "lucide-react";
 import type { FloorView, RoomView } from "../../lib/room-kinds";
 import { floorInputSchema, normalizeRoomInput, roomInputSchema } from "../../lib/schemas";
 import {
@@ -31,6 +31,7 @@ import { hostUi } from "@polaris/app-host/client";
 import { placesRefusalText } from "../../lib/refusal-text";
 
 const { runAction } = hostUi.runAction;
+const { ShareDialog } = hostUi.accessShareDialog;
 
 /** The id a row carries until the server has made it. */
 const TEMP_PREFIX = "new-";
@@ -74,8 +75,11 @@ function NameRow({
     label,
     pending = false,
     onSave,
-    onRemove
+    onRemove,
+    onShare
 }: {
+    /** Lend the whole room - every door, switch and camera in it - as one key. */
+    onShare?: () => void;
     name: string;
     /** The room's floor; absent for a floor's own row. */
     floorId?: string;
@@ -135,6 +139,20 @@ function NameRow({
                     >
                         <Check className="size-4 shrink-0" />
                     </Button>
+                    {onShare ? (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className={ICON_BUTTON}
+                            aria-label={t("roomsDialog.shareName", { name })}
+                            title={t("roomsDialog.shareName", { name })}
+                            aria-disabled={pending}
+                            disabled={pending}
+                            onClick={onShare}
+                        >
+                            <Share2 className="size-4 shrink-0" />
+                        </Button>
+                    ) : null}
                     <Button
                         size="sm"
                         variant="ghost"
@@ -176,6 +194,7 @@ export function RoomsDialog({
     const [newRoom, setNewRoom] = useState("");
     const [newRoomFloor, setNewRoomFloor] = useState("");
     const [removing, setRemoving] = useState<Removing>(null);
+    const [sharingRoom, setSharingRoom] = useState<RoomView | null>(null);
     const [busy, setBusy] = useState(false);
     const [uses, setUses] = useState<Record<string, number>>({});
     const floorIssue = useNameIssue(newFloor, floorInputSchema);
@@ -502,6 +521,7 @@ export function RoomsDialog({
                                             pending={isTemp(room.id)}
                                             onSave={(next) => saveRoom(room, next)}
                                             onRemove={() => setRemoving({ kind: "room", room })}
+                                            onShare={() => setSharingRoom(room)}
                                         />
                                     ))}
                                 </ul>
@@ -549,6 +569,19 @@ export function RoomsDialog({
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {sharingRoom ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(next: boolean) => (next ? undefined : setSharingRoom(null))}
+                    subject="place.room"
+                    subjectId={sharingRoom.id}
+                    name={sharingRoom.name}
+                    // A hotel stay or an office's working hours: dates,
+                    // check-in and check-out, hours and uses.
+                    bounded
+                />
+            ) : null}
 
             <ConfirmDeleteDialog
                 open={removing !== null}

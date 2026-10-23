@@ -28,6 +28,7 @@
 
 import { cache } from "react";
 import * as core from "@polaris/core";
+import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -38,6 +39,128 @@ const { grantedActions, grantedSubjects, liveGrants, reachesAnySubject, spendGra
     host.accessGrants;
 type SessionUser = AppHostTypes["SessionUser"];
 type LiveGrant = AppHostTypes["LiveGrant"];
+
+/** A grant as it was used, with what it was over - a device itself, or the
+ *  room the device is in - so the access log can say which key opened it. */
+export type LentGrant = LiveGrant & {
+    readonly subjectType: "place.device" | "place.camera" | "place.room";
+    readonly subjectId: string;
+};
+
+/**
+ * The rooms a device is in: one, or none. A device moved into a room later is
+ * covered by that room's grants from then on, and one moved out stops being.
+ */
+async function roomsOfDevice(deviceId: string): Promise<string[]> {
+    const row = await prisma.placeDevice
+        .findUnique({ where: { id: deviceId }, select: { roomId: true } })
+        .catch(() => null);
+    return row?.roomId ? [row.roomId] : [];
+}
+
+/**
+ * The rooms a camera is in: the room it was put in, or - for a camera never
+ * put in one - a room of the same place whose name its free-text `zone`
+ * repeats (ignoring case), which is how cameras were grouped before rooms.
+ */
+export async function roomsOfCamera(cameraId: string): Promise<string[]> {
+    const camera = await prisma.camera
+        .findUnique({
+            where: { id: cameraId },
+            select: { placeId: true, zone: true, roomId: true }
+        })
+        .catch(() => null);
+    if (camera?.roomId) return [camera.roomId];
+    const zone = camera?.zone?.trim();
+    if (!camera?.placeId || !zone) return [];
+    const rooms = await prisma.placeRoom.findMany({
+        where: { placeId: camera.placeId, name: { equals: zone, mode: "insensitive" } },
+        select: { id: true },
+        take: 10
+    });
+    return rooms.map((room) => room.id);
+}
+
+/** Whether a value can be a device's or a camera's id at all: a link's
+ *  `?camera=` or `deviceId` is whatever its holder sent. */
+export function isThingId(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+/** What one room covers right now: its devices and its cameras, by id. */
+export async function roomContents(
+    roomIds: readonly string[]
+): Promise<{ devices: Map<string, string>; cameras: Map<string, string> }> {
+    const devices = new Map<string, string>();
+    const cameras = new Map<string, string>();
+    if (roomIds.length === 0) return { devices, cameras };
+    const rooms = await prisma.placeRoom.findMany({
+        where: { id: { in: [...roomIds] } },
+        select: { id: true, name: true, placeId: true },
+        take: 200
+    });
+    const [deviceRows, cameraRows] = await Promise.all([
+        prisma.placeDevice.findMany({
+            where: { roomId: { in: rooms.map((room) => room.id) } },
+            select: { id: true, roomId: true },
+            take: 2000
+        }),
+        prisma.camera.findMany({
+            where: {
+                OR: [
+                    { roomId: { in: rooms.map((room) => room.id) } },
+                    ...rooms.map((room) => ({
+                        roomId: null,
+                        placeId: room.placeId,
+                        zone: { equals: room.name, mode: "insensitive" as const }
+                    }))
+                ]
+            },
+            select: { id: true, placeId: true, zone: true, roomId: true },
+            take: 2000
+        })
+    ]);
+    for (const device of deviceRows) if (device.roomId) devices.set(device.id, device.roomId);
+    for (const camera of cameraRows) {
+        if (camera.roomId) {
+            if (rooms.some((one) => one.id === camera.roomId))
+                cameras.set(camera.id, camera.roomId);
+            continue;
+        }
+        const room = rooms.find(
+            (one) =>
+                one.placeId === camera.placeId &&
+                one.name.toLowerCase() === (camera.zone ?? "").trim().toLowerCase()
+        );
+        if (room) cameras.set(camera.id, room.id);
+    }
+    return { devices, cameras };
+}
+
+/** A room grant that shows the room's cameras: one lent with `watch`. */
+function watchesRoom(grant: LentGrant): boolean {
+    return grant.actions.includes("watch");
+}
+
+/** Live grants over any of these rooms, each tagged with its room. */
+async function roomGrants(userId: string, roomIds: readonly string[]): Promise<LentGrant[]> {
+    const found = await Promise.all(
+        roomIds.map(async (roomId) =>
+            (await liveGrants(userId, "place.room", roomId)).map((grant) => ({
+                ...grant,
+                subjectType: "place.room" as const,
+                subjectId: roomId
+            }))
+        )
+    );
+    return found.flat();
+}
+
+/** The stronger of two capabilities on the same device ladder. */
+function stronger(held: string | undefined, other: string): string {
+    if (!held) return other;
+    return core.atLeast("place.device", held, other) ? held : other;
+}
 
 /** What one account reaches in Places. */
 export interface PlacesReach {
@@ -75,12 +198,35 @@ export async function placesReach(user: SessionUser): Promise<PlacesReach> {
             upses: new Map()
         };
     }
-    const [cameras, devices, deviceActions, upses] = await Promise.all([
-        grantedSubjects(user.id, "place.camera"),
-        grantedSubjects(user.id, "place.device"),
-        grantedActions(user.id, "place.device"),
-        grantedSubjects(user.id, "place.ups")
-    ]);
+    const [cameraGrants, deviceGrants, deviceGrantActions, upses, rooms, roomActions] =
+        await Promise.all([
+            grantedSubjects(user.id, "place.camera"),
+            grantedSubjects(user.id, "place.device"),
+            grantedActions(user.id, "place.device"),
+            grantedSubjects(user.id, "place.ups"),
+            grantedSubjects(user.id, "place.room"),
+            grantedActions(user.id, "place.room")
+        ]);
+    const cameras = new Map(cameraGrants);
+    const devices = new Map(deviceGrants);
+    const deviceActions = new Map(deviceGrantActions);
+    // A room lent is everything in it, read now: what was put in it since the
+    // grant was written is in, what was taken out is not.
+    if (rooms.size > 0) {
+        const inside = await roomContents([...rooms.keys()]);
+        for (const [deviceId, roomId] of inside.devices) {
+            const held = rooms.get(roomId)!;
+            devices.set(deviceId, stronger(devices.get(deviceId), held));
+            const actions = (roomActions.get(roomId) ?? []).filter((one) => one !== "watch");
+            deviceActions.set(deviceId, [
+                ...new Set([...(deviceActions.get(deviceId) ?? []), ...actions])
+            ]);
+        }
+        for (const [cameraId, roomId] of inside.cameras) {
+            const watches = (roomActions.get(roomId) ?? []).includes("watch");
+            if (watches && !cameras.has(cameraId)) cameras.set(cameraId, "view");
+        }
+    }
     return { everything: false, cameras, devices, deviceActions, upses };
 }
 
@@ -111,7 +257,8 @@ export const reachesPlaces = cache(async (userId: string): Promise<boolean> =>
         "place.ups",
         "place.nas",
         "place.server",
-        "place.domain"
+        "place.domain",
+        "place.room"
     ])
 );
 
@@ -154,7 +301,32 @@ export function onlyReachable<T extends { id: string }>(
  */
 export async function mayWatchCamera(user: SessionUser, cameraId: string): Promise<boolean> {
     if (await sessionCan(user, "home.read")) return true;
-    return (await liveGrants(user.id, "place.camera", cameraId)).length > 0;
+    if ((await liveGrants(user.id, "place.camera", cameraId)).length > 0) return true;
+    return (await roomGrants(user.id, await roomsOfCamera(cameraId))).some(watchesRoom);
+}
+
+/**
+ * Log a visitor opening a camera's live view - once per view, from the routes
+ * that start one (the MP4 stream and the HLS master playlist), never per frame
+ * or segment. A resident is not a visitor and is not logged here.
+ */
+export async function logCameraWatch(user: SessionUser, cameraId: string): Promise<void> {
+    if (await sessionCan(user, "home.read")) return;
+    const direct = await liveGrants(user.id, "place.camera", cameraId);
+    const grant: LentGrant | undefined = direct[0]
+        ? { ...direct[0], subjectType: "place.camera", subjectId: cameraId }
+        : (await roomGrants(user.id, await roomsOfCamera(cameraId))).find(watchesRoom);
+    if (!grant) return;
+    await host.accessGrants.recordGrantUse({
+        grantId: grant.id,
+        subjectType: grant.subjectType,
+        subjectId: grant.subjectId,
+        targetType: "camera",
+        targetId: cameraId,
+        userId: user.id,
+        action: "watch",
+        outcome: "done"
+    });
 }
 
 /** Refused because this camera was not lent to them. The same sentence whether
@@ -176,9 +348,16 @@ export async function requireDeviceControl(
     user: SessionUser,
     deviceId: string,
     action: DeviceAction
-): Promise<LiveGrant | null> {
+): Promise<LentGrant | null> {
     if (await sessionCan(user, "home.control")) return null;
-    const held = await liveGrants(user.id, "place.device", deviceId);
+    const held: LentGrant[] = [
+        ...(await liveGrants(user.id, "place.device", deviceId)).map((grant) => ({
+            ...grant,
+            subjectType: "place.device" as const,
+            subjectId: deviceId
+        })),
+        ...(await roomGrants(user.id, await roomsOfDevice(deviceId)))
+    ];
     // The grant has to allow this direction: a key lent to open the door does
     // not lock it, and one lent to lock it at night does not open it.
     const wanted = grantActionFor(action);
@@ -192,6 +371,19 @@ export async function requireDeviceControl(
         // of hours, lent but used up - because the screen says which: it has the
         // grant in front of it, and this is the path somebody reaches by editing
         // an address.
+        if (held.length > 0) {
+            await host.accessGrants.recordGrantUse({
+                grantId: held[0]!.id,
+                subjectType: held[0]!.subjectType,
+                subjectId: held[0]!.subjectId,
+                targetType: "device",
+                targetId: deviceId,
+                userId: user.id,
+                action,
+                outcome: "refused",
+                reason: "notThat"
+            });
+        }
         throw new HomeError("You cannot operate that from here");
     }
     return usable;
@@ -201,7 +393,9 @@ export async function requireDeviceControl(
 export async function requireDeviceView(user: SessionUser, deviceId: string): Promise<void> {
     if (await sessionCan(user, "home.read")) return;
     const held = await liveGrants(user.id, "place.device", deviceId);
-    if (held.length === 0) throw new HomeError("That device is not shared with you");
+    if (held.length > 0) return;
+    const viaRoom = await roomGrants(user.id, await roomsOfDevice(deviceId));
+    if (viaRoom.length === 0) throw new HomeError("That device is not shared with you");
 }
 
 /**

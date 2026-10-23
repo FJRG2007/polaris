@@ -7066,6 +7066,41 @@ model OfficeDocumentOpen {
 // The vocabulary - which subjects exist, which capabilities each of them has,
 // and how the hours are read - is `access-grants.ts` in @polaris/core, and the
 // window arithmetic is shared with standing hours.
+// One use of a grant: a door opened, a switch pressed, a camera watched -
+// done or refused, by a person or through a link. The access log a hotel or an
+// office reads per door, per room and per key (Brivo and Kisi keep the same
+// per-credential event trail). Nothing here is a foreign key: taking a grant
+// back must not erase the record of what it was used for. Kept 90 days, like
+// camera events, and pruned by the writer.
+model GrantUse {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    /// The grant that was used, or null when none applied (a refusal).
+    grantId     String?  @db.Uuid
+    /// What the grant was over (place.device, place.room, ...).
+    subjectType String
+    subjectId   String   @db.Uuid
+    /// The thing acted on: a device, a camera, a UPS. Equal to the subject
+    /// unless the grant was over a room.
+    targetType  String
+    targetId    String   @db.Uuid
+    /// Who: a person's id, or null for a link.
+    userId      String?  @db.Uuid
+    /// A link's "what this is for", so a guest is told apart without a name.
+    linkNote    String   @default("")
+    /// open | close | operate | watch | command
+    action      String
+    /// done | refused
+    outcome     String
+    /// Why it was refused (closed, expired, spent, notThat, failed, ...).
+    reason      String   @default("")
+    at          DateTime @default(now())
+
+    @@index([subjectType, subjectId, at])
+    @@index([targetId, at])
+    @@index([grantId, at])
+    @@index([at])
+}
+
 model AccessGrant {
     id            String @id @default(uuid(7)) @db.Uuid
     /// chat.space | chat.channel | task.space | task.folder | note.space |

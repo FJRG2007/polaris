@@ -12,12 +12,14 @@
 
 import * as core from "@polaris/core";
 import * as devices from "./devices";
+import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import { homeInstall } from "./access";
 import { requireNearby } from "./nearby";
-import { countDeviceUse } from "./sharing";
+import { countDeviceUse, isThingId, roomContents } from "./sharing";
+import { getCamera } from "./cameras";
 import { actionsFor, grantActionFor, type DeviceAction, type DeviceView } from "./device-kinds";
 
 type LiveGrant = AppHostTypes["LiveGrant"];
@@ -74,6 +76,65 @@ export async function guestKey(token: string): Promise<GuestKey | null> {
     };
 }
 
+/** What a room's link shows: every device and camera in the room now. */
+export type GuestRoom =
+    | {
+          readonly standing: "live";
+          readonly name: string;
+          readonly devices: readonly DeviceView[];
+          /** Empty unless the room was lent with `watch`. */
+          readonly cameras: readonly {
+              readonly id: string;
+              readonly name: string;
+              readonly private: boolean;
+          }[];
+          readonly allowed: readonly string[];
+          readonly nearbyMeters: number | null;
+          readonly until: string | null;
+          readonly note: string;
+      }
+    | { readonly standing: Exclude<core.GrantStanding, "live"> };
+
+/** A room handed out as a link, read now, or null when it names no room. */
+export async function guestRoom(token: string): Promise<GuestRoom | null> {
+    const reached = await host.accessGrants.linkReach(token);
+    if (!reached || reached.subjectType !== "place.room") return null;
+    if (reached.standing !== "live") return { standing: reached.standing };
+    const install = await homeInstall();
+    if (!install) return null;
+    const room = await prisma.placeRoom.findFirst({
+        where: { id: reached.subjectId, installedAppId: install.id },
+        select: { name: true }
+    });
+    if (!room) return null;
+    const inside = await roomContents([reached.subjectId]);
+    const watches = reached.grant.actions.includes("watch");
+    const [found, cameras] = await Promise.all([
+        Promise.all(
+            [...inside.devices.keys()].map((id) =>
+                devices.getDevice(install.id, id).catch(() => null)
+            )
+        ),
+        Promise.all(
+            (watches ? [...inside.cameras.keys()] : []).map((id) =>
+                getCamera(install.id, id).catch(() => null)
+            )
+        )
+    ]);
+    return {
+        standing: "live",
+        name: room.name,
+        devices: found.filter((device): device is DeviceView => device !== null),
+        cameras: cameras.flatMap((camera) =>
+            camera ? [{ id: camera.id, name: camera.name, private: camera.privacy }] : []
+        ),
+        allowed: reached.grant.actions,
+        nearbyMeters: reached.grant.nearbyMeters ?? null,
+        until: reached.grant.until?.toISOString() ?? null,
+        note: reached.note
+    };
+}
+
 /**
  * Press one button on a link's door. Throws a `HomeError` the guest can read -
  * a `NearbyRefusal` when the link is fenced and the browser is not near.
@@ -82,33 +143,65 @@ export async function pressGuestKey(
     token: string,
     action: DeviceAction,
     where: core.ReportedLocation | null,
-    ip: string
+    ip: string,
+    /** Which device, for a room's link; a door's link names its own. */
+    deviceId?: string
 ): Promise<DeviceView> {
     const reached = await host.accessGrants.linkReach(token);
-    if (!reached || reached.subjectType !== "place.device" || reached.standing !== "live") {
+    const room = reached?.subjectType === "place.room";
+    if (!reached || !(room || reached.subjectType === "place.device")) {
         throw new HomeError("This link does not open anything right now");
     }
+    const targetId = room ? (deviceId ?? "") : reached.subjectId;
+    const log = (outcome: "done" | "refused", reason = "") =>
+        host.accessGrants.recordGrantUse({
+            grantId: reached.standing === "live" ? reached.grant.id : null,
+            subjectType: reached.subjectType,
+            subjectId: reached.subjectId,
+            targetType: "device",
+            targetId,
+            userId: null,
+            linkNote: reached.note,
+            action,
+            outcome,
+            reason
+        });
     const limited = await host.rateLimitService.rateLimit(
-        `guest-key:${reached.grant.id}:${ip}`,
+        `guest-key:${reached.standing === "live" ? reached.grant.id : reached.subjectId}:${ip}`,
         PRESSES_PER_MINUTE,
         60_000
     );
     if (!limited.ok) throw new HomeError("Too many presses. Wait a minute and try again");
+    const held =
+        !room ||
+        (isThingId(targetId) && (await roomContents([reached.subjectId])).devices.has(targetId));
+    if (reached.standing !== "live") {
+        if (held) await log("refused", reached.standing);
+        throw new HomeError("This link does not open anything right now");
+    }
+    if (!held) throw new HomeError("This link does not allow that");
     const install = await homeInstall();
     if (!install) throw new HomeError("This link does not open anything right now");
     const grant = reached.grant;
     if (
-        !core.atLeast("place.device", grant.capability, "control") ||
+        !core.atLeast(reached.subjectType as core.GrantSubject, grant.capability, "control") ||
         !grant.actions.includes(grantActionFor(action))
     ) {
+        await log("refused", "notThat");
         throw new HomeError("This link does not allow that");
     }
-    const device = await devices.getDevice(install.id, reached.subjectId);
-    const near = await requireNearby(grant.nearbyMeters, device.placeId, where);
+    const device = await devices.getDevice(install.id, targetId);
+    const near = await requireNearby(grant.nearbyMeters, device.placeId, where).catch(
+        async (caught: unknown) => {
+            await log("refused", "notNearby");
+            throw caught;
+        }
+    );
     let done: DeviceView;
     try {
         done = await devices.actOnDevice(install.id, device.id, action, "Guest link");
     } catch (caught) {
+        await log("refused", "failed");
         await host.auditService.recordAudit({
             actorId: null,
             action: `places.device.${action}.refused`,
@@ -119,6 +212,7 @@ export async function pressGuestKey(
         throw caught;
     }
     await countDeviceUse(grant);
+    await log("done");
     await host.auditService.recordAudit({
         actorId: null,
         action: `places.device.${action}`,

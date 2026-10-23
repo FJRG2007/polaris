@@ -1878,7 +1878,8 @@
         "removeFloorBody": "Sus salas siguen, sin planta.",
         "removeRoomBody": "Sus dispositivos siguen aquí, sin sala.",
         "removeUsed": "{count, plural, one {# automatización la usa y dejará de actuar sobre ella.} other {# automatizaciones la usan y dejarán de actuar sobre ella.}}",
-        "remove": "Quitar"
+        "remove": "Quitar",
+        "shareName": "Compartir {name}"
     },
     "deviceDialog": {
         "connected": "Conectado a través de la cuenta en la que está.",
@@ -2775,5 +2776,15 @@
         "removeQuestion": "¿Quitar {name}?",
         "removeBody": "Sus cámaras quedan como están.",
         "removeConfirm": "Quitar"
+    },
+    "guestCamera": {
+        "closed": "Este enlace no muestra nada ahora mismo.",
+        "tooMany": "Abierto demasiadas veces. Espera un minuto.",
+        "offline": "La cámara no responde en este momento.",
+        "opening": "Abriendo la cámara",
+        "live": "{name}, en vivo",
+        "watch": "Ver en vivo",
+        "roomEmpty": "Aún no hay nada en esta sala.",
+        "private": "Privada ahora mismo."
     }
 }

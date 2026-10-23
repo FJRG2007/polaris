@@ -47,6 +47,19 @@ export async function operateDevice(
     try {
         device = await devices.actOnDevice(installedAppId, deviceId, action, user.name, setting);
     } catch (caught) {
+        if (lent) {
+            await host.accessGrants.recordGrantUse({
+                grantId: lent.id,
+                subjectType: lent.subjectType,
+                subjectId: lent.subjectId,
+                targetType: "device",
+                targetId: deviceId,
+                userId: user.id,
+                action,
+                outcome: "refused",
+                reason: "failed"
+            });
+        }
         // Recorded refused as well as done. An attempt that was turned down is
         // the half of this log that says somebody tried.
         await host.auditService.recordAudit({
@@ -58,6 +71,18 @@ export async function operateDevice(
         throw caught;
     }
     await countDeviceUse(lent);
+    if (lent) {
+        await host.accessGrants.recordGrantUse({
+            grantId: lent.id,
+            subjectType: lent.subjectType,
+            subjectId: lent.subjectId,
+            targetType: "device",
+            targetId: deviceId,
+            userId: user.id,
+            action,
+            outcome: "done"
+        });
+    }
     await host.auditService.recordAudit({
         actorId: user.id,
         action: `places.device.${action}`,

@@ -23,9 +23,11 @@ import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { GrantCandidate } from "@/lib/access/sharing-service";
+import { AccessLog } from "@/components/access/access-log";
 import {
     CalendarClock,
     Copy,
+    History,
     Link2,
     Loader2,
     MapPin,
@@ -136,7 +138,9 @@ export function ShareDialog({
     // A grant that allows nothing is a "no" that looks like a "yes".
     const noAction = reachable.length > 0 && !reachable.some((one) => actions.includes(one));
     const actionLabel = (one: string) => t(`share.actions.${one}` as NamespaceKey<"components">);
-    const [kind, setKind] = useState<core.GrantPrincipal>("user");
+    // Who it goes to: a person, a team, a role - or, for what may be handed out
+    // that way, a link anybody can open with no account.
+    const [kind, setKind] = useState<core.GrantPrincipal | "link">("user");
     const [principalId, setPrincipalId] = useState("");
     const [query, setQuery] = useState("");
     const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
@@ -144,16 +148,27 @@ export function ShareDialog({
     const [limited, setLimited] = useState(false);
     const [startsAt, setStartsAt] = useState("");
     const [endsAt, setEndsAt] = useState("");
+    // Check-in and check-out: the time on the first and the last day. Empty is
+    // the whole day, which is what a share without a stay means.
+    const [checkIn, setCheckIn] = useState("");
+    const [checkOut, setCheckOut] = useState("");
     const [days, setDays] = useState(core.EVERY_DAY);
     const [hours, setHours] = useState({ from: "", to: "" });
     const [maxUses, setMaxUses] = useState("");
     // Only near the place, and how near. Offered where an act happens at a
     // place - a door, a UPS - and nowhere else.
-    const fenceable = subject === "place.device" || subject === "place.ups";
-    const linkable = (core.GRANT_LINK_SUBJECTS as readonly string[]).includes(subject);
+    const fenceable =
+        subject === "place.device" || subject === "place.ups" || subject === "place.room";
+    const linkable = core.isGrantLinkSubject(subject);
+    // What a link may carry here: a NAS, a server or a domain is only ever seen
+    // through one, whatever a person could be given.
+    const linkCapabilities: readonly string[] = linkable ? core.linkCapabilities(subject) : [];
+    const linkNarrower = linkable && linkCapabilities.length < capabilities.length;
     const [nearby, setNearby] = useState(false);
     const [nearbyMeters, setNearbyMeters] = useState("100");
     const [located, setLocated] = useState<boolean | null>(null);
+    /** The key whose uses the log below is narrowed to, if any. */
+    const [logGrant, setLogGrant] = useState<GrantView | null>(null);
     /** A link just made: shown once, since only its hash is kept. */
     const [madeLink, setMadeLink] = useState<string | null>(null);
 
@@ -191,6 +206,9 @@ export function ShareDialog({
     }, [kind, query, subject, subjectId]);
 
     const groups = useMemo(() => candidates.filter((one) => one.type === kind), [candidates, kind]);
+    const asLink = kind === "link";
+    /** Ready to send: somebody picked, or a link, which names nobody. */
+    const ready = asLink || Boolean(principalId);
 
     const reset = (): void => {
         setPrincipalId("");
@@ -200,6 +218,8 @@ export function ShareDialog({
         setLimited(false);
         setStartsAt("");
         setEndsAt("");
+        setCheckIn("");
+        setCheckOut("");
         setDays(core.EVERY_DAY);
         setHours({ from: "", to: "" });
         setMaxUses("");
@@ -219,8 +239,14 @@ export function ShareDialog({
                   // one lent whole: sent as a bare date these are both
                   // midnight UTC, which begins a grant early and ends it a
                   // day short.
-                  startsAt: core.dayBegins(startsAt)?.toISOString(),
-                  endsAt: core.dayEnds(endsAt)?.toISOString(),
+                  startsAt: (checkIn
+                      ? core.dayAt(startsAt, checkIn)
+                      : core.dayBegins(startsAt)
+                  )?.toISOString(),
+                  endsAt: (checkOut
+                      ? core.dayAt(endsAt, checkOut)
+                      : core.dayEnds(endsAt)
+                  )?.toISOString(),
                   days,
                   startMinute: core.clockMinute(hours.from),
                   endMinute: core.clockMinute(hours.to),
@@ -264,6 +290,7 @@ export function ShareDialog({
         grant.principalType === "link" ? t("share.linkName") : grant.principalName;
 
     const add = async (): Promise<void> => {
+        if (kind === "link") return makeLink();
         if (!principalId || noAction || badFence) return;
         setBusy(true);
         const answer = await shareAction(subject, subjectId, {
@@ -378,6 +405,22 @@ export function ShareDialog({
                                             </p>
                                         ) : null}
                                     </div>
+                                    {bounded ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label={t("share.log.ofKey", { name: who(grant) })}
+                                            title={t("share.log.ofKey", { name: who(grant) })}
+                                            aria-pressed={logGrant?.id === grant.id}
+                                            onClick={() =>
+                                                setLogGrant((now) =>
+                                                    now?.id === grant.id ? null : grant
+                                                )
+                                            }
+                                        >
+                                            <History className="size-4 shrink-0" aria-hidden />
+                                        </Button>
+                                    ) : null}
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -393,6 +436,33 @@ export function ShareDialog({
                     )}
                 </section>
 
+                {madeLink ? (
+                    <div
+                        role="status"
+                        className="flex min-w-0 flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3"
+                    >
+                        <p className="text-[12px] text-muted-foreground">{t("share.linkMade")}</p>
+                        <div className="flex min-w-0 items-center gap-2">
+                            <Input
+                                readOnly
+                                value={madeLink}
+                                aria-label={t("share.linkName")}
+                                onFocus={(event) => event.target.select()}
+                                className="min-w-0 flex-1"
+                            />
+                            <Button
+                                size="icon"
+                                variant="outline"
+                                aria-label={t("share.copyLink")}
+                                title={t("share.copyLink")}
+                                onClick={() => void copyLink()}
+                            >
+                                <Copy className="size-4 shrink-0" aria-hidden />
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+
                 <section
                     className="flex flex-col gap-3 border-t border-border pt-4"
                     aria-label={t("share.more")}
@@ -404,6 +474,9 @@ export function ShareDialog({
                         onValueChange={(next) => {
                             setKind(next);
                             setPrincipalId("");
+                            if (next === "link" && !linkCapabilities.includes(capability)) {
+                                pickCapability(linkCapabilities[0] ?? capability);
+                            }
                         }}
                         options={[
                             { value: "user", label: t("share.person") },
@@ -418,11 +491,25 @@ export function ShareDialog({
                                 label: t("share.role"),
                                 disabled: !candidates.some((one) => one.type === "role"),
                                 title: t("share.roleHint")
-                            }
+                            },
+                            ...(linkable
+                                ? [
+                                      {
+                                          value: "link" as const,
+                                          label: t("share.linkChoice"),
+                                          title: t("share.linkHint")
+                                      }
+                                  ]
+                                : [])
                         ]}
                     />
 
-                    {kind === "user" ? (
+                    {asLink ? (
+                        <p className="flex items-start gap-2 text-[12px] text-foreground-subtle">
+                            <Link2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+                            {t("share.linkHint")}
+                        </p>
+                    ) : kind === "user" ? (
                         <div className="flex flex-col gap-1">
                             <label
                                 className="text-[12px] text-muted-foreground"
@@ -494,12 +581,18 @@ export function ShareDialog({
                             onValueChange={pickCapability}
                             options={capabilities.map((one) => ({
                                 value: one,
-                                label: capabilityLabel(one)
+                                label: capabilityLabel(one),
+                                disabled: asLink && !linkCapabilities.includes(one)
                             }))}
                         />
                         <p className="text-[12px] text-foreground-subtle">
                             {capabilityHint(capability)}
                         </p>
+                        {asLink && linkNarrower ? (
+                            <p className="text-[12px] text-foreground-subtle">
+                                {t("share.linkSeeOnly")}
+                            </p>
+                        ) : null}
                     </div>
 
                     {reachable.length > 1 ? (
@@ -566,6 +659,29 @@ export function ShareDialog({
                                                 type="date"
                                                 value={endsAt}
                                                 onChange={(event) => setEndsAt(event.target.value)}
+                                            />
+                                        </Field>
+                                        <Field label={t("share.checkIn")} htmlFor="share-check-in">
+                                            <Input
+                                                id="share-check-in"
+                                                type="time"
+                                                value={checkIn}
+                                                disabled={!startsAt}
+                                                onChange={(event) => setCheckIn(event.target.value)}
+                                            />
+                                        </Field>
+                                        <Field
+                                            label={t("share.checkOut")}
+                                            htmlFor="share-check-out"
+                                        >
+                                            <Input
+                                                id="share-check-out"
+                                                type="time"
+                                                value={checkOut}
+                                                disabled={!endsAt}
+                                                onChange={(event) =>
+                                                    setCheckOut(event.target.value)
+                                                }
                                             />
                                         </Field>
                                     </div>
@@ -701,64 +817,28 @@ export function ShareDialog({
 
                     <div className="flex justify-end">
                         <Button
-                            disabled={busy || !principalId || noAction || badFence}
-                            aria-disabled={busy || !principalId || noAction || badFence}
+                            disabled={busy || !ready || noAction || badFence}
+                            aria-disabled={busy || !ready || noAction || badFence}
                             onClick={() => void add()}
                         >
                             {busy ? (
                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                            ) : asLink ? (
+                                <Link2 className="size-4 shrink-0" aria-hidden />
                             ) : null}
-                            {t("share.share")}
+                            {asLink ? t("share.makeLink") : t("share.share")}
                         </Button>
                     </div>
-
-                    {linkable ? (
-                        <div className="flex flex-col gap-2 border-t border-border pt-3">
-                            <p className="text-[13px] font-medium text-foreground">
-                                {t("share.linkTitle")}
-                            </p>
-                            <p className="text-[12px] text-foreground-subtle">
-                                {t("share.linkHint")}
-                            </p>
-                            {madeLink ? (
-                                <div className="flex min-w-0 flex-col gap-2">
-                                    <p className="text-[12px] text-muted-foreground">
-                                        {t("share.linkMade")}
-                                    </p>
-                                    <div className="flex min-w-0 items-center gap-2">
-                                        <Input
-                                            readOnly
-                                            value={madeLink}
-                                            aria-label={t("share.linkName")}
-                                            onFocus={(event) => event.target.select()}
-                                            className="min-w-0 flex-1"
-                                        />
-                                        <Button
-                                            size="icon"
-                                            variant="outline"
-                                            aria-label={t("share.copyLink")}
-                                            title={t("share.copyLink")}
-                                            onClick={() => void copyLink()}
-                                        >
-                                            <Copy className="size-4 shrink-0" aria-hidden />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ) : null}
-                            <div className="flex justify-end">
-                                <Button
-                                    variant="outline"
-                                    disabled={busy || noAction || badFence}
-                                    aria-disabled={busy || noAction || badFence}
-                                    onClick={() => void makeLink()}
-                                >
-                                    <Link2 className="size-4 shrink-0" aria-hidden />
-                                    {t("share.makeLink")}
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
                 </section>
+                {bounded && open ? (
+                    <AccessLog
+                        subject={subject}
+                        subjectId={subjectId}
+                        grantId={logGrant?.id ?? null}
+                        grantLabel={logGrant ? who(logGrant) : ""}
+                        onClearGrant={() => setLogGrant(null)}
+                    />
+                ) : null}
                 {extra}
                 {confirmDialog}
             </DialogContent>
@@ -795,7 +875,15 @@ function describe(
 ): string {
     // `core.describeGrant`'s sentence, in the reader's words.
     const schedule = grant.schedule;
-    const day = (iso: string) => iso.slice(0, 10);
+    // The day, and the time too when the bound is a check-in or a check-out
+    // rather than the whole day.
+    const day = (iso: string) => {
+        const at = new Date(iso);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const date = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+        const clock = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+        return clock === "00:00" || clock === "23:59" ? date : `${date} ${clock}`;
+    };
     const parts: string[] = [];
     if (schedule.startsAt && schedule.endsAt) {
         parts.push(t("share.range", { from: day(schedule.startsAt), to: day(schedule.endsAt) }));
