@@ -32,6 +32,7 @@ const MIC = key("call", "Call", run("call.mic"));
 const DEAFEN = key("call", "Call", run("call.deafen"));
 const CAMERA = key("call", "Call", run("call.camera"));
 const RECORD = key("call", "Call", run("call.record"));
+const SHARE = key("call", "Call", run("call.share"));
 const HANGUP = key("call", "Call", run("call.hangup"));
 const UNREAD = key("key", "Action", run("chat.unread"));
 const CHAT = key("key", "Action", run("chat.open"));
@@ -55,9 +56,9 @@ export const DECKS = [
         deviceType: 0,
         model: "20GBA9901",
         keys: [
-            [BACK, MIC, DEAFEN, CAMERA, HANGUP],
-            [UNREAD, NOTIFICATIONS, ALARMS, BUSY, RECORD],
-            [PLACE, PLACE, PLACE, TIMER, HOME]
+            [BACK, MIC, DEAFEN, CAMERA, SHARE],
+            [HANGUP, RECORD, UNREAD, NOTIFICATIONS, ALARMS],
+            [PLACE, PLACE, BUSY, TIMER, HOME]
         ]
     },
     {
@@ -66,7 +67,7 @@ export const DECKS = [
         model: "20GAI9901",
         keys: [
             [BACK, MIC, DEAFEN],
-            [CAMERA, HANGUP, UNREAD]
+            [CAMERA, SHARE, HANGUP]
         ]
     },
     {
@@ -74,7 +75,7 @@ export const DECKS = [
         deviceType: 2,
         model: "20GAT9901",
         keys: [
-            [BACK, MIC, DEAFEN, CAMERA, RECORD, HANGUP, null, null],
+            [BACK, MIC, DEAFEN, CAMERA, SHARE, RECORD, HANGUP, null],
             [UNREAD, CHAT, NOTIFICATIONS, ALARMS, BUSY, null, null, null],
             [PLACE, PLACE, PLACE, PLACE, null, null, null, null],
             [TIMER, HOME, null, null, null, null, null, null]
@@ -86,7 +87,7 @@ export const DECKS = [
         model: "20GBD9901",
         keys: [
             [BACK, MIC, DEAFEN, HANGUP],
-            [UNREAD, NOTIFICATIONS, CAMERA, PLACE]
+            [CAMERA, SHARE, UNREAD, PLACE]
         ],
         dials: [PLACES_DIAL, PLACES_DIAL, TIMER, null]
     },
@@ -96,7 +97,7 @@ export const DECKS = [
         model: "20GBJ9901",
         keys: [
             [BACK, MIC, DEAFEN, HANGUP],
-            [UNREAD, NOTIFICATIONS, CAMERA, PLACE]
+            [CAMERA, SHARE, UNREAD, PLACE]
         ]
     },
     {
@@ -104,7 +105,7 @@ export const DECKS = [
         deviceType: 13,
         model: "20GBX9901",
         keys: [
-            [BACK, MIC, DEAFEN, CAMERA, RECORD, HANGUP, null, null, null],
+            [BACK, MIC, DEAFEN, CAMERA, SHARE, RECORD, HANGUP, null, null],
             [UNREAD, CHAT, NOTIFICATIONS, ALARMS, BUSY, null, null, null, null],
             [PLACE, PLACE, PLACE, PLACE, null, null, null, null, null],
             [TIMER, HOME, null, null, null, null, null, null, null]

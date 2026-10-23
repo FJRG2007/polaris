@@ -127,4 +127,12 @@ describe("the bundled profiles", () => {
             expect(page.Controllers.some((c) => c.Type === "Encoder")).toBe(Boolean(deck.dials));
         }
     });
+
+    it("put the whole call on every deck, sharing the screen included", () => {
+        const call = ["call.mic", "call.deafen", "call.camera", "call.share", "call.hangup"];
+        for (const deck of decks) {
+            const ids = deck.keys.flat().map((spec) => spec?.settings.action);
+            for (const id of call) expect(ids).toContain(id);
+        }
+    });
 });
