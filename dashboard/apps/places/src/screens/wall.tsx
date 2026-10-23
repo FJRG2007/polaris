@@ -1,89 +1,118 @@
 "use client";
 
 /**
- * The wall: every camera in this place, grouped by where it points.
+ * The wall: the cameras being shown, grouped by where they point.
  *
- * The shell is on screen before anything has been asked for, and the cameras
- * arrive after - so the page never waits on a relay or a camera that is asleep.
- * Which of them the relay is actually serving is a second, slower question, and
- * it lands on its own without holding the tiles back.
+ * The cameras screen fetches the list and hands it over, so the wall and the
+ * compact list read the same cameras and the same filters. Which of them the
+ * relay is actually serving is a second, slower question the screen asks on its
+ * own, without holding the tiles back.
  *
  * What the detectors are following is asked for here rather than in each tile.
  * One ask covers the whole wall, so a house with twelve cameras costs what a
  * house with one does; the tiles are handed their own boxes and draw them.
  */
 
-import Link from "next/link";
 import * as actions from "./actions";
-import { Cctv, Eye, EyeOff, Layers, Plus } from "lucide-react";
+import { Eye, EyeOff, Layers } from "lucide-react";
 import { CameraSetsDialog } from "./cameras/camera-sets-dialog";
 import { usePlaceRooms } from "./use-place-rooms";
 import { CameraTile } from "./camera-tile";
 import { CameraViewer } from "./camera-viewer";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useDetections } from "./use-detections";
 import { usePlacesT } from "./use-places-t";
 import type { CameraView } from "../lib/cameras";
-import { Button, EmptyState, Skeleton } from "@polaris/ui";
+import type { CameraPrivacy } from "./use-camera-privacy";
+import { Button, Skeleton } from "@polaris/ui";
 import {
-    applyPrivacy,
     groupState,
     nextPrivacy,
-    rollbackPrivacy,
-    settlePrivacy,
     targetKey,
     type CameraSetView,
     type PrivacyTarget
 } from "../lib/privacy-kinds";
 
-/**
- * How long to wait before asking the relay again about a camera it is not
- * serving yet, by how many times it has been asked since.
- *
- * Quick at first: a camera that just came back from privacy is published again
- * within a second or two, and a single ask the moment the switch answered lands
- * before the relay has picked it up - the tile then said "Starting" until the
- * page was reloaded. Slower after that, so a camera that is really down costs
- * the relay one question every half a minute.
- */
-const LIVE_RECHECK_MS = [2_000, 2_000, 3_000, 5_000, 10_000, 30_000];
-
-export function Wall({ canManage, canControl }: { canManage: boolean; canControl: boolean }) {
+/** The switch over a group of cameras: private unless all already are. Named
+ *  groups (rooms, sets) carry their name; a zone's sits by its heading. */
+function GroupSwitch({
+    label,
+    target,
+    group,
+    named = false,
+    privacy
+}: {
+    label: string;
+    target: PrivacyTarget;
+    group: readonly CameraView[];
+    named?: boolean;
+    privacy: CameraPrivacy;
+}) {
     const t = usePlacesT();
-    const [cameras, setCameras] = useState<CameraView[] | null>(null);
-    const [live, setLive] = useState<Set<string>>(() => new Set());
-    const [error, setError] = useState<string | null>(null);
-    const [opened, setOpened] = useState<string | null>(null);
-    /** How many times the relay has been asked again since the last change. */
-    const [recheck, setRecheck] = useState(0);
+    if (group.length === 0) return null;
+    const rows = group.map((camera) => ({ private: camera.privacy }));
+    const wanted = nextPrivacy(rows);
+    const words = wanted
+        ? t("privacy.groupOn", { group: label })
+        : t("privacy.groupOff", { group: label });
+    const flip = () =>
+        void privacy.switchPrivacy(
+            target,
+            group.map((camera) => camera.id),
+            wanted
+        );
+    const icon = wanted ? (
+        <EyeOff className="size-4 shrink-0" />
+    ) : (
+        <Eye className="size-4 shrink-0" />
+    );
+    if (named)
+        return (
+            <Button
+                variant="ghost"
+                size="sm"
+                className="min-w-0 max-w-48"
+                aria-pressed={groupState(rows).all}
+                aria-label={words}
+                title={words}
+                onClick={flip}
+            >
+                {icon}
+                <span className="truncate">{label}</span>
+            </Button>
+        );
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            aria-pressed={groupState(rows).all}
+            aria-label={words}
+            title={words}
+            onClick={flip}
+        >
+            {icon}
+        </Button>
+    );
+}
 
-    useEffect(() => {
-        let cancelled = false;
-        void (async () => {
-            const result = await actions.listCamerasAction();
-            if (cancelled) return;
-            if (result.error) setError(result.error);
-            setCameras(result.cameras ?? []);
-            // Only worth asking once there is something to ask about.
-            if (!result.cameras?.length) return;
-            const status = await actions.liveCamerasAction();
-            if (!cancelled && status.live) setLive(new Set(status.live));
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    // Every camera on the wall, in one ask. Stopped while one is open: the wall
-    // behind a dialog is standing still, and the viewer asks for its own.
-    const [privacyError, setPrivacyError] = useState<string | null>(null);
-    const [untrusted, setUntrusted] = useState<{
-        target: PrivacyTarget;
-        ids: readonly string[];
-        cameraIds: readonly string[];
-        wanted: boolean;
-    } | null>(null);
-    const placeId = cameras?.[0]?.placeId ?? "";
+/**
+ * Privacy over groups of cameras - the whole place, its rooms, its sets - and
+ * what went wrong the last time a switch was pressed. Above the wall and the
+ * list alike, over every camera in the place rather than the ones a search left.
+ */
+export function CameraGroups({
+    cameras,
+    canManage,
+    canControl,
+    privacy
+}: {
+    cameras: readonly CameraView[];
+    canManage: boolean;
+    canControl: boolean;
+    privacy: CameraPrivacy;
+}) {
+    const t = usePlacesT();
+    const placeId = cameras[0]?.placeId ?? "";
     const [rooms] = usePlaceRooms(placeId);
     const [sets, setSets] = useState<CameraSetView[]>([]);
     const [managingSets, setManagingSets] = useState(false);
@@ -104,190 +133,9 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         };
     }, [placeId]);
 
-    /**
-     * Privacy for one camera or a group. Shown at once, then each camera's own
-     * answer replaces it: one that refused goes back on its own, and a call that
-     * failed outright puts every camera back.
-     */
-    async function switchPrivacy(
-        target: PrivacyTarget,
-        ids: readonly string[],
-        wanted: boolean,
-        trusting: readonly string[] = []
-    ) {
-        const list = cameras ?? [];
-        const before = new Map(
-            list
-                .filter((camera) => ids.includes(camera.id))
-                .map((camera) => [camera.id, camera.privacy])
-        );
-        setPrivacyError(null);
-        setUntrusted(null);
-        setCameras((current) => applyPrivacy(current ?? [], ids, wanted));
-        const result =
-            trusting.length > 0
-                ? await actions.trustCamerasAgainAction(trusting, targetKey(target), wanted)
-                : await actions.cameraPrivacyAction(targetKey(target), wanted);
-        if (result.error || !result.results) {
-            setCameras((current) => rollbackPrivacy(current ?? [], before));
-            setPrivacyError(result.error ?? t("privacy.failed"));
-            return;
-        }
-        const results = result.results;
-        setCameras((current) => settlePrivacy(current ?? [], results));
-        // A camera made public again is on its way back to the relay: ask again
-        // from the quick end until it is served.
-        if (results.some((row) => !row.private && before.get(row.cameraId))) setRecheck(0);
-        const failed = results.filter((row) => row.failure);
-        if (failed.length === 0) return;
-        const first = failed[0];
-        const refused = failed
-            .filter((row) => row.failure === "certificate")
-            .map((row) => row.cameraId);
-        if (canManage && refused.length > 0)
-            setUntrusted({ target, ids, cameraIds: refused, wanted });
-        const reason =
-            first?.failure === "locked"
-                ? t("privacy.locked", { seconds: first.waitSeconds ?? 0 })
-                : t(`privacy.${first?.failure ?? "failed"}`);
-        setPrivacyError(
-            `${t("privacy.failedSome", {
-                count: failed.length,
-                total: results.length,
-                names: failed.map((row) => row.name).join(", ")
-            })} ${reason}`
-        );
-    }
+    if (!placeId) return null;
 
-    /** The switch over a group of cameras: private unless all already are.
-     *  Named groups (rooms, sets) carry their name; a zone's sits by its heading. */
-    function groupSwitch(
-        label: string,
-        target: PrivacyTarget,
-        group: readonly CameraView[],
-        named = false
-    ) {
-        if (!canControl || group.length === 0) return null;
-        const rows = group.map((camera) => ({ private: camera.privacy }));
-        const wanted = nextPrivacy(rows);
-        const words = wanted
-            ? t("privacy.groupOn", { group: label })
-            : t("privacy.groupOff", { group: label });
-        if (named)
-            return (
-                <Button
-                    key={targetKey(target)}
-                    variant="ghost"
-                    size="sm"
-                    className="min-w-0 max-w-48"
-                    aria-pressed={groupState(rows).all}
-                    aria-label={words}
-                    title={words}
-                    onClick={() =>
-                        void switchPrivacy(
-                            target,
-                            group.map((camera) => camera.id),
-                            wanted
-                        )
-                    }
-                >
-                    {wanted ? (
-                        <EyeOff className="size-4 shrink-0" />
-                    ) : (
-                        <Eye className="size-4 shrink-0" />
-                    )}
-                    <span className="truncate">{label}</span>
-                </Button>
-            );
-        return (
-            <Button
-                variant="ghost"
-                size="icon"
-                aria-pressed={groupState(rows).all}
-                aria-label={words}
-                title={words}
-                onClick={() =>
-                    void switchPrivacy(
-                        target,
-                        group.map((camera) => camera.id),
-                        wanted
-                    )
-                }
-            >
-                {wanted ? (
-                    <EyeOff className="size-4 shrink-0" />
-                ) : (
-                    <Eye className="size-4 shrink-0" />
-                )}
-            </Button>
-        );
-    }
-
-    const watching = useMemo(() => (cameras ?? []).map((camera) => camera.id), [cameras]);
-    const boxes = useDetections(watching, opened === null);
-
-    // A camera that should be on the relay and is not is asked about again
-    // until it is, rather than left on "Starting" until a reload. Stopped while
-    // one is open: the viewer asks for its own.
-    const waiting = (cameras ?? []).some(
-        (camera) => camera.enabled && !camera.privacy && !live.has(camera.id)
-    );
-    useEffect(() => {
-        if (!waiting || opened !== null) return;
-        let current = true;
-        const next = () => {
-            if (current) setRecheck((value) => value + 1);
-        };
-        const controller = new AbortController();
-        const timer = setTimeout(
-            () =>
-                void fetch("/api/home/cameras/live", {
-                    signal: controller.signal,
-                    cache: "no-store"
-                })
-                    .then((response): Promise<{ live?: string[] }> =>
-                        response.ok ? response.json() : Promise.resolve({})
-                    )
-                    .then((status) => {
-                        if (current && status.live) setLive(new Set(status.live));
-                        next();
-                    }, next),
-            LIVE_RECHECK_MS[Math.min(recheck, LIVE_RECHECK_MS.length - 1)]
-        );
-        return () => {
-            current = false;
-            controller.abort();
-            clearTimeout(timer);
-        };
-    }, [waiting, opened, recheck]);
-
-    if (cameras === null) return <WallSkeleton />;
-
-    if (error && cameras.length === 0) {
-        return <EmptyState icon={<Cctv />} title={t("wall.listFailed")} description={error} />;
-    }
-
-    if (cameras.length === 0) {
-        return (
-            <EmptyState
-                icon={<Cctv />}
-                title={t("wall.empty.title")}
-                description={canManage ? t("wall.empty.manage") : t("wall.empty.view")}
-                action={
-                    canManage ? (
-                        <Button asChild size="sm">
-                            <Link href="/places/cameras">
-                                <Plus className="size-4 shrink-0" />
-                                {t("wall.empty.add")}
-                            </Link>
-                        </Button>
-                    ) : undefined
-                }
-            />
-        );
-    }
-
-    // Rooms with a camera on this wall, then the sets, each by what it holds.
+    // Rooms with a camera here, then the sets, each by what it holds.
     const namedGroups: { label: string; target: PrivacyTarget; cameras: CameraView[] }[] = [
         ...(rooms ?? []).map((room) => ({
             label: room.name,
@@ -301,90 +149,144 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         }))
     ].filter((group) => group.cameras.length > 0);
 
-    const zones = [...new Set(cameras.map((camera) => camera.zone))].sort((left, right) =>
-        left === "" ? 1 : right === "" ? -1 : left.localeCompare(right)
-    );
+    const untrusted = privacy.untrusted;
+    const showGroups = (canControl && namedGroups.length > 0) || canManage;
+    if (!privacy.error && !canControl && !showGroups) return null;
 
     return (
-        <div className="flex flex-col gap-6">
-            {cameras[0]?.placeId ? (
-                <div className="-mb-4 flex items-center justify-end gap-2">
-                    {privacyError ? (
-                        <p role="alert" className="min-w-0 flex-1 text-[0.75rem] text-danger">
-                            {privacyError}
-                        </p>
-                    ) : null}
-                    {privacyError && untrusted ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="min-w-0 max-w-48"
-                            title={t("privacy.trustAgain")}
-                            onClick={() =>
-                                void switchPrivacy(
-                                    untrusted.target,
-                                    untrusted.ids,
-                                    untrusted.wanted,
-                                    untrusted.cameraIds
-                                )
-                            }
-                        >
-                            <span className="truncate">{t("privacy.trustAgain")}</span>
-                        </Button>
-                    ) : null}
-                    {groupSwitch(
-                        t("privacy.allCameras"),
-                        { kind: "place", id: cameras[0].placeId },
-                        cameras
-                    )}
-                </div>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
+            {privacy.error ? (
+                <p role="alert" className="min-w-0 flex-1 basis-60 text-[0.75rem] text-danger">
+                    {privacy.error}
+                </p>
             ) : null}
-            {placeId && ((canControl && namedGroups.length > 0) || canManage) ? (
-                <div className="-mb-4 flex min-w-0 flex-wrap items-center justify-end gap-1">
-                    {namedGroups.map((group) =>
-                        groupSwitch(group.label, group.target, group.cameras, true)
-                    )}
-                    {canManage ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={t("cameraSets.title")}
-                            title={t("cameraSets.title")}
-                            onClick={() => setManagingSets(true)}
-                        >
-                            <Layers className="size-4 shrink-0" />
-                        </Button>
-                    ) : null}
-                </div>
+            {privacy.error && untrusted ? (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-w-0 max-w-48"
+                    title={t("privacy.trustAgain")}
+                    onClick={() =>
+                        void privacy.switchPrivacy(
+                            untrusted.target,
+                            untrusted.ids,
+                            untrusted.wanted,
+                            untrusted.cameraIds
+                        )
+                    }
+                >
+                    <span className="truncate">{t("privacy.trustAgain")}</span>
+                </Button>
+            ) : null}
+            {canControl
+                ? namedGroups.map((group) => (
+                      <GroupSwitch
+                          key={targetKey(group.target)}
+                          label={group.label}
+                          target={group.target}
+                          group={group.cameras}
+                          named
+                          privacy={privacy}
+                      />
+                  ))
+                : null}
+            {canManage ? (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("cameraSets.title")}
+                    title={t("cameraSets.title")}
+                    onClick={() => setManagingSets(true)}
+                >
+                    <Layers className="size-4 shrink-0" />
+                </Button>
+            ) : null}
+            {canControl ? (
+                <GroupSwitch
+                    label={t("privacy.allCameras")}
+                    target={{ kind: "place", id: placeId }}
+                    group={cameras}
+                    privacy={privacy}
+                />
             ) : null}
             {managingSets ? (
                 <CameraSetsDialog
                     open
                     placeId={placeId}
-                    cameras={cameras}
+                    cameras={[...cameras]}
                     sets={sets}
                     onClose={() => setManagingSets(false)}
                     onChange={setSets}
                 />
             ) : null}
+        </div>
+    );
+}
+
+export function Wall({
+    cameras,
+    shown,
+    live,
+    canControl,
+    privacy,
+    menuFor,
+    onWatching,
+    onPrivacyPreset
+}: {
+    /** Every camera in the place, for the zone switches. */
+    cameras: readonly CameraView[];
+    /** The ones the filters left, which are the ones drawn. */
+    shown: readonly CameraView[];
+    live: ReadonlySet<string>;
+    canControl: boolean;
+    privacy: CameraPrivacy;
+    /** What a camera's tile offers to manage it, or nothing for a reader who
+     *  may not. */
+    menuFor?: (camera: CameraView) => ReactNode;
+    /** Told whether a camera is open in the viewer, while the wall stands still. */
+    onWatching?: (watching: boolean) => void;
+    /** Told a camera's stored privacy position once the viewer changed it. */
+    onPrivacyPreset: (cameraId: string, preset: string) => void;
+}) {
+    const t = usePlacesT();
+    const [opened, setOpened] = useState<string | null>(null);
+    useEffect(() => onWatching?.(opened !== null), [opened, onWatching]);
+
+    // Every camera on the wall, in one ask. Stopped while one is open: the wall
+    // behind a dialog is standing still, and the viewer asks for its own.
+    const watching = useMemo(() => shown.map((camera) => camera.id), [shown]);
+    const boxes = useDetections(watching, opened === null);
+
+    const zones = [...new Set(shown.map((camera) => camera.zone))].sort((left, right) =>
+        left === "" ? 1 : right === "" ? -1 : left.localeCompare(right)
+    );
+    const placeId = cameras[0]?.placeId ?? "";
+    const viewing = opened ? cameras.find((camera) => camera.id === opened) : undefined;
+
+    return (
+        <div className="flex flex-col gap-6">
             {zones.map((zone) => (
                 <section key={zone || "unplaced"} className="flex flex-col gap-2">
                     {zones.length > 1 ? (
                         <div className="flex min-w-0 items-center gap-1">
-                            <h2 className="truncate text-[0.6875rem] font-semibold uppercase tracking-wide text-foreground-subtle">
+                            <h2
+                                className="truncate text-[0.6875rem] font-semibold uppercase tracking-wide text-foreground-subtle"
+                                title={zone || t("wall.unzoned")}
+                            >
                                 {zone || t("wall.unzoned")}
                             </h2>
-                            {zone && cameras[0]?.placeId
-                                ? groupSwitch(
-                                      zone,
-                                      { kind: "zone", placeId: cameras[0].placeId, zone },
-                                      cameras.filter((camera) => camera.zone === zone)
-                                  )
-                                : null}
+                            {zone && placeId && canControl ? (
+                                <GroupSwitch
+                                    label={zone}
+                                    target={{ kind: "zone", placeId, zone }}
+                                    group={cameras.filter((camera) => camera.zone === zone)}
+                                    privacy={privacy}
+                                />
+                            ) : null}
                         </div>
                     ) : null}
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {cameras
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                        {shown
                             .filter((camera) => camera.zone === zone)
                             .map((camera) => (
                                 <CameraTile
@@ -404,30 +306,25 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                                     idle={opened !== null}
                                     onOpen={() => setOpened(camera.id)}
                                     onPrivacy={(wanted) =>
-                                        void switchPrivacy(
+                                        void privacy.switchPrivacy(
                                             { kind: "camera", id: camera.id },
                                             [camera.id],
                                             wanted
                                         )
                                     }
+                                    menu={menuFor?.(camera)}
                                 />
                             ))}
                     </div>
                 </section>
             ))}
 
-            {opened ? (
+            {viewing ? (
                 <CameraViewer
-                    camera={cameras.find((camera) => camera.id === opened) as CameraView}
+                    camera={viewing}
                     canControl={canControl}
                     onClose={() => setOpened(null)}
-                    onPrivacyPreset={(preset) =>
-                        setCameras((current) =>
-                            (current ?? []).map((camera) =>
-                                camera.id === opened ? { ...camera, privacyPreset: preset } : camera
-                            )
-                        )
-                    }
+                    onPrivacyPreset={(preset) => onPrivacyPreset(viewing.id, preset)}
                 />
             ) : null}
         </div>
@@ -436,9 +333,9 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
 
 /** The shape of the wall while it is being fetched, so the page does not jump
  *  once the cameras land. */
-function WallSkeleton() {
+export function WallSkeleton() {
     return (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {[0, 1, 2].map((index) => (
                 <div
                     key={index}

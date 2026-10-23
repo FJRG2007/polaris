@@ -9,8 +9,6 @@
         "quiet": "Quiet",
         "rec": "REC",
         "recording": "Recording",
-        "settings": "Settings",
-        "settingsFor": "Settings for {name}",
         "starting": "Starting",
         "switchedOff": "Switched off"
     },
@@ -41,6 +39,13 @@
             "motion": "Kept on movement",
             "off": "Nothing kept"
         },
+        "layout": {
+            "label": "Show as",
+            "list": "List",
+            "wall": "Wall"
+        },
+        "listFailed": "The cameras could not be listed",
+        "moreFor": "More for {name}",
         "noArea": "No area",
         "noMatch": {
             "description": "Nothing here is called that, or is at that address, in the area you are looking at.",
@@ -60,7 +65,11 @@
         "search": "Search cameras",
         "share": "Share",
         "shareName": "Share {name}",
-        "subtitleQuiet": "Not answering since {since}"
+        "subtitleQuiet": "Not answering since {since}",
+        "switchFailed": "That camera could not be changed. Try again.",
+        "switchOff": "Switch off",
+        "switchOn": "Switch on",
+        "whatItKeeps": "What it keeps"
     },
     "common": {
         "cancel": "Cancel",
@@ -149,7 +158,7 @@
             "title": "Alerts"
         },
         "cameras": {
-            "description": "What each camera is, how Polaris reaches it, and what it is allowed to notice.",
+            "description": "Every camera here, what it sees right now, and how it is set up.",
             "title": "Cameras"
         },
         "clips": {
@@ -168,10 +177,6 @@
             "description": "Teach the cameras who lives here, so everybody else is the one worth reporting. The photographs stay on the machine running the recognizer.",
             "title": "People"
         },
-        "place": {
-            "addCamera": "Add a camera",
-            "description": "Every camera here, and what it can see right now."
-        },
         "settings": {
             "description": "Where the house keeps what it records, and what recognizes faces.",
             "title": "Settings"
@@ -182,9 +187,6 @@
         },
         "overview": {
             "description": "How this place is doing right now: what is on, what needs you, and what the cameras saw."
-        },
-        "live": {
-            "title": "Live"
         }
     },
     "placeOverview": {
@@ -363,13 +365,6 @@
         "zoomReset": "{scale}x - reset"
     },
     "wall": {
-        "empty": {
-            "add": "Add a camera",
-            "manage": "Add one and Polaris will find its streams, or look for the ones already on your network.",
-            "title": "No cameras yet",
-            "view": "Nobody has added a camera to this house yet."
-        },
-        "listFailed": "The cameras could not be listed",
         "unzoned": "Everywhere else"
     },
     "dialog": {

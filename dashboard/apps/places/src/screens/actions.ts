@@ -1084,6 +1084,37 @@ export async function clearPrivacyPositionAction(cameraId: string): Promise<{ er
 }
 
 /**
+ * Switch a camera on or off, or change what it keeps, from the wall or the list.
+ *
+ * The relay follows: a camera switched off is dropped from it, as a removed one
+ * is, and one switched back on is handed to it again.
+ */
+export async function switchCameraAction(
+    id: string,
+    input: unknown
+): Promise<{ camera?: cameras.CameraView; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const parsed = schemas.cameraSwitchSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("actions.someWrong") };
+    const result = await guard(async () => {
+        const camera = await cameras.switchCamera(install.id, String(id), parsed.data);
+        if (parsed.data.enabled === false) {
+            const endpoint = await relay.relayEndpoint(relay.relayServerFor(camera.reachVia));
+            if (endpoint) await relay.unpublishCamera(endpoint, camera.id);
+        }
+        return camera;
+    });
+    if (result.error || !result.value)
+        return { error: result.error ?? (await say("actions.cameraNotSaved")) };
+    // Handing it back to the relay can take a while the first time, so the
+    // switch answers at once and the tile shows the camera starting.
+    if (parsed.data.enabled === true && !result.value.privacy)
+        void startCameraAction(result.value.id).catch(() => null);
+    revalidatePath(PATH);
+    return { camera: result.value };
+}
+
+/**
  * Turn privacy on or off for a camera, a zone or a whole place.
  *
  * `home.control`, the same as pointing a camera: somebody a camera was lent to

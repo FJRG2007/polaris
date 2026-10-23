@@ -9,8 +9,6 @@
         "quiet": "Inactiva",
         "rec": "REC",
         "recording": "Grabando",
-        "settings": "Ajustes",
-        "settingsFor": "Ajustes de {name}",
         "starting": "Iniciando",
         "switchedOff": "Apagada"
     },
@@ -41,6 +39,13 @@
             "motion": "Guarda movimiento",
             "off": "No guarda nada"
         },
+        "layout": {
+            "label": "Ver como",
+            "list": "Lista",
+            "wall": "Mosaico"
+        },
+        "listFailed": "No se han podido listar las cámaras",
+        "moreFor": "Más de {name}",
         "noArea": "Sin zona",
         "noMatch": {
             "description": "En la zona que estás viendo no hay nada que se llame así ni que esté en esa dirección.",
@@ -60,7 +65,11 @@
         "search": "Buscar cámaras",
         "share": "Compartir",
         "shareName": "Compartir {name}",
-        "subtitleQuiet": "No responde desde {since}"
+        "subtitleQuiet": "No responde desde {since}",
+        "switchFailed": "No se pudo cambiar esa cámara. Inténtalo otra vez.",
+        "switchOff": "Apagar",
+        "switchOn": "Encender",
+        "whatItKeeps": "Qué guarda"
     },
     "common": {
         "cancel": "Cancelar",
@@ -149,7 +158,7 @@
             "title": "Avisos"
         },
         "cameras": {
-            "description": "Qué es cada cámara, cómo llega Polaris a ella y qué puede detectar.",
+            "description": "Las cámaras de este sitio, lo que ven ahora y cómo están puestas.",
             "title": "Cámaras"
         },
         "clips": {
@@ -168,10 +177,6 @@
             "description": "Enseña a las cámaras quién vive aquí, para que solo se avise de los demás. Las fotos se quedan en la máquina que ejecuta el reconocedor.",
             "title": "Personas"
         },
-        "place": {
-            "addCamera": "Añadir cámara",
-            "description": "Todas las cámaras de este sitio y lo que ven ahora mismo."
-        },
         "settings": {
             "description": "Dónde guarda la casa lo que graba y qué reconoce las caras.",
             "title": "Ajustes"
@@ -182,9 +187,6 @@
         },
         "overview": {
             "description": "Cómo está este sitio ahora mismo: qué está encendido, qué necesita atención y qué han visto las cámaras."
-        },
-        "live": {
-            "title": "Directo"
         }
     },
     "placeOverview": {
@@ -363,13 +365,6 @@
         "zoomReset": "{scale}x - restablecer"
     },
     "wall": {
-        "empty": {
-            "add": "Añadir cámara",
-            "manage": "Añade una y Polaris encontrará sus emisiones, o busca las que ya están en tu red.",
-            "title": "Aún no hay cámaras",
-            "view": "Nadie ha añadido todavía una cámara a esta casa."
-        },
-        "listFailed": "No se han podido listar las cámaras",
         "unzoned": "Resto de sitios"
     },
     "dialog": {

@@ -2,7 +2,7 @@
  * The front page of a place: how it is doing, at a glance.
  *
  * What is on, what needs somebody, each room with its controls, and the cameras
- * as one card among those - the live wall is a press away at /places/live. The
+ * as one card among those - the live wall is a press away at /places/cameras. The
  * server hands over the frame and who may do what; everything inside it is read
  * by the client, so the page is on screen before any device account or camera
  * has been asked anything.
