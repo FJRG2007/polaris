@@ -17,7 +17,9 @@ const SHOTS: Readonly<Record<string, readonly string[]>> = {
     "status-pages": ["status-pages"],
     "mail-server": ["mail-server"],
     "cloud-servers": ["cloud-servers"],
-    "security-scans": ["security-scans"]
+    "security-scans": ["security-scans"],
+    crm: ["crm"],
+    "dns-blocker": ["network-filter"]
 };
 
 export interface AppScreenshot {
