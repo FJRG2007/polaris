@@ -54,6 +54,7 @@ export const TRIGGER_TYPES = [
     "core.onEvent",
     "core.failed",
     "core.threshold",
+    "core.connectivity",
     "core.called"
 ] as const;
 export const STEP_TYPES = [
@@ -106,6 +107,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.called": () => ({ inputs: [] }),
     "core.onEvent": () => ({ name: "" }),
     "core.failed": () => ({ automations: [] }),
+    "core.connectivity": () => ({ event: "up" }),
     "core.threshold": () => ({
         source: "",
         subjectId: "",
@@ -490,6 +492,20 @@ export function NodeFields({
             );
         case "core.message":
             return <ChatMessageFields config={config} set={set} />;
+        case "core.connectivity":
+            return (
+                <Field label={t("connectivity.when")}>
+                    <Select
+                        value={typeof config.event === "string" ? config.event : "up"}
+                        onValueChange={(event) => set({ event })}
+                        options={core.CONNECTIVITY_TRIGGER_EVENTS.map((event) => ({
+                            value: event,
+                            label: t(`connectivity.events.${event}`)
+                        }))}
+                        aria-label={t("connectivity.when")}
+                    />
+                </Field>
+            );
         case "core.threshold":
             return <ThresholdFields config={config} set={set} setConfig={setConfig} />;
         case "core.chat":

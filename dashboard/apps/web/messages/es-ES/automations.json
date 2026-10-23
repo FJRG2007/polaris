@@ -133,7 +133,8 @@
         "waitCondition": "Esperar una condición",
         "set": "Fijar valores",
         "message": "Publicar en un canal",
-        "threshold": "Una lectura cruza un umbral"
+        "threshold": "Una lectura cruza un umbral",
+        "connectivity": "Internet se cae o vuelve"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -626,7 +627,8 @@
         "waitCondition": "Pausa hasta que se cumpla una condición o se acabe el tiempo.",
         "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso.",
         "message": "Publica en un canal mediante su webhook, como bot.",
-        "threshold": "Empieza cuando una lectura de un servidor, servicio o SAI se pasa de un valor."
+        "threshold": "Empieza cuando una lectura de un servidor, servicio o SAI se pasa de un valor.",
+        "connectivity": "Empieza cuando la línea cae, vuelve, cambia de IP o deja de verse desde fuera."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -863,5 +865,22 @@
         "duration": "Duró",
         "notYet": "Aún no",
         "sinceStart": "{time} por ahora"
+    },
+    "connectivity": {
+        "when": "Cuándo",
+        "events": {
+            "down": "Internet se cae",
+            "up": "Internet vuelve",
+            "ipChanged": "Cambia la IP pública",
+            "unreachable": "Polaris no se ve desde fuera"
+        }
+    },
+    "templates": {
+        "internetBack": {
+            "name": "Avísame cuando vuelva internet",
+            "action": "Avísame cuando vuelva",
+            "noticeTitle": "Internet ha vuelto",
+            "noticeBody": "Estuvo caído {duration}."
+        }
     }
 }

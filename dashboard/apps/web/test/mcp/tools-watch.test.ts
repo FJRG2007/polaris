@@ -25,6 +25,34 @@ vi.mock("@/lib/tasks/access", () => ({}));
 vi.mock("@/lib/tasks/task-service", () => ({}));
 vi.mock("@/lib/tasks/task-detail-service", () => ({}));
 vi.mock("@/lib/watch-service", () => mocks);
+vi.mock("@/lib/connectivity/outage-tracker", () => ({
+    connectivityReport: async () => ({
+        periods: [{ key: "24h", uptime: 0.995, count: 1 }],
+        outages: [
+            {
+                startedAt: "2026-10-23T08:00:00.000Z",
+                endedAt: "2026-10-23T08:05:00.000Z",
+                kind: "line"
+            }
+        ]
+    })
+}));
+vi.mock("@/lib/connectivity/line-report", () => ({
+    lineReport: async (range: string) => ({
+        range,
+        now: {
+            at: "2026-10-23T12:00:00.000Z",
+            up: true,
+            kind: null,
+            since: null,
+            publicIp: "203.0.113.5"
+        },
+        totals: { samples: 60, latencyMs: 14, latencyMaxMs: 40, lossPct: 0.5, upPct: 99.5 },
+        ipChanges: [
+            { at: "2026-10-23T09:00:00.000Z", previous: "198.51.100.7", current: "203.0.113.5" }
+        ]
+    })
+}));
 
 const { MCP_TOOLS } = await import("@/lib/mcp/tools");
 const { handleMcpMessage } = await import("@/lib/mcp/protocol");
@@ -39,14 +67,14 @@ type ToolResult = { content: { text: string }[]; isError?: boolean; structuredCo
 async function call(
     name: string,
     args: Record<string, unknown>,
-    extra: { scopes?: string[]; projectId?: string } = {}
+    extra: { scopes?: string[]; projectId?: string; isAdmin?: boolean } = {}
 ) {
     const reply = await handleMcpMessage(
         { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } },
         MCP_TOOLS,
         {
             userId: "user-1",
-            isAdmin: false,
+            isAdmin: extra.isAdmin ?? false,
             scopes: (extra.scopes ?? ["deploy.read", "deploy.manage"]) as never,
             ...(extra.projectId ? { projectId: extra.projectId } : {})
         },
@@ -157,5 +185,24 @@ describe("the watch tools", () => {
             target: "Home server",
             condition: "cpu over 90 % for 2 checks"
         });
+    });
+});
+
+describe("watch_connectivity", () => {
+    it("reads the line, the periods, the outages and the public IP for an administrator", async () => {
+        const result = await call("watch_connectivity", { range: "24h" }, { isAdmin: true });
+        expect(result.isError).toBeFalsy();
+        const text = result.content[0]!.text;
+        expect(text).toContain("Now: Online");
+        expect(text).toContain("24h: latency 14 ms");
+        expect(text).toContain("24h: 99.50%, 1 outages");
+        expect(text).toContain("198.51.100.7 -> 203.0.113.5");
+        expect(result.structuredContent.range).toBe("24h");
+    });
+
+    it("is refused to anybody who does not manage this Polaris", async () => {
+        const result = await call("watch_connectivity", {});
+        expect(result.isError).toBe(true);
+        expect(result.content[0]!.text).toContain("manage this Polaris");
     });
 });

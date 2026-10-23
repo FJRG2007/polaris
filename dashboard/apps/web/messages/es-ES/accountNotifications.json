@@ -445,6 +445,22 @@
             "label": "Una dirección no responde",
             "description": "Una de las direcciones en las que se llega a este Polaris se ha caído, o ha vuelto."
         },
+        "networkInternetDown": {
+            "label": "Internet se cae",
+            "description": "Polaris perdió la conexión, o el servidor DNS dejó de responder."
+        },
+        "networkInternetBack": {
+            "label": "Internet vuelve",
+            "description": "La conexión vuelve a funcionar, y cuánto tiempo faltó."
+        },
+        "networkPublicIp": {
+            "label": "Cambia tu IP pública",
+            "description": "Cambió la dirección que tu conexión tiene en internet."
+        },
+        "networkUnreachable": {
+            "label": "Polaris no se ve desde fuera",
+            "description": "El nombre público ya no apunta a tu conexión."
+        },
         "integrationAttention": {
             "label": "Una integración necesita atención",
             "description": "Un servicio en el que alguien intentó conectar una cuenta ha rechazado la autorización."

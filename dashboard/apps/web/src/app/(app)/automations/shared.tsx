@@ -39,7 +39,8 @@ import {
     TriangleAlert,
     Webhook,
     Workflow,
-    type LucideIcon
+    type LucideIcon,
+    Wifi
 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -256,6 +257,7 @@ const NODE_KEYS = {
     "core.onEvent": "onEvent",
     "core.failed": "failed",
     "core.threshold": "threshold",
+    "core.connectivity": "connectivity",
     "core.switch": "switch",
     "core.parallel": "parallel",
     "core.join": "join",
@@ -318,6 +320,7 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "core.onEvent": Radio,
     "core.failed": TriangleAlert,
     "core.threshold": Gauge,
+    "core.connectivity": Wifi,
     "core.switch": Split,
     "core.parallel": Columns3,
     "core.join": Merge,

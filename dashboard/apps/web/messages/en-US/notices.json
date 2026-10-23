@@ -460,5 +460,16 @@
     "cloudLeft": {
         "title": "{name} may still be running in CloudAMQP",
         "body": "CloudAMQP refused the stored API key, so the instance {name} could not be removed there. Delete it in the CloudAMQP console so it stops billing."
+    },
+    "connectivity": {
+        "downTitle": "The internet is down",
+        "downBody": "Polaris cannot reach the internet. Everything on your local network keeps working; anything outside it waits until the line is back.",
+        "downBodyDns": "The line answers, but names do not resolve: the DNS server this box uses is not answering. Anything that looks up a name outside your network waits until it does.",
+        "backTitle": "The internet is back",
+        "backBody": "The connection is working again after {duration} without it.",
+        "ipTitle": "Your public IP changed",
+        "ipBody": "Your connection's public address went from {previous} to {current}. Anything outside that points at the old one stops reaching you until it is updated.",
+        "unreachableTitle": "Polaris is not reachable from outside",
+        "unreachableBody": "The internet works, but this dashboard's public name no longer points at your connection's address, so nobody outside your network can reach it. Check the domain in Settings."
     }
 }

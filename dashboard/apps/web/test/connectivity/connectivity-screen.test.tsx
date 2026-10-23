@@ -43,6 +43,9 @@ vi.mock("@/components/display-format", () => ({
             new Intl.NumberFormat("en-US", options).format(value)
     })
 }));
+vi.mock("@/app/(app)/automations/actions", () => ({
+    createAutomationAction: async () => ({ ok: true, id: "a1" })
+}));
 vi.mock("@/app/(app)/watch/connectivity/actions", () => ({
     checkConnectivityAction: async () => ({}),
     setMergeGapAction: async () => ({ seconds: 60 })

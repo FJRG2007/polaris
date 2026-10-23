@@ -286,20 +286,30 @@ export async function shelfOf(id: string): Promise<Shelf> {
 
 export async function createAutomation(
     actor: RunActor,
-    input: { name: string; description: string; orgId: string | null },
-    timeZone: string
+    input: {
+        name: string;
+        description: string;
+        orgId: string | null;
+        template?: core.AutomationTemplate;
+    },
+    timeZone: string,
+    templateWords?: { title: string; body: string }
 ): Promise<string> {
     const shelf: Shelf = { orgId: input.orgId, userId: input.orgId ? null : actor.id };
     if (!(await mayEditShelf(actor, shelf))) throw new AutomationAccessError("forbidden");
     if ((await prisma.automation.count({ where: shelfWhere(shelf) })) >= L.perShelf)
         throw new AutomationAccessError("limit");
-    const graph = core.emptyGraph(timeZone);
-    graph.nodes.push({
-        id: core.automationNodeId(),
-        type: "core.manual",
-        typeVersion: 1,
-        config: {}
-    });
+    const graph =
+        input.template && templateWords
+            ? core.internetBackGraph(timeZone, templateWords)
+            : core.emptyGraph(timeZone);
+    if (graph.nodes.length === 0)
+        graph.nodes.push({
+            id: core.automationNodeId(),
+            type: "core.manual",
+            typeVersion: 1,
+            config: {}
+        });
     const row = await prisma.automation.create({
         data: {
             orgId: shelf.orgId,

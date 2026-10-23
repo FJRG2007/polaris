@@ -460,5 +460,16 @@
     "cloudLeft": {
         "title": "{name} puede seguir funcionando en CloudAMQP",
         "body": "CloudAMQP rechazó la clave de API guardada, así que la instancia {name} no se pudo quitar allí. Bórrala en la consola de CloudAMQP para que deje de cobrarse."
+    },
+    "connectivity": {
+        "downTitle": "Internet se ha caído",
+        "downBody": "Polaris no llega a internet. Todo en tu red local sigue funcionando; lo que va fuera espera a que vuelva la línea.",
+        "downBodyDns": "La línea responde, pero los nombres no se resuelven: el servidor DNS de este equipo no contesta. Lo que busca un nombre fuera de tu red espera a que vuelva.",
+        "backTitle": "Internet ha vuelto",
+        "backBody": "La conexión vuelve a funcionar tras {duration} sin ella.",
+        "ipTitle": "Tu IP pública ha cambiado",
+        "ipBody": "La dirección pública de tu conexión pasó de {previous} a {current}. Lo que apunte a la anterior deja de llegarte hasta que se actualice.",
+        "unreachableTitle": "Polaris no se ve desde fuera",
+        "unreachableBody": "Internet funciona, pero el nombre público de este panel ya no apunta a la dirección de tu conexión, así que nadie de fuera llega. Revisa el dominio en Ajustes."
     }
 }

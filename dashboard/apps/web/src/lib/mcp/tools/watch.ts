@@ -18,6 +18,7 @@ import * as watch from "@/lib/watch-service";
 import { defineMcpSearch, preferMatches } from "../search";
 import { alarmInputSchema } from "@/lib/watch/watch-schema";
 import { McpRefusal, type McpCaller, type McpTool } from "../protocol";
+import { LINE_RANGES } from "@/lib/connectivity/line-samples";
 import {
     ALARM_METRICS,
     ALARM_TARGET_TYPES,
@@ -277,6 +278,86 @@ const changeTool: McpTool<z.infer<typeof changeInput>> = {
     }
 };
 
+// ---------------------------------------------------------------------------
+// Connectivity
+// ---------------------------------------------------------------------------
+
+/** Outages a read carries, newest first. */
+const OUTAGES_LISTED = 10;
+const IPS_LISTED = 5;
+
+const connectivityInput = z.object({
+    range: z.enum(LINE_RANGES).default("7d")
+});
+
+const connectivityTool: McpTool<z.infer<typeof connectivityInput>> = {
+    name: "watch_connectivity",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Read internet connectivity",
+    description:
+        // i18n-ignore read by the calling model, not shown to a person
+        "Whether this Polaris has internet right now, its latency, packet loss and uptime over a range (24h, 7d, 30d or 90d), uptime for each period, the latest outages with their cause (line down, DNS only, address unreachable) and duration, and the public IP's recent changes.",
+    input: connectivityInput,
+    category: "development",
+    scope: "deploy.read",
+    readOnly: true,
+    async run(input, caller) {
+        ownerOf(caller);
+        if (!caller.isAdmin)
+            throw new McpRefusal("Connectivity is read by the people who manage this Polaris.");
+        // Loaded on call: the sampler behind the line report reaches the network
+        // services, which nothing else in this catalogue needs at import time.
+        const [{ connectivityReport }, { lineReport }] = await Promise.all([
+            import("@/lib/connectivity/outage-tracker"),
+            import("@/lib/connectivity/line-report")
+        ]);
+        const [record, line] = await Promise.all([connectivityReport(), lineReport(input.range)]);
+        const totals = line.totals;
+        const now = line.now
+            ? line.now.up
+                ? `Online (checked ${line.now.at})`
+                : `Offline since ${line.now.since ?? line.now.at} (${line.now.kind === "dns" ? "DNS not answering" : "line down"})`
+            : "Not measured yet.";
+        const periods = record.periods.map(
+            (period) =>
+                `${period.key}: ${period.uptime === null ? "no data" : `${(period.uptime * 100).toFixed(2)}%`}, ${period.count} outages`
+        );
+        const outages = record.outages.slice(0, OUTAGES_LISTED).map((outage) => {
+            const end = outage.endedAt ?? "ongoing";
+            return `${outage.startedAt} -> ${end}  ${outage.kind}`;
+        });
+        const ips = (line.ipChanges ?? [])
+            .slice(0, IPS_LISTED)
+            .map(
+                (change) => `${change.at}  ${change.previous ?? "first seen"} -> ${change.current}`
+            );
+        return {
+            text: [
+                `Now: ${now}`,
+                "",
+                `${input.range}: latency ${totals.latencyMs ?? "-"} ms (max ${totals.latencyMaxMs ?? "-"}), loss ${totals.lossPct ?? "-"}%, uptime ${totals.upPct ?? "-"}% over ${totals.samples} samples`,
+                "",
+                "Periods:",
+                ...periods,
+                "",
+                "Outages:",
+                ...(outages.length > 0 ? outages : ["none recorded"]),
+                "",
+                "Public IP:",
+                ...(ips.length > 0 ? ips : ["not seen yet"])
+            ].join("\n"),
+            structured: {
+                now: line.now,
+                range: input.range,
+                totals,
+                periods: record.periods,
+                outages: record.outages.slice(0, OUTAGES_LISTED),
+                ipChanges: (line.ipChanges ?? []).slice(0, IPS_LISTED)
+            }
+        };
+    }
+};
+
 /** The account's alarms, for `polaris_search`. */
 export const WATCH_SEARCH = defineMcpSearch({
     id: "watch.alarms",
@@ -301,4 +382,9 @@ export const WATCH_SEARCH = defineMcpSearch({
     }
 });
 
-export const WATCH_TOOLS = [listTool, createTool, changeTool] as unknown as McpTool<never>[];
+export const WATCH_TOOLS = [
+    listTool,
+    createTool,
+    changeTool,
+    connectivityTool
+] as unknown as McpTool<never>[];

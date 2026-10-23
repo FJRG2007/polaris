@@ -133,7 +133,8 @@
         "waitCondition": "Wait for a condition",
         "set": "Set values",
         "message": "Post to a chat channel",
-        "threshold": "A reading crosses a threshold"
+        "threshold": "A reading crosses a threshold",
+        "connectivity": "The internet goes down or comes back"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -626,7 +627,8 @@
         "waitCondition": "Pause until a condition is true, or time runs out.",
         "set": "Work values out once. Later steps pick them from this step's values.",
         "message": "Post in a space channel through its webhook, as a bot.",
-        "threshold": "Starts when a server, service or UPS reading stays past a value."
+        "threshold": "Starts when a server, service or UPS reading stays past a value.",
+        "connectivity": "Starts when the line drops, returns, changes address or stops being reachable."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -863,5 +865,22 @@
         "duration": "Lasted",
         "notYet": "Not yet",
         "sinceStart": "{time} so far"
+    },
+    "connectivity": {
+        "when": "When",
+        "events": {
+            "down": "The internet goes down",
+            "up": "The internet comes back",
+            "ipChanged": "The public IP changes",
+            "unreachable": "Polaris is unreachable from outside"
+        }
+    },
+    "templates": {
+        "internetBack": {
+            "name": "Tell me when the internet comes back",
+            "action": "Tell me when it comes back",
+            "noticeTitle": "The internet is back",
+            "noticeBody": "It was down for {duration}."
+        }
     }
 }

@@ -13,6 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { usersWithPermission } from "@polaris/auth";
 import { withLease } from "@/lib/cron/lease";
 import { advanceRun, resumeConditionWaits, resumeEventWaits, type StartedRun } from "./engine";
 import { fireTrigger } from "./combine";
@@ -167,13 +168,24 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
                         enabled: true,
                         publishedVersionId: true,
                         orgId: true,
-                        userId: true
+                        userId: true,
+                        runAsId: true
                     }
                 }
             }
         });
+        // The line's events name the deployment's public address, so they start
+        // only automations that run as somebody who may manage the system.
+        const managers =
+            event.type === "core.connectivity" && triggers.length > 0
+                ? new Set(await usersWithPermission("system.manage"))
+                : null;
         for (const trigger of triggers) {
             const automation = trigger.automation;
+            if (managers) {
+                const runner = automation.runAsId ?? automation.userId;
+                if (!runner || !managers.has(runner)) continue;
+            }
             if (!automation.enabled || automation.publishedVersionId !== trigger.versionId)
                 continue;
             // An event that names a shelf only starts that shelf's automations.

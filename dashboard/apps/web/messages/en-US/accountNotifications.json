@@ -445,6 +445,22 @@
             "label": "An address stopped answering",
             "description": "One of the addresses this Polaris is reachable at went down, or came back."
         },
+        "networkInternetDown": {
+            "label": "The internet goes down",
+            "description": "Polaris lost its connection, or the DNS server stopped answering."
+        },
+        "networkInternetBack": {
+            "label": "The internet comes back",
+            "description": "The connection works again, with how long it was gone."
+        },
+        "networkPublicIp": {
+            "label": "Your public IP changes",
+            "description": "The address your connection has on the internet changed."
+        },
+        "networkUnreachable": {
+            "label": "Polaris is unreachable from outside",
+            "description": "The public name no longer points at your connection."
+        },
         "integrationAttention": {
             "label": "An integration needs attention",
             "description": "A service somebody tried to connect an account of refused the authorization."

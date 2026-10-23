@@ -271,6 +271,7 @@
         "tasks_reminder_cancel": "Cancel a task reminder",
         "watch_alarms": "List monitoring alarms",
         "watch_alarm_create": "Create a monitoring alarm",
-        "watch_alarm_change": "Turn a monitoring alarm on, off or delete it"
+        "watch_alarm_change": "Turn a monitoring alarm on, off or delete it",
+        "watch_connectivity": "Read internet connectivity"
     }
 }
