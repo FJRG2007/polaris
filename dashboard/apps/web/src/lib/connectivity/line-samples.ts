@@ -366,3 +366,37 @@ export function lineTotals(sums: readonly { readonly sum: SampleSum }[]): LinePo
 export function hourOf(at: number): number {
     return Math.floor(at / HOUR_MS) * HOUR_MS;
 }
+
+/* -------------------------------------------------------------------------- */
+/* What the screen is sent                                                     */
+/* -------------------------------------------------------------------------- */
+
+export interface PublicIpChangeView {
+    readonly at: string;
+    readonly previous: string | null;
+    readonly current: string;
+}
+
+export interface LineReport {
+    readonly range: LineRange;
+    readonly from: number;
+    readonly to: number;
+    readonly points: readonly LinePoint[];
+    readonly totals: ReturnType<typeof lineTotals>;
+    /** The line as the sampler last left it; null before its first pass. */
+    readonly now: {
+        readonly at: string;
+        readonly up: boolean;
+        readonly kind: LineKind | null;
+        readonly since: string | null;
+        readonly publicIp: string | null;
+    } | null;
+    /** Newest first. Absent from a shared view, which does not name this network. */
+    readonly ipChanges?: readonly PublicIpChangeView[];
+}
+
+/** The report as anybody it was shared with is sent it: no addresses. */
+export function sharedLineReport(report: LineReport): LineReport {
+    const { ipChanges: _ipChanges, ...rest } = report;
+    return { ...rest, now: rest.now ? { ...rest.now, publicIp: null } : null };
+}

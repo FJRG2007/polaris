@@ -345,6 +345,30 @@
             "closedBy": "How it ended",
             "recovered": "Recovered",
             "unobserved": "Not watched"
+        },
+        "line": {
+            "title": "Line quality",
+            "description": "Measured every minute: how fast the internet answers, how much is lost, and how much of the time it worked.",
+            "range": "Range",
+            "latency": "Latency",
+            "loss": "Packet loss",
+            "uptime": "Uptime",
+            "ms": "{value} ms",
+            "error": "The line's measurements could not be loaded. They will be tried again shortly.",
+            "empty": "No measurements in this range yet. The first ones appear a minute after Polaris starts.",
+            "now": {
+                "up": "Online",
+                "down": "Offline",
+                "dns": "DNS not answering"
+            },
+            "ips": {
+                "title": "Public IP history",
+                "empty": "The public IP has not been seen yet.",
+                "changed": "{previous} -> {current}",
+                "first": "First seen: {current}"
+            },
+            "automate": "Get told, call a webhook or run a Places action when the line changes:",
+            "automations": "Automations"
         }
     }
 }

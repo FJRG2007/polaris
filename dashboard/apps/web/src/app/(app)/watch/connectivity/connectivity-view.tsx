@@ -17,6 +17,7 @@
 import { RefreshCw } from "lucide-react";
 import { OutageTable } from "./outage-table";
 import { MergeGapForm } from "./merge-gap-form";
+import { LineCharts } from "./line-charts";
 import * as rules from "@/lib/connectivity/outages";
 import { checkConnectivityAction } from "./actions";
 import { DowntimeHeatmap, spanWith } from "@/components/metrics/downtime-heatmap";
@@ -208,6 +209,8 @@ export function ConnectivityView() {
                             />
                         </CardBody>
                     </Card>
+
+                    <LineCharts admin />
 
                     <OutageTable
                         outages={data?.outages ?? null}

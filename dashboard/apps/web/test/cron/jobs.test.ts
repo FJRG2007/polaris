@@ -109,6 +109,8 @@ describe("the work Polaris runs on a schedule", () => {
             "calendar-sync",
             "chat-scheduled",
             "connection-health",
+            // Two samplers would each announce the same outage.
+            "connectivity-samples",
             // Two passes would take two base backups of the same instance, and
             // two replication checks could each find a copy stopped and start one.
             "database-archives",
