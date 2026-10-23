@@ -101,6 +101,7 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
+import * as polls from "./drive-reads";
 
 /** How often the machines behind the sources are re-checked. One short-lived
  *  socket per source, and a device going down is worth noticing while the
@@ -289,8 +290,8 @@ export function DriveExplorer({
         let timer: ReturnType<typeof setTimeout> | null = null;
 
         const look = async () => {
-            const result = await driveActions
-                .driveJobsAction(here.current.connectionId ?? undefined, here.current.path)
+            const result = await polls
+                .driveJobs(here.current.connectionId ?? undefined, here.current.path)
                 .catch(() => null);
             if (!live) return;
             const running = result?.jobs ?? [];
@@ -1825,7 +1826,7 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
         let active = true;
         setDiscovering(true);
         setError(null);
-        driveActions.discoverUnasSharesAction(connectionId).then((result) => {
+        polls.unasShares(connectionId).then((result) => {
             if (!active) return;
             setDiscovering(false);
             if (result.error) setError(result.error);

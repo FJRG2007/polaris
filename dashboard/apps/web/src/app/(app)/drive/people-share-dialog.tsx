@@ -26,13 +26,7 @@ import { ExpirySelect } from "@/components/expiry-select";
 import { useDisplayFormat } from "@/components/display-format";
 import type { DriveShareRole, SharePerson } from "@/lib/drive-sharing";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import {
-    findSharePeopleAction,
-    listItemSharesAction,
-    myShareGroupsAction,
-    shareItemAction,
-    stopSharingAction
-} from "./sharing-actions";
+import { findSharePeopleAction, shareItemAction, stopSharingAction } from "./sharing-actions";
 import {
     Badge,
     Button,
@@ -44,6 +38,7 @@ import {
     Input,
     Select
 } from "@polaris/ui";
+import * as polls from "./drive-reads";
 
 export interface PeopleShareTarget {
     connectionId: string;
@@ -91,7 +86,7 @@ export function PeopleShareDialog({
 
     const reload = useCallback(async () => {
         if (connectionId === undefined || path === undefined) return;
-        const result = await listItemSharesAction(connectionId, path);
+        const result = await polls.itemShares(connectionId, path);
         setHolders(result.people);
         if (result.error) setError(result.error);
     }, [connectionId, path]);
@@ -110,7 +105,7 @@ export function PeopleShareDialog({
         void reload();
         // Somebody in no groups gets no group field at all rather than an empty
         // dropdown that looks like something failed to load.
-        void myShareGroupsAction().then(setGroups);
+        void polls.myShareGroups().then(setGroups);
     }, [connectionId, path, reload]);
 
     if (!target) return null;

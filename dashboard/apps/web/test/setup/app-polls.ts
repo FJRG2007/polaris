@@ -475,3 +475,45 @@ vi.mock("@/app/(app)/admin/admin-polls", () => ({
         0
     )
 }));
+
+vi.mock("@/app/(app)/drive/drive-reads", () => ({
+    linkedAccounts: forward(() => import("@/app/(app)/drive/actions"), "linkedAccountsAction", 1),
+    driveJobs: forward(() => import("@/app/(app)/drive/actions"), "driveJobsAction", 2),
+    unasShares: forward(() => import("@/app/(app)/drive/actions"), "discoverUnasSharesAction", 1),
+    removalPlan: forward(
+        () => import("@/app/(app)/drive/actions"),
+        "connectionRemovalPlanAction",
+        1
+    ),
+    myShareGroups: forward(
+        () => import("@/app/(app)/drive/sharing-actions"),
+        "myShareGroupsAction",
+        0
+    ),
+    itemShares: forward(
+        () => import("@/app/(app)/drive/sharing-actions"),
+        "listItemSharesAction",
+        2
+    ),
+    transferOrgs: forward(
+        () => import("@/app/(app)/drive/transfer-actions"),
+        "transferOrgsAction",
+        0
+    ),
+    waitingTransfers: forward(
+        () => import("@/app/(app)/drive/transfer-actions"),
+        "waitingTransfersAction",
+        0
+    ),
+    sentTransfers: forward(
+        () => import("@/app/(app)/drive/transfer-actions"),
+        "sentTransfersAction",
+        0
+    ),
+    shareLogs: forward(() => import("@/app/(app)/drive/share-actions"), "getShareLogsAction", 1),
+    snippetLogs: forward(
+        () => import("@/app/(app)/drive/snippets/snippet-actions"),
+        "getSnippetLogsAction",
+        1
+    )
+}));

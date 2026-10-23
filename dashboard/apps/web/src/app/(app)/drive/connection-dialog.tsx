@@ -31,7 +31,6 @@ import {
 import {
     createConnectionAction,
     detectNasAction,
-    linkedAccountsAction,
     testUnasConnectionAction,
     updateConnectionAction,
     type LinkedAccountOption,
@@ -52,6 +51,7 @@ import {
     DialogDescription
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import * as polls from "./drive-reads";
 
 interface FieldDef {
     name: string;
@@ -153,7 +153,7 @@ function LinkedAccountField({ field }: { field: FieldDef }) {
     useEffect(() => {
         let live = true;
         if (!field.provider) return;
-        linkedAccountsAction(field.provider).then((rows) => {
+        polls.linkedAccounts(field.provider).then((rows) => {
             if (!live) return;
             setAccounts(rows);
             // One account is the common case; preselecting it saves a click and

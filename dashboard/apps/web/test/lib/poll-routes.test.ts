@@ -108,7 +108,18 @@ const actions = vi.hoisted(() => {
         "listAgentsAction",
         "listContactsAction",
         "mailBodyHeldAction",
-        "ownVulnerabilitiesAction"
+        "ownVulnerabilitiesAction",
+        "linkedAccountsAction",
+        "driveJobsAction",
+        "discoverUnasSharesAction",
+        "connectionRemovalPlanAction",
+        "myShareGroupsAction",
+        "listItemSharesAction",
+        "transferOrgsAction",
+        "waitingTransfersAction",
+        "sentTransfersAction",
+        "getShareLogsAction",
+        "getSnippetLogsAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -307,6 +318,27 @@ vi.mock("@/app/(app)/admin/domains/actions", () => ({
 vi.mock("@/app/(app)/admin/retention/actions", () => ({
     mailBodyHeldAction: actions.mailBodyHeldAction
 }));
+vi.mock("@/app/(app)/drive/actions", () => ({
+    linkedAccountsAction: actions.linkedAccountsAction,
+    driveJobsAction: actions.driveJobsAction,
+    discoverUnasSharesAction: actions.discoverUnasSharesAction,
+    connectionRemovalPlanAction: actions.connectionRemovalPlanAction
+}));
+vi.mock("@/app/(app)/drive/sharing-actions", () => ({
+    myShareGroupsAction: actions.myShareGroupsAction,
+    listItemSharesAction: actions.listItemSharesAction
+}));
+vi.mock("@/app/(app)/drive/transfer-actions", () => ({
+    transferOrgsAction: actions.transferOrgsAction,
+    waitingTransfersAction: actions.waitingTransfersAction,
+    sentTransfersAction: actions.sentTransfersAction
+}));
+vi.mock("@/app/(app)/drive/share-actions", () => ({
+    getShareLogsAction: actions.getShareLogsAction
+}));
+vi.mock("@/app/(app)/drive/snippets/snippet-actions", () => ({
+    getSnippetLogsAction: actions.getSnippetLogsAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -424,7 +456,18 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/admin/inbox/agents": () => import("@/app/api/admin/inbox/agents/route"),
     "/api/admin/inbox/contacts": () => import("@/app/api/admin/inbox/contacts/route"),
     "/api/admin/retention/mail-bodies": () => import("@/app/api/admin/retention/mail-bodies/route"),
-    "/api/admin/own-vulnerabilities": () => import("@/app/api/admin/own-vulnerabilities/route")
+    "/api/admin/own-vulnerabilities": () => import("@/app/api/admin/own-vulnerabilities/route"),
+    "/api/drive/linked-accounts": () => import("@/app/api/drive/linked-accounts/route"),
+    "/api/drive/jobs": () => import("@/app/api/drive/jobs/route"),
+    "/api/drive/unas-shares": () => import("@/app/api/drive/unas-shares/route"),
+    "/api/drive/removal-plan": () => import("@/app/api/drive/removal-plan/route"),
+    "/api/drive/share-groups": () => import("@/app/api/drive/share-groups/route"),
+    "/api/drive/item-shares": () => import("@/app/api/drive/item-shares/route"),
+    "/api/drive/transfer-orgs": () => import("@/app/api/drive/transfer-orgs/route"),
+    "/api/drive/transfers/waiting": () => import("@/app/api/drive/transfers/waiting/route"),
+    "/api/drive/transfers/sent": () => import("@/app/api/drive/transfers/sent/route"),
+    "/api/drive/share-logs": () => import("@/app/api/drive/share-logs/route"),
+    "/api/drive/snippet-logs": () => import("@/app/api/drive/snippet-logs/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -1619,6 +1662,138 @@ const CASES: Case[] = [
             ).ownVulnerabilities(),
         action: "ownVulnerabilitiesAction",
         args: []
+    },
+    {
+        name: "the signed-in accounts a connection can use",
+        path: "/api/drive/linked-accounts",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).linkedAccounts("provider-1"),
+        action: "linkedAccountsAction",
+        args: ["provider-1"]
+    },
+    {
+        name: "the drive's running jobs, asked again while any runs",
+        path: "/api/drive/jobs",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).driveJobs("connectionId-1", "folder-1"),
+        action: "driveJobsAction",
+        args: ["connectionId-1", "folder-1"]
+    },
+    {
+        name: "the shares a NAS offers",
+        path: "/api/drive/unas-shares",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).unasShares("connectionId-1"),
+        action: "discoverUnasSharesAction",
+        args: ["connectionId-1"]
+    },
+    {
+        name: "what removing a connection would do",
+        path: "/api/drive/removal-plan",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).removalPlan("connectionId-1"),
+        action: "connectionRemovalPlanAction",
+        args: ["connectionId-1"]
+    },
+    {
+        name: "the groups an item can be shared with",
+        path: "/api/drive/share-groups",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).myShareGroups(),
+        action: "myShareGroupsAction",
+        args: []
+    },
+    {
+        name: "who an item is shared with",
+        path: "/api/drive/item-shares",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).itemShares("connectionId-1", "path-1"),
+        action: "listItemSharesAction",
+        args: ["connectionId-1", "path-1"]
+    },
+    {
+        name: "the organizations files can be sent to",
+        path: "/api/drive/transfer-orgs",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).transferOrgs(),
+        action: "transferOrgsAction",
+        args: []
+    },
+    {
+        name: "the transfers waiting for the account",
+        path: "/api/drive/transfers/waiting",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).waitingTransfers(),
+        action: "waitingTransfersAction",
+        args: []
+    },
+    {
+        name: "the transfers the account sent",
+        path: "/api/drive/transfers/sent",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).sentTransfers(),
+        action: "sentTransfersAction",
+        args: []
+    },
+    {
+        name: "who opened a shared link",
+        path: "/api/drive/share-logs",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).shareLogs("shareId-1"),
+        action: "getShareLogsAction",
+        args: ["shareId-1"]
+    },
+    {
+        name: "who opened a snippet",
+        path: "/api/drive/snippet-logs",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/drive/drive-reads")>(
+                    "@/app/(app)/drive/drive-reads"
+                )
+            ).snippetLogs("snippetId-1"),
+        action: "getSnippetLogsAction",
+        args: ["snippetId-1"]
     }
 ];
 

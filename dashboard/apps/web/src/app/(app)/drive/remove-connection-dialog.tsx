@@ -15,12 +15,13 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, HardDrive, Loader2, TriangleAlert } from "lucide-react";
-import { connectionRemovalPlanAction, removeConnectionAction } from "./actions";
+import { removeConnectionAction } from "./actions";
 import type {
     ConnectionRemovalMode,
     ConnectionRemovalPlan,
     RemoveConnectionResult
 } from "@/lib/connection-removal-service";
+import * as polls from "./drive-reads";
 
 interface Choice {
     readonly mode: ConnectionRemovalMode;
@@ -67,7 +68,7 @@ export function RemoveConnectionDialog({
         setError(null);
         if (!connection) return;
         let current = true;
-        void connectionRemovalPlanAction(connection.id).then((result) => {
+        void polls.removalPlan(connection.id).then((result) => {
             if (!current) return;
             setPlan(result);
             setDestination(result?.destinations[0]?.id ?? "");
