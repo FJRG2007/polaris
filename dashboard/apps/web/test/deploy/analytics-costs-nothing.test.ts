@@ -70,7 +70,7 @@ describe("the screen that reads the numbers", () => {
             "utf8"
         );
         expect(page).not.toContain("listProjectScopes");
-        expect(panel).toContain("listAnalyticsSitesAction()");
+        expect(panel).toContain("polls.analyticsSites()");
     });
 
     it("tells an empty account apart from a list that has not arrived", () => {
