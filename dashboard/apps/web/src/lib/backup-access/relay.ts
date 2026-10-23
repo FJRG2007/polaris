@@ -87,7 +87,11 @@ export function renderRelayConfig(keys: RelayKeys, ports: readonly number[]): st
 
 /** The house end: dials the relay, keeps the mapping open, and hands each port to
  *  the same port on this machine. */
-export function renderHomeConfig(keys: RelayKeys, relayAddress: string, ports: readonly number[]): string {
+export function renderHomeConfig(
+    keys: RelayKeys,
+    relayAddress: string,
+    ports: readonly number[]
+): string {
     const { publicAddress, peerAddress } = wg.slotAddresses(RELAY_SLOT);
     const endpoint = `${relayAddress.includes(":") ? `[${relayAddress}]` : relayAddress}:${RELAY_LISTEN_PORT}`;
     if (!wg.isHostPort(endpoint)) throw new Error("The relay's address is not an address");
@@ -124,7 +128,11 @@ export const RELAY_ID = "000000backup";
  * the relay end publishing every carried port and the house end able to reach
  * this machine's published ports.
  */
-export function relaySpec(end: "relay" | "home", config: string, ports: readonly number[]): ComposeSpec {
+export function relaySpec(
+    end: "relay" | "home",
+    config: string,
+    ports: readonly number[]
+): ComposeSpec {
     const spec = wg.endSpec({
         tunnelId: RELAY_ID,
         end: end === "relay" ? "public" : "nat",
@@ -141,7 +149,14 @@ export function relaySpec(end: "relay" | "home", config: string, ports: readonly
                 ...helper,
                 ports:
                     end === "relay"
-                        ? [...helper.ports, ...ports.map((port) => ({ host: port, container: port, protocol: "tcp" as const }))]
+                        ? [
+                              ...helper.ports,
+                              ...ports.map((port) => ({
+                                  host: port,
+                                  container: port,
+                                  protocol: "tcp" as const
+                              }))
+                          ]
                         : helper.ports,
                 extraHosts: end === "home" ? [HOST_GATEWAY] : helper.extraHosts
             },

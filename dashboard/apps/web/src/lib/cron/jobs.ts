@@ -109,7 +109,10 @@ async function syncMailboxes(): Promise<number | { skipped: string }> {
     // On backup access the data saver spaces the passes out rather than stopping
     // them: mail keeps arriving, a quarter-hour late at most, instead of every
     // minute over the backup line.
-    if ((await (await import("@/lib/backup-access")).dataSaverActive()) && Date.now() - lastMailSync < MAIL_SAVER_GAP_MS)
+    if (
+        (await (await import("@/lib/backup-access")).dataSaverActive()) &&
+        Date.now() - lastMailSync < MAIL_SAVER_GAP_MS
+    )
         return { skipped: "Data saver: on backup access" };
     lastMailSync = Date.now();
     const ids = await accountsToSync();

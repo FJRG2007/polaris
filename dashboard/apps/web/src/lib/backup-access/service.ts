@@ -76,13 +76,7 @@ import {
     type LiveRecord,
     type RecordOp
 } from "./records";
-import {
-    relayPorts,
-    relayProject,
-    relaySpec,
-    renderHomeConfig,
-    renderRelayConfig
-} from "./relay";
+import { relayPorts, relayProject, relaySpec, renderHomeConfig, renderRelayConfig } from "./relay";
 import { combineVerdicts, outsideScript, readOutside, type OutsideAnswer } from "./outside-check";
 
 const TTL_KEY = "backupAccess.ttl";
@@ -223,7 +217,9 @@ export async function backupView(): Promise<BackupView> {
         state,
         probe,
         tunnelReady: tunnel !== null,
-        relay: relay ? { address: relay.address, tcp: relay.tcp, skippedUdp: relay.skippedUdp } : null,
+        relay: relay
+            ? { address: relay.address, tcp: relay.tcp, skippedUdp: relay.skippedUdp }
+            : null,
         servers,
         cloudflare: Boolean(token)
     };
@@ -260,7 +256,10 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     let target: BackupTarget | null = null;
     if (uplink && config.path) {
         try {
-            target = config.path === "tunnel" ? await warmTunnel(zones.baseDomain) : await warmRelay(config);
+            target =
+                config.path === "tunnel"
+                    ? await warmTunnel(zones.baseDomain)
+                    : await warmRelay(config);
         } catch (caught) {
             problem = caught instanceof PathRefusal ? caught.code : "failed";
             detail = caught instanceof PathRefusal ? null : message(caught);
@@ -285,7 +284,12 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     try {
         if (decision.move === "to-backup" && target) await toBackup(zones.baseDomain, target);
         // A path changed while on backup: the records follow it before the old one goes.
-        else if (decision.state.serving === "backup" && target && saved && !sameTarget(saved.target, target))
+        else if (
+            decision.state.serving === "backup" &&
+            target &&
+            saved &&
+            !sameTarget(saved.target, target)
+        )
             await toBackup(zones.baseDomain, target);
         if (decision.move === "to-direct" || (decision.state.serving === "direct" && saved))
             conflicts = await toDirect();
@@ -299,7 +303,12 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
         // The streaks still count: the next pass decides the same move again.
         await setSetting(
             BACKUP_STATE_KEY,
-            JSON.stringify({ ...decision.state, serving: previous.serving, since: previous.since, lastFlip: previous.lastFlip })
+            JSON.stringify({
+                ...decision.state,
+                serving: previous.serving,
+                since: previous.since,
+                lastFlip: previous.lastFlip
+            })
         );
     }
     if (uplink) {
@@ -313,7 +322,13 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     }
     await setSetting(
         PROBE_KEY,
-        JSON.stringify({ ...measured, checkedAt: now.toISOString(), problem, detail, conflicts } satisfies Probe)
+        JSON.stringify({
+            ...measured,
+            checkedAt: now.toISOString(),
+            problem,
+            detail,
+            conflicts
+        } satisfies Probe)
     );
     return { verdict: measured.verdict, move: moved };
 }
@@ -325,7 +340,9 @@ class PathRefusal extends Error {
 }
 
 /** Every owned name's address records, as they are now. */
-async function liveRecords(baseDomain: string): Promise<{ token: string; zoneId: string; live: LiveRecord[] }> {
+async function liveRecords(
+    baseDomain: string
+): Promise<{ token: string; zoneId: string; live: LiveRecord[] }> {
     const token = await loadCloudflareToken();
     if (!token) throw new PathRefusal("no-token");
     const zones = await getDomainZones();
@@ -358,7 +375,10 @@ async function apply(token: string, zoneId: string, ops: readonly RecordOp[]): P
 }
 
 /** `armed` is null once records were written back and have to be looked at again. */
-const ttlSchema = z.object({ armed: z.boolean().nullable(), ttl: z.record(z.string(), z.number()) });
+const ttlSchema = z.object({
+    armed: z.boolean().nullable(),
+    ttl: z.record(z.string(), z.number())
+});
 
 /** Short TTLs on DNS-only records while a flip may come; their own back after. */
 async function arm(baseDomain: string, armed: boolean): Promise<void> {
@@ -370,7 +390,10 @@ async function arm(baseDomain: string, armed: boolean): Promise<void> {
     // changes once the writes landed, so a pass cut short is planned again.
     await setSetting(
         TTL_KEY,
-        JSON.stringify({ armed: stored?.armed ?? null, ttl: { ...stored?.ttl, ...plan.remembered } })
+        JSON.stringify({
+            armed: stored?.armed ?? null,
+            ttl: { ...stored?.ttl, ...plan.remembered }
+        })
     );
     await apply(token, zoneId, plan.ops);
     await setSetting(TTL_KEY, JSON.stringify({ armed, ttl: plan.remembered }));
@@ -378,7 +401,8 @@ async function arm(baseDomain: string, armed: boolean): Promise<void> {
 
 async function forgetArmed(): Promise<void> {
     const stored = parse(ttlSchema, await getSetting(TTL_KEY));
-    if (stored && stored.armed !== null) await setSetting(TTL_KEY, JSON.stringify({ ...stored, armed: null }));
+    if (stored && stored.armed !== null)
+        await setSetting(TTL_KEY, JSON.stringify({ ...stored, armed: null }));
 }
 
 function sameTarget(a: BackupTarget, b: BackupTarget): boolean {
@@ -394,7 +418,10 @@ async function toBackup(baseDomain: string, target: BackupTarget): Promise<void>
     const saved = parse(recordsSchema, await getSetting(BACKUP_RECORDS_KEY));
     const plan = planFlip(live, target, saved?.originals);
     if (!saved)
-        await setSetting(BACKUP_RECORDS_KEY, JSON.stringify({ zoneId, target, originals: plan.originals }));
+        await setSetting(
+            BACKUP_RECORDS_KEY,
+            JSON.stringify({ zoneId, target, originals: plan.originals })
+        );
     // Moving between paths keeps the originals and only changes what is restored over.
     else if (!sameTarget(saved.target, target))
         await setSetting(BACKUP_RECORDS_KEY, JSON.stringify({ ...saved, target }));
@@ -426,7 +453,9 @@ async function toDirect(): Promise<string[]> {
 /** Take down a path that is no longer chosen, once no record points at it. */
 async function retireUnused(config: BackupConfig): Promise<void> {
     const [serving, tunnel, relay] = await Promise.all([
-        getSetting(BACKUP_RECORDS_KEY).then((raw) => parse(recordsSchema, raw)?.target.kind ?? null),
+        getSetting(BACKUP_RECORDS_KEY).then(
+            (raw) => parse(recordsSchema, raw)?.target.kind ?? null
+        ),
         getSetting(TUNNEL_KEY),
         getSetting(RELAY_KEY)
     ]);
@@ -486,7 +515,8 @@ async function retireTunnel(): Promise<void> {
     }
     if (stored) {
         const token = await loadCloudflareToken();
-        if (token) await deleteTunnel(token, stored.accountId, stored.tunnelId).catch(() => undefined);
+        if (token)
+            await deleteTunnel(token, stored.accountId, stored.tunnelId).catch(() => undefined);
     }
     await setSetting(TUNNEL_KEY, null);
 }
@@ -494,7 +524,12 @@ async function retireTunnel(): Promise<void> {
 /** A target row as `getPorts` takes it, with the address the house dials. */
 async function relayTarget(id: string, anyOwner = false) {
     const row = await prisma.deployTarget.findFirst({
-        where: { id, status: "active", kind: { not: "local" }, ...(anyOwner ? {} : { owner: { isAdmin: true } }) },
+        where: {
+            id,
+            status: "active",
+            kind: { not: "local" },
+            ...(anyOwner ? {} : { owner: { isAdmin: true } })
+        },
         select: {
             id: true,
             kind: true,
@@ -517,7 +552,8 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
     if (!address) throw new PathRefusal("no-address");
     let stored = parse(relaySchema, await getSetting(RELAY_KEY));
     // Another server was picked: its relay end comes down, the house end is replaced below.
-    if (stored && stored.targetId !== target.id) await retireRelayEnd(stored.targetId).catch(() => undefined);
+    if (stored && stored.targetId !== target.id)
+        await retireRelayEnd(stored.targetId).catch(() => undefined);
     if (!stored || stored.targetId !== target.id || stored.address !== address) {
         const relay = generateKeyPair();
         const home = generateKeyPair();
@@ -559,7 +595,12 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
             ? new PathRefusal("ports-busy")
             : caught;
     });
-    await keepUp(new HostdPorts(), relayProject("home"), () => relaySpec("home", homeConfig, ports.tcp), changed);
+    await keepUp(
+        new HostdPorts(),
+        relayProject("home"),
+        () => relaySpec("home", homeConfig, ports.tcp),
+        changed
+    );
     if (changed) await setSetting(RELAY_KEY, JSON.stringify({ ...stored, tcp: ports.tcp }));
     return { kind: "relay", address };
 }
@@ -603,7 +644,9 @@ async function keepUp(
         // unchanged project running as it is.
         const list = ports.listContainers?.bind(ports) ?? (async () => []);
         const running = await list(project).catch((caught: unknown) => {
-            throw /hostd|ECONNREFUSED|ENOENT|501/i.test(message(caught)) ? new PathRefusal("no-daemon") : caught;
+            throw /hostd|ECONNREFUSED|ENOENT|501/i.test(message(caught))
+                ? new PathRefusal("no-daemon")
+                : caught;
         });
         if (changed || running.length === 0) await ports.composeUp(spec());
     } finally {
@@ -612,7 +655,11 @@ async function keepUp(
 }
 
 /** How long a TCP connection takes to open, or null when it does not. */
-export function connectTime(host: string, port: number, timeoutMs = CONNECT_TIMEOUT_MS): Promise<number | null> {
+export function connectTime(
+    host: string,
+    port: number,
+    timeoutMs = CONNECT_TIMEOUT_MS
+): Promise<number | null> {
     return new Promise((resolve) => {
         const started = performance.now();
         const socket = connect({ host, port });
@@ -670,7 +717,9 @@ async function measure(
     else if (!ip || !published) inside = "unknown";
     // On backup the follower stands back, so a line back on a new address is "up"
     // once it holds still; the follower repoints it after the records are restored.
-    else inside = ip === published || (serving === "backup" && ip === before?.lastIp) ? "up" : "down";
+    else
+        inside =
+            ip === published || (serving === "backup" && ip === before?.lastIp) ? "up" : "down";
     // The address visitors would reach today: the one the line has now, else the
     // one the records were last given.
     const outside = await checkFromOutside(relayTargetId, ip ?? published);
@@ -756,7 +805,9 @@ async function checkFromOutside(
 
 /** One bell per flip, to every administrator. */
 async function announce(state: FlipState, domain: string): Promise<void> {
-    const rows = await prisma.user.findMany({ where: { isAdmin: true }, select: { id: true } }).catch(() => []);
+    const rows = await prisma.user
+        .findMany({ where: { isAdmin: true }, select: { id: true } })
+        .catch(() => []);
     const on = state.serving === "backup";
     for (const { id: userId } of rows) {
         const t = await wordsFor(userId, "notices");
@@ -766,7 +817,9 @@ async function announce(state: FlipState, domain: string): Promise<void> {
                 href: "/admin/domains#backup-access",
                 type: on ? "domain.backup-on" : "domain.backup-off",
                 level: on ? "warning" : "success",
-                title: on ? t("backupAccess.onTitle", { domain }) : t("backupAccess.offTitle", { domain }),
+                title: on
+                    ? t("backupAccess.onTitle", { domain })
+                    : t("backupAccess.offTitle", { domain }),
                 body: t(noticeBody(state.lastFlip?.reason ?? null, on))
             })
             .catch(() => undefined);

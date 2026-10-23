@@ -400,9 +400,7 @@ export function startUpdateWatcher(): void {
         // On backup access the data saver holds the check (it may pull an image).
         void dataSaverActive()
             .then((saver) => (saver ? undefined : checkForUpdate()))
-            .catch((error) =>
-            console.error("polaris: update watcher tick failed:", error)
-        );
+            .catch((error) => console.error("polaris: update watcher tick failed:", error));
         // Rides along rather than starting a timer of its own: both ask "is this
         // deployment waiting on somebody", both are cheap when the answer is no,
         // and one interval is one thing to reason about. An update that widened

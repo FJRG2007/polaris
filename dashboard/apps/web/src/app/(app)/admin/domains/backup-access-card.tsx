@@ -83,11 +83,16 @@ export function BackupAccessCard() {
                         <Pick
                             on={view.config.path === "relay"}
                             disabled={busy || view.servers.length === 0}
-                            title={view.servers.length === 0 ? t("domains.backup.needsServer") : undefined}
+                            title={
+                                view.servers.length === 0
+                                    ? t("domains.backup.needsServer")
+                                    : undefined
+                            }
                             onClick={() =>
                                 void save({
                                     path: "relay",
-                                    relayTargetId: view.config.relayTargetId ?? view.servers[0]?.id ?? null
+                                    relayTargetId:
+                                        view.config.relayTargetId ?? view.servers[0]?.id ?? null
                                 })
                             }
                         >
@@ -147,7 +152,9 @@ export function BackupAccessCard() {
                                         size="sm"
                                         variant="secondary"
                                         disabled={busy}
-                                        onClick={() => void save({ manualOn: !view.config.manualOn })}
+                                        onClick={() =>
+                                            void save({ manualOn: !view.config.manualOn })
+                                        }
                                     >
                                         {view.config.manualOn
                                             ? t("domains.backup.useDirect")
@@ -160,7 +167,9 @@ export function BackupAccessCard() {
                                     type="checkbox"
                                     checked={view.config.dataSaver}
                                     disabled={busy}
-                                    onChange={(event) => void save({ dataSaver: event.target.checked })}
+                                    onChange={(event) =>
+                                        void save({ dataSaver: event.target.checked })
+                                    }
                                 />
                                 <span className="min-w-0">
                                     {t("domains.backup.dataSaver")}
@@ -182,7 +191,9 @@ export function BackupAccessCard() {
                     ) : null}
                     {view.relay && view.relay.skippedUdp.length > 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            {t("domains.backup.udpSkipped", { ports: view.relay.skippedUdp.join(", ") })}
+                            {t("domains.backup.udpSkipped", {
+                                ports: view.relay.skippedUdp.join(", ")
+                            })}
                         </p>
                     ) : null}
                     <p className="text-xs text-muted-foreground">{t("domains.backup.physics")}</p>
@@ -289,7 +300,9 @@ function Latency({ view }: { view: BackupView }) {
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
                 {rows.map(([key, ms, set]) => (
                     <div key={key} className="contents">
-                        <dt className="text-muted-foreground">{t(`domains.backup.paths.${key}`)}</dt>
+                        <dt className="text-muted-foreground">
+                            {t(`domains.backup.paths.${key}`)}
+                        </dt>
                         <dd className="min-w-0 truncate font-mono">
                             {!set
                                 ? t("domains.backup.notSet")

@@ -11,7 +11,11 @@ import {
 const START = Date.parse("2026-10-24T10:00:00.000Z");
 const MINUTE = 60_000;
 
-function run(verdicts: Verdict[], base: Partial<DecideInput> = {}, from: FlipState = INITIAL_STATE) {
+function run(
+    verdicts: Verdict[],
+    base: Partial<DecideInput> = {},
+    from: FlipState = INITIAL_STATE
+) {
     let state = from;
     const moves: (string | null)[] = [];
     verdicts.forEach((verdict, index) => {
@@ -70,7 +74,9 @@ describe("backup access flip decision", () => {
         expect(run(["down", "down", "down"], { mode: "manual" }).moves).toEqual([null, null, null]);
         const on = run(["up"], { mode: "manual", manualOn: true });
         expect(on.moves).toEqual(["to-backup"]);
-        expect(run(["up"], { mode: "manual", manualOn: false }, on.state).moves).toEqual(["to-direct"]);
+        expect(run(["up"], { mode: "manual", manualOn: false }, on.state).moves).toEqual([
+            "to-direct"
+        ]);
     });
 
     it("hands the domain back when the path goes away", () => {

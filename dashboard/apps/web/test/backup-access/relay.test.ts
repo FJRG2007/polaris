@@ -50,7 +50,10 @@ describe("backup relay config", () => {
     it("refuses a value that would break the file", () => {
         expect(() => renderHomeConfig(keys, "198.51.100.20\nPostUp = x", [80])).toThrow();
         expect(() =>
-            renderRelayConfig({ relay: { privateKey: "nope", publicKey: "nope" }, home: keys.home }, [80])
+            renderRelayConfig(
+                { relay: { privateKey: "nope", publicKey: "nope" }, home: keys.home },
+                [80]
+            )
         ).toThrow();
     });
 

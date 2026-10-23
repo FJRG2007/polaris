@@ -101,7 +101,8 @@ function plain(record: SavedRecord): SavedRecord {
 
 function byName<T extends SavedRecord>(records: readonly T[]): Map<string, T[]> {
     const names = new Map<string, T[]>();
-    for (const record of records) names.set(record.name, [...(names.get(record.name) ?? []), record]);
+    for (const record of records)
+        names.set(record.name, [...(names.get(record.name) ?? []), record]);
     return names;
 }
 
@@ -121,7 +122,11 @@ export function planFlip(
     const before = byName(saved);
     for (const [name, records] of byName(live)) {
         const own = before.get(name) ?? records;
-        const wanted = backupRecord(target, name, own.some((record) => record.proxied));
+        const wanted = backupRecord(
+            target,
+            name,
+            own.some((record) => record.proxied)
+        );
         const [first, ...rest] = records;
         if (!first || (rest.length === 0 && same(first, wanted))) continue;
         originals.push(...records.map(plain));
@@ -147,7 +152,14 @@ export function planRestore(
     for (const [name, wanted] of byName(originals)) {
         const held = current.get(name) ?? [];
         const isBackup = (record: SavedRecord) =>
-            same(record, backupRecord(target, name, wanted.some((entry) => entry.proxied)));
+            same(
+                record,
+                backupRecord(
+                    target,
+                    name,
+                    wanted.some((entry) => entry.proxied)
+                )
+            );
         const missing = wanted.filter((record) => !held.some((entry) => same(entry, record)));
         if (missing.length === 0) continue;
         const backups = held.filter(isBackup);

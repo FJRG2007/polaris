@@ -29,7 +29,9 @@ export function hostDataSaver(): boolean {
 
 /** Read the data-saver flag of one answer of `/api/version`. Exported for the test. */
 export function dataSaverFrom(data: unknown): boolean {
-    return Boolean(data && typeof data === "object" && (data as { dataSaver?: unknown }).dataSaver === true);
+    return Boolean(
+        data && typeof data === "object" && (data as { dataSaver?: unknown }).dataSaver === true
+    );
 }
 
 /** Read one answer of `/api/version`. Exported for the test. */

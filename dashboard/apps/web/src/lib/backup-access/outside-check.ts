@@ -26,7 +26,8 @@ const CONNECT_SECONDS = 5;
  */
 export function outsideScript(address: string, port = 443): string {
     if (isIP(address) === 0) throw new Error("The address to check is not an IP address");
-    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("The port to check is not a port");
+    if (!Number.isInteger(port) || port < 1 || port > 65535)
+        throw new Error("The port to check is not a port");
     const url = `https://${isIP(address) === 6 ? `[${address}]` : address}:${port}/`;
     return [
         `addr='${address}'`,
@@ -68,8 +69,11 @@ export function readOutside(output: string): OutsideAnswer | null {
     if (tool === "curl") {
         const seconds = Number(timing);
         // A connection that opened has a connect time, whatever TLS made of it after.
-        if (Number.isFinite(seconds) && seconds > 0) return { verdict: "up", ms: Math.round(seconds * 1000) };
-        return Number.isInteger(status) && CURL_UNREACHED.has(status) ? { verdict: "down", ms: null } : null;
+        if (Number.isFinite(seconds) && seconds > 0)
+            return { verdict: "up", ms: Math.round(seconds * 1000) };
+        return Number.isInteger(status) && CURL_UNREACHED.has(status)
+            ? { verdict: "down", ms: null }
+            : null;
     }
     if (tool === "nc" || tool === "bash") {
         if (!Number.isInteger(status)) return null;

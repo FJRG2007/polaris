@@ -36,7 +36,9 @@ export async function upWithFreshImage(
 ): Promise<void> {
     // On backup access the data saver keeps the cached image: a refresh is a pull
     // of the whole image over the backup line. One that is missing still pulls.
-    const saver = await import("@/lib/backup-access").then((m) => m.dataSaverActive()).catch(() => false);
+    const saver = await import("@/lib/backup-access")
+        .then((m) => m.dataSaverActive())
+        .catch(() => false);
     const policy = saver ? "missing" : sessionPullPolicy(lastPulledAt, now());
     if (policy === "missing") return up("missing");
     try {

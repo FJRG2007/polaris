@@ -65,7 +65,9 @@ vi.mock("node:net", async (original) => {
                 setTimeout: () => undefined,
                 destroy: () => undefined
             });
-            setImmediate(() => (lineUp ? socket.emit("connect") : socket.emit("error", new Error("refused"))));
+            setImmediate(() =>
+                lineUp ? socket.emit("connect") : socket.emit("error", new Error("refused"))
+            );
             return socket;
         }
     };
@@ -74,7 +76,9 @@ vi.mock("node:net", async (original) => {
 vi.mock("@polaris/ssh", () => ({ execCommand: vi.fn() }));
 vi.mock("@/lib/connection-pool", () => ({ borrowSsh: vi.fn() }));
 vi.mock("@/lib/host-service", () => ({ getHostConnection: vi.fn() }));
-vi.mock("@/lib/domain-zones", () => ({ getDomainZones: async () => ({ baseDomain: "example.test" }) }));
+vi.mock("@/lib/domain-zones", () => ({
+    getDomainZones: async () => ({ baseDomain: "example.test" })
+}));
 vi.mock("@/lib/domain-dns", () => ({ ownedZoneNames: async () => NAMES }));
 vi.mock("@/lib/domain-address-sync", () => ({ PUBLISHED_KEY: "published" }));
 vi.mock("@/lib/network-service", () => ({ probePublicIp: async () => HOME }));
@@ -130,8 +134,15 @@ vi.mock("@/lib/integrations/cloudflare-api", () => ({
         deletedTunnels.push(id);
     },
     findNameRecords: async (_token: string, _zone: string, name: string) =>
-        [...zone.values()].filter((record) => record.name === name).map((record) => ({ ...record })),
-    saveDnsRecord: async (_token: string, _zone: string, id: string | null, record: Omit<FakeRecord, "id">) => {
+        [...zone.values()]
+            .filter((record) => record.name === name)
+            .map((record) => ({ ...record })),
+    saveDnsRecord: async (
+        _token: string,
+        _zone: string,
+        id: string | null,
+        record: Omit<FakeRecord, "id">
+    ) => {
         const saved = { ...record, id: id ?? `r${nextId++}` };
         zone.set(saved.id, saved);
         return saved;

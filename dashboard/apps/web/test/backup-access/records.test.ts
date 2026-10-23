@@ -22,7 +22,8 @@ function apply(live: LiveRecord[], ops: RecordOp[]): LiveRecord[] {
     let next = [...live];
     let created = 0;
     for (const op of ops) {
-        if (op.op === "put") next = next.map((r) => (r.id === op.id ? { id: r.id, ...op.record } : r));
+        if (op.op === "put")
+            next = next.map((r) => (r.id === op.id ? { id: r.id, ...op.record } : r));
         if (op.op === "delete") next = next.filter((r) => r.id !== op.id);
         if (op.op === "create") next.push({ id: `new${(created += 1)}`, ...op.record });
         if (op.op === "ttl") next = next.map((r) => (r.id === op.id ? { ...r, ttl: op.ttl } : r));
@@ -102,7 +103,9 @@ describe("backup access record plans", () => {
     it("leaves a name somebody else changed and reports it", () => {
         const plan = planFlip(ORIGINALS, TUNNEL);
         const edited = apply(ORIGINALS, plan.ops).map((r) =>
-            r.name === "example.com" ? { ...r, type: "A" as const, content: "192.0.2.1", proxied: false } : r
+            r.name === "example.com"
+                ? { ...r, type: "A" as const, content: "192.0.2.1", proxied: false }
+                : r
         );
         const restore = planRestore(edited, plan.originals, TUNNEL);
         expect(restore.conflicts).toEqual(["example.com"]);
@@ -111,8 +114,22 @@ describe("backup access record plans", () => {
 
     it("shortens DNS-only TTLs while armed and gives them back after", () => {
         const live: LiveRecord[] = [
-            { id: "x", name: "example.com", type: "A", content: "203.0.113.7", proxied: false, ttl: 3600 },
-            { id: "y", name: "www.example.com", type: "A", content: "203.0.113.7", proxied: true, ttl: 1 }
+            {
+                id: "x",
+                name: "example.com",
+                type: "A",
+                content: "203.0.113.7",
+                proxied: false,
+                ttl: 3600
+            },
+            {
+                id: "y",
+                name: "www.example.com",
+                type: "A",
+                content: "203.0.113.7",
+                proxied: true,
+                ttl: 1
+            }
         ];
         const arm = planTtl(live, true, {});
         expect(arm.ops).toEqual([{ op: "ttl", id: "x", ttl: ARMED_TTL }]);

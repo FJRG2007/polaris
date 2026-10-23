@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { combineVerdicts, outsideScript, readOutside } from "../../src/lib/backup-access/outside-check";
-import { decide, INITIAL_STATE, FAIL_TO_FLIP, type FlipState } from "../../src/lib/backup-access/decision";
+import {
+    combineVerdicts,
+    outsideScript,
+    readOutside
+} from "../../src/lib/backup-access/outside-check";
+import {
+    decide,
+    INITIAL_STATE,
+    FAIL_TO_FLIP,
+    type FlipState
+} from "../../src/lib/backup-access/decision";
 
 describe("outsideScript", () => {
     it("checks the address on 443 with each tool in turn", () => {
@@ -24,13 +33,22 @@ describe("outsideScript", () => {
 
 describe("readOutside", () => {
     it("reads a timed curl connection as up, whatever TLS said", () => {
-        expect(readOutside("banner\nPOLARIS_OUTSIDE curl 0 0.042318\n")).toEqual({ verdict: "up", ms: 42 });
+        expect(readOutside("banner\nPOLARIS_OUTSIDE curl 0 0.042318\n")).toEqual({
+            verdict: "up",
+            ms: 42
+        });
         expect(readOutside("POLARIS_OUTSIDE curl 35 0.031\n")).toEqual({ verdict: "up", ms: 31 });
     });
 
     it("reads curl's could-not-connect and timeout as down", () => {
-        expect(readOutside("POLARIS_OUTSIDE curl 7 0.000000")).toEqual({ verdict: "down", ms: null });
-        expect(readOutside("POLARIS_OUTSIDE curl 28 0.000000")).toEqual({ verdict: "down", ms: null });
+        expect(readOutside("POLARIS_OUTSIDE curl 7 0.000000")).toEqual({
+            verdict: "down",
+            ms: null
+        });
+        expect(readOutside("POLARIS_OUTSIDE curl 28 0.000000")).toEqual({
+            verdict: "down",
+            ms: null
+        });
     });
 
     it("does not guess on curl codes that say nothing about the port", () => {
@@ -51,9 +69,18 @@ describe("readOutside", () => {
 
 describe("combineVerdicts", () => {
     it("lets the outside answer win over the inside check", () => {
-        expect(combineVerdicts("up", { verdict: "down", ms: null })).toEqual({ verdict: "down", from: "outside" });
-        expect(combineVerdicts("down", { verdict: "up", ms: 20 })).toEqual({ verdict: "up", from: "outside" });
-        expect(combineVerdicts("unknown", { verdict: "down", ms: null })).toEqual({ verdict: "down", from: "outside" });
+        expect(combineVerdicts("up", { verdict: "down", ms: null })).toEqual({
+            verdict: "down",
+            from: "outside"
+        });
+        expect(combineVerdicts("down", { verdict: "up", ms: 20 })).toEqual({
+            verdict: "up",
+            from: "outside"
+        });
+        expect(combineVerdicts("unknown", { verdict: "down", ms: null })).toEqual({
+            verdict: "down",
+            from: "outside"
+        });
     });
 
     it("falls back to the inside check when outside could not be asked", () => {
@@ -62,7 +89,10 @@ describe("combineVerdicts", () => {
     });
 
     it("keeps no uplink whatever outside says", () => {
-        expect(combineVerdicts("no-uplink", { verdict: "up", ms: 10 })).toEqual({ verdict: "no-uplink", from: "inside" });
+        expect(combineVerdicts("no-uplink", { verdict: "up", ms: 10 })).toEqual({
+            verdict: "no-uplink",
+            from: "inside"
+        });
     });
 
     it("flips on a carrier-NAT line the inside check cannot see", () => {
