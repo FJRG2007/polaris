@@ -16,6 +16,7 @@
 import { z } from "zod";
 import { nextCronRun, parseCron } from "./cron.js";
 import { durationSchema, durationSeconds } from "./automation-schema.js";
+import { automationNodeId } from "./automation-nodes.js";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -736,6 +737,16 @@ export const thresholdConfigSchema = z.object({
 });
 export type ThresholdConfig = z.infer<typeof thresholdConfigSchema>;
 
+/** What the line did, as the connectivity sampler saw it: the events behind the
+ *  "Internet goes down", "comes back", "public IP changes" and "unreachable from
+ *  outside" triggers. */
+export const CONNECTIVITY_TRIGGER_EVENTS = ["down", "up", "ipChanged", "unreachable"] as const;
+export type ConnectivityTriggerEvent = (typeof CONNECTIVITY_TRIGGER_EVENTS)[number];
+
+export const connectivityTriggerConfigSchema = z.object({
+    event: z.enum(CONNECTIVITY_TRIGGER_EVENTS).default("down")
+});
+
 /** Every node type core contributes, with the config each one takes. */
 export const CORE_NODE_CONFIGS = {
     "core.manual": z.object({}).strict(),
@@ -814,7 +825,8 @@ export const CORE_NODE_CONFIGS = {
         recover: z.boolean().default(false)
     }),
     "core.waitCondition": waitConditionConfigSchema,
-    "core.threshold": thresholdConfigSchema
+    "core.threshold": thresholdConfigSchema,
+    "core.connectivity": connectivityTriggerConfigSchema
 } as const;
 export type CoreNodeType = keyof typeof CORE_NODE_CONFIGS;
 export const CORE_NODE_TYPES = Object.keys(CORE_NODE_CONFIGS) as CoreNodeType[];
@@ -866,7 +878,8 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
         idempotent: true
     },
     "core.waitCondition": { role: "action", ports: ["timeout"], idempotent: true },
-    "core.threshold": { role: "trigger", ports: [], idempotent: true }
+    "core.threshold": { role: "trigger", ports: [], idempotent: true },
+    "core.connectivity": { role: "trigger", ports: [], idempotent: true }
 };
 
 /** Loop nodes: their "each" port starts a body that runs once per item or pass. */
@@ -1663,6 +1676,35 @@ export function normalizeAutomationName(value: string): string {
     return value.trim().replace(/\s+/g, " ");
 }
 
+/** Ready-made automations somebody can start from. */
+export const AUTOMATION_TEMPLATES = ["internetBack"] as const;
+export type AutomationTemplate = (typeof AUTOMATION_TEMPLATES)[number];
+
+/**
+ * "Tell me when the internet comes back": the connectivity trigger on "up" and a
+ * bell notice that says how long the line was down. The words come from the
+ * caller, in the reader's language.
+ */
+export function internetBackGraph(
+    timeZone: string,
+    words: { readonly title: string; readonly body: string }
+): AutomationGraph {
+    const graph = emptyGraph(timeZone);
+    const trigger = automationNodeId();
+    const notify = automationNodeId();
+    graph.nodes.push(
+        { id: trigger, type: "core.connectivity", typeVersion: 1, config: { event: "up" } },
+        {
+            id: notify,
+            type: "core.notify",
+            typeVersion: 1,
+            config: { title: words.title, body: words.body }
+        }
+    );
+    graph.edges.push({ from: { node: trigger, port: "next" }, to: { node: notify } });
+    return graph;
+}
+
 export const automationCreateSchema = z.object({
     name: z
         .string()
@@ -1670,7 +1712,9 @@ export const automationCreateSchema = z.object({
         .pipe(z.string().min(1, "nameRequired").max(AUTOMATION_LIMITS.nameLength)),
     description: z.string().trim().max(AUTOMATION_LIMITS.descriptionLength).default(""),
     /** Null for the personal shelf. */
-    orgId: z.string().uuid().nullable().default(null)
+    orgId: z.string().uuid().nullable().default(null),
+    /** Start from a ready-made graph instead of an empty one. */
+    template: z.enum(AUTOMATION_TEMPLATES).optional()
 });
 
 export const automationSettingsSchema = z

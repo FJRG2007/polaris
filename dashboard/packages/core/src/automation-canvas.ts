@@ -695,6 +695,17 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
         "startedAt",
         "durationSeconds",
         "peak"
+    ],
+    "core.connectivity": [
+        "id",
+        "at",
+        "event",
+        "kind",
+        "since",
+        "durationSeconds",
+        "previous",
+        "current",
+        "publicIp"
     ]
 };
 

@@ -105,6 +105,19 @@ export function armedTriggers(
                 nextDueAt: null,
                 state: { config: configKey }
             });
+        } else if (node.type === "core.connectivity") {
+            // Fired by the connectivity sampler's events (lib/connectivity/line-events.ts),
+            // matched by the event it names.
+            const config = core.connectivityTriggerConfigSchema.safeParse(node.config);
+            if (!config.success) continue;
+            out.push({
+                nodeId: node.id,
+                eventType: "core.connectivity",
+                subjectKey: config.data.event,
+                hookHash: null,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
         } else if (node.type === "core.threshold") {
             // Polled (thresholds.ts). Its memory - ok or alarm, the streak, the
             // open episode - survives a publish that left its config alone.

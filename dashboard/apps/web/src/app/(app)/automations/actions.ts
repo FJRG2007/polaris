@@ -139,10 +139,19 @@ export async function createAutomationAction(
         };
     }
     try {
+        const t = parsed.data.template ? await getTranslations("automations") : null;
         const newId = await service.createAutomation(
             await actor(),
             parsed.data,
-            zone.success ? zone.data : "UTC"
+            zone.success ? zone.data : "UTC",
+            t && parsed.data.template
+                ? {
+                      title: t(`templates.${parsed.data.template}.noticeTitle`),
+                      body: t(`templates.${parsed.data.template}.noticeBody`, {
+                          seconds: "{{trigger.durationSeconds}}"
+                      })
+                  }
+                : undefined
         );
         refresh();
         return { ok: true, id: newId };
