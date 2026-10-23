@@ -16,7 +16,8 @@ import { githubTokenForOwner } from "../github-access";
 import { reconcilePullRequestPreviews } from "./environments";
 import { getChangedFiles, getLatestCommit } from "../github-service";
 import { parseWatchPaths, shouldDeployForPaths } from "@polaris/deploy";
-import { commitPassesFilter, deployPushedCommit } from "./push-deploys";
+import { commitPassesFilter } from "./push-deploys";
+import { deployOrHold, pollCiWaits } from "./ci-wait";
 
 const INTERVAL_MS = Number(process.env.POLARIS_AUTODEPLOY_POLL_MS) || 60_000;
 let started = false;
@@ -79,11 +80,13 @@ export async function pollAutoDeploys(): Promise<void> {
         }
 
         try {
-            await deployPushedCommit(app, ownerId, {
+            await deployOrHold(app, ownerId, {
                 commitMessage: latest.message,
                 commitSha: latest.sha,
                 authorName: latest.authorName ?? undefined,
-                authorAvatarUrl: latest.authorAvatarUrl ?? undefined
+                authorAvatarUrl: latest.authorAvatarUrl ?? undefined,
+                repoFullName: `${parsed.owner}/${parsed.repo}`,
+                branch
             });
         } catch {
             // The commit was handed back, so the next tick retries it.
@@ -99,6 +102,10 @@ export function startAutoDeployPoller(): void {
     const tick = (): void =>
         void pollAutoDeploys()
             .catch((error) => console.error("polaris: auto-deploy poll failed:", error))
+            // Pushes held for CI whose check events never arrived - every LAN
+            // install, and any delivery GitHub dropped.
+            .then(() => pollCiWaits())
+            .catch((error) => console.error("polaris: wait-for-CI poll failed:", error))
             // Previews ride the same tick: an install GitHub cannot reach has no
             // other way to hear that a pull request opened or closed.
             .then(() => reconcilePullRequestPreviews())

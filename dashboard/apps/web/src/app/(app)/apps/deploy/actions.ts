@@ -624,6 +624,7 @@ export async function setAutoDeployAction(input: {
     commitFilter?: string;
     watchPaths?: string;
     keepReleases?: boolean;
+    waitForCi?: boolean;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
@@ -637,7 +638,8 @@ export async function setAutoDeployAction(input: {
             deployBranch: input.deployBranch,
             commitFilter: input.commitFilter,
             watchPaths: input.watchPaths,
-            keepReleases: input.keepReleases
+            keepReleases: input.keepReleases,
+            ...(typeof input.waitForCi === "boolean" ? { waitForCi: input.waitForCi } : {})
         });
         revalidatePath(DEPLOY_PATH);
         return {};

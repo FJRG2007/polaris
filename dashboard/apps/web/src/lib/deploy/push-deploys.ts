@@ -8,8 +8,11 @@
 
 import { prisma } from "@polaris/db";
 import { trackedBranch } from "./branches";
-import { deployApplication } from "../deploy-service";
+import { deployOrHold } from "./ci-wait";
 import { parseWatchPaths, shouldDeployForPaths } from "@polaris/deploy";
+
+// Where it always lived; kept importable from here for every caller that does.
+export { deployPushedCommit } from "./pushed-commit";
 
 /** "refs/heads/main" -> "main". */
 export function branchFromRef(ref: string): string {
@@ -33,53 +36,10 @@ export function commitPassesFilter(message: string, filter: string | null | unde
 }
 
 /**
- * Deploy a pushed commit on a service, unless something already took it.
- *
- * A push reaches a service two ways - the webhook, and the poller for installs
- * GitHub cannot reach - and a webhook can be delivered twice. Each used to read
- * the last deployed commit, start a deploy and only then record the new one, so
- * two of them landing together each started a deploy of the same commit, and
- * the second died on the first's container name ("Conflict. The container name
- * ... is already in use"), seen on a live server on 2026-09-11. The commit is
- * now claimed first, in one conditional write only one caller can win; a deploy
- * that could not start hands it back so the next poll retries it.
- *
- * Answers whether this call started the deploy.
- */
-export async function deployPushedCommit(
-    app: { readonly id: string; readonly lastDeployedSha: string | null },
-    ownerId: string,
-    commit: {
-        commitSha: string;
-        commitMessage: string;
-        authorName?: string;
-        authorAvatarUrl?: string;
-    }
-): Promise<boolean> {
-    const claimed = await prisma.application.updateMany({
-        where: {
-            id: app.id,
-            OR: [{ lastDeployedSha: null }, { lastDeployedSha: { not: commit.commitSha } }]
-        },
-        data: { lastDeployedSha: commit.commitSha }
-    });
-    if (claimed.count === 0) return false;
-    try {
-        await deployApplication(app.id, ownerId, null, { ...commit, trigger: "push" });
-        return true;
-    } catch (error) {
-        await prisma.application.updateMany({
-            where: { id: app.id, lastDeployedSha: commit.commitSha },
-            data: { lastDeployedSha: app.lastDeployedSha }
-        });
-        throw error;
-    }
-}
-
-/**
  * Trigger auto-deploys for a git push: find applications tracking this repo with
  * auto-deploy enabled whose branch and commit-message filters pass, and deploy
- * each. Returns the number of deployments started. Not owner-scoped - a webhook
+ * each - or, for a service waiting for CI, hold the push until its checks pass.
+ * Returns the number of deployments started. Not owner-scoped - a webhook
  * fans out to every matching app on the instance.
  */
 export async function triggerAutoDeploysForPush(input: {
@@ -126,9 +86,11 @@ export async function triggerAutoDeploysForPush(input: {
         }
         const ownerId = app.environment.project.ownerId;
         try {
-            const deployed = await deployPushedCommit(app, ownerId, {
+            const deployed = await deployOrHold(app, ownerId, {
                 commitMessage: input.commitMessage,
-                commitSha: input.commitSha
+                commitSha: input.commitSha,
+                repoFullName: input.repoFullName,
+                branch: input.branch
             });
             if (deployed) started += 1;
         } catch {
