@@ -99,7 +99,7 @@ export async function linkGeoAllowed(
 
 /** Both address rules in the order the public endpoints apply them, or null. */
 export async function linkAddressDenial(
-    rules: { allowedCidrs: string; allowedCountries: string; allowedContinents: string },
+    rules: LinkAddressRules,
     ip: string | undefined
 ): Promise<LinkDenial | null> {
     if (!linkIpAllowed(rules.allowedCidrs, ip)) return "ip_not_allowed";
@@ -107,6 +107,63 @@ export async function linkAddressDenial(
         return "country_not_allowed";
     }
     return null;
+}
+
+/** The address rules a link stores, as the JSON-array columns every link table
+ *  uses. Empty means no restriction. */
+export interface LinkAddressRules {
+    allowedCidrs: string;
+    allowedCountries: string;
+    allowedContinents: string;
+}
+
+/** The one verdict a public route acts on: serve, or the reason it may not. */
+export type LinkCheck = LinkUsability | { ok: false; reason: LinkDenial };
+
+/**
+ * The single check every public link runs before it serves anything: whether
+ * the link is live (revoked, scheduled, expired, used up), then whether the
+ * caller's address and region are ones it accepts. Liveness comes first, so a
+ * link that is off says so to everyone rather than "not from here".
+ *
+ * The password is a separate gate (`verifyUnlock`), because a refused password
+ * is a form to fill in rather than a dead end.
+ */
+export async function checkLink(
+    link: { limits: LinkLimits; rules: LinkAddressRules },
+    ip: string | undefined,
+    now: Date = new Date()
+): Promise<LinkCheck> {
+    const usable = linkUsability(link.limits, now);
+    if (!usable.ok) return usable;
+    const denial = await linkAddressDenial(link.rules, ip);
+    return denial ? { ok: false, reason: denial } : { ok: true };
+}
+
+/** Address rules ready to store: each list as the JSON column it lives in. */
+export function storedAddressRules(rules: {
+    allowedCidrs?: readonly string[];
+    allowedCountries?: readonly string[];
+    allowedContinents?: readonly string[];
+}): LinkAddressRules {
+    return {
+        allowedCidrs: JSON.stringify(rules.allowedCidrs ?? []),
+        allowedCountries: JSON.stringify(rules.allowedCountries ?? []),
+        allowedContinents: JSON.stringify(rules.allowedContinents ?? [])
+    };
+}
+
+/** Stored address rules read back as lists, for a dialog to show. */
+export function readAddressRules(rules: LinkAddressRules): {
+    allowedCidrs: string[];
+    allowedCountries: string[];
+    allowedContinents: string[];
+} {
+    return {
+        allowedCidrs: parseStringList(rules.allowedCidrs),
+        allowedCountries: parseStringList(rules.allowedCountries),
+        allowedContinents: parseStringList(rules.allowedContinents)
+    };
 }
 
 /** The cookie that records a solved password for one link. */

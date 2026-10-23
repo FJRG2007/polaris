@@ -1540,5 +1540,18 @@
     },
     "deviceAddress": {
         "via": "vía"
+    },
+    "linkAdvanced": {
+        "title": "Avanzado",
+        "none": "Sin límites",
+        "set": "{count, plural, one {# límite} other {# límites}}",
+        "password": "Contraseña",
+        "replacePassword": "Nueva clave",
+        "passwordSet": "Se mantiene si no escribes otra",
+        "passwordNone": "Sin contraseña",
+        "expires": "Caduca",
+        "uses": "Usos",
+        "noLimit": "Sin límite",
+        "hint": "Se comprueba en cada apertura. Vacío: cualquiera con el enlace."
     }
 }

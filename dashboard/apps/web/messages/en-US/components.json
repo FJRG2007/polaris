@@ -1540,5 +1540,18 @@
     },
     "deviceAddress": {
         "via": "via"
+    },
+    "linkAdvanced": {
+        "title": "Advanced",
+        "none": "No limits",
+        "set": "{count, plural, one {# limit} other {# limits}}",
+        "password": "Password",
+        "replacePassword": "New password",
+        "passwordSet": "Kept unless you type one",
+        "passwordNone": "No password",
+        "expires": "Expires",
+        "uses": "Uses",
+        "noLimit": "No limit",
+        "hint": "Checked on every open. Empty means anyone with the link."
     }
 }
