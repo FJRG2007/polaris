@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { Field } from "../deploy/form-field";
 import { NewTemplateForm } from "../deploy/service-form";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { listTemplateTargetsAction, type TemplateTarget } from "../deploy/actions";
+import { type TemplateTarget } from "../deploy/actions";
 import {
     Button,
     Dialog,
@@ -25,6 +25,7 @@ import {
     SearchableSelect,
     Select
 } from "@polaris/ui";
+import * as polls from "./marketplace-polls";
 
 export function TemplateDeployDialog({
     templateId,
@@ -45,7 +46,8 @@ export function TemplateDeployDialog({
     const [chosen, setChosen] = useState(false);
 
     useEffect(() => {
-        void listTemplateTargetsAction()
+        void polls
+            .templateTargets()
             .then((list) => {
                 setTargets(list);
                 const first = list[0];

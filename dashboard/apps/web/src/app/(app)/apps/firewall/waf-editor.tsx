@@ -63,6 +63,7 @@ import {
     type WafRuleMatches,
     type WafScopeRule
 } from "./actions";
+import * as polls from "./firewall-polls";
 
 /** The scope as nothing has ever been written to it. The injection checks and
  *  obfuscation are on here for the same reason they are on in the schema: that is the
@@ -241,7 +242,7 @@ export function WafEditor({
         setView({ kind: "list" });
         setAddresses(null);
         setMatches(undefined);
-        void getWafRuleAction({ scopeType, scopeId }).then((result) => {
+        void polls.wafRule({ scopeType, scopeId }).then((result) => {
             if (!active) return;
             const rule = result.rule ?? BLANK;
             confirmed.current = rule;

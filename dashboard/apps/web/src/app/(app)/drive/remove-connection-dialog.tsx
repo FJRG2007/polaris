@@ -15,12 +15,13 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, HardDrive, Loader2, TriangleAlert } from "lucide-react";
-import { connectionRemovalPlanAction, removeConnectionAction } from "./actions";
+import { removeConnectionAction } from "./actions";
 import type {
     ConnectionRemovalMode,
     ConnectionRemovalPlan,
     RemoveConnectionResult
 } from "@/lib/connection-removal-service";
+import * as polls from "./drive-reads";
 
 interface Choice {
     readonly mode: ConnectionRemovalMode;
@@ -67,13 +68,14 @@ export function RemoveConnectionDialog({
         setError(null);
         if (!connection) return;
         let current = true;
-        void connectionRemovalPlanAction(connection.id).then((result) => {
+        void polls.removalPlan(connection.id).then((result) => {
             if (!current) return;
             setPlan(result);
             setDestination(result?.destinations[0]?.id ?? "");
             // A device something is mounted on cannot simply be forgotten, so the
             // only answer that works is the one already selected when they arrive.
-            if (result && result.services.length > 0 && result.destinations.length > 0) setMode("move");
+            if (result && result.services.length > 0 && result.destinations.length > 0)
+                setMode("move");
         });
         return () => {
             current = false;
@@ -132,21 +134,30 @@ export function RemoveConnectionDialog({
                         >
                             <span className="flex items-center gap-2 text-sm font-medium">
                                 {t(choice.label)}
-                                {mode === choice.mode ? <Check className="size-3.5 text-primary" /> : null}
+                                {mode === choice.mode ? (
+                                    <Check className="size-3.5 text-primary" />
+                                ) : null}
                             </span>
-                            <span className="text-xs text-muted-foreground">{t(choice.summary)}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t(choice.summary)}
+                            </span>
                         </button>
                     ))}
                 </div>
 
                 {mode === "move" && plan ? (
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">{t("removeConnection.copyTo")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("removeConnection.copyTo")}
+                        </span>
                         <Select
                             value={destination}
                             onValueChange={setDestination}
                             disabled={pending}
-                            options={plan.destinations.map((entry) => ({ value: entry.id, label: entry.name }))}
+                            options={plan.destinations.map((entry) => ({
+                                value: entry.id,
+                                label: entry.name
+                            }))}
                         />
                     </label>
                 ) : null}
@@ -183,16 +194,16 @@ function Dependents({ plan }: { plan: ConnectionRemovalPlan }) {
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                     <span>
                         {t("removeConnection.servicesKeepData", {
-                            services: plan.services.map((service) => `${service.name} (${service.volume})`).join(", "),
+                            services: plan.services
+                                .map((service) => `${service.name} (${service.volume})`)
+                                .join(", "),
                             count: plan.services.length
                         })}
                     </span>
                 </p>
             ) : null}
             {links > 0 ? (
-                <p className="pl-6">
-                    {t("removeConnection.linksStop", { count: links })}
-                </p>
+                <p className="pl-6">{t("removeConnection.linksStop", { count: links })}</p>
             ) : null}
         </div>
     );

@@ -16,3 +16,20 @@ export const sessionScreen = (sessionId: string, signal?: AbortSignal) =>
         { sessionId },
         signal
     );
+
+export const sessionChoices = (signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.sessionChoicesAction>>(
+        "/api/agents/sessions/choices",
+        {},
+        signal
+    );
+
+export const sessionChanges = (
+    input: Parameters<typeof actions.sessionChangesAction>[0],
+    signal?: AbortSignal
+) =>
+    readPoll<Answer<typeof actions.sessionChangesAction>>(
+        "/api/agents/sessions/changes",
+        { input: JSON.stringify(input) },
+        signal
+    );

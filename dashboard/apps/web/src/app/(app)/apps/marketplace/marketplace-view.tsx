@@ -56,13 +56,7 @@ import {
     type StoreScope,
     type StoreSort
 } from "@/lib/apps/marketplace-store";
-import {
-    installAppAction,
-    listInstallTargetsAction,
-    listStorageConnectionsAction,
-    type InstallTarget,
-    type StorageConnectionOption
-} from "./actions";
+import { installAppAction, type InstallTarget, type StorageConnectionOption } from "./actions";
 import {
     AppPreview,
     OverflowMenu,
@@ -89,6 +83,7 @@ import { categoryLabel } from "@/lib/apps/app-words";
 import { validationMessage } from "@/components/i18n/validation-message";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./marketplace-polls";
 
 type Words = NamespaceTranslator<"marketplace">;
 
@@ -690,7 +685,7 @@ export function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () 
 
     useEffect(() => {
         let active = true;
-        void Promise.all([listInstallTargetsAction(), listStorageConnectionsAction()])
+        void Promise.all([polls.installTargets(), polls.storageConnections()])
             .then(([loadedTargets, loadedConnections]) => {
                 if (!active) return;
                 setTargets(loadedTargets);

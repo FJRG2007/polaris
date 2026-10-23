@@ -19,14 +19,10 @@ import type { RunnerScopeInput } from "@polaris/core";
 import { RepoPicker } from "@/components/repo-picker";
 import { Badge, Checkbox, Input, Select } from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-    githubReposAction,
-    previewScopeAction,
-    runnerPrincipalsAction,
-    searchGithubReposAction
-} from "./actions";
+import { githubReposAction, searchGithubReposAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
+import * as polls from "./runners-polls";
 
 /** The kinds of scope, each said as `scopeField.kinds.<kind>`. */
 const SCOPE_KINDS = ["repo", "repos", "account", "org", "users", "group"] as const;
@@ -113,7 +109,8 @@ export function ScopeField({
 
     useEffect(() => {
         if (!needsPeople) return;
-        void runnerPrincipalsAction()
+        void polls
+            .runnerPrincipals()
             .then(setPrincipals)
             .catch(() => undefined);
     }, [needsPeople]);
@@ -132,7 +129,8 @@ export function ScopeField({
         let live = true;
         setChecking(true);
         const timer = setTimeout(() => {
-            void previewScopeAction(JSON.parse(serialized))
+            void polls
+                .scopePreview(JSON.parse(serialized))
                 .then((result) => {
                     if (!live) return;
                     const next = {
@@ -220,9 +218,7 @@ export function ScopeField({
                                 placeholder={t("scopeField.repoPlaceholder")}
                                 maxHeightClass="max-h-40"
                             />
-                            {!connected ? (
-                                <Hint>{t("scopeField.notConnected")}</Hint>
-                            ) : null}
+                            {!connected ? <Hint>{t("scopeField.notConnected")}</Hint> : null}
                         </>
                     ) : null}
                 </div>
@@ -240,7 +236,9 @@ export function ScopeField({
                         spellCheck={false}
                     />
                     <Hint>
-                        {state.kind === "org" ? t("scopeField.orgHint") : t("scopeField.accountHint")}
+                        {state.kind === "org"
+                            ? t("scopeField.orgHint")
+                            : t("scopeField.accountHint")}
                     </Hint>
                 </label>
             ) : null}
@@ -295,7 +293,10 @@ export function ScopeField({
                             placeholder={t("schema.pickGroup")}
                             options={principals.groups.map((group) => ({
                                 value: group.id,
-                                label: t("scopeField.groupLinked", { name: group.name, count: group.linked })
+                                label: t("scopeField.groupLinked", {
+                                    name: group.name,
+                                    count: group.linked
+                                })
                             }))}
                         />
                     )}
@@ -326,9 +327,7 @@ function ScopePreview({
     if (!preview) return null;
     if (preview.note) return <span className="text-xs text-danger">{preview.note}</span>;
     if (preview.count === 0) return null;
-    return (
-        <Hint>{t("scopeField.serves", { count: preview.count })}</Hint>
-    );
+    return <Hint>{t("scopeField.serves", { count: preview.count })}</Hint>;
 }
 
 function Hint({ children }: { children: React.ReactNode }) {

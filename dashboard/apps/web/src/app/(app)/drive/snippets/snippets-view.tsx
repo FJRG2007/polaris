@@ -34,10 +34,10 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 import {
     deleteSnippetAction,
-    getSnippetLogsAction,
     revealSnippetLinkAction,
     type SnippetLogRow
 } from "./snippet-actions";
+import * as polls from "../drive-reads";
 
 export interface SnippetRow {
     id: string;
@@ -343,7 +343,7 @@ function SnippetLogsDialog({
             return;
         }
         let live = true;
-        void getSnippetLogsAction(snippet.id).then((result) => {
+        void polls.snippetLogs(snippet.id).then((result) => {
             if (live) setLogs(result.logs);
         });
         return () => {

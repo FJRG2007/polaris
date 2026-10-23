@@ -61,6 +61,7 @@ import {
     Switch,
     TimeSeriesChart
 } from "@polaris/ui";
+import * as polls from "./firewall-polls";
 
 type Overview = Awaited<ReturnType<typeof getWafOverviewAction>>;
 
@@ -1095,7 +1096,7 @@ function AddressDialog({
         let active = true;
         setLoaded(null);
         setError(null);
-        void getWafAddressActivityAction(ip, hours).then((result) => {
+        void polls.addressActivity(ip, hours).then((result) => {
             if (!active) return;
             if (result.error) setError(result.error);
             else setLoaded(result);

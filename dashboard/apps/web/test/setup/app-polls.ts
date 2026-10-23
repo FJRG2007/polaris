@@ -8,16 +8,19 @@ import { vi } from "vitest";
 
 type Loader = () => Promise<unknown>;
 
-/** Imports already under way, by loader. Two first imports of a mocked module at
- *  the same moment hand one of them the real module, so a screen that asks two
- *  reads at once would reach the server code; the second waits on the first. */
-const loading = new Map<Loader, Promise<unknown>>();
+/** Imports already under way, by the module they import. Two first imports of a
+ *  mocked module at the same moment hand one of them the real module, so a screen
+ *  that asks two reads at once would reach the server code; the second waits on
+ *  the first. Keyed by the loader's source rather than the loader itself, since
+ *  two reads from one module each have their own `() => import(...)`. */
+const loading = new Map<string, Promise<unknown>>();
 
 function loadOnce(load: Loader): Promise<unknown> {
-    const pending = loading.get(load);
+    const key = load.toString();
+    const pending = loading.get(key);
     if (pending) return pending;
-    const started = load().finally(() => loading.delete(load));
-    loading.set(load, started);
+    const started = load().finally(() => loading.delete(key));
+    loading.set(key, started);
     return started;
 }
 
@@ -223,18 +226,55 @@ vi.mock("@/app/(app)/apps/deploy/deploy-polls", () => {
     };
 });
 
-vi.mock("@/app/(app)/apps/servers/servers-polls", () => {
-    const actions = () => import("@/app/(app)/apps/servers/actions");
-    return {
-        serverEdge: forward(actions, "serverEdgeAction", 1),
-        enrollmentStatus: forward(actions, "enrollmentStatusAction", 1)
-    };
-});
+vi.mock("@/app/(app)/apps/servers/servers-polls", () => ({
+    serverEdge: forward(() => import("@/app/(app)/apps/servers/actions"), "serverEdgeAction", 1),
+    enrollmentStatus: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "enrollmentStatusAction",
+        1
+    ),
+    removalPlan: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "serverRemovalPlanAction",
+        1
+    ),
+    hostGroups: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "listHostGroupsAction",
+        0
+    ),
+    followState: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "serverFollowStateAction",
+        1
+    ),
+    githubKeys: forward(
+        () => import("@/app/(app)/apps/servers/ssh-key-actions"),
+        "githubKeysAction",
+        0
+    ),
+    leftoverAutoRemove: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "leftoverAutoRemoveAction",
+        0
+    ),
+    sharedHost: forward(() => import("@/app/(app)/apps/servers/actions"), "sharedHostAction", 1)
+}));
 
 vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
     sessionScreen: forward(
         () => import("@/app/(app)/apps/agents/sessions/actions"),
         "sessionScreenAction",
+        1
+    ),
+    sessionChoices: forward(
+        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        "sessionChoicesAction",
+        0
+    ),
+    sessionChanges: forward(
+        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        "sessionChangesAction",
         1
     )
 }));
@@ -266,6 +306,11 @@ vi.mock("@/app/(app)/home/home-polls", () => ({
         () => import("@/app/(app)/home/app-widget-actions"),
         "readAppWidgetsAction",
         0
+    ),
+    appWidgetTargets: forward(
+        () => import("@/app/(app)/home/app-widget-actions"),
+        "appWidgetTargetsAction",
+        2
     )
 }));
 
@@ -284,11 +329,24 @@ vi.mock("@/app/(app)/apps/mail-server/mail-server-polls", () => ({
         () => import("@/app/(app)/apps/mail-server/actions"),
         "serverDetailAction",
         1
+    ),
+    dnsPlan: forward(() => import("@/app/(app)/apps/mail-server/actions"), "planDnsAction", 1),
+    placements: forward(
+        () => import("@/app/(app)/apps/mail-server/actions"),
+        "listPlacementsAction",
+        0
     )
 }));
 
 vi.mock("@/app/(app)/automations/automations-polls", () => ({
-    run: forward(() => import("@/app/(app)/automations/actions"), "getRunAction", 1)
+    run: forward(() => import("@/app/(app)/automations/actions"), "getRunAction", 1),
+    hookAddress: forward(() => import("@/app/(app)/automations/actions"), "hookAddressAction", 3),
+    chatWebhooks: forward(() => import("@/app/(app)/automations/actions"), "chatWebhooksAction", 0),
+    thresholdChoices: forward(
+        () => import("@/app/(app)/automations/actions"),
+        "thresholdChoicesAction",
+        0
+    )
 }));
 
 vi.mock("@/app/(app)/admin/settings/settings-polls", () => ({
@@ -398,4 +456,311 @@ vi.mock("@/components/shared-polls", () => ({
         "getUserProfileAction",
         1
     )
+}));
+
+vi.mock("@/app/(app)/chat/chat-reads", () => ({
+    chatMembers: forward(() => import("@/app/(app)/chat/actions"), "listMembersAction", 1),
+    spaceBans: forward(() => import("@/app/(app)/chat/actions"), "spaceBansAction", 1),
+    chatInvites: forward(() => import("@/app/(app)/chat/actions"), "listInvitesAction", 2),
+    chatWebhooks: forward(() => import("@/app/(app)/chat/actions"), "listWebhooksAction", 1),
+    carriedMessage: forward(() => import("@/app/(app)/chat/actions"), "carriedMessageAction", 1),
+    chatRules: forward(() => import("@/app/(app)/chat/actions"), "chatRulesAction", 0),
+    callsUnavailable: forward(
+        () => import("@/app/(app)/chat/meeting-actions"),
+        "callsUnavailableAction",
+        0
+    ),
+    editHistory: forward(() => import("@/app/(app)/chat/actions"), "editHistoryAction", 1),
+    conversationsElsewhere: forward(
+        () => import("@/app/(app)/chat/actions"),
+        "conversationsElsewhereAction",
+        0
+    ),
+    tenorReady: forward(() => import("@/app/(app)/chat/actions"), "tenorReadyAction", 0),
+    savedMedia: forward(() => import("@/app/(app)/chat/actions"), "listSavedMediaAction", 0),
+    readInvite: forward(() => import("@/app/(app)/chat/actions"), "readInviteAction", 1),
+    inviteCandidates: forward(
+        () => import("@/app/(app)/chat/actions"),
+        "inviteCandidatesAction",
+        1
+    ),
+    messageDelivery: forward(() => import("@/app/(app)/chat/actions"), "messageDeliveryAction", 1),
+    linkPreview: forward(() => import("@/app/(app)/chat/actions"), "linkPreviewAction", 1),
+    chatProfile: forward(() => import("@/app/(app)/chat/actions"), "profileAction", 2),
+    meetingList: forward(() => import("@/app/(app)/chat/meeting-actions"), "listMeetingsAction", 0)
+}));
+
+vi.mock("@/app/(app)/admin/admin-polls", () => ({
+    callServerSettings: forward(
+        () => import("@/app/(app)/admin/chat/actions"),
+        "callServerSettingsAction",
+        0
+    ),
+    dnsZones: forward(
+        () => import("@/app/(app)/account/domains/dns-actions"),
+        "listDnsZonesAction",
+        0
+    ),
+    networkStatus: forward(
+        () => import("@/app/(app)/admin/domains/actions"),
+        "networkStatusAction",
+        0
+    ),
+    firstDiscordChannel: forward(
+        () => import("@/app/(app)/admin/inbox/actions"),
+        "firstDiscordChannelAction",
+        0
+    ),
+    channelTargets: forward(
+        () => import("@/app/(app)/admin/inbox/actions"),
+        "listChannelTargetsAction",
+        1
+    ),
+    inboxAgents: forward(() => import("@/app/(app)/admin/inbox/actions"), "listAgentsAction", 0),
+    inboxContacts: forward(
+        () => import("@/app/(app)/admin/inbox/actions"),
+        "listContactsAction",
+        0
+    ),
+    mailBodyHeld: forward(
+        () => import("@/app/(app)/admin/retention/actions"),
+        "mailBodyHeldAction",
+        0
+    ),
+    ownVulnerabilities: forward(
+        () => import("@/app/(app)/admin/settings/actions"),
+        "ownVulnerabilitiesAction",
+        0
+    )
+}));
+
+vi.mock("@/app/(app)/drive/drive-reads", () => ({
+    linkedAccounts: forward(() => import("@/app/(app)/drive/actions"), "linkedAccountsAction", 1),
+    driveJobs: forward(() => import("@/app/(app)/drive/actions"), "driveJobsAction", 2),
+    unasShares: forward(() => import("@/app/(app)/drive/actions"), "discoverUnasSharesAction", 1),
+    removalPlan: forward(
+        () => import("@/app/(app)/drive/actions"),
+        "connectionRemovalPlanAction",
+        1
+    ),
+    myShareGroups: forward(
+        () => import("@/app/(app)/drive/sharing-actions"),
+        "myShareGroupsAction",
+        0
+    ),
+    itemShares: forward(
+        () => import("@/app/(app)/drive/sharing-actions"),
+        "listItemSharesAction",
+        2
+    ),
+    transferOrgs: forward(
+        () => import("@/app/(app)/drive/transfer-actions"),
+        "transferOrgsAction",
+        0
+    ),
+    waitingTransfers: forward(
+        () => import("@/app/(app)/drive/transfer-actions"),
+        "waitingTransfersAction",
+        0
+    ),
+    sentTransfers: forward(
+        () => import("@/app/(app)/drive/transfer-actions"),
+        "sentTransfersAction",
+        0
+    ),
+    shareLogs: forward(() => import("@/app/(app)/drive/share-actions"), "getShareLogsAction", 1),
+    snippetLogs: forward(
+        () => import("@/app/(app)/drive/snippets/snippet-actions"),
+        "getSnippetLogsAction",
+        1
+    )
+}));
+
+vi.mock("@/app/(app)/account/account-polls", () => ({
+    keyUsage: forward(
+        () => import("@/app/(app)/account/api-keys/usage-actions"),
+        "keyUsageAction",
+        1
+    ),
+    friendsPage: forward(
+        () => import("@/app/(app)/account/privacy/actions"),
+        "loadFriendsAction",
+        1
+    ),
+    friendRequests: forward(
+        () => import("@/app/(app)/account/privacy/actions"),
+        "loadFriendRequestsAction",
+        0
+    ),
+    stepUpRemaining: forward(
+        () => import("@/app/(app)/account/step-up-actions"),
+        "stepUpRemainingAction",
+        1
+    ),
+    trustedDevice: forward(
+        () => import("@/app/(app)/account/sessions/actions"),
+        "trustedDeviceAction",
+        1
+    )
+}));
+
+vi.mock("@/app/(app)/tasks/tasks-polls", () => ({
+    handoffChoices: forward(
+        () => import("@/app/(app)/tasks/actions"),
+        "agentHandoffChoicesAction",
+        0
+    ),
+    taskDetail: forward(() => import("@/app/(app)/tasks/actions"), "getTaskDetailAction", 1),
+    taskShare: forward(() => import("@/app/(app)/tasks/actions"), "getTaskShareAction", 1),
+    createContext: forward(() => import("@/app/(app)/tasks/actions"), "createContextAction", 2),
+    trackerTargets: forward(
+        () => import("@/app/(app)/tasks/trackers/actions"),
+        "trackerTargetsAction",
+        0
+    )
+}));
+
+vi.mock("@/app/(app)/apps/analytics/analytics-polls", () => ({
+    analyticsSites: forward(
+        () => import("@/app/(app)/apps/analytics/actions"),
+        "listAnalyticsSitesAction",
+        0
+    ),
+    analyticsOverview: forward(
+        () => import("@/app/(app)/apps/analytics/actions"),
+        "getAnalyticsOverviewAction",
+        1
+    )
+}));
+
+vi.mock("@/app/(app)/apps/backups/backups-polls", () => ({
+    backupKeys: forward(() => import("@/app/(app)/apps/backups/actions"), "listBackupKeysAction", 0)
+}));
+
+vi.mock("@/app/(app)/apps/code/code-polls", () => ({
+    codeWork: forward(() => import("@/app/(app)/apps/code/actions"), "listWorkAction", 1)
+}));
+
+vi.mock("@/app/(app)/apps/containers/containers-polls", () => ({
+    containerDriveLink: forward(
+        () => import("@/app/(app)/apps/containers/[containerId]/drive-link-actions"),
+        "containerDriveLinkAction",
+        1
+    )
+}));
+
+vi.mock("@/app/(app)/apps/databases/databases-polls", () => ({
+    engineOptions: forward(
+        () => import("@/app/(app)/apps/databases/actions"),
+        "engineOptionsAction",
+        0
+    ),
+    managedDatabases: forward(
+        () => import("@/app/(app)/apps/databases/actions"),
+        "listManagedAction",
+        0
+    ),
+    tunnelServers: forward(
+        () => import("@/app/(app)/apps/databases/actions"),
+        "listTunnelServersAction",
+        0
+    )
+}));
+
+vi.mock("@/app/(app)/apps/firewall/firewall-polls", () => ({
+    addressActivity: forward(
+        () => import("@/app/(app)/apps/firewall/actions"),
+        "getWafAddressActivityAction",
+        2
+    ),
+    wafRule: forward(() => import("@/app/(app)/apps/firewall/actions"), "getWafRuleAction", 1)
+}));
+
+vi.mock("@/app/(app)/apps/installed/[id]/installed-polls", () => ({
+    redeployStrategy: forward(
+        () => import("@/app/(app)/apps/installed/[id]/actions"),
+        "redeployStrategyAction",
+        1
+    )
+}));
+
+vi.mock("@/app/(app)/apps/marketplace/marketplace-polls", () => ({
+    installTargets: forward(
+        () => import("@/app/(app)/apps/marketplace/actions"),
+        "listInstallTargetsAction",
+        0
+    ),
+    storageConnections: forward(
+        () => import("@/app/(app)/apps/marketplace/actions"),
+        "listStorageConnectionsAction",
+        0
+    ),
+    templateTargets: forward(
+        () => import("@/app/(app)/apps/deploy/actions"),
+        "listTemplateTargetsAction",
+        0
+    )
+}));
+
+vi.mock("@/app/(app)/apps/runners/runners-polls", () => ({
+    runnerHost: forward(
+        () => import("@/app/(app)/apps/runners/actions"),
+        "probeRunnerHostAction",
+        1
+    ),
+    runnerPrincipals: forward(
+        () => import("@/app/(app)/apps/runners/actions"),
+        "runnerPrincipalsAction",
+        0
+    ),
+    scopePreview: forward(() => import("@/app/(app)/apps/runners/actions"), "previewScopeAction", 1)
+}));
+
+vi.mock("@/app/(app)/apps/telemetry/telemetry-polls", () => ({
+    telemetryOverview: forward(
+        () => import("@/app/(app)/apps/telemetry/actions"),
+        "telemetryOverviewAction",
+        1
+    ),
+    telemetryIssue: forward(
+        () => import("@/app/(app)/apps/telemetry/actions"),
+        "openIssueAction",
+        2
+    )
+}));
+
+vi.mock("@/app/(app)/apps/agents/repos/repos-polls", () => ({
+    repoAdvice: forward(() => import("@/app/(app)/apps/agents/actions"), "adviseRepoAction", 1)
+}));
+
+vi.mock("@/app/(app)/mail/mail-polls", () => ({
+    drafts: forward(() => import("@/app/(app)/mail/actions"), "listDraftsAction", 0)
+}));
+
+vi.mock("@/app/(app)/vault/vault-polls", () => ({
+    itemUses: forward(() => import("@/app/(app)/vault/vault-actions"), "itemUsesAction", 1)
+}));
+
+vi.mock("@/app/(app)/notes/notes-polls", () => ({
+    noteShare: forward(() => import("@/app/(app)/notes/actions"), "noteShareAction", 1),
+    spaceOwners: forward(() => import("@/app/(app)/notes/actions"), "noteSpaceOwnersAction", 0)
+}));
+
+vi.mock("@/app/(app)/office/office-polls", () => ({
+    googleLink: forward(
+        () => import("@/app/(app)/office/google-actions"),
+        "officeGoogleLinkAction",
+        1
+    ),
+    googleState: forward(
+        () => import("@/app/(app)/office/google-actions"),
+        "officeGoogleStateAction",
+        0
+    ),
+    googleFiles: forward(
+        () => import("@/app/(app)/office/google-actions"),
+        "listGoogleFilesAction",
+        1
+    ),
+    links: forward(() => import("@/app/(app)/office/link-actions"), "listLinksAction", 1)
 }));

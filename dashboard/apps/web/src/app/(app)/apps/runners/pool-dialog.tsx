@@ -26,7 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { knownRunnerText, runnerText } from "@/lib/runners/words";
 import type { RunnerHostReadiness } from "@/lib/runners/runner-service";
-import { createRunnerPoolAction, probeRunnerHostAction } from "./actions";
+import { createRunnerPoolAction } from "./actions";
 import { EMPTY_SCOPE, ScopeField, toScope, type ScopeState } from "./scope-field";
 import {
     Button,
@@ -48,6 +48,7 @@ import {
     type RunnerIsolation,
     type RunnerWindow
 } from "@polaris/core";
+import * as polls from "./runners-polls";
 
 export interface ServerOption {
     id: string;
@@ -96,7 +97,8 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     const poolLabels = normalizeRunnerLabels(labels.split(","));
     // Named after what it serves when nobody bothered: a pool called "acme/website"
     // beats one called "New pool", and it is still theirs to change under Advanced.
-    const proposedName = name.trim() || scope.repos[0]?.split("/")[1] || scope.owner || t("dialog.defaultName");
+    const proposedName =
+        name.trim() || scope.repos[0]?.split("/")[1] || scope.owner || t("dialog.defaultName");
     const draft = {
         serverId,
         name: proposedName,
@@ -130,7 +132,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
         setProbing(true);
         setReadiness(null);
         setProbeError(null);
-        void probeRunnerHostAction(serverId).then((result) => {
+        void polls.runnerHost(serverId).then((result) => {
             if (!live) return;
             setProbing(false);
             const machine = result.readiness;
@@ -164,7 +166,11 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     // workspace is not one of its options rather than a worse one.
     const workspaceAvailable = readiness === null || readiness.reach === "login";
     const isolationOptions = [
-        { value: "container", label: t("dialog.isolation.container"), disabled: !containersAvailable },
+        {
+            value: "container",
+            label: t("dialog.isolation.container"),
+            disabled: !containersAvailable
+        },
         {
             value: "workspace",
             label: t("dialog.isolation.workspace"),
@@ -205,7 +211,9 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
         const parts = [
             poolLabels.join(", ") || t("dialog.summary.noLabels"),
             t("dialog.summary.atOnce", { count: Number(maxConcurrent) || 0 }),
-            isolation === "container" ? t("dialog.summary.contained") : t("dialog.summary.directory")
+            isolation === "container"
+                ? t("dialog.summary.contained")
+                : t("dialog.summary.directory")
         ];
         const limits = [
             perTarget.trim() ? t("dialog.summary.each", { count: perTarget }) : null,
@@ -252,20 +260,27 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                     <DialogTitle>{t("dialog.title")}</DialogTitle>
                     <DialogDescription>
                         {t.rich("dialog.intro", {
-                            code: (chunks) => <code className="mx-1 font-mono text-xs">{chunks}</code>
+                            code: (chunks) => (
+                                <code className="mx-1 font-mono text-xs">{chunks}</code>
+                            )
                         })}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
-                    <Field label={t("dialog.runsOn")} error={probeError ? runnerText(t, probeError) : null}>
+                    <Field
+                        label={t("dialog.runsOn")}
+                        error={probeError ? runnerText(t, probeError) : null}
+                    >
                         <Select
                             value={serverId}
                             onValueChange={setServerId}
                             placeholder={t("dialog.pickServer")}
                             options={servers.map((entry) => ({
                                 value: entry.id,
-                                label: entry.local ? t("dialog.thisMachine", { name: entry.name }) : entry.name
+                                label: entry.local
+                                    ? t("dialog.thisMachine", { name: entry.name })
+                                    : entry.name
                             }))}
                         />
                         <MachineNote
@@ -278,7 +293,12 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                     <ScopeField state={scope} onChange={setScope} onPreview={onPreview} />
 
                     {spread ? (
-                        <Hint>{t("dialog.spread", { repos: scopeCount, count: Number(maxConcurrent) || 1 })}</Hint>
+                        <Hint>
+                            {t("dialog.spread", {
+                                repos: scopeCount,
+                                count: Number(maxConcurrent) || 1
+                            })}
+                        </Hint>
                     ) : null}
 
                     {/* Everything below is already answered from what the machine
@@ -323,7 +343,9 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                     />
                                     <Hint>
                                         {t.rich("dialog.labelsHint", {
-                                            code: (chunks) => <code className="font-mono text-xs">{chunks}</code>
+                                            code: (chunks) => (
+                                                <code className="font-mono text-xs">{chunks}</code>
+                                            )
                                         })}
                                     </Hint>
                                 </Field>
@@ -333,7 +355,9 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                         label={t("dialog.jobsAtOnce")}
                                         error={
                                             overCapacity
-                                                ? t("dialog.worthAbout", { count: readiness?.recommended ?? 0 })
+                                                ? t("dialog.worthAbout", {
+                                                      count: readiness?.recommended ?? 0
+                                                  })
                                                 : issue("maxConcurrent")
                                         }
                                         className="w-32"
@@ -368,7 +392,9 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                 </div>
 
                                 <div className="flex flex-col gap-2">
-                                    <span className="text-sm font-medium">{t("dialog.limits")}</span>
+                                    <span className="text-sm font-medium">
+                                        {t("dialog.limits")}
+                                    </span>
                                     <Hint>{t("dialog.limitsHint")}</Hint>
 
                                     <div className="flex gap-2">

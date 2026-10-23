@@ -12,3 +12,10 @@ type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnTy
 
 export const appWidgets = (signal?: AbortSignal) =>
     readPoll<Answer<typeof actions.readAppWidgetsAction>>("/api/home/app-widgets", {}, signal);
+
+export const appWidgetTargets = (app: string, kind: string, signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.appWidgetTargetsAction>>(
+        "/api/home/app-widget-targets",
+        { app, kind },
+        signal
+    );

@@ -24,10 +24,9 @@ import {
     acceptTransferAction,
     cancelTransferAction,
     declineTransferAction,
-    dismissTransferNoticeAction,
-    sentTransfersAction,
-    waitingTransfersAction
+    dismissTransferNoticeAction
 } from "./transfer-actions";
+import * as polls from "./drive-reads";
 
 export function TransfersPanel() {
     const t = useTranslations("drive");
@@ -37,7 +36,7 @@ export function TransfersPanel() {
     const [busy, startTransition] = useTransition();
 
     const reload = () => {
-        void Promise.all([waitingTransfersAction(), sentTransfersAction()])
+        void Promise.all([polls.waitingTransfers(), polls.sentTransfers()])
             .then(([incoming, outgoing]) => {
                 setWaiting(incoming);
                 setSent(outgoing);
@@ -165,7 +164,9 @@ export function TransfersPanel() {
                                     {offer.name}
                                 </span>
                                 <Badge variant="neutral" className="shrink-0">
-                                    {offer.mode === "move" ? t("transfers.sendingIt") : t("transfers.copy")}
+                                    {offer.mode === "move"
+                                        ? t("transfers.sendingIt")
+                                        : t("transfers.copy")}
                                 </Badge>
                                 <Button
                                     size="sm"

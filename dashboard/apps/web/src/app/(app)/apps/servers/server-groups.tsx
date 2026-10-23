@@ -13,7 +13,16 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Layers, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Checkbox, ConfirmDeleteDialog, Input } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Checkbox,
+    ConfirmDeleteDialog,
+    Input
+} from "@polaris/ui";
 import {
     createHostGroupAction,
     deleteHostGroupAction,
@@ -22,6 +31,7 @@ import {
     setHostGroupMembersAction
 } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./servers-polls";
 
 interface Group {
     id: string;
@@ -29,7 +39,11 @@ interface Group {
     hostIds: string[];
 }
 
-export function ServerGroups({ servers }: { servers: readonly { id: string; name: string; kind: string }[] }) {
+export function ServerGroups({
+    servers
+}: {
+    servers: readonly { id: string; name: string; kind: string }[];
+}) {
     const t = useTranslations("servers");
     const tcommon = useTranslations("common");
     const [groups, setGroups] = useState<Group[] | null>(null);
@@ -45,7 +59,7 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
     const eligible = servers.filter((server) => server.kind === "host");
 
     useEffect(() => {
-        void listHostGroupsAction().then(setGroups);
+        void polls.hostGroups().then(setGroups);
     }, []);
 
     function reload() {
@@ -69,10 +83,14 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
     }
 
     function toggleMember(group: Group, hostId: string, member: boolean) {
-        const nextIds = member ? [...group.hostIds, hostId] : group.hostIds.filter((id) => id !== hostId);
+        const nextIds = member
+            ? [...group.hostIds, hostId]
+            : group.hostIds.filter((id) => id !== hostId);
         const previous = groups;
         setGroups((current) =>
-            (current ?? []).map((entry) => (entry.id === group.id ? { ...entry, hostIds: nextIds } : entry))
+            (current ?? []).map((entry) =>
+                entry.id === group.id ? { ...entry, hostIds: nextIds } : entry
+            )
         );
         setError(null);
         start(async () => {
@@ -92,15 +110,18 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                     {t("groups.title")}
                 </CardTitle>
                 {!creating ? (
-                    <Button type="button" variant="secondary" size="sm" onClick={() => setCreating(true)}>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCreating(true)}
+                    >
                         <Plus className="size-4" /> {t("groups.new")}
                     </Button>
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-xs text-muted-foreground">
-                    {t("groups.intro")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("groups.intro")}</p>
 
                 {creating ? (
                     <div className="flex gap-2">
@@ -133,14 +154,19 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                 ) : null}
 
                 {groups === null ? (
-                    <p className="py-4 text-center text-sm text-muted-foreground">{t("groups.loading")}</p>
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                        {t("groups.loading")}
+                    </p>
                 ) : groups.length === 0 ? (
                     <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
                         {t("groups.none")}
                     </p>
                 ) : (
                     groups.map((group) => (
-                        <div key={group.id} className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5">
+                        <div
+                            key={group.id}
+                            className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5"
+                        >
                             <div className="flex items-center justify-between gap-2">
                                 {renaming === group.id ? (
                                     <Input
@@ -186,15 +212,24 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                                 </div>
                             </div>
                             {eligible.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">{t("groups.enrollFirst")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("groups.enrollFirst")}
+                                </p>
                             ) : (
                                 <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                                     {eligible.map((server) => (
-                                        <label key={server.id} className="flex items-center gap-2 text-xs">
+                                        <label
+                                            key={server.id}
+                                            className="flex items-center gap-2 text-xs"
+                                        >
                                             <Checkbox
                                                 checked={group.hostIds.includes(server.id)}
                                                 onChange={(event) =>
-                                                    toggleMember(group, server.id, event.target.checked)
+                                                    toggleMember(
+                                                        group,
+                                                        server.id,
+                                                        event.target.checked
+                                                    )
                                                 }
                                             />
                                             {server.name}

@@ -17,7 +17,6 @@
  */
 
 import Link from "next/link";
-import { listWorkAction } from "./actions";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn, EmptyState, SegmentedControl, Skeleton } from "@polaris/ui";
@@ -33,6 +32,7 @@ import {
     Search
 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./code-polls";
 
 /** How long typing pauses before the list is asked again. GitHub's search takes
  *  thirty requests a minute and a qualifier is thirty keystrokes, so a request
@@ -64,7 +64,7 @@ export function CodeView() {
         setError("");
         const timer = setTimeout(
             async () => {
-                const result = await listWorkAction({ kind, scope: effectiveScope, state, query });
+                const result = await polls.codeWork({ kind, scope: effectiveScope, state, query });
                 if (mine !== asked.current) return;
                 if (result.error) {
                     setError(result.error);
@@ -234,17 +234,31 @@ export function StateIcon({ state, kind }: { state: CodeItem["state"]; kind: Cod
     const t = useTranslations("code");
     if (kind === "issue") {
         return state === "closed" ? (
-            <CircleSlash className="mt-0.5 size-4 shrink-0 text-[#8957e5]" aria-label={t("states.closed")} />
+            <CircleSlash
+                className="mt-0.5 size-4 shrink-0 text-[#8957e5]"
+                aria-label={t("states.closed")}
+            />
         ) : (
-            <CircleDot className="mt-0.5 size-4 shrink-0 text-[#3fb950]" aria-label={t("states.open")} />
+            <CircleDot
+                className="mt-0.5 size-4 shrink-0 text-[#3fb950]"
+                aria-label={t("states.open")}
+            />
         );
     }
     if (state === "merged") {
-        return <GitMerge className="mt-0.5 size-4 shrink-0 text-[#a371f7]" aria-label={t("states.merged")} />;
+        return (
+            <GitMerge
+                className="mt-0.5 size-4 shrink-0 text-[#a371f7]"
+                aria-label={t("states.merged")}
+            />
+        );
     }
     if (state === "closed") {
         return (
-            <GitPullRequest className="mt-0.5 size-4 shrink-0 text-[#f85149]" aria-label={t("states.closed")} />
+            <GitPullRequest
+                className="mt-0.5 size-4 shrink-0 text-[#f85149]"
+                aria-label={t("states.closed")}
+            />
         );
     }
     if (state === "draft") {
@@ -255,5 +269,10 @@ export function StateIcon({ state, kind }: { state: CodeItem["state"]; kind: Cod
             />
         );
     }
-    return <GitPullRequest className="mt-0.5 size-4 shrink-0 text-[#3fb950]" aria-label={t("states.open")} />;
+    return (
+        <GitPullRequest
+            className="mt-0.5 size-4 shrink-0 text-[#3fb950]"
+            aria-label={t("states.open")}
+        />
+    );
 }

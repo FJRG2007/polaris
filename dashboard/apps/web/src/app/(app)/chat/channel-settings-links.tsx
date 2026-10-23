@@ -34,6 +34,7 @@ import {
     Select,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./chat-reads";
 
 /** How long a copy button stays ticked. */
 const COPIED_MS = 1600;
@@ -73,7 +74,7 @@ export function InvitesSection({ channel }: { channel: ChatChannelView }) {
     useEffect(() => {
         if (!channel.spaceId || channel.private) return;
         let live = true;
-        void actions.listInvitesAction(channel.spaceId, channel.id).then((result) => {
+        void polls.chatInvites(channel.spaceId, channel.id).then((result) => {
             if (!live) return;
             setInvites(result.invites ?? []);
             setError(result.error ?? "");
@@ -288,7 +289,7 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
 
     useEffect(() => {
         let live = true;
-        void actions.listWebhooksAction(channel.id).then((result) => {
+        void polls.chatWebhooks(channel.id).then((result) => {
             if (!live) return;
             setHooks(result.webhooks ?? []);
             setError(result.error ?? "");

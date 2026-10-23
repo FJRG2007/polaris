@@ -24,7 +24,7 @@ import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { useEffect, useState } from "react";
-import { chatWebhooksAction, hookAddressAction, rotateHookAction } from "../actions";
+import { rotateHookAction } from "../actions";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { RefInput, RefTextarea } from "./references";
 import { ThresholdFields } from "./threshold-fields";
@@ -37,6 +37,7 @@ import {
     emptyCondition,
     triggerChoices
 } from "./flow-fields";
+import * as polls from "../automations-polls";
 
 export type T = ReturnType<typeof useTranslations<"automations">>;
 
@@ -766,7 +767,7 @@ export function WebhookAddress({
     useEffect(() => {
         if (known || asked?.key === key) return;
         let cancelled = false;
-        void hookAddressAction(detail.id, nodeId, rotation).then((answer) => {
+        void polls.hookAddress(detail.id, nodeId, rotation).then((answer) => {
             if (!cancelled && answer.ok) setAsked({ key, path: answer.path });
         });
         return () => {
@@ -825,7 +826,7 @@ function ChatMessageFields({ config, set }: { config: Config; set: (change: Conf
     const [error, setError] = useState("");
     useEffect(() => {
         let cancelled = false;
-        void chatWebhooksAction().then((answer) => {
+        void polls.chatWebhooks().then((answer) => {
             if (cancelled) return;
             if (answer.ok) setWebhooks(answer.webhooks);
             else setError(answer.error);

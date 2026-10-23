@@ -67,7 +67,8 @@ describe("management", () => {
         expect(routes.length).toBeGreaterThan(10);
         const open = routes.filter((path) => {
             const source = readFileSync(path, "utf8");
-            return !/\bapiAdmin\(\)|\.isAdmin\b/.test(source);
+            // The inbox's reads are held by whoever answers it, as its pages are.
+            return !/\bapiAdmin\(\)|\.isAdmin\b|\bapiPermission\("inbox\.read"\)/.test(source);
         });
         expect(open.map(label)).toEqual([]);
     });

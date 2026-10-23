@@ -15,7 +15,7 @@ import { runAction } from "@/lib/run-action";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import type { PickedPerson } from "@/components/people-picker";
 import { ChatPeoplePicker } from "./chat-people-picker";
-import { addChannelMembersAction, listMembersAction } from "./actions";
+import { addChannelMembersAction } from "./actions";
 import {
     Button,
     Dialog,
@@ -25,6 +25,7 @@ import {
     DialogHeader,
     DialogTitle
 } from "@polaris/ui";
+import * as polls from "./chat-reads";
 
 export function AddPeopleDialog({
     open,
@@ -45,9 +46,9 @@ export function AddPeopleDialog({
 
     useEffect(() => {
         if (!open) return;
-        void listMembersAction(channel.id).then((result) =>
-            setAlready((result.members ?? []).map((member) => member.userId))
-        );
+        void polls
+            .chatMembers(channel.id)
+            .then((result) => setAlready((result.members ?? []).map((member) => member.userId)));
     }, [open, channel.id]);
 
     const add = async () => {

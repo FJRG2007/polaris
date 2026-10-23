@@ -16,6 +16,7 @@ import { ChevronLeft, Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import * as polls from "./inbox-polls";
+import * as adminPolls from "../admin-polls";
 import { useUnmountSignal } from "@/lib/poll-fetch";
 import { PLATFORM_LOGO, editablePeer, humanPeerId, peerHint, platformLabel } from "./platform-meta";
 import type {
@@ -45,8 +46,6 @@ import {
     assignConversationAction,
     createContactAction,
     deleteConversationAction,
-    listAgentsAction,
-    listContactsAction,
     sendMessageAction,
     startConversationAction
 } from "./actions";
@@ -75,7 +74,8 @@ export function InboxView({
 
     // Load the assignable agents once, for the thread's assignment control.
     useEffect(() => {
-        void listAgentsAction()
+        void adminPolls
+            .inboxAgents()
             .then(setAgents)
             .catch(() => undefined);
     }, []);
@@ -596,7 +596,8 @@ function NewChatDialog({
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void listContactsAction()
+        void adminPolls
+            .inboxContacts()
             .then(setContacts)
             .catch(() => undefined);
     }, []);

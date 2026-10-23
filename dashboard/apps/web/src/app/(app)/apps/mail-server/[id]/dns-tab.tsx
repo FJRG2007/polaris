@@ -45,8 +45,12 @@ import {
     Input,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "../mail-server-polls";
 
-type Domain = Extract<Awaited<ReturnType<typeof listDomainsAction>>, { domains: unknown }>["domains"][number];
+type Domain = Extract<
+    Awaited<ReturnType<typeof listDomainsAction>>,
+    { domains: unknown }
+>["domains"][number];
 type Reports = Extract<Awaited<ReturnType<typeof scanDnsAction>>, { reports: unknown }>["reports"];
 type Plan = Extract<Awaited<ReturnType<typeof planDnsAction>>, { plan: unknown }>["plan"];
 type Applied = Extract<Awaited<ReturnType<typeof applyDnsAction>>, { results: unknown }>["results"];
@@ -97,10 +101,17 @@ export function DnsTab({ serverId }: { serverId: string }) {
         <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                    {shown?.at ? t("dns.lastChecked", { when: format.dateTime(shown.at) }) : t("dns.notChecked")}
+                    {shown?.at
+                        ? t("dns.lastChecked", { when: format.dateTime(shown.at) })
+                        : t("dns.notChecked")}
                 </p>
                 <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => void runScan()} disabled={scanning}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void runScan()}
+                        disabled={scanning}
+                    >
                         <RefreshCw className={scanning ? "animate-spin" : undefined} />
                         {scanning ? t("dns.checking") : t("dns.check")}
                     </Button>
@@ -118,21 +129,38 @@ export function DnsTab({ serverId }: { serverId: string }) {
                     <Skeleton className="h-40 w-full" />
                 )
             ) : list.length === 0 ? (
-                <EmptyState icon={<Globe />} title={t("dns.noDomains")} description={t("dns.noDomainsBody")} />
+                <EmptyState
+                    icon={<Globe />}
+                    title={t("dns.noDomains")}
+                    description={t("dns.noDomainsBody")}
+                />
             ) : null}
             {list.map((domain) => {
                 const report = shown?.reports.find((entry) => entry.domain === domain.name) ?? null;
                 return (
-                    <section key={domain.id} className="flex flex-col gap-3 rounded-lg border border-border p-4">
+                    <section
+                        key={domain.id}
+                        className="flex flex-col gap-3 rounded-lg border border-border p-4"
+                    >
                         <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-sm font-semibold text-foreground">{domain.name}</h3>
                             {domain.primary ? <Badge>{t("dns.firstDomain")}</Badge> : null}
                             {report ? <VerdictBadge verdict={report.verdict} /> : null}
                             <div className="ml-auto flex flex-wrap items-center gap-2">
-                                <Button size="sm" variant="outline" onClick={() => setCatchAll(domain)}>
-                                    {domain.catchAll ? t("dns.catchAllTo", { address: domain.catchAll }) : t("dns.catchAll")}
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setCatchAll(domain)}
+                                >
+                                    {domain.catchAll
+                                        ? t("dns.catchAllTo", { address: domain.catchAll })
+                                        : t("dns.catchAll")}
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={() => setPublishing(domain)}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setPublishing(domain)}
+                                >
                                     {t("dns.publish")}
                                 </Button>
                                 {!domain.primary ? (
@@ -152,9 +180,23 @@ export function DnsTab({ serverId }: { serverId: string }) {
                     </section>
                 );
             })}
-            <AddDomainDialog serverId={serverId} open={adding} onOpenChange={setAdding} onAdded={() => void domains.reload()} />
-            <CatchAllDialog serverId={serverId} domain={catchAll} onClose={() => setCatchAll(null)} onSaved={() => void domains.reload()} />
-            <PublishDialog serverId={serverId} domain={publishing} onClose={() => setPublishing(null)} />
+            <AddDomainDialog
+                serverId={serverId}
+                open={adding}
+                onOpenChange={setAdding}
+                onAdded={() => void domains.reload()}
+            />
+            <CatchAllDialog
+                serverId={serverId}
+                domain={catchAll}
+                onClose={() => setCatchAll(null)}
+                onSaved={() => void domains.reload()}
+            />
+            <PublishDialog
+                serverId={serverId}
+                domain={publishing}
+                onClose={() => setPublishing(null)}
+            />
             <ConfirmDeleteDialog
                 open={removing !== null}
                 onOpenChange={(open) => (open ? undefined : setRemoving(null))}
@@ -191,10 +233,15 @@ function RecordTable({ domain, report }: { domain: Domain; report: Reports[numbe
                 </thead>
                 <tbody className="divide-y divide-border">
                     {rows.map((entry, index) => (
-                        <tr key={`${entry.record.type}-${entry.record.name}-${index}`} className="align-top">
+                        <tr
+                            key={`${entry.record.type}-${entry.record.name}-${index}`}
+                            className="align-top"
+                        >
                             <td className="py-2 pr-3">
                                 <div className="flex flex-col">
-                                    <span className="font-mono text-xs text-foreground">{entry.record.type}</span>
+                                    <span className="font-mono text-xs text-foreground">
+                                        {entry.record.type}
+                                    </span>
                                     <span className="text-xs text-muted-foreground">
                                         {purposeLabel(t, entry.record.purpose)}
                                     </span>
@@ -207,7 +254,9 @@ function RecordTable({ domain, report }: { domain: Domain; report: Reports[numbe
                                 </div>
                                 <div className="flex items-start gap-1">
                                     <Mono className="text-muted-foreground">
-                                        {entry.record.priority !== null ? `${entry.record.priority} ` : ""}
+                                        {entry.record.priority !== null
+                                            ? `${entry.record.priority} `
+                                            : ""}
                                         {entry.record.value}
                                     </Mono>
                                     <CopyButton value={entry.record.value} />
@@ -215,8 +264,14 @@ function RecordTable({ domain, report }: { domain: Domain; report: Reports[numbe
                             </td>
                             <td className="py-2 pr-3">
                                 <div className="flex flex-col gap-1">
-                                    <VerdictBadge verdict={entry.checkable ? entry.verdict : "unverified"} />
-                                    {entry.note ? <span className="text-xs text-muted-foreground">{mailNoteText(t, entry.note)}</span> : null}
+                                    <VerdictBadge
+                                        verdict={entry.checkable ? entry.verdict : "unverified"}
+                                    />
+                                    {entry.note ? (
+                                        <span className="text-xs text-muted-foreground">
+                                            {mailNoteText(t, entry.note)}
+                                        </span>
+                                    ) : null}
                                 </div>
                             </td>
                         </tr>
@@ -244,7 +299,8 @@ function AddDomainDialog({
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const parsed = mailDomainSchema.safeParse({ serverId, name });
-    const fieldError = !parsed.success && name.trim() ? mailSchemaText(t, parsed.error.issues[0]?.message) : null;
+    const fieldError =
+        !parsed.success && name.trim() ? mailSchemaText(t, parsed.error.issues[0]?.message) : null;
 
     async function submit(): Promise<void> {
         if (!parsed.success || pending) return;
@@ -276,7 +332,14 @@ function AddDomainDialog({
                     }}
                 >
                     <Field label={t("dns.domain")} required error={fieldError}>
-                        {(id) => <Input id={id} value={name} onChange={(event) => setName(event.target.value)} placeholder="example.org" />}
+                        {(id) => (
+                            <Input
+                                id={id}
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder="example.org"
+                            />
+                        )}
                     </Field>
                     {error ? <p className="text-xs text-danger">{error}</p> : null}
                     <DialogFooter>
@@ -343,22 +406,40 @@ function CatchAllDialog({
         >
             <DialogContent className="w-[min(28rem,95vw)] max-w-[min(28rem,95vw)]">
                 <DialogHeader>
-                    <DialogTitle>{t("dns.catchAllTitle", { domain: domain?.name ?? "" })}</DialogTitle>
+                    <DialogTitle>
+                        {t("dns.catchAllTitle", { domain: domain?.name ?? "" })}
+                    </DialogTitle>
                     <DialogDescription>{t("dns.catchAllBody")}</DialogDescription>
                 </DialogHeader>
                 <Field label={t("dns.deliverTo")} hint={t("dns.catchAllHint")}>
                     {(id) => (
-                        <Input id={id} value={address} onChange={(event) => setAddress(event.target.value)} placeholder={t("dns.catchAllPlaceholder", { domain: domain?.name ?? "" })} />
+                        <Input
+                            id={id}
+                            value={address}
+                            onChange={(event) => setAddress(event.target.value)}
+                            placeholder={t("dns.catchAllPlaceholder", {
+                                domain: domain?.name ?? ""
+                            })}
+                        />
                     )}
                 </Field>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 <DialogFooter>
                     {domain?.catchAll ? (
-                        <Button type="button" variant="ghost" onClick={() => void save(null)} disabled={pending}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => void save(null)}
+                            disabled={pending}
+                        >
                             {t("dns.stopCatching")}
                         </Button>
                     ) : null}
-                    <Button type="button" onClick={() => void save(address.trim() || null)} disabled={pending || unchanged}>
+                    <Button
+                        type="button"
+                        onClick={() => void save(address.trim() || null)}
+                        disabled={pending || unchanged}
+                    >
                         {tcommon("actions.save")}
                     </Button>
                 </DialogFooter>
@@ -370,7 +451,9 @@ function CatchAllDialog({
 /** What a record is for, in the reader's words. */
 function purposeLabel(t: NamespaceTranslator<"mailServer">, purpose: string): string {
     const key = purpose === "mta-sts" ? "mtaSts" : purpose === "tls-rpt" ? "tlsRpt" : purpose;
-    return PURPOSES.has(purpose as MailRecordPurpose) ? t(`dns.purposes.${key}` as NamespaceKey<"mailServer">) : "";
+    return PURPOSES.has(purpose as MailRecordPurpose)
+        ? t(`dns.purposes.${key}` as NamespaceKey<"mailServer">)
+        : "";
 }
 
 const PURPOSES = new Set<MailRecordPurpose>([
@@ -388,7 +471,15 @@ const PURPOSES = new Set<MailRecordPurpose>([
     "other"
 ]);
 
-function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain: Domain | null; onClose: () => void }) {
+function PublishDialog({
+    serverId,
+    domain,
+    onClose
+}: {
+    serverId: string;
+    domain: Domain | null;
+    onClose: () => void;
+}) {
     const t = useTranslations("mailServer");
     const [plan, setPlan] = useState<Plan | null>(null);
     const [planning, setPlanning] = useState(false);
@@ -407,7 +498,7 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
         setReplace(false);
         setError(null);
         setPlanning(true);
-        void planDnsAction({ serverId, domainId }).then((answer) => {
+        void polls.dnsPlan({ serverId, domainId }).then((answer) => {
             if (stale) return;
             setPlanning(false);
             if (answer.error) setError(answer.error);
@@ -422,19 +513,27 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
         if (!domain) return;
         setApplying(true);
         setError(null);
-        const answer = await applyDnsAction({ serverId, domainId: domain.id, replaceConflicts: replace });
+        const answer = await applyDnsAction({
+            serverId,
+            domainId: domain.id,
+            replaceConflicts: replace
+        });
         setApplying(false);
         if (answer.error) setError(answer.error);
         else if ("results" in answer) setResults(answer.results);
     }
 
-    const changes = plan?.records.filter((entry) => entry.action === "create" || entry.action === "update").length ?? 0;
+    const changes =
+        plan?.records.filter((entry) => entry.action === "create" || entry.action === "update")
+            .length ?? 0;
     const conflicts = plan?.records.filter((entry) => entry.action === "conflict").length ?? 0;
     return (
         <Dialog open={domain !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="w-[min(48rem,95vw)] max-w-[min(48rem,95vw)]">
                 <DialogHeader>
-                    <DialogTitle>{t("dns.publishTitle", { domain: domain?.name ?? "" })}</DialogTitle>
+                    <DialogTitle>
+                        {t("dns.publishTitle", { domain: domain?.name ?? "" })}
+                    </DialogTitle>
                     <DialogDescription>{t("dns.publishBody")}</DialogDescription>
                 </DialogHeader>
                 {planning ? <Skeleton className="h-40 w-full" /> : null}
@@ -451,15 +550,27 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {plan.records.map((entry, index) => (
-                                    <tr key={`${entry.record.type}-${entry.record.name}-${index}`} className="align-top">
+                                    <tr
+                                        key={`${entry.record.type}-${entry.record.name}-${index}`}
+                                        className="align-top"
+                                    >
                                         <td className="py-2 pr-3">
-                                            <span className="font-mono text-xs">{entry.record.type}</span>{" "}
-                                            <Mono className="text-muted-foreground">{entry.record.name}</Mono>
+                                            <span className="font-mono text-xs">
+                                                {entry.record.type}
+                                            </span>{" "}
+                                            <Mono className="text-muted-foreground">
+                                                {entry.record.name}
+                                            </Mono>
                                         </td>
                                         <td className="max-w-xs py-2 pr-3">
                                             <Mono>{entry.value}</Mono>
-                                            {entry.existing.length > 0 && entry.action !== "unchanged" ? (
-                                                <p className="mt-1 text-xs text-muted-foreground">{t("dns.now", { values: entry.existing.join(", ") })}</p>
+                                            {entry.existing.length > 0 &&
+                                            entry.action !== "unchanged" ? (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {t("dns.now", {
+                                                        values: entry.existing.join(", ")
+                                                    })}
+                                                </p>
                                             ) : null}
                                         </td>
                                         <td className="py-2 pr-3">
@@ -476,7 +587,11 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
                                             >
                                                 {t(`dns.plan.${entry.action}`)}
                                             </Badge>
-                                            {entry.note ? <p className="mt-1 text-xs text-muted-foreground">{mailNoteText(t, entry.note)}</p> : null}
+                                            {entry.note ? (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {mailNoteText(t, entry.note)}
+                                                </p>
+                                            ) : null}
                                         </td>
                                     </tr>
                                 ))}
@@ -487,7 +602,10 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
                 {results ? (
                     <ul className="flex max-h-[50vh] flex-col gap-1 overflow-auto overscroll-contain text-[0.8125rem]">
                         {results.map((result, index) => (
-                            <li key={`${result.type}-${result.name}-${index}`} className="flex flex-wrap items-center gap-2">
+                            <li
+                                key={`${result.type}-${result.name}-${index}`}
+                                className="flex flex-wrap items-center gap-2"
+                            >
                                 <Badge
                                     variant={
                                         result.outcome === "failed"
@@ -501,7 +619,11 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
                                 </Badge>
                                 <span className="font-mono text-xs">{result.type}</span>
                                 <Mono className="text-muted-foreground">{result.name}</Mono>
-                                {result.note ? <span className="text-xs text-muted-foreground">{mailNoteText(t, result.note)}</span> : null}
+                                {result.note ? (
+                                    <span className="text-xs text-muted-foreground">
+                                        {mailNoteText(t, result.note)}
+                                    </span>
+                                ) : null}
                             </li>
                         ))}
                     </ul>
@@ -509,7 +631,10 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
                 <DialogFooter className="flex-wrap items-center gap-3">
                     {plan && !results && conflicts > 0 ? (
                         <label className="mr-auto flex items-center gap-2 text-xs text-muted-foreground">
-                            <Checkbox checked={replace} onChange={(event) => setReplace(event.target.checked)} />
+                            <Checkbox
+                                checked={replace}
+                                onChange={(event) => setReplace(event.target.checked)}
+                            />
                             {t("dns.replace", { count: conflicts })}
                         </label>
                     ) : null}
@@ -518,7 +643,13 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
                             {t("dns.done")}
                         </Button>
                     ) : (
-                        <Button type="button" onClick={() => void apply()} disabled={!plan || applying || (changes === 0 && !(replace && conflicts > 0))}>
+                        <Button
+                            type="button"
+                            onClick={() => void apply()}
+                            disabled={
+                                !plan || applying || (changes === 0 && !(replace && conflicts > 0))
+                            }
+                        >
                             {applying ? t("dns.applying") : t("dns.apply")}
                         </Button>
                     )}

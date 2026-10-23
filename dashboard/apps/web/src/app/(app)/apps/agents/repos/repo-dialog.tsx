@@ -5,7 +5,7 @@ import { ExecutionPicker } from "./execution-picker";
 import { useEffect, useState, useTransition } from "react";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
-import { adviseRepoAction, updateRepoConfigAction } from "../actions";
+import { updateRepoConfigAction } from "../actions";
 import {
     Button,
     Dialog,
@@ -30,6 +30,7 @@ import {
     type AgentShellPolicy,
     type ExecutionAdvice
 } from "@polaris/core";
+import * as polls from "./repos-polls";
 
 /** Everything about one repository that is worth changing after it is added. */
 export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: () => void }) {
@@ -53,7 +54,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
 
     useEffect(() => {
         void (async () => {
-            const result = await adviseRepoAction({
+            const result = await polls.repoAdvice({
                 repoFullName: repo.repoFullName,
                 isPrivate: repo.isPrivate
             });

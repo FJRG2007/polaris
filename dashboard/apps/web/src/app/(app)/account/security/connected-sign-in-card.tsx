@@ -25,12 +25,12 @@ import { ShieldAlert } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StepUpDialog } from "@/components/step-up-dialog";
-import { stepUpRemainingAction } from "@/app/(app)/account/step-up-actions";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { IntegrationLogo } from "@/components/logos";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { Feedback, type SettingLock } from "./setting-card";
 import { setConnectionSignInAction, setConnectionSignInChallengeAction } from "./actions";
+import * as polls from "../account-polls";
 
 export interface ConnectedSignIn {
     id: string;
@@ -90,7 +90,8 @@ export function ConnectedSignInCard({
     // nothing.
     useEffect(() => {
         let live = true;
-        void stepUpRemainingAction(PURPOSE)
+        void polls
+            .stepUpRemaining(PURPOSE)
             .then((result) => live && setProved(result.remainingMs > 0))
             .catch(() => undefined);
         return () => {
@@ -199,7 +200,9 @@ function ChallengeRow({
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                     <p className="text-sm">{t("connected.challenge.title")}</p>
-                    <p className="text-xs text-muted-foreground">{t("connected.challenge.description")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("connected.challenge.description")}
+                    </p>
                 </div>
                 <Switch
                     checked={challenge.enforced || enabled}

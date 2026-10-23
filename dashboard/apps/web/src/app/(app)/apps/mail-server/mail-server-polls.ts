@@ -16,3 +16,17 @@ export const serverDetail = (serverId: string, signal?: AbortSignal) =>
         { serverId },
         signal
     );
+
+export const dnsPlan = (input: Parameters<typeof actions.planDnsAction>[0], signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.planDnsAction>>(
+        "/api/mail-server/dns-plan",
+        { input: JSON.stringify(input) },
+        signal
+    );
+
+export const placements = (signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.listPlacementsAction>>(
+        "/api/mail-server/placements",
+        {},
+        signal
+    );

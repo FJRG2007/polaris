@@ -32,6 +32,7 @@ import {
     EmptyState,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./chat-reads";
 
 export function BansDialog({
     space,
@@ -52,7 +53,7 @@ export function BansDialog({
         if (!spaceId) return;
         setBans(null);
         setError("");
-        void actions.spaceBansAction(spaceId).then((result) => {
+        void polls.spaceBans(spaceId).then((result) => {
             if (result.error) setError(result.error);
             setBans(result.bans ?? []);
         });

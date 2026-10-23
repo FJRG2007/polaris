@@ -37,7 +37,6 @@ import {
     promptSessionAction,
     discardSessionWorkAction,
     retrySessionPushAction,
-    sessionScreenAction,
     stopSessionAction
 } from "../actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -214,7 +213,7 @@ export function SessionDetail({ session, events, messages, canControl = false }:
 
     const look = () => {
         startTransition(() => {
-            void runAction(() => sessionScreenAction(session.id), setError).then((result) => {
+            void runAction(() => polls.sessionScreen(session.id), setError).then((result) => {
                 if (result?.error) setError(result.error);
                 else setScreen(result?.screen ?? "");
             });

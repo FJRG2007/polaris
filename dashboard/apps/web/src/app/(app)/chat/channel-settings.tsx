@@ -60,6 +60,7 @@ import {
     Switch,
     Textarea
 } from "@polaris/ui";
+import * as polls from "./chat-reads";
 
 export const SETTINGS_SECTIONS = ["overview", "permissions", "invites", "integrations"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
@@ -667,7 +668,7 @@ function Permissions({
     const [error, setError] = useState("");
 
     const load = useCallback(async () => {
-        const result = await actions.listMembersAction(channel.id);
+        const result = await polls.chatMembers(channel.id);
         setMembers(result.members ?? []);
         if (result.error) setError(result.error);
     }, [channel.id]);

@@ -14,12 +14,7 @@ import type { BackupKeyView } from "@/lib/backups/keyring";
 import { KeyRound, Loader2, RefreshCw } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import {
-    addRecoveryKeyAction,
-    listBackupKeysAction,
-    revealRecoveryKeyAction,
-    rotateBackupKeyAction
-} from "./actions";
+import { addRecoveryKeyAction, revealRecoveryKeyAction, rotateBackupKeyAction } from "./actions";
 import {
     Badge,
     Button,
@@ -35,6 +30,7 @@ import {
     Input,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./backups-polls";
 
 const RECOVERY_SHAPE = /^polaris-backup-key:[0-9a-f-]{36}:[A-Za-z0-9_-]{43}$/;
 
@@ -52,7 +48,7 @@ export function KeysPanel() {
     const [note, setNote] = useState<string | null>(null);
 
     const load = useCallback(async () => {
-        const result = await listBackupKeysAction();
+        const result = await polls.backupKeys();
         if (result.error !== undefined) {
             setError(result.error);
             setKeys([]);
@@ -109,10 +105,13 @@ export function KeysPanel() {
             <Card>
                 <CardBody className="flex flex-col gap-3 text-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                        <p className="max-w-prose text-muted-foreground">
-                            {t("keys.intro")}
-                        </p>
-                        <Button size="sm" variant="secondary" onClick={() => setRotating(true)} disabled={keys === null}>
+                        <p className="max-w-prose text-muted-foreground">{t("keys.intro")}</p>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setRotating(true)}
+                            disabled={keys === null}
+                        >
                             <RefreshCw className="size-4" /> {t("keys.new")}
                         </Button>
                     </div>
@@ -126,7 +125,10 @@ export function KeysPanel() {
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {keys.map((key) => (
-                                <li key={key.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                                <li
+                                    key={key.id}
+                                    className="flex flex-wrap items-center gap-2 px-3 py-2"
+                                >
                                     <KeyRound className="size-4 text-muted-foreground" />
                                     <code className="text-xs">{key.id.slice(0, 8)}</code>
                                     {key.retiredAt ? (
@@ -135,7 +137,10 @@ export function KeysPanel() {
                                         <Badge variant="success">{t("keys.current")}</Badge>
                                     )}
                                     <span className="text-xs text-muted-foreground">
-                                        {t("keys.made", { when: format.date(key.createdAt), count: key.copies })}
+                                        {t("keys.made", {
+                                            when: format.date(key.createdAt),
+                                            count: key.copies
+                                        })}
                                     </span>
                                     <Button
                                         size="sm"
@@ -144,7 +149,9 @@ export function KeysPanel() {
                                         disabled={revealing !== null}
                                         onClick={() => void reveal(key.id)}
                                     >
-                                        {revealing === key.id && <Loader2 className="size-4 animate-spin" />}{" "}
+                                        {revealing === key.id && (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        )}{" "}
                                         {t("keys.recovery")}
                                     </Button>
                                 </li>
@@ -173,7 +180,8 @@ export function KeysPanel() {
                                 onClick={() => void add()}
                                 disabled={adding || !trimmed || pastedProblem !== null}
                             >
-                                {adding && <Loader2 className="size-4 animate-spin" />} {t("destinations.addShort")}
+                                {adding && <Loader2 className="size-4 animate-spin" />}{" "}
+                                {t("destinations.addShort")}
                             </Button>
                         </div>
                     </label>
@@ -205,8 +213,13 @@ export function KeysPanel() {
                     </DialogHeader>
                     {revealed && (
                         <div className="flex items-center gap-2 rounded-md border border-border p-2">
-                            <code className="min-w-0 flex-1 break-all text-xs">{revealed.recoveryKey}</code>
-                            <CopyButton value={revealed.recoveryKey} label={t("keys.theRecoveryKey")} />
+                            <code className="min-w-0 flex-1 break-all text-xs">
+                                {revealed.recoveryKey}
+                            </code>
+                            <CopyButton
+                                value={revealed.recoveryKey}
+                                label={t("keys.theRecoveryKey")}
+                            />
                         </div>
                     )}
                 </DialogContent>

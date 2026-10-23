@@ -26,7 +26,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { Cloud, Download, ExternalLink, Printer } from "lucide-react";
 import { useBrowserExporter } from "./export-slot";
-import { officeGoogleLinkAction, saveToGoogleAction } from "./google-actions";
+import { saveToGoogleAction } from "./google-actions";
 import type { OfficeGoogleLink } from "@/lib/office/google";
 import {
     Button,
@@ -37,6 +37,7 @@ import {
     DropdownMenuTrigger,
     useToast
 } from "@polaris/ui";
+import * as polls from "./office-polls";
 
 export function ExportMenu({
     documentId,
@@ -58,7 +59,7 @@ export function ExportMenu({
     useEffect(() => {
         if (!savesToGoogle) return;
         let live = true;
-        void officeGoogleLinkAction(documentId).then((answer) => {
+        void polls.googleLink(documentId).then((answer) => {
             if (live) setGoogle(answer.link ?? null);
         });
         return () => {

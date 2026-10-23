@@ -36,7 +36,6 @@ import {
     Input
 } from "@polaris/ui";
 import {
-    getShareLogsAction,
     revealShareLinkAction,
     revokeShareAction,
     updateShareAction,
@@ -46,6 +45,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { LinkVisitorCell, signedInVisitors } from "../link-visitor-cell";
 import { useDisplayFormat } from "@/components/display-format";
 import { useFormChanged } from "@/lib/use-form-changed";
+import * as polls from "../drive-reads";
 
 export interface ShareRow {
     id: string;
@@ -509,7 +509,7 @@ function ShareLogsDialog({
         if (!shareId) return;
         let active = true;
         setLogs(null);
-        void getShareLogsAction(shareId).then((result) => {
+        void polls.shareLogs(shareId).then((result) => {
             if (active) setLogs(result.logs);
         });
         return () => {

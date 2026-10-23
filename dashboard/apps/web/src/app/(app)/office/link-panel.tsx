@@ -31,12 +31,8 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { OfficeLinkView } from "@/lib/office/links";
 import { Copy, Link2, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button, Input, Select, Switch, useToast } from "@polaris/ui";
-import {
-    createLinkAction,
-    listLinksAction,
-    revealLinkAction,
-    revokeLinkAction
-} from "./link-actions";
+import { createLinkAction, revealLinkAction, revokeLinkAction } from "./link-actions";
+import * as polls from "./office-polls";
 
 /** What each standing means, said as the person who made the link would say it. */
 const STANDING = {
@@ -66,7 +62,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
     useEffect(() => {
         let current = true;
         void runAction(
-            () => listLinksAction(documentId),
+            () => polls.links(documentId),
             (message) => toast.show({ title: message })
         ).then((answer) => {
             if (!current || !answer) return;
@@ -135,8 +131,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
     async function revoke(link: OfficeLinkView): Promise<void> {
         const sure = await confirm({
             title: t("links.stopThisLink"),
-            description:
-                t("links.anybodyWhoHasItStops"),
+            description: t("links.anybodyWhoHasItStops"),
             confirmLabel: t("links.stopIt"),
             danger: true
         });
@@ -275,7 +270,9 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
             ) : null}
 
             {links === null ? (
-                <p className="mt-3 text-[12px] text-muted-foreground">{t("links.readingTheLinks")}</p>
+                <p className="mt-3 text-[12px] text-muted-foreground">
+                    {t("links.readingTheLinks")}
+                </p>
             ) : links.length === 0 ? (
                 <p className="mt-3 text-[12px] text-muted-foreground">
                     {t("links.noneYetEverybodyWhoOpens")}
@@ -287,10 +284,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                             key={link.id}
                             className="flex items-center gap-2 rounded-md border border-border px-2.5 py-2"
                         >
-                            <Link2
-                                className="size-4 shrink-0 text-muted-foreground"
-                                aria-hidden
-                            />
+                            <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-[13px]">
                                     {t(ROLE_KEYS[link.role])}

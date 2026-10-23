@@ -74,7 +74,6 @@ import {
 } from "./vault-model";
 import {
     deleteItemAction,
-    itemUsesAction,
     recordItemUseAction,
     restoreItemAction,
     saveFolderAction,
@@ -110,6 +109,7 @@ import {
     Trash2,
     UserCheck
 } from "lucide-react";
+import * as polls from "./vault-polls";
 
 /** The icon each kind of item is drawn with. */
 const TYPE_ICON: Record<number, typeof KeyRound> = {
@@ -293,7 +293,7 @@ export function VaultApp() {
             return;
         }
         let live = true;
-        void itemUsesAction(selected).then((rows) => {
+        void polls.itemUses(selected).then((rows) => {
             if (live) setUses(rows);
         });
         return () => {
@@ -356,7 +356,7 @@ export function VaultApp() {
         void recordItemUseAction({ itemId: item.id, use }).then(() => {
             // Only the open item's history is on screen, and only then is it
             // worth re-reading.
-            if (item.id === selected) void itemUsesAction(item.id).then(setUses);
+            if (item.id === selected) void polls.itemUses(item.id).then(setUses);
         });
     }
 
@@ -1032,8 +1032,8 @@ export function VaultApp() {
                                         title={t("app.sections.signIn")}
                                         when={Boolean(
                                             current.login.username ||
-                                                loginEmail(current) ||
-                                                current.login.password
+                                            loginEmail(current) ||
+                                            current.login.password
                                         )}
                                     >
                                         <Row

@@ -10,7 +10,6 @@
 
 import { useEffect, useState } from "react";
 import { MAX_APP_WIDGET_TARGETS } from "@polaris/core";
-import { appWidgetTargetsAction } from "./app-widget-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AppWidgetTarget } from "@/lib/app-extensions/types";
 import {
@@ -25,6 +24,7 @@ import {
     isDirty,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./home-polls";
 
 export interface AppWidgetSetupSubject {
     readonly app: string;
@@ -56,7 +56,7 @@ export function AppWidgetSetup({
         setTargets(null);
         setProblem(null);
         setChosen([...subject.targets]);
-        void appWidgetTargetsAction(subject.app, subject.kind).then(
+        void polls.appWidgetTargets(subject.app, subject.kind).then(
             (answer) => {
                 if (!live) return;
                 if (answer.error) setProblem(answer.error);

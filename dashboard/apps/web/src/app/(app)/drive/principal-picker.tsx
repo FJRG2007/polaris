@@ -16,7 +16,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import type { SharePerson } from "@/lib/drive-sharing";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import { findSharePeopleAction, myShareGroupsAction } from "./sharing-actions";
+import { findSharePeopleAction } from "./sharing-actions";
+import * as polls from "./drive-reads";
 
 export function PrincipalPicker({
     value,
@@ -31,7 +32,7 @@ export function PrincipalPicker({
     const [groups, setGroups] = useState<SharePerson[]>([]);
 
     useEffect(() => {
-        void myShareGroupsAction().then(setGroups);
+        void polls.myShareGroups().then(setGroups);
     }, []);
 
     // The two controls are one answer, so choosing in either clears the other:

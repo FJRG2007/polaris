@@ -36,12 +36,9 @@ import {
     Skeleton,
     useToast
 } from "@polaris/ui";
-import {
-    importGoogleFileAction,
-    listGoogleFilesAction,
-    officeGoogleStateAction
-} from "./google-actions";
+import { importGoogleFileAction, listGoogleFilesAction } from "./google-actions";
 import type { GoogleOfficeFile, OfficeGoogleAccount } from "@/lib/office/google";
+import * as polls from "./office-polls";
 
 /** Where linking Google for Office starts. It returns to `/office`. */
 export const OFFICE_GOOGLE_LINK = "/api/connections/google/link?scope=office";
@@ -100,7 +97,7 @@ export function GoogleImportDialog({
         setState({ status: "loading" });
         void (async () => {
             try {
-                const answer = await inTime(officeGoogleStateAction());
+                const answer = await inTime(polls.googleState());
                 if (!live) return;
                 if (answer.error) {
                     setState({ status: "failed", error: answer.error });
@@ -132,7 +129,7 @@ export function GoogleImportDialog({
             let answer: Awaited<ReturnType<typeof listGoogleFilesAction>>;
             try {
                 answer = await inTime(
-                    listGoogleFilesAction({ connectionId: accountId, search, pageToken: page })
+                    polls.googleFiles({ connectionId: accountId, search, pageToken: page })
                 );
             } catch {
                 answer = { error: t("google.errors.failed") };

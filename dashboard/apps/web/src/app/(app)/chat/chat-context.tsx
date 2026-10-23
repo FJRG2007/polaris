@@ -16,8 +16,7 @@
  */
 
 import * as core from "@polaris/core";
-import { callsUnavailableAction } from "./meeting-actions";
-import { chatListsAction, chatRulesAction, listChannelsAction } from "./actions";
+import { chatListsAction, listChannelsAction } from "./actions";
 import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import {
     createContext,
@@ -29,6 +28,7 @@ import {
     useState,
     type ReactNode
 } from "react";
+import * as polls from "./chat-reads";
 
 /**
  * What this account may do in the chat beyond reading and writing in it.
@@ -202,7 +202,8 @@ export function ChatProvider({
     // change while somebody is typing, and re-reading them per conversation
     // would be three rows fetched on every navigation.
     useEffect(() => {
-        void chatRulesAction()
+        void polls
+            .chatRules()
             .then((result) => setRules(result.rules))
             .catch(() => {
                 // Left null, which reads as the defaults. The server enforces
@@ -228,7 +229,8 @@ export function ChatProvider({
         if (!may.call) return;
         let stopped = false;
         const ask = (): void => {
-            void callsUnavailableAction()
+            void polls
+                .callsUnavailable()
                 .then((reason) => {
                     if (!stopped) setCallsOff(reason);
                 })

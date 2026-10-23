@@ -19,11 +19,12 @@ import { runAction } from "@/lib/run-action";
 import { MAIL_BODY_KEEP_MAX } from "@polaris/core";
 import { useEffect, useState, useTransition } from "react";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
-import { mailBodyHeldAction, saveMailBodyKeepAction } from "./actions";
+import { saveMailBodyKeepAction } from "./actions";
 import { writeSnapshot } from "@/lib/snapshot-cache";
 import { useKeptSnapshot } from "@/components/use-live-resource";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "../admin-polls";
 
 /** Where the last count is kept, and how old it may be and still be shown. */
 const HELD_KEY = "retention:mail-held";
@@ -59,7 +60,7 @@ export function MailBodyForm({ kept }: { kept: number }) {
 
     useEffect(() => {
         void runAction(
-            () => mailBodyHeldAction(),
+            () => polls.mailBodyHeld(),
             () => setCountFailed(true)
         ).then((result) => {
             if (!result) return;
@@ -91,7 +92,9 @@ export function MailBodyForm({ kept }: { kept: number }) {
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("retention.mail.title")}</h2>
-                    <p className="max-w-xl text-sm text-muted-foreground">{t("retention.mail.intro")}</p>
+                    <p className="max-w-xl text-sm text-muted-foreground">
+                        {t("retention.mail.intro")}
+                    </p>
                 </div>
 
                 <label className="flex max-w-[12rem] flex-col gap-1 text-sm">
@@ -109,14 +112,18 @@ export function MailBodyForm({ kept }: { kept: number }) {
                         onChange={(event) => setValue(event.target.value)}
                     />
                     <span className="text-xs text-muted-foreground">
-                        {parsed === 0 && valid ? t("retention.mail.zeroHint") : t("retention.mail.hint")}
+                        {parsed === 0 && valid
+                            ? t("retention.mail.zeroHint")
+                            : t("retention.mail.hint")}
                     </span>
                 </label>
 
                 <p className="text-sm text-muted-foreground">{heldLine(t, held, countFailed)}</p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
-                {saved && !dirty && <p className="text-sm text-muted-foreground">{t("retention.mail.saved")}</p>}
+                {saved && !dirty && (
+                    <p className="text-sm text-muted-foreground">{t("retention.mail.saved")}</p>
+                )}
 
                 <Button
                     className="self-start"

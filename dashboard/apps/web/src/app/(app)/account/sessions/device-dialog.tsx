@@ -41,9 +41,9 @@ import {
 import {
     forgetTrustedDeviceAction,
     revokeSessionAction,
-    signOutTrustedDeviceAction,
-    trustedDeviceAction
+    signOutTrustedDeviceAction
 } from "./actions";
+import * as polls from "../account-polls";
 
 /** One fact about the device, as a row of the summary. */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -78,7 +78,7 @@ export function DeviceDialog({
         let active = true;
         setDetail(null);
         setError(null);
-        void trustedDeviceAction(deviceId).then((result) => {
+        void polls.trustedDevice(deviceId).then((result) => {
             if (!active) return;
             if (!result.detail) {
                 setError(result.error ?? t("sessions.device.couldNotOpen"));

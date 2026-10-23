@@ -15,9 +15,14 @@
 import { useEffect, useState, useTransition } from "react";
 import { ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, Loader2, Server, TriangleAlert } from "lucide-react";
-import { removeServerAction, serverRemovalPlanAction } from "./actions";
-import type { RemoveServerResult, ServerRemovalMode, ServerRemovalPlan } from "@/lib/server-removal-service";
+import { removeServerAction } from "./actions";
+import type {
+    RemoveServerResult,
+    ServerRemovalMode,
+    ServerRemovalPlan
+} from "@/lib/server-removal-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./servers-polls";
 
 /** The ways to remove a server, in the order they are offered; each one's words
  *  are `remove.modes.<mode>` in the `servers` catalog. */
@@ -48,7 +53,7 @@ export function RemoveServerDialog({
         setError(null);
         if (!server) return;
         let current = true;
-        void serverRemovalPlanAction(server.id).then((result) => {
+        void polls.removalPlan(server.id).then((result) => {
             if (!current) return;
             setPlan(result);
             setDestination(result?.destinations[0]?.id ?? "");
@@ -69,7 +74,10 @@ export function RemoveServerDialog({
             if (result.error) {
                 setError(
                     result.moved && result.moved.length > 0
-                        ? t("remove.partlyMoved", { reason: result.error, names: result.moved.join(", ") })
+                        ? t("remove.partlyMoved", {
+                              reason: result.error,
+                              names: result.moved.join(", ")
+                          })
                         : result.error
                 );
                 return;
@@ -122,7 +130,9 @@ export function RemoveServerDialog({
                         >
                             <span className="flex items-center gap-2 text-sm font-medium">
                                 {choice.label}
-                                {mode === choice.mode ? <Check className="size-3.5 text-primary" /> : null}
+                                {mode === choice.mode ? (
+                                    <Check className="size-3.5 text-primary" />
+                                ) : null}
                             </span>
                             <span className="text-xs text-muted-foreground">{choice.summary}</span>
                         </button>
@@ -136,7 +146,10 @@ export function RemoveServerDialog({
                             value={destination}
                             onValueChange={setDestination}
                             disabled={pending}
-                            options={plan.destinations.map((entry) => ({ value: entry.id, label: entry.name }))}
+                            options={plan.destinations.map((entry) => ({
+                                value: entry.id,
+                                label: entry.name
+                            }))}
                         />
                         {plan.localVolumes > 0 ? (
                             <span className="text-xs text-warning">
@@ -191,7 +204,9 @@ function Inventory({
                         .slice(0, 6)
                         .map((service) => `${service.project}/${service.name}`)
                         .join(", ")}
-                    {plan.services.length > 6 ? t("remove.andMore", { count: plan.services.length - 6 }) : ""}
+                    {plan.services.length > 6
+                        ? t("remove.andMore", { count: plan.services.length - 6 })
+                        : ""}
                 </p>
             ) : null}
         </div>

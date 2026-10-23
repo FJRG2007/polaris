@@ -20,7 +20,6 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { mailSchemaText } from "@/lib/mail-server/words";
 import { mailServerRefusalText } from "@/lib/mail-server/refusal-text";
 import {
-    listPlacementsAction,
     listServersAction,
     startSetupAction,
     uninstallMailServerAppAction,
@@ -39,6 +38,7 @@ import {
     Select,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./mail-server-polls";
 
 export function MailServersView({ canUninstall }: { canUninstall: boolean }) {
     const t = useTranslations("mailServer");
@@ -87,10 +87,20 @@ export function MailServersView({ canUninstall }: { canUninstall: boolean }) {
                             >
                                 <Server className="size-4 text-foreground-subtle" />
                                 <div className="flex min-w-0 flex-1 flex-col">
-                                    <span className="truncate text-[0.8125rem] font-medium text-foreground" title={server.hostname}>{server.hostname}</span>
+                                    <span
+                                        className="truncate text-[0.8125rem] font-medium text-foreground"
+                                        title={server.hostname}
+                                    >
+                                        {server.hostname}
+                                    </span>
                                     <span className="truncate text-xs text-muted-foreground">
-                                        {t("list.on", { domain: server.primaryDomain, place: server.placementName })}
-                                        {server.error ? ` - ${mailServerRefusalText(t, server.error)}` : ""}
+                                        {t("list.on", {
+                                            domain: server.primaryDomain,
+                                            place: server.placementName
+                                        })}
+                                        {server.error
+                                            ? ` - ${mailServerRefusalText(t, server.error)}`
+                                            : ""}
                                     </span>
                                 </div>
                                 <span className="hidden text-xs text-foreground-subtle sm:inline">
@@ -161,7 +171,9 @@ function UninstallDialog({
                 <DialogHeader>
                     <DialogTitle>{t("uninstall.title")}</DialogTitle>
                     <DialogDescription>
-                        {servers && servers.length > 0 ? t("uninstall.removeFirst") : t("uninstall.body")}
+                        {servers && servers.length > 0
+                            ? t("uninstall.removeFirst")
+                            : t("uninstall.body")}
                     </DialogDescription>
                 </DialogHeader>
                 {servers && servers.length > 0 ? (
@@ -173,10 +185,15 @@ function UninstallDialog({
                                     className="flex items-center gap-2 px-3 py-2 text-[0.8125rem] transition-colors hover:bg-muted"
                                 >
                                     <Server className="size-4 text-foreground-subtle" />
-                                    <span className="min-w-0 flex-1 truncate" title={server.hostname}>
+                                    <span
+                                        className="min-w-0 flex-1 truncate"
+                                        title={server.hostname}
+                                    >
                                         {server.hostname}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{t("uninstall.open")}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("uninstall.open")}
+                                    </span>
                                 </Link>
                             </li>
                         ))}
@@ -192,7 +209,12 @@ function UninstallDialog({
                         {blocked ? t("uninstall.close") : tcommon("actions.cancel")}
                     </Button>
                     {blocked ? null : (
-                        <Button type="button" variant="danger" onClick={uninstall} disabled={pending}>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            onClick={uninstall}
+                            disabled={pending}
+                        >
                             {pending ? <Loader2 className="animate-spin" /> : null}
                             {pending ? t("uninstall.pending") : t("list.uninstall")}
                         </Button>
@@ -203,7 +225,13 @@ function UninstallDialog({
     );
 }
 
-function SetupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function SetupDialog({
+    open,
+    onOpenChange
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
     const t = useTranslations("mailServer");
     const tcommon = useTranslations("common");
     const router = useRouter();
@@ -216,20 +244,25 @@ function SetupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
 
     useEffect(() => {
         if (!open) return;
-        listPlacementsAction()
+        polls
+            .placements()
             .then(setPlacements)
             .catch(() => setPlacements([{ id: "local", name: t("common.thisMachine") }]));
     }, [open, t]);
 
     // Suggest the name from the domain the way almost everybody names it.
-    const suggested = domain.trim() && !hostname.trim() ? `mail.${domain.trim().toLowerCase()}` : "";
+    const suggested =
+        domain.trim() && !hostname.trim() ? `mail.${domain.trim().toLowerCase()}` : "";
     const input = { serverId, hostname: hostname.trim() || suggested, domain };
     const parsed = mailServerSetupSchema.safeParse(input);
     const fieldError = (path: string): string | null => {
         if (parsed.success) return null;
         const value = path === "hostname" ? input.hostname : domain;
         if (!value.trim()) return null;
-        return mailSchemaText(t, parsed.error.issues.find((issue) => issue.path[0] === path)?.message);
+        return mailSchemaText(
+            t,
+            parsed.error.issues.find((issue) => issue.path[0] === path)?.message
+        );
     };
 
     async function submit(): Promise<void> {
@@ -268,13 +301,27 @@ function SetupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
                                 id={id}
                                 value={serverId}
                                 onValueChange={setServerId}
-                                options={placements.map((placement) => ({ value: placement.id, label: placement.name }))}
+                                options={placements.map((placement) => ({
+                                    value: placement.id,
+                                    label: placement.name
+                                }))}
                             />
                         )}
                     </Field>
-                    <Field label={t("setup.firstDomain")} required error={fieldError("domain")} hint={t("setup.firstDomainHint")}>
+                    <Field
+                        label={t("setup.firstDomain")}
+                        required
+                        error={fieldError("domain")}
+                        hint={t("setup.firstDomainHint")}
+                    >
                         {(id) => (
-                            <Input id={id} value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="example.com" autoComplete="off" />
+                            <Input
+                                id={id}
+                                value={domain}
+                                onChange={(event) => setDomain(event.target.value)}
+                                placeholder="example.com"
+                                autoComplete="off"
+                            />
                         )}
                     </Field>
                     <Field
@@ -298,7 +345,11 @@ function SetupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             {tcommon("actions.cancel")}
                         </Button>
-                        <Button type="submit" disabled={!parsed.success || pending} aria-disabled={!parsed.success || pending}>
+                        <Button
+                            type="submit"
+                            disabled={!parsed.success || pending}
+                            aria-disabled={!parsed.success || pending}
+                        >
                             {pending ? t("setup.starting") : t("setup.submit")}
                         </Button>
                     </DialogFooter>

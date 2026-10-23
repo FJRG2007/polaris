@@ -36,6 +36,7 @@ import {
     Input,
     Select
 } from "@polaris/ui";
+import * as polls from "./chat-reads";
 
 /** How long an invitation lasts, by its length in minutes. */
 export const INVITE_DURATION_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
@@ -107,13 +108,11 @@ export function InviteDialog({
         const ticket = ++asked.current;
         const timer = setTimeout(
             () => {
-                void actions
-                    .inviteCandidatesAction({ spaceId, query: query.trim() })
-                    .then((result) => {
-                        if (ticket !== asked.current) return;
-                        setPeople(result.people ?? []);
-                        if (result.error) setError(result.error);
-                    });
+                void polls.inviteCandidates({ spaceId, query: query.trim() }).then((result) => {
+                    if (ticket !== asked.current) return;
+                    setPeople(result.people ?? []);
+                    if (result.error) setError(result.error);
+                });
             },
             query ? SEARCH_DEBOUNCE_MS : 0
         );

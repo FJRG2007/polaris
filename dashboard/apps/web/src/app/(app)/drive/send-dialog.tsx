@@ -16,11 +16,7 @@ import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Building2, Send, User, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
-import {
-    findTransferPeopleAction,
-    sendTransferAction,
-    transferOrgsAction
-} from "./transfer-actions";
+import { findTransferPeopleAction, sendTransferAction } from "./transfer-actions";
 import {
     Button,
     Dialog,
@@ -31,6 +27,7 @@ import {
     Switch,
     Textarea
 } from "@polaris/ui";
+import * as polls from "./drive-reads";
 
 interface Candidate {
     readonly id: string;
@@ -72,7 +69,8 @@ export function SendDialog({
         setNote("");
         setGiveUp(false);
         setError(null);
-        void transferOrgsAction()
+        void polls
+            .transferOrgs()
             .then((rows) => setOrgs(rows.map((org) => ({ ...org, allowed: true, isOrg: true }))))
             .catch(() => setOrgs([]));
     }, [open]);
@@ -253,7 +251,9 @@ export function SendDialog({
                         </Button>
                         <Button onClick={send} disabled={busy || chosen.length === 0}>
                             <Send className="size-4 shrink-0" />
-                            {chosen.length > 1 ? t("send.sendTo", { count: chosen.length }) : t("send.send")}
+                            {chosen.length > 1
+                                ? t("send.sendTo", { count: chosen.length })
+                                : t("send.send")}
                         </Button>
                     </div>
                 </div>

@@ -31,6 +31,7 @@ import {
     Input,
     Select
 } from "@polaris/ui";
+import * as polls from "./notes-polls";
 
 const ROLES = [
     { value: "guest", label: "notebook.roles.guest" },
@@ -68,8 +69,8 @@ export function NewNotebookDialog({
     // the picker entirely.
     useEffect(() => {
         if (!open) return;
-        void actions
-            .noteSpaceOwnersAction()
+        void polls
+            .spaceOwners()
             .then(setOrgs)
             .catch(() => setOrgs([]));
     }, [open]);

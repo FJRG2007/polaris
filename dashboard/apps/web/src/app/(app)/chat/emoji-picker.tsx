@@ -53,13 +53,12 @@ import {
     type RecentMedia
 } from "./recents";
 import {
-    listSavedMediaAction,
     saveMediaAction,
     savedSourcesAction,
     searchTenorAction,
-    tenorReadyAction,
     unsaveMediaAction
 } from "./actions";
+import * as polls from "./chat-reads";
 
 type Tab = "emoji" | "saved" | "gif" | "sticker";
 
@@ -370,7 +369,7 @@ export function EmojiPicker({
 
     useEffect(() => {
         if (!open || tenorReady !== null) return;
-        void tenorReadyAction().then(setTenorReady);
+        void polls.tenorReady().then(setTenorReady);
     }, [open, tenorReady]);
 
     // Asked once the tab is opened rather than with the picker: most times this
@@ -378,7 +377,7 @@ export function EmojiPicker({
     // nobody needed.
     useEffect(() => {
         if (!open || tab !== "saved" || saved !== null) return;
-        void listSavedMediaAction().then((answer) => {
+        void polls.savedMedia().then((answer) => {
             setSaved(answer.saved);
             // Everything in here is kept by definition, so the stars are known
             // without asking a second question about them.

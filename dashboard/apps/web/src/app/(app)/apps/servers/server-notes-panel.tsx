@@ -24,6 +24,7 @@ import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./servers-polls";
 
 export function ServerNotesPanel({ hostId }: { hostId: string }) {
     const t = useTranslations("servers");
@@ -71,7 +72,10 @@ export function ServerNotesPanel({ hostId }: { hostId: string }) {
             {history && history.length > 0 ? (
                 <section className="flex flex-col gap-2">
                     <h2 className="text-sm font-medium">{t("notes.history")}</h2>
-                    <ActivityFeed lines={history} describe={(line) => describeServerEvent(line, t)} />
+                    <ActivityFeed
+                        lines={history}
+                        describe={(line) => describeServerEvent(line, t)}
+                    />
                 </section>
             ) : null}
         </div>
@@ -86,7 +90,7 @@ function FollowToggle({ hostId }: { hostId: string }) {
 
     useEffect(() => {
         setFollowing(null);
-        void actions.serverFollowStateAction(hostId).then((state) => setFollowing(state.following));
+        void polls.followState(hostId).then((state) => setFollowing(state.following));
     }, [hostId]);
 
     if (following === null) return null;
