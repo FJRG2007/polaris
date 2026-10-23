@@ -31,15 +31,25 @@ function localAnswer(parsed: Parsed, resolved: Resolved): string | null {
     return null;
 }
 
-/** `plr` with nothing after it, with a person at the terminal, opens the
- *  terminal UI; anywhere else it prints the help, as it always has. */
+/** `plr` with nothing after it, with a person at the terminal who is signed
+ *  in, opens the terminal UI; anywhere else it prints the help, as it always
+ *  has. */
 function opensTui(argv: readonly string[], interactive: boolean, env: NodeJS.ProcessEnv): boolean {
     return argv.length === 0 && interactive && !inCi(env);
 }
 
+async function signedIn(context: Context): Promise<boolean> {
+    if (context.host.env.POLARIS_TOKEN) return true;
+    const { loadConfig } = await import("./config.js");
+    return Object.keys((await loadConfig(context.configDir)).profiles).length > 0;
+}
+
 /** Run one command line. Separate from `main` so a test can drive it. */
 export async function run(argv: readonly string[], context: Context, probe?: Probe): Promise<void> {
-    if (opensTui(argv, context.io.interactive && Boolean(context.ui), context.host.env))
+    if (
+        opensTui(argv, context.io.interactive && Boolean(context.ui), context.host.env) &&
+        (await signedIn(context))
+    )
         return run(["tui"], context, probe);
     const parsed = parse(argv);
     const resolved = resolve(parsed.positionals, context.host.env);

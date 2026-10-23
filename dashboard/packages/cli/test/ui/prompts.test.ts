@@ -48,6 +48,13 @@ describe("plr on its own", () => {
         expect(stdout()).toBe("");
     });
 
+    it("prints the help when nobody is signed in yet", async () => {
+        const { ui } = fakeUi();
+        const { context, stdout } = await testContext({ env: {}, ui });
+        await run([], context, clean);
+        expect(stdout()).toMatch(/^plr - the Polaris command line/);
+    });
+
     it("prints the help in CI, even at a terminal", async () => {
         const { ui } = fakeUi();
         const { context, stdout } = await testContext({ env: { ...env, CI: "true" }, ui });
@@ -68,6 +75,19 @@ describe("choosing what a command acts on", () => {
         expect(writes(seen).map((each) => each.url)).toEqual([
             `https://polaris.example.com/api/v1/deploy/services/${ID}/deploy`
         ]);
+    });
+
+    it("a service named by POLARIS_SERVICE is deployed without asking", async () => {
+        const { fetch, seen } = server();
+        const { ui, shown } = fakeUi();
+        const { context } = await testContext({
+            env: { ...env, POLARIS_SERVICE: "shop/web" },
+            fetch,
+            ui
+        });
+        await run(["service", "deploy"], context, clean);
+        expect(shown.some((each) => each.startsWith("confirm:"))).toBe(false);
+        expect(writes(seen)).toHaveLength(1);
     });
 
     it("without a person, a missing service is a sentence naming what to pass", async () => {

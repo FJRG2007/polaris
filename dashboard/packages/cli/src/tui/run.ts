@@ -147,7 +147,7 @@ export async function tui(context: Context, flags: Flags): Promise<void> {
                     return;
                 case "load-projects": {
                     const { projects } = await get("/api/v1/deploy/projects", projectsSchema);
-                    return dispatch({ type: "projects", projects });
+                    return dispatch({ type: "projects", profile: effect.profile, projects });
                 }
                 case "load-service": {
                     const { service } = await get(
@@ -161,14 +161,18 @@ export async function tui(context: Context, flags: Flags): Promise<void> {
                         `/api/v1/deploy/services/${effect.serviceId}/deployments`,
                         deploymentsSchema
                     );
-                    return dispatch({ type: "deployments", deployments });
+                    return dispatch({
+                        type: "deployments",
+                        serviceId: effect.serviceId,
+                        deployments
+                    });
                 }
                 case "load-variables": {
                     const { variables } = await get(
                         `/api/v1/deploy/services/${effect.serviceId}/env`,
                         envNamesSchema
                     );
-                    return dispatch({ type: "variables", variables });
+                    return dispatch({ type: "variables", serviceId: effect.serviceId, variables });
                 }
                 case "follow-log":
                     return followLog(effect.serviceId);

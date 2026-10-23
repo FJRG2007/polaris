@@ -344,8 +344,9 @@ export async function deploy(
         ui.intro("plr service deploy");
         const found = await resolveService(context, session, ref, ui);
         // Asked only when the service was chosen from the list: one named on
-        // the command line is already the decision.
-        if (!ref && !(await ui.confirm(`Deploy ${refOf(found)} again?`, true))) {
+        // the command line or by POLARIS_SERVICE is already the decision.
+        const picked = !ref && !context.host.env.POLARIS_SERVICE;
+        if (picked && !(await ui.confirm(`Deploy ${refOf(found)} again?`, true))) {
             ui.outro("Nothing was deployed.");
             return;
         }

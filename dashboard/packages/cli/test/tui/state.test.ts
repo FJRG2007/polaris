@@ -75,19 +75,29 @@ describe("opening", () => {
         expect(top(step.state).kind).toBe("projects");
         expect(step.effects).toEqual([
             { type: "use-profile", name: "work" },
-            { type: "load-projects" }
+            { type: "load-projects", profile: "work" }
         ]);
     });
 
     it("picks a profile with Enter and reads its projects", () => {
         const { state, effects } = play(initial(PROFILES, null), "down", "enter");
         expect(state.profile).toBe("work");
-        expect(effects).toEqual([{ type: "use-profile", name: "work" }, { type: "load-projects" }]);
+        expect(effects).toEqual([
+            { type: "use-profile", name: "work" },
+            { type: "load-projects", profile: "work" }
+        ]);
+    });
+
+    it("drops projects read for a profile already left", () => {
+        const work = play(initial(PROFILES, null), "down", "enter").state;
+        const stale = reduce(work, { type: "projects", profile: "home", projects: PROJECTS });
+        expect(stale.state).toBe(work);
     });
 });
 
 describe("browsing", () => {
-    const loaded = () => play(initial(PROFILES, "home"), { type: "projects", projects: PROJECTS });
+    const loaded = () =>
+        play(initial(PROFILES, "home"), { type: "projects", profile: "home", projects: PROJECTS });
 
     it("projects -> services -> a service, each loading what it shows", () => {
         const { state, effects } = play(
@@ -146,7 +156,7 @@ describe("a service", () => {
     const at = () =>
         play(
             initial(PROFILES, "home"),
-            { type: "projects", projects: PROJECTS },
+            { type: "projects", profile: "home", projects: PROJECTS },
             "enter",
             "enter",
             { type: "service", service: SERVICE }
@@ -170,6 +180,30 @@ describe("a service", () => {
         ]);
     });
 
+    it("Enter does not answer the question, and Ctrl+C still quits", () => {
+        const asked = play({ state: at().state, effects: [] }, "restart");
+        const entered = play({ state: asked.state, effects: [] }, "enter");
+        expect(entered.state.confirm).toEqual({ action: "restart", serviceId: ID });
+        expect(entered.effects).toEqual([]);
+        expect(play({ state: asked.state, effects: [] }, "quit").effects).toEqual([
+            { type: "quit" }
+        ]);
+    });
+
+    it("rows read for another service are not shown as this one's", () => {
+        const deployments = play({ state: at().state, effects: [] }, "enter").state;
+        const stale = reduce(deployments, {
+            type: "deployments",
+            serviceId: "s2",
+            deployments: []
+        });
+        expect(stale.state).toBe(deployments);
+        const variables = play({ state: at().state, effects: [] }, "down", "down", "enter").state;
+        expect(reduce(variables, { type: "variables", serviceId: "s2", variables: [] }).state).toBe(
+            variables
+        );
+    });
+
     it("restart from the menu is confirmed too", () => {
         const menu = play(
             { state: at().state, effects: [] },
@@ -191,6 +225,7 @@ describe("a service", () => {
     it("variables show names and mask secrets; values are never there to show", () => {
         const env = play({ state: at().state, effects: [] }, "down", "down", "enter", {
             type: "variables",
+            serviceId: ID,
             variables: [{ key: "DATABASE_URL", isSecret: true, updatedAt: "2026-10-04" }]
         });
         expect(env.effects).toEqual([{ type: "load-variables", serviceId: ID }]);
@@ -237,6 +272,14 @@ describe("reading keys", () => {
         ]);
     });
 
+    it("reads CRLF as one Enter", () => {
+        expect(parseKeys("\r\n\n\r")).toEqual([
+            { name: "return" },
+            { name: "return" },
+            { name: "return" }
+        ]);
+    });
+
     it("drops escape sequences that are not keys here", () => {
         expect(parseKeys("\u001b[H\u001b[200~x")).toEqual([{ text: "x" }]);
     });
@@ -246,6 +289,7 @@ describe("drawing", () => {
     it("fills the window exactly, and cuts long lines rather than wrapping them", () => {
         const step = play(initial(PROFILES, "home"), {
             type: "projects",
+            profile: "home",
             projects: [{ ...PROJECTS[0]!, name: "x".repeat(300) }]
         });
         const lines = render(step.state, 40, 10);

@@ -89,10 +89,22 @@ export type Key =
 
 export type Event =
     | { readonly type: "key"; readonly key: Key }
-    | { readonly type: "projects"; readonly projects: readonly Project[] }
+    | {
+          readonly type: "projects";
+          readonly profile: string | null;
+          readonly projects: readonly Project[];
+      }
     | { readonly type: "service"; readonly service: ServiceDetail }
-    | { readonly type: "deployments"; readonly deployments: readonly Deployment[] }
-    | { readonly type: "variables"; readonly variables: readonly Variable[] }
+    | {
+          readonly type: "deployments";
+          readonly serviceId: string;
+          readonly deployments: readonly Deployment[];
+      }
+    | {
+          readonly type: "variables";
+          readonly serviceId: string;
+          readonly variables: readonly Variable[];
+      }
     | { readonly type: "log"; readonly text: string; readonly append: boolean }
     | { readonly type: "done"; readonly text: string }
     | { readonly type: "failed"; readonly text: string };
@@ -100,7 +112,7 @@ export type Event =
 /** What the driver is asked to do after a step. */
 export type Effect =
     | { readonly type: "use-profile"; readonly name: string }
-    | { readonly type: "load-projects" }
+    | { readonly type: "load-projects"; readonly profile: string | null }
     | { readonly type: "load-service"; readonly serviceId: string }
     | { readonly type: "load-deployments"; readonly serviceId: string }
     | { readonly type: "load-variables"; readonly serviceId: string }
@@ -149,7 +161,7 @@ export function initial(profiles: readonly ProfileRow[], profile: string | null)
         state: { ...state, cursors: [0] },
         effects: [
             ...(state.profile ? [{ type: "use-profile" as const, name: state.profile }] : []),
-            { type: "load-projects" }
+            { type: "load-projects", profile: state.profile }
         ]
     };
 }
@@ -248,10 +260,10 @@ function withCursor(state: State, value: number): State {
 }
 
 /** What has to be read for a screen when it is opened. */
-function loadsFor(screen: Screen): Effect[] {
+function loadsFor(state: State, screen: Screen): Effect[] {
     switch (screen.kind) {
         case "projects":
-            return [{ type: "load-projects" }];
+            return [{ type: "load-projects", profile: state.profile }];
         case "service":
             return [{ type: "load-service", serviceId: screen.serviceId }];
         case "deployments":
@@ -273,7 +285,7 @@ function push(state: State, screen: Screen): Step {
         filter: "",
         filtering: false,
         message: null,
-        loading: loadsFor(screen).length > 0,
+        loading: loadsFor(state, screen).length > 0,
         // What another service left behind is not shown as this one's.
         ...(screen.kind === "logs" ? { log: [], scroll: 0 } : {}),
         ...(screen.kind === "deployments" ? { deployments: null } : {}),
@@ -282,7 +294,7 @@ function push(state: State, screen: Screen): Step {
             ? { service: null }
             : {})
     };
-    return { state: next, effects: loadsFor(screen) };
+    return { state: next, effects: loadsFor(next, screen) };
 }
 
 function back(state: State): Step {
@@ -326,11 +338,15 @@ function serviceOf(screen: Screen): string | null {
     return "serviceId" in screen ? screen.serviceId : null;
 }
 
+function showing(state: State, kind: Screen["kind"], serviceId: string): boolean {
+    return state.stack.some((each) => each.kind === kind && serviceOf(each) === serviceId);
+}
+
 function onKey(state: State, key: Key): Step {
     const same: Step = { state, effects: [] };
 
     if (state.confirm) {
-        if (key === "yes" || key === "enter") {
+        if (key === "yes") {
             const { action, serviceId } = state.confirm;
             return {
                 state: {
@@ -345,7 +361,9 @@ function onKey(state: State, key: Key): Step {
                 effects: [{ type: "run", action, serviceId }]
             };
         }
-        if (key === "no" || key === "back" || key === "quit")
+        if (key === "quit")
+            return { state: { ...state, confirm: null }, effects: [{ type: "quit" }] };
+        if (key === "no" || key === "back")
             return { state: { ...state, confirm: null, message: null }, effects: [] };
         return same;
     }
@@ -406,8 +424,8 @@ function onKey(state: State, key: Key): Step {
             };
         case "refresh":
             return {
-                state: { ...state, loading: loadsFor(screen).length > 0, message: null },
-                effects: loadsFor(screen)
+                state: { ...state, loading: loadsFor(state, screen).length > 0, message: null },
+                effects: loadsFor(state, screen)
             };
         case "deploy":
         case "restart": {
@@ -451,6 +469,8 @@ export function reduce(state: State, event: Event): Step {
         case "key":
             return onKey(state, event.key);
         case "projects":
+            // An answer for a profile already left behind is dropped.
+            if (event.profile !== state.profile) return { state, effects: [] };
             return { state: { ...state, projects: event.projects, loading: false }, effects: [] };
         case "service":
             // An answer for a service already left behind is dropped.
@@ -458,11 +478,13 @@ export function reduce(state: State, event: Event): Step {
                 return { state, effects: [] };
             return { state: { ...state, service: event.service, loading: false }, effects: [] };
         case "deployments":
+            if (!showing(state, "deployments", event.serviceId)) return { state, effects: [] };
             return {
                 state: { ...state, deployments: event.deployments, loading: false },
                 effects: []
             };
         case "variables":
+            if (!showing(state, "env", event.serviceId)) return { state, effects: [] };
             return { state: { ...state, variables: event.variables, loading: false }, effects: [] };
         case "log": {
             const incoming = event.text
@@ -477,7 +499,7 @@ export function reduce(state: State, event: Event): Step {
                 state: { ...state, loading: false, message: { text: event.text, tone: "info" } },
                 effects:
                     screen.kind === "service" || screen.kind === "deployments"
-                        ? loadsFor(screen)
+                        ? loadsFor(state, screen)
                         : []
             };
         }
@@ -560,8 +582,10 @@ export function parseKeys(chunk: string): RawKey[] {
         const char = rest[0]!;
         at += 1;
         if (char === "\u001b") keys.push({ name: "escape" });
-        else if (char === "\r" || char === "\n") keys.push({ name: "return" });
-        else if (char === "\u007f" || char === "\b") keys.push({ name: "backspace" });
+        else if (char === "\r" || char === "\n") {
+            keys.push({ name: "return" });
+            if (char === "\r" && rest[1] === "\n") at += 1;
+        } else if (char === "\u007f" || char === "\b") keys.push({ name: "backspace" });
         else if (char === "\u0003") keys.push({ name: "c", ctrl: true });
         else if (char === "\u0004") keys.push({ name: "d", ctrl: true });
         else if (char >= " ") keys.push({ text: char });
