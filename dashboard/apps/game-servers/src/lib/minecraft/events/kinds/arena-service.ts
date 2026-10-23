@@ -1583,7 +1583,7 @@ export async function closeArena(
             // nothing is asked over it: the arena is tried again later.
             const lines = arena.teardown(left.arena);
             const pacing = pace.teardownPacer();
-            for (let start = 0; start < lines.length; ) {
+            for (let start = 0; start < lines.length;) {
                 const trip = pacing.take(lines.slice(start), pace.fillVolume);
                 start += trip.length;
                 let replies: (string | null)[] = [];
