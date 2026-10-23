@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const session = vi.hoisted(() => ({ backgroundUser: vi.fn(), requireUser: vi.fn() }));
-const admin = vi.hoisted(() => ({ apiAdmin: vi.fn() }));
+const admin = vi.hoisted(() => ({ apiAdmin: vi.fn(), apiPermission: vi.fn() }));
 const actions = vi.hoisted(() => {
     const names = [
         "databaseOverviewAction",
@@ -2634,6 +2634,7 @@ beforeEach(() => {
     vi.unstubAllGlobals();
     session.backgroundUser.mockResolvedValue({ id: "user-1" });
     admin.apiAdmin.mockResolvedValue({ id: "user-1", isAdmin: true });
+    admin.apiPermission.mockResolvedValue({ id: "user-1", isAdmin: false });
     for (const spy of Object.values(actions)) spy.mockReset();
     vi.stubGlobal(
         "fetch",

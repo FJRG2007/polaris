@@ -8,16 +8,19 @@ import { vi } from "vitest";
 
 type Loader = () => Promise<unknown>;
 
-/** Imports already under way, by loader. Two first imports of a mocked module at
- *  the same moment hand one of them the real module, so a screen that asks two
- *  reads at once would reach the server code; the second waits on the first. */
-const loading = new Map<Loader, Promise<unknown>>();
+/** Imports already under way, by the module they import. Two first imports of a
+ *  mocked module at the same moment hand one of them the real module, so a screen
+ *  that asks two reads at once would reach the server code; the second waits on
+ *  the first. Keyed by the loader's source rather than the loader itself, since
+ *  two reads from one module each have their own `() => import(...)`. */
+const loading = new Map<string, Promise<unknown>>();
 
 function loadOnce(load: Loader): Promise<unknown> {
-    const pending = loading.get(load);
+    const key = load.toString();
+    const pending = loading.get(key);
     if (pending) return pending;
-    const started = load().finally(() => loading.delete(load));
-    loading.set(load, started);
+    const started = load().finally(() => loading.delete(key));
+    loading.set(key, started);
     return started;
 }
 
