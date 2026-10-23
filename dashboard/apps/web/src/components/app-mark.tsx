@@ -97,6 +97,31 @@ export function AppMark({
         );
     }
 
+    if (app.logo) {
+        // Always on white, the way the README's tiles are drawn: several of these
+        // marks are black (Umami, Langflow) or near it, and a full-colour logo on
+        // the dark surface would be a silhouette nobody recognises.
+        return (
+            <span
+                className={cn(
+                    "grid shrink-0 place-items-center rounded-md border border-[#D0D7DE] bg-white",
+                    className
+                )}
+                style={{ width: size, height: size }}
+            >
+                <img
+                    src={app.logo}
+                    alt=""
+                    loading="lazy"
+                    // object-contain: these are the projects' own files and they are
+                    // not all square.
+                    className="object-contain"
+                    style={{ width: size * 0.62, height: size * 0.62 }}
+                />
+            </span>
+        );
+    }
+
     if (Brand) {
         return (
             <span

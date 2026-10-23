@@ -29,7 +29,8 @@ export const APP_REPLACES: Readonly<Record<string, readonly ReplacedProduct[]>> 
         product("Fly.io", "fly-io"),
         product("Vercel", "vercel"),
         product("Google Analytics", "google-analytics"),
-        product("Plausible", "plausible")
+        product("Plausible", "plausible"),
+        product("Umami", "umami")
     ],
     chat: [
         product("Discord", "discord"),
@@ -39,21 +40,27 @@ export const APP_REPLACES: Readonly<Record<string, readonly ReplacedProduct[]>> 
         product("Signal", "signal"),
         product("Zoom", "zoom"),
         product("Google Meet", "google-meet"),
-        product("Microsoft Teams", "microsoft-teams")
+        product("Microsoft Teams", "microsoft-teams"),
+        product("Mattermost", "mattermost")
     ],
     tasks: [
         product("ClickUp", "clickup"),
         product("Jira", "jira"),
         product("Linear", "linear"),
         product("Asana", "asana"),
-        product("Trello", "trello")
+        product("Trello", "trello"),
+        product("Vikunja", "vikunja")
     ],
     drive: [
         product("Google Drive", "google-drive"),
         product("Dropbox", "dropbox"),
         product("Nextcloud", "nextcloud")
     ],
-    vault: [product("Bitwarden", "bitwarden"), product("1Password", "1password")],
+    vault: [
+        product("Bitwarden", "bitwarden"),
+        product("1Password", "1password"),
+        product("Vaultwarden", "vaultwarden")
+    ],
     mail: [product("Gmail", "gmail"), product("Microsoft Outlook", "microsoft-outlook")],
     notes: [product("Notion", "notion"), product("Obsidian", "obsidian")],
     office: [

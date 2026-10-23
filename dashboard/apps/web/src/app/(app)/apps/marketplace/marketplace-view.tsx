@@ -31,6 +31,7 @@ import { replacedLogos } from "@/lib/apps/replaces";
 import { BuiltInAppsSection } from "@polaris/ui/built-in-apps";
 import { useLocalizeStoreApp } from "./use-store-words";
 import { TemplateDeployDialog } from "./template-deploy-dialog";
+import { BuiltInAlternativeNote } from "./built-in-alternative";
 import { UninstallDialog } from "./uninstall-dialog";
 import { appProvenance } from "@/lib/apps/provenance";
 import { appPreview } from "@/lib/apps/app-screenshots";
@@ -123,7 +124,8 @@ export function MarketplaceView({
     initialQuery = "",
     canInstall = false,
     scope = "deployable",
-    canBrowsePolaris = false
+    canBrowsePolaris = false,
+    openableBuiltIns = []
 }: {
     installed: StoreInstallRow[];
     /** What the search starts with - an app's name, when a screen sent somebody
@@ -137,6 +139,9 @@ export function MarketplaceView({
     /** Whether the reader may open the admin screen, for the way there from an
      *  empty user marketplace. */
     canBrowsePolaris?: boolean;
+    /** The built-in apps this reader may open, for the note on a template whose
+     *  job one of them already does (see `BuiltInAlternativeNote`). */
+    openableBuiltIns?: readonly string[];
 }) {
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
@@ -168,6 +173,7 @@ export function MarketplaceView({
     const featured = useMemo(() => (browsing ? featuredApps(all) : []), [all, browsing]);
 
     const { install, installingId, error } = useOneClickInstall();
+    const openable = useMemo(() => new Set(openableBuiltIns), [openableBuiltIns]);
 
     const installsByCatalog = useMemo(() => {
         const map = new Map<string, StoreInstallRow[]>();
@@ -185,6 +191,7 @@ export function MarketplaceView({
             installing={installingId === app.id}
             disabled={installingId !== null}
             featured={featuredCard}
+            openable={openable}
             onInstall={() => (app.deployTemplate ? setDeploying(app) : install(app))}
             onConfigure={() => setWizardApp(app)}
             onUninstall={setRemoving}
@@ -530,6 +537,7 @@ function StoreCard({
     installing,
     disabled,
     featured,
+    openable,
     onInstall,
     onConfigure,
     onUninstall
@@ -542,6 +550,7 @@ function StoreCard({
      *  and this page's feedback honest. */
     disabled: boolean;
     featured: boolean;
+    openable: ReadonlySet<string>;
     onInstall: () => void;
     onConfigure: () => void;
     onUninstall: (item: StoreInstallRow) => void;
@@ -616,7 +625,9 @@ function StoreCard({
                 </>
             }
             note={
-                app.consent && (
+                <>
+                    <BuiltInAlternativeNote app={app} openable={openable} />
+                    {app.consent && (
                     <p className="text-xs text-muted-foreground">
                         {t.rich("card.consent", {
                             label: app.consent.label,
@@ -633,7 +644,8 @@ function StoreCard({
                             )
                         })}
                     </p>
-                )
+                    )}
+                </>
             }
             status={
                 <>

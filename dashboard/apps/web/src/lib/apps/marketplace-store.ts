@@ -6,6 +6,7 @@
  */
 
 import { POLARIS_APPS, type AppEntry } from "@/lib/apps";
+import { appReplaces } from "@/lib/apps/replaces";
 import { appProvenance } from "@/lib/apps/provenance";
 import { hasScreenshots } from "@/lib/apps/app-screenshots";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
@@ -243,4 +244,21 @@ const NOT_AN_APP = new Set(["overview", "admin", "account"]);
  */
 export function builtInApps(): AppEntry[] {
     return POLARIS_APPS.filter((app) => !app.requiresApp && !app.hidden && !NOT_AN_APP.has(app.id));
+}
+
+/**
+ * The built-in app that already does a Deploy template's job, if one does.
+ *
+ * Read off what each built-in replaces (`APP_REPLACES`) rather than kept as a
+ * second table: a built-in that lists a template's own product - the product's
+ * tile is named after the template id, as Vaultwarden's is `vaultwarden` - does
+ * that template's job, so the card can say so. A claim only has to be made once,
+ * in the table the store page and the README already read.
+ */
+export function builtInAlternative(app: AppManifest): AppEntry | undefined {
+    const product = app.deployTemplate;
+    if (!product) return undefined;
+    return builtInApps().find((entry) =>
+        appReplaces(entry.id).some((item) => item.logo === product)
+    );
 }
