@@ -5858,6 +5858,35 @@ describe("a meteor shower", () => {
         expect(world.sent).toContain("scoreboard objectives remove pe_mh");
     });
 
+    it("gives the shower its one heart in a meteor still standing when the last one lands on nothing open", async () => {
+        world.ground = 70;
+        setUp([shower()]);
+        await start();
+        // Every meteor after the first comes down on the first's heap: none takes.
+        await play(4 * 60_000);
+        const run = state().run!;
+        expect(run.landings).toBe(4);
+        expect(run.meteors).toHaveLength(1);
+        const hearts = run.meteors[0]!.blocks.filter(
+            (block) => block.block === "minecraft:ancient_debris"
+        );
+        expect(hearts).toHaveLength(1);
+        expect(world.blocks.get(`${hearts[0]!.x} ${hearts[0]!.y} ${hearts[0]!.z}`)).toBe(
+            "minecraft:ancient_debris"
+        );
+        expect(
+            world.sent.filter(
+                (line) =>
+                    line.includes("setblock") && line.endsWith("minecraft:ancient_debris keep")
+            )
+        ).toHaveLength(1);
+        expect(
+            world.sent.filter(
+                (line) => line.startsWith("tellraw @a") && visible(line).includes("Its heart is")
+            )
+        ).toHaveLength(1);
+    });
+
     it("guides by heading alone when it cannot tell which way a player looks", async () => {
         world.ground = 70;
         world.unfacing = ["Ana"];

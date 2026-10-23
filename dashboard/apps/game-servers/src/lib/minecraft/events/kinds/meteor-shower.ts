@@ -13,9 +13,10 @@
  *   back by a player, which is theirs now - is forgotten as soon as it is seen
  *   gone, and never touched again.
  *
- * Each one looks the part where the server has the blocks (1.16 on): a heart
- * of something rarer in the middle of the heap (`HEART`), worth `HEART_POINTS`
- * blocks, and a scorched rim of blackstone and basalt round it (`crustCells`),
+ * Each one looks the part where the server has the blocks (1.16 on): one
+ * heart a shower of something rarer, in the middle of the last heap (`HEART`,
+ * `heartAt`), worth `HEART_POINTS` blocks, and a scorched rim of blackstone and
+ * basalt round each heap (`crustCells`),
  * put into air the same way and taken back the same way - never scored, and
  * never what decides whether a meteor is mined out.
  *

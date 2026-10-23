@@ -4168,6 +4168,8 @@ async function meteorShower(
             // Nowhere for this one: it is let go, and the next looked for afresh.
             loop.run = { ...loop.run, landings: loop.run.landings + 1, placeTries: 0 };
             await persist(installedAppId, loop);
+            if (loop.run.landings === options.meteors)
+                await heartIntoStanding(installedAppId, loop, server, options);
             break;
         }
         if (found) {
@@ -4461,6 +4463,8 @@ async function landMeteor(
     if (ours.length === 0 && rimOurs.length > 0)
         await server.sayAll(rimOurs.map(meteors.removeIfOurs));
     await persist(installedAppId, loop);
+    const heartLanded = !!heart && ours.some((block) => block.block === `minecraft:${heart}`);
+    if (heart && !heartLanded) await heartIntoStanding(installedAppId, loop, server, options);
     if (ours.length === 0) return;
     await server.sayAll([
         ...meteors.landingEffects(found),
@@ -4472,7 +4476,7 @@ async function landMeteor(
             messages.tag(language) +
                 messages.meteorAt(found.x, found.y, found.z, ours.length, language)
         ),
-        ...(heart && ours.some((block) => block.block === `minecraft:${heart}`)
+        ...(heart && heartLanded
             ? [
                   commands.say(
                       messages.tag(language) +
@@ -4484,6 +4488,55 @@ async function landMeteor(
             ? [commands.say(messages.tag(language) + messages.meteorInfected(language))]
             : [])
     ]);
+}
+
+/**
+ * The shower's heart when its last meteor came down without it - let go, or
+ * its middle not open: swapped for one block still ore in the newest meteor
+ * standing, so a shower never ends with no heart at all.
+ */
+async function heartIntoStanding(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    options: catalog.EventOptions<"meteor-shower">
+): Promise<void> {
+    const heart = meteors.heartOf(options.ores, loop.rich ?? false);
+    if (!heart) return;
+    for (let index = loop.run.meteors.length - 1; index >= 0; index -= 1) {
+        const meteor = loop.run.meteors[index]!;
+        const into = (await stillOurs(server, meteor.blocks))[0];
+        if (!into) continue;
+        const block = { ...into, block: `minecraft:${heart}` };
+        const swap = (blocks: readonly meteors.MeteorBlock[]) =>
+            loop.run.meteors.map((one, at) =>
+                at === index
+                    ? {
+                          ...one,
+                          blocks: one.blocks.flatMap((cell) =>
+                              cell.x === into.x && cell.y === into.y && cell.z === into.z
+                                  ? blocks
+                                  : [cell]
+                          )
+                      }
+                    : one
+            );
+        loop.run = { ...loop.run, meteors: swap([block]) };
+        await persist(installedAppId, loop);
+        await server.sayAll([meteors.removeIfOurs(into), meteors.placeBlock(block)]);
+        if (commands.readTest(await server.say([meteors.isOurs(block)])) !== "passed") {
+            loop.run = { ...loop.run, meteors: swap([]) };
+            await persist(installedAppId, loop);
+            return;
+        }
+        await server.sayAll([
+            commands.say(
+                messages.tag(loop.language) +
+                    messages.meteorHeart(heart, meteors.HEART_POINTS, loop.language)
+            )
+        ]);
+        return;
+    }
 }
 
 /**
