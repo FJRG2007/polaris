@@ -1,11 +1,12 @@
 "use server";
 
 /**
- * Where a service's image is built, and the folder it was uploaded from: the
- * actions behind those two settings. Both change how the service is built, so
- * they ask for `service.configure`.
+ * Where a service's image is built, the folder it was uploaded from, and the
+ * repository it is connected to: the actions behind those settings. Each changes
+ * how the service is built, so they ask for `service.configure`.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { reply } from "./reply";
 import { revalidatePath } from "next/cache";
@@ -13,7 +14,11 @@ import { requirePermission } from "@/lib/session";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as buildMachine from "@/lib/deploy/build-machine";
+import { parseGithubRepo } from "@/lib/repo-reference";
+import { githubChecksAccess } from "@/lib/github-service";
+import { githubRepoChoiceRefusal } from "@/lib/github-access";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import * as sourceConnection from "@/lib/deploy/source-connection";
 import { uploadedSourceOf, type UploadedSource } from "@/lib/deploy/source-upload";
 import { describeServiceSource, type ServiceSourceView } from "@/lib/deploy/service-source";
 
@@ -117,6 +122,96 @@ export async function serviceSourceAction(
                 environmentBranch: app.environment.branch
             })
         };
+    } catch (caught) {
+        return failure(caught, "source.loadFailed");
+    }
+}
+
+/**
+ * Disconnect the service's repository. The deployment running now keeps
+ * running; pushes stop deploying it and the next deploy needs a source.
+ */
+export async function disconnectSourceAction(applicationId: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const id = z.string().uuid().safeParse(applicationId);
+    if (!id.success) return { error: await reply("common.serviceNotFound") };
+    try {
+        const access = await requireApplicationAccess(id.data, user.id, "service.configure");
+        const name = await sourceConnection.disconnectSource(id.data, access.ownerId, user.id);
+        if (name) {
+            await recordDeployAudit({
+                actorId: user.id,
+                action: "deploy.app.source.disconnect",
+                targetType: "application",
+                targetId: id.data,
+                metadata: { repository: name }
+            });
+        }
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "source.disconnectFailed");
+    }
+}
+
+/**
+ * Point the service at another GitHub repository and branch, picked from the
+ * repositories this person can see - the same check a new service gets.
+ */
+export async function changeSourceAction(
+    applicationId: unknown,
+    input: unknown
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const id = z.string().uuid().safeParse(applicationId);
+    if (!id.success) return { error: await reply("common.serviceNotFound") };
+    const parsed = sourceConnection.repointSourceSchema.safeParse(input);
+    if (!parsed.success) return { error: await reply("source.repositoryInvalid") };
+    try {
+        const access = await requireApplicationAccess(id.data, user.id, "service.configure");
+        const refusal = await githubRepoChoiceRefusal(
+            user,
+            access.ownerId,
+            `https://github.com/${parsed.data.repoFullName}`
+        );
+        if (refusal) return { error: refusal };
+        await sourceConnection.repointSource(id.data, access.ownerId, user.id, parsed.data);
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.app.source.change",
+            targetType: "application",
+            targetId: id.data,
+            metadata: { repository: parsed.data.repoFullName, branch: parsed.data.branch || null }
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "source.changeFailed");
+    }
+}
+
+/**
+ * Whether "Wait for CI" can work for this service as GitHub is set up now: what
+ * is missing, and the page on GitHub where it is turned on.
+ */
+export async function ciAccessAction(applicationId: unknown): Promise<{
+    error?: string;
+    access?: { gap: "app" | "install" | "events" | null; url: string | null };
+}> {
+    const user = await requirePermission("deploy.read");
+    const id = z.string().uuid().safeParse(applicationId);
+    if (!id.success) return { error: await reply("common.serviceNotFound") };
+    try {
+        const access = await requireApplicationAccess(id.data, user.id, "project.read");
+        const app = await prisma.application.findFirst({
+            where: { id: id.data, environment: { project: { ownerId: access.ownerId } } },
+            select: { sourceConfig: true }
+        });
+        if (!app) return { error: await reply("common.serviceNotFound") };
+        const source = JSON.parse(app.sourceConfig || "{}") as Record<string, unknown>;
+        const repo = typeof source.repoUrl === "string" ? parseGithubRepo(source.repoUrl) : null;
+        if (!repo) return { access: { gap: null, url: null } };
+        return { access: (await githubChecksAccess(repo.owner)) ?? { gap: null, url: null } };
     } catch (caught) {
         return failure(caught, "source.loadFailed");
     }

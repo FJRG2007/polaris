@@ -110,6 +110,24 @@ export function describeServiceEvent(line: ActivityLine, t: ServiceT): string {
             return t("history.firstDeployFailed", { who, output: line.toValue ?? "" });
         case "secrets-withheld":
             return t("history.secretsWithheld", { who, names: line.toValue ?? "" });
+        // Written by the wait for CI (`lib/deploy/ci-wait.ts`): the commit held
+        // is `fromValue` (`toValue` for the line that starts the wait), the check
+        // that failed `toValue`.
+        case "ci-waiting":
+            return t("history.ciWaiting", { sha: (line.toValue ?? "").slice(0, 7) });
+        case "ci-failed":
+            return t("history.ciFailed", {
+                sha: (line.fromValue ?? "").slice(0, 7),
+                check: line.toValue ?? ""
+            });
+        case "ci-unreadable":
+            return t("history.ciUnreadable", { sha: (line.fromValue ?? "").slice(0, 7) });
+        case "ci-timeout":
+            return t("history.ciTimeout", { sha: (line.fromValue ?? "").slice(0, 7) });
+        case "source-disconnected":
+            return t("history.sourceDisconnected", { who, name: line.fromValue ?? "" });
+        case "source-changed":
+            return t("history.sourceChanged", { who, name: line.toValue ?? "" });
         default:
             return t("history.changed", { who });
     }
