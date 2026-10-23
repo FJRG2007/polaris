@@ -81,9 +81,9 @@ import {
 import {
     clearSearchHistoryAction,
     forgetSearchAction,
-    listRecentSearchesAction,
     recordSearchAction
 } from "@/app/(app)/search-actions";
+import * as polls from "./shared-polls";
 
 /** How long a fetched resource index is reused before it is asked for again. */
 const INDEX_TTL_MS = 60_000;
@@ -277,7 +277,8 @@ export function CommandPalette({
         // What this browser remembers paints now; what the account remembers is
         // merged into it when it arrives.
         setRecent(recentStore.readRecentSearches());
-        void listRecentSearchesAction()
+        void polls
+            .recentSearches()
             .then((body) => setRecent(recentStore.mergeIntoStore(body.recent)))
             .catch(() => undefined);
     }, [open, loadResources]);

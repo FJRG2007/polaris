@@ -34,11 +34,11 @@ import {
     type SecuritySection
 } from "@/lib/domain-security/types";
 import {
-    readDomainSecurityAction,
     recheckDomainSecurityAction,
     setDomainDedicatedAction,
     type SecurityRef
 } from "@/app/(app)/account/domains/security-actions";
+import * as polls from "../shared-polls";
 
 /** How long an answer is shown again without asking. */
 const SNAPSHOT_MS = 30_000;
@@ -163,7 +163,7 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const result = await readDomainSecurityAction(scope, domain).catch(() => null);
+            const result = await polls.domainSecurity(scope, domain).catch(() => null);
             if (cancelled) return;
             if (result?.view) {
                 accept(result.view);

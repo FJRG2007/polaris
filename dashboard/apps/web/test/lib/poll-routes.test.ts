@@ -67,7 +67,22 @@ const actions = vi.hoisted(() => {
         "variableGroupReachAction",
         "serviceTagsAction",
         "revealEnvScopeAction",
-        "listNasConnectionsAction"
+        "listNasConnectionsAction",
+        "presenceNowAction",
+        "noticeChannelsAction",
+        "listRecentSearchesAction",
+        "diskAlertsAction",
+        "readDomainSecurityAction",
+        "planDomainSecurityAction",
+        "securityInventoryAction",
+        "namespaceMessagesAction",
+        "subjectBreakdownAction",
+        "listHistoryAction",
+        "setupStateAction",
+        "setupInstalledAction",
+        "stepUpOptionsAction",
+        "shouldOfferOverviewAction",
+        "getUserProfileAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -142,7 +157,10 @@ vi.mock("@/app/(app)/admin/inbox/actions", () => ({
 vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
     serverDetailAction: actions.serverDetailAction
 }));
-vi.mock("@/app/(app)/automations/actions", () => ({ getRunAction: actions.getRunAction }));
+vi.mock("@/app/(app)/automations/actions", () => ({
+    getRunAction: actions.getRunAction,
+    noticeChannelsAction: actions.noticeChannelsAction
+}));
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
     checkUpdatesAction: actions.checkUpdatesAction
 }));
@@ -190,6 +208,42 @@ vi.mock("@/app/(app)/apps/deploy/variable-group-actions", () => ({
 }));
 vi.mock("@/app/(app)/apps/deploy/variable-actions", () => ({
     revealEnvScopeAction: actions.revealEnvScopeAction
+}));
+vi.mock("@/app/(app)/account/preferences/actions", () => ({
+    presenceNowAction: actions.presenceNowAction
+}));
+vi.mock("@/app/(app)/search-actions", () => ({
+    listRecentSearchesAction: actions.listRecentSearchesAction
+}));
+vi.mock("@/app/(app)/disk-alert-actions", () => ({
+    diskAlertsAction: actions.diskAlertsAction
+}));
+vi.mock("@/app/(app)/account/domains/security-actions", () => ({
+    readDomainSecurityAction: actions.readDomainSecurityAction,
+    planDomainSecurityAction: actions.planDomainSecurityAction,
+    securityInventoryAction: actions.securityInventoryAction
+}));
+vi.mock("@/components/i18n/namespace-actions", () => ({
+    namespaceMessagesAction: actions.namespaceMessagesAction
+}));
+vi.mock("@/app/(app)/breakdown-actions", () => ({
+    subjectBreakdownAction: actions.subjectBreakdownAction
+}));
+vi.mock("@/app/(app)/apps/deploy/restore-actions", () => ({
+    listHistoryAction: actions.listHistoryAction
+}));
+vi.mock("@/app/(app)/setup-actions", () => ({
+    setupStateAction: actions.setupStateAction,
+    setupInstalledAction: actions.setupInstalledAction
+}));
+vi.mock("@/app/(app)/account/step-up-actions", () => ({
+    stepUpOptionsAction: actions.stepUpOptionsAction
+}));
+vi.mock("@/app/(app)/tour-actions", () => ({
+    shouldOfferOverviewAction: actions.shouldOfferOverviewAction
+}));
+vi.mock("@/app/(app)/drive/activity-actions", () => ({
+    getUserProfileAction: actions.getUserProfileAction
 }));
 
 type Handler = (request: Request) => Promise<Response>;
@@ -267,7 +321,22 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
         import("@/app/api/deploy/variable-groups/reach/route"),
     "/api/deploy/services/tags": () => import("@/app/api/deploy/services/tags/route"),
     "/api/deploy/variables/reveal": () => import("@/app/api/deploy/variables/reveal/route"),
-    "/api/deploy/nas-connections": () => import("@/app/api/deploy/nas-connections/route")
+    "/api/deploy/nas-connections": () => import("@/app/api/deploy/nas-connections/route"),
+    "/api/account/presence": () => import("@/app/api/account/presence/route"),
+    "/api/automations/notice-channels": () => import("@/app/api/automations/notice-channels/route"),
+    "/api/search/recent": () => import("@/app/api/search/recent/route"),
+    "/api/disk-alerts": () => import("@/app/api/disk-alerts/route"),
+    "/api/domains/security": () => import("@/app/api/domains/security/route"),
+    "/api/domains/security/plan": () => import("@/app/api/domains/security/plan/route"),
+    "/api/domains/security/inventory": () => import("@/app/api/domains/security/inventory/route"),
+    "/api/i18n/namespaces": () => import("@/app/api/i18n/namespaces/route"),
+    "/api/watch/breakdown": () => import("@/app/api/watch/breakdown/route"),
+    "/api/deploy/restore-points": () => import("@/app/api/deploy/restore-points/route"),
+    "/api/setup/state": () => import("@/app/api/setup/state/route"),
+    "/api/setup/installed": () => import("@/app/api/setup/installed/route"),
+    "/api/account/step-up/options": () => import("@/app/api/account/step-up/options/route"),
+    "/api/tours/overview-offer": () => import("@/app/api/tours/overview-offer/route"),
+    "/api/users/profile": () => import("@/app/api/users/profile/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -970,6 +1039,186 @@ const CASES: Case[] = [
             ).nasConnections(),
         action: "listNasConnectionsAction",
         args: []
+    },
+    {
+        name: "one's own presence, asked again when the menu opens",
+        path: "/api/account/presence",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).presenceNow(),
+        action: "presenceNowAction",
+        args: []
+    },
+    {
+        name: "the channels a notice can be sent through",
+        path: "/api/automations/notice-channels",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).noticeChannels(),
+        action: "noticeChannelsAction",
+        args: []
+    },
+    {
+        name: "what the account searched lately",
+        path: "/api/search/recent",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).recentSearches(),
+        action: "listRecentSearchesAction",
+        args: []
+    },
+    {
+        name: "the disks running out of room, asked again on a timer",
+        path: "/api/disk-alerts",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).diskAlerts(),
+        action: "diskAlertsAction",
+        args: []
+    },
+    {
+        name: "a domain's mail security",
+        path: "/api/domains/security",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).domainSecurity({ kind: "sample" }, "domain-1"),
+        action: "readDomainSecurityAction",
+        args: [{ kind: "sample" }, "domain-1"]
+    },
+    {
+        name: "what fixing a domain's mail security would change",
+        path: "/api/domains/security/plan",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).domainSecurityPlan({ kind: "sample" }, "domain-1", { kind: "sample" }),
+        action: "planDomainSecurityAction",
+        args: [{ kind: "sample" }, "domain-1", { kind: "sample" }]
+    },
+    {
+        name: "every domain's mail security",
+        path: "/api/domains/security/inventory",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).securityInventory(),
+        action: "securityInventoryAction",
+        args: []
+    },
+    {
+        name: "a screen's extra translations",
+        path: "/api/i18n/namespaces",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).namespaceMessages(["automations"]),
+        action: "namespaceMessagesAction",
+        args: [["automations"]]
+    },
+    {
+        name: "a chart's breakdown by subject",
+        path: "/api/watch/breakdown",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).subjectBreakdown({ kind: "sample" }),
+        action: "subjectBreakdownAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "the points a thing can be restored to",
+        path: "/api/deploy/restore-points",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).restoreHistory({ kind: "sample" }),
+        action: "listHistoryAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "whether the first-run setup is still to do",
+        path: "/api/setup/state",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).setupState(),
+        action: "setupStateAction",
+        args: []
+    },
+    {
+        name: "the apps the first-run setup installed",
+        path: "/api/setup/installed",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).setupInstalled(),
+        action: "setupInstalledAction",
+        args: []
+    },
+    {
+        name: "the ways one can confirm it is them",
+        path: "/api/account/step-up/options",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).stepUpOptions(),
+        action: "stepUpOptionsAction",
+        args: []
+    },
+    {
+        name: "whether to offer the overview tour",
+        path: "/api/tours/overview-offer",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).shouldOfferOverview(),
+        action: "shouldOfferOverviewAction",
+        args: []
+    },
+    {
+        name: "a person's profile card",
+        path: "/api/users/profile",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).userProfile("userId-1"),
+        action: "getUserProfileAction",
+        args: ["userId-1"]
     }
 ];
 

@@ -21,10 +21,8 @@ import type {
     ProjectWebhookChoice
 } from "@/lib/automations/notice-targets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import {
-    noticeChannelsAction,
-    type NoticeDestinationChoice
-} from "@/app/(app)/automations/actions";
+import { type NoticeDestinationChoice } from "@/app/(app)/automations/actions";
+import * as polls from "../shared-polls";
 
 interface Channels {
     readonly mail: boolean;
@@ -88,7 +86,7 @@ export function NoticeDeliveryFields({
 
     useEffect(() => {
         let cancelled = false;
-        void noticeChannelsAction().then((answer) => {
+        void polls.noticeChannels().then((answer) => {
             if (cancelled) return;
             if (answer.ok) setChannels(answer);
             else setError(answer.error);

@@ -20,10 +20,11 @@ import type { StepUpChoice } from "@/lib/step-up";
 import { Button, Input, Select } from "@polaris/ui";
 import type { StepUpProofInput } from "@polaris/core";
 import { useEffect, useId, useRef, useState } from "react";
-import { sendStepUpCodeAction, stepUpOptionsAction } from "@/app/(app)/account/step-up-actions";
+import { sendStepUpCodeAction } from "@/app/(app)/account/step-up-actions";
 import { codeDigits } from "@/components/code-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import * as polls from "./shared-polls";
 
 const PROOFS = new Set(["totp", "email", "whatsapp", "password"]);
 
@@ -60,7 +61,7 @@ export function StepUpFields({
         setSent("");
         setError("");
         let live = true;
-        void stepUpOptionsAction()
+        void polls.stepUpOptions()
             .then((result) => {
                 if (!live) return;
                 setChoices(result.choices);

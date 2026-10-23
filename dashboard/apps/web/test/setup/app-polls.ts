@@ -333,3 +333,69 @@ vi.mock("@/app/(app)/chat/call-requests", () => {
         claimCall: forward(calls, "claimCallAction", 2)
     };
 });
+
+vi.mock("@/components/shared-polls", () => ({
+    presenceNow: forward(
+        () => import("@/app/(app)/account/preferences/actions"),
+        "presenceNowAction",
+        0
+    ),
+    noticeChannels: forward(
+        () => import("@/app/(app)/automations/actions"),
+        "noticeChannelsAction",
+        0
+    ),
+    recentSearches: forward(
+        () => import("@/app/(app)/search-actions"),
+        "listRecentSearchesAction",
+        0
+    ),
+    diskAlerts: forward(() => import("@/app/(app)/disk-alert-actions"), "diskAlertsAction", 0),
+    domainSecurity: forward(
+        () => import("@/app/(app)/account/domains/security-actions"),
+        "readDomainSecurityAction",
+        2
+    ),
+    domainSecurityPlan: forward(
+        () => import("@/app/(app)/account/domains/security-actions"),
+        "planDomainSecurityAction",
+        3
+    ),
+    securityInventory: forward(
+        () => import("@/app/(app)/account/domains/security-actions"),
+        "securityInventoryAction",
+        0
+    ),
+    namespaceMessages: forward(
+        () => import("@/components/i18n/namespace-actions"),
+        "namespaceMessagesAction",
+        1
+    ),
+    subjectBreakdown: forward(
+        () => import("@/app/(app)/breakdown-actions"),
+        "subjectBreakdownAction",
+        1
+    ),
+    restoreHistory: forward(
+        () => import("@/app/(app)/apps/deploy/restore-actions"),
+        "listHistoryAction",
+        1
+    ),
+    setupState: forward(() => import("@/app/(app)/setup-actions"), "setupStateAction", 0),
+    setupInstalled: forward(() => import("@/app/(app)/setup-actions"), "setupInstalledAction", 0),
+    stepUpOptions: forward(
+        () => import("@/app/(app)/account/step-up-actions"),
+        "stepUpOptionsAction",
+        0
+    ),
+    shouldOfferOverview: forward(
+        () => import("@/app/(app)/tour-actions"),
+        "shouldOfferOverviewAction",
+        0
+    ),
+    userProfile: forward(
+        () => import("@/app/(app)/drive/activity-actions"),
+        "getUserProfileAction",
+        1
+    )
+}));

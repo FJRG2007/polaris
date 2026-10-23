@@ -18,12 +18,9 @@ import { useRouter } from "next/navigation";
 import type { SetupApp } from "@/lib/setup/setup-wizard";
 import { SetupWizard } from "@/components/setup/setup-wizard";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import {
-    finishSetupAction,
-    setupInstalledAction,
-    setupStateAction
-} from "@/app/(app)/setup-actions";
+import { finishSetupAction } from "@/app/(app)/setup-actions";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
+import * as polls from "../shared-polls";
 
 export function SetupWizardOffer() {
     const t = useTranslations("setup");
@@ -38,7 +35,8 @@ export function SetupWizardOffer() {
 
     useEffect(() => {
         let live = true;
-        setupStateAction()
+        polls
+            .setupState()
             .then(
                 (answer) => live && setState({ offer: answer.offer, installed: answer.installed })
             )
@@ -86,7 +84,8 @@ function useInstalledSetupApps(round: number): readonly SetupApp[] | null {
     const [installed, setInstalled] = useState<readonly SetupApp[] | null>(null);
     useEffect(() => {
         let live = true;
-        setupInstalledAction()
+        polls
+            .setupInstalled()
             .then((answer) => live && setInstalled(answer))
             // Without an answer the panel lists every app as not installed yet.
             .catch(() => live && setInstalled([]));

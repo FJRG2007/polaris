@@ -31,6 +31,7 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
+import * as polls from "./shared-polls";
 
 const CHANGE_TONE = {
     added: "text-success-ink",
@@ -96,7 +97,7 @@ function HistoryList({
 
     useEffect(() => {
         let live = true;
-        void listHistoryAction(target).then((result) => {
+        void polls.restoreHistory(target).then((result) => {
             if (!live) return;
             if (result.error || !result.points) setError(t("history.unavailable"));
             else setPoints(result.points);

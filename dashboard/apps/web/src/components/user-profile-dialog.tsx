@@ -26,6 +26,7 @@ import {
     type UserProfile
 } from "@/app/(app)/drive/activity-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./shared-polls";
 
 export function UserProfileDialog({
     userId,
@@ -50,7 +51,7 @@ export function UserProfileDialog({
         setLoading(true);
         setError(null);
         setReason("");
-        void getUserProfileAction(userId).then((result) => {
+        void polls.userProfile(userId).then((result) => {
             if (!active) return;
             if (result.error) setError(result.error);
             else setProfile(result.profile ?? null);

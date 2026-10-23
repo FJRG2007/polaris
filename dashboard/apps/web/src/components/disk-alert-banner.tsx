@@ -22,11 +22,8 @@ import { useLiveRead } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ActiveMoveView } from "@/lib/storage-moves/service";
 import { moveSize, movePhaseText, moveTarget } from "@/components/storage-move-words";
-import {
-    diskAlertsAction,
-    diskMovesAction,
-    freeDiskSpaceAction
-} from "@/app/(app)/disk-alert-actions";
+import { diskMovesAction, freeDiskSpaceAction } from "@/app/(app)/disk-alert-actions";
+import * as polls from "./shared-polls";
 
 /** A disk does not change between two glances; re-read after a clean-up. */
 const REFRESH_MS = 5 * 60_000;
@@ -52,7 +49,7 @@ export function DiskAlertBanner() {
     const [busy, setBusy] = useState<string | null>(null);
     const [said, setSaid] = useState<Record<string, { text: string; ok: boolean }>>({});
 
-    const load = useCallback(() => diskAlertsAction(), []);
+    const load = useCallback(() => polls.diskAlerts(), []);
     const { data, refresh } = useLiveRead<DiskReading[]>({
         load,
         cacheKey: "disk-alerts",
