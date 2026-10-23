@@ -22,6 +22,7 @@ import {
     setHostGroupMembersAction
 } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./servers-polls";
 
 interface Group {
     id: string;
@@ -45,7 +46,7 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
     const eligible = servers.filter((server) => server.kind === "host");
 
     useEffect(() => {
-        void listHostGroupsAction().then(setGroups);
+        void polls.hostGroups().then(setGroups);
     }, []);
 
     function reload() {

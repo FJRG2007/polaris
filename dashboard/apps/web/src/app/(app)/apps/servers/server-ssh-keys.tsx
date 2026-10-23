@@ -37,10 +37,10 @@ import {
 import {
     addServerKeysAction,
     generateServerKeyAction,
-    githubKeysAction,
     removeServerKeyAction,
     serverKeysAction
 } from "./ssh-key-actions";
+import * as polls from "./servers-polls";
 
 export function ServerSshKeys({ hostId }: { hostId: string }) {
     const t = useTranslations("servers");
@@ -508,7 +508,7 @@ function GithubDialog(props: {
         if (!open) return;
         let live = true;
         setState(null);
-        void githubKeysAction().then((result) => {
+        void polls.githubKeys().then((result) => {
             if (!live) return;
             setState(result);
             // Everything not already on the server starts ticked.

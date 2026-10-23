@@ -223,13 +223,40 @@ vi.mock("@/app/(app)/apps/deploy/deploy-polls", () => {
     };
 });
 
-vi.mock("@/app/(app)/apps/servers/servers-polls", () => {
-    const actions = () => import("@/app/(app)/apps/servers/actions");
-    return {
-        serverEdge: forward(actions, "serverEdgeAction", 1),
-        enrollmentStatus: forward(actions, "enrollmentStatusAction", 1)
-    };
-});
+vi.mock("@/app/(app)/apps/servers/servers-polls", () => ({
+    serverEdge: forward(() => import("@/app/(app)/apps/servers/actions"), "serverEdgeAction", 1),
+    enrollmentStatus: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "enrollmentStatusAction",
+        1
+    ),
+    removalPlan: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "serverRemovalPlanAction",
+        1
+    ),
+    hostGroups: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "listHostGroupsAction",
+        0
+    ),
+    followState: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "serverFollowStateAction",
+        1
+    ),
+    githubKeys: forward(
+        () => import("@/app/(app)/apps/servers/ssh-key-actions"),
+        "githubKeysAction",
+        0
+    ),
+    leftoverAutoRemove: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "leftoverAutoRemoveAction",
+        0
+    ),
+    sharedHost: forward(() => import("@/app/(app)/apps/servers/actions"), "sharedHostAction", 1)
+}));
 
 vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
     sessionScreen: forward(

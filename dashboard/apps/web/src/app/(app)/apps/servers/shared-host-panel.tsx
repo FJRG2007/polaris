@@ -10,7 +10,8 @@
 import { Switch } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { setSharedHostAction, sharedHostAction } from "./actions";
+import { setSharedHostAction } from "./actions";
+import * as polls from "./servers-polls";
 
 export function SharedHostPanel({ hostId }: { hostId: string }) {
     const t = useTranslations("servers");
@@ -19,7 +20,8 @@ export function SharedHostPanel({ hostId }: { hostId: string }) {
 
     useEffect(() => {
         let active = true;
-        void sharedHostAction(hostId)
+        void polls
+            .sharedHost(hostId)
             .then((result) => {
                 if (!active) return;
                 if (result.shared !== undefined) setShared(result.shared);

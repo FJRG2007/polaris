@@ -24,6 +24,7 @@ import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./servers-polls";
 
 export function ServerNotesPanel({ hostId }: { hostId: string }) {
     const t = useTranslations("servers");
@@ -86,7 +87,7 @@ function FollowToggle({ hostId }: { hostId: string }) {
 
     useEffect(() => {
         setFollowing(null);
-        void actions.serverFollowStateAction(hostId).then((state) => setFollowing(state.following));
+        void polls.followState(hostId).then((state) => setFollowing(state.following));
     }, [hostId]);
 
     if (following === null) return null;

@@ -46,7 +46,6 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     hostVolumesAction,
-    leftoverAutoRemoveAction,
     removeHostVolumeAction,
     setLeftoverAutoRemoveAction,
     removeStrayContainerAction,
@@ -54,6 +53,7 @@ import {
     uninstallLeftoversAction,
     volumeMovesAction
 } from "./actions";
+import * as polls from "./servers-polls";
 
 /** A disk does not change between two glances at it. */
 const REFRESH_MS = 60_000;
@@ -115,7 +115,8 @@ export function ServerStorage() {
 
     const readAutoRemove = useCallback(() => {
         setAutoRemoveUnread(false);
-        void leftoverAutoRemoveAction()
+        void polls
+            .leftoverAutoRemove()
             .then(setAutoRemoveShown)
             .catch(() => {
                 setAutoRemoveShown(null);

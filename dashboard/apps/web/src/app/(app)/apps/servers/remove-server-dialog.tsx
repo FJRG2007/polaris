@@ -15,9 +15,10 @@
 import { useEffect, useState, useTransition } from "react";
 import { ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, Loader2, Server, TriangleAlert } from "lucide-react";
-import { removeServerAction, serverRemovalPlanAction } from "./actions";
+import { removeServerAction } from "./actions";
 import type { RemoveServerResult, ServerRemovalMode, ServerRemovalPlan } from "@/lib/server-removal-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./servers-polls";
 
 /** The ways to remove a server, in the order they are offered; each one's words
  *  are `remove.modes.<mode>` in the `servers` catalog. */
@@ -48,7 +49,7 @@ export function RemoveServerDialog({
         setError(null);
         if (!server) return;
         let current = true;
-        void serverRemovalPlanAction(server.id).then((result) => {
+        void polls.removalPlan(server.id).then((result) => {
             if (!current) return;
             setPlan(result);
             setDestination(result?.destinations[0]?.id ?? "");

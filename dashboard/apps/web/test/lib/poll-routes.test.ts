@@ -124,7 +124,13 @@ const actions = vi.hoisted(() => {
         "loadFriendsAction",
         "loadFriendRequestsAction",
         "stepUpRemainingAction",
-        "trustedDeviceAction"
+        "trustedDeviceAction",
+        "serverRemovalPlanAction",
+        "listHostGroupsAction",
+        "serverFollowStateAction",
+        "githubKeysAction",
+        "leftoverAutoRemoveAction",
+        "sharedHostAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -175,7 +181,12 @@ vi.mock("@/app/(app)/apps/deploy/project-actions", () => ({
 }));
 vi.mock("@/app/(app)/apps/servers/actions", () => ({
     serverEdgeAction: actions.serverEdgeAction,
-    enrollmentStatusAction: actions.enrollmentStatusAction
+    enrollmentStatusAction: actions.enrollmentStatusAction,
+    serverRemovalPlanAction: actions.serverRemovalPlanAction,
+    listHostGroupsAction: actions.listHostGroupsAction,
+    serverFollowStateAction: actions.serverFollowStateAction,
+    leftoverAutoRemoveAction: actions.leftoverAutoRemoveAction,
+    sharedHostAction: actions.sharedHostAction
 }));
 vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
     sessionScreenAction: actions.sessionScreenAction
@@ -355,6 +366,9 @@ vi.mock("@/app/(app)/account/privacy/actions", () => ({
 vi.mock("@/app/(app)/account/sessions/actions", () => ({
     trustedDeviceAction: actions.trustedDeviceAction
 }));
+vi.mock("@/app/(app)/apps/servers/ssh-key-actions", () => ({
+    githubKeysAction: actions.githubKeysAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -488,7 +502,14 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/account/friends": () => import("@/app/api/account/friends/route"),
     "/api/account/friends/requests": () => import("@/app/api/account/friends/requests/route"),
     "/api/account/step-up/remaining": () => import("@/app/api/account/step-up/remaining/route"),
-    "/api/account/sessions/device": () => import("@/app/api/account/sessions/device/route")
+    "/api/account/sessions/device": () => import("@/app/api/account/sessions/device/route"),
+    "/api/servers/removal-plan": () => import("@/app/api/servers/removal-plan/route"),
+    "/api/servers/groups": () => import("@/app/api/servers/groups/route"),
+    "/api/servers/follow-state": () => import("@/app/api/servers/follow-state/route"),
+    "/api/servers/github-keys": () => import("@/app/api/servers/github-keys/route"),
+    "/api/servers/leftover-auto-remove": () =>
+        import("@/app/api/servers/leftover-auto-remove/route"),
+    "/api/servers/shared-host": () => import("@/app/api/servers/shared-host/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -1875,6 +1896,78 @@ const CASES: Case[] = [
             ).trustedDevice("deviceId-1"),
         action: "trustedDeviceAction",
         args: ["deviceId-1"]
+    },
+    {
+        name: "what removing a server would take with it",
+        path: "/api/servers/removal-plan",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/servers/servers-polls")>(
+                    "@/app/(app)/apps/servers/servers-polls"
+                )
+            ).removalPlan("hostId-1"),
+        action: "serverRemovalPlanAction",
+        args: ["hostId-1"]
+    },
+    {
+        name: "the owner's server groups",
+        path: "/api/servers/groups",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/servers/servers-polls")>(
+                    "@/app/(app)/apps/servers/servers-polls"
+                )
+            ).hostGroups(),
+        action: "listHostGroupsAction",
+        args: []
+    },
+    {
+        name: "whether the reader follows a server",
+        path: "/api/servers/follow-state",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/servers/servers-polls")>(
+                    "@/app/(app)/apps/servers/servers-polls"
+                )
+            ).followState("hostId-1"),
+        action: "serverFollowStateAction",
+        args: ["hostId-1"]
+    },
+    {
+        name: "the keys on the reader's linked GitHub accounts",
+        path: "/api/servers/github-keys",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/servers/servers-polls")>(
+                    "@/app/(app)/apps/servers/servers-polls"
+                )
+            ).githubKeys(),
+        action: "githubKeysAction",
+        args: []
+    },
+    {
+        name: "whether deleted apps' data is removed on its own",
+        path: "/api/servers/leftover-auto-remove",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/servers/servers-polls")>(
+                    "@/app/(app)/apps/servers/servers-polls"
+                )
+            ).leftoverAutoRemove(),
+        action: "leftoverAutoRemoveAction",
+        args: []
+    },
+    {
+        name: "whether a server is shared with containers Polaris did not start",
+        path: "/api/servers/shared-host",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/servers/servers-polls")>(
+                    "@/app/(app)/apps/servers/servers-polls"
+                )
+            ).sharedHost("hostId-1"),
+        action: "sharedHostAction",
+        args: ["hostId-1"]
     }
 ];
 
