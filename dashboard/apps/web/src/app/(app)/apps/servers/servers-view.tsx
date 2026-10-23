@@ -66,7 +66,8 @@ import {
     useDeferredFocus,
     ShortcutHint,
     shortcutPressed,
-    rowClickIntent
+    rowClickIntent,
+    TagList
 } from "@polaris/ui";
 
 /** How often reachability is re-checked. A server going down is worth noticing
@@ -376,7 +377,7 @@ export function ServersView({
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
-                                                <div className="flex flex-wrap items-center gap-1">
+                                                <TagList>
                                                     {server.authMethod ? (
                                                         <Badge variant="neutral">
                                                             {server.authMethod}
@@ -394,7 +395,7 @@ export function ServersView({
                                                             {t("list.root")}
                                                         </Badge>
                                                     ) : null}
-                                                </div>
+                                                </TagList>
                                             </td>
                                             <td className="px-3 py-2">
                                                 <div className="flex justify-end gap-1">

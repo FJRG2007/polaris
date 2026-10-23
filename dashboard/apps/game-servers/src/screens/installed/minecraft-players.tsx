@@ -78,7 +78,8 @@ import {
     Skeleton,
     Switch,
     cn,
-    useRowSelection
+    useRowSelection,
+    TagList
 } from "@polaris/ui";
 import {
     Backpack,
@@ -1429,7 +1430,7 @@ function PlayerRow({
                     )}
                 </td>
                 <td className="px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-1">
+                    <TagList>
                         {player.linkedTo && (
                             <Badge
                                 title={t("playersTab.linkedHint", {
@@ -1502,7 +1503,7 @@ function PlayerRow({
                                 {t("playersTab.waitingCount", { count: waiting })}
                             </Badge>
                         )}
-                    </div>
+                    </TagList>
                 </td>
                 <td className="hidden px-3 py-2 text-xs text-muted-foreground md:table-cell">
                     {/* Every place they play from, not the first one written down.
@@ -1511,11 +1512,11 @@ function PlayerRow({
                     {player.addresses.length === 0 ? (
                         "-"
                     ) : (
-                        <span className="flex flex-wrap gap-1">
+                        <TagList>
                             {player.addresses.map((address) => (
                                 <Badge key={address}>{schemaText(address)}</Badge>
                             ))}
-                        </span>
+                        </TagList>
                     )}
                 </td>
                 <td className="px-3 py-2">

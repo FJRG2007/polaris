@@ -38,7 +38,7 @@ export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";
 export { SizeField, type SizeFieldProps } from "./components/size-field";
 export { Textarea, type TextareaProps } from "./components/textarea";
-export { Badge, statusChipClass, type BadgeProps } from "./components/badge";
+export { Badge, TagList, statusChipClass, type BadgeProps } from "./components/badge";
 export { CopyButton, CopyIcon, useCopied } from "./components/copy-button";
 export {
     ENGLISH_UI_STRINGS,

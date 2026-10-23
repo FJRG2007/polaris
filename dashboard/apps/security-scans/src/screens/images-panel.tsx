@@ -12,7 +12,7 @@ import * as actions from "../actions/security";
 import type { SecurityTranslator } from "../lib/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { FindingsTable, type ImageFinding } from "./findings-table";
-import { Badge, Button, Card, CardBody, EmptyState, Skeleton } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, EmptyState, Skeleton, TagList } from "@polaris/ui";
 
 type Images = Extract<Awaited<ReturnType<typeof actions.serverImagesAction>>, { ok: true }>["data"];
 type Submit = (
@@ -182,7 +182,7 @@ export function ImagesPanel({
                                                               : t(`state.${scan.state}` as never)}
                                                       </span>
                                                   ) : (
-                                                      <span className="flex flex-wrap gap-1">
+                                                      <TagList>
                                                           {COUNTED.filter(
                                                               (sev) =>
                                                                   Number(counts?.[sev] ?? 0) > 0
@@ -209,7 +209,7 @@ export function ImagesPanel({
                                                                   {t("images.clean")}
                                                               </Badge>
                                                           ) : null}
-                                                      </span>
+                                                      </TagList>
                                                   )}
                                               </td>
                                               <td className="whitespace-nowrap px-2 py-1.5 text-right">
