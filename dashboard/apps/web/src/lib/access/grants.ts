@@ -669,6 +669,9 @@ export async function writeGrant(
     if (actions.some((action) => !reachable.includes(action))) {
         throw new GrantError("That is not something this can be shared as");
     }
+    if (!core.subjectPrincipals(subject).includes(input.principalType)) {
+        throw new GrantError("That is not something this can be shared as");
+    }
     if (!(await principalExists(input.principalType, input.principalId, orgIds))) {
         throw new GrantError(
             input.principalType === "user"

@@ -81,7 +81,8 @@ export const GRANT_SUBJECTS = [
     "place.room",
     "watch.connectivity",
     "watch.alarm",
-    "status.page"
+    "status.page",
+    "calendar.calendar"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -103,6 +104,21 @@ export function isGrantSubject(value: unknown): value is GrantSubject {
 export const GRANT_PRINCIPALS = ["user", "team", "role"] as const;
 
 export type GrantPrincipal = (typeof GRANT_PRINCIPALS)[number];
+
+/**
+ * Who a grant on a subject may be to, where that is not everybody. A subject
+ * whose app already keeps people and teams in a table of its own takes only
+ * what that table cannot hold, so the same person is never handed one thing
+ * twice in two places.
+ */
+export const GRANT_SUBJECT_PRINCIPALS: Partial<Record<GrantSubject, readonly GrantPrincipal[]>> = {
+    "calendar.calendar": ["role"]
+};
+
+/** The principals a grant on this subject may be to. */
+export function subjectPrincipals(subject: GrantSubject): readonly GrantPrincipal[] {
+    return GRANT_SUBJECT_PRINCIPALS[subject] ?? GRANT_PRINCIPALS;
+}
 
 /**
  * What a grant may hand over, per subject, weakest first.
@@ -162,7 +178,11 @@ export const GRANT_CAPABILITIES = {
     // One status page: its components, checks, incidents and maintenance, and
     // its title and address. Deleting it and its custom domain stay with the
     // people who run status pages.
-    "status.page": ["edit"]
+    "status.page": ["edit"],
+    // A calendar, handed to an organization's role: seeing every detail, or
+    // also changing its events. People and teams keep their own table
+    // (CalendarShare, with its four levels); a grant here is only ever a role.
+    "calendar.calendar": ["view", "edit"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -204,7 +224,8 @@ export const GRANT_ACTIONS = {
     "place.room": ["watch", "open", "close", "operate"],
     "watch.connectivity": [],
     "watch.alarm": [],
-    "status.page": []
+    "status.page": [],
+    "calendar.calendar": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

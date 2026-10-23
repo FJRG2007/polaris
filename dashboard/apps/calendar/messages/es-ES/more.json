@@ -539,6 +539,7 @@
         "wholeSeries": "Todas las fechas de la serie"
     },
     "shareDialog": {
+        "roles": "Dar a un rol",
         "add": "Añadir",
         "close": "Cerrar",
         "emailLabel": "Enviar el enlace",

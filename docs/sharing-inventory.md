@@ -41,7 +41,7 @@ reason).
 | Watch | Servers, services, containers (metrics, uptime) | `place.server`, `place.domain` | AccessGrant via Places device | AccessGrant link `/k` | shared-with marker in Watch (servers; a lent domain is read in Places, Watch lists no domains) | add | done |
 | Watch | Webhooks | - | none | none | - | no: carries delivery secrets | - |
 | Status pages | Status page (editors) | `status.page` | `status.manage` holders (every page) | public page itself | editors (edit one page; create, delete, domain stay with `status.manage`) | add | done |
-| Calendar | Calendar | - | `CalendarShare` (user, team) | none | dialog fronting CalendarShare, roles, link (read-only feed) | add | todo |
+| Calendar | Calendar | `calendar.calendar` | `CalendarShare` (user, team, four levels) + AccessGrant for org roles | published link `/cal/p/<token>` (busy or full, rotate, mail) | roles (the shared dialog, limited to roles; people and teams stay in CalendarShare) | add | done |
 | Calendar | Booking page | - | owner | public booking page | co-hosts | add | todo |
 | CRM | Company, person, opportunity | - | org roles (`CrmRoleRule`) | none | per-record people share | add | todo |
 | CRM | Dashboard | - | org shelf | none | people + link | add | todo |

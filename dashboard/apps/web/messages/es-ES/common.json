@@ -61,7 +61,8 @@
             "place.room": "una sala",
             "watch.connectivity": "el registro de conexión",
             "watch.alarm": "una alarma",
-            "status.page": "una página de estado"
+            "status.page": "una página de estado",
+            "calendar.calendar": "un calendario"
         }
     },
     "mentions": {

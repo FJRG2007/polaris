@@ -119,6 +119,16 @@ export async function requireMayShare(
             if (!alarm) throw new GrantError("You cannot share that");
             return;
         }
+        case "calendar.calendar": {
+            // A calendar's owner hands it to a role; the people and teams it
+            // is shared with are kept, and shared, by the Calendar itself.
+            const calendar = await prisma.calendar.findFirst({
+                where: { id: subjectId, ownerId: user.id, trashedAt: null },
+                select: { id: true }
+            });
+            if (!calendar) throw new GrantError("You cannot share that");
+            return;
+        }
         case "status.page": {
             // Whoever runs status pages decides who else keeps one up to date.
             if (!(await sessionCan(user, "status.manage"))) {
@@ -370,6 +380,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return "/watch/alarms";
         case "status.page":
             return `/status-pages/${subjectId}`;
+        case "calendar.calendar":
+            return "/calendar";
         case "office.document":
             return "/office/shared";
         case "place.ups":

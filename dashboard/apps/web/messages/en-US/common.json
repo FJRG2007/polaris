@@ -61,7 +61,8 @@
             "place.room": "a room",
             "watch.connectivity": "the connectivity record",
             "watch.alarm": "an alarm",
-            "status.page": "a public status page"
+            "status.page": "a public status page",
+            "calendar.calendar": "a calendar"
         }
     },
     "mentions": {

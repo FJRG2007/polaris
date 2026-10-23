@@ -539,6 +539,7 @@
         "wholeSeries": "Every date in the series"
     },
     "shareDialog": {
+        "roles": "Share with a role",
         "add": "Share",
         "close": "Close",
         "emailLabel": "Email the link",

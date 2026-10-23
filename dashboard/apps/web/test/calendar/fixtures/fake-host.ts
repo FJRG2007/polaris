@@ -210,6 +210,11 @@ export const host = {
         }
     },
     domainService: { appBaseUrl: async () => "https://polaris.example.test" },
+    // No calendar is handed to a role here; the role path has its own test.
+    accessGrants: {
+        grantedSubjects: async () => new Map<string, string>(),
+        dropGrantsFor: async () => undefined
+    },
     calendarHost: {
         teamIdsOf: async (userId: string) =>
             [...fake.teams.entries()]

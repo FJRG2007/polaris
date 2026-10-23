@@ -35,6 +35,8 @@ import {
 } from "@polaris/ui";
 import * as sharing from "../../actions/sharing";
 
+const { ShareDialog } = hostUi.accessShareDialog;
+
 const LEVELS: readonly ShareLevel[] = ["freebusy", "read", "write", "manage"];
 
 type Target =
@@ -51,24 +53,52 @@ export function ShareCalendarDialog({
     onChanged
 }: CalendarDialogSlotProps) {
     const t = useCalendarT();
+    const [roles, setRoles] = useState(false);
+    const isOwner = calendar.reach === "owner";
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{t("shareDialog.title", { name: calendar.name })}</DialogTitle>
-                    <DialogDescription>{t("shareDialog.lead")}</DialogDescription>
-                </DialogHeader>
-                {calendar.kind === "resource" ? (
-                    <StatusNote tone="neutral">{t("shareDialog.notForRooms")}</StatusNote>
-                ) : open ? (
-                    <SharePanel
-                        calendarId={calendar.id}
-                        isOwner={calendar.reach === "owner"}
-                        onChanged={onChanged}
-                    />
-                ) : null}
-            </DialogContent>
-        </Dialog>
+        <>
+            <Dialog open={open && !roles} onOpenChange={onOpenChange}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{t("shareDialog.title", { name: calendar.name })}</DialogTitle>
+                        <DialogDescription>{t("shareDialog.lead")}</DialogDescription>
+                    </DialogHeader>
+                    {calendar.kind === "resource" ? (
+                        <StatusNote tone="neutral">{t("shareDialog.notForRooms")}</StatusNote>
+                    ) : open ? (
+                        <>
+                            <SharePanel
+                                calendarId={calendar.id}
+                                isOwner={isOwner}
+                                onChanged={onChanged}
+                            />
+                            {isOwner ? (
+                                <div className="flex justify-end">
+                                    <Button variant="outline" size="sm" onClick={() => setRoles(true)}>
+                                        {t("shareDialog.roles")}
+                                    </Button>
+                                </div>
+                            ) : null}
+                        </>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
+            {/* An organization role is the one audience CalendarShare cannot
+                hold, so it goes through the dialog every app shares with,
+                limited to roles. */}
+            {isOwner && roles ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(next) => {
+                        if (!next) setRoles(false);
+                    }}
+                    subject="calendar.calendar"
+                    subjectId={calendar.id}
+                    name={calendar.name}
+                    principals={["role"]}
+                />
+            ) : null}
+        </>
     );
 }
 
