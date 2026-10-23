@@ -68,9 +68,7 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
             <LinkUnavailable
                 title={tc("publicShell.unavailable")}
                 message={
-                    usable.reason === "expired"
-                        ? t("dropPoint.expired")
-                        : t("dropPoint.closed")
+                    usable.reason === "expired" ? t("dropPoint.expired") : t("dropPoint.closed")
                 }
             />
         );
@@ -124,9 +122,7 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                             <CardTitle>{request.title}</CardTitle>
                         </CardHeader>
                         <CardBody className="flex flex-col gap-3 text-sm">
-                            <p className="text-muted-foreground">
-                                {t("dropPoint.signInFirst")}
-                            </p>
+                            <p className="text-muted-foreground">{t("dropPoint.signInFirst")}</p>
                             <Link
                                 href={signInHref(`/r/${token}`)}
                                 className="inline-flex w-fit items-center rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/90"
@@ -174,7 +170,9 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                         {deniedExtensions.length > 0 ? (
                             <Badge variant="neutral">
                                 {t("dropPoint.denied", {
-                                    extensions: deniedExtensions.map((extension) => `.${extension}`).join(" ")
+                                    extensions: deniedExtensions
+                                        .map((extension) => `.${extension}`)
+                                        .join(" ")
                                 })}
                             </Badge>
                         ) : null}
@@ -183,11 +181,15 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                         </Badge>
                         {minSizeBytes > 0 ? (
                             <Badge variant="neutral">
-                                {t("dropPoint.atLeast", { size: formatBytes(BigInt(minSizeBytes)) })}
+                                {t("dropPoint.atLeast", {
+                                    size: formatBytes(BigInt(minSizeBytes))
+                                })}
                             </Badge>
                         ) : null}
                         {request.maxFiles !== null ? (
-                            <Badge variant="neutral">{t("dropPoint.maxFiles", { count: request.maxFiles })}</Badge>
+                            <Badge variant="neutral">
+                                {t("dropPoint.maxFiles", { count: request.maxFiles })}
+                            </Badge>
                         ) : null}
                         {request.expiresAt ? (
                             <Badge variant="neutral">
