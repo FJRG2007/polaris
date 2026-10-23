@@ -141,13 +141,13 @@ function storeList(webLocale: string, showcase: site.ShowcaseSection[]): site.Si
             const alt = t("detail.screenshotAlt", { name: app.name, index: index + 1 });
             return existsSync(join(media, dark))
                 ? [
-                      {
+                      withPhone({
                           name: alt,
                           caption: "",
                           dark,
                           light: existsSync(join(media, light)) ? light : null,
                           alt
-                      }
+                      })
                   ]
                 : [];
         });
@@ -300,16 +300,33 @@ function captured(scene: string, webLocale: string): site.ShowcaseItem[] {
             name = match[1]!.trim();
         const alt = at[1] ?? "";
         return [
-            {
+            withPhone({
                 name: name || alt,
                 caption: name ? alt : "",
                 dark,
                 light: existsSync(join(media, light)) ? light : null,
                 alt
-            }
+            })
         ];
     }
     return [];
+}
+
+/** The phone capture taken beside a desktop one, when there is one. */
+function phoneOf(file: string | null): string | null {
+    if (!file?.endsWith("-desktop.webp")) return null;
+    const phone = file.replace(/-desktop\.webp$/, "-mobile.webp");
+    return existsSync(join(media, phone)) ? phone : null;
+}
+
+/** `item` with its phone captures, which a page shows under 640 px as the dashboard does. */
+function withPhone(item: site.ShowcaseItem): site.ShowcaseItem {
+    return { ...item, darkMobile: phoneOf(item.dark), lightMobile: phoneOf(item.light) };
+}
+
+/** Every picture of a README section with its phone captures. */
+function withPhones(sections: site.ShowcaseSection[]): site.ShowcaseSection[] {
+    return sections.map((section) => ({ ...section, items: section.items.map(withPhone) }));
 }
 
 /** The dashboard's marketplace words the built-in row and an app's page use. */
@@ -457,10 +474,9 @@ async function guides(spanish: boolean): Promise<docs.DocPage[]> {
 }
 const [docsEn, docsEs] = await Promise.all([guides(false), guides(true)]);
 
-const showcaseEn = localize(site.parseShowcase(readmeEn), "en");
-const showcaseEsLocal = localize(
-    showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn),
-    "es"
+const showcaseEn = withPhones(localize(site.parseShowcase(readmeEn), "en"));
+const showcaseEsLocal = withPhones(
+    localize(showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn), "es")
 );
 
 const data: site.SiteData = {
@@ -513,11 +529,13 @@ const pictures = new Set<string>();
 for (const locale of Object.values(data.locales))
     for (const section of locale.showcase)
         for (const item of section.items)
-            for (const file of [item.dark, item.light]) if (file) pictures.add(file);
+            for (const file of [item.dark, item.light, item.darkMobile, item.lightMobile])
+                if (file) pictures.add(file);
 for (const locale of Object.values(data.locales))
     for (const app of [...locale.builtIn, ...locale.apps])
         for (const item of app.shots)
-            for (const file of [item.dark, item.light]) if (file) pictures.add(file);
+            for (const file of [item.dark, item.light, item.darkMobile, item.lightMobile])
+                if (file) pictures.add(file);
 for (const file of docMedia) pictures.add(file);
 for (const file of pictures)
     copyFileSync(join(media, file), join(siteDir, "public", "media", file));

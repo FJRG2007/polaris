@@ -224,6 +224,9 @@ export interface ShowcaseItem {
     /** Media file names under docs/assets/media. */
     readonly dark: string;
     readonly light: string | null;
+    /** The phone captures beside them, shown under 640 px; absent when none was taken. */
+    readonly darkMobile?: string | null;
+    readonly lightMobile?: string | null;
     readonly alt: string;
 }
 

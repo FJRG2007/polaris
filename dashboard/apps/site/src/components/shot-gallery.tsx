@@ -18,7 +18,13 @@ export interface Shot {
     /** Addresses, already under the site's base path. */
     readonly dark: string;
     readonly light: string | null;
+    /** The phone captures, drawn under 640 px like the dashboard's gallery. */
+    readonly darkMobile?: string | null;
+    readonly lightMobile?: string | null;
 }
+
+/** Up to this width a phone capture replaces the desktop one, as in the dashboard. */
+const PHONE = "(max-width: 640px)";
 
 export interface ViewerWords {
     readonly zoomIn: string;
@@ -42,6 +48,22 @@ function shown(shot: Shot): string {
 export function ShotPicture({ shot, className }: { shot: Shot; className?: string }) {
     return (
         <picture>
+            {shot.lightMobile ? (
+                <source
+                    media={`${PHONE} and (prefers-color-scheme: light)`}
+                    srcSet={shot.lightMobile}
+                />
+            ) : null}
+            {shot.darkMobile ? (
+                <source
+                    media={
+                        shot.light && !shot.lightMobile
+                            ? `${PHONE} and (prefers-color-scheme: dark)`
+                            : PHONE
+                    }
+                    srcSet={shot.darkMobile}
+                />
+            ) : null}
             {shot.light ? (
                 <source media="(prefers-color-scheme: light)" srcSet={shot.light} />
             ) : null}

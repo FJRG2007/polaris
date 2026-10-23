@@ -32,7 +32,9 @@ function shot(item: ShowcaseItem): Shot {
         caption: item.caption,
         alt: item.alt,
         dark: asset(`media/${item.dark}`),
-        light: item.light ? asset(`media/${item.light}`) : null
+        light: item.light ? asset(`media/${item.light}`) : null,
+        darkMobile: item.darkMobile ? asset(`media/${item.darkMobile}`) : null,
+        lightMobile: item.lightMobile ? asset(`media/${item.lightMobile}`) : null
     };
 }
 
