@@ -12,7 +12,7 @@ import { LikelyCause } from "./likely-cause";
 import { DeployFailureLine } from "./deploy-failure";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { isInFlightStatus } from "@/lib/deploy/status";
-import { deployFreshnessAction, imageUpdateAction } from "./glance-actions";
+import * as polls from "./deploy-polls";
 import { useEffect, useState, type ReactNode } from "react";
 import type { DeployFreshness } from "@/lib/deploy/freshness";
 import type { DeploymentSummary } from "@/lib/deploy-service";
@@ -46,7 +46,7 @@ function useFreshness(applicationId: string, sha: string | null): DeployFreshnes
             return;
         }
         let active = true;
-        void deployFreshnessAction(applicationId)
+        void polls.deployFreshness(applicationId)
             .catch(() => null)
             .then((result) => {
                 freshnessCache.set(key, { at: Date.now(), value: result });
@@ -72,7 +72,7 @@ function useImageUpdate(
             return;
         }
         let active = true;
-        void imageUpdateAction(applicationId)
+        void polls.imageUpdate(applicationId)
             .catch(() => null)
             .then((result) => {
                 if (active) setValue(result);

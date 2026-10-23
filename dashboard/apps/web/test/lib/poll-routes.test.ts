@@ -14,6 +14,8 @@ const actions = vi.hoisted(() => {
         "cutoverPanelAction",
         "refreshExternalServiceAction",
         "projectGlanceAction",
+        "deployFreshnessAction",
+        "imageUpdateAction",
         "listDeploymentsAction",
         "listPromotionsAction",
         "serverEdgeAction",
@@ -55,7 +57,9 @@ vi.mock("@/app/(app)/apps/deploy/external-actions", () => ({
     refreshExternalServiceAction: actions.refreshExternalServiceAction
 }));
 vi.mock("@/app/(app)/apps/deploy/glance-actions", () => ({
-    projectGlanceAction: actions.projectGlanceAction
+    projectGlanceAction: actions.projectGlanceAction,
+    deployFreshnessAction: actions.deployFreshnessAction,
+    imageUpdateAction: actions.imageUpdateAction
 }));
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
     listDeploymentsAction: actions.listDeploymentsAction
@@ -113,6 +117,8 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/deploy/external-services/status": () =>
         import("@/app/api/deploy/external-services/status/route"),
     "/api/deploy/projects/glance": () => import("@/app/api/deploy/projects/glance/route"),
+    "/api/deploy/freshness": () => import("@/app/api/deploy/freshness/route"),
+    "/api/deploy/image-update": () => import("@/app/api/deploy/image-update/route"),
     "/api/deploy/deployments": () => import("@/app/api/deploy/deployments/route"),
     "/api/deploy/promotions": () => import("@/app/api/deploy/promotions/route"),
     "/api/servers/edge": () => import("@/app/api/servers/edge/route"),
@@ -212,6 +218,20 @@ const CASES: Case[] = [
         ask: async () => (await deploy()).projectGlance("project-1"),
         action: "projectGlanceAction",
         args: ["project-1"]
+    },
+    {
+        name: "a service's freshness against its branch",
+        path: "/api/deploy/freshness",
+        ask: async () => (await deploy()).deployFreshness("app-1"),
+        action: "deployFreshnessAction",
+        args: ["app-1"]
+    },
+    {
+        name: "a service's newer image",
+        path: "/api/deploy/image-update",
+        ask: async () => (await deploy()).imageUpdate("app-1"),
+        action: "imageUpdateAction",
+        args: ["app-1"]
     },
     {
         name: "a service's deployments",
