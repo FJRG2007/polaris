@@ -46,7 +46,7 @@ reason).
 | CRM | Company, person, opportunity | `crm.record` | org roles (`CrmRoleRule`) + AccessGrant per record | none | per-record people share (its fields, read; timeline, related records and changes stay on the shelf) | add | done |
 | CRM | Dashboard | `crm.dashboard` | org shelf + AccessGrant per dashboard | none | people (view its charts, counted as a reader of only the kinds they count; a public link is not built) | add | done |
 | Automations | Automation | `automation.automation` | org shelf + AccessGrant per automation | none | people (view its steps, versions and runs; editing is not shared, as an automation runs as whoever published it; a folder is not shared) | add | done |
-| Analytics | Site | - | org shelf | none | people + public link | add | todo |
+| Analytics | Site | `analytics.site` | whoever sees the service + AccessGrant per service | none | people (view its numbers; the tracker switch and key stay with whoever configures it; a public link is not built) | add | done |
 | Telemetry | Project | - | org shelf | none | people (view) | add | todo |
 | Deploy | Project | - | `ProjectMember` | none | dialog fronting ProjectMember | add | todo |
 | Deploy | Service | - | through its project | none | - | no: reached through its project | - |

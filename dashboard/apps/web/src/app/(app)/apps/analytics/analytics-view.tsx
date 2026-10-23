@@ -20,6 +20,7 @@ import { HeaderPortal } from "@/components/header-portal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { ShareDialog } from "@/components/access/share-dialog";
 import {
     ANALYTICS_SCOPES,
     scopeNeedsTarget,
@@ -40,6 +41,7 @@ import {
     Globe,
     MonitorSmartphone,
     RefreshCw,
+    Share2,
     ShieldCheck,
     TrendingUp
 } from "lucide-react";
@@ -109,6 +111,7 @@ export function AnalyticsView({
     // nothing to measure - and the difference is a dropdown that says "no services
     // yet" to somebody who has forty.
     const [services, setServices] = useState<SiteOption[] | null>(null);
+    const [sharing, setSharing] = useState(false);
 
     // After the screen, never before it: this walks every project the account can
     // reach, and it only fills the picker in the header.
@@ -206,12 +209,35 @@ export function AnalyticsView({
                         </span>
                     ) : null}
                 </div>
+                {data?.shared ? <Badge variant="neutral">{t("view.sharedWithYou")}</Badge> : null}
                 <SitePicker
                     scope={scope}
                     siteId={siteId}
                     services={services}
                     canOperate={canOperate}
                 />
+                {data?.canShare && scope === "application" && siteId ? (
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("view.share")}
+                        title={t("view.share")}
+                        onClick={() => setSharing(true)}
+                    >
+                        <Share2 aria-hidden="true" />
+                    </Button>
+                ) : null}
+                {sharing && data ? (
+                    <ShareDialog
+                        open
+                        onOpenChange={(open) => {
+                            if (!open) setSharing(false);
+                        }}
+                        subject="analytics.site"
+                        subjectId={siteId}
+                        name={data.site.name}
+                    />
+                ) : null}
                 <RangeTabs range={range} />
             </div>
 

@@ -66,7 +66,8 @@
             "calendar.booking": "a page for bookings",
             "crm.record": "a record in the CRM",
             "crm.dashboard": "a CRM dashboard",
-            "automation.automation": "a saved automation"
+            "automation.automation": "a saved automation",
+            "analytics.site": "a site's visitor numbers"
         }
     },
     "mentions": {

@@ -86,7 +86,8 @@ export const GRANT_SUBJECTS = [
     "calendar.booking",
     "crm.record",
     "crm.dashboard",
-    "automation.automation"
+    "automation.automation",
+    "analytics.site"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -200,7 +201,10 @@ export const GRANT_CAPABILITIES = {
     "crm.dashboard": ["view"],
     // One automation: its steps, its versions and its runs. Changing, publishing,
     // switching and running it stay on its shelf, as it runs as whoever published it.
-    "automation.automation": ["view"]
+    "automation.automation": ["view"],
+    // One service's visitor numbers: its traffic, pages, sources and recent visits.
+    // Switching its tracker and rotating its key stay with whoever configures it.
+    "analytics.site": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -247,7 +251,8 @@ export const GRANT_ACTIONS = {
     "calendar.booking": [],
     "crm.record": [],
     "crm.dashboard": [],
-    "automation.automation": []
+    "automation.automation": [],
+    "analytics.site": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

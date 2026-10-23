@@ -11,6 +11,8 @@
         "r12m": "Últimos 12 meses"
     },
     "view": {
+        "share": "Dar acceso",
+        "sharedWithYou": "Compartido contigo",
         "title": "Analítica",
         "online": "{count} en línea",
         "noServices": "Aún no hay servicios. Despliega uno y sus visitas aparecerán aquí solas, sin añadir ningún script.",

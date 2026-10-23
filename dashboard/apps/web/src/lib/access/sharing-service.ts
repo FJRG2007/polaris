@@ -21,6 +21,7 @@ import * as core from "@polaris/core";
 import { sessionCan } from "@/lib/session";
 import type { SessionUser } from "@/lib/session";
 import { GrantError } from "@/lib/access/grants";
+import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { mayEditShelf as mayEditAutomationShelf } from "@/lib/automations/runner";
 import { memberOrgIds, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
 import { requireSpace as requireNoteSpace } from "@/lib/notes/access";
@@ -189,6 +190,19 @@ export async function requireMayShare(
             if (!row || !(await mayEditAutomationShelf(user, row))) {
                 throw new GrantError("You cannot share that");
             }
+            return;
+        }
+        case "analytics.site": {
+            // Whoever may configure a service decides who else reads its numbers.
+            const configurable = await requireApplicationAccess(
+                subjectId,
+                user.id,
+                "service.configure"
+            ).then(
+                () => true,
+                () => false
+            );
+            if (!configurable) throw new GrantError("You cannot share that");
             return;
         }
         case "crm.dashboard": {
@@ -474,6 +488,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         }
         case "crm.dashboard":
             return "/crm/dashboards";
+        case "analytics.site":
+            return `/apps/analytics?scope=application&id=${encodeURIComponent(subjectId)}`;
         case "automation.automation":
             return `/automations/${subjectId}`;
         case "office.document":

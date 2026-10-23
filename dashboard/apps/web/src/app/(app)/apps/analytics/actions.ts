@@ -16,6 +16,8 @@ import { listProjectScopes, visibleApplication } from "@/lib/deploy-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import type { SiteOption } from "./site-catalog";
 import { requirePermission, userHasManage } from "@/lib/session";
+import { grantedSubjects } from "@/lib/access/grants";
+import { requireAnalyticsReader } from "./reader";
 import { analyticsSettingsSchema, visitRangeSchema, type VisitRange } from "@polaris/core";
 import {
     getAnalyticsSettings,
@@ -37,6 +39,27 @@ async function say(key: NamespaceKey<"analytics">): Promise<string> {
 }
 
 const ANALYTICS_PATH = "/apps/analytics";
+
+/** A service shared with this reader, measured as its owner sees it. */
+async function lentSite(userId: string, scopeId: string): Promise<AnalyticsSiteView | null> {
+    const held = await grantedSubjects(userId, "analytics.site");
+    if (!held.has(scopeId)) return null;
+    const application = await prisma.application.findUnique({
+        where: { id: scopeId },
+        select: { id: true, name: true }
+    });
+    if (!application) return null;
+    const domains = await prisma.domain.findMany({
+        where: { applicationId: application.id, enabled: true },
+        select: { hostname: true }
+    });
+    return ensureAnalyticsSite(
+        "application",
+        application.id,
+        application.name,
+        domains.map((domain) => domain.hostname.toLowerCase())
+    );
+}
 
 const scopeSchema = z.object({
     scopeType: z.enum(["application", "polaris"]),
@@ -67,7 +90,7 @@ async function resolveSite(
         );
     }
     const application = await visibleApplication(scopeId, userId);
-    if (!application) return null;
+    if (!application) return lentSite(userId, scopeId);
     const domains = await prisma.domain.findMany({
         where: { applicationId: application.id, enabled: true },
         select: { hostname: true }
@@ -115,6 +138,10 @@ export interface AnalyticsOverview {
     readonly recent: Awaited<ReturnType<typeof recentVisits>>;
     readonly settings: Awaited<ReturnType<typeof getAnalyticsSettings>>;
     readonly canOperate: boolean;
+    /** Whether this reader may share the service's numbers: they configure it. */
+    readonly canShare: boolean;
+    /** The service's numbers were shared with this reader. */
+    readonly shared: boolean;
 }
 
 /** Everything one screen shows, in one round trip. */
@@ -128,7 +155,15 @@ export interface AnalyticsOverview {
  * dropdown.
  */
 export async function listAnalyticsSitesAction(): Promise<{ sites: SiteOption[] }> {
-    const user = await requirePermission("deploy.manage");
+    const { user, lent } = await requireAnalyticsReader();
+    if (lent) {
+        const rows = await prisma.application.findMany({
+            where: { id: { in: [...lent] } },
+            orderBy: { name: "asc" },
+            select: { id: true, name: true }
+        });
+        return { sites: rows.map((row) => ({ id: row.id, label: row.name })) };
+    }
     const projects = await listProjectScopes(user.id);
     const sites: SiteOption[] = [];
     for (const project of projects) {
@@ -149,7 +184,7 @@ export async function getAnalyticsOverviewAction(input: {
     scopeId: string;
     range: string;
 }): Promise<AnalyticsOverview | { error: string }> {
-    const user = await requirePermission("deploy.manage");
+    const { user } = await requireAnalyticsReader();
     const canOperate = await userHasManage(user, "system.manage");
     const scope = scopeSchema.safeParse({ scopeType: input.scopeType, scopeId: input.scopeId });
     if (!scope.success) return { error: await say("errors.notMeasured") };
@@ -159,12 +194,24 @@ export async function getAnalyticsOverviewAction(input: {
     const site = await resolveSite(user.id, canOperate, scope.data.scopeType, scope.data.scopeId);
     if (!site) return { error: await say("errors.notYoursToSee") };
 
-    const [view, recent, settings] = await Promise.all([
+    const configurable =
+        scope.data.scopeType === "application"
+            ? requireApplicationAccess(scope.data.scopeId, user.id, "service.configure").then(
+                  () => true,
+                  () => false
+              )
+            : Promise.resolve(false);
+    const [view, recent, settings, canShare, visible] = await Promise.all([
         readAnalytics(site, range.data),
         recentVisits(site.id),
-        getAnalyticsSettings()
+        getAnalyticsSettings(),
+        configurable,
+        scope.data.scopeType === "application"
+            ? visibleApplication(scope.data.scopeId, user.id)
+            : Promise.resolve(null)
     ]);
-    return { site, range: range.data, view, recent, settings, canOperate };
+    const shared = scope.data.scopeType === "application" && !visible;
+    return { site, range: range.data, view, recent, settings, canOperate, canShare, shared };
 }
 
 export async function setTrackerEnabledAction(input: {
