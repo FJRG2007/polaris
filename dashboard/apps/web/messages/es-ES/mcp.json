@@ -271,6 +271,7 @@
         "tasks_reminder_cancel": "Cancelar un recordatorio",
         "watch_alarms": "Ver alarmas de vigilancia",
         "watch_alarm_create": "Crear alarma de vigilancia",
-        "watch_alarm_change": "Activar, desactivar o borrar una alarma de vigilancia"
+        "watch_alarm_change": "Activar, desactivar o borrar una alarma de vigilancia",
+        "watch_connectivity": "Ver conexión a internet"
     }
 }
