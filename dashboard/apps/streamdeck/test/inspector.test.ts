@@ -183,6 +183,71 @@ describe("the settings screen", () => {
         });
     });
 
+    it("lists Polaris's timers as soon as the source is switched to Polaris", () => {
+        const { dom, sent, listeners } = openScreen("timer");
+        listeners.get("message")?.({
+            data: JSON.stringify({
+                event: "sendToPropertyInspector",
+                payload: {
+                    type: "status",
+                    link: "online",
+                    address: "https://polaris.example.com",
+                    account: "Ana",
+                    connecting: { phase: "idle" },
+                    update: null,
+                    catalogue: [
+                        {
+                            id: "calendar.timer",
+                            kind: "toggle",
+                            area: "tools",
+                            label: "Calendar timer",
+                            icon: "timer",
+                            live: true,
+                            options: [
+                                {
+                                    name: "timer",
+                                    type: "choice",
+                                    label: "Timer",
+                                    required: true,
+                                    choices: [
+                                        { value: "new", label: "A new timer" },
+                                        { value: "focus", label: "Focus cycle" },
+                                        { value: "t1", label: "Tea" }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            })
+        });
+        const document = dom.window.document;
+        const source = document.querySelector("select") as InstanceType<
+            typeof dom.window.HTMLSelectElement
+        >;
+        source.value = "polaris";
+        source.dispatchEvent(new dom.window.Event("change"));
+        // Nothing comes back from the app: the screen draws the Polaris fields itself.
+        const options = [...document.querySelectorAll("select option")].map(
+            (option) => option.textContent
+        );
+        expect(options).toEqual(expect.arrayContaining(["A new timer", "Focus cycle", "Tea"]));
+        expect(
+            sent.filter((message) => message.event === "setSettings").at(-1)?.payload
+        ).toMatchObject({
+            source: "polaris"
+        });
+
+        // Picking one of the account's timers drops the new timer's name field.
+        expect(document.querySelector('input[type="text"]')).not.toBeNull();
+        const timer = document.querySelectorAll("select")[1] as InstanceType<
+            typeof dom.window.HTMLSelectElement
+        >;
+        timer.value = "t1";
+        timer.dispatchEvent(new dom.window.Event("change"));
+        expect(document.querySelector('input[type="text"]')).toBeNull();
+    });
+
     it("draws more presses for a key and saves a double press with its window", () => {
         const { dom, sent, listeners } = openScreen("key");
         const fan = (id: string, label: string, kind = "run") => ({
