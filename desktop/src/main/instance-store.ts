@@ -6,8 +6,9 @@
  * have none, which is exactly the day they are needed. So the record - the id,
  * the public key and the addresses, none of them secret - is written beside the
  * settings and read back on the first call. An alternate is still used only after
- * it signs a fresh challenge with that key, so a tampered file can at worst cost
- * the fallback, never send the key somewhere else.
+ * it signs a fresh challenge with that key - which proves continuity with this
+ * file and nothing more: whoever can write it can name their own key and address
+ * and have the API key sent there, so it is written readable by this user only.
  *
  * The file path is a parameter so this stays testable without Electron.
  */
@@ -15,13 +16,12 @@
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readInstance, type InstanceRecord } from "../../../dashboard/packages/core/src/instance-fallback";
 
+export { RELEARN_MS } from "../../../dashboard/packages/core/src/instance-fallback";
+
 export interface StoredInstance {
     readonly record: InstanceRecord;
     readonly learnedAt: number;
 }
-
-/** How long a stored record is trusted before it is learned again over the server's own address. */
-export const RELEARN_MS = 24 * 60 * 60_000;
 
 /** Every stored record, keyed by server origin. Anything malformed is left out. */
 export function readInstances(file: string): Map<string, StoredInstance> {

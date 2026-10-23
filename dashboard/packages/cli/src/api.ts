@@ -40,10 +40,11 @@ let toldLocal = false;
 function failoverFor(connection: Connection, doFetch: Fetch, timeoutMs: number): Failover | null {
     const instance = readInstance(connection.instance);
     if (!instance) return null;
-    let failover = failovers.get(connection.url);
+    const key = [connection.url, instance.id, instance.publicKey, ...instance.addresses].join(" ");
+    let failover = failovers.get(key);
     if (!failover) {
         failover = createFailover({ primary: connection.url, instance, fetch: doFetch, timeoutMs });
-        failovers.set(connection.url, failover);
+        failovers.set(key, failover);
     }
     return failover;
 }
@@ -178,9 +179,19 @@ export async function send(
             // points. The address it names is reported instead, to sign in with.
             redirect: "manual"
         };
+        const bodyTimeout = new AbortController();
         const response = failover
-            ? await failover.request(path, init)
-            : await doFetch(`${connection.url}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+            ? await failover.request(path, { ...init, signal: bodyTimeout.signal })
+            : await doFetch(`${connection.url}${path}`, {
+                  ...init,
+                  signal: AbortSignal.timeout(timeoutMs)
+              });
+        if (failover) {
+            const deadline = AbortSignal.timeout(timeoutMs);
+            deadline.addEventListener("abort", () => bodyTimeout.abort(deadline.reason), {
+                once: true
+            });
+        }
         const status = failover?.status();
         if (status?.local && !toldLocal) {
             toldLocal = true;

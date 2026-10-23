@@ -37,6 +37,8 @@ export const DEFAULT_HOLD_MS = 60_000;
 export const DEFAULT_VERIFIED_MS = 10 * 60_000;
 /** How long a request to one address may take before the next one is tried. */
 export const DEFAULT_TIMEOUT_MS = 8_000;
+/** How often a client asks its usual address again, so a local address that moved is picked up. */
+export const RELEARN_MS = 24 * 60 * 60_000;
 
 /** Shown while a client is on an address other than the one it was given. */
 export const USING_LOCAL_WORDS = "Using your local network address";
@@ -188,8 +190,13 @@ async function timedFetch(
     timeoutMs: number
 ): Promise<Response> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new DOMException("timed out", "TimeoutError")), timeoutMs);
-    const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal;
+    const timer = setTimeout(
+        () => controller.abort(new DOMException("timed out", "TimeoutError")),
+        timeoutMs
+    );
+    const signal = init.signal
+        ? AbortSignal.any([init.signal, controller.signal])
+        : controller.signal;
     try {
         return await fetchImpl(url, { ...init, signal });
     } finally {
@@ -295,7 +302,7 @@ export function refusedWords(origin: string): string {
 
 /** Why a local address could not be used, in words, for a client that relies on the system's trust. */
 export const UNTRUSTED_WORDS =
-    "Your local network address uses Polaris's own certificate, which this device does not trust yet. Open Admin -> Domains and use Trust this device.";
+    "Your local network address uses Polaris's own certificate, which this device does not trust yet. An administrator can download it in Admin -> Domains (Trust this device) for you to install.";
 
 export interface FailoverOptions {
     /** The address the client was given. Always tried first. */
@@ -368,7 +375,10 @@ export function createFailover(options: FailoverOptions): Failover {
         verifiedUntil.delete(origin);
         if (verdict.kind === "different") refused.add(origin);
         else if (verdict.certificate) untrusted.add(origin);
-        else if (options.answersWithoutTls && (await options.answersWithoutTls(origin).catch(() => false))) {
+        else if (
+            options.answersWithoutTls &&
+            (await options.answersWithoutTls(origin).catch(() => false))
+        ) {
             untrusted.add(origin);
         } else untrusted.delete(origin);
         return false;

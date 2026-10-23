@@ -227,7 +227,8 @@ export async function login(context: Context, flags: Flags): Promise<void> {
                 scopes: claim.scopes,
                 storage,
                 signedInAt: new Date().toISOString(),
-                instance: await learnInstance(url, context.fetch)
+                instance: await learnInstance(url, context.fetch),
+                instanceLearnedAt: new Date().toISOString()
             }
         }
     };

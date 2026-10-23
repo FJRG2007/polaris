@@ -267,7 +267,7 @@
         },
         "reach": {
             "local": "Using your local network address",
-            "untrusted": "Your local network address uses Polaris's own certificate, which this browser does not trust yet. Open Admin -> Domains in Polaris and use Trust this device.",
+            "untrusted": "Your local network address uses Polaris's own certificate, which this browser does not trust yet. An administrator can download it in Admin -> Domains (Trust this device) for you to install.",
             "refused": "{host} answers as a different Polaris, so nothing was sent there.",
             "missing": "Allow the local address so this browser keeps working when the internet is down at home.",
             "allow": "Allow the local address",

@@ -34,6 +34,7 @@ import { dialog, type BrowserWindow, type WebContents } from "electron";
 import { PUSH_PLATFORMS, pushChoice, rememberPushChoice, type PushPlatform } from "./settings";
 import { CHANNELS, type Outcome, type PushEvent, type PushPhase, type PushState } from "@/shared/bridge";
 import {
+    addressWords,
     ApiFailure,
     call,
     callJson,
@@ -182,6 +183,8 @@ class Push {
                 { signal: abort.signal }
             );
             const image = `${repository}:${randomBytes(6).toString("hex")}`;
+            const words = addressWords(server);
+            if (words) this.line(`${words} (the usual address is not answering).`);
 
             this.enter("building");
             this.line(`$ docker ${buildArgs(image, this.folder, this.platform).join(" ")}`);

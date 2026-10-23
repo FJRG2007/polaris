@@ -140,7 +140,8 @@ export async function sendFile(
     headers: Readonly<Record<string, string>>,
     signal: AbortSignal
 ): Promise<unknown> {
-    const request = net.request({ method: "POST", url: `${caller.server}${path}`, credentials: "omit", cache: "no-store" });
+    const origin = (await failoverFor(caller.server)?.resolve()) ?? caller.server;
+    const request = net.request({ method: "POST", url: `${origin}${path}`, credentials: "omit", cache: "no-store" });
     request.chunkedEncoding = true;
     request.setHeader("authorization", `Bearer ${caller.key}`);
     for (const [name, value] of Object.entries(headers)) request.setHeader(name, value);

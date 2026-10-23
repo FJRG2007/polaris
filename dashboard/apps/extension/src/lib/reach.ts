@@ -29,6 +29,7 @@ import {
     createFailover,
     learnInstance,
     readInstance,
+    RELEARN_MS,
     type Failover,
     type InstanceRecord
 } from "@polaris/core/instance-fallback";
@@ -46,8 +47,6 @@ const INSTANCE = storage.defineItem<LearnedInstance | null>("local:server.instan
     fallback: null
 });
 
-/** How often what was learned is asked again, so a LAN address that moved is picked up. */
-const RELEARN_MS = 24 * 60 * 60_000;
 /** How long after a failed attempt to learn it is not tried again. */
 const RETRY_LEARN_MS = 10 * 60_000;
 /** How long a resolved address is used before it is resolved again. */
@@ -131,7 +130,8 @@ export async function reachOrigin(): Promise<string | null> {
     void learnOver(primary).catch(() => undefined);
     const picked = await failoverFor(primary);
     if (!picked) return primary;
-    if (resolved?.key === picked.key && Date.now() - resolved.at < RESOLVE_MS) return resolved.origin;
+    if (resolved?.key === picked.key && Date.now() - resolved.at < RESOLVE_MS)
+        return resolved.origin;
     const origin = await picked.failover.resolve();
     resolved = { key: picked.key, origin, at: Date.now() };
     return origin;

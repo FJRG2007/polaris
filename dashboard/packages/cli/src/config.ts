@@ -43,10 +43,12 @@ export const profileSchema = z.object({
         .object({
             id: z.string().max(64),
             publicKey: z.string().max(64),
-            addresses: z.array(z.string().url()).max(16)
+            addresses: z.array(z.string().url()).max(16).readonly()
         })
         .nullable()
-        .optional()
+        .optional(),
+    /** When `instance` was last asked for over `url`; `signedInAt` before this existed. */
+    instanceLearnedAt: z.string().optional()
 });
 
 export type Profile = z.infer<typeof profileSchema>;

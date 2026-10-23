@@ -14,6 +14,7 @@ import {
     createFailover,
     learnInstance,
     readInstance,
+    RELEARN_MS,
     type Failover,
     type InstanceRecord
 } from "../../../packages/core/src/instance-fallback";
@@ -221,16 +222,20 @@ export class PolarisClient {
 
     readonly #failovers = new Map<string, Failover>();
 
+    /** Called when the deck moves between its usual address and a local one. */
+    onAddress: () => void = () => undefined;
+
+    #failoverKey(address: string, instance: InstanceRecord): string {
+        return [address, instance.id, instance.publicKey, ...instance.addresses].join(" ");
+    }
+
     /**
      * Send to the deck's Polaris: its own address first, then - only after it
      * proved it is the same Polaris - one of its local addresses.
      */
-    /** Called when the deck moves between its usual address and a local one. */
-    onAddress: () => void = () => undefined;
-
     async #send(credentials: Credentials, path: string, init: RequestInit): Promise<Response> {
         if (!credentials.instance) return this.fetcher(`${credentials.address}${path}`, init);
-        const key = `${credentials.address} ${credentials.instance.id}`;
+        const key = this.#failoverKey(credentials.address, credentials.instance);
         let failover = this.#failovers.get(key);
         if (!failover) {
             failover = createFailover({
@@ -251,12 +256,35 @@ export class PolarisClient {
     /** Which address the deck is on, in words, or null on its usual one. */
     addressWords(credentials: Credentials): string | null {
         if (!credentials.instance) return null;
-        return this.#failovers.get(`${credentials.address} ${credentials.instance.id}`)?.status().words ?? null;
+        return (
+            this.#failovers
+                .get(this.#failoverKey(credentials.address, credentials.instance))
+                ?.status().words ?? null
+        );
     }
 
+    readonly #learnedAt = new Map<string, number>();
+
     /** What the Polaris says about itself, learned over the address just approved. */
-    learn(address: string): Promise<InstanceRecord | null> {
+    learn(address: string, now = Date.now()): Promise<InstanceRecord | null> {
+        this.#learnedAt.set(address, now);
         return learnInstance(address, (url, options) => this.fetcher(url, options));
+    }
+
+    /**
+     * What the Polaris says about itself now, when asking is due and the answer
+     * differs from what the credentials hold; null otherwise. Asked over the
+     * usual address only, at most once a day, so a local address that moved -
+     * or credentials kept from before Polaris described itself - catch up.
+     */
+    async relearn(credentials: Credentials, now = Date.now()): Promise<InstanceRecord | null> {
+        if (this.addressWords(credentials)) return null;
+        const last = this.#learnedAt.get(credentials.address);
+        if (last !== undefined && now - last < RELEARN_MS) return null;
+        const instance = await this.learn(credentials.address, now).catch(() => null);
+        if (!instance || JSON.stringify(instance) === JSON.stringify(credentials.instance ?? null))
+            return null;
+        return instance;
     }
 
     #headers(token?: string): Record<string, string> {
@@ -374,12 +402,10 @@ export class PolarisClient {
         signal: AbortSignal
     ): Promise<void> {
         const watch = Buffer.from(JSON.stringify(watched)).toString("base64url");
-        const response = await this.#send(credentials, `/api/deck/state?watch=${watch}`,
-            {
-                headers: { ...this.#headers(credentials.token), accept: "text/event-stream" },
-                signal
-            }
-        );
+        const response = await this.#send(credentials, `/api/deck/state?watch=${watch}`, {
+            headers: { ...this.#headers(credentials.token), accept: "text/event-stream" },
+            signal
+        });
         if (response.status === 401) throw new Unauthorized();
         if (response.status === 429) throw await throttled(response);
         if (!response.ok || !response.body) throw new Error(`Polaris answered ${response.status}`);

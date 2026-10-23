@@ -125,17 +125,13 @@ export class Connection {
         return this.credentials ? this.client.addressWords(this.credentials) : null;
     }
 
-    #learnTried = false;
-
     /**
-     * Credentials kept from before Polaris described itself have no local
-     * addresses. Learned once, over the usual address that just answered, and
-     * saved with them so the module can carry on over the local network.
+     * Keep what Polaris says about itself current with the credentials: ones kept
+     * from before Polaris described itself have no local addresses, and a local
+     * address can move. Asked over the usual address that just answered.
      */
     async #learnInstance(credentials: Credentials): Promise<void> {
-        if (credentials.instance || this.#learnTried) return;
-        this.#learnTried = true;
-        const instance = await this.client.learn(credentials.address).catch(() => null);
+        const instance = await this.client.relearn(credentials);
         if (!instance || this.credentials !== credentials) return;
         this.credentials = { ...credentials, instance };
         this.host.save(this.credentials);
@@ -279,7 +275,9 @@ export class Connection {
                         token: claimed.token,
                         keyId: claimed.keyId,
                         account: accountName(claimed.account),
-                        ...(await this.client.learn(address).then((instance) => (instance ? { instance } : {})))
+                        ...(await this.client
+                            .learn(address)
+                            .then((instance) => (instance ? { instance } : {})))
                     };
                     this.host.save(this.credentials);
                     this.#failures = 0;

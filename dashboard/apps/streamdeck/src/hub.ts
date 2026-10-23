@@ -168,20 +168,25 @@ class Hub {
         }
     }
 
-    #learnTried = false;
+    /** Store the credentials as Stream Deck's global settings, which hold plain JSON only. */
+    #keep(credentials: Credentials): Promise<void> {
+        const { instance, ...rest } = credentials;
+        return streamDeck.settings.setGlobalSettings({
+            ...rest,
+            ...(instance ? { instance: { ...instance, addresses: [...instance.addresses] } } : {})
+        });
+    }
 
     /**
-     * A deck connected before Polaris described itself has no local addresses.
-     * Learned once, over the usual address that just answered, and kept with the
-     * key so the deck can carry on over the local network from then on.
+     * Keep what Polaris says about itself current with the key: a deck connected
+     * before Polaris described itself has no local addresses, and a local address
+     * can move. Asked over the usual address that just answered.
      */
     async #learnInstance(credentials: Credentials): Promise<void> {
-        if (credentials.instance || this.#learnTried) return;
-        this.#learnTried = true;
-        const instance = await this.client.learn(credentials.address).catch(() => null);
+        const instance = await this.client.relearn(credentials);
         if (!instance || this.credentials !== credentials) return;
         this.credentials = { ...credentials, instance };
-        await streamDeck.settings.setGlobalSettings({ ...this.credentials });
+        await this.#keep(this.credentials);
     }
 
     async refreshCatalogue(force: boolean): Promise<void> {
@@ -371,9 +376,11 @@ class Hub {
                         token: claimed.token,
                         keyId: claimed.keyId,
                         account: claimed.account.name || claimed.account.email,
-                        ...(await this.client.learn(address).then((instance) => (instance ? { instance } : {})))
+                        ...(await this.client
+                            .learn(address)
+                            .then((instance) => (instance ? { instance } : {})))
                     };
-                    await streamDeck.settings.setGlobalSettings({ ...this.credentials });
+                    await this.#keep(this.credentials);
                     this.connecting = { phase: "idle" };
                     this.#failures = 0;
                     await this.refreshCatalogue(true);
