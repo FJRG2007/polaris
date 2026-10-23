@@ -30,6 +30,9 @@ import { watch } from "./watch";
 import { automations } from "./automations";
 import { tools } from "./tools";
 import { statusPages } from "./status-pages";
+import { mailServer } from "./mail-server";
+import { cloudServers } from "./cloud-servers";
+import { securityScans } from "./security-scans";
 import type { SceneDefinition } from "../runtime/scene";
 
 /** Every scene the README shows, in the order the capture takes them. */
@@ -69,6 +72,9 @@ export const SCENES: readonly SceneDefinition[] = [
     placesOverview,
     tools,
     statusPages,
+    mailServer,
+    cloudServers,
+    securityScans,
     marketplace,
     marketplaceInstall,
     launcher,

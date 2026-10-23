@@ -14,7 +14,10 @@ const SHOTS: Readonly<Record<string, readonly string[]>> = {
     "game-servers": ["games", "game-players", "game-console", "game-inventory", "game-events"],
     home: ["places"],
     tools: ["tools"],
-    "status-pages": ["status-pages"]
+    "status-pages": ["status-pages"],
+    "mail-server": ["mail-server"],
+    "cloud-servers": ["cloud-servers"],
+    "security-scans": ["security-scans"]
 };
 
 export interface AppScreenshot {
