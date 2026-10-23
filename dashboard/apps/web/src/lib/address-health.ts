@@ -426,6 +426,13 @@ function backText(t: NamespaceTranslator<"notices">, back: PassNews["back"]): Gr
     };
 }
 
+/** The address a group notice recorded for one of its hosts; the host alone when it recorded none. */
+function urlIn(metadata: Record<string, unknown>, host: string): string {
+    const urls = metadata.urls;
+    const url = urls && typeof urls === "object" ? (urls as Record<string, unknown>)[host] : undefined;
+    return typeof url === "string" ? url : host;
+}
+
 /**
  * Tell a pass's news once. Everything that stopped answering together is one
  * notice; everything that came back closes the notice that said it was down,
@@ -444,7 +451,12 @@ async function tellPass(news: PassNews, anyUp: boolean): Promise<void> {
                 await raiseGroup(
                     DOWN_CONDITION,
                     news.down.map((entry) => entry.host),
-                    { ...base, ...downText(t, news.down), actionRequired: true }
+                    {
+                        ...base,
+                        ...downText(t, news.down),
+                        actionRequired: true,
+                        metadata: { urls: Object.fromEntries(news.down.map((entry) => [entry.host, entry.url])) }
+                    }
                 );
             }
             if (news.back.length === 0) return;
@@ -454,7 +466,7 @@ async function tellPass(news: PassNews, anyUp: boolean): Promise<void> {
                 DOWN_CONDITION,
                 news.back.map((entry) => entry.host),
                 (hosts) => backText(t, news.back.filter((entry) => hosts.includes(entry.host))),
-                (hosts) => downText(t, hosts.map((host) => ({ host, url: `https://${host}`, detail: null })))
+                (hosts, metadata) => downText(t, hosts.map((host) => ({ host, url: urlIn(metadata, host), detail: null })))
             );
             const unannounced = left.map((host) => byHost.get(host)!).filter(Boolean);
             if (unannounced.length > 0) await notify({ ...base, ...backText(t, unannounced) });

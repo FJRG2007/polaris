@@ -24,10 +24,17 @@ function membersOf(metadata: Record<string, unknown>): string[] {
     return Array.isArray(members) ? members.filter((member): member is string => typeof member === "string") : [];
 }
 
+function sameMembers(a: readonly string[], b: readonly string[]): boolean {
+    const sorted = [...a].sort();
+    return sorted.length === b.length && sorted.every((member, index) => member === b[index]);
+}
+
 /**
  * Raise one notice for everything in `members` that went wrong in this pass. The
  * key is the prefix and the first member, so a pass repeated while they are
- * still down rewrites the same notice.
+ * still down rewrites the same notice; an open notice already holding that key
+ * for other members (one partly settled) keeps it, and this one takes the next
+ * free key instead of overwriting it.
  */
 export async function raiseGroup(
     prefix: string,
@@ -35,9 +42,17 @@ export async function raiseGroup(
     input: Omit<NotifyInput, "condition">
 ): Promise<NotifyReport> {
     const sorted = [...new Set(members)].sort();
+    const taken = new Map(
+        (await openConditions(input.userId, prefix)).map((open) => [open.conditionKey, membersOf(open.metadata)])
+    );
+    const base = `${prefix}${sorted[0] ?? ""}`;
+    let condition = base;
+    for (let n = 2; taken.has(condition) && !sameMembers(taken.get(condition)!, sorted); n++) {
+        condition = `${base}#${n}`;
+    }
     return notify({
         ...input,
-        condition: `${prefix}${sorted[0] ?? ""}`,
+        condition,
         metadata: { ...input.metadata, members: sorted }
     });
 }
@@ -54,7 +69,7 @@ export async function settleGroup(
     prefix: string,
     recovered: readonly string[],
     back: (members: readonly string[]) => GroupText,
-    still: (remaining: readonly string[]) => GroupText
+    still: (remaining: readonly string[], metadata: Record<string, unknown>) => GroupText
 ): Promise<string[]> {
     const left = new Set(recovered);
     if (left.size === 0) return [];
@@ -71,7 +86,7 @@ export async function settleGroup(
                 recovery: { ...text, level: text.level ?? "success", metadata: { ...open.metadata, members } }
             });
         } else {
-            const text = still(remaining);
+            const text = still(remaining, open.metadata);
             await raiseCondition(open.conditionKey, {
                 userId,
                 type: open.type,

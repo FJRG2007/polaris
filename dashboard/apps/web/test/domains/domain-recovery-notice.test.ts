@@ -93,6 +93,25 @@ describe("a domain that comes back", () => {
         expect(bell.plain).toHaveLength(0);
     });
 
+    it("raises a new notice when a domain goes down again beside a sweep still open", async () => {
+        await notifyDomainHealthChanges([
+            { domainId: "a", status: "down", detail: null },
+            { domainId: "b", status: "down", detail: null }
+        ]);
+        await notifyDomainHealthChanged({ domainId: "a", status: "up", detail: null });
+        await notifyDomainHealthChanged({ domainId: "a", status: "down", detail: "HTTP 502" });
+        expect(rows()).toHaveLength(2);
+        expect(rows()[0]).toMatchObject({ conditionKey: "domain.down:a", actionRequired: true });
+        expect(JSON.parse(rows()[0]!.metadata!).members).toEqual(["b"]);
+        expect(rows()[1]).toMatchObject({ conditionKey: "domain.down:a#2", actionRequired: true });
+        expect(JSON.parse(rows()[1]!.metadata!).members).toEqual(["a"]);
+
+        await notifyDomainHealthChanged({ domainId: "b", status: "up", detail: null });
+        expect(rows()[0]).toMatchObject({ conditionKey: null, level: "success" });
+        expect(rows()[1]).toMatchObject({ conditionKey: "domain.down:a#2", actionRequired: true });
+        expect(bell.plain).toHaveLength(0);
+    });
+
     it("tells a recovery nothing announced on its own", async () => {
         await notifyDomainHealthChanged({ domainId: "a", status: "up", detail: null });
         expect(rows()).toHaveLength(0);

@@ -304,10 +304,33 @@ describe("a run", () => {
             updatedAt: null
         });
         settings.set(PUBLISHED_KEY, NEW);
+        settings.set("network.dnsFollowFailing", "failed:52.10.0.2");
         for (const list of records.values()) for (const entry of list) if (entry.content === OLD) entry.content = NEW;
         await syncZoneAddress();
         expect(rows()[0]).toMatchObject({ id: "legacy", actionRequired: false });
         expect(rows()[0]!.readAt).toBeInstanceOf(Date);
+        expect(settings.has("network.dnsFollowFailing")).toBe(false);
+    });
+
+    it("leaves keyless rows alone once nothing from before conditions is left", async () => {
+        const sweep = vi.spyOn(bell.store!.notification, "updateMany");
+        settings.set(PUBLISHED_KEY, NEW);
+        for (const list of records.values()) for (const entry of list) if (entry.content === OLD) entry.content = NEW;
+        await syncZoneAddress();
+        expect(sweep.mock.calls.some(([args]) => (args as { where: { type?: unknown } }).where.type !== undefined)).toBe(false);
+    });
+
+    it("puts the open failure back to unread when the problem changes", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        repoint.mockRejectedValue(new Error("Authentication error"));
+        await syncZoneAddress();
+        ofType("domain.address-stale")[0]!.readAt = new Date();
+        await syncZoneAddress();
+        expect(ofType("domain.address-stale")[0]!.readAt).toBeInstanceOf(Date);
+        probe.mockResolvedValue("52.10.0.3");
+        await syncZoneAddress();
+        expect(ofType("domain.address-stale")).toHaveLength(1);
+        expect(ofType("domain.address-stale")[0]!.readAt).toBeNull();
     });
 
     it("tells the operator plainly when there is no token to update with", async () => {

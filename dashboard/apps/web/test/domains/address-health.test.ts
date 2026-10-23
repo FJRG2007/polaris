@@ -260,7 +260,7 @@ describe("probing what a deployment answers on", () => {
     });
 
     it("keeps a group open, rewritten, while part of it is still down", async () => {
-        addresses.push({ url: "https://plr.example.com", host: "plr.example.com", kind: "domain" });
+        addresses.push({ url: "http://plr.example.com/status", host: "plr.example.com", kind: "domain" });
         answering.delete("polaris.example.com");
         await sweep();
         answering.add("polaris.example.com");
@@ -268,6 +268,7 @@ describe("probing what a deployment answers on", () => {
         const mine = bell.store!.rows.filter((row) => row.userId === "user-1");
         expect(mine).toHaveLength(1);
         expect(mine[0]).toMatchObject({ title: "plr.example.com is not answering", conditionKey: "network.address:plr.example.com" });
+        expect(mine[0]?.body).toContain("Nothing answered at http://plr.example.com/status.");
     });
 
     it("announces a recovery nothing had announced as one notice for the pass", async () => {

@@ -435,7 +435,7 @@ async function checkReach(
         body: t("domainAddress.unreachedBody", { current, seen: seen.join(", ") || "-" }),
         level: "warning",
         actionRequired: true
-    }));
+    }), current);
     return "unreached";
 }
 
@@ -450,13 +450,26 @@ async function administrators(): Promise<string[]> {
 type Notice = Pick<notices.NotificationInput, "type" | "title" | "body" | "level" | "actionRequired">;
 type Words = Awaited<ReturnType<typeof wordsFor<"notices">>>;
 
-/** One notice per administrator. With a condition, the open one is rewritten. */
-async function notifyAdmins(condition: string | null, build: (t: Words) => Promise<Notice> | Notice): Promise<void> {
+/**
+ * One notice per administrator. With a condition, the open one is rewritten, and
+ * put back to unread when `signature` (what the problem is) differs from the one
+ * it was raised for.
+ */
+async function notifyAdmins(
+    condition: string | null,
+    build: (t: Words) => Promise<Notice> | Notice,
+    signature?: string
+): Promise<void> {
     for (const userId of await administrators()) {
         const t = await wordsFor(userId, "notices");
         const input = { userId, href: "/admin/domains", ...(await build(t)) };
-        if (condition) await notices.raiseCondition(condition, input);
-        else await notices.createNotification(input);
+        if (!condition) {
+            await notices.createNotification(input);
+            continue;
+        }
+        const open = (await notices.openConditions(userId, condition)).find((entry) => entry.conditionKey === condition);
+        const resurface = signature !== undefined && open !== undefined && open.metadata.signature !== signature;
+        await notices.raiseCondition(condition, { ...input, metadata: signature === undefined ? null : { signature } }, { resurface });
     }
 }
 
@@ -467,7 +480,8 @@ async function notifyAdmins(condition: string | null, build: (t: Words) => Promi
  * carry no key, so they are marked read by type as well.
  */
 async function settle(domain: string, current: string, from: string | null, count: number, moved: string | null): Promise<void> {
-    await setSetting(FAILING_KEY, null);
+    const legacy = await getSetting(FAILING_KEY);
+    if (legacy !== null) await setSetting(FAILING_KEY, null);
     let closed = 0;
     for (const userId of await administrators()) {
         const t = await wordsFor(userId, "notices");
@@ -485,7 +499,7 @@ async function settle(domain: string, current: string, from: string | null, coun
             }
         });
     }
-    await notices.markNotificationsReadByType([STALE_CONDITION]).catch(() => {});
+    if (legacy !== null) await notices.markNotificationsReadByType([STALE_CONDITION]).catch(() => {});
     if (closed > 0) return;
     if (count > 0) await announceUpdated(domain, from, current, count);
     else if (moved) await announceMoved(moved, current);
@@ -547,5 +561,5 @@ async function fail(
                   : t("domainAddress.notUpdated", { current, detail: detail ?? "-" }),
         level: "warning",
         actionRequired: true
-    }));
+    }), `${problem}:${current}`);
 }
