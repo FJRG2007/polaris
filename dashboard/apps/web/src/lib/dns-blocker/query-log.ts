@@ -286,6 +286,7 @@ export class QueryBar {
     public readonly permitted = new Map<string, number>();
     public readonly blockedDomains = new Map<string, number>();
     public readonly blockedClients = new Map<string, number>();
+    private sealed = false;
 
     public constructor(public readonly start: number) {}
 
@@ -312,6 +313,20 @@ export class QueryBar {
             count(this.blockedClients, row.client);
             if (row.list) count(this.lists, row.list);
         } else count(this.permitted, row.domain);
+    }
+
+    /** A bar the window has moved past keeps only its busiest `limit` names of
+     *  each domain list: a name past them there is too rare to reach a top list,
+     *  and every other bar of the day would otherwise hold its own copy. */
+    public seal(limit: number): void {
+        if (this.sealed) return;
+        this.sealed = true;
+        for (const counts of [this.permitted, this.blockedDomains]) {
+            if (counts.size <= limit) continue;
+            const kept = [...counts].sort((a, b) => b[1] - a[1]).slice(0, limit);
+            counts.clear();
+            for (const [key, by] of kept) counts.set(key, by);
+        }
     }
 }
 

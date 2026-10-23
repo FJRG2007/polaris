@@ -1,9 +1,11 @@
 /**
  * What the Network filter shows before its reads answer: the last status and
- * the last unfiltered numbers this browser saw, drawn at once and replaced when
+ * the last unfiltered numbers this tab saw, drawn at once and replaced when
  * the fresh ones arrive, and the Overview's numbers asked for at the same time
  * as the status instead of after it.
  *
+ * Held for the tab only: the numbers name the network's devices and what they
+ * looked up, which must not stay on a shared computer once it is closed.
  * Browser storage can be missing or refuse (a private window, cleared data), so
  * every access is guarded and a miss simply means waiting for the read.
  */
@@ -27,7 +29,7 @@ type KeptStatus = Pick<DnsBlockerStatus, "state" | "address" | "stale">;
 
 function load<T>(key: string): T | null {
     try {
-        const raw = window.localStorage.getItem(key);
+        const raw = window.sessionStorage.getItem(key);
         if (!raw) return null;
         const held = JSON.parse(raw) as { at: number; value: T };
         return Date.now() - held.at < MAX_AGE_MS ? held.value : null;
@@ -38,7 +40,7 @@ function load<T>(key: string): T | null {
 
 function keep(key: string, value: unknown): void {
     try {
-        window.localStorage.setItem(key, JSON.stringify({ at: Date.now(), value }));
+        window.sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), value }));
     } catch {
         // Full or refused: the next visit waits for the read, as before.
     }
@@ -61,7 +63,7 @@ export function keepStatus(status: DnsBlockerStatus): void {
     keep(STATUS_KEY, { state: status.state, address: status.address, stale: status.stale });
 }
 
-/** The last unfiltered numbers this browser saw, for a filter that is that. */
+/** The last unfiltered numbers this tab saw, for a filter that is that. */
 export function lastInsights(filter: QueryFilter): DnsInsights | null {
     return unfiltered(filter) ? load<DnsInsights>(INSIGHTS_KEY) : null;
 }

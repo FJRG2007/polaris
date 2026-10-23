@@ -88,7 +88,10 @@ const APPEND_CHUNK = 11_000;
 const STREAM_PAST = 8 * APPEND_CHUNK;
 
 /** The unfiltered 24 hours, followed per DNS server container (see `log-follow`). */
-const followers = new Map<string, QueryLogFollower>();
+const followers = new Map<
+    string,
+    { readonly follower: QueryLogFollower; readonly current: { target: Engine } }
+>();
 
 /** The DNS server's container and the runtime that reaches it, for the other
  *  modules that ask it something. */
@@ -167,9 +170,9 @@ const PIECE_SCRIPT = [
 /** The DNS server's log files as the follower reads them: what was written
  *  since the last ask, a command's worth at a time, or the file streamed when
  *  more than a few of those are waiting. */
-function engineSource(target: Engine): LogSource {
+function engineSource(current: () => Engine): LogSource {
     const piece = (path: string, from: number, sized: boolean) =>
-        target.ports.runIn(target.container, [
+        current().ports.runIn(current().container, [
             "sh",
             "-c",
             PIECE_SCRIPT,
@@ -184,7 +187,7 @@ function engineSource(target: Engine): LogSource {
         let encoded = first;
         while (at < size) {
             if (encoded === null) {
-                yield* streamFrom(target, path, at);
+                yield* streamFrom(current(), path, at);
                 return;
             }
             const bytes = Buffer.from(encoded, "base64");
@@ -214,15 +217,17 @@ function engineSource(target: Engine): LogSource {
 
 /** The unfiltered last 24 hours, followed rather than read again whole. */
 function followedLog(target: Engine, now: number): Promise<LogRead> {
-    let follower = followers.get(target.container);
-    if (!follower) {
+    let followed = followers.get(target.container);
+    if (!followed) {
         // One DNS server at a time: a container left behind by a reinstall is
         // not followed any further.
         followers.clear();
-        follower = new QueryLogFollower(engineSource(target));
-        followers.set(target.container, follower);
+        const current = { target };
+        followed = { current, follower: new QueryLogFollower(engineSource(() => current.target)) };
+        followers.set(target.container, followed);
     }
-    return follower
+    followed.current.target = target;
+    return followed.follower
         .read(rangeWindow("24h", now))
         .then(({ found, reader }) => ({ found, stats: reader.stats(), reader }));
 }

@@ -54,6 +54,8 @@ interface Followed {
 const { page: _page, ...UNFILTERED } = queryFilterSchema.parse({});
 
 const NEWLINE = 0x0a;
+/** Names of each domain list a finished bar keeps (see `QueryBar.seal`). */
+const BAR_DOMAINS_KEPT = 500;
 
 const followed = (): Followed => ({ offset: 0, bars: new Map(), rows: [] });
 
@@ -121,8 +123,9 @@ export class QueryLogFollower {
             file.offset += cut + 1;
             rest = bytes.slice(cut + 1);
         }
-        for (const start of file.bars.keys())
+        for (const [start, bar] of file.bars)
             if (start + window.bucketMs <= window.from) file.bars.delete(start);
+            else if (start + window.bucketMs < window.to) bar.seal(BAR_DOMAINS_KEPT);
         if (file.rows.length > 0 && file.rows[0]!.at < window.from)
             file.rows = file.rows.filter((row) => row.at >= window.from);
     }

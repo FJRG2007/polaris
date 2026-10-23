@@ -9,6 +9,8 @@ import { fixtureDay, fixtureLine } from "./fixtures/query-log-day";
 
 const readFile = vi.fn();
 const runIn = vi.fn();
+/** The runtime `getPorts` answers with now: credentials can change under a follower. */
+const ports = { current: { readFile, runIn } };
 
 vi.mock("@polaris/db", () => ({
     prisma: { application: { findUnique: async () => ({ target: {} }) } }
@@ -19,14 +21,13 @@ vi.mock("@/lib/dns-blocker/service", () => ({
     engineConfigCurrent: async () => true,
     readSettings: async () => ({ logDays: 2 })
 }));
-vi.mock("@/lib/deploy/runtime", () => ({ getPorts: async () => ({ readFile, runIn }) }));
+vi.mock("@/lib/deploy/runtime", () => ({ getPorts: async () => ports.current }));
 vi.mock("@/lib/container-files-service", () => ({ resolveContainerName: async () => "engine" }));
 
 const { QueryLogFollower } = await import("@/lib/dns-blocker/log-follow");
 const { dnsInsights, seenDevices } = await import("@/lib/dns-blocker/insights");
-const { QueryLogReader, queryFilterSchema, queryLogPath, rangeWindow } = await import(
-    "@/lib/dns-blocker/query-log"
-);
+const { QueryBar, QueryLogReader, parseQueryLine, queryFilterSchema, queryLogPath, rangeWindow } =
+    await import("@/lib/dns-blocker/query-log");
 
 const DAY = 86_400_000;
 const TODAY = Date.parse("2026-10-23T00:00:00Z");
@@ -102,6 +103,7 @@ beforeEach(() => {
     files = new Map();
     readFile.mockReset();
     runIn.mockReset();
+    ports.current = { readFile, runIn };
 });
 
 describe("QueryLogFollower", () => {
@@ -175,6 +177,34 @@ describe("QueryLogFollower", () => {
         expectSame(followed, fullRead(now));
         expect(followed.devices().some((device) => device.name === "salón-tele.lan")).toBe(true);
     });
+
+    it("keeps only the busiest names of a bar the window moved past", async () => {
+        // A bar of 900 lookups, each of a name of its own but the busiest.
+        const named = (domain: string, line: string) => {
+            const cells = line.split("	");
+            cells[5] = domain;
+            return cells.join("	");
+        };
+        const run = lines(TODAY, TODAY + 500_000, 900, 19).map((line, index) =>
+            named(index % 3 === 0 ? "busy.example.test." : `rare-${index}.example.test.`, line)
+        );
+        append(TODAY, [...run, ...lines(TODAY + 3_600_000, TODAY + 3_660_000, 5, 20)]);
+        const follower = new QueryLogFollower(memorySource([4_096]));
+        const now = TODAY + 3_660_000;
+        const followed = (await follower.read(rangeWindow("24h", now))).reader;
+        const full = fullRead(now);
+        expect(followed.stats().topPermitted[0]).toEqual(full.stats().topPermitted[0]);
+        expect(followed.stats().topBlocked[0]).toEqual(full.stats().topBlocked[0]);
+        expect(followed.stats().queries).toBe(full.stats().queries);
+
+        const bar = new QueryBar(TODAY);
+        for (const line of run) bar.add(parseQueryLine(line)!);
+        expect(bar.permitted.size + bar.blockedDomains.size).toBeGreaterThan(500);
+        bar.seal(50);
+        expect(bar.permitted.size).toBeLessThanOrEqual(50);
+        expect(bar.blockedDomains.size).toBeLessThanOrEqual(50);
+        expect(bar.queries).toBe(900);
+    });
 });
 
 /** The engine's container, running the commands the source sends it. */
@@ -247,6 +277,30 @@ describe("dnsInsights, unfiltered", () => {
         const result = await dnsInsights(queryFilterSchema.parse({}), true);
         expect(result.stats.queries).toBe(0);
         expect(readFile).not.toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
+    it("reads through the runtime as it is now, not as it was on the first read", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        engineFake();
+        append(TODAY, lines(TODAY, TODAY + 3_600_000, 200, 17));
+        let now = TODAY + 3_600_000;
+        vi.setSystemTime(now);
+        const filter = queryFilterSchema.parse({});
+        await dnsInsights(filter, true);
+
+        // The host's address or key changed: the old connection is refused.
+        const rotated = vi.fn(runIn.getMockImplementation());
+        runIn.mockImplementation(async () => {
+            throw new Error("old credentials");
+        });
+        ports.current = { readFile, runIn: rotated };
+        append(TODAY, lines(now, now + 300_000, 50, 18));
+        now += 300_000;
+        vi.setSystemTime(now);
+        const after = await dnsInsights(filter, true);
+        expect(rotated).toHaveBeenCalled();
+        expect(after.stats).toEqual(fullRead(now).stats());
         vi.useRealTimers();
     });
 });
