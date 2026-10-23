@@ -4356,7 +4356,13 @@ async function landMeteor(
     options: catalog.EventOptions<"meteor-shower">
 ): Promise<void> {
     const language = loop.language;
-    const heart = meteors.heartOf(options.ores, loop.rich ?? false);
+    // The heart only in the last meteor down: one rare block a shower.
+    const heart = meteors.heartAt(
+        options.ores,
+        loop.rich ?? false,
+        loop.run.landings,
+        options.meteors
+    );
     const cells = meteors.meteorCells(found, options.size, options.ores, Math.random, heart);
     const open = await commands.answersOf(server, cells.map(meteors.airTest));
     const free = cells.filter((_, at) => commands.readTest(open[at] ?? "") === "passed");

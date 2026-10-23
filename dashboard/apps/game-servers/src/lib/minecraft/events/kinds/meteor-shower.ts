@@ -75,9 +75,9 @@ export const ORE_MIX: Readonly<Record<MeteorOres, readonly (readonly [string, nu
 };
 
 /**
- * The heart of each meteor: one block of something rarer than its ore, in the
- * middle of the heap where it is mined last. Never one of the mix's own ores,
- * so its count is its own.
+ * The heart of a shower: one block of something rarer than its ore, in the
+ * middle of the last meteor's heap (`heartAt`), where it is mined last. Never
+ * one of the mix's own ores, so its count is its own.
  */
 export const HEART: Readonly<Record<MeteorOres, string>> = {
     common: "diamond_ore",
@@ -95,6 +95,17 @@ export const RICH_SINCE = [1, 16] as const;
 export function heartOf(ores: MeteorOres, rich: boolean): string | null {
     const heart = HEART[ores];
     return heart === "ancient_debris" && !rich ? null : heart;
+}
+
+/** The heart the meteor landing `landing` (from 0) of `count` carries: only
+ *  the last one has it, so a shower pays out one rare block, not one a meteor. */
+export function heartAt(
+    ores: MeteorOres,
+    rich: boolean,
+    landing: number,
+    count: number
+): string | null {
+    return landing === count - 1 ? heartOf(ores, rich) : null;
 }
 
 /** The scorched rim round a meteor, and how often each block comes up:
