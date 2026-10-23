@@ -727,12 +727,15 @@ export async function restoreCopy(ownerId: string, copyId: string, actorId: stri
 }
 
 /** The plans, with what each writes to and how many things use it. */
-export async function listPlans(ownerId: string) {
+/** `lent` are plans another administrator shared with this one
+ *  (`backup.plan`): listed beside their own, marked shared, to read only. */
+export async function listPlans(ownerId: string, lent: ReadonlySet<string> = new Set()) {
     const plans = await prisma.backupPlan.findMany({
-        where: { ownerId },
+        where: lent.size > 0 ? { OR: [{ ownerId }, { id: { in: [...lent] } }] } : { ownerId },
         orderBy: { name: "asc" },
         select: {
             id: true,
+            ownerId: true,
             name: true,
             every: true,
             keepLast: true,
@@ -756,7 +759,8 @@ export async function listPlans(ownerId: string) {
         notifyOnFailure: plan.notifyOnFailure,
         destinationIds: plan.destinations.map((entry) => entry.destinationId),
         destinationNames: plan.destinations.map((entry) => entry.destination.name),
-        usedBy: plan._count.resources
+        usedBy: plan._count.resources,
+        shared: plan.ownerId !== ownerId
     }));
 }
 
@@ -780,6 +784,10 @@ export async function savePlan(
         maxBytes: BigInt(input.maxBytes),
         notifyOnFailure: input.notifyOnFailure
     };
+    // Only the owner's own plan is replaced: one shared with them reads, nothing more.
+    if (planId && (await prisma.backupPlan.count({ where: { id: planId, ownerId } })) === 0) {
+        throw new SourceUnavailableError("That plan does not exist");
+    }
     const plan = planId
         ? await prisma.backupPlan.update({ where: { id: planId }, data, select: { id: true } })
         : await prisma.backupPlan.create({ data: { ownerId, ...data }, select: { id: true } });

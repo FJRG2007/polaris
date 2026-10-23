@@ -68,7 +68,8 @@
             "crm.dashboard": "a CRM dashboard",
             "automation.automation": "a saved automation",
             "analytics.site": "a site's visitor numbers",
-            "telemetry.project": "a telemetry project's issues"
+            "telemetry.project": "a telemetry project's issues",
+            "backup.plan": "a backup plan"
         }
     },
     "mentions": {

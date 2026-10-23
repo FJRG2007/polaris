@@ -132,7 +132,7 @@ export function BackupsView() {
 
             {tab === "protected" ? (
                 <ProtectedTable
-                    plans={overview?.plans ?? []}
+                    plans={(overview?.plans ?? []).filter((plan) => !plan.shared)}
                     destinations={overview?.destinations ?? []}
                     onChanged={loadOverview}
                 />

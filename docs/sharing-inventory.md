@@ -51,7 +51,7 @@ reason).
 | Deploy | Project | - | `ProjectMember` | none | a Share entry on the project that opens its Members settings (the ProjectMember list stays the one system; no AccessGrant copy) | add | done |
 | Deploy | Service | - | through its project | none | - | no: reached through its project | - |
 | Databases | Database | - | through its Deploy project | none | - | no: credentials, reached through its project | - |
-| Backups | Plan | - | owner | none | people (view) | add | todo |
+| Backups | Plan | `backup.plan` | owner + AccessGrant per plan | none | people (view its schedule, what it keeps and where, beside their own plans; Backups stays an administrators-only app, so the reader has to be one; changing, deleting and putting things on it stay with the owner) | add | done |
 | Backups | Recovery point | - | owner | none | - | no: a restore writes over live data; view through the plan | - |
 | Game servers | Server (players) | - | `GamePlayerAccess` | invite link | operators via the dialog | add | todo |
 | Network filter | Stats, rules | - | administrators | none | people (view) | add | todo |

@@ -88,7 +88,8 @@ export const GRANT_SUBJECTS = [
     "crm.dashboard",
     "automation.automation",
     "analytics.site",
-    "telemetry.project"
+    "telemetry.project",
+    "backup.plan"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -208,7 +209,10 @@ export const GRANT_CAPABILITIES = {
     "analytics.site": ["view"],
     // One telemetry project: its issues and their events. Resolving, ignoring and
     // deleting them, its address, reporters and settings stay with its owner.
-    "telemetry.project": ["view"]
+    "telemetry.project": ["view"],
+    // One backup plan: its schedule, what it keeps and where. Changing, deleting
+    // and putting things on it stay with its owner.
+    "backup.plan": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -257,7 +261,8 @@ export const GRANT_ACTIONS = {
     "crm.dashboard": [],
     "automation.automation": [],
     "analytics.site": [],
-    "telemetry.project": []
+    "telemetry.project": [],
+    "backup.plan": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

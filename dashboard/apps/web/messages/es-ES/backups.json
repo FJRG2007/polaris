@@ -90,6 +90,8 @@
         "monthly": "Cada 30 días"
     },
     "plans": {
+        "share": "Dar acceso",
+        "sharedWithYou": "Compartido contigo",
         "intro": "Un plan se puede compartir: pon diez bases de datos en un plan nocturno y cambia la programación una sola vez.",
         "new": "Nuevo plan",
         "none": "Aún no hay planes. Sin uno, solo se hacen copias cuando las pides.",

@@ -90,6 +90,8 @@
         "monthly": "Every 30 days"
     },
     "plans": {
+        "share": "Share access",
+        "sharedWithYou": "Shared with you",
         "intro": "A plan can be shared: put ten databases on one nightly plan and change the schedule once.",
         "new": "New plan",
         "none": "No plans yet. Without one, things are backed up only when you ask.",

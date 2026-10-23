@@ -12,6 +12,7 @@
 
 import { adoptLegacyBackups } from "@/lib/backups/adoption";
 import { apiAdmin } from "@/lib/api-session";
+import { grantedSubjects } from "@/lib/access/grants";
 import { ensureDefaultDestinations } from "@/lib/backups/service";
 import { backupSummary, listDestinations, listPlans } from "@/lib/backups/manage";
 
@@ -31,7 +32,7 @@ export async function GET(): Promise<Response> {
     await adoptLegacyBackups(user.id).catch(() => undefined);
     const [summary, plans, destinations] = await Promise.all([
         backupSummary(user.id),
-        listPlans(user.id),
+        grantedSubjects(user.id, "backup.plan").then((held) => listPlans(user.id, new Set(held.keys()))),
         listDestinations(user.id)
     ]);
     return Response.json({ summary, plans, destinations });

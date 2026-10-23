@@ -17,6 +17,7 @@ import * as manage from "@/lib/backups/manage";
 import * as keyring from "@/lib/backups/keyring";
 import * as relocate from "@/lib/backups/relocate";
 import { recordAudit } from "@/lib/audit-service";
+import { dropGrantsFor } from "@/lib/access/grants";
 import { runBackup } from "@/lib/backups/service";
 import { destinationSchema, planSchema, protectSchema, restoreSchema } from "@/lib/backups/schemas";
 import { backupRefusalText } from "@/lib/backups/refusal-text";
@@ -208,6 +209,7 @@ export async function deletePlanAction(planId: string): Promise<Result> {
     const user = await requireAdmin();
     try {
         await manage.deletePlan(user.id, planId);
+        await dropGrantsFor("backup.plan", planId);
         await recordAudit({
             actorId: user.id,
             action: "backup.plan.delete",

@@ -192,6 +192,15 @@ export async function requireMayShare(
             }
             return;
         }
+        case "backup.plan": {
+            // Only its owner shows a plan to somebody else.
+            const plan = await prisma.backupPlan.findUnique({
+                where: { id: subjectId },
+                select: { ownerId: true }
+            });
+            if (!plan || plan.ownerId !== user.id) throw new GrantError("You cannot share that");
+            return;
+        }
         case "telemetry.project": {
             // Whoever may open the project as its owner (or an administrator)
             // decides who else reads its issues.
@@ -499,6 +508,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         }
         case "crm.dashboard":
             return "/crm/dashboards";
+        case "backup.plan":
+            return "/apps/backups";
         case "telemetry.project":
             return `/apps/telemetry?project=${encodeURIComponent(subjectId)}`;
         case "analytics.site":
