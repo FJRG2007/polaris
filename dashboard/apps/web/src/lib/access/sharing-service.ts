@@ -407,6 +407,25 @@ export async function owningOrgIds(
     return memberOrgIds(user.id);
 }
 
+/**
+ * The organization that owns this thing, named - or null for something nobody's
+ * organization owns. What an "organization" link opens for, which is never the
+ * sharer's own organizations: those are a fallback for picking groups, not an
+ * owner.
+ */
+export async function subjectOrg(
+    subject: core.GrantSubject,
+    subjectId: string
+): Promise<{ id: string; name: string } | null> {
+    const id = await ownerOrgOf(subject, subjectId);
+    if (!id) return null;
+    const org = await prisma.organization.findUnique({
+        where: { id },
+        select: { id: true, name: true }
+    });
+    return org ?? null;
+}
+
 async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promise<string | null> {
     switch (subject) {
         case "office.document":

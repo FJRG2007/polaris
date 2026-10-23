@@ -403,7 +403,11 @@ export type GrantStanding =
     /** Every use it had is spent. */
     | "spent"
     /** A link only: in force, but not for the address or region asking. */
-    | "elsewhere";
+    | "elsewhere"
+    /** A link only: it opens for an account, and nobody is signed in. */
+    | "signin"
+    /** A link only: signed in, but not as somebody it opens for. */
+    | "denied";
 
 /** A grant, judged. `until` is when the open window shuts, for a screen that
  *  wants to say how long is left rather than that it is fine. */
@@ -483,7 +487,9 @@ export const GRANT_STANDING_LABELS: Record<GrantStanding, string> = {
     expired: "Expired",
     closed: "Outside its hours",
     spent: "Used up",
-    elsewhere: "Not from here"
+    elsewhere: "Not from here",
+    signin: "Needs sign-in",
+    denied: "Not for this account"
 };
 
 /**

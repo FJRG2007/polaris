@@ -206,8 +206,8 @@ export async function grantedCapability(
  * from how it reads. It is deliberate and it is what makes this cheap enough to
  * sit on an access path: almost nothing is shared, so one indexed query answers
  * "nobody has been given this" and the caller's teams and roles - two more
- * queries - are never looked up at all. Where there are rows there are at most a
- * hundred of them, so matching them to the caller in memory costs nothing.
+ * queries - are never looked up at all. Where there are rows, only the ones
+ * addressed to the caller are read.
  */
 export async function liveGrants(
     userId: string,
@@ -215,19 +215,20 @@ export async function liveGrants(
     subjectId: string,
     now = new Date()
 ): Promise<LiveGrant[]> {
-    const all = await prisma.accessGrant.findMany({
+    // One row is enough to know whether anything is shared at all, and the
+    // rows that matter are then only the caller's: a thing shared with
+    // thousands of people is never read whole on the way into it.
+    const any = await prisma.accessGrant.findFirst({
         where: { subjectType: subject, subjectId },
-        select: { ...GRANT_FIELDS, principalType: true, principalId: true }
+        select: { id: true }
     });
-    if (all.length === 0) return [];
+    if (!any) return [];
 
     const principals = await principalsOf(userId);
-    const held = new Set([
-        `user:${principals.userId}`,
-        ...principals.teamIds.map((id) => `team:${id}`),
-        ...principals.roleIds.map((id) => `role:${id}`)
-    ]);
-    const rows = all.filter((row) => held.has(`${row.principalType}:${row.principalId}`));
+    const rows = await prisma.accessGrant.findMany({
+        where: { subjectType: subject, subjectId, ...addressedTo(principals) },
+        select: { ...GRANT_FIELDS, principalType: true, principalId: true }
+    });
     if (rows.length === 0) return [];
 
     const zone = await houseZone(rows);
@@ -523,6 +524,11 @@ export interface GrantView {
     };
     readonly note: string;
     readonly createdAt: string;
+    /** A link only: who it opens for. "anyone" for every other row. */
+    readonly audience: core.LinkAudience;
+    /** What a row prints under the name: an address when that person lets the
+     *  viewer see it, else their handle; empty for a group. */
+    readonly contact: string;
 }
 
 /**
@@ -540,19 +546,123 @@ export async function listSubjectGrants(
 ): Promise<GrantView[]> {
     const rows = await prisma.accessGrant.findMany({
         where: { subjectType: subject, subjectId },
-        orderBy: { createdAt: "asc" }
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: core.GRANT_PAGE_SIZE
     });
+    return viewsOf(rows, now, null);
+}
+
+/** One page of a subject's grants, as the dialog asks for it. */
+export interface GrantPageQuery {
+    /** People, teams and roles - or the links. Never both on one page. */
+    readonly links: boolean;
+    /** Narrowed to principals whose name or handle has this in it. */
+    readonly search?: string;
+    /** The last row of the previous page. */
+    readonly cursor?: string | null;
+    readonly limit?: number;
+}
+
+export interface GrantPage {
+    readonly grants: GrantView[];
+    /** How many rows match, whatever the page size. */
+    readonly total: number;
+    readonly nextCursor: string | null;
+}
+
+/** How many principals a search may narrow a page to: a name typed into a
+ *  list of thousands is looking for somebody, not for a census. */
+const SEARCH_CAP = 500;
+
+/**
+ * A page of what one thing hands out, oldest first, with the total.
+ *
+ * Bounded whatever the subject carries: a page is at most GRANT_PAGE_SIZE rows,
+ * read off the (subject, createdAt, id) index, and the count is one indexed
+ * count. A search first finds the people, teams and roles whose names match -
+ * capped - and then pages the subject's rows for those.
+ */
+export async function listSubjectGrantPage(
+    subject: core.GrantSubject,
+    subjectId: string,
+    query: GrantPageQuery,
+    viewer: { id: string } | null,
+    now = new Date()
+): Promise<GrantPage> {
+    const limit = Math.min(Math.max(query.limit ?? core.GRANT_PAGE_SIZE, 1), core.GRANT_PAGE_SIZE);
+    const kinds = query.links ? [core.LINK_PRINCIPAL] : ["user", "team", "role"];
+    const where: { [key: string]: unknown } = {
+        subjectType: subject,
+        subjectId,
+        principalType: { in: kinds }
+    };
+    const term = (query.search ?? "").trim();
+    if (term.length > 0 && !query.links) {
+        const ids = await principalsNamed(term);
+        if (ids.length === 0) return { grants: [], total: 0, nextCursor: null };
+        where.principalId = { in: ids };
+    }
+    const [rows, total] = await Promise.all([
+        prisma.accessGrant.findMany({
+            where,
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            take: limit + 1,
+            ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {})
+        }),
+        prisma.accessGrant.count({ where })
+    ]);
+    const page = rows.slice(0, limit);
+    return {
+        grants: await viewsOf(page, now, viewer),
+        total,
+        nextCursor: rows.length > limit ? (page[page.length - 1]?.id ?? null) : null
+    };
+}
+
+/** The ids of people, teams and roles a search names, capped. */
+async function principalsNamed(term: string): Promise<string[]> {
+    const contains = { contains: term, mode: "insensitive" as const };
+    const [users, teams, roles] = await Promise.all([
+        prisma.user.findMany({
+            where: { OR: [{ name: contains }, { username: contains }] },
+            select: { id: true },
+            take: SEARCH_CAP
+        }),
+        prisma.team.findMany({ where: { name: contains }, select: { id: true }, take: SEARCH_CAP }),
+        prisma.orgRole.findMany({
+            where: { name: contains },
+            select: { id: true },
+            take: SEARCH_CAP
+        })
+    ]);
+    return [...users, ...teams, ...roles].map((one) => one.id);
+}
+
+type StoredGrant = Awaited<ReturnType<typeof prisma.accessGrant.findMany>>[number];
+
+async function viewsOf(
+    rows: readonly StoredGrant[],
+    now: Date,
+    viewer: { id: string } | null
+): Promise<GrantView[]> {
     if (rows.length === 0) return [];
     const zone = await houseZone(rows);
 
     const named = await nameParticipants(rows);
+    const contacts = viewer ? await contactsOf(viewer, rows) : new Map<string, string>();
     const views: GrantView[] = [];
     for (const row of rows) {
         // A link names nobody: what the screen says for it is its note.
-        const who =
+        const found =
             row.principalType === core.LINK_PRINCIPAL
                 ? { name: "", orgName: "" }
                 : named.get(`${row.principalType}:${row.principalId}`);
+        const who = found
+            ? {
+                  ...found,
+                  contact: row.principalType === "user" ? contacts.get(row.principalId) : ""
+              }
+            : undefined;
         if (!who) continue;
         const verdict = core.judgeGrant(row, now, zone);
         views.push({
@@ -577,7 +687,9 @@ export async function listSubjectGrants(
                 nearbyMeters: row.nearbyMeters
             },
             note: row.note,
-            createdAt: row.createdAt.toISOString()
+            createdAt: row.createdAt.toISOString(),
+            audience: core.linkAudienceOf(row.linkAudience),
+            contact: who.contact ?? ""
         });
     }
     return views;
@@ -593,7 +705,7 @@ async function nameParticipants(
         idsIn(of("user"), (ids) =>
             prisma.user.findMany({
                 where: { id: { in: ids } },
-                select: { id: true, name: true, email: true }
+                select: { id: true, name: true, username: true }
             })
         ),
         idsIn(of("team"), (ids) =>
@@ -612,7 +724,7 @@ async function nameParticipants(
 
     const named = new Map<string, { name: string; orgName: string }>();
     for (const user of users) {
-        named.set(`user:${user.id}`, { name: user.name || user.email, orgName: "" });
+        named.set(`user:${user.id}`, { name: user.name || user.username || "", orgName: "" });
     }
     for (const team of teams) {
         named.set(`team:${team.id}`, { name: team.name, orgName: team.org.name });
@@ -625,6 +737,27 @@ async function nameParticipants(
 
 async function idsIn<T>(ids: string[], read: (ids: string[]) => Promise<T[]>): Promise<T[]> {
     return ids.length === 0 ? [] : read([...new Set(ids)]);
+}
+
+/**
+ * What may be printed under each person on a page, for this viewer: the one
+ * rule every roster follows (`contactLines`), imported when a page is drawn
+ * rather than at the top - this module sits on the access path of four apps.
+ */
+async function contactsOf(
+    viewer: { id: string },
+    rows: readonly { principalType: string; principalId: string }[]
+): Promise<Map<string, string>> {
+    const ids = [
+        ...new Set(rows.filter((row) => row.principalType === "user").map((row) => row.principalId))
+    ];
+    if (ids.length === 0) return new Map();
+    const people = await prisma.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, email: true, username: true }
+    });
+    const { contactLines } = await import("@/lib/privacy-service");
+    return contactLines(viewer, people);
 }
 
 /** Refused because of what was asked for rather than who asked. The caller shows
@@ -741,8 +874,14 @@ export async function writeGrantLink(
     subject: core.GrantLinkSubject,
     subjectId: string,
     input: core.GrantLinkInput,
-    grantedById: string
+    grantedById: string,
+    /** The organization an `org` link opens for: the one that owns the thing. */
+    orgId: string | null = null
 ): Promise<{ id: string; token: string }> {
+    const audience = core.linkAudienceOf(input.audience);
+    if (audience === "org" && !orgId) {
+        throw new GrantError("This does not belong to an organization");
+    }
     // Narrower than a person's: a NAS, a server or a domain is only ever seen
     // through a link, whatever a person could be given.
     const allowed = core.linkCapabilities(subject);
@@ -777,6 +916,8 @@ export async function writeGrantLink(
             nearbyMeters: input.nearbyMeters,
             note: input.note,
             ...storedAddressRules(input),
+            linkAudience: audience,
+            linkOrgId: audience === "org" ? orgId : null,
             grantedById
         },
         select: { id: true }
@@ -827,7 +968,9 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
             note: true,
             allowedCidrs: true,
             allowedCountries: true,
-            allowedContinents: true
+            allowedContinents: true,
+            linkAudience: true,
+            linkOrgId: true
         }
     });
     if (!found) return null;
@@ -841,9 +984,51 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
     // caller to place, which a rule refuses and no rule ignores.
     const ip = await clientIp().catch(() => undefined);
     if (await linkAddressDenial(row, ip)) return { standing: "elsewhere", ...base };
+    const audience = core.linkAudienceOf(row.linkAudience);
+    if (audience !== "anyone") {
+        const refused = await audienceRefusal(audience, row, now);
+        if (refused) return { standing: refused, ...base };
+    }
     const [grant] = live([row], zone, now);
     return grant ? { standing: "live", grant, ...base } : { standing: "spent", ...base };
 }
+/**
+ * Whether the person signed in is somebody an account-only link opens for.
+ *
+ * `restricted` is somebody who already has the thing - by a grant of their own,
+ * or because they may share it, which is what its owners and administrators
+ * can. `org` is anybody signed in to the organization the link was written for.
+ * The session and the sharing rules are imported here, on demand: almost every
+ * link is an `anyone` link, and this module is on four apps' access path.
+ */
+async function audienceRefusal(
+    audience: Exclude<core.LinkAudience, "anyone">,
+    row: { subjectType: string; subjectId: string; linkOrgId: string | null },
+    now: Date
+): Promise<"signin" | "denied" | null> {
+    const { guardedUser } = await import("@/lib/session");
+    const viewer = await guardedUser({ touch: false }).catch(() => null);
+    if (!viewer) return "signin";
+    if (audience === "org") {
+        if (!row.linkOrgId) return "denied";
+        const member = await prisma.organizationMember.findFirst({
+            where: { orgId: row.linkOrgId, userId: viewer.id },
+            select: { userId: true }
+        });
+        return member ? null : "denied";
+    }
+    if (!core.isGrantSubject(row.subjectType)) return "denied";
+    const held = await liveGrants(viewer.id, row.subjectType, row.subjectId, now);
+    if (held.length > 0) return null;
+    const { requireMayShare } = await import("@/lib/access/sharing-service");
+    try {
+        await requireMayShare(viewer, row.subjectType, row.subjectId);
+        return null;
+    } catch {
+        return "denied";
+    }
+}
+
 /**
  * Whether the chosen principal is one this subject may actually be handed to.
  *
@@ -884,6 +1069,72 @@ export async function removeGrant(
     await prisma.accessGrant.deleteMany({
         where: { id: grantId, subjectType: subject, subjectId }
     });
+}
+
+/**
+ * Change what one grant hands over - its capability, its actions and its
+ * bounds - without changing who it is to. Scoped to the subject like
+ * `removeGrant`, and held to the same rules as a fresh write: a link may still
+ * only carry what a link may.
+ */
+export async function updateGrant(
+    subject: core.GrantSubject,
+    subjectId: string,
+    grantId: string,
+    input: core.GrantUpdateInput
+): Promise<void> {
+    const row = await prisma.accessGrant.findFirst({
+        where: { id: grantId, subjectType: subject, subjectId },
+        select: { principalType: true }
+    });
+    if (!row) throw new GrantError("That share is no longer there");
+    const allowed =
+        row.principalType === core.LINK_PRINCIPAL && core.isGrantLinkSubject(subject)
+            ? core.linkCapabilities(subject)
+            : (core.GRANT_CAPABILITIES[subject] as readonly string[]);
+    if (!allowed.includes(input.capability)) {
+        throw new GrantError("That is not something this can be shared as");
+    }
+    const actions = [...new Set(input.actions)];
+    const reachable = core.grantActions(subject, input.capability, []);
+    if (actions.some((action) => !reachable.includes(action))) {
+        throw new GrantError("That is not something this can be shared as");
+    }
+    await prisma.accessGrant.updateMany({
+        where: { id: grantId, subjectType: subject, subjectId },
+        data: {
+            capability: input.capability,
+            actions,
+            startsAt: input.startsAt ? new Date(input.startsAt) : null,
+            endsAt: input.endsAt ? new Date(input.endsAt) : null,
+            days: input.days,
+            startMinute: input.startMinute,
+            endMinute: input.endMinute,
+            timeZone: input.timeZone,
+            maxUses: input.maxUses,
+            nearbyMeters: input.nearbyMeters,
+            note: input.note
+        }
+    });
+}
+
+/** Who one link opens for, changed in place: the address stays the same, so a
+ *  link already sent starts or stops working for whoever holds it. */
+export async function setLinkAudience(
+    subject: core.GrantSubject,
+    subjectId: string,
+    grantId: string,
+    audience: core.LinkAudience,
+    orgId: string | null
+): Promise<void> {
+    if (audience === "org" && !orgId) {
+        throw new GrantError("This does not belong to an organization");
+    }
+    const changed = await prisma.accessGrant.updateMany({
+        where: { id: grantId, subjectType: subject, subjectId, principalType: core.LINK_PRINCIPAL },
+        data: { linkAudience: audience, linkOrgId: audience === "org" ? orgId : null }
+    });
+    if (changed.count === 0) throw new GrantError("That share is no longer there");
 }
 
 /**
