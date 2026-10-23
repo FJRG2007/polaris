@@ -29,6 +29,16 @@ export function safeRedirect(target: string | null | undefined): string {
 }
 
 /**
+ * The sign-in screen, set to bring the reader back to `back` once they are in.
+ * A public link that asks for an account (a drop point for named people, a form
+ * for members) sent them to the sign-in screen and then to the dashboard, so
+ * they had to find the link again to do what they came for.
+ */
+export function signInHref(back: string): string {
+    return `/oauth/login?redirect=${encodeURIComponent(safeRedirect(back))}`;
+}
+
+/**
  * The same rule for a target that is optional: the resolved path when the value
  * stays on this origin, and nothing when it is absent or would leave it, rather
  * than falling back to the root.

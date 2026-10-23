@@ -14,6 +14,7 @@ import { CircleCheck } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { submitFormAction } from "./actions";
+import { signInHref } from "@/lib/safe-redirect";
 import type { FormField } from "@polaris/core";
 import { Card, Input, Button, Select, CardBody, Textarea } from "@polaris/ui";
 
@@ -72,7 +73,10 @@ export function PublicForm({
                 <CardBody className="flex flex-col gap-3 p-8 text-center">
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">{name}</h1>
                     <p className="text-sm text-muted-foreground">{t("form.accountOnly")}</p>
-                    <a href="/oauth/login" className="text-sm text-primary hover:underline">
+                    <a
+                        href={signInHref(`/forms/${token}`)}
+                        className="text-sm text-primary hover:underline"
+                    >
                         {t("form.signIn")}
                     </a>
                 </CardBody>

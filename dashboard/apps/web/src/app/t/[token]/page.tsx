@@ -16,6 +16,7 @@ import Link from "next/link";
 import { LogIn } from "lucide-react";
 import * as core from "@polaris/core";
 import { getSession } from "@/lib/session";
+import { signInHref } from "@/lib/safe-redirect";
 import { getTranslations } from "@/lib/i18n/request";
 import { getPublicTask } from "@/lib/tasks/share-service";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
@@ -26,11 +27,14 @@ export const dynamic = "force-dynamic";
 function Shell({
     children,
     signedIn,
-    signInLabel
+    signInLabel,
+    back
 }: {
     children: React.ReactNode;
     signedIn: boolean;
     signInLabel: string;
+    /** This page, for the sign-in screen to return to. */
+    back: string;
 }) {
     return (
         <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-6">
@@ -42,7 +46,7 @@ function Shell({
                 </div>
                 {!signedIn && (
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/oauth/login">
+                        <Link href={signInHref(back)}>
                             <LogIn className="size-4" />
                             {signInLabel}
                         </Link>
@@ -80,7 +84,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
 
     if (!task) {
         return (
-            <Shell signedIn={signedIn} signInLabel={t("task.signIn")}>
+            <Shell signedIn={signedIn} signInLabel={t("task.signIn")} back={`/t/${token}`}>
                 <div className="flex flex-1 flex-col items-center justify-center text-center">
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("task.unavailableTitle")}</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -94,7 +98,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
     const showDate = (iso: string | null): string => (iso ? (task.timed ? format.dateTime(iso) : format.date(iso)) : "-");
 
     return (
-        <Shell signedIn={signedIn} signInLabel={t("task.signIn")}>
+        <Shell signedIn={signedIn} signInLabel={t("task.signIn")} back={`/t/${token}`}>
             <Card>
                 <CardHeader className="flex flex-col gap-1">
                     <span className="font-mono text-xs text-muted-foreground">{task.reference}</span>

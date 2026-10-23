@@ -15,6 +15,7 @@ import { noteActivity } from "@/lib/session-guard";
 import { formatBytes } from "@polaris/core";
 import { DropUploader } from "./upload-form";
 import { clientIp } from "@/lib/request-context";
+import { signInHref } from "@/lib/safe-redirect";
 import { LinkPasswordForm } from "@/components/link-password-form";
 import { LinkUnavailable, PublicShell } from "@/components/public-shell";
 import { unlockFileRequestAction } from "@/app/(app)/drive/request-actions";
@@ -127,7 +128,7 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                                 {t("dropPoint.signInFirst")}
                             </p>
                             <Link
-                                href="/oauth/login"
+                                href={signInHref(`/r/${token}`)}
                                 className="inline-flex w-fit items-center rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/90"
                             >
                                 {t("dropPoint.signIn")}
