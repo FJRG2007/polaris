@@ -198,6 +198,10 @@
         "failedBody": "Build {sha}. The updater stopped with exit code {code}; Settings has the log and can report it."
     },
     "address": {
+        "downManyTitle": "{count} addresses are not answering",
+        "downManyBody": "Nothing answered at {names}. Polaris can reach the internet, so this is about those addresses.",
+        "backManyTitle": "{count} addresses answer again",
+        "backManyBody": "{names} are reachable again.",
         "backTitle": "{host} is answering again",
         "backBody": "{url} is reachable again.",
         "tunnelGoneTitle": "The tunnel address is gone",

@@ -288,17 +288,37 @@ export async function resolveCondition(
     }
 }
 
-/** The condition keys still open for one reader under a prefix, for a checker
- *  that has to tell which of its conditions ended without being told. */
-export async function openConditions(userId: string, prefix: string): Promise<string[]> {
-    const rows = await prisma.notification
-        .findMany({
+/** An open condition as a checker reads it back. */
+export interface OpenCondition {
+    conditionKey: string;
+    type: string;
+    metadata: Record<string, unknown>;
+}
+
+/** The conditions still open for one reader under a key prefix, for a checker
+ *  that has to tell which of its conditions a recovery ends. */
+export async function openConditions(userId: string, prefix: string): Promise<OpenCondition[]> {
+    let rows: Array<{ conditionKey: string | null; type: string; metadata: string | null }>;
+    try {
+        rows = await prisma.notification.findMany({
             where: { userId, conditionKey: { startsWith: prefix } },
-            select: { conditionKey: true },
+            select: { conditionKey: true, type: true, metadata: true },
             take: 500
-        })
-        .catch(() => []);
-    return rows.map((row) => row.conditionKey).filter((key): key is string => key !== null);
+        });
+    } catch {
+        return [];
+    }
+    return rows.flatMap((row) => {
+        if (!row.conditionKey) return [];
+        let metadata: Record<string, unknown> = {};
+        try {
+            const parsed: unknown = row.metadata ? JSON.parse(row.metadata) : null;
+            if (parsed && typeof parsed === "object") metadata = parsed as Record<string, unknown>;
+        } catch {
+            // Unreadable metadata names no members; the notice is still open.
+        }
+        return [{ conditionKey: row.conditionKey, type: row.type, metadata }];
+    });
 }
 
 /** How many notifications the live feed carries. The bell and the page share it,

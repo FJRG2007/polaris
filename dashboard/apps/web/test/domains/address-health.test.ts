@@ -11,6 +11,7 @@
  * ever marked, never removed.
  */
 
+import { conditionStore } from "../notifications/fixtures/condition-store";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The Setting table, with the write shapes the sweep relies on. */
@@ -87,7 +88,16 @@ let addresses: Address[] = [];
 let answering = new Set<string>();
 let tunnelRunning = true;
 
-const notify = vi.fn(async () => {});
+// The dispatcher is mocked, but a condition still lands in an in-memory table
+// through the real service, so a recovery can be seen closing its notice.
+const bell = vi.hoisted(() => ({
+    store: null as ReturnType<typeof import("../notifications/fixtures/condition-store").conditionStore> | null
+}));
+const notify = vi.fn(async (input: { condition?: string; event?: string; userId?: string }) => {
+    if (!input.condition) return;
+    const { raiseCondition } = await import("@/lib/notification-service");
+    await raiseCondition(input.condition, { ...(input as never), type: input.event! });
+});
 const stopPolarisTunnel = vi.fn(async () => {
     rows.delete("polaris.ptunnel.url");
     addresses = addresses.filter((address) => address.kind !== "tunnel");
@@ -98,7 +108,17 @@ const checkDomain = vi.fn(async ({ hostname }: { hostname: string }) =>
         : { status: "down" as const, code: null, latencyMs: 6000, detail: "Timed out" }
 );
 
-vi.mock("@polaris/db", () => ({ prisma: { setting } }));
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        setting,
+        notification: {
+            updateMany: (args: never) => bell.store!.notification.updateMany(args),
+            create: (args: never) => bell.store!.notification.create(args),
+            findMany: (args: never) => bell.store!.notification.findMany(args)
+        }
+    }
+}));
+vi.mock("@/lib/shelf", () => ({ shelfFilter: () => ({}) }));
 vi.mock("@polaris/auth", () => ({ usersWithPermission: async () => ["user-1", "user-2"] }));
 vi.mock("@/lib/notifications/dispatch", () => ({
     notify: (input: unknown) => notify(input as never)
@@ -146,6 +166,7 @@ function alerts(): { title: string; body: string }[] {
 beforeEach(() => {
     vi.useFakeTimers();
     rows.clear();
+    bell.store = conditionStore();
     notify.mockClear();
     stopPolarisTunnel.mockClear();
     checkDomain.mockClear();
@@ -208,6 +229,53 @@ describe("probing what a deployment answers on", () => {
 
         answering.add("polaris.example.com");
         await sweep();
+        await sweep();
+        // No second notice: the one that said it was down now says it is back.
+        expect(alerts()).toHaveLength(0);
+        const notices = bell.store!.rows;
+        expect(notices).toHaveLength(2);
+        for (const notice of notices) {
+            expect(notice.title).toContain("answering again");
+            expect(notice).toMatchObject({ level: "success", conditionKey: null, actionRequired: false });
+        }
+    });
+
+    it("tells addresses that fail and come back together as one notice each way", async () => {
+        addresses.push({ url: "https://plr.example.com", host: "plr.example.com", kind: "domain" });
+        addresses.push({ url: "https://mc.example.com", host: "mc.example.com", kind: "domain" });
+        answering.delete("polaris.example.com");
+        await sweep();
+        await sweep();
+        const forOne = () => bell.store!.rows.filter((row) => row.userId === "user-1");
+        expect(forOne()).toHaveLength(1);
+        expect(forOne()[0]?.title).toBe("3 addresses are not answering");
+
+        answering.add("polaris.example.com");
+        answering.add("plr.example.com");
+        answering.add("mc.example.com");
+        await sweep();
+        expect(forOne()).toHaveLength(1);
+        expect(forOne()[0]?.title).toBe("3 addresses answer again");
+        expect(forOne()[0]?.body).toBe("polaris.example.com, plr.example.com, mc.example.com are reachable again.");
+    });
+
+    it("keeps a group open, rewritten, while part of it is still down", async () => {
+        addresses.push({ url: "https://plr.example.com", host: "plr.example.com", kind: "domain" });
+        answering.delete("polaris.example.com");
+        await sweep();
+        answering.add("polaris.example.com");
+        await sweep();
+        const mine = bell.store!.rows.filter((row) => row.userId === "user-1");
+        expect(mine).toHaveLength(1);
+        expect(mine[0]).toMatchObject({ title: "plr.example.com is not answering", conditionKey: "network.address:plr.example.com" });
+    });
+
+    it("announces a recovery nothing had announced as one notice for the pass", async () => {
+        answering.delete("polaris.example.com");
+        await sweep();
+        bell.store!.rows.length = 0;
+        notify.mockClear();
+        answering.add("polaris.example.com");
         await sweep();
         expect(alerts()).toHaveLength(2);
         expect(alerts()[0]?.title).toContain("answering again");
@@ -320,8 +388,9 @@ describe("an address answering again", () => {
         await vi.advanceTimersByTimeAsync(25 * 60_000);
         answering.add("polaris.example.com");
         await sweep();
-        expect(alerts()[0]?.title).toContain("answering again");
-        expect(alerts()[0]?.body).toMatch(/is reachable again, after 25 min down\./);
+        const back = bell.store!.rows[0]!;
+        expect(back.title).toContain("answering again");
+        expect(back.body).toMatch(/is reachable again, after 25 min down\./);
     });
 
     it("forgets when a removed address changed, with its health", async () => {

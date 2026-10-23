@@ -91,6 +91,8 @@ describe("resolveCondition", () => {
         await raiseCondition("svc:b", notice("b"));
         await raiseCondition("other", notice("c"));
         await resolveCondition("svc:a");
-        expect(await openConditions("u1", "svc:")).toEqual(["svc:b"]);
+        expect(await openConditions("u1", "svc:")).toEqual([
+            { conditionKey: "svc:b", type: "domain.address-stale", metadata: {} }
+        ]);
     });
 });

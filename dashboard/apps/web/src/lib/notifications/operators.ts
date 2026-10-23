@@ -32,6 +32,8 @@ export interface OperatorAlert {
     recipients?: readonly string[];
     /** Kept with the notification, for whatever reads it back. */
     metadata?: Record<string, unknown>;
+    /** An ongoing condition: one notice per recipient, rewritten while it holds. */
+    condition?: string;
 }
 
 /** Raise one alert with every recipient, never failing its caller. */
@@ -49,7 +51,8 @@ export async function notifyOperators(alert: OperatorAlert): Promise<void> {
                 level: alert.level,
                 audience: "admins",
                 actionRequired: alert.actionRequired,
-                metadata: alert.metadata
+                metadata: alert.metadata,
+                condition: alert.condition
             });
         })
     );

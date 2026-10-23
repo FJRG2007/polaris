@@ -198,6 +198,10 @@
         "failedBody": "Build {sha}. El actualizador se detuvo con el código de salida {code}; Ajustes tiene el registro y puede notificarlo."
     },
     "address": {
+        "downManyTitle": "{count} direcciones no responden",
+        "downManyBody": "Nada respondió en {names}. Polaris accede a internet, así que el problema son esas direcciones.",
+        "backManyTitle": "{count} direcciones responden",
+        "backManyBody": "{names} vuelven a ser accesibles.",
         "backTitle": "{host} vuelve a responder",
         "backBody": "{url} vuelve a ser accesible.",
         "tunnelGoneTitle": "La dirección del túnel ya no está",
