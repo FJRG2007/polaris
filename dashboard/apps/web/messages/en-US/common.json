@@ -63,7 +63,8 @@
             "watch.alarm": "an alarm",
             "status.page": "a public status page",
             "calendar.calendar": "a calendar",
-            "calendar.booking": "a page for bookings"
+            "calendar.booking": "a page for bookings",
+            "crm.record": "a record in the CRM"
         }
     },
     "mentions": {

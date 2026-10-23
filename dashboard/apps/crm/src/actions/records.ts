@@ -148,9 +148,25 @@ export async function listRecordsAction(input: unknown): Promise<Outcome<records
 export async function openRecordAction(input: unknown): Promise<Outcome<page.RecordOpening>> {
     const parsed = z.object({ object, id }).safeParse(input);
     if (!parsed.success) return invalid();
-    return outcome(async () =>
-        page.openRecord(await requireCrmActor(), parsed.data.object, parsed.data.id)
-    );
+    return outcome(async () => {
+        const actor = await requireCrmActor();
+        // A kind the reader may not read on their shelf is only ever a share.
+        if (!actor.can[parsed.data.object].read) {
+            const shared = await page.openSharedRecord(
+                actor.user,
+                parsed.data.object,
+                parsed.data.id
+            );
+            if (shared) return shared;
+        }
+        const opening = await page.openRecord(actor, parsed.data.object, parsed.data.id);
+        if (opening.record) return opening;
+        // Not on the reader's shelf: it may be somebody else's, shared with them.
+        return (
+            (await page.openSharedRecord(actor.user, parsed.data.object, parsed.data.id)) ??
+            opening
+        );
+    });
 }
 
 /** An older page of what happened to a record. */

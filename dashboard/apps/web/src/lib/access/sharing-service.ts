@@ -21,7 +21,7 @@ import * as core from "@polaris/core";
 import { sessionCan } from "@/lib/session";
 import type { SessionUser } from "@/lib/session";
 import { GrantError } from "@/lib/access/grants";
-import { memberOrgIds } from "@/lib/orgs/org-service";
+import { memberOrgIds, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
 import { requireSpace as requireNoteSpace } from "@/lib/notes/access";
 import { requireShareable as requireOfficeShareable } from "@/lib/office/documents";
 import { requireSpace as requireChatSpace, requireChannel } from "@/lib/chat/access";
@@ -136,6 +136,44 @@ export async function requireMayShare(
                 select: { id: true }
             });
             if (!page) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "crm.record": {
+            // Whoever may change a record where it lives may show it to
+            // somebody else: its owner on a personal shelf, a role that edits
+            // that kind of record on an organization's.
+            const [kind, id] = subjectId.split(":");
+            const delegate =
+                kind === "companies"
+                    ? prisma.crmCompany
+                    : kind === "people"
+                      ? prisma.crmPerson
+                      : kind === "opportunities"
+                        ? prisma.crmOpportunity
+                        : null;
+            const row =
+                delegate && id && /^[0-9a-f-]{36}$/i.test(id)
+                    ? await (
+                          delegate as unknown as {
+                              findFirst(args: unknown): Promise<{
+                                  orgId: string | null;
+                                  userId: string | null;
+                              } | null>;
+                          }
+                      ).findFirst({
+                          where: { id, deletedAt: null },
+                          select: { orgId: true, userId: true }
+                      })
+                    : null;
+            if (!row) throw new GrantError("You cannot share that");
+            if (row.orgId) {
+                const access = await resolveOrgAccess(user, row.orgId);
+                if (!orgCan(access, `crm.${kind}.edit` as core.OrgPermission)) {
+                    throw new GrantError("You cannot share that");
+                }
+            } else if (row.userId !== user.id) {
+                throw new GrantError("You cannot share that");
+            }
             return;
         }
         case "status.page": {
@@ -393,6 +431,10 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return "/calendar";
         case "calendar.booking":
             return `/calendar/booking/${subjectId}`;
+        case "crm.record": {
+            const [kind, id] = subjectId.split(":");
+            return `/crm/${kind}/${encodeURIComponent(id ?? "")}`;
+        }
         case "office.document":
             return "/office/shared";
         case "place.ups":

@@ -83,7 +83,8 @@ export const GRANT_SUBJECTS = [
     "watch.alarm",
     "status.page",
     "calendar.calendar",
-    "calendar.booking"
+    "calendar.booking",
+    "crm.record"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -187,7 +188,11 @@ export const GRANT_CAPABILITIES = {
     // A booking page, handed to a co-host: seeing it and every booking made
     // through it, or also changing how it books and cancelling bookings. The
     // calendars it books into, duplicating and deleting stay with its owner.
-    "calendar.booking": ["view", "edit"]
+    "calendar.booking": ["view", "edit"],
+    // One CRM record - a company, a person or an opportunity - named
+    // "<kind>:<id>", handed to somebody outside its shelf: its fields, read.
+    // Its timeline, the records around it and every change stay on the shelf.
+    "crm.record": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -231,7 +236,8 @@ export const GRANT_ACTIONS = {
     "watch.alarm": [],
     "status.page": [],
     "calendar.calendar": [],
-    "calendar.booking": []
+    "calendar.booking": [],
+    "crm.record": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

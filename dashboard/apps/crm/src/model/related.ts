@@ -46,6 +46,11 @@ export function relatedLists(
 }
 
 /** Where a record's page is. */
+/** How a shared record is named in `crm.record`. */
+export function recordSubjectId(object: CrmObject, id: string): string {
+    return `${object}:${id}`;
+}
+
 export function recordHref(object: CrmObject, id: string): string {
     return `/crm/${object}/${encodeURIComponent(id)}`;
 }

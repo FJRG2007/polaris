@@ -404,6 +404,8 @@
         "failed": "The export failed"
     },
     "record": {
+        "share": "Share record",
+        "sharedWithYou": "Shared with you",
         "open": "Open record",
         "openPage": "Open full page",
         "untitled": "Untitled",

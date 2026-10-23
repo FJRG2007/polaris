@@ -404,6 +404,8 @@
         "failed": "No se pudo exportar"
     },
     "record": {
+        "share": "Compartir",
+        "sharedWithYou": "Compartido contigo",
         "open": "Abrir registro",
         "openPage": "Abrir en página",
         "untitled": "Sin nombre",

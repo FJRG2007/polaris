@@ -34,7 +34,11 @@ vi.mock("@polaris/db", () => {
     return { prisma: client, Prisma: { Decimal: class {} } };
 });
 vi.mock("@polaris/app-host", () => ({
-    host: { crmHost: {}, i18nRequest: { getLocale: async () => "en-US" } }
+    host: {
+        crmHost: {},
+        i18nRequest: { getLocale: async () => "en-US" },
+        accessGrants: { dropGrantsFor: async () => undefined }
+    }
 }));
 
 import { destroyRecords, restoreRecords } from "@polaris-app/crm/src/lib/records";

@@ -82,7 +82,11 @@ vi.mock("@polaris/db", () => {
     };
 });
 vi.mock("@polaris/app-host", () => ({
-    host: { crmHost: {}, i18nRequest: { getLocale: async () => "en-US" } }
+    host: {
+        crmHost: {},
+        i18nRequest: { getLocale: async () => "en-US" },
+        accessGrants: { dropGrantsFor: async () => undefined }
+    }
 }));
 
 import { csvValue } from "@polaris-app/crm/src/model/csv";

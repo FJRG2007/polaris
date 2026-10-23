@@ -12,9 +12,18 @@ import { listTimeline } from "./timeline";
 import type { TimelinePage } from "../model/timeline";
 import { getRecord, shelfPeople, shown } from "./records";
 import { recordSelect, table } from "./columns";
-import { relatedLists, type RelatedList } from "../model/related";
+import { recordSubjectId, relatedLists, type RelatedList } from "../model/related";
 import type { ObjectRule } from "../model/roles";
-import { recordWhere, type Abilities, type CrmActor } from "./access";
+import { host } from "@polaris/app-host";
+import { CRM_VERBS } from "@polaris/core";
+import { OPEN_RULES } from "../model/roles";
+import {
+    recordWhere,
+    type Abilities,
+    type CrmActor,
+    type SessionUser,
+    type Shelf
+} from "./access";
 import {
     CRM_OBJECTS,
     recordName,
@@ -45,6 +54,58 @@ export interface RecordOpening {
     readonly favorite: boolean;
     /** What the reader's role is held to for this kind of record. */
     readonly rule?: ObjectRule;
+    /** Somebody else's record, shared with this reader to read and nothing more. */
+    readonly shared?: boolean;
+}
+
+/**
+ * A record from another shelf that was shared with this reader: its fields and
+ * nothing around it - no timeline, no related records, no shelf people - read
+ * as a reader who may see that one kind and change nothing. Null without a live
+ * grant, or once the record is gone or in the trash.
+ */
+export async function openSharedRecord(
+    user: SessionUser,
+    object: CrmObject,
+    id: string
+): Promise<RecordOpening | null> {
+    const held = await host.accessGrants.grantedSubjects(user.id, "crm.record");
+    if (!held.has(recordSubjectId(object, id))) return null;
+    const row = (await table(object).findFirst({
+        where: { id, deletedAt: null },
+        select: { orgId: true, userId: true }
+    })) as { orgId: string | null; userId: string | null } | null;
+    if (!row) return null;
+    const shelf: Shelf = row.orgId
+        ? { orgId: row.orgId, userId: null, key: `org:${row.orgId}`, orgName: null }
+        : { orgId: null, userId: row.userId, key: `user:${row.userId}`, orgName: null };
+    const reader: CrmActor = {
+        user,
+        shelf,
+        can: Object.fromEntries(
+            CRM_OBJECTS.map((kind) => [
+                kind,
+                Object.fromEntries(CRM_VERBS.map((verb) => [verb, kind === object && verb === "read"]))
+            ])
+        ) as unknown as Abilities,
+        rules: OPEN_RULES,
+        manageRoles: false
+    };
+    const [record, fields] = await Promise.all([
+        getRecord(reader, object, id),
+        loadFields(shelf, object)
+    ]);
+    if (!record) return null;
+    return {
+        record,
+        fields: [...fields],
+        can: reader.can,
+        people: [],
+        related: [],
+        timeline: { events: [], next: null },
+        favorite: false,
+        shared: true
+    };
 }
 
 export async function openRecord(

@@ -63,7 +63,8 @@
             "watch.alarm": "una alarma",
             "status.page": "una página de estado",
             "calendar.calendar": "un calendario",
-            "calendar.booking": "una página de reservas"
+            "calendar.booking": "una página de reservas",
+            "crm.record": "un registro del CRM"
         }
     },
     "mentions": {

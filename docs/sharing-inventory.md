@@ -43,7 +43,7 @@ reason).
 | Status pages | Status page (editors) | `status.page` | `status.manage` holders (every page) | public page itself | editors (edit one page; create, delete, domain stay with `status.manage`) | add | done |
 | Calendar | Calendar | `calendar.calendar` | `CalendarShare` (user, team, four levels) + AccessGrant for org roles | published link `/cal/p/<token>` (busy or full, rotate, mail) | roles (the shared dialog, limited to roles; people and teams stay in CalendarShare) | add | done |
 | Calendar | Booking page | `calendar.booking` | owner + AccessGrant co-hosts | public booking page | co-hosts (see it and its bookings, or also change how it books and cancel bookings; its calendars, duplicate and delete stay with the owner) | add | done |
-| CRM | Company, person, opportunity | - | org roles (`CrmRoleRule`) | none | per-record people share | add | todo |
+| CRM | Company, person, opportunity | `crm.record` | org roles (`CrmRoleRule`) + AccessGrant per record | none | per-record people share (its fields, read; timeline, related records and changes stay on the shelf) | add | done |
 | CRM | Dashboard | - | org shelf | none | people + link | add | todo |
 | Automations | Automation, folder | - | org shelf | none | people (view, edit) | add | todo |
 | Analytics | Site | - | org shelf | none | people + public link | add | todo |
