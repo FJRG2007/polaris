@@ -82,6 +82,29 @@ function presenceState(held: string, wanted: string): DeckState {
     return { tone: on ? "warn" : "idle", on };
 }
 
+/**
+ * A presence key with what pressing it does: it sets its choice, or goes back
+ * to automatic when that choice holds - and a key set to another choice that
+ * held goes off with it, at once.
+ */
+export function presenceKey(held: string, wanted: string): DeckState {
+    const next = held === wanted ? "auto" : wanted;
+    const also = PRESSED_CHOICES.filter(
+        (choice) => choice !== wanted && (held === choice) !== (next === choice)
+    ).map((choice) => ({
+        action: "status.presence",
+        options: { choice },
+        face: presenceState(next, choice)
+    }));
+    return {
+        ...presenceState(held, wanted),
+        press: {
+            face: presenceState(next, wanted),
+            ...(also.length > 0 ? { also } : {})
+        }
+    };
+}
+
 const conversationList = z.object({
     conversations: z.array(z.object({ id: z.string(), name: z.string().nullish() }).passthrough())
 });
@@ -206,13 +229,10 @@ export function coreDeckActions(refused: string): readonly CoreDeckAction[] {
                     held.choice === wanted ? "auto" : (wanted as "busy" | "away" | "invisible")
                 );
                 const now = await presenceChoiceOf(caller.userId);
-                return { ok: true, state: presenceState(now.choice, wanted) };
+                return { ok: true, state: presenceKey(now.choice, wanted) };
             },
             read: async (options, caller) =>
-                presenceState(
-                    (await presenceChoiceOf(caller.userId)).choice,
-                    String(options.choice)
-                ),
+                presenceKey((await presenceChoiceOf(caller.userId)).choice, String(options.choice)),
             wakes: "clock"
         },
         {

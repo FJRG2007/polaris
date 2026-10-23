@@ -40,6 +40,9 @@ interface Held {
     userId: string | null;
     controls: SeatControls;
     at: number;
+    /** Whether the microphone was muted when the seat deafened: what
+     *  undeafening gives back (`pressDeafen`). Unknown until a deafen is seen. */
+    mutedBeforeDeafen?: boolean;
 }
 
 type ControlsListener = (userId: string) => void;
@@ -93,6 +96,8 @@ export async function noteControls(
     forgetOld(now);
     const seats = registry().seats;
     let held = seats.get(participantId);
+    // A seat first heard from now has no word from before to compare with.
+    const known = held !== undefined;
     if (!held) {
         // Whose seat this is, read once per seat rather than on every beat.
         const row = await prisma.meetingParticipant
@@ -121,6 +126,8 @@ export async function noteControls(
     };
     held.at = now;
     held.controls = next;
+    if (next.deafened && !before.deafened && known) held.mutedBeforeDeafen = before.muted;
+    else if (!next.deafened) held.mutedBeforeDeafen = undefined;
     const changed = (Object.keys(next) as (keyof SeatControls)[]).some(
         (key) => next[key] !== before[key]
     );
@@ -148,6 +155,9 @@ export interface LiveCall {
     readonly seat: MeetingSeat;
     readonly controls: SeatControls;
     readonly mayRecord: boolean;
+    /** Deafened: whether the microphone comes back muted when the headphones
+     *  come off, when this server saw the seat deafen. */
+    readonly mutedBeforeDeafen?: boolean;
 }
 
 /** The lookups in flight, by account: a deck reads every call key at once,
@@ -193,7 +203,8 @@ async function readLiveCall(userId: string): Promise<LiveCall | null> {
               select: { kind: true }
           })
         : null;
-    const held = registry().seats.get(row.id)?.controls;
+    const seat = registry().seats.get(row.id);
+    const held = seat?.controls;
     return {
         seat: { meetingId: row.meetingId, participantId: row.id, admission: "admitted" },
         controls: {
@@ -209,7 +220,10 @@ async function readLiveCall(userId: string): Promise<LiveCall | null> {
             viewerId: userId,
             hostId: row.meeting.hostId,
             channelKind: channel?.kind ?? null
-        })
+        }),
+        ...(row.deafened && seat?.mutedBeforeDeafen !== undefined
+            ? { mutedBeforeDeafen: seat.mutedBeforeDeafen }
+            : {})
     };
 }
 
@@ -241,18 +255,19 @@ function send(seat: MeetingSeat, remote: CallRemoteCommand): void {
     });
 }
 
-/** Flip one of the caller's own call switches. Answers where it was sent to. */
+/** Flip one of the caller's own call switches. Answers where it was sent to,
+ *  and the call as it was read before. */
 export async function flipCallSwitch(
     userId: string,
     which: CallSwitch
-): Promise<{ ok: true; on: boolean } | { ok: false; refusal: RemoteRefusal }> {
+): Promise<{ ok: true; on: boolean; live: LiveCall } | { ok: false; refusal: RemoteRefusal }> {
     const live = await liveCallOf(userId);
     if (!live) return { ok: false, refusal: "notInCall" };
     // The call screen's own rule for the record button, asked of the same call.
     if (which === "record" && !live.mayRecord) return { ok: false, refusal: "mayNotRecord" };
     const on = wantedOn(which, live.controls);
     send(live.seat, { command: which, on });
-    return { ok: true, on };
+    return { ok: true, on, live };
 }
 
 /** Hang up the caller's own call, in the tab that is on it. */

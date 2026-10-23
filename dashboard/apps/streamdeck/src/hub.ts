@@ -15,8 +15,15 @@ import { wordsFor } from "./words";
 import { keyImage } from "./render";
 import { backoffMs } from "./backoff";
 import { joinPath, normalizeAddress } from "./address";
-import { InFlight } from "./optimistic";
-import { faceFor, runOptions, watchOptions, type Binding, type KeySettings } from "./face";
+import { InFlight, shows } from "./optimistic";
+import {
+    alternates,
+    faceFor,
+    runOptions,
+    watchOptions,
+    type Binding,
+    type KeySettings
+} from "./face";
 import streamDeck, { type DialAction, type KeyAction } from "@elgato/streamdeck";
 import {
     PolarisClient,
@@ -26,6 +33,7 @@ import {
     Unauthorized,
     type Credentials,
     type DeckAction,
+    type DeckAlso,
     type DeckLocked,
     type DeckReleases,
     type DeckState,
@@ -136,6 +144,19 @@ class Hub {
 
     state(id: string): DeckState | undefined {
         return this.#states.get(id);
+    }
+
+    /** The keys drawing what `also` names: its action, with its settings when
+     *  it gives them. A key that alternates draws its side, not a state. */
+    keysShowing(also: DeckAlso): string[] {
+        const keys: string[] = [];
+        for (const [id, instance] of this.#instances) {
+            const entry = this.entry(instance.settings);
+            if (instance.surface !== "key" || !entry || alternates(instance.settings, entry))
+                continue;
+            if (shows(also, entry.id, watchOptions(instance.settings, "key"))) keys.push(id);
+        }
+        return keys;
     }
 
     redraw(id: string): void {

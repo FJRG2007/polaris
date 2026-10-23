@@ -116,6 +116,9 @@ export interface DeckState {
     readonly press?: {
         readonly face?: DeckState;
         readonly noop?: boolean;
+        /** What it does to keys showing something else: deafening mutes the
+         *  microphone's key, hanging up ends every call key. */
+        readonly also?: readonly DeckAlso[];
     };
     /** A timer kept in Polaris: what the key counts down from between
      *  readings. `endsAt` and `serverNow` are on Polaris's clock, and only
@@ -128,6 +131,14 @@ export interface DeckState {
         readonly serverNow?: number;
         readonly phase?: "focus" | "short" | "long";
     };
+}
+
+/** A face a press draws on every key showing `action` - with these settings
+ *  when `options` is given, whatever its settings when not. */
+export interface DeckAlso {
+    readonly action: string;
+    readonly options?: Readonly<Record<string, unknown>>;
+    readonly face: DeckState;
 }
 
 export type RunResult =

@@ -108,6 +108,18 @@ export type DeckFace = Omit<DeckState, "press">;
 export interface DeckPress {
     readonly face?: DeckFace;
     readonly noop?: true;
+    /** What the press changes on keys showing something else - deafening
+     *  mutes the microphone's key, hanging up ends every call key - drawn on
+     *  them at once and put back with the pressed key's own face. */
+    readonly also?: readonly DeckAlso[];
+}
+
+/** A face a press draws on other keys: every key showing `action`, with
+ *  these settings when `options` is given and whatever its settings when not. */
+export interface DeckAlso {
+    readonly action: string;
+    readonly options?: Readonly<Record<string, unknown>>;
+    readonly face: DeckFace;
 }
 
 /** An action the deck's key does not carry the permission for, though its

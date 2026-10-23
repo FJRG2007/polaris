@@ -6,15 +6,21 @@
  * the state it returns replaces the guess, and a refusal or no answer at all
  * puts back the face the key had. A press whose result is already there - a
  * lock pressed to lock while locked - keeps its face; Polaris reads the device
- * again and does nothing.
+ * again and does nothing. A press that moves other keys too - deafening mutes,
+ * hanging up ends every call key - draws them at once as well, and they go
+ * back with it.
  *
  * Shared with the Companion module. SDK-free and pure, so the tests reach it.
  */
 
-import type { DeckAction, DeckState } from "./polaris";
+import type { DeckAction, DeckAlso, DeckState } from "./polaris";
 
-/** What a press does to its key before Polaris answers. */
-export type Prediction = { readonly noop: true } | { readonly face: DeckState } | null;
+/** What a press does to its key before Polaris answers, and to the other keys
+ *  it moves. */
+export type Prediction =
+    | { readonly noop: true }
+    | { readonly face: DeckState; readonly also?: readonly DeckAlso[] }
+    | null;
 
 /**
  * What a press of `entry`'s key shows at once, from the state it shows now.
@@ -27,10 +33,53 @@ export function predict(
 ): Prediction {
     if (!entry || !state) return null;
     if (state.press?.noop) return { noop: true };
-    if (state.press?.face) return { face: state.press.face };
+    if (state.press?.face)
+        return state.press.also?.length
+            ? { face: state.press.face, also: state.press.also }
+            : { face: state.press.face };
     if (entry.kind === "toggle" && typeof state.on === "boolean")
         return { face: { ...state, on: !state.on } };
     return null;
+}
+
+/** Whether a key showing `action` with `options` is one `also` names. */
+export function shows(
+    also: DeckAlso,
+    action: string | undefined,
+    options: Record<string, unknown>
+): boolean {
+    if (also.action !== action) return false;
+    if (!also.options) return true;
+    const named = Object.entries(also.options);
+    return (
+        named.length === Object.keys(options).length &&
+        named.every(([name, value]) => options[name] === value)
+    );
+}
+
+/**
+ * Draw a press on the other keys it moves: each key `keysOf` finds showing
+ * what an `also` names is marked as having a press on its way and given the
+ * face. Run after the pressed key is begun, so it is left alone, as is a key
+ * with its own press on the way or with nothing drawn yet - there would be no
+ * face to put back. Returns what to draw; settle each key with the press.
+ */
+export function beginAlso(
+    flight: InFlight,
+    also: readonly DeckAlso[] | undefined,
+    keysOf: (also: DeckAlso) => readonly string[],
+    stateOf: (key: string) => DeckState | undefined
+): { key: string; state: DeckState }[] {
+    const drawn: { key: string; state: DeckState }[] = [];
+    for (const item of also ?? []) {
+        for (const key of keysOf(item)) {
+            const before = stateOf(key);
+            if (!before || flight.busy(key)) continue;
+            flight.begin(key, before);
+            drawn.push({ key, state: item.face });
+        }
+    }
+    return drawn;
 }
 
 /**

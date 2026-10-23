@@ -273,13 +273,31 @@ describe("runDeckAction", () => {
             { action: "status.presence", options: { choice: "busy" } },
             words
         );
-        expect(first).toEqual({ ok: true, state: { tone: "warn", on: true } });
+        expect(first).toMatchObject({ ok: true, state: { tone: "warn", on: true } });
         await service.runDeckAction(
             caller([]),
             { action: "status.presence", options: { choice: "busy" } },
             words
         );
         expect(presenceWrites).toEqual(["busy", "auto"]);
+    });
+
+    it("a status key pressed turns off the key of the status it replaces, at once", () => {
+        // Away holds; pressing Busy sets Busy, so the Away key goes off with it.
+        expect(core.presenceKey("away", "busy").press).toEqual({
+            face: { tone: "warn", on: true },
+            also: [
+                {
+                    action: "status.presence",
+                    options: { choice: "away" },
+                    face: { tone: "idle", on: false }
+                }
+            ]
+        });
+        // Busy holds; pressing it goes back to automatic and touches no other key.
+        expect(core.presenceKey("busy", "busy").press).toEqual({
+            face: { tone: "idle", on: false }
+        });
     });
 
     it("runs an app's action through its tool, with the finer scope its permission grants", async () => {

@@ -14,7 +14,9 @@
  * about it did. Server-only.
  */
 
-type Listener = (userId: string, actions: readonly string[]) => void;
+/** `pressed`: a deck pressed one of them and drew a guess, so a stream sends
+ *  their state again shortly even when it did not change. */
+type Listener = (userId: string, actions: readonly string[], pressed: boolean) => void;
 
 const REGISTRY = Symbol.for("polaris.deck.live");
 
@@ -27,10 +29,14 @@ function listeners(): Set<Listener> {
 /** Announce that what these deck actions show changed for this account. Never
  *  throws. Asynchronous only because apps reach it through the host, where
  *  every service is. */
-export async function deckChanged(userId: string, actions: readonly string[]): Promise<void> {
+export async function deckChanged(
+    userId: string,
+    actions: readonly string[],
+    pressed = false
+): Promise<void> {
     for (const listener of listeners()) {
         try {
-            listener(userId, actions);
+            listener(userId, actions, pressed);
         } catch (caught) {
             console.error("deck: a live listener failed", caught);
         }

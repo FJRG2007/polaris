@@ -29,6 +29,10 @@ export const DECK_STREAM = {
     clockMs: 15_000,
     /** A burst of chat changes is one read. */
     coalesceMs: 750,
+    /** A call's controls move once per press: read almost at once. */
+    callMs: 50,
+    /** How long after a press its keys are sent again, changed or not. */
+    pressedMs: 3_000,
     heartbeatMs: 25_000,
     /** How long one stream lives before the plugin has to reconnect. */
     lifetimeMs: 5 * 60_000
@@ -76,6 +80,8 @@ export function deckStateStream(
     let first = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
     let pending: ReturnType<typeof setTimeout> | null = null;
+    let pendingAt = 0;
+    const resends = new Set<ReturnType<typeof setTimeout>>();
     let unsubscribe: (() => void) | null = null;
     let offCalls: (() => void) | null = null;
     let offDeck: (() => void) | null = null;
@@ -95,6 +101,7 @@ export function deckStateStream(
                 if (closed) return;
                 closed = true;
                 for (const timer of timers) clearInterval(timer);
+                for (const timer of resends) clearTimeout(timer);
                 if (pending) clearTimeout(pending);
                 unsubscribe?.();
                 offCalls?.();
@@ -106,13 +113,30 @@ export function deckStateStream(
                 }
             }
 
-            // A burst of wakes is one read.
-            function wake(): void {
-                if (pending || closed) return;
+            // A burst of wakes is one read, as soon as the soonest of them asks.
+            function wake(delayMs: number = DECK_STREAM.coalesceMs): void {
+                if (closed) return;
+                const at = Date.now() + delayMs;
+                if (pending && pendingAt <= at) return;
+                if (pending) clearTimeout(pending);
+                pendingAt = at;
                 pending = setTimeout(() => {
                     pending = null;
                     void read();
-                }, DECK_STREAM.coalesceMs);
+                }, delayMs);
+            }
+
+            // What a press drew is sent again once the tab has had time to do
+            // it, even unchanged: the stream sends only what moved, and a guess
+            // nothing carried out - a moderator's mute - would otherwise stay.
+            function resend(keys: readonly string[]): void {
+                if (closed || keys.length === 0) return;
+                const timer = setTimeout(() => {
+                    resends.delete(timer);
+                    for (const key of keys) last.delete(key);
+                    wake(0);
+                }, DECK_STREAM.pressedMs);
+                resends.add(timer);
             }
 
             // One read at a time; a wake during one runs once more after it.
@@ -137,7 +161,7 @@ export function deckStateStream(
                     // key a moment after it is pressed, wherever it was pressed.
                     if (call && !offCalls) {
                         offCalls = onControlsChanged((userId) => {
-                            if (userId === caller.userId) wake();
+                            if (userId === caller.userId) wake(DECK_STREAM.callMs);
                         });
                     }
                     if (chat && !unsubscribe) {
@@ -158,8 +182,14 @@ export function deckStateStream(
             }
 
             signal?.addEventListener("abort", stop);
-            offDeck = onDeckChanged((userId, actions) => {
-                if (deckChangeConcerns(watched, caller.userId, userId, actions)) wake();
+            offDeck = onDeckChanged((userId, actions, pressed) => {
+                if (!deckChangeConcerns(watched, caller.userId, userId, actions)) return;
+                if (!pressed) return wake();
+                resend(
+                    watched
+                        .filter((entry) => actions.includes(entry.action))
+                        .map((entry) => entry.key)
+                );
             });
             write(`retry: 5000\n\n`);
             await read();
@@ -179,6 +209,7 @@ export function deckStateStream(
         cancel() {
             closed = true;
             for (const timer of timers) clearInterval(timer);
+            for (const timer of resends) clearTimeout(timer);
             if (pending) clearTimeout(pending);
             unsubscribe?.();
             offCalls?.();

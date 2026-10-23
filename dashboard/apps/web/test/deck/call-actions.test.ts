@@ -14,7 +14,7 @@ type Controls = {
     sharing: boolean;
 };
 
-let live: { controls: Controls; mayRecord: boolean } | null = null;
+let live: { controls: Controls; mayRecord: boolean; mutedBeforeDeafen?: boolean } | null = null;
 const flipCallSwitch = vi.fn();
 const hangUpCall = vi.fn();
 const playCallSound = vi.fn();
@@ -31,7 +31,7 @@ vi.mock("@/lib/chat/call-remote-service", () => ({
     deckSounds: async () => []
 }));
 
-const { callDeckActions, noCallState, switchOn, switchState } =
+const { callDeckActions, noCallState, switchOn, switchState, callPress } =
     await import("../../src/lib/deck/call-actions");
 
 const { defaultRef } = await import("../../src/lib/chat/soundboard");
@@ -104,14 +104,14 @@ describe("out of a call", () => {
 describe("in a call", () => {
     it("shows the microphone lit and crossed out while muted", async () => {
         live = { controls: { ...QUIET, muted: true }, mayRecord: false };
-        expect(await action("call.mic").read!({}, caller())).toEqual({
+        expect(await action("call.mic").read!({}, caller())).toMatchObject({
             tone: "warn",
             on: true,
             icon: "mic-off",
             detail: "Muted"
         });
         live = { controls: QUIET, mayRecord: false };
-        expect(await action("call.mic").read!({}, caller("es-ES"))).toEqual({
+        expect(await action("call.mic").read!({}, caller("es-ES"))).toMatchObject({
             tone: "idle",
             on: false,
             icon: "mic",
@@ -138,7 +138,7 @@ describe("in a call", () => {
             on: true,
             detail: "Recording"
         });
-        expect(await action("call.hangup").read!({}, caller())).toEqual({
+        expect(await action("call.hangup").read!({}, caller())).toMatchObject({
             tone: "bad",
             icon: "phone-off",
             detail: "In a call"
@@ -147,8 +147,12 @@ describe("in a call", () => {
 
     it("muting answers with the key muted: the command is for the microphone", async () => {
         // Asked to turn the microphone off, which is the key on.
-        flipCallSwitch.mockResolvedValue({ ok: true, on: false });
-        expect(await action("call.mic").run!({}, caller())).toEqual({
+        flipCallSwitch.mockResolvedValue({
+            ok: true,
+            on: false,
+            live: { controls: QUIET, mayRecord: false }
+        });
+        expect(await action("call.mic").run!({}, caller())).toMatchObject({
             ok: true,
             state: switchState("mic", true, "en-US")
         });
@@ -156,8 +160,12 @@ describe("in a call", () => {
     });
 
     it("turning the camera on answers with the camera on", async () => {
-        flipCallSwitch.mockResolvedValue({ ok: true, on: true });
-        expect(await action("call.camera").run!({}, caller())).toEqual({
+        flipCallSwitch.mockResolvedValue({
+            ok: true,
+            on: true,
+            live: { controls: QUIET, mayRecord: false }
+        });
+        expect(await action("call.camera").run!({}, caller())).toMatchObject({
             ok: true,
             state: switchState("camera", true, "en-US")
         });
@@ -173,7 +181,7 @@ describe("in a call", () => {
 
     it("shows a share lit while the seat is sharing its screen", async () => {
         live = { controls: { ...QUIET, sharing: true }, mayRecord: false };
-        expect(await action("call.share").read!({}, caller())).toEqual({
+        expect(await action("call.share").read!({}, caller())).toMatchObject({
             tone: "ok",
             on: true,
             icon: "screen-share",
@@ -182,8 +190,12 @@ describe("in a call", () => {
     });
 
     it("stopping a share answers with the key off", async () => {
-        flipCallSwitch.mockResolvedValue({ ok: true, on: false });
-        expect(await action("call.share").run!({}, caller())).toEqual({
+        flipCallSwitch.mockResolvedValue({
+            ok: true,
+            on: false,
+            live: { controls: { ...QUIET, sharing: true }, mayRecord: false }
+        });
+        expect(await action("call.share").run!({}, caller())).toMatchObject({
             ok: true,
             state: switchState("share", false, "en-US")
         });
@@ -191,8 +203,12 @@ describe("in a call", () => {
     });
 
     it("starting a share says a screen is to be picked, not that it went live", async () => {
-        flipCallSwitch.mockResolvedValue({ ok: true, on: true });
-        expect(await action("call.share").run!({}, caller("es-ES"))).toEqual({
+        flipCallSwitch.mockResolvedValue({
+            ok: true,
+            on: true,
+            live: { controls: QUIET, mayRecord: false }
+        });
+        expect(await action("call.share").run!({}, caller("es-ES"))).toMatchObject({
             ok: true,
             state: { ...switchState("share", false, "es-ES"), detail: "Elige pantalla" }
         });
@@ -213,6 +229,86 @@ describe("in a call", () => {
         });
         expect(playCallSound).toHaveBeenCalledWith("u1", SOUND);
         expect(action("call.sound").options.safeParse({}).success).toBe(false);
+    });
+});
+
+describe("a press drawn before the tab has done it", () => {
+    const mic = (on: boolean) => switchState("mic", on, "en-US");
+    const deafen = (on: boolean) => switchState("deafen", on, "en-US");
+
+    it("deafening shows the microphone muted too, as the call screen does", async () => {
+        live = { controls: QUIET, mayRecord: false };
+        expect((await action("call.deafen").read!({}, caller())).press).toEqual({
+            face: deafen(true),
+            also: [{ action: "call.mic", face: mic(true) }]
+        });
+    });
+
+    it("undeafening gives the microphone back as it was before", async () => {
+        const deafened = { ...QUIET, deafened: true, muted: true };
+        live = { controls: deafened, mayRecord: false, mutedBeforeDeafen: false };
+        expect((await action("call.deafen").read!({}, caller())).press).toEqual({
+            face: deafen(false),
+            also: [{ action: "call.mic", face: mic(false) }]
+        });
+        // Muted before: it stays muted, so the microphone's key is not touched.
+        live = { controls: deafened, mayRecord: false, mutedBeforeDeafen: true };
+        expect((await action("call.deafen").read!({}, caller())).press).toEqual({
+            face: deafen(false)
+        });
+        // Not seen deafening: what comes back is not guessed.
+        live = { controls: deafened, mayRecord: false };
+        expect((await action("call.deafen").read!({}, caller())).press).toEqual({
+            face: deafen(false)
+        });
+    });
+
+    it("unmuting while deafened takes the headphones off too", async () => {
+        live = { controls: { ...QUIET, deafened: true, muted: true }, mayRecord: false };
+        expect((await action("call.mic").read!({}, caller())).press).toEqual({
+            face: mic(false),
+            also: [{ action: "call.deafen", face: deafen(false) }]
+        });
+        live = { controls: { ...QUIET, muted: true }, mayRecord: false };
+        expect((await action("call.mic").read!({}, caller())).press).toEqual({ face: mic(false) });
+    });
+
+    it("hanging up shows every call key out of the call", async () => {
+        live = { controls: QUIET, mayRecord: false };
+        const press = (await action("call.hangup").read!({}, caller())).press!;
+        expect(press.face).toEqual(noCallState("en-US"));
+        expect(press.also!.map((also) => also.action)).toEqual([
+            "call.mic",
+            "call.deafen",
+            "call.camera",
+            "call.record",
+            "call.share",
+            "call.sound"
+        ]);
+        for (const also of press.also!) expect(also.face).toEqual(noCallState("en-US"));
+    });
+
+    it("a share or a recording the call will not start keeps its face", () => {
+        expect(callPress("record", { controls: QUIET, mayRecord: false }, "en-US")).toEqual({
+            noop: true
+        });
+        expect(callPress("share", { controls: QUIET, mayRecord: false }, "en-US").face).toEqual(
+            expect.objectContaining({ on: false, detail: "Pick a screen" })
+        );
+    });
+
+    it("a deafen run answers with what pressing it again does", async () => {
+        flipCallSwitch.mockResolvedValue({
+            ok: true,
+            on: true,
+            live: { controls: QUIET, mayRecord: false }
+        });
+        const result = await action("call.deafen").run!({}, caller());
+        expect(result).toMatchObject({ ok: true, state: deafen(true) });
+        expect(result.ok && result.state?.press).toEqual({
+            face: deafen(false),
+            also: [{ action: "call.mic", face: mic(false) }]
+        });
     });
 });
 

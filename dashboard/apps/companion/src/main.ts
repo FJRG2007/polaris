@@ -35,7 +35,7 @@ import * as mapping from "./mapping";
 import * as timers from "./timers";
 import * as localTimer from "../../streamdeck/src/timer";
 import * as polarisTimer from "../../streamdeck/src/polaris-timer";
-import { InFlight, predict } from "../../streamdeck/src/optimistic";
+import { beginAlso, InFlight, predict, shows } from "../../streamdeck/src/optimistic";
 import {
     PolarisClient,
     readCredentials,
@@ -196,14 +196,26 @@ export default class PolarisInstance extends InstanceBase<Schema> {
      * and does nothing.
      */
     async #press(entry: DeckAction, options: Record<string, unknown>): Promise<void> {
-        const keys = mapping.keysShowing(
-            entry,
-            options,
-            mapping.watchList(this.#connection.catalogue, this.#feedbacks)
-        );
+        const watched = mapping.watchList(this.#connection.catalogue, this.#feedbacks);
+        const keys = mapping.keysShowing(entry, options, watched);
         const guess = predict(entry, keys.length ? this.#states.get(keys[0]!) : undefined);
         for (const key of keys) this.#inFlight.begin(key, this.#states.get(key));
         if (guess && "face" in guess) this.#show(keys.map((key) => ({ key, state: guess.face })));
+        // The other things it moves - the microphone, when deafening - show
+        // with it, and go back with it.
+        const linked =
+            guess && "face" in guess
+                ? beginAlso(
+                      this.#inFlight,
+                      guess.also,
+                      (also) =>
+                          watched
+                              .filter((item) => shows(also, item.action, item.options))
+                              .map((item) => item.key),
+                      (key) => this.#states.get(key)
+                  )
+                : [];
+        this.#show(linked);
         const result = await this.#connection.run(entry.id, options);
         const ok = result?.ok === true;
         const returned = result?.ok ? result.state : undefined;
@@ -212,6 +224,10 @@ export default class PolarisInstance extends InstanceBase<Schema> {
             const state = this.#inFlight.settle(key, ok, returned);
             if (state) settled.push({ key, state });
             else if (!ok) this.#states.delete(key);
+        }
+        for (const { key } of linked) {
+            const state = this.#inFlight.settle(key, ok);
+            if (state) settled.push({ key, state });
         }
         this.#show(settled);
         if (!ok) {
