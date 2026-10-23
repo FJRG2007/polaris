@@ -646,30 +646,30 @@
             }
         },
         "backup": {
-            "title": "Acceso de respaldo",
+            "title": "Acceso de reserva",
             "description": "Mantiene tu dominio accesible desde fuera cuando la línea de casa deja de recibir visitas. Mientras la ruta directa funciona se usa esa, así que no añade retraso.",
             "now": "Sirviendo",
             "lastFlip": "Último cambio",
             "checked": "Comprobado",
             "never": "Nunca",
-            "path": "Ruta de respaldo",
+            "path": "Ruta auxiliar",
             "server": "Servidor relé",
             "mode": "Modo",
             "paths": {
-                "off": "Apagado",
+                "off": "Nada",
                 "direct": "Directa",
                 "tunnel": "Túnel de Cloudflare",
                 "relay": "Relé propio"
             },
             "modes": {
                 "automatic": "Automático",
-                "always": "Siempre activo",
+                "always": "Siempre",
                 "manual": "Manual"
             },
             "useBackup": "Pasar al respaldo",
             "useDirect": "Volver a directa",
             "needsToken": "Conecta antes un token de Cloudflare",
-            "needsServer": "Añade antes un servidor en la nube",
+            "needsServer": "Falta un servidor en la nube",
             "connectCloudflare": "El túnel y cada cambio necesitan un token de Cloudflare. <link>Conecta uno en Integraciones</link>.",
             "dataSaver": "Ahorro de datos en respaldo",
             "dataSaverHint": "Pausa descargas de imágenes, búsquedas de actualizaciones, despliegues y copias programadas hasta que vuelva la ruta directa.",
@@ -681,13 +681,13 @@
             "reasons": {
                 "outage": "la ruta directa dejó de responder",
                 "recovered": "la ruta directa volvió a responder",
-                "always": "siempre activo",
+                "always": "siempre",
                 "manual": "cambiado a mano",
                 "unconfigured": "se apagó la ruta de respaldo"
             },
             "latency": "Tiempo de conexión",
-            "notSet": "Sin configurar",
-            "noAnswer": "Sin respuesta",
+            "notSet": "Sin activar",
+            "noAnswer": "No responde",
             "ms": "{ms} ms",
             "insideOnly": "Solo comprobado desde dentro: este router no vuelve a su propia IP pública, así que una línea con CGNAT puede pasar inadvertida. Añade un servidor en la nube para comprobar desde fuera.",
             "udpSkipped": "El relé solo lleva TCP. Los puertos UDP {ports} no llegan por él.",
