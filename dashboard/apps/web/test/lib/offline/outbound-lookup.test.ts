@@ -85,11 +85,30 @@ describe("createOutboundLookup", () => {
         expect(await ask(lookup, "localhost", 6)).toMatchObject({ address: "::1", family: 6 });
     });
 
-    it("opens on the first EAI_AGAIN and fails every outside lookup fast after it", async () => {
+    it("opens on the probe's name failing and fails every outside lookup fast after it", async () => {
+        const { lookup, resolver, breaker } = setup();
+        const first = ask(lookup, PROBE_NAME);
+        resolver.failAll();
+        expect((await first).error?.code).toBe("EAI_AGAIN");
+        expect(breaker.isOpen).toBe(true);
+        expect(resolver.pending).toHaveLength(0);
+
+        const fast = await ask(lookup, "oauth2.googleapis.com");
+        expect(fast.error?.code).toBe("EAI_AGAIN");
+        expect(fast.error?.syscall).toBe("getaddrinfo");
+        expect(resolver.pending).toHaveLength(0);
+        // Local names are untouched by it.
+        expect((await ask(lookup, "localhost")).error).toBeNull();
+    });
+
+    it("asks the probe's name before one other name's failure opens it", async () => {
         const { lookup, resolver, breaker } = setup();
         const first = ask(lookup, "oauth2.googleapis.com");
         resolver.failAll();
         expect((await first).error?.code).toBe("EAI_AGAIN");
+        expect(breaker.isOpen).toBe(false);
+        expect(resolver.pending.map((entry) => entry.hostname)).toEqual([PROBE_NAME]);
+        resolver.failAll();
         expect(breaker.isOpen).toBe(true);
 
         const fast = await ask(lookup, "api.github.com");
@@ -98,6 +117,28 @@ describe("createOutboundLookup", () => {
         expect(resolver.pending).toHaveLength(0);
         // Local names are untouched by it.
         expect((await ask(lookup, "localhost")).error).toBeNull();
+    });
+
+    it("stays closed when only one name's DNS is broken", async () => {
+        const { lookup, resolver, breaker } = setup();
+        for (let i = 0; i < 3; i++) {
+            const broken = ask(lookup, "lame.example.org");
+            resolver.failAll("EAI_AGAIN");
+            expect((await broken).error?.code).toBe("EAI_AGAIN");
+            resolver.answerAll();
+        }
+        expect(breaker.isOpen).toBe(false);
+        const fine = ask(lookup, "example.org");
+        resolver.answerAll();
+        expect((await fine).address).toBe("203.0.113.7");
+    });
+
+    it("asks the probe's name once however many names fail together", async () => {
+        const { lookup, resolver } = setup();
+        const failing = Promise.all([ask(lookup, "a.example.org"), ask(lookup, "b.example.org")]);
+        resolver.failAll();
+        await failing;
+        expect(resolver.pending.map((entry) => entry.hostname)).toEqual([PROBE_NAME]);
     });
 
     it("probes after the window and recovers by itself", async () => {

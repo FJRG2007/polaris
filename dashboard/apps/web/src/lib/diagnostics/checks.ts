@@ -29,6 +29,7 @@ import { polarisZoneHost } from "@/lib/domain-zones";
 import { getUpdateStatus } from "@/lib/update-service";
 import { checkedAddresses } from "@/lib/address-health";
 import { getCapabilities, loadEnv } from "@polaris/config";
+import { offlineFor } from "@/lib/offline/outbound-lookup";
 
 export const CHECK_IDS = [
     "database",
@@ -262,7 +263,9 @@ const RUNNERS: Record<CheckId, () => Promise<Verdict>> = {
     async dns() {
         const host = await dashboardHost();
         if (!host) return verdict("skip", "noDomain");
-        const found = await within(lookup(host).then((answer) => answer.address));
+        const found = offlineFor(host)
+            ? null
+            : await within(lookup(host).then((answer) => answer.address));
         if (!found)
             return verdict(
                 "fail",

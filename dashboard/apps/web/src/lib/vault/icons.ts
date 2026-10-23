@@ -18,6 +18,7 @@
 import { Agent, fetch } from "undici";
 import { lookup } from "node:dns/promises";
 import { isPrivateIp } from "@polaris/core";
+import { offlineFor } from "@/lib/offline/outbound-lookup";
 import type { LookupFunction } from "node:net";
 
 /** How long to wait for a site that is not answering. */
@@ -76,6 +77,7 @@ function plausibleDomain(domain: string): boolean {
  * moment apart are exactly what a DNS rebind needs to be two different answers.
  */
 async function resolvesPublicly(domain: string): Promise<PinnedHost | null> {
+    if (offlineFor(domain)) return null;
     try {
         const addresses = await lookup(domain, { all: true });
         const first = addresses[0];

@@ -26,6 +26,7 @@
 
 import { BlockList, isIP } from "node:net";
 import { lookup as dnsLookup } from "node:dns/promises";
+import { offlineError, offlineFor } from "@/lib/offline/outbound-lookup";
 
 /** Who is asking, which decides how far in the address may point. */
 export type EgressScope = "instance" | "member";
@@ -48,7 +49,10 @@ export class EgressRefusal extends Error {
 /** How a name is turned into addresses. Swapped in tests. */
 export type Lookup = (host: string) => Promise<readonly { address: string; family: number }[]>;
 
-const realLookup: Lookup = (host) => dnsLookup(host, { all: true, verbatim: true });
+const realLookup: Lookup = (host) =>
+    offlineFor(host)
+        ? Promise.reject(offlineError(host))
+        : dnsLookup(host, { all: true, verbatim: true });
 
 /** Never dialled, by anybody. */
 const FORBIDDEN = new BlockList();

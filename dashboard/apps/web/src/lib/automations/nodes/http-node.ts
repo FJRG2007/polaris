@@ -14,6 +14,7 @@ import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
 import { networkInterfaces } from "node:os";
 import { Agent, fetch as guardedFetch } from "undici";
+import { offlineFor } from "@/lib/offline/outbound-lookup";
 import { StepError, type NodeIo, type RunContext, type ServerNode } from "../types";
 import {
     configuredRequest,
@@ -94,7 +95,7 @@ async function internalAddresses(): Promise<Set<string>> {
         for (const entry of list ?? []) out.add(unmapped(entry.address));
     await Promise.all(
         internalHostnames().map(async (name) => {
-            const found = await lookup(name, { all: true }).catch(() => []);
+            const found = offlineFor(name) ? [] : await lookup(name, { all: true }).catch(() => []);
             for (const entry of found) out.add(unmapped(entry.address));
         })
     );

@@ -17,9 +17,11 @@
  *   such as a compose service, `.local`, `.lan`, `.internal`, `.home.arpa` - go to
  *   the system resolver as before, untouched by anything below.
  * - Outside names go through a breaker. A temporary failure (`EAI_AGAIN`, a
- *   timeout) opens it, and while it is open every outside lookup fails at once with
- *   the same `EAI_AGAIN` a real one would - no caller has to learn a new error. A
- *   probe every so often, by the next caller or by the timer below, closes it.
+ *   timeout) of the probe's name opens it; of any other name, the probe's name is
+ *   asked first, since one domain's broken DNS is not the line being down. While
+ *   it is open every outside lookup fails at once with the same `EAI_AGAIN` a
+ *   real one would - no caller has to learn a new error. A probe every so often,
+ *   by the next caller or by the timer below, closes it.
  * - Answers are cached briefly (30 s), a name that does not exist for less (5 s),
  *   and the same name asked twice while the first lookup is out is one lookup. The
  *   approach of `cacheable-lookup` and undici's `dns` interceptor, here because the
@@ -132,6 +134,20 @@ export function createOutboundLookup(input: {
         cache.set(key, { addresses, until: now() + (addresses ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS) });
     }
 
+    let confirming = false;
+    /** Ask the resolver for the probe's name, past the cache, and let it decide. */
+    function confirm(): void {
+        if (confirming) return;
+        confirming = true;
+        input.resolve(PROBE_NAME, { all: true }, (error) => {
+            confirming = false;
+            if (!error) return breaker.succeed();
+            const missing = error.code === "ENOTFOUND" || error.code === "ENODATA";
+            if (missing || OFFLINE_CODES.has(error.code ?? "")) breaker.fail(Number.POSITIVE_INFINITY);
+            else breaker.fail();
+        });
+    }
+
     function lookup(hostname: string, rawOptions: unknown, rawCallback?: unknown): void {
         const callback = (typeof rawOptions === "function" ? rawOptions : rawCallback) as Callback;
         const options: Options =
@@ -177,9 +193,12 @@ export function createOutboundLookup(input: {
             if (error) {
                 const missing = error.code === "ENOTFOUND" || error.code === "ENODATA";
                 // A name that does not exist is the resolver answering - unless it
-                // is the probe's, which always exists.
-                if (OFFLINE_CODES.has(error.code ?? "") || (missing && name === PROBE_NAME)) {
+                // is the probe's, which always exists. One other name failing may
+                // be that name's own broken DNS, so the probe's name decides.
+                if (name === PROBE_NAME && (missing || OFFLINE_CODES.has(error.code ?? ""))) {
                     breaker.fail(Number.POSITIVE_INFINITY);
+                } else if (OFFLINE_CODES.has(error.code ?? "")) {
+                    confirm();
                 } else if (missing) {
                     breaker.succeed();
                     remember(key, null);
@@ -248,9 +267,24 @@ export function internetOffline(): boolean {
 }
 
 /**
+ * Whether a lookup of `hostname` should be refused at once: an outside name while
+ * offline. For callers of `node:dns/promises`, which never goes through the
+ * wrapped `dns.lookup`.
+ */
+export function offlineFor(hostname: string): boolean {
+    return internetOffline() && !isLocalName(hostname);
+}
+
+/** The `EAI_AGAIN` a real lookup of `hostname` would have failed with offline. */
+export function offlineError(hostname: string): NodeJS.ErrnoException {
+    return lookupError(hostname, "EAI_AGAIN");
+}
+
+/**
  * Tell the breaker about a request that failed past the lookup - a connect that
- * timed out to an outside address. Three in a row open it; a lookup that fails
- * opens it alone, since it already waited out the resolver's own timeout.
+ * timed out to an outside address. Three in a row open it, and any answered
+ * request in between starts the count again; a lookup of the probe's name that
+ * fails opens it alone, since it already waited out the resolver's own timeout.
  */
 export function noteOutboundFailure(hostname: string, error: unknown): void {
     const installed = (globalThis as Holder)[INSTALLED];
@@ -264,6 +298,13 @@ export function noteOutboundFailure(hostname: string, error: unknown): void {
     if (codes.has("UND_ERR_CONNECT_TIMEOUT") || codes.has("ETIMEDOUT") || codes.has("ENETUNREACH") || codes.has("EHOSTUNREACH")) {
         installed.breaker.fail(1);
     }
+}
+
+/** A request to an outside address was answered: the line carries connections. */
+export function noteOutboundSuccess(hostname: string): void {
+    const installed = (globalThis as Holder)[INSTALLED];
+    if (!installed || !hostname || isLocalName(hostname)) return;
+    installed.breaker.succeed();
 }
 
 const WATCHED_FETCH = Symbol.for("polaris.offline.fetch");
@@ -290,7 +331,9 @@ export function watchOutboundFetch(): void {
     const original = globalThis.fetch;
     const watched = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
         try {
-            return await original(input, init);
+            const response = await original(input, init);
+            noteOutboundSuccess(hostOf(input));
+            return response;
         } catch (error) {
             noteOutboundFailure(hostOf(input), error);
             throw error;
