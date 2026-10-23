@@ -605,3 +605,15 @@ vi.mock("@/app/(app)/apps/analytics/analytics-polls", () => ({
 vi.mock("@/app/(app)/apps/backups/backups-polls", () => ({
     backupKeys: forward(() => import("@/app/(app)/apps/backups/actions"), "listBackupKeysAction", 0)
 }));
+
+vi.mock("@/app/(app)/apps/code/code-polls", () => ({
+    codeWork: forward(() => import("@/app/(app)/apps/code/actions"), "listWorkAction", 1)
+}));
+
+vi.mock("@/app/(app)/apps/containers/containers-polls", () => ({
+    containerDriveLink: forward(
+        () => import("@/app/(app)/apps/containers/[containerId]/drive-link-actions"),
+        "containerDriveLinkAction",
+        1
+    )
+}));

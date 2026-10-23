@@ -28,7 +28,6 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { containerAction, removeContainerAction } from "../actions";
-import { containerDriveLinkAction } from "./drive-link-actions";
 import { containerStateLabel } from "../container-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -73,6 +72,7 @@ import {
     TerminalSquare,
     Trash2
 } from "lucide-react";
+import * as polls from "../containers-polls";
 
 export type ContainerTab = "details" | "logs" | "files" | "console";
 
@@ -807,12 +807,13 @@ function FilesTab({
     useEffect(() => {
         if (!containerName) return;
         let cancelled = false;
-        void containerDriveLinkAction({
-            connectionId,
-            containerName,
-            path,
-            mounts: JSON.parse(mountsKey) as unknown
-        })
+        void polls
+            .containerDriveLink({
+                connectionId,
+                containerName,
+                path,
+                mounts: JSON.parse(mountsKey) as unknown
+            })
             .then((href) => {
                 if (!cancelled) setDriveHref(href);
             })

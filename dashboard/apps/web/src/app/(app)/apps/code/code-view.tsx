@@ -17,7 +17,6 @@
  */
 
 import Link from "next/link";
-import { listWorkAction } from "./actions";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn, EmptyState, SegmentedControl, Skeleton } from "@polaris/ui";
@@ -33,6 +32,7 @@ import {
     Search
 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./code-polls";
 
 /** How long typing pauses before the list is asked again. GitHub's search takes
  *  thirty requests a minute and a qualifier is thirty keystrokes, so a request
@@ -64,7 +64,7 @@ export function CodeView() {
         setError("");
         const timer = setTimeout(
             async () => {
-                const result = await listWorkAction({ kind, scope: effectiveScope, state, query });
+                const result = await polls.codeWork({ kind, scope: effectiveScope, state, query });
                 if (mine !== asked.current) return;
                 if (result.error) {
                     setError(result.error);

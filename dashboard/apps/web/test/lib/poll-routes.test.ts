@@ -138,7 +138,9 @@ const actions = vi.hoisted(() => {
         "trackerTargetsAction",
         "listAnalyticsSitesAction",
         "getAnalyticsOverviewAction",
-        "listBackupKeysAction"
+        "listBackupKeysAction",
+        "listWorkAction",
+        "containerDriveLinkAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -393,6 +395,12 @@ vi.mock("@/app/(app)/apps/analytics/actions", () => ({
 vi.mock("@/app/(app)/apps/backups/actions", () => ({
     listBackupKeysAction: actions.listBackupKeysAction
 }));
+vi.mock("@/app/(app)/apps/code/actions", () => ({
+    listWorkAction: actions.listWorkAction
+}));
+vi.mock("@/app/(app)/apps/containers/[containerId]/drive-link-actions", () => ({
+    containerDriveLinkAction: actions.containerDriveLinkAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -541,7 +549,9 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/tasks/trackers/targets": () => import("@/app/api/tasks/trackers/targets/route"),
     "/api/analytics/sites": () => import("@/app/api/analytics/sites/route"),
     "/api/analytics/overview": () => import("@/app/api/analytics/overview/route"),
-    "/api/backups/keys": () => import("@/app/api/backups/keys/route")
+    "/api/backups/keys": () => import("@/app/api/backups/keys/route"),
+    "/api/code/work": () => import("@/app/api/code/work/route"),
+    "/api/containers/drive-link": () => import("@/app/api/containers/drive-link/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2100,6 +2110,30 @@ const CASES: Case[] = [
             ).backupKeys(),
         action: "listBackupKeysAction",
         args: []
+    },
+    {
+        name: "the pull requests or issues a filter finds",
+        path: "/api/code/work",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/code/code-polls")>(
+                    "@/app/(app)/apps/code/code-polls"
+                )
+            ).codeWork({ kind: "sample" }),
+        action: "listWorkAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "where a container's folder opens in Drive",
+        path: "/api/containers/drive-link",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/containers/containers-polls")>(
+                    "@/app/(app)/apps/containers/containers-polls"
+                )
+            ).containerDriveLink({ kind: "sample" }),
+        action: "containerDriveLinkAction",
+        args: [{ kind: "sample" }]
     }
 ];
 
