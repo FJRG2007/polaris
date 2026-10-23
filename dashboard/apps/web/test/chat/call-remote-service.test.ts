@@ -63,6 +63,25 @@ describe("liveCallOf", () => {
     });
 });
 
+describe("what undeafening gives back", () => {
+    it("is the microphone as it was when the seat deafened, once that was seen", async () => {
+        findUnique.mockResolvedValue({ userId: "u9" });
+        const deafened = { ...ROW, id: "p9", muted: true, deafened: true };
+        findFirst.mockResolvedValue(deafened);
+        // Never seen deafening: not known.
+        await service.noteControls("p9", { muted: true, deafened: true });
+        expect((await service.liveCallOf("u9"))?.mutedBeforeDeafen).toBeUndefined();
+        // Heard, then deafened: it comes back heard.
+        await service.noteControls("p9", { muted: false, deafened: false });
+        await service.noteControls("p9", { muted: true, deafened: true });
+        expect((await service.liveCallOf("u9"))?.mutedBeforeDeafen).toBe(false);
+        // Undeafened: forgotten, and not reported for a seat that is not deafened.
+        await service.noteControls("p9", { muted: false, deafened: false });
+        findFirst.mockResolvedValue({ ...deafened, muted: false, deafened: false });
+        expect((await service.liveCallOf("u9"))?.mutedBeforeDeafen).toBeUndefined();
+    });
+});
+
 describe("deckSounds", () => {
     it("lists the spaces' sounds a space at a time, after Polaris's own", async () => {
         queryRaw.mockResolvedValue([
