@@ -71,3 +71,18 @@ export function scrollTo(text: string, block: ScrollLogicalPosition = "start"): 
     if (!found) throw new Error(`nothing reads "${text}"`);
     found.scrollIntoView({ block });
 }
+
+/** `then` once it no longer throws: for a hand reaching for a button the screen
+ *  is still fetching. Gives up, with the last failure, after `tries` tenths of a
+ *  second of the scene's clock. */
+export async function once(then: () => void, tries = 100): Promise<void> {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            then();
+            return;
+        } catch (failure) {
+            if (attempt >= tries) throw failure;
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+    }
+}

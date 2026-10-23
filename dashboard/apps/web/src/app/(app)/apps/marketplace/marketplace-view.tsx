@@ -29,6 +29,7 @@ import { Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { replacedLogos } from "@/lib/apps/replaces";
 import { BuiltInAppsSection } from "@polaris/ui/built-in-apps";
+import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
 import { useLocalizeStoreApp } from "./use-store-words";
 import { TemplateDeployDialog } from "./template-deploy-dialog";
 import { UninstallDialog } from "./uninstall-dialog";
@@ -38,7 +39,7 @@ import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
-import { findApp, promptedEnvVars, type AppCapability, type AppManifest } from "@/lib/apps/catalog";
+import { findApp, promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
 import {
     POLARIS_APPS_PATH,
     STORE_SORTS,
@@ -86,21 +87,6 @@ import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import * as polls from "./marketplace-polls";
 
 type Words = NamespaceTranslator<"marketplace">;
-
-/** Each capability's badge, as `capabilities.<key>`. */
-export const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">> = {
-    "messaging-hub": "capabilities.messagingHub",
-    "messaging-channel": "capabilities.messagingChannel",
-    "ai-assistant": "capabilities.aiAssistant",
-    "game-manager": "capabilities.gameManager",
-    "game-server": "capabilities.gameServer",
-    "camera-hub": "capabilities.cameraHub",
-    "mqtt-broker": "capabilities.mqttBroker",
-    "home-hub": "capabilities.homeHub",
-    "mail-server": "capabilities.mailServer",
-    "dns-blocker": "capabilities.dnsBlocker",
-    tool: "capabilities.tool"
-};
 
 /** An install's state, said as `statuses.<status>`; one a newer service adds shows as it came. */
 const STATUSES = new Set(["installing", "running", "stopped", "failed"]);

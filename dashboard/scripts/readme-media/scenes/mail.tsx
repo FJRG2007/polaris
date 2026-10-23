@@ -1,5 +1,6 @@
 /** Mail: every mailbox in one inbox. */
 
+import { tourScene } from "../runtime/tour";
 import { Chrome } from "../runtime/chrome";
 import { label } from "../runtime/interact";
 import { defineScene } from "../runtime/scene";
@@ -92,7 +93,7 @@ function mailApi(ctx: SceneContext) {
     };
 }
 
-export const mail = defineScene({
+const mailStill = defineScene({
     id: "mail",
     path: "/mail",
     api: mailApi,
@@ -107,3 +108,6 @@ export const mailThread = defineScene({
     actions: () => ({ actOnAction: () => ({ done: 1 }) }),
     render: (ctx) => <Inbox ctx={ctx} open />
 });
+
+/** The inbox, then a conversation opened from it. */
+export const mail = tourScene([mailStill, mailThread], [{ hold: 1600 }, { view: 1, hold: 3400 }]);

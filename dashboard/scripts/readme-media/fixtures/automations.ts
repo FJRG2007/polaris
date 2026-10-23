@@ -1,5 +1,6 @@
 /** The automations a small team keeps running, a folder of them and how each last went. */
 
+import { beat } from "../runtime/tour";
 import { ago, id } from "./people";
 import type { SceneContext } from "../runtime/scene";
 import type { FolderRow } from "@/lib/automations/organize";
@@ -91,6 +92,8 @@ export function automationFolders(ctx: SceneContext): FolderRow[] {
 }
 
 export function automationRows(ctx: SceneContext): AutomationRow[] {
+    // Once the loop has played a beat, the alert that failed has run again and passed.
+    const rerun = beat() >= 1;
     return DRAFTS.map((draft, n) => ({
         id: id("automation", n + 1),
         name: ctx.say(...draft.name),
@@ -98,8 +101,11 @@ export function automationRows(ctx: SceneContext): AutomationRow[] {
         enabled: draft.enabled ?? true,
         published: true,
         mode: draft.mode,
-        lastRunAt: draft.ran == null ? null : ago(ctx.now, draft.ran),
-        lastStatus: draft.status,
+        lastRunAt:
+            draft.ran == null
+                ? null
+                : ago(ctx.now, rerun && draft.status === "failed" ? 0 : draft.ran),
+        lastStatus: rerun && draft.status === "failed" ? "succeeded" : draft.status,
         updatedAt: ago(ctx.now, (draft.ran ?? 60) + 120),
         folderId: draft.folder ? id("automation-folder", draft.folder) : null,
         tags: draft.tags ?? [],

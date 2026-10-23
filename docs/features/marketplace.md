@@ -52,3 +52,43 @@ everything made in it, including files such as camera footage - and leaves
 nothing behind. Unticking that in the dialog keeps the data for a reinstall
 instead; it stays on the server and is listed under Storage, where it can be
 freed later.
+
+## Some of the apps it adds
+
+Each one as it looks once installed: Tools, Status pages, Mail server, Cloud
+servers, Security scans, CRM and Network filter.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/tools-light-en-desktop.webp">
+  <img src="../assets/media/tools-dark-en-desktop.webp" alt="Tools">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/status-pages-light-en-desktop.webp">
+  <img src="../assets/media/status-pages-dark-en-desktop.webp" alt="Status pages">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/mail-server-light-en-desktop.webp">
+  <img src="../assets/media/mail-server-dark-en-desktop.webp" alt="Mail server">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/cloud-servers-light-en-desktop.webp">
+  <img src="../assets/media/cloud-servers-dark-en-desktop.webp" alt="Cloud servers">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/security-scans-light-en-desktop.webp">
+  <img src="../assets/media/security-scans-dark-en-desktop.webp" alt="Security scans">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/crm-light-en-desktop.webp">
+  <img src="../assets/media/crm-dark-en-desktop.webp" alt="CRM">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/network-filter-light-en-desktop.webp">
+  <img src="../assets/media/network-filter-dark-en-desktop.webp" alt="Network filter">
+</picture>

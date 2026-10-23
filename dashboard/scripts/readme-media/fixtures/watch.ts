@@ -4,6 +4,7 @@
  * Addresses are the documentation ranges, so no picture names a real machine.
  */
 
+import { beat } from "../runtime/tour";
 import { id } from "./people";
 import type { SceneContext } from "../runtime/scene";
 import type { SparkPoint, WatchCard } from "@/lib/watch-overview-service";
@@ -15,12 +16,15 @@ const BUCKET = (60 * 60 * 1000) / POINTS;
 
 /** A line around `base` with a little noise and, when asked, a climb at the end. */
 function spark(now: number, base: number, seed: number, climb = 0): SparkPoint[] {
-    return Array.from({ length: POINTS }, (_, i) => {
+    // The loop moves the line on a bucket per beat, the way the page redraws it.
+    const moved = beat();
+    return Array.from({ length: POINTS }, (_, at) => {
+        const i = at + moved;
         // Noise in proportion to the load, so a quiet machine draws a calm line.
         const wave = (Math.sin((i + seed) * 0.9) * 0.1 + Math.cos((i * seed) % 7) * 0.05) * base;
-        const rise = climb && i > POINTS - 8 ? ((i - (POINTS - 8)) / 8) * climb : 0;
+        const rise = climb && at > POINTS - 8 ? ((at - (POINTS - 8)) / 8) * climb : 0;
         return {
-            t: now - (POINTS - 1 - i) * BUCKET,
+            t: now - (POINTS - 1 - at) * BUCKET,
             v: Math.max(1, Math.round(base + wave + rise))
         };
     });

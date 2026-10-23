@@ -12,7 +12,14 @@
 const SHOTS: Readonly<Record<string, readonly string[]>> = {
     calendar: ["calendar", "calendar-time"],
     "game-servers": ["games", "game-players", "game-console", "game-inventory", "game-events"],
-    home: ["places"]
+    home: ["places"],
+    tools: ["tools"],
+    "status-pages": ["status-pages"],
+    "mail-server": ["mail-server"],
+    "cloud-servers": ["cloud-servers"],
+    "security-scans": ["security-scans"],
+    crm: ["crm"],
+    "dns-blocker": ["network-filter"]
 };
 
 export interface AppScreenshot {

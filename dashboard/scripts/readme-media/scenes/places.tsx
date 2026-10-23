@@ -1,5 +1,6 @@
 /** Places: one place at a glance - its cameras beside each room's own controls. */
 
+import { tourScene } from "../runtime/tour";
 import { PageHeader } from "@polaris/ui";
 import { Chrome } from "../runtime/chrome";
 import { defineScene } from "../runtime/scene";
@@ -8,7 +9,7 @@ import { CABIN_ID, placeOverview, places } from "../fixtures/places";
 import { PlaceSwitcher } from "../../../apps/places/src/screens/place-switcher";
 import { OverviewView } from "../../../apps/places/src/screens/overview/overview-view";
 
-export const placesOverview = defineScene({
+const placesStill = defineScene({
     id: "places",
     path: "/places",
     actions: (ctx) => ({ placeOverviewAction: () => ({ overview: placeOverview(ctx) }) }),
@@ -33,3 +34,9 @@ export const placesOverview = defineScene({
         );
     }
 });
+
+/** The place, then the porch light switched on and the front door opened. */
+export const placesOverview = tourScene(
+    [placesStill],
+    [{ hold: 1800 }, { fresh: true, hold: 1600 }, { fresh: true, hold: 2800 }]
+);

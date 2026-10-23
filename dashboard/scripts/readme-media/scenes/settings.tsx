@@ -27,6 +27,8 @@ import {
 export const settings = defineScene({
     id: "settings",
     path: "/admin/settings",
+    // Nothing found in Polaris's own images: the card stays out of the way.
+    actions: () => ({ ownVulnerabilitiesAction: () => null }),
     api: (ctx) => ({
         "GET /api/admin/settings/update-status": () => ({ value: toWire(updateStatus(ctx)) }),
         "GET /api/admin/settings/overview": () => settingsOverview(ctx),

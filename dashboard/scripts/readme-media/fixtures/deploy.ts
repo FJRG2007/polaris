@@ -128,7 +128,8 @@ export function projectSummary(): ProjectSummary {
                               }
                           ]
                         : [],
-                    volumes: []
+                    volumes: [],
+                    waitForCi: false
                 })),
                 databases: [
                     {
@@ -188,6 +189,9 @@ export function deployments(ctx: SceneContext): DeploymentSummary[] {
         id: id("deployment", n),
         status,
         error: null,
+        security: null,
+        securityOverrideAt: null,
+        canDeployAnyway: false,
         createdAt: ago(ctx.now, minutesAgo),
         isCurrent: n === 1,
         commitMessage: message,

@@ -10,6 +10,7 @@ import { asset, href, siteData, words } from "@/lib/site";
 import { InstallCommand } from "@/components/install-command";
 import type { ShowcaseItem, SiteLocale } from "@/data/builders";
 import { ShotGallery, type Shot } from "@/components/shot-gallery";
+import { FeatureTabs, type Feature } from "@/components/feature-tabs";
 import { ArrowRight, Globe, MousePointerClick, TerminalSquare } from "lucide-react";
 
 function shot(item: ShowcaseItem): Shot {
@@ -18,7 +19,9 @@ function shot(item: ShowcaseItem): Shot {
         caption: item.caption,
         alt: item.alt,
         dark: asset(`media/${item.dark}`),
-        light: item.light ? asset(`media/${item.light}`) : null
+        light: item.light ? asset(`media/${item.light}`) : null,
+        darkMobile: item.darkMobile ? asset(`media/${item.darkMobile}`) : null,
+        lightMobile: item.lightMobile ? asset(`media/${item.lightMobile}`) : null
     };
 }
 
@@ -31,6 +34,48 @@ function SectionHead({ id, title, intro }: { id: string; title: string; intro: s
             <p className="text-pretty text-muted-foreground">{intro}</p>
         </div>
     );
+}
+
+/**
+ * The tour's tabs: the features the README leads with first, then every other
+ * app that has a capture. Each plays its first capture, captioned with the
+ * dashboard's own line for it, and leads to its marketplace page.
+ */
+const MAIN_FEATURES = ["apps", "drive", "chat", "tasks", "mail", "game-servers"];
+const MORE_FEATURES = [
+    "polar",
+    "office",
+    "vault",
+    "notes",
+    "automations",
+    "watch",
+    "calendar",
+    "home"
+];
+
+function tourFeatures(locale: SiteLocale): { main: Feature[]; more: Feature[] } {
+    const { apps, builtIn } = siteData().locales[locale];
+    const feature = (id: string): Feature[] => {
+        const own = builtIn.find((app) => app.id === id);
+        const store = apps.find((app) => app.id === id);
+        const name = own?.name ?? store?.name;
+        const lead = (own?.shots ?? store?.shots ?? [])[0];
+        if (!name || !lead) return [];
+        return [
+            {
+                id,
+                label: name,
+                caption: own?.description ?? store!.summary,
+                alt: lead.alt,
+                dark: asset(`media/${lead.dark}`),
+                light: lead.light ? asset(`media/${lead.light}`) : null,
+                darkMobile: lead.darkMobile ? asset(`media/${lead.darkMobile}`) : null,
+                lightMobile: lead.lightMobile ? asset(`media/${lead.lightMobile}`) : null,
+                href: href(locale, `marketplace/${id}/`)
+            }
+        ];
+    };
+    return { main: MAIN_FEATURES.flatMap(feature), more: MORE_FEATURES.flatMap(feature) };
 }
 
 export function HomeView({ locale }: { locale: SiteLocale }) {
@@ -82,6 +127,14 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
                         <ShotGallery shots={[shot(lead)]} words={all.viewer} hero />
                     </div>
                 ) : null}
+            </section>
+
+            <section aria-labelledby="tour" className="flex flex-col gap-6">
+                <SectionHead id="tour" title={t.tourTitle} intro={t.tourIntro} />
+                <FeatureTabs
+                    {...tourFeatures(locale)}
+                    words={{ label: t.tourTitle, more: t.tourMore, open: t.tourOpen }}
+                />
             </section>
 
             {replaces.length ? (

@@ -70,6 +70,7 @@ export const APP_IDS = [
     "watch",
     "automations",
     "crm",
+    "status-pages",
     "inbox",
     "tools",
     "admin",

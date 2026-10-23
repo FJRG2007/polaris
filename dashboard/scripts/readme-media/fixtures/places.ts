@@ -5,6 +5,7 @@
  * camera's picture is a drawing in `media/`, named by the camera's fixture id.
  */
 
+import { beat } from "../runtime/tour";
 import { TEAM, ago, id } from "./people";
 import type { SceneContext } from "../runtime/scene";
 import type { CameraView } from "../../../apps/places/src/lib/cameras";
@@ -65,7 +66,11 @@ function camera(n: number, name: string, zone: string): CameraView {
         enabled: true,
         ptz: n === 2,
         lastSeenAt: null,
-        offlineSince: null
+        offlineSince: null,
+        roomId: "",
+        privacy: false,
+        privacyNative: false,
+        privacyPreset: ""
     };
 }
 
@@ -111,7 +116,7 @@ export function devices(ctx: SceneContext): DeviceView[] {
             kind: "lock",
             name: ctx.say("Front door", "Puerta principal"),
             zone: entrance,
-            state: "locked",
+            state: beat() >= 2 ? "unlocked" : "locked",
             doorState: "closed",
             batteryPercent: 82
         }),
@@ -119,7 +124,7 @@ export function devices(ctx: SceneContext): DeviceView[] {
             kind: "light",
             name: ctx.say("Porch light", "Luz del porche"),
             zone: entrance,
-            state: "off"
+            state: beat() >= 1 ? "on" : "off"
         }),
         device(3, ctx, {
             kind: "lock",
@@ -229,7 +234,7 @@ export function placeOverview(ctx: SceneContext): PlaceOverview {
         events: [
             {
                 id: id("place-event", 1),
-                cameraName: watched[0].name,
+                cameraName: watched[0]!.name,
                 at: ago(ctx.now, 6),
                 kind: "package",
                 person: null,
@@ -237,7 +242,7 @@ export function placeOverview(ctx: SceneContext): PlaceOverview {
             },
             {
                 id: id("place-event", 2),
-                cameraName: watched[1].name,
+                cameraName: watched[1]!.name,
                 at: ago(ctx.now, 38),
                 kind: "vehicle",
                 person: null,
@@ -245,7 +250,7 @@ export function placeOverview(ctx: SceneContext): PlaceOverview {
             },
             {
                 id: id("place-event", 3),
-                cameraName: watched[0].name,
+                cameraName: watched[0]!.name,
                 at: ago(ctx.now, 52),
                 kind: "person",
                 person: TEAM.ana.name,
@@ -253,7 +258,7 @@ export function placeOverview(ctx: SceneContext): PlaceOverview {
             },
             {
                 id: id("place-event", 4),
-                cameraName: watched[2].name,
+                cameraName: watched[2]!.name,
                 at: ago(ctx.now, 140),
                 kind: "animal",
                 person: null,

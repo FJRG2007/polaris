@@ -42,18 +42,17 @@
         "lookIntro": "Capturas de la interfaz real con datos de ejemplo. Elige una para ampliarla.",
         "seeApps": "Ver todas las apps",
         "ctaTitle": "Tu propio Polaris está a una línea",
-        "ctaBody": "Gratis y de código abierto con licencia AGPL-3.0."
+        "ctaBody": "Gratis y de código abierto con licencia AGPL-3.0.",
+        "tourTitle": "Míralo en uso",
+        "tourIntro": "Elige una parte de Polaris y mírala trabajar con datos de muestra.",
+        "tourMore": "Más",
+        "tourOpen": "Ver su página"
     },
     "market": {
         "title": "Tienda",
         "intro": "Cada app del catálogo, como la lista el panel. Las integradas vienen en cada instalación; el resto se instala pulsando un botón.",
-        "search": "Buscar apps",
-        "all": "Todas",
-        "builtin": "Integrada",
-        "optional": "Opcional",
-        "soon": "Próximamente",
-        "empty": "Ninguna app coincide.",
-        "count": "{n} apps"
+        "installPolaris": "Instalar Polaris",
+        "installHint": "Las apps se instalan desde tu propio Polaris, en un clic."
     },
     "downloads": {
         "title": "Descargas",

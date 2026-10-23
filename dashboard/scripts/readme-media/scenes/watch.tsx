@@ -1,5 +1,6 @@
 /** Watch: every server, service and container, with what each is doing. */
 
+import { tourScene } from "../runtime/tour";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { Chrome } from "../runtime/chrome";
@@ -61,7 +62,7 @@ function Overview({ servers, services }: { servers: WatchCard[]; services: Watch
     );
 }
 
-export const watch = defineScene({
+const watchStill = defineScene({
     id: "watch",
     path: "/watch",
     api: (ctx) => ({ "GET /api/watch/containers": () => ({ containers: watchContainers(ctx) }) }),
@@ -71,3 +72,14 @@ export const watch = defineScene({
         </Chrome>
     )
 });
+
+/** The overview as it redraws: every line moves on as new readings come in. */
+export const watch = tourScene(
+    [watchStill],
+    [
+        { hold: 1100 },
+        { fresh: true, hold: 1100 },
+        { fresh: true, hold: 1100 },
+        { fresh: true, hold: 1600 }
+    ]
+);

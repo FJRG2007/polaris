@@ -86,7 +86,7 @@ export function arkSettings(ctx: SceneContext): InstalledAppSetting[] {
 
 /** What the page knows about a server before it asks it anything. */
 function contextFor(ctx: SceneContext, index: number, game: Partial<GameContext>): GameContext {
-    const address = gameFacts(ctx)[index]!.address;
+    const address = gameFacts(ctx)[index]!.address ?? "";
     const hostname = address.replace(/:\d+$/, "");
     return {
         ...survivalContext(ctx),

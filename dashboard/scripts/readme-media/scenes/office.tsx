@@ -1,5 +1,6 @@
 /** Office: documents, sheets, slides and canvases, kept in Polaris. */
 
+import { tourScene } from "../runtime/tour";
 import { Chrome } from "../runtime/chrome";
 import { label } from "../runtime/interact";
 import { defineScene } from "../runtime/scene";
@@ -13,7 +14,7 @@ import {
     officePreview
 } from "../fixtures/office";
 
-export const office = defineScene({
+const officeStill = defineScene({
     id: "office",
     path: "/office",
     actions: (ctx) => ({ listDocumentsAction: () => ({ documents: officeDocuments(ctx) }) }),
@@ -60,3 +61,9 @@ export const officeDoc = defineScene({
         </Chrome>
     )
 });
+
+/** Every document, then one opened to work on. */
+export const office = tourScene(
+    [officeStill, officeDoc],
+    [{ hold: 1600 }, { view: 1, hold: 3400 }]
+);

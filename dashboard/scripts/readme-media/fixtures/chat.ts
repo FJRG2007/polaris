@@ -99,6 +99,9 @@ function channel(
         others: [],
         blocked: false,
         gameLinks: [],
+        newcomerHistory: "inherit",
+        spaceNewcomerHistory: true,
+        mayManageSpaceDefault: false,
         ...extra
     };
 }
@@ -371,6 +374,8 @@ export function message(
         preview: null,
         previewPending: false,
         receipt: null,
+        invites: [],
+        flaggedLinks: [],
         createdAt: ago(ctx.now, minutesAgo),
         ...extra
     };
@@ -816,7 +821,8 @@ export function profileOf(ctx: SceneContext, userId: string): ChatProfile {
                 total: 1
             }
         },
-        role: null
+        role: null,
+        restricted: false
     };
 }
 

@@ -1,5 +1,6 @@
 /** Calendar: a working week, the app's own screen. */
 
+import { tourScene } from "../runtime/tour";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button, PAGE_BLEED, PageHeader } from "@polaris/ui";
@@ -11,7 +12,7 @@ import { TimeView } from "../../../apps/calendar/src/screens/clock/time-view";
 import { CalendarScreen } from "../../../apps/calendar/src/screens/calendar-screen";
 import { SignedInContactLinks } from "../../../apps/calendar/src/screens/contact-links";
 
-export const calendar = defineScene({
+const calendarStill = defineScene({
     id: "calendar",
     path: "/calendar",
     actions: (ctx) => ({
@@ -77,3 +78,9 @@ export const calendarTime = defineScene({
         </Chrome>
     )
 });
+
+/** The week, then the time where everybody is. */
+export const calendar = tourScene(
+    [calendarStill, calendarTime],
+    [{ hold: 2000 }, { view: 1, hold: 3000 }]
+);

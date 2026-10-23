@@ -44,16 +44,16 @@ describe("the store listing", () => {
             calendar.querySelector('img[src="/marketplace/calendar-dark-en-desktop.webp"]')
         ).not.toBeNull();
         expect(calendar.querySelector('[data-preview="placeholder"]')).toBeNull();
-        const crm = cardOf("CRM");
-        expect(crm.querySelector("img")).toBeNull();
-        expect(crm.querySelector('[data-preview="placeholder"]')).not.toBeNull();
+        const bridge = cardOf("Messaging bridge");
+        expect(bridge.querySelector("img")).toBeNull();
+        expect(bridge.querySelector('[data-preview="placeholder"]')).not.toBeNull();
     });
 
     it("features only apps with a capture", () => {
         render(<MarketplaceView scope="polaris" installed={[]} />, { wrapper: MessagesWrapper });
         const featured = screen.getByRole("region", { name: "Featured" });
         expect(within(featured).getByRole("link", { name: "Calendar" })).toBeTruthy();
-        expect(within(featured).queryByRole("link", { name: "CRM" })).toBeNull();
+        expect(within(featured).queryByRole("link", { name: "Messaging bridge" })).toBeNull();
     });
 
     it("filters by the category chip pressed, and hides the featured row while filtered", () => {
@@ -108,7 +108,7 @@ describe("the store listing", () => {
 describe("an app's page without captures", () => {
     it("shows the designed preview and no screenshot gallery", () => {
         render(
-            <AppDetail appId="crm">
+            <AppDetail appId="messaging-bridge">
                 <div />
             </AppDetail>,
             { wrapper: MessagesWrapper }
