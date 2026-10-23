@@ -42,7 +42,7 @@ export function UpsAnalytics() {
     const from = to - SPANS[span] * 86_400_000;
 
     return (
-        <section aria-labelledby="ups-analytics" className="mt-8 flex flex-col gap-3">
+        <section aria-labelledby="ups-analytics" className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 id="ups-analytics" className="text-sm font-medium">
                     {t("ups.analytics.title")}

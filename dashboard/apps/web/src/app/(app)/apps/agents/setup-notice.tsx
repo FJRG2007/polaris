@@ -161,7 +161,7 @@ export async function SetupNotice() {
 
 function Notice({ children }: { children: React.ReactNode }) {
     return (
-        <div className="mb-4 rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-warning-ink">
+        <div className="rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-warning-ink">
             {children}
         </div>
     );

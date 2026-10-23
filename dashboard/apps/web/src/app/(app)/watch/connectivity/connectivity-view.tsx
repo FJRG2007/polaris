@@ -147,93 +147,101 @@ export function ConnectivityView() {
                     </Button>
                 }
             />
-            {checkError ? <p className="mb-3 text-sm text-danger">{checkError}</p> : null}
+            <div className="flex flex-col gap-4">
+                {checkError ? <p className="text-sm text-danger">{checkError}</p> : null}
 
-            {error && !data ? (
-                <EmptyState
-                    title={t("connectivity.errors.load")}
-                    description={t("connectivity.errors.loadHint")}
-                />
-            ) : (
-                <div className="flex flex-col gap-5">
-                    <CurrentState report={data} now={now} span={span} />
+                {error && !data ? (
+                    <EmptyState
+                        title={t("connectivity.errors.load")}
+                        description={t("connectivity.errors.loadHint")}
+                    />
+                ) : (
+                    <div className="flex flex-col gap-5">
+                        <CurrentState report={data} now={now} span={span} />
 
-                    <section className="flex flex-col gap-3" aria-labelledby="connectivity-periods">
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <h2 id="connectivity-periods" className="text-sm font-medium">
-                                {t("connectivity.periods.title")}
-                            </h2>
-                            {since !== null ? (
-                                <span className="text-xs text-muted-foreground">
-                                    {t("connectivity.periods.since", { date: format.date(since) })}
-                                </span>
-                            ) : null}
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            {(["24h", "7d", "30d", "90d"] as const).map((key) => (
-                                <PeriodTile
-                                    key={key}
-                                    title={t(`connectivity.periods.${key}`)}
-                                    summary={
-                                        data?.periods.find((period) => period.key === key) ?? null
+                        <section
+                            className="flex flex-col gap-3"
+                            aria-labelledby="connectivity-periods"
+                        >
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <h2 id="connectivity-periods" className="text-sm font-medium">
+                                    {t("connectivity.periods.title")}
+                                </h2>
+                                {since !== null ? (
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("connectivity.periods.since", {
+                                            date: format.date(since)
+                                        })}
+                                    </span>
+                                ) : null}
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                {(["24h", "7d", "30d", "90d"] as const).map((key) => (
+                                    <PeriodTile
+                                        key={key}
+                                        title={t(`connectivity.periods.${key}`)}
+                                        summary={
+                                            data?.periods.find((period) => period.key === key) ??
+                                            null
+                                        }
+                                        loading={loading && !data}
+                                        span={span}
+                                        uptime={(value) => uptimeText(value, format)}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t("connectivity.days.title")}</CardTitle>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("connectivity.days.description")}
+                                </p>
+                            </CardHeader>
+                            <CardBody className="overflow-x-auto">
+                                <DowntimeHeatmap
+                                    days={days}
+                                    since={since}
+                                    selected={filters.value.day?.label ?? null}
+                                    onSelect={(day) =>
+                                        filters.set({
+                                            ...filters.value,
+                                            day: day
+                                                ? { label: day.day, start: day.start, end: day.end }
+                                                : null
+                                        })
                                     }
-                                    loading={loading && !data}
                                     span={span}
-                                    uptime={(value) => uptimeText(value, format)}
                                 />
-                            ))}
-                        </div>
-                    </section>
+                            </CardBody>
+                        </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t("connectivity.days.title")}</CardTitle>
-                            <p className="text-xs text-muted-foreground">
-                                {t("connectivity.days.description")}
-                            </p>
-                        </CardHeader>
-                        <CardBody className="overflow-x-auto">
-                            <DowntimeHeatmap
-                                days={days}
-                                since={since}
-                                selected={filters.value.day?.label ?? null}
-                                onSelect={(day) =>
-                                    filters.set({
-                                        ...filters.value,
-                                        day: day
-                                            ? { label: day.day, start: day.start, end: day.end }
-                                            : null
-                                    })
-                                }
-                                span={span}
-                            />
-                        </CardBody>
-                    </Card>
+                        <LineCharts admin />
 
-                    <LineCharts admin />
+                        <OutageTable
+                            outages={data?.outages ?? null}
+                            truncated={data?.truncated ?? false}
+                            filters={filters.value}
+                            onFilters={filters.set}
+                            now={now}
+                            staleMs={staleMs}
+                            span={span}
+                        />
 
-                    <OutageTable
-                        outages={data?.outages ?? null}
-                        truncated={data?.truncated ?? false}
-                        filters={filters.value}
-                        onFilters={filters.set}
-                        now={now}
-                        staleMs={staleMs}
-                        span={span}
-                    />
+                        {data && data.months.length > 0 ? (
+                            <OlderMonths report={data} span={span} />
+                        ) : null}
 
-                    {data && data.months.length > 0 ? (
-                        <OlderMonths report={data} span={span} />
-                    ) : null}
-
-                    <MergeGapForm
-                        seconds={data?.mergeGapSeconds ?? null}
-                        onSaved={(seconds) => {
-                            if (data) replace({ ...data, mergeGapSeconds: seconds });
-                        }}
-                    />
-                </div>
-            )}
+                        <MergeGapForm
+                            seconds={data?.mergeGapSeconds ?? null}
+                            onSaved={(seconds) => {
+                                if (data) replace({ ...data, mergeGapSeconds: seconds });
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
         </>
     );
 }

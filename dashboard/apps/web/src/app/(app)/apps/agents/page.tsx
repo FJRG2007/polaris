@@ -39,10 +39,12 @@ export default async function AgentsPage() {
                     ) : null
                 }
             />
-            <Suspense fallback={null}>
-                <SetupNotice />
-            </Suspense>
-            <AgentsOverview repos={repos} runs={runs} />
+            <div className="flex flex-col gap-4">
+                <Suspense fallback={null}>
+                    <SetupNotice />
+                </Suspense>
+                <AgentsOverview repos={repos} runs={runs} />
+            </div>
         </>
     );
 }

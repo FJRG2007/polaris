@@ -63,7 +63,18 @@ import {
     ArkMessageDialog,
     ArkPlayerDialog
 } from "./ark-player-dialogs";
-import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Skeleton, Switch } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    cn,
+    Input,
+    ScrollRow,
+    Skeleton,
+    Switch,
+    TagList
+} from "@polaris/ui";
 import {
     Ban,
     Clock,
@@ -1951,7 +1962,7 @@ function ArkPlayerRow({
                     </div>
                 </td>
                 <td className="px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-1">
+                    <TagList>
                         {entry.userId && (
                             <Badge
                                 title={t("panel.linkedHint", {
@@ -2001,7 +2012,7 @@ function ArkPlayerRow({
                                 {t("panel.timedOut", { left: timeoutText(tGames, timeout.until) })}
                             </Badge>
                         )}
-                    </div>
+                    </TagList>
                 </td>
                 <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">

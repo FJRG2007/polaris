@@ -34,13 +34,12 @@ export default async function AdminSecurityPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("security.title")}
-                description={t("security.description")}
-            />
-            <SecurityAdmin policy={policy} mailReady={mail.channelId !== null} />
-            <div className="mt-3 max-w-2xl">
-                <PlayerAddressesCard shared={addressesShared} />
+            <PageHeader title={t("security.title")} description={t("security.description")} />
+            <div className="flex flex-col gap-4">
+                <SecurityAdmin policy={policy} mailReady={mail.channelId !== null} />
+                <div className="max-w-2xl">
+                    <PlayerAddressesCard shared={addressesShared} />
+                </div>
             </div>
         </>
     );

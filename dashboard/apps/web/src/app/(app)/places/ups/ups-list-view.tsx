@@ -72,161 +72,175 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                 }
             />
 
-            {data && data.usb.state !== "ok" ? (
-                <p className="mb-4 text-sm text-muted-foreground">
-                    {data.usb.state === "updateNeeded"
-                        ? t("ups.found.updateNeeded")
-                        : t("ups.found.fullEditionNeeded")}
-                </p>
-            ) : null}
+            <div className="flex flex-col gap-4">
+                {data && data.usb.state !== "ok" ? (
+                    <p className="text-sm text-muted-foreground">
+                        {data.usb.state === "updateNeeded"
+                            ? t("ups.found.updateNeeded")
+                            : t("ups.found.fullEditionNeeded")}
+                    </p>
+                ) : null}
 
-            {offers.length > 0 ? (
-                <section aria-label={t("ups.found.title")} className="mb-5 flex flex-col gap-2">
-                    <h2 className="text-sm font-medium">{t("ups.found.title")}</h2>
-                    <ul className="flex flex-col gap-2">
-                        {offers.map((offer) => {
-                            const key = `${offer.machineId}/${offer.deviceId}`;
-                            return (
-                                <li
-                                    key={key}
-                                    className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2"
-                                >
-                                    <Usb
-                                        className="size-4 shrink-0 text-muted-foreground"
-                                        aria-hidden
-                                    />
-                                    <span
-                                        className="min-w-0 flex-1 truncate text-sm"
-                                        title={offer.name}
+                {offers.length > 0 ? (
+                    <section aria-label={t("ups.found.title")} className="flex flex-col gap-2">
+                        <h2 className="text-sm font-medium">{t("ups.found.title")}</h2>
+                        <ul className="flex flex-col gap-2">
+                            {offers.map((offer) => {
+                                const key = `${offer.machineId}/${offer.deviceId}`;
+                                return (
+                                    <li
+                                        key={key}
+                                        className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2"
                                     >
-                                        {offer.name}{" "}
-                                        <span className="text-muted-foreground">
-                                            {t("ups.found.on", {
-                                                machine: machineName(offer.machineId)
-                                            })}
+                                        <Usb
+                                            className="size-4 shrink-0 text-muted-foreground"
+                                            aria-hidden
+                                        />
+                                        <span
+                                            className="min-w-0 flex-1 truncate text-sm"
+                                            title={offer.name}
+                                        >
+                                            {offer.name}{" "}
+                                            <span className="text-muted-foreground">
+                                                {t("ups.found.on", {
+                                                    machine: machineName(offer.machineId)
+                                                })}
+                                            </span>
                                         </span>
-                                    </span>
-                                    <Button
-                                        size="sm"
-                                        disabled={addingOffer !== null}
-                                        onClick={() => void addOffer(offer)}
-                                    >
-                                        {t("ups.found.add")}
-                                    </Button>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                    {offerError ? (
-                        <p role="alert" className="text-sm text-danger-ink">
-                            {t(`ups.errors.${offerError === "notFound" ? "notFound" : "failed"}`)}
-                        </p>
-                    ) : null}
-                </section>
-            ) : null}
+                                        <Button
+                                            size="sm"
+                                            disabled={addingOffer !== null}
+                                            onClick={() => void addOffer(offer)}
+                                        >
+                                            {t("ups.found.add")}
+                                        </Button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                        {offerError ? (
+                            <p role="alert" className="text-sm text-danger-ink">
+                                {t(
+                                    `ups.errors.${offerError === "notFound" ? "notFound" : "failed"}`
+                                )}
+                            </p>
+                        ) : null}
+                    </section>
+                ) : null}
 
-            {data && data.ups.length === 0 ? (
-                <EmptyState
-                    icon={<BatteryCharging className="size-5" aria-hidden />}
-                    title={t("ups.empty.title")}
-                    description={t("ups.empty.body")}
-                />
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[36rem] text-sm">
-                        <thead className="text-left text-xs text-muted-foreground">
-                            <tr>
-                                <th className="py-2 pr-3 font-medium">{t("ups.columns.name")}</th>
-                                <th className="py-2 pr-3 font-medium">{t("ups.columns.status")}</th>
-                                <th className="py-2 pr-3 text-right font-medium">
-                                    {t("ups.columns.charge")}
-                                </th>
-                                <th className="py-2 pr-3 text-right font-medium">
-                                    {t("ups.columns.runtime")}
-                                </th>
-                                <th className="py-2 pr-3 text-right font-medium">
-                                    {t("ups.columns.load")}
-                                </th>
-                                <th className="py-2 font-medium">{t("ups.columns.connection")}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {data === null
-                                ? [0, 1].map((row) => (
-                                      <tr key={row} className="border-t border-border">
-                                          <td colSpan={6} className="py-2.5">
-                                              <Skeleton className="h-5 w-full" />
-                                          </td>
-                                      </tr>
-                                  ))
-                                : data.ups.map(({ ups, result }) => {
-                                      const reading = result.ok ? result.reading : null;
-                                      const status = upsStatus(reading);
-                                      const charge = rounded(reading?.charge ?? null);
-                                      const minutes = minutesLeft(reading?.runtimeS ?? null);
-                                      const load = rounded(reading?.load ?? null);
-                                      return (
-                                          <tr key={ups.id} className="border-t border-border">
-                                              <td className="max-w-[16rem] py-2.5 pr-3">
-                                                  <Link
-                                                      href={`/places/ups/${ups.id}`}
-                                                      className="block truncate font-medium hover:underline"
-                                                      title={ups.name}
-                                                  >
-                                                      {ups.name}
-                                                  </Link>
-                                              </td>
-                                              <td className="py-2.5 pr-3">
-                                                  <Badge
-                                                      variant={status.tone}
-                                                      title={
-                                                          result.ok
-                                                              ? undefined
-                                                              : t(
-                                                                    `ups.unreachable.${result.reason}`
-                                                                )
-                                                      }
-                                                  >
-                                                      {t(`ups.status.${status.key}`)}
-                                                  </Badge>
-                                              </td>
-                                              <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                  {charge === null
-                                                      ? "-"
-                                                      : t("ups.units.percent", { value: charge })}
-                                              </td>
-                                              <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                  {minutes === null
-                                                      ? "-"
-                                                      : t("ups.units.minutes", { count: minutes })}
-                                              </td>
-                                              <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                  {load === null
-                                                      ? "-"
-                                                      : t("ups.units.percent", { value: load })}
-                                              </td>
-                                              <td className="py-2.5 text-muted-foreground">
-                                                  {t(`ups.connection.${ups.connection}`)}
+                {data && data.ups.length === 0 ? (
+                    <EmptyState
+                        icon={<BatteryCharging className="size-5" aria-hidden />}
+                        title={t("ups.empty.title")}
+                        description={t("ups.empty.body")}
+                    />
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[36rem] text-sm">
+                            <thead className="text-left text-xs text-muted-foreground">
+                                <tr>
+                                    <th className="py-2 pr-3 font-medium">
+                                        {t("ups.columns.name")}
+                                    </th>
+                                    <th className="py-2 pr-3 font-medium">
+                                        {t("ups.columns.status")}
+                                    </th>
+                                    <th className="py-2 pr-3 text-right font-medium">
+                                        {t("ups.columns.charge")}
+                                    </th>
+                                    <th className="py-2 pr-3 text-right font-medium">
+                                        {t("ups.columns.runtime")}
+                                    </th>
+                                    <th className="py-2 pr-3 text-right font-medium">
+                                        {t("ups.columns.load")}
+                                    </th>
+                                    <th className="py-2 font-medium">
+                                        {t("ups.columns.connection")}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data === null
+                                    ? [0, 1].map((row) => (
+                                          <tr key={row} className="border-t border-border">
+                                              <td colSpan={6} className="py-2.5">
+                                                  <Skeleton className="h-5 w-full" />
                                               </td>
                                           </tr>
-                                      );
-                                  })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                                      ))
+                                    : data.ups.map(({ ups, result }) => {
+                                          const reading = result.ok ? result.reading : null;
+                                          const status = upsStatus(reading);
+                                          const charge = rounded(reading?.charge ?? null);
+                                          const minutes = minutesLeft(reading?.runtimeS ?? null);
+                                          const load = rounded(reading?.load ?? null);
+                                          return (
+                                              <tr key={ups.id} className="border-t border-border">
+                                                  <td className="max-w-[16rem] py-2.5 pr-3">
+                                                      <Link
+                                                          href={`/places/ups/${ups.id}`}
+                                                          className="block truncate font-medium hover:underline"
+                                                          title={ups.name}
+                                                      >
+                                                          {ups.name}
+                                                      </Link>
+                                                  </td>
+                                                  <td className="py-2.5 pr-3">
+                                                      <Badge
+                                                          variant={status.tone}
+                                                          title={
+                                                              result.ok
+                                                                  ? undefined
+                                                                  : t(
+                                                                        `ups.unreachable.${result.reason}`
+                                                                    )
+                                                          }
+                                                      >
+                                                          {t(`ups.status.${status.key}`)}
+                                                      </Badge>
+                                                  </td>
+                                                  <td className="py-2.5 pr-3 text-right tabular-nums">
+                                                      {charge === null
+                                                          ? "-"
+                                                          : t("ups.units.percent", {
+                                                                value: charge
+                                                            })}
+                                                  </td>
+                                                  <td className="py-2.5 pr-3 text-right tabular-nums">
+                                                      {minutes === null
+                                                          ? "-"
+                                                          : t("ups.units.minutes", {
+                                                                count: minutes
+                                                            })}
+                                                  </td>
+                                                  <td className="py-2.5 pr-3 text-right tabular-nums">
+                                                      {load === null
+                                                          ? "-"
+                                                          : t("ups.units.percent", { value: load })}
+                                                  </td>
+                                                  <td className="py-2.5 text-muted-foreground">
+                                                      {t(`ups.connection.${ups.connection}`)}
+                                                  </td>
+                                              </tr>
+                                          );
+                                      })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
-            {data && data.ups.length > 1 ? <UpsAnalytics /> : null}
-            {adding ? (
-                <UpsConnectionDialog
-                    open
-                    onOpenChange={setAdding}
-                    editing={null}
-                    machines={machines}
-                    offers={offers}
-                    onSaved={(id) => router.push(`/places/ups/${id}`)}
-                />
-            ) : null}
+                {data && data.ups.length > 1 ? <UpsAnalytics /> : null}
+                {adding ? (
+                    <UpsConnectionDialog
+                        open
+                        onOpenChange={setAdding}
+                        editing={null}
+                        machines={machines}
+                        offers={offers}
+                        onSaved={(id) => router.push(`/places/ups/${id}`)}
+                    />
+                ) : null}
+            </div>
         </>
     );
 }

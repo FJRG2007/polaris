@@ -35,47 +35,49 @@ export default async function AgentSetupPage() {
     return (
         <>
             <PageHeader title={t("overview.setUp")} description={t("setup.description")} />
-            <div className="space-y-3">
-                <Step
-                    done={appReady}
-                    title={t("setup.app.title")}
-                    body={t("setup.app.body")}
-                    href="/admin/integrations"
-                    action={t("setup.app.action")}
-                />
-                <Step
-                    done={modelReady}
-                    title={t("setup.model.title")}
-                    body={t("setup.model.body")}
-                    href={connectionsHref(AI_KEYS_SECTION, "/apps/agents/setup")}
-                    action={t("setup.model.action")}
-                />
-                <Step
-                    done={repoReady}
-                    title={t("repos.add")}
-                    body={t("setup.repo.body")}
-                    href="/apps/agents/repos"
-                    action={t("repos.add")}
-                />
-            </div>
+            <div className="flex flex-col gap-4">
+                <div className="space-y-3">
+                    <Step
+                        done={appReady}
+                        title={t("setup.app.title")}
+                        body={t("setup.app.body")}
+                        href="/admin/integrations"
+                        action={t("setup.app.action")}
+                    />
+                    <Step
+                        done={modelReady}
+                        title={t("setup.model.title")}
+                        body={t("setup.model.body")}
+                        href={connectionsHref(AI_KEYS_SECTION, "/apps/agents/setup")}
+                        action={t("setup.model.action")}
+                    />
+                    <Step
+                        done={repoReady}
+                        title={t("repos.add")}
+                        body={t("setup.repo.body")}
+                        href="/apps/agents/repos"
+                        action={t("repos.add")}
+                    />
+                </div>
 
-            {appReady && modelReady && repoReady ? (
-                <Card className="mt-4">
-                    <CardBody className="space-y-2 py-6">
-                        <p className="text-sm">
-                            {t.rich("setup.ready", {
-                                app: `@${github?.login ?? t("setup.theApp")}`,
-                                code: (chunks) => (
-                                    <code key="app" className="rounded bg-white/5 px-1">
-                                        {chunks}
-                                    </code>
-                                )
-                            })}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{t("setup.readyHint")}</p>
-                    </CardBody>
-                </Card>
-            ) : null}
+                {appReady && modelReady && repoReady ? (
+                    <Card>
+                        <CardBody className="space-y-2 py-6">
+                            <p className="text-sm">
+                                {t.rich("setup.ready", {
+                                    app: `@${github?.login ?? t("setup.theApp")}`,
+                                    code: (chunks) => (
+                                        <code key="app" className="rounded bg-white/5 px-1">
+                                            {chunks}
+                                        </code>
+                                    )
+                                })}
+                            </p>
+                            <p className="text-sm text-muted-foreground">{t("setup.readyHint")}</p>
+                        </CardBody>
+                    </Card>
+                ) : null}
+            </div>
         </>
     );
 }

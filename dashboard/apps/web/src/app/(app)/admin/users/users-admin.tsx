@@ -76,7 +76,8 @@ import {
     Select,
     ShortcutHint,
     cn,
-    shortcutPressed
+    shortcutPressed,
+    TagList
 } from "@polaris/ui";
 
 /** How long typing settles before the search asks the server. */
@@ -515,7 +516,7 @@ export function UsersAdmin({
                                                 </PersonRow>
                                             </td>
                                             <td className="hidden px-3 py-2 sm:table-cell">
-                                                <div className="flex flex-wrap items-center gap-1">
+                                                <TagList>
                                                     {user.isAdmin ? (
                                                         <Badge variant="primary">
                                                             <Shield className="size-3" />
@@ -540,12 +541,12 @@ export function UsersAdmin({
                                                     {user.twoFactorEnabled ? (
                                                         <Badge variant="success">2FA</Badge> // i18n-ignore: the same abbreviation in every language
                                                     ) : null}
-                                                </div>
+                                                </TagList>
                                             </td>
                                             <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                                 {isOnline(user.lastSeenAt, now) ? (
                                                     <span
-                                                        className="flex items-center gap-1.5 text-success"
+                                                        className="inline-flex items-center gap-1.5 text-success"
                                                         title={
                                                             user.lastSeenAt
                                                                 ? format.dateTime(user.lastSeenAt)
