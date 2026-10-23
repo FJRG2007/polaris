@@ -176,16 +176,25 @@ export function isGatewayFailure(status: number): boolean {
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-/** One timed fetch. Combines the caller's own abort signal with the timeout. */
+/**
+ * One fetch whose wait for an answer is bounded. The timeout covers only the wait
+ * for the response headers, so a long download or an event stream that answered
+ * in time is never cut off; the caller's own signal still ends it whenever.
+ */
 async function timedFetch(
     fetchImpl: FetchLike,
     url: string,
     init: RequestInit,
     timeoutMs: number
 ): Promise<Response> {
-    const timeout = AbortSignal.timeout(timeoutMs);
-    const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
-    return fetchImpl(url, { ...init, signal });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException("timed out", "TimeoutError")), timeoutMs);
+    const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal;
+    try {
+        return await fetchImpl(url, { ...init, signal });
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 /**

@@ -352,7 +352,8 @@ class Hub {
                         address,
                         token: claimed.token,
                         keyId: claimed.keyId,
-                        account: claimed.account.name || claimed.account.email
+                        account: claimed.account.name || claimed.account.email,
+                        ...(await this.client.learn(address).then((instance) => (instance ? { instance } : {})))
                     };
                     await streamDeck.settings.setGlobalSettings({ ...this.credentials });
                     this.connecting = { phase: "idle" };

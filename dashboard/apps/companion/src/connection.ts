@@ -127,6 +127,8 @@ export class Connection {
         this.#catalogueAt = Date.now();
         try {
             const listing = await this.client.listing(credentials);
+            const words = this.client.addressWords(credentials);
+            if (words) this.host.log("info", `${words} (the usual address is not answering).`);
             this.catalogue = listing.actions;
             this.latest = listing.latest;
             this.host.catalogue(this.catalogue);
@@ -254,7 +256,8 @@ export class Connection {
                         address,
                         token: claimed.token,
                         keyId: claimed.keyId,
-                        account: accountName(claimed.account)
+                        account: accountName(claimed.account),
+                        ...(await this.client.learn(address).then((instance) => (instance ? { instance } : {})))
                     };
                     this.host.save(this.credentials);
                     this.#failures = 0;

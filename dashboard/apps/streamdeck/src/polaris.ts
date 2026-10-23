@@ -10,6 +10,13 @@
  * The SDK-free half of the plugin, so the tests reach it with a stubbed fetch.
  */
 
+import {
+    createFailover,
+    learnInstance,
+    readInstance,
+    type Failover,
+    type InstanceRecord
+} from "../../../packages/core/src/instance-fallback";
 import os from "node:os";
 import { SseReader } from "./sse";
 
@@ -158,6 +165,9 @@ export interface Credentials {
     readonly token: string;
     readonly keyId?: string;
     readonly account?: string;
+    /** Who the Polaris is and its other addresses, learned when the deck was
+     *  connected - what lets it carry on over the local network. */
+    readonly instance?: InstanceRecord;
 }
 
 /** Read stored credentials, or null when there are none worth using. */
@@ -165,11 +175,13 @@ export function readCredentials(raw: unknown): Credentials | null {
     const value = raw as Partial<Credentials> | null;
     if (!value || typeof value.address !== "string" || typeof value.token !== "string") return null;
     if (value.address === "" || value.token === "") return null;
+    const instance = readInstance(value.instance);
     return {
         address: value.address,
         token: value.token,
         ...(typeof value.keyId === "string" ? { keyId: value.keyId } : {}),
-        ...(typeof value.account === "string" ? { account: value.account } : {})
+        ...(typeof value.account === "string" ? { account: value.account } : {}),
+        ...(instance ? { instance } : {})
     };
 }
 
@@ -206,6 +218,38 @@ export class PolarisClient {
         private readonly fetcher: Fetch = fetch,
         private readonly product = "polaris-streamdeck"
     ) {}
+
+    readonly #failovers = new Map<string, Failover>();
+
+    /**
+     * Send to the deck's Polaris: its own address first, then - only after it
+     * proved it is the same Polaris - one of its local addresses.
+     */
+    #send(credentials: Credentials, path: string, init: RequestInit): Promise<Response> {
+        if (!credentials.instance) return this.fetcher(`${credentials.address}${path}`, init);
+        const key = `${credentials.address} ${credentials.instance.id}`;
+        let failover = this.#failovers.get(key);
+        if (!failover) {
+            failover = createFailover({
+                primary: credentials.address,
+                instance: credentials.instance,
+                fetch: (url, options) => this.fetcher(url, options)
+            });
+            this.#failovers.set(key, failover);
+        }
+        return failover.request(path, init);
+    }
+
+    /** Which address the deck is on, in words, or null on its usual one. */
+    addressWords(credentials: Credentials): string | null {
+        if (!credentials.instance) return null;
+        return this.#failovers.get(`${credentials.address} ${credentials.instance.id}`)?.status().words ?? null;
+    }
+
+    /** What the Polaris says about itself, learned over the address just approved. */
+    learn(address: string): Promise<InstanceRecord | null> {
+        return learnInstance(address, (url, options) => this.fetcher(url, options));
+    }
 
     #headers(token?: string): Record<string, string> {
         return {
@@ -256,7 +300,7 @@ export class PolarisClient {
 
     /** The catalogue, and the newest releases Polaris knows of. */
     async listing(credentials: Credentials): Promise<DeckListing> {
-        const response = await this.fetcher(`${credentials.address}/api/deck/actions`, {
+        const response = await this.#send(credentials, `/api/deck/actions`, {
             headers: this.#headers(credentials.token)
         });
         const body = await this.#json<{
@@ -280,7 +324,7 @@ export class PolarisClient {
     ): Promise<RunResult> {
         let response: Response;
         try {
-            response = await this.fetcher(`${credentials.address}/api/deck/run`, {
+            response = await this.#send(credentials, `/api/deck/run`, {
                 method: "POST",
                 headers: this.#headers(credentials.token),
                 body: JSON.stringify({
@@ -300,7 +344,7 @@ export class PolarisClient {
 
     /** Ask Polaris to revoke the key this deck holds. */
     async end(credentials: Credentials): Promise<void> {
-        const response = await this.fetcher(`${credentials.address}/api/deck/session`, {
+        const response = await this.#send(credentials, `/api/deck/session`, {
             method: "DELETE",
             headers: this.#headers(credentials.token)
         });
@@ -322,8 +366,7 @@ export class PolarisClient {
         signal: AbortSignal
     ): Promise<void> {
         const watch = Buffer.from(JSON.stringify(watched)).toString("base64url");
-        const response = await this.fetcher(
-            `${credentials.address}/api/deck/state?watch=${watch}`,
+        const response = await this.#send(credentials, `/api/deck/state?watch=${watch}`,
             {
                 headers: { ...this.#headers(credentials.token), accept: "text/event-stream" },
                 signal
