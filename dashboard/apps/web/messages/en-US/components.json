@@ -1451,6 +1451,7 @@
         "slowCall": "Your connection is slow: video and voice may break up.",
         "unreachable": "Can't reach Polaris right now. Retrying.",
         "updating": "Polaris is updating. It will be back in a moment.",
+        "noInternet": "No internet connection - Polaris keeps working on your network",
         "polarisBack": "Polaris is back",
         "retry": "Try now"
     },
