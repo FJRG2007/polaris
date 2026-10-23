@@ -191,6 +191,12 @@ export async function register(): Promise<void> {
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS
     // once the operator installs the root. Best-effort: a failure keeps the
     // self-signed default and never blocks startup.
+    // Who this Polaris is, for clients that fall back to its LAN address when the
+    // public one stops answering. Made here when an install has none, so nothing
+    // has to be configured for it.
+    const { ensureInstanceIdentity } = await import("./lib/instance-identity");
+    void ensureInstanceIdentity().catch((error) => console.error("polaris: instance identity setup failed:", error));
+
     const { ensureLocalCa } = await import("./lib/local-ca-service");
     void ensureLocalCa().catch((error) => console.error("polaris: local CA setup failed:", error));
 
