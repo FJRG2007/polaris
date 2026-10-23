@@ -105,7 +105,9 @@ export const GAME_MODE_LABEL: Readonly<Record<GameMode, string>> = {
 /** Whether the audience is one Polaris turns into names itself, from who is on
  *  and who the operators are, because the game has no selector for it. Java
  *  only: Bedrock keeps its operators by xuid. */
-export function namedByPolaris(audience: Audience): boolean {
+export function namedByPolaris(
+    audience: Audience
+): audience is Extract<Audience, { kind: "operators" | "others" }> {
     return audience.kind === "operators" || audience.kind === "others";
 }
 

@@ -24,7 +24,7 @@ const playerName = z
 
 async function onlinePlayers(ownerId: string, installedAppId: string): Promise<string[]> {
     const status = await getServerPlayers(ownerId, installedAppId).catch(() => null);
-    return status?.players.players ?? [];
+    return [...(status?.players.players ?? [])];
 }
 
 async function problemText(problem: transfer.TransferProblem): Promise<string> {

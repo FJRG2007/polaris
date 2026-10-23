@@ -260,7 +260,9 @@ function createMetadata(input: CreateGameServerInput): Record<string, unknown> {
             return { game: "ark", map: input.map, closed: input.exclusiveJoin };
         case "fivem":
             return { game: "fivem", onesync: input.onesync, closed: input.exclusiveJoin };
-        default:
+        case "hytale":
+            return { game: "hytale", memory: input.memory };
+        case "minecraft":
             return {
                 game: "minecraft",
                 edition: input.edition,

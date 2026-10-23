@@ -372,9 +372,8 @@ const CYCLE: readonly (readonly [Sky, number])[] = [
  * a surge, twice from the third, and every so often in the downpour. Fixed by
  * the run, so a restart picks the same weather back up.
  */
-export function forecast(total: number, seed: string, huts: number): Spell[] {
+export function forecast(total: number, huts: number): Spell[] {
     if (total <= 0) return [];
-    const random = seeded(`acid-sky-${seed}`);
     const downpourAt = Math.max(0, total - Math.min(DOWNPOUR_MS, Math.round(total / 3)));
     const spells: Spell[] = [];
     let at = 0;

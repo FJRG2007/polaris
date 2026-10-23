@@ -41,8 +41,7 @@ function jarUrl(baseUrl: string, installedAppId: string): string {
 
 export async function symbioteState(
     applicationId: string,
-    ownerId: string,
-    installedAppId: string
+    ownerId: string
 ): Promise<SymbioteState> {
     const [env, publicUrl, bundled] = await Promise.all([
         readEnv(applicationId, ownerId),

@@ -448,24 +448,25 @@ export async function deleteInstallFootage(installedAppId: string): Promise<void
             });
             await remove(clips.map((clip) => clip.path));
             if (clips.length < FOOTAGE_PAGE) break;
-            after = clips[clips.length - 1].id;
+            after = clips[clips.length - 1]!.id;
         }
 
         after = undefined;
         for (;;) {
-            const events = await prisma.cameraEvent.findMany({
-                where: {
-                    cameraId,
-                    stillKey: { not: null },
-                    ...(after ? { id: { gt: after } } : {})
-                },
-                orderBy: { id: "asc" },
-                take: FOOTAGE_PAGE,
-                select: { id: true, stillKey: true }
-            });
+            const events: { id: string; stillKey: string | null }[] =
+                await prisma.cameraEvent.findMany({
+                    where: {
+                        cameraId,
+                        stillKey: { not: null },
+                        ...(after ? { id: { gt: after } } : {})
+                    },
+                    orderBy: { id: "asc" },
+                    take: FOOTAGE_PAGE,
+                    select: { id: true, stillKey: true }
+                });
             await remove(events.flatMap((event) => (event.stillKey ? [event.stillKey] : [])));
             if (events.length < FOOTAGE_PAGE) break;
-            after = events[events.length - 1].id;
+            after = events[events.length - 1]!.id;
         }
     } finally {
         for (const driver of drivers.values())

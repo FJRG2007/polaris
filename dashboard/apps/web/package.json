@@ -12,7 +12,8 @@
         "postbuild": "node scripts/check-client-paths.mjs",
         "start": "next start",
         "test": "vitest run --passWithNoTests",
-        "typecheck": "tsc --noEmit",
+        "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+        "typecheck:web": "tsc --noEmit",
         "lint": "eslint --quiet src test",
         "i18n:scan": "node scripts/i18n-scan.mjs"
     },

@@ -128,7 +128,6 @@ export function FieldNote({
     known?: KnownValues;
 }) {
     const schemaText = useSchemaText();
-    const t = useGameText("minecraft");
     const used = visibleLength(mc.stripMotd(text), known);
     return (
         <span

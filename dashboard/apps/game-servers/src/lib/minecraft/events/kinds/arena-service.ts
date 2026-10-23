@@ -474,7 +474,6 @@ async function kitMarker(ctx: KindContext): Promise<stored.Marker> {
 async function bringIn(ctx: KindContext): Promise<void> {
     const run = ctx.run;
     const language = ctx.language;
-    const box = run.arena!.box;
     const game = gameOf(run.preset.kind);
     const duelling = run.preset.kind === "team-duel";
     const hillside = run.preset.kind === "king-of-the-hill";
@@ -787,7 +786,6 @@ function goLines(run: stored.EventRun, language: speech.Speech, offhand: boolean
     const marker = run.marker!;
     const out: string[] = [];
     if (run.preset.kind === "team-duel") {
-        const options = run.preset.options as catalog.EventOptions<"team-duel">;
         for (const one of run.entrants)
             out.push(
                 arena.moveTo(one.name, spots.get(lower(one.name))!),
@@ -949,7 +947,6 @@ async function keptOut(
 async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
     const run = ctx.run;
     const language = ctx.language;
-    const options = run.preset.options as catalog.EventOptions<"team-duel">;
     const box = run.arena!.box;
     const memory = memoryOf(run.id);
     const now = ctx.now;
@@ -1586,7 +1583,7 @@ export async function closeArena(
             // nothing is asked over it: the arena is tried again later.
             const lines = arena.teardown(left.arena);
             const pacing = pace.teardownPacer();
-            for (let start = 0; start < lines.length; ) {
+            for (let start = 0; start < lines.length;) {
                 const trip = pacing.take(lines.slice(start), pace.fillVolume);
                 start += trip.length;
                 let replies: (string | null)[] = [];

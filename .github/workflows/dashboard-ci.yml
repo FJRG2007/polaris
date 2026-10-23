@@ -175,6 +175,8 @@ jobs:
         run: npm run build:packages
       # The web app's tsc holds about as much as the build does and sits right at
       # Node's ~4 GB default heap, so it gets the same room the build step has.
+      # It also covers the app bundles under apps/game-servers and apps/places
+      # (apps/web/tsconfig.typecheck.json), which nothing else type-checks.
       - run: npm run typecheck
         env:
           NODE_OPTIONS: --max-old-space-size=8192
@@ -289,11 +291,16 @@ jobs:
       #
       # The checks job runs ESLint over the same sources in this same run, so the
       # build skips its own copy of that too.
+      #
+      # `typecheck:web` is the dashboard alone: the app bundles it loads are
+      # checked by the checks job's `npm run typecheck` (tsconfig.typecheck.json),
+      # which has room to spare before this job ends, so they are not paid for
+      # twice on the slowest job.
       - run: npm run build -w @polaris/web
         env:
           NODE_OPTIONS: --max-old-space-size=10240
           POLARIS_BUILD_SKIP_LINT: "1"
           POLARIS_BUILD_SKIP_TYPECHECK: "1"
-      - run: npm run typecheck -w @polaris/web
+      - run: npm run typecheck:web -w @polaris/web
         env:
           NODE_OPTIONS: --max-old-space-size=8192
