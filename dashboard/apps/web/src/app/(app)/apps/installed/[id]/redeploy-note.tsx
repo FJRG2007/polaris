@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import type { DeployStrategy } from "@/lib/deploy/releases";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { redeployStrategyAction } from "./actions";
+import * as polls from "./installed-polls";
 
 export function RedeployNote({
     installId,
@@ -24,7 +24,8 @@ export function RedeployNote({
     useEffect(() => {
         if (!applicationId) return;
         let active = true;
-        void redeployStrategyAction(installId)
+        void polls
+            .redeployStrategy(installId)
             .then((result) => {
                 if (active) setStrategy(result);
             })

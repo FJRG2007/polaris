@@ -644,3 +644,11 @@ vi.mock("@/app/(app)/apps/firewall/firewall-polls", () => ({
     ),
     wafRule: forward(() => import("@/app/(app)/apps/firewall/actions"), "getWafRuleAction", 1)
 }));
+
+vi.mock("@/app/(app)/apps/installed/[id]/installed-polls", () => ({
+    redeployStrategy: forward(
+        () => import("@/app/(app)/apps/installed/[id]/actions"),
+        "redeployStrategyAction",
+        1
+    )
+}));

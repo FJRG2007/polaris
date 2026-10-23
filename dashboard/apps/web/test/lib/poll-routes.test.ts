@@ -145,7 +145,8 @@ const actions = vi.hoisted(() => {
         "listManagedAction",
         "listTunnelServersAction",
         "getWafAddressActivityAction",
-        "getWafRuleAction"
+        "getWafRuleAction",
+        "redeployStrategyAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -415,6 +416,9 @@ vi.mock("@/app/(app)/apps/firewall/actions", () => ({
     getWafAddressActivityAction: actions.getWafAddressActivityAction,
     getWafRuleAction: actions.getWafRuleAction
 }));
+vi.mock("@/app/(app)/apps/installed/[id]/actions", () => ({
+    redeployStrategyAction: actions.redeployStrategyAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -570,7 +574,9 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/databases/managed": () => import("@/app/api/databases/managed/route"),
     "/api/databases/tunnel-servers": () => import("@/app/api/databases/tunnel-servers/route"),
     "/api/firewall/address-activity": () => import("@/app/api/firewall/address-activity/route"),
-    "/api/firewall/rule": () => import("@/app/api/firewall/rule/route")
+    "/api/firewall/rule": () => import("@/app/api/firewall/rule/route"),
+    "/api/apps/installed/redeploy-strategy": () =>
+        import("@/app/api/apps/installed/redeploy-strategy/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2213,6 +2219,18 @@ const CASES: Case[] = [
             ).wafRule({ scopeType: "project", scopeId: "scopeId-1" }),
         action: "getWafRuleAction",
         args: [{ scopeType: "project", scopeId: "scopeId-1" }]
+    },
+    {
+        name: "how an installed app's service redeploys",
+        path: "/api/apps/installed/redeploy-strategy",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/installed/[id]/installed-polls")>(
+                    "@/app/(app)/apps/installed/[id]/installed-polls"
+                )
+            ).redeployStrategy("installId-1"),
+        action: "redeployStrategyAction",
+        args: ["installId-1"]
     }
 ];
 
