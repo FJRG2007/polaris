@@ -51,16 +51,19 @@ export function UserProfileDialog({
         setLoading(true);
         setError(null);
         setReason("");
-        void polls.userProfile(userId).then((result) => {
-            if (!active) return;
-            if (result.error) setError(result.error);
-            else setProfile(result.profile ?? null);
-            setLoading(false);
-        }, () => {
-            if (!active) return;
-            setError(t("userProfile.loadFailed"));
-            setLoading(false);
-        });
+        void polls.userProfile(userId).then(
+            (result) => {
+                if (!active) return;
+                if (result.error) setError(result.error);
+                else setProfile(result.profile ?? null);
+                setLoading(false);
+            },
+            () => {
+                if (!active) return;
+                setError(t("userProfile.loadFailed"));
+                setLoading(false);
+            }
+        );
         return () => {
             active = false;
         };
@@ -119,7 +122,9 @@ export function UserProfileDialog({
                                     {profile.isAdmin ? (
                                         <Badge variant="neutral">{t("userProfile.admin")}</Badge>
                                     ) : null}
-                                    {profile.banned ? <Badge variant="danger">{t("userProfile.banned")}</Badge> : null}
+                                    {profile.banned ? (
+                                        <Badge variant="danger">{t("userProfile.banned")}</Badge>
+                                    ) : null}
                                 </p>
                                 {profile.email ? (
                                     <p className="truncate text-sm text-muted-foreground">

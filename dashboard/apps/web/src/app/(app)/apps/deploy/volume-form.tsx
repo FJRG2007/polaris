@@ -13,7 +13,16 @@ import { FolderPicker } from "./folder-picker";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
 import { createVolumeAction, updateVolumeAction, listNasConnectionsAction } from "./actions";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, SegmentedControl, Select } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    SegmentedControl,
+    Select
+} from "@polaris/ui";
 import * as polls from "./deploy-polls";
 
 type Kind = "volume" | "bind" | "nas";
@@ -78,15 +87,18 @@ export function VolumeForm({
     // inline form is handed a fresh object on every render of its panel, and
     // depending on that identity would re-fetch the connections forever.
     useEffect(() => {
-        void polls.nasConnections().then((rows) => {
-            setConnections(rows);
-            // Pre-select when there's a single usable connection (create only - edit
-            // keeps the volume's own connection).
-            if (editing) return;
-            const usable = rows.filter((row) => row.active);
-            const only = usable[0];
-            if (only && usable.length === 1) setConnectionId(only.id);
-        }, () => undefined);
+        void polls.nasConnections().then(
+            (rows) => {
+                setConnections(rows);
+                // Pre-select when there's a single usable connection (create only - edit
+                // keeps the volume's own connection).
+                if (editing) return;
+                const usable = rows.filter((row) => row.active);
+                const only = usable[0];
+                if (only && usable.length === 1) setConnectionId(only.id);
+            },
+            () => undefined
+        );
     }, [editing]);
 
     function save() {
@@ -112,7 +124,10 @@ export function VolumeForm({
             } else {
                 // Auto path and named volumes are generated server-side; custom sends
                 // the typed/picked subpath.
-                const resolvedSource = kind === "volume" || pathMode === "auto" ? undefined : source.trim() || undefined;
+                const resolvedSource =
+                    kind === "volume" || pathMode === "auto"
+                        ? undefined
+                        : source.trim() || undefined;
                 result = await createVolumeAction({
                     applicationId: targetId,
                     name: name.trim(),
@@ -159,13 +174,18 @@ export function VolumeForm({
                         value={serviceId}
                         onValueChange={setServiceId}
                         aria-label={t("volumeForm.service")}
-                        options={(services ?? []).map((service) => ({ value: service.id, label: service.name }))}
+                        options={(services ?? []).map((service) => ({
+                            value: service.id,
+                            label: service.name
+                        }))}
                     />
                 </label>
             )}
 
             {editing ? (
-                <p className="text-xs text-muted-foreground">{t(KIND_LABELS[kind])} - {t(KIND_HELP[kind])}</p>
+                <p className="text-xs text-muted-foreground">
+                    {t(KIND_LABELS[kind])} - {t(KIND_HELP[kind])}
+                </p>
             ) : (
                 <>
                     <SegmentedControl
@@ -186,17 +206,29 @@ export function VolumeForm({
             <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     {t("volumeForm.name")}
-                    <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={t("volumeForm.namePlaceholder")} />
+                    <Input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder={t("volumeForm.namePlaceholder")}
+                    />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     {t("volumeForm.mountPath")}
                     {/* i18n-ignore: an example path */}
-                    <Input value={mountPath} onChange={(event) => setMountPath(event.target.value)} placeholder="/app/secrets" />
+                    <Input
+                        value={mountPath}
+                        onChange={(event) => setMountPath(event.target.value)}
+                        placeholder="/app/secrets"
+                    />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     {t("volumeForm.sizeLimit")}
                     {/* i18n-ignore: an example size */}
-                    <Input value={sizeLimit} onChange={(event) => setSizeLimit(event.target.value)} placeholder="10G" />
+                    <Input
+                        value={sizeLimit}
+                        onChange={(event) => setSizeLimit(event.target.value)}
+                        placeholder="10G"
+                    />
                 </label>
             </div>
 
@@ -210,7 +242,9 @@ export function VolumeForm({
                         aria-label={t("volumeForm.connection")}
                         options={connections.map((connection) => ({
                             value: connection.id,
-                            label: connection.active ? connection.name : t("volumeForm.notConnected", { name: connection.name }),
+                            label: connection.active
+                                ? connection.name
+                                : t("volumeForm.notConnected", { name: connection.name }),
                             disabled: !connection.active
                         }))}
                     />
@@ -250,9 +284,15 @@ export function VolumeForm({
                         </p>
                     ) : (
                         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                            {kind === "nas" ? t("volumeForm.folderNas") : t("volumeForm.folderServer")}
+                            {kind === "nas"
+                                ? t("volumeForm.folderNas")
+                                : t("volumeForm.folderServer")}
                             <div className="flex items-center gap-2">
-                                <Input value={source} onChange={(event) => setSource(event.target.value)} placeholder={t("volumeForm.folderPlaceholder")} />
+                                <Input
+                                    value={source}
+                                    onChange={(event) => setSource(event.target.value)}
+                                    placeholder={t("volumeForm.folderPlaceholder")}
+                                />
                                 {kind === "nas" && (
                                     <Button
                                         type="button"
@@ -260,13 +300,19 @@ export function VolumeForm({
                                         size="sm"
                                         disabled={!connectionId}
                                         onClick={() => setPickerOpen(true)}
-                                        title={connectionId ? t("volumeForm.browseFolders") : t("volumeForm.selectConnectionFirst")}
+                                        title={
+                                            connectionId
+                                                ? t("volumeForm.browseFolders")
+                                                : t("volumeForm.selectConnectionFirst")
+                                        }
                                     >
                                         <FolderSearch className="size-4" /> {t("volumeForm.browse")}
                                     </Button>
                                 )}
                             </div>
-                            <span className="text-[0.6875rem] text-muted-foreground">{t("volumeForm.subpathHint")}</span>
+                            <span className="text-[0.6875rem] text-muted-foreground">
+                                {t("volumeForm.subpathHint")}
+                            </span>
                         </label>
                     )}
                     {kind === "nas" && connectionId && (

@@ -22,7 +22,11 @@ import type * as securityActionsModule from "@/app/(app)/account/domains/securit
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
 
 export const presenceNow = (signal?: AbortSignal) =>
-    readPoll<Answer<typeof preferenceActions.presenceNowAction>>("/api/account/presence", {}, signal);
+    readPoll<Answer<typeof preferenceActions.presenceNowAction>>(
+        "/api/account/presence",
+        {},
+        signal
+    );
 
 export const noticeChannels = (signal?: AbortSignal) =>
     readPoll<Answer<typeof automationActions.noticeChannelsAction>>(
