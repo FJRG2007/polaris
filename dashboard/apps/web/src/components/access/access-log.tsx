@@ -25,6 +25,7 @@ const KNOWN_REASONS = new Set([
     "expired",
     "closed",
     "spent",
+    "elsewhere",
     "notThat",
     "notNearby",
     "failed",

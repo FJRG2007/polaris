@@ -49,6 +49,7 @@
  */
 
 import { z } from "zod";
+import { addressRuleFields } from "./schemas/link-rules.js";
 import {
     EVERY_DAY,
     MINUTES_IN_DAY,
@@ -280,7 +281,9 @@ export type GrantStanding =
     /** Right day, wrong hour. */
     | "closed"
     /** Every use it had is spent. */
-    | "spent";
+    | "spent"
+    /** A link only: in force, but not for the address or region asking. */
+    | "elsewhere";
 
 /** A grant, judged. `until` is when the open window shuts, for a screen that
  *  wants to say how long is left rather than that it is fine. */
@@ -359,7 +362,8 @@ export const GRANT_STANDING_LABELS: Record<GrantStanding, string> = {
     waiting: "Not started",
     expired: "Expired",
     closed: "Outside its hours",
-    spent: "Used up"
+    spent: "Used up",
+    elsewhere: "Not from here"
 };
 
 /**
@@ -559,7 +563,7 @@ export type AccessGrantInput = z.infer<typeof accessGrantSchema>;
  * bounds, nobody named. Whoever holds the link holds the grant, so what a link
  * may do is narrower than what a person may (`linkCapabilities`).
  */
-export const grantLinkSchema = withGrantRules(grantBounds);
+export const grantLinkSchema = withGrantRules(grantBounds.extend(addressRuleFields));
 
 export type GrantLinkInput = z.infer<typeof grantLinkSchema>;
 

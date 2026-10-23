@@ -22,6 +22,8 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { createHash, randomBytes } from "node:crypto";
 import { teamIdsFor } from "@/lib/orgs/org-service";
+import { clientIp } from "@/lib/request-context";
+import { linkAddressDenial, storedAddressRules } from "@/lib/link-guards";
 
 /** Every group one account counts as, for the purpose of matching a grant. */
 export interface GrantPrincipals {
@@ -771,6 +773,7 @@ export async function writeGrantLink(
             maxUses: input.maxUses,
             nearbyMeters: input.nearbyMeters,
             note: input.note,
+            ...storedAddressRules(input),
             grantedById
         },
         select: { id: true }
@@ -816,7 +819,13 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
     if (!LINK_TOKEN.test(token)) return null;
     const found = await prisma.accessGrant.findFirst({
         where: { principalType: core.LINK_PRINCIPAL, principalId: linkPrincipalId(token) },
-        select: { ...GRANT_FIELDS, note: true }
+        select: {
+            ...GRANT_FIELDS,
+            note: true,
+            allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true
+        }
     });
     if (!found) return null;
     const row = paid ? { ...found, maxUses: null } : found;
@@ -824,6 +833,11 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
     const verdict = core.judgeGrant(row, now, zone);
     const base = { subjectType: row.subjectType, subjectId: row.subjectId, note: row.note };
     if (verdict.standing !== "live") return { standing: verdict.standing, ...base };
+    // The same address rules every public link answers to, after liveness so a
+    // link that is off says so to everyone. Outside a request there is no
+    // caller to place, which a rule refuses and no rule ignores.
+    const ip = await clientIp().catch(() => undefined);
+    if (await linkAddressDenial(row, ip)) return { standing: "elsewhere", ...base };
     const [grant] = live([row], zone, now);
     return grant ? { standing: "live", grant, ...base } : { standing: "spent", ...base };
 }

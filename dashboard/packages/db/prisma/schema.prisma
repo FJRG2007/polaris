@@ -7238,6 +7238,12 @@ model AccessGrant {
     /// The location itself is never stored - only whether it was near.
     nearbyMeters Int?
 
+    /// A link only: the address rules every public link carries (lib/link-guards).
+    /// JSON string arrays; empty means anyone.
+    allowedCidrs      String @default("[]")
+    allowedCountries  String @default("[]")
+    allowedContinents String @default("[]")
+
     /// Why it exists, in the words of whoever wrote it ("Cleaner, Tuesdays").
     note        String  @default("")
     /// Who handed it over. A bare id rather than a relation, like the columns
