@@ -158,6 +158,7 @@ import {
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { useShareAsked } from "./call-share-ask";
+import { MeetingLinkLimits } from "./meeting-link-limits";
 
 /**
  * The room.
@@ -3125,6 +3126,7 @@ function InviteToCallDialog({
                                 ? t("callRoom.anybodyWithItCanAsk")
                                 : t("callRoom.forSomebodyWithNoAccount")}
                         </p>
+                        {link && <MeetingLinkLimits meetingId={meetingId} />}
                     </div>
                 )}
 

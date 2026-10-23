@@ -598,7 +598,8 @@
             "waiting": "Sin empezar",
             "expired": "Caducado",
             "closed": "Fuera de horario",
-            "spent": "Agotado"
+            "spent": "Agotado",
+            "elsewhere": "No desde aquí"
         },
         "stopTitle": "¿Dejar de compartir con {name}?",
         "stopBody": "{who} pierde el acceso a {what} al momento. Puedes volver a compartirlo después.",
@@ -681,7 +682,8 @@
                 "notThat": "no permitido",
                 "notNearby": "lejos",
                 "failed": "falló",
-                "private": "privada"
+                "private": "privada",
+                "elsewhere": "no desde aquí"
             },
             "actions": {
                 "open": "abrió",
@@ -1540,5 +1542,19 @@
     },
     "deviceAddress": {
         "via": "vía"
+    },
+    "linkAdvanced": {
+        "title": "Avanzado",
+        "none": "Sin límites",
+        "set": "{count, plural, one {# límite} other {# límites}}",
+        "password": "Contraseña",
+        "replacePassword": "Nueva clave",
+        "removePassword": "Quitar contraseña",
+        "passwordSet": "Se queda si no escribes otra",
+        "passwordNone": "Sin contraseña",
+        "expires": "Caduca",
+        "uses": "Usos",
+        "noLimit": "Sin límite",
+        "hint": "Se comprueba en cada apertura. Vacío: cualquiera con el enlace."
     }
 }

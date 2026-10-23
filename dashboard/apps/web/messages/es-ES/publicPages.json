@@ -204,6 +204,9 @@
         "send": "Enviar"
     },
     "task": {
+        "typePassword": "Escribe la contraseña",
+        "tooMany": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+        "wrongPassword": "Contraseña incorrecta.",
         "signIn": "Entrar",
         "unavailableTitle": "Esta tarea no está disponible",
         "unavailable": "Puede que el enlace se haya desactivado o que la tarea se haya eliminado.",
@@ -214,7 +217,15 @@
     "note": {
         "lastChanged": "Último cambio: {time}"
     },
+    "meetingLink": {
+        "typePassword": "Escribe la contraseña",
+        "tooMany": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+        "wrongPassword": "Contraseña incorrecta."
+    },
     "form": {
+        "typePassword": "Escribe la contraseña",
+        "tooManyTries": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+        "wrongPassword": "Contraseña incorrecta.",
         "unavailableTitle": "Formulario no disponible",
         "unavailable": "Puede que el enlace haya caducado o que el formulario se haya cerrado.",
         "tooMany": "Demasiados envíos desde aquí. Vuelve a intentarlo dentro de un rato.",
@@ -231,6 +242,7 @@
         "incomplete": "Este enlace está incompleto. La parte que va tras el # es la clave que necesita.",
         "unavailable": "Este enlace no está disponible. Puede que haya caducado o se haya agotado.",
         "mismatch": "No se ha podido abrir este enlace. Su clave no coincide.",
+        "blocked": "Este enlace no está disponible desde tu red o tu ubicación.",
         "opening": "Abriéndolo...",
         "passwordTitle": "Contraseña necesaria",
         "passwordHint": "Quien lo envió le puso una contraseña.",
@@ -278,6 +290,9 @@
         "canRead": "Puedes leerlo"
     },
     "polarShare": {
+        "typePassword": "Escribe la contraseña",
+        "tooMany": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+        "wrongPassword": "Contraseña incorrecta.",
         "sharedOn": "Compartido el {date}",
         "empty": "Esta conversación no tiene mensajes que mostrar.",
         "readOnly": "Una copia de solo lectura de una conversación con Polar.",
@@ -291,7 +306,8 @@
             "waiting": "Este enlace aún no funciona. Vuelve a probar el día que empieza.",
             "expired": "Este enlace ha caducado.",
             "closed": "Este enlace no funciona a esta hora. Vuelve a probar más tarde.",
-            "spent": "Este enlace ya se ha usado todas las veces que permitía."
+            "spent": "Este enlace ya se ha usado todas las veces que permitía.",
+            "elsewhere": "Este enlace no se abre desde donde estás."
         },
         "until": "Funciona hasta el {when}.",
         "nearby": "Solo funciona a menos de {meters} m del lugar. El navegador te pedirá la ubicación al pulsar.",

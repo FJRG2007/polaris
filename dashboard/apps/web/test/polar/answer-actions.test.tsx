@@ -131,7 +131,14 @@ beforeEach(() => {
                 return Response.json({
                     link: {
                         url: "https://polaris.example/c/tok",
-                        sharedAt: new Date().toISOString()
+                        sharedAt: new Date().toISOString(),
+                        views: 0,
+                        hasPassword: false,
+                        expiresAt: null,
+                        maxViews: null,
+                        allowedCidrs: [],
+                        allowedCountries: [],
+                        allowedContinents: []
                     }
                 });
             }

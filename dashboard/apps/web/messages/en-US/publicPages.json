@@ -204,6 +204,9 @@
         "send": "Send"
     },
     "task": {
+        "typePassword": "Type the password",
+        "tooMany": "Too many attempts. Wait a few minutes and try again.",
+        "wrongPassword": "Incorrect password.",
         "signIn": "Sign in",
         "unavailableTitle": "This task is not available",
         "unavailable": "The link may have been turned off, or the task may have been deleted.",
@@ -214,7 +217,15 @@
     "note": {
         "lastChanged": "Last changed {time}"
     },
+    "meetingLink": {
+        "typePassword": "Type the password",
+        "tooMany": "Too many attempts. Wait a few minutes and try again.",
+        "wrongPassword": "Incorrect password."
+    },
     "form": {
+        "typePassword": "Type the password",
+        "tooManyTries": "Too many attempts. Wait a few minutes and try again.",
+        "wrongPassword": "Incorrect password.",
         "unavailableTitle": "This form is not available",
         "unavailable": "The link may have expired, or the form may have been closed.",
         "tooMany": "Too many submissions from here. Try again in a little while.",
@@ -231,6 +242,7 @@
         "incomplete": "This link is incomplete. The part after the # is the key it needs.",
         "unavailable": "This link is not available. It may have expired or been used up.",
         "mismatch": "This link could not be opened. Its key does not match.",
+        "blocked": "This link is not available from your network or location.",
         "opening": "Opening it...",
         "passwordTitle": "Password required",
         "passwordHint": "Whoever sent this put a password on it.",
@@ -278,6 +290,9 @@
         "canRead": "You can read this"
     },
     "polarShare": {
+        "typePassword": "Type the password",
+        "tooMany": "Too many attempts. Wait a few minutes and try again.",
+        "wrongPassword": "Incorrect password.",
         "sharedOn": "Shared on {date}",
         "empty": "This conversation has no messages to show.",
         "readOnly": "A read-only copy of a conversation with Polar.",
@@ -291,7 +306,8 @@
             "waiting": "This link does not work yet. Try again on the day it starts.",
             "expired": "This link has run out.",
             "closed": "This link does not work at this hour. Try again later.",
-            "spent": "This link has been used as many times as it allowed."
+            "spent": "This link has been used as many times as it allowed.",
+            "elsewhere": "This link does not open from where you are."
         },
         "until": "Works until {when}.",
         "nearby": "Only works within {meters} m of the place. Your browser will ask for your location when you press.",

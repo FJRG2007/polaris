@@ -10,6 +10,7 @@ import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { sharedFileResponse } from "@/lib/polar/share-file";
 import { readSharedPolarFileByToken } from "@/lib/polar/share";
+import { gatePolarShare } from "@/lib/polar/share-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,11 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     const { token, fileId } = await params;
     const file = idSchema.safeParse(fileId);
     if (!file.success) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    // The same gate as the page, so a file is not one password short of it. Its
+    // opens are not counted, nor held to the cap: the page that shows it
+    // already took its view.
+    const gate = await gatePolarShare(token, { withinCap: false });
+    if (!gate.ok) return NextResponse.json({ error: "not_found" }, { status: 404 });
     try {
         return sharedFileResponse(request, await readSharedPolarFileByToken(token, file.data));
     } catch (error) {

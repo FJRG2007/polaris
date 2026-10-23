@@ -99,7 +99,8 @@
             "off": "No",
             "opened": "Abierto {count} {count, plural, one {vez} other {veces}}",
             "label": "el enlace público",
-            "comments": "Incluir la conversación"
+            "comments": "Incluir la conversación",
+            "saveLimits": "Guardar límites"
         }
     },
     "activity": {

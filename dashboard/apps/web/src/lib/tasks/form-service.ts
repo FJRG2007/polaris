@@ -9,11 +9,14 @@
  */
 
 import { prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
 import * as core from "@polaris/core";
 import { createTask } from "./task-service";
 import { generateToken } from "@polaris/core/tokens";
 import { TaskRefusal } from "./refusal";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { readAddressRules } from "@/lib/link-guards";
+import { linkLimitColumns } from "@/lib/link-limits";
 
 export interface FormView {
     readonly id: string;
@@ -27,6 +30,21 @@ export interface FormView {
     readonly requireLogin: boolean;
     readonly enabled: boolean;
     readonly submissionCount: number;
+    readonly defaultStatusId: string | null;
+    readonly hasPassword: boolean;
+    readonly expiresAt: string | null;
+    readonly maxSubmissions: number | null;
+    readonly allowedCidrs: string[];
+    readonly allowedCountries: string[];
+    readonly allowedContinents: string[];
+}
+
+/** The columns a saved set of limits writes. The shared cap is on submissions
+ *  here; none are written when no limits were sent. */
+async function limitColumns(limits: core.FormInput["limits"]) {
+    if (!limits) return {};
+    const { maxViews, ...rest } = await linkLimitColumns(limits);
+    return { ...rest, maxSubmissions: maxViews };
 }
 
 function parseFields(raw: string): core.FormField[] {
@@ -52,6 +70,13 @@ export async function listForms(spaceId: string): Promise<FormView[]> {
             confirmation: true,
             requireLogin: true,
             enabled: true,
+            defaultStatusId: true,
+            passwordHash: true,
+            expiresAt: true,
+            maxSubmissions: true,
+            allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true,
             list: { select: { name: true } },
             _count: { select: { submissions: true } }
         }
@@ -67,7 +92,12 @@ export async function listForms(spaceId: string): Promise<FormView[]> {
         confirmation: form.confirmation,
         requireLogin: form.requireLogin,
         enabled: form.enabled,
-        submissionCount: form._count.submissions
+        submissionCount: form._count.submissions,
+        defaultStatusId: form.defaultStatusId,
+        hasPassword: Boolean(form.passwordHash),
+        expiresAt: form.expiresAt?.toISOString() ?? null,
+        maxSubmissions: form.maxSubmissions,
+        ...readAddressRules(form)
     }));
 }
 
@@ -97,7 +127,8 @@ export async function createForm(
             confirmation: input.confirmation,
             requireLogin: input.requireLogin,
             enabled: input.enabled,
-            createdById: actorId
+            createdById: actorId,
+            ...(await limitColumns(input.limits))
         },
         select: { id: true }
     });
@@ -120,7 +151,8 @@ export async function updateForm(
             defaultStatusId: input.defaultStatusId,
             confirmation: input.confirmation,
             requireLogin: input.requireLogin,
-            enabled: input.enabled
+            enabled: input.enabled,
+            ...(await limitColumns(input.limits))
         }
     });
     if (count === 0) throw new TaskRefusal("refusals.formNotInSpace");
@@ -186,6 +218,7 @@ export async function submitForm(
             confirmation: true,
             requireLogin: true,
             enabled: true,
+            maxSubmissions: true,
             createdById: true
         }
     });
@@ -199,7 +232,8 @@ export async function submitForm(
     const clean: Record<string, string> = {};
     for (const field of fields) {
         const value = (answers[field.id] ?? "").toString().trim().slice(0, 5000);
-        if (field.required && !value) return { ok: false, error: t("forms.required", { field: field.label }) };
+        if (field.required && !value)
+            return { ok: false, error: t("forms.required", { field: field.label }) };
         if (value) clean[field.id] = value;
     }
 
@@ -244,41 +278,64 @@ export async function submitForm(
             : "Form submission";
     const body = [description, ...spare].filter(Boolean).join("\n\n");
 
+    // The submission takes its slot before the task is filed, with the form's
+    // row held so two people sending the last permitted one cannot both get it.
+    // Postgres only - the local SQLite database has one writer at a time.
+    const slot = await prisma.$transaction(async (tx) => {
+        if (loadEnv().POLARIS_DB_PROVIDER === "postgresql") {
+            await tx.$queryRaw`SELECT "id" FROM "TaskForm" WHERE "id" = ${form.id}::uuid FOR UPDATE`;
+        }
+        if (
+            form.maxSubmissions !== null &&
+            (await tx.taskFormSubmission.count({ where: { formId: form.id } })) >=
+                form.maxSubmissions
+        ) {
+            return null;
+        }
+        return tx.taskFormSubmission.create({
+            data: { formId: form.id, answers: JSON.stringify(clean), submittedById },
+            select: { id: true }
+        });
+    });
+    if (!slot) return { ok: false, error: (await readerWords("publicPages"))("denied.exhausted") };
+
     // The task has no author: a form submission is not something an account did,
     // and attributing it to whoever built the form would misread the history.
-    const created = await createTask(null, form.spaceId, {
-        listId: form.listId,
-        name,
-        description: body,
-        parentId: null,
-        statusId: form.defaultStatusId,
-        priority,
-        blockedUntil: null,
-        blockedNote: "",
-        assigneeIds: [],
-        tagIds: [],
-        startDate: null,
-        dueDate,
-        timed: false,
-        timeEstimate: null,
-        points: null,
-        sprintId: null,
-        milestone: false,
-        recurrence: null
-    });
+    let created: Awaited<ReturnType<typeof createTask>>;
+    try {
+        created = await createTask(null, form.spaceId, {
+            listId: form.listId,
+            name,
+            description: body,
+            parentId: null,
+            statusId: form.defaultStatusId,
+            priority,
+            blockedUntil: null,
+            blockedNote: "",
+            assigneeIds: [],
+            tagIds: [],
+            startDate: null,
+            dueDate,
+            timed: false,
+            timeEstimate: null,
+            points: null,
+            sprintId: null,
+            milestone: false,
+            recurrence: null
+        });
+    } catch (error) {
+        await prisma.taskFormSubmission.delete({ where: { id: slot.id } }).catch(() => undefined);
+        throw error;
+    }
 
     for (const value of custom) {
         await prisma.taskCustomFieldValue
             .create({ data: { taskId: created.id, fieldId: value.fieldId, value: value.value } })
             .catch(() => undefined);
     }
-    await prisma.taskFormSubmission.create({
-        data: {
-            formId: form.id,
-            taskId: created.id,
-            answers: JSON.stringify(clean),
-            submittedById
-        }
+    await prisma.taskFormSubmission.update({
+        where: { id: slot.id },
+        data: { taskId: created.id }
     });
 
     // The space rides back so the caller can tell the team a request arrived

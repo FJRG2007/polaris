@@ -25,6 +25,12 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import type { GrantCandidate } from "@/lib/access/sharing-service";
 import { AccessLog } from "@/components/access/access-log";
 import {
+    EMPTY_LINK_ADVANCED,
+    LinkAdvancedFields,
+    linkAddressRules,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
+import {
     CalendarClock,
     Copy,
     History,
@@ -71,7 +77,8 @@ const STANDING_TONE: Record<core.GrantStanding, "success" | "warning" | "neutral
     waiting: "neutral",
     expired: "neutral",
     closed: "warning",
-    spent: "neutral"
+    spent: "neutral",
+    elsewhere: "warning"
 };
 
 export function ShareDialog({
@@ -171,6 +178,9 @@ export function ShareDialog({
     const [logGrant, setLogGrant] = useState<GrantView | null>(null);
     /** A link just made: shown once, since only its hash is kept. */
     const [madeLink, setMadeLink] = useState<string | null>(null);
+    /** Who a link opens for, by address and region: the same Advanced section
+     *  every link in Polaris has. Its dates and uses are the grant's own. */
+    const [linkRules, setLinkRules] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
 
     const load = useCallback(async () => {
         const answer = await listGrantsAction(subject, subjectId);
@@ -211,6 +221,7 @@ export function ShareDialog({
     const ready = asLink || Boolean(principalId);
 
     const reset = (): void => {
+        setLinkRules(EMPTY_LINK_ADVANCED);
         setPrincipalId("");
         setQuery("");
         setPeople([]);
@@ -263,7 +274,10 @@ export function ShareDialog({
     const makeLink = async (): Promise<void> => {
         if (noAction || badFence) return;
         setBusy(true);
-        const answer = await shareLinkAction(subject, subjectId, bounds());
+        const answer = await shareLinkAction(subject, subjectId, {
+            ...bounds(),
+            ...linkAddressRules(linkRules)
+        });
         setBusy(false);
         if (answer.error || !answer.link) {
             toast.show({ title: answer.error ?? t("share.needAction") });
@@ -814,6 +828,15 @@ export function ShareDialog({
                             onChange={(event) => setNote(event.target.value)}
                         />
                     </Field>
+
+                    {asLink ? (
+                        <LinkAdvancedFields
+                            value={linkRules}
+                            onChange={setLinkRules}
+                            omit={["password", "expiry", "uses"]}
+                            idPrefix="share-link"
+                        />
+                    ) : null}
 
                     <div className="flex justify-end">
                         <Button

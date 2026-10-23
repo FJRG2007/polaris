@@ -461,6 +461,25 @@
         "filesInto": "Files into {list} - {count} {count, plural, one {submission} other {submissions}}",
         "copyLink": "Copy the form link",
         "delete": "Delete form",
+        "edit": "Edit form",
+        "editNamed": "Edit {name}",
+        "editor": {
+            "title": "Edit {name}",
+            "hint": "What the form asks, where it files, and who may send it.",
+            "intro": "Introduction",
+            "questions": "Questions",
+            "question": "Question",
+            "type": "Answer type",
+            "choices": "Choices, separated by commas",
+            "required": "Required",
+            "removeQuestion": "Remove question",
+            "addQuestion": "Add a question",
+            "confirmation": "Message after sending",
+            "open": "Accepting responses",
+            "requireLogin": "Only people with an account",
+            "maxSubmissions": "Responses",
+            "save": "Save form"
+        },
         "received": "Thanks. Your request has been received."
     },
     "notify": {

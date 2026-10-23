@@ -29,8 +29,12 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import {
+    checkLink,
     linkUsability,
     passwordVersion,
+    readAddressRules,
+    storedAddressRules,
+    type LinkAddressRules,
     signMarker,
     signUnlock,
     unlockCookieName,
@@ -60,6 +64,9 @@ export interface OfficeLinkView {
     readonly lastUsedAt: string | null;
     readonly note: string;
     readonly createdAt: string;
+    readonly allowedCidrs: string[];
+    readonly allowedCountries: string[];
+    readonly allowedContinents: string[];
     /** Why it cannot be used, when it cannot. Said on the row rather than worked
      *  out on the screen, so the reason is the same one the visitor meets. */
     readonly standing: "live" | "revoked" | "expired" | "exhausted" | "scheduled";
@@ -75,7 +82,10 @@ const LINK_FIELDS = {
     useCount: true,
     lastUsedAt: true,
     note: true,
-    createdAt: true
+    createdAt: true,
+    allowedCidrs: true,
+    allowedCountries: true,
+    allowedContinents: true
 } as const;
 
 type LinkRow = {
@@ -89,7 +99,19 @@ type LinkRow = {
     lastUsedAt: Date | null;
     note: string;
     createdAt: Date;
+    allowedCidrs: string;
+    allowedCountries: string;
+    allowedContinents: string;
 };
+
+/** A row's address rules. A row read without them (an older select) has none. */
+function rulesOf(row: Partial<LinkAddressRules>): LinkAddressRules {
+    return {
+        allowedCidrs: row.allowedCidrs ?? "[]",
+        allowedCountries: row.allowedCountries ?? "[]",
+        allowedContinents: row.allowedContinents ?? "[]"
+    };
+}
 
 function viewOf(row: LinkRow): OfficeLinkView {
     const usable = linkUsability({
@@ -110,6 +132,7 @@ function viewOf(row: LinkRow): OfficeLinkView {
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         note: row.note,
         createdAt: row.createdAt.toISOString(),
+        ...readAddressRules(rulesOf(row)),
         standing: usable.ok ? "live" : (usable.reason as OfficeLinkView["standing"])
     };
 }
@@ -131,6 +154,9 @@ export interface NewLink {
     readonly expiresAt: string;
     readonly maxUses: number | null;
     readonly note: string;
+    readonly allowedCidrs?: readonly string[];
+    readonly allowedCountries?: readonly string[];
+    readonly allowedContinents?: readonly string[];
 }
 
 /**
@@ -161,7 +187,8 @@ export async function createLink(
             passwordHash: input.password ? await hashLinkPassword(input.password) : null,
             expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
             maxUses: input.maxUses,
-            note: input.note
+            note: input.note,
+            ...storedAddressRules(input)
         },
         select: LINK_FIELDS
     });
@@ -212,7 +239,15 @@ export interface LinkVisit {
      *  never handed to a page. */
     readonly passwordHash: string | null;
     /** Why it will not open, when it will not. */
-    readonly refusal: "" | "unknown" | "revoked" | "expired" | "exhausted" | "scheduled";
+    readonly refusal:
+        | ""
+        | "unknown"
+        | "revoked"
+        | "expired"
+        | "exhausted"
+        | "scheduled"
+        | "ip_not_allowed"
+        | "country_not_allowed";
 }
 
 /**
@@ -222,19 +257,28 @@ export interface LinkVisit {
  * by, and spending one to draw the password form would mean a link with a
  * password is worth a third of what it says.
  */
-export async function resolveLink(token: string): Promise<LinkVisit | null> {
+export async function resolveLink(
+    token: string,
+    ip: string | undefined
+): Promise<LinkVisit | null> {
     const row = await prisma.officeLink.findUnique({
         where: { tokenHash: hashToken(token) },
         select: { ...LINK_FIELDS, documentId: true }
     });
     if (!row) return null;
-    const usable = linkUsability({
-        revokedAt: row.revokedAt,
-        startsAt: null,
-        expiresAt: row.expiresAt,
-        maxUses: row.maxUses,
-        useCount: row.useCount
-    });
+    const usable = await checkLink(
+        {
+            limits: {
+                revokedAt: row.revokedAt,
+                startsAt: null,
+                expiresAt: row.expiresAt,
+                maxUses: row.maxUses,
+                useCount: row.useCount
+            },
+            rules: rulesOf(row)
+        },
+        ip
+    );
     return {
         linkId: row.id,
         documentId: row.documentId,
@@ -412,23 +456,40 @@ export function readLinkPass(
  */
 export async function linkPassStanding(
     documentId: string,
-    value: string | undefined
+    value: string | undefined,
+    ip: string | undefined
 ): Promise<core.OfficeRole | null> {
     const parts = passParts(value, Date.now());
     if (!parts) return null;
     const row = await prisma.officeLink.findFirst({
         where: { id: parts.linkId, documentId },
-        select: { role: true, revokedAt: true, expiresAt: true, passwordHash: true }
+        select: {
+            role: true,
+            revokedAt: true,
+            expiresAt: true,
+            passwordHash: true,
+            allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true
+        }
     });
     if (!row) return null;
     const pass = readLinkPass(documentId, value, row.passwordHash);
     if (!pass || row.role !== pass.role) return null;
-    const usable = linkUsability({
-        revokedAt: row.revokedAt,
-        startsAt: null,
-        expiresAt: row.expiresAt,
-        maxUses: null,
-        useCount: 0
-    });
+    // The address is asked again on every request: a pass carried to another
+    // network or country is no wider than the link that issued it.
+    const usable = await checkLink(
+        {
+            limits: {
+                revokedAt: row.revokedAt,
+                startsAt: null,
+                expiresAt: row.expiresAt,
+                maxUses: null,
+                useCount: 0
+            },
+            rules: rulesOf(row)
+        },
+        ip
+    );
     return usable.ok ? pass.role : null;
 }

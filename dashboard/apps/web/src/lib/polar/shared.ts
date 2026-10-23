@@ -643,6 +643,14 @@ export function firstLine(text: string, most = 80): string {
 export interface PolarShareLink {
     url: string;
     sharedAt: string;
+    /** How often the link has been opened. */
+    views: number;
+    hasPassword: boolean;
+    expiresAt: string | null;
+    maxViews: number | null;
+    allowedCidrs: string[];
+    allowedCountries: string[];
+    allowedContinents: string[];
 }
 
 export interface SharedPolarFile {

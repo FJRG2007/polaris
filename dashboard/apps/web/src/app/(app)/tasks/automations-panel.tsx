@@ -18,7 +18,8 @@ import { optionLabel } from "./option-label";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Avatar } from "@/components/avatar";
-import { Plus, Trash2, Zap } from "lucide-react";
+import { Pencil, Plus, Trash2, Zap } from "lucide-react";
+import { FormEditorDialog } from "./form-editor-dialog";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
 import type { FormView } from "@/lib/tasks/form-service";
@@ -477,9 +478,20 @@ export function FormsPanel({
     const [name, setName] = useState("");
     const [listId, setListId] = useState(lists[0]?.id ?? "");
     const [error, setError] = useState("");
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const editing = forms.find((form) => form.id === editingId) ?? null;
 
     return (
         <section className="flex flex-col gap-3">
+            {editing && (
+                <FormEditorDialog
+                    key={editing.id}
+                    form={editing}
+                    spaceId={spaceId}
+                    lists={lists}
+                    onClose={() => setEditingId(null)}
+                />
+            )}
             <header className="flex items-center justify-between">
                 <div>
                     <h2 className="text-sm font-medium">{t("forms.title")}</h2>
@@ -586,6 +598,15 @@ export function FormsPanel({
                                         {url}
                                     </code>
                                     <CopyButton value={url} label={t("forms.copyLink")} />
+                                    <button
+                                        type="button"
+                                        aria-label={t("forms.editNamed", { name: form.name })}
+                                        title={t("forms.edit")}
+                                        onClick={() => setEditingId(form.id)}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <Pencil className="size-3.5" />
+                                    </button>
                                     <button
                                         type="button"
                                         aria-label={t("automations.deleteNamed", {

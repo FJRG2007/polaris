@@ -61,6 +61,23 @@ export const addressRuleFields = {
     allowedContinents: z.array(regionCode).default([])
 } as const;
 
+/**
+ * A link's limits saved whole: the password, expiry, cap on opens and the
+ * address rules every public link in Polaris offers. Absent or empty is no
+ * restriction.
+ */
+export const linkLimitsSchema = z.object({
+    /** Stored as a hash, never in the clear. Absent keeps the current one. */
+    password: z.string().min(1).max(256).optional(),
+    /** Sent to take a password off a link that had one. */
+    clearPassword: z.boolean().default(false),
+    maxViews: z.number().int().positive().max(1_000_000).nullable().default(null),
+    expiresAt: z.coerce.date().nullable().default(null),
+    ...addressRuleFields
+});
+
+export type LinkLimitsInput = z.infer<typeof linkLimitsSchema>;
+
 /** The same three, all optional, for an update that only sends what changed. */
 export const addressRuleUpdateFields = {
     allowedCidrs: z.array(cidrOrIp).optional(),

@@ -217,14 +217,18 @@ export async function vaultContentsAction(): Promise<{
     ciphers: Record<string, unknown>[];
     folders: Record<string, unknown>[];
     sends: Record<string, unknown>[];
+    /** Polaris's own address rules per Send, which the Send protocol has no
+     *  field for. */
+    sendRules: Record<string, sends.SendAddressRules>;
 }> {
     const user = await requirePermission("vault.use");
-    const [items, folderRows, sendRows] = await Promise.all([
+    const [items, folderRows, sendRows, sendRules] = await Promise.all([
         ciphers.listCiphers(user.id),
         folders.listFolders(user.id),
-        sends.listSends(user.id)
+        sends.listSends(user.id),
+        sends.listSendRules(user.id)
     ]);
-    return { ciphers: items, folders: folderRows, sends: sendRows };
+    return { ciphers: items, folders: folderRows, sends: sendRows, sendRules };
 }
 
 /**
@@ -391,8 +395,12 @@ export async function passwordOpensVaultAction(clientHash: string): Promise<{ op
 }
 
 /** Create a Send and hand back the link to give somebody. */
+/** A Send's address rules as the Sends screen sends them. */
+const sendRulesSchema = z.object({ ...core.addressRuleFields });
+
 export async function createSendAction(
-    input: unknown
+    input: unknown,
+    rules?: unknown
 ): Promise<{ send?: Record<string, unknown>; url?: string; error?: string }> {
     const user = await requirePermission("vault.use");
     const parsed = core.sendSchema.safeParse(input);
@@ -401,7 +409,9 @@ export async function createSendAction(
             error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.sendNotEncrypted")
         };
     }
-    const send = await sends.createSend(user.id, parsed.data);
+    const parsedRules = sendRulesSchema.safeParse(rules ?? {});
+    if (!parsedRules.success) return { error: await vaultRefusal("errors.sendRules") };
+    const send = await sends.createSend(user.id, parsed.data, parsedRules.data);
     revalidatePath("/vault/sends");
     // A public path rather than the `<origin>/vault/#/send/...` an official
     // client mints: that one is inside the dashboard, which asks a stranger to
@@ -430,6 +440,20 @@ export async function recordItemUseAction(input: unknown): Promise<{ error?: str
 export async function itemUsesAction(itemId: string): Promise<ItemUseEntry[]> {
     const user = await requirePermission("vault.use");
     return accessLog.listItemUses(user.id, itemId);
+}
+
+/** Replace the address rules of one of this account's Sends. */
+export async function setSendRulesAction(
+    sendId: string,
+    rules: unknown
+): Promise<{ error?: string }> {
+    const user = await requirePermission("vault.use");
+    const parsed = sendRulesSchema.safeParse(rules);
+    if (!parsed.success) return { error: await vaultRefusal("errors.sendRules") };
+    if (!(await sends.setSendRules(user.id, String(sendId ?? ""), parsed.data)))
+        return { error: await vaultRefusal("errors.sendNotYours") };
+    revalidatePath("/vault/sends");
+    return {};
 }
 
 export async function deleteSendAction(sendId: string): Promise<{ error?: string }> {

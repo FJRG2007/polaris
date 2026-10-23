@@ -17,6 +17,7 @@
 import { z } from "zod";
 import { emailField } from "./auth.js";
 import { commentBody } from "./comments.js";
+import { linkLimitsSchema } from "./link-rules.js";
 
 // ---------------------------------------------------------------------------
 // Shared field primitives
@@ -830,7 +831,10 @@ export const formSchema = z.object({
     confirmation: z.string().trim().max(500).default("Thanks. Your request has been received."),
     /** An open form accepts anonymous submissions from anyone with the link. */
     requireLogin: z.boolean().default(false),
-    enabled: z.boolean().default(true)
+    enabled: z.boolean().default(true),
+    /** The link's limits, shared with every public link; `maxViews` caps
+     *  submissions. Absent, a saved form keeps the limits it has. */
+    limits: linkLimitsSchema.optional()
 });
 
 export type FormInput = z.infer<typeof formSchema>;
@@ -1234,7 +1238,9 @@ export const taskShareSchema = z.object({
     taskId: uuid,
     enabled: z.boolean(),
     /** Whether the public page carries the discussion as well as the work. */
-    showComments: z.boolean().default(false)
+    showComments: z.boolean().default(false),
+    /** Sent whole when saved; absent, the link keeps the limits it has. */
+    limits: linkLimitsSchema.optional()
 });
 
 export type TaskShareInput = z.infer<typeof taskShareSchema>;

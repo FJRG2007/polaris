@@ -25,12 +25,18 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ROLE_KEYS } from "./office-kinds";
 import { useEffect, useState } from "react";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    linkAddressRules,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { runAction } from "@/lib/run-action";
 import { useConfirm } from "@/components/confirm-dialog";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { OfficeLinkView } from "@/lib/office/links";
 import { Copy, Link2, Loader2, Plus, Trash2 } from "lucide-react";
-import { Button, Input, Select, Switch, useToast } from "@polaris/ui";
+import { Button, Input, Select, useToast } from "@polaris/ui";
 import { createLinkAction, revealLinkAction, revokeLinkAction } from "./link-actions";
 import * as polls from "./office-polls";
 
@@ -51,9 +57,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
     const [busy, setBusy] = useState(false);
     const [making, setMaking] = useState(false);
     const [role, setRole] = useState<core.OfficeRole>("viewer");
-    const [password, setPassword] = useState("");
-    const [withPassword, setWithPassword] = useState(false);
-    const [expiresAt, setExpiresAt] = useState("");
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
     const [note, setNote] = useState("");
     /** The address just made, shown once. Cleared as soon as it is copied or the
      *  form is opened again. */
@@ -91,9 +95,10 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
             () =>
                 createLinkAction(documentId, {
                     role,
-                    password: withPassword ? password : "",
-                    expiresAt,
-                    maxUses: null,
+                    password: advanced.password,
+                    expiresAt: advanced.expiresAt,
+                    maxUses: advanced.maxUses ? Number(advanced.maxUses) : null,
+                    ...linkAddressRules(advanced),
                     note
                 }),
             (message) => toast.show({ title: message })
@@ -108,9 +113,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
         setLinks(answer.links ?? []);
         setFresh(answer.url ?? "");
         setMaking(false);
-        setPassword("");
-        setWithPassword(false);
-        setExpiresAt("");
+        setAdvanced(EMPTY_LINK_ADVANCED);
         setNote("");
     }
 
@@ -206,39 +209,12 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                         </span>
                     </label>
 
-                    <label className="flex items-center gap-2 text-[13px]">
-                        <Switch
-                            checked={withPassword}
-                            onChange={setWithPassword}
-                            aria-label={t("links.askForAPassword")}
-                        />
-                        {t("links.askForAPassword")}
-                    </label>
-                    {withPassword ? (
-                        /* enigma:allow-no-breach-check enigma:allow-identity-password -
-                           this is the link's own passphrase, not a credential: it
-                           authenticates nobody, there is no account behind it to
-                           compare against, and the person typing it here is the
-                           one handing it out rather than the one it protects. */
-                        <Input
-                            type="password"
-                            value={password}
-                            autoComplete="new-password"
-                            placeholder={t("links.whatTheyWillHaveTo")}
-                            onChange={(event) => setPassword(event.target.value)}
-                        />
-                    ) : null}
-
-                    <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
-                            {t("links.stopWorkingOnOptional")}
-                        </span>
-                        <Input
-                            type="date"
-                            value={expiresAt}
-                            onChange={(event) => setExpiresAt(event.target.value)}
-                        />
-                    </label>
+                    <LinkAdvancedFields
+                        value={advanced}
+                        onChange={setAdvanced}
+                        usesLabel={t("links.openings")}
+                        idPrefix="office-link"
+                    />
 
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
@@ -255,11 +231,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                         <Button size="sm" variant="secondary" onClick={() => setMaking(false)}>
                             {t("links.cancel")}
                         </Button>
-                        <Button
-                            size="sm"
-                            disabled={busy || (withPassword && password.length === 0)}
-                            onClick={() => void make()}
-                        >
+                        <Button size="sm" disabled={busy} onClick={() => void make()}>
                             {busy ? (
                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                             ) : null}

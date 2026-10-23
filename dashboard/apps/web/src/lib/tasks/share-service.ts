@@ -28,6 +28,8 @@ import { translate } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import type { Locale } from "@polaris/core";
 import { TaskRefusal } from "./refusal";
+import { readAddressRules } from "@/lib/link-guards";
+import { linkLimitColumns } from "@/lib/link-limits";
 
 /** A task's public link as its owner sees it. */
 export interface TaskShareView {
@@ -36,7 +38,26 @@ export interface TaskShareView {
     /** How often the link has been opened, so a dead link reads as dead. */
     readonly views: number;
     readonly createdAt: string;
+    readonly hasPassword: boolean;
+    readonly expiresAt: string | null;
+    readonly maxViews: number | null;
+    readonly allowedCidrs: string[];
+    readonly allowedCountries: string[];
+    readonly allowedContinents: string[];
 }
+
+const SHARE_FIELDS = {
+    token: true,
+    showComments: true,
+    views: true,
+    createdAt: true,
+    passwordHash: true,
+    expiresAt: true,
+    maxViews: true,
+    allowedCidrs: true,
+    allowedCountries: true,
+    allowedContinents: true
+} as const;
 
 /** The link to the task inside Polaris. Only resolves for people with access,
  *  which is exactly what makes it the safe one to paste internally. */
@@ -53,19 +74,34 @@ async function toShareView(share: {
     showComments: boolean;
     views: number;
     createdAt: Date;
+    passwordHash: string | null;
+    expiresAt: Date | null;
+    maxViews: number | null;
+    allowedCidrs: string;
+    allowedCountries: string;
+    allowedContinents: string;
 }): Promise<TaskShareView> {
     return {
         url: await publicUrl(share.token),
         showComments: share.showComments,
         views: share.views,
-        createdAt: share.createdAt.toISOString()
+        createdAt: share.createdAt.toISOString(),
+        hasPassword: Boolean(share.passwordHash),
+        expiresAt: share.expiresAt?.toISOString() ?? null,
+        maxViews: share.maxViews,
+        ...readAddressRules(share)
     };
+}
+
+/** The columns a saved set of limits writes; none when no limits were sent. */
+async function limitColumns(limits: core.TaskShareInput["limits"]) {
+    return limits ? linkLimitColumns(limits) : {};
 }
 
 export async function getTaskShare(taskId: string): Promise<TaskShareView | null> {
     const share = await prisma.taskShare.findUnique({
         where: { taskId },
-        select: { token: true, showComments: true, views: true, createdAt: true }
+        select: SHARE_FIELDS
     });
     return share ? toShareView(share) : null;
 }
@@ -83,16 +119,18 @@ export async function setTaskShare(
         await prisma.taskShare.deleteMany({ where: { taskId: input.taskId } });
         return null;
     }
+    const limits = await limitColumns(input.limits);
     const share = await prisma.taskShare.upsert({
         where: { taskId: input.taskId },
-        update: { showComments: input.showComments },
+        update: { showComments: input.showComments, ...limits },
         create: {
             taskId: input.taskId,
             token: generateToken(),
             showComments: input.showComments,
-            createdById: actorId
+            createdById: actorId,
+            ...limits
         },
-        select: { token: true, showComments: true, views: true, createdAt: true }
+        select: SHARE_FIELDS
     });
     return toShareView(share);
 }
@@ -128,7 +166,8 @@ export interface PublicTaskView {
         readonly items: { readonly name: string; readonly done: boolean }[];
     }[];
     /** Present only when the sharer chose to include the discussion. */
-    readonly comments: { readonly author: string; readonly body: string; readonly createdAt: string }[] | null;
+    readonly comments:
+        { readonly author: string; readonly body: string; readonly createdAt: string }[] | null;
     readonly createdAt: string;
     readonly updatedAt: string;
 }
@@ -151,6 +190,7 @@ export async function getPublicTask(token: string): Promise<PublicTaskView | nul
         select: {
             id: true,
             showComments: true,
+            maxViews: true,
             task: {
                 select: {
                     id: true,
@@ -196,7 +236,16 @@ export async function getPublicTask(token: string): Promise<PublicTaskView | nul
           })
         : null;
 
-    await prisma.taskShare.update({ where: { id: share.id }, data: { views: { increment: 1 } } });
+    // Counted conditionally: two people opening the last permitted view at the
+    // same moment must not both get it.
+    const counted = await prisma.taskShare.updateMany({
+        where: {
+            id: share.id,
+            ...(share.maxViews === null ? {} : { views: { lt: share.maxViews } })
+        },
+        data: { views: { increment: 1 } }
+    });
+    if (counted.count === 0) return null;
 
     return {
         reference: core.taskReference(task.space.prefix, task.number),
@@ -241,13 +290,16 @@ export interface ShareDelivery {
     readonly failures: { readonly recipient: string; readonly reason: string }[];
 }
 
-function outsiderMessage(locale: Locale, input: {
-    sender: string;
-    reference: string;
-    name: string;
-    note: string;
-    url: string;
-}): { subject: string; text: string; html: string } {
+function outsiderMessage(
+    locale: Locale,
+    input: {
+        sender: string;
+        reference: string;
+        name: string;
+        note: string;
+        url: string;
+    }
+): { subject: string; text: string; html: string } {
     const escape = (value: string): string =>
         value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const readOnly = translate(locale, "tasks.shareMail.readOnly");
@@ -270,7 +322,14 @@ function outsiderMessage(locale: Locale, input: {
         `<p><a href="${escape(input.url)}">${escape(translate(locale, "tasks.shareMail.open"))}</a></p>`,
         `<p>${escape(readOnly)}</p>`
     ].join("");
-    return { subject: translate(locale, "tasks.shareMail.subject", { sender: input.sender, name: input.name }), text, html };
+    return {
+        subject: translate(locale, "tasks.shareMail.subject", {
+            sender: input.sender,
+            name: input.name
+        }),
+        text,
+        html
+    };
 }
 
 /**
@@ -323,9 +382,16 @@ export async function sendTaskByEmail(
         // The same authority the app itself uses, asked on their behalf: a link
         // to a space they cannot reach would only tell them it exists.
         try {
-            await access.requireTask({ id: member.id, isAdmin: member.isAdmin }, input.taskId, "guest");
+            await access.requireTask(
+                { id: member.id, isAdmin: member.isAdmin },
+                input.taskId,
+                "guest"
+            );
         } catch {
-            failures.push({ recipient: member.name, reason: translate(senderLocale, "tasks.shareMail.noAccess") });
+            failures.push({
+                recipient: member.name,
+                reason: translate(senderLocale, "tasks.shareMail.noAccess")
+            });
             continue;
         }
         await follow.follow("task", input.taskId, member.id, "explicit");
@@ -351,7 +417,10 @@ export async function sendTaskByEmail(
         });
         if (!share) {
             for (const address of outsiders) {
-                failures.push({ recipient: address, reason: translate(senderLocale, "tasks.shareMail.linkOff") });
+                failures.push({
+                    recipient: address,
+                    reason: translate(senderLocale, "tasks.shareMail.linkOff")
+                });
             }
         } else {
             const url = await publicUrl(share.token);

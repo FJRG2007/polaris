@@ -15,6 +15,8 @@
  * Server-only.
  */
 
+import { readAddressRules, storedAddressRules } from "@/lib/link-guards";
+import { linkLimitColumns } from "@/lib/link-limits";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
 import { prisma, Prisma, VISIBLE_USER } from "@polaris/db";
@@ -95,11 +97,52 @@ export async function polarShareLink(
             tokenNonce: true,
             tokenKeyId: true,
             sharedAt: true,
-            linkEnabled: true
+            linkEnabled: true,
+            views: true,
+            passwordHash: true,
+            expiresAt: true,
+            maxViews: true,
+            allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true
         }
     });
     if (!share || share.linkEnabled === false) return null;
-    return { url: await linkFor(tokenOf(share)), sharedAt: share.sharedAt.toISOString() };
+    return {
+        url: await linkFor(tokenOf(share)),
+        sharedAt: share.sharedAt.toISOString(),
+        views: share.views ?? 0,
+        hasPassword: Boolean(share.passwordHash),
+        expiresAt: share.expiresAt?.toISOString() ?? null,
+        maxViews: share.maxViews ?? null,
+        ...readAddressRules({
+            allowedCidrs: share.allowedCidrs ?? "[]",
+            allowedCountries: share.allowedCountries ?? "[]",
+            allowedContinents: share.allowedContinents ?? "[]"
+        })
+    };
+}
+
+/**
+ * Save the link's limits, without moving its snapshot. The password is only
+ * touched when one is typed or it is being taken off. Null when the chat is not
+ * this person's or its link is off.
+ */
+export async function setPolarShareLimits(
+    userId: string,
+    threadId: string,
+    limits: core.LinkLimitsInput
+): Promise<PolarShareLink | null> {
+    const share = await prisma.polarThreadShare.findFirst({
+        where: { threadId, thread: { userId }, linkEnabled: true },
+        select: { id: true }
+    });
+    if (!share) return null;
+    await prisma.polarThreadShare.update({
+        where: { id: share.id },
+        data: await linkLimitColumns(limits)
+    });
+    return polarShareLink(userId, threadId);
 }
 
 /**
@@ -161,7 +204,8 @@ export async function sharePolarThread(
  * Stops serving the link. With `everyone`, or when nobody was sent the chat,
  * the share is deleted outright; otherwise the people keep it and the link's
  * token is replaced, so the old address stays a 404 even if the link is made
- * again. Idempotent; false only when the chat is not theirs.
+ * again, and its views and limits start over with it. Idempotent; false only
+ * when the chat is not theirs.
  */
 export async function revokePolarShare(
     userId: string,
@@ -179,7 +223,15 @@ export async function revokePolarShare(
     }
     await prisma.polarThreadShare.updateMany({
         where: { threadId },
-        data: { linkEnabled: false, ...freshToken() }
+        data: {
+            linkEnabled: false,
+            ...freshToken(),
+            views: 0,
+            passwordHash: null,
+            expiresAt: null,
+            maxViews: null,
+            ...storedAddressRules({})
+        }
     });
     return true;
 }

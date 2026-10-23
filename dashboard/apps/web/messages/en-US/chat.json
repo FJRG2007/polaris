@@ -1707,6 +1707,14 @@
         "notRestarted": "The call server did not restart. Chat settings says what it is doing.",
         "restarting": "The call server is restarting and will ask for this network's address again. Calls can be made in a few seconds."
     },
+    "meetingLink": {
+        "limits": "Link limits",
+        "limitsFor": "Limits on the guest link",
+        "hint": "Who may use the link. It stops working when the call ends.",
+        "save": "Save the limits",
+        "saved": "Saved",
+        "checkLimits": "Check the addresses and countries."
+    },
     "guestCall": {
         "unavailableTitle": "Call unavailable",
         "unavailable": "This call has ended, or the link is no longer good.",

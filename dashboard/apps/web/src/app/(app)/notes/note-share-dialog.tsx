@@ -17,10 +17,14 @@ import * as actions from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Globe, Link2, Lock } from "lucide-react";
+import { Globe, Link2 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import type { NoteShareView } from "@/lib/notes/share-service";
-import { AccessRulesEditor, EMPTY_ACCESS_RULES } from "@/components/access-rules-editor";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import {
     Button,
     Dialog,
@@ -28,7 +32,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input,
     isDirty,
     Switch
 } from "@polaris/ui";
@@ -60,10 +63,8 @@ export function NoteShareDialog({
     // The settings being edited. Held apart from `share` so a half-typed
     // password is never what the screen reports as the link's state.
     const [includeChildren, setIncludeChildren] = useState(true);
-    const [password, setPassword] = useState("");
-    const [maxViews, setMaxViews] = useState("");
-    const [expires, setExpires] = useState("");
-    const [rules, setRules] = useState(EMPTY_ACCESS_RULES);
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
+    const { password, maxUses: maxViews, expiresAt: expires } = advanced;
 
     useEffect(() => {
         if (!open) return;
@@ -76,10 +77,10 @@ export function NoteShareDialog({
             setShare(found);
             if (found) {
                 setIncludeChildren(found.includeChildren);
-                setMaxViews(found.maxViews === null ? "" : String(found.maxViews));
-                setExpires(asDateField(found.expiresAt));
-                setRules({
-                    groupIds: [],
+                setAdvanced({
+                    password: "",
+                    maxUses: found.maxViews === null ? "" : String(found.maxViews),
+                    expiresAt: asDateField(found.expiresAt),
                     allowedCidrs: [...found.allowedCidrs],
                     allowedCountries: [...found.allowedCountries],
                     allowedContinents: [...found.allowedContinents]
@@ -112,9 +113,9 @@ export function NoteShareDialog({
                 includeChildren,
                 maxViews,
                 expires,
-                allowedCidrs: rules.allowedCidrs,
-                allowedCountries: rules.allowedCountries,
-                allowedContinents: rules.allowedContinents
+                allowedCidrs: advanced.allowedCidrs,
+                allowedCountries: advanced.allowedCountries,
+                allowedContinents: advanced.allowedContinents
             }
         );
 
@@ -127,16 +128,16 @@ export function NoteShareDialog({
                     ...(password ? { password } : {}),
                     ...(maxViews ? { maxViews: Number(maxViews) } : { clearMaxViews: true }),
                     ...(expires ? { expiresAt: expires } : { clearExpiry: true }),
-                    allowedCidrs: rules.allowedCidrs,
-                    allowedCountries: rules.allowedCountries,
-                    allowedContinents: rules.allowedContinents
+                    allowedCidrs: advanced.allowedCidrs,
+                    allowedCountries: advanced.allowedCountries,
+                    allowedContinents: advanced.allowedContinents
                 }),
             setError
         );
         setBusy(false);
         if (result?.share) {
             setShare(result.share);
-            setPassword("");
+            setAdvanced((current) => ({ ...current, password: "" }));
             if (result.url) setUrl(result.url);
         }
     }
@@ -148,7 +149,7 @@ export function NoteShareDialog({
         if (!result?.error) {
             setShare(null);
             setUrl("");
-            setPassword("");
+            setAdvanced(EMPTY_LINK_ADVANCED);
         }
     }
 
@@ -204,60 +205,12 @@ export function NoteShareDialog({
                                 {t("share.children")}
                             </label>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs text-muted-foreground">
-                                        <Lock className="mr-1 inline size-3" />
-                                        {share.hasPassword
-                                            ? t("share.replacePassword")
-                                            : t("share.password")}
-                                    </span>
-                                    {/* enigma:allow-no-breach-check enigma:allow-identity-password -
-                                        this is the link's own passphrase, not a credential: it
-                                        authenticates nobody, there is no account behind it to
-                                        compare against, and guesses at it are limited per link
-                                        per address in `unlockNoteShareAction`. */}
-                                    <Input
-                                        type="password"
-                                        value={password}
-                                        placeholder={
-                                            share.hasPassword
-                                                ? t("share.passwordSet")
-                                                : t("share.passwordNone")
-                                        }
-                                        autoComplete="new-password"
-                                        onChange={(event) => setPassword(event.target.value)}
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs text-muted-foreground">
-                                        {t("share.expires")}
-                                    </span>
-                                    <Input
-                                        type="date"
-                                        value={expires}
-                                        onChange={(event) => setExpires(event.target.value)}
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs text-muted-foreground">
-                                        {t("share.opens", { count: share.viewCount })}
-                                    </span>
-                                    <Input
-                                        type="number"
-                                        min={1}
-                                        value={maxViews}
-                                        placeholder={t("share.noLimit")}
-                                        onChange={(event) => setMaxViews(event.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            <AccessRulesEditor
-                                value={rules}
-                                groups={[]}
-                                showGroups={false}
-                                onChange={setRules}
+                            <LinkAdvancedFields
+                                value={advanced}
+                                onChange={setAdvanced}
+                                usesLabel={t("share.opens", { count: share.viewCount })}
+                                passwordSet={share.hasPassword}
+                                idPrefix="note-share"
                             />
 
                             {error && <p className="text-sm text-danger">{error}</p>}

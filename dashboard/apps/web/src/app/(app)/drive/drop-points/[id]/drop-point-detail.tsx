@@ -14,7 +14,11 @@ import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { tokenList } from "@/lib/token-field";
 import { useNow } from "@/components/presence";
-import { GeoPicker } from "@/components/geo-picker";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { useConfirm } from "@/components/confirm-dialog";
 import { AccountInput } from "@/components/account-input";
@@ -107,7 +111,12 @@ export interface VisitorRow {
 }
 
 function status(config: DropPointConfig): {
-    label: "detail.status.closed" | "detail.status.scheduled" | "detail.status.expired" | "detail.status.full" | "detail.status.open";
+    label:
+        | "detail.status.closed"
+        | "detail.status.scheduled"
+        | "detail.status.expired"
+        | "detail.status.full"
+        | "detail.status.open";
     variant: "success" | "neutral" | "warning";
 } {
     if (config.revokedAt) return { label: "detail.status.closed", variant: "neutral" };
@@ -269,8 +278,18 @@ export function DropPointDetail({
 
     const tabs = [
         { id: "overview" as const, label: t("detail.tabs.overview"), icon: Inbox, count: null },
-        { id: "files" as const, label: t("detail.tabs.files"), icon: FileText, count: files.length },
-        { id: "visitors" as const, label: t("detail.tabs.visitors"), icon: Users, count: visitors.length }
+        {
+            id: "files" as const,
+            label: t("detail.tabs.files"),
+            icon: FileText,
+            count: files.length
+        },
+        {
+            id: "visitors" as const,
+            label: t("detail.tabs.visitors"),
+            icon: Users,
+            count: visitors.length
+        }
     ];
 
     return (
@@ -424,31 +443,49 @@ function OverviewTab({ config }: { config: DropPointConfig }) {
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-                    <Field label={t("detail.fields.maxSize")}>{formatBytes(BigInt(config.maxSizeBytes))}</Field>
-                    <Field label={t("detail.fields.minSize")}>
-                        {config.minSizeBytes ? formatBytes(BigInt(config.minSizeBytes)) : t("detail.values.none")}
+                    <Field label={t("detail.fields.maxSize")}>
+                        {formatBytes(BigInt(config.maxSizeBytes))}
                     </Field>
-                    <Field label={t("detail.fields.maxFiles")}>{config.maxFiles ?? t("detail.values.noLimit")}</Field>
+                    <Field label={t("detail.fields.minSize")}>
+                        {config.minSizeBytes
+                            ? formatBytes(BigInt(config.minSizeBytes))
+                            : t("detail.values.none")}
+                    </Field>
+                    <Field label={t("detail.fields.maxFiles")}>
+                        {config.maxFiles ?? t("detail.values.noLimit")}
+                    </Field>
                     <Field label={t("detail.fields.collected")}>{config.submissionCount}</Field>
                     <Field label={t("detail.fields.starts")}>
-                        {config.startsAt ? format.dateTime(config.startsAt) : t("detail.values.immediately")}
+                        {config.startsAt
+                            ? format.dateTime(config.startsAt)
+                            : t("detail.values.immediately")}
                     </Field>
                     <Field label={t("detail.fields.expires")}>
-                        {config.expiresAt ? format.date(config.expiresAt) : t("detail.values.never")}
+                        {config.expiresAt
+                            ? format.date(config.expiresAt)
+                            : t("detail.values.never")}
                     </Field>
                     <Field label={t("detail.fields.signIn")}>
-                        {config.requireLogin ? t("detail.values.required") : t("detail.values.notRequired")}
+                        {config.requireLogin
+                            ? t("detail.values.required")
+                            : t("detail.values.notRequired")}
                     </Field>
-                    <Field label={t("detail.fields.pin")}>{config.hasPassword ? t("detail.values.set") : t("detail.values.none")}</Field>
+                    <Field label={t("detail.fields.pin")}>
+                        {config.hasPassword ? t("detail.values.set") : t("detail.values.none")}
+                    </Field>
                     <Field label={t("detail.fields.uploaderDelete")}>
                         {config.allowUploaderDelete
                             ? config.uploaderDeleteWindowSeconds
-                                ? t("detail.values.minutes", { count: Math.round(config.uploaderDeleteWindowSeconds / 60) })
+                                ? t("detail.values.minutes", {
+                                      count: Math.round(config.uploaderDeleteWindowSeconds / 60)
+                                  })
                                 : t("detail.values.anytime")
                             : t("detail.values.off")}
                     </Field>
                     <Field label={t("detail.fields.users")}>
-                        {config.allowedUsers.length > 0 ? config.allowedUsers.join(", ") : t("detail.values.anyone")}
+                        {config.allowedUsers.length > 0
+                            ? config.allowedUsers.join(", ")
+                            : t("detail.values.anyone")}
                     </Field>
                     <Field label={t("detail.fields.fileTypes")}>
                         {config.allowedExtensions.length > 0
@@ -461,7 +498,9 @@ function OverviewTab({ config }: { config: DropPointConfig }) {
                             : t("detail.values.none")}
                     </Field>
                     <Field label={t("detail.fields.ipAllowlist")}>
-                        {config.allowedCidrs.length > 0 ? config.allowedCidrs.join(", ") : t("detail.values.any")}
+                        {config.allowedCidrs.length > 0
+                            ? config.allowedCidrs.join(", ")
+                            : t("detail.values.any")}
                     </Field>
                     <Field label={t("detail.fields.locations")}>
                         {config.allowedContinents.length + config.allowedCountries.length > 0
@@ -508,9 +547,13 @@ function FilesTab({
                             <tr>
                                 <th className="px-4 py-2 font-medium">{t("detail.files.file")}</th>
                                 <th className="px-4 py-2 font-medium">{t("detail.files.size")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.files.uploadedBy")}</th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.files.uploadedBy")}
+                                </th>
                                 <th className="px-4 py-2 font-medium">{t("detail.files.when")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.files.status")}</th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.files.status")}
+                                </th>
                                 <th className="px-4 py-2" />
                             </tr>
                         </thead>
@@ -581,10 +624,18 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                         <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2 font-medium">{t("detail.visitors.ip")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.visitors.user")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.visitors.firstSeen")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.visitors.connected")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.visitors.uploaded")}</th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.visitors.user")}
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.visitors.firstSeen")}
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.visitors.connected")}
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.visitors.uploaded")}
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -620,12 +671,16 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                                                             : "text-muted-foreground"
                                                     }
                                                 >
-                                                    {live ? t("detail.visitors.activeNow") : duration}
+                                                    {live
+                                                        ? t("detail.visitors.activeNow")
+                                                        : duration}
                                                 </span>
                                             </span>
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
-                                            {row.uploads > 0 ? t("detail.visitors.files", { count: row.uploads }) : t("detail.visitors.none")}
+                                            {row.uploads > 0
+                                                ? t("detail.visitors.files", { count: row.uploads })
+                                                : t("detail.visitors.none")}
                                         </td>
                                     </tr>
                                 );
@@ -733,18 +788,28 @@ function EditDropPointDialog({
     const t = useTranslations("drivePoints");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [geoCountries, setGeoCountries] = useState<string[]>(config.allowedCountries);
-    const [geoContinents, setGeoContinents] = useState<string[]>(config.allowedContinents);
+    const initialExpiry = config.expiresAt ? config.expiresAt.slice(0, 10) : "";
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>({
+        ...EMPTY_LINK_ADVANCED,
+        expiresAt: initialExpiry,
+        allowedCidrs: config.allowedCidrs,
+        allowedCountries: config.allowedCountries,
+        allowedContinents: config.allowedContinents
+    });
     const { formProps, changed: fieldsChanged } = useFormChanged();
 
-    // The locations live outside the form, so they are compared separately;
+    // The Advanced section lives outside the form, so it is compared separately;
     // together they decide whether there is anything to save at all.
     const sameList = (a: string[], b: string[]) =>
         a.length === b.length && [...a].sort().join() === [...b].sort().join();
+    const expiryChanged = advanced.expiresAt !== initialExpiry;
     const changed =
         fieldsChanged ||
-        !sameList(geoCountries, config.allowedCountries) ||
-        !sameList(geoContinents, config.allowedContinents);
+        advanced.password !== "" ||
+        expiryChanged ||
+        !sameList(advanced.allowedCidrs, config.allowedCidrs) ||
+        !sameList(advanced.allowedCountries, config.allowedCountries) ||
+        !sameList(advanced.allowedContinents, config.allowedContinents);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -755,16 +820,12 @@ function EditDropPointDialog({
         const allowedExtensions = tokenList(String(form.get("extensions") ?? ""), /^\./);
         const deniedExtensions = tokenList(String(form.get("deniedExtensions") ?? ""), /^\./);
         const allowedUsers = tokenList(String(form.get("allowedUsers") ?? ""), /^@+/);
-        const allowedCidrs = String(form.get("allowedCidrs") ?? "")
-            .split(/[\s,]+/)
-            .map((value) => value.trim())
-            .filter(Boolean);
         const maxMb = Number(form.get("maxMb") ?? 0);
         const minMb = Number(form.get("minMb") ?? 0);
         const deleteWindowMin = Number(form.get("deleteWindowMin") ?? 0);
         const maxFiles = form.get("maxFiles");
         const removePin = form.get("removePin") === "on";
-        const pin = String(form.get("password") ?? "");
+        const pin = advanced.password;
         const startsRaw = String(form.get("startsAt") ?? "").trim();
 
         const result = await updateFileRequestAction(config.id, {
@@ -777,16 +838,17 @@ function EditDropPointDialog({
             maxFiles: maxFiles ? Number(maxFiles) : null,
             allowedExtensions,
             deniedExtensions,
-            allowedCidrs,
-            allowedCountries: geoCountries,
-            allowedContinents: geoContinents,
+            allowedCidrs: advanced.allowedCidrs,
+            allowedCountries: advanced.allowedCountries,
+            allowedContinents: advanced.allowedContinents,
             allowedUsers,
             startsAt: startsRaw ? new Date(startsRaw).toISOString() : null,
             allowUploaderDelete: form.get("allowUploaderDelete") === "on",
             allowOverwrite: form.get("allowOverwrite") === "on",
             uploaderDeleteWindowSeconds:
                 deleteWindowMin > 0 ? Math.floor(deleteWindowMin * 60) : null,
-            expiresAt: String(form.get("expiresAt") ?? "") || null
+            // An untouched expiry keeps its exact time; the field shows only the day.
+            expiresAt: expiryChanged ? advanced.expiresAt || null : undefined
         });
         setPending(false);
         if (result.error) {
@@ -802,7 +864,9 @@ function EditDropPointDialog({
                 <DialogHeader>
                     <DialogTitle>{t("edit.title")}</DialogTitle>
                     <DialogDescription className="truncate">
-                        {t("edit.description", { place: config.destinationPath || config.connectionName })}
+                        {t("edit.description", {
+                            place: config.destinationPath || config.connectionName
+                        })}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
@@ -898,42 +962,14 @@ function EditDropPointDialog({
                                 defaultValue={toLocalInput(config.startsAt)}
                             />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
-                            {t("detail.fields.expires")}
-                            <Input
-                                name="expiresAt"
-                                type="date"
-                                defaultValue={config.expiresAt ? config.expiresAt.slice(0, 10) : ""}
-                            />
-                        </label>
                     </div>
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("form.cidrs")}
-                        <Input
-                            name="allowedCidrs"
-                            defaultValue={config.allowedCidrs.join(", ")}
-                            placeholder={t("form.cidrsPlaceholder")}
-                            autoComplete="off"
-                        />
-                    </label>
-                    <div className="flex flex-col gap-1 text-sm">
-                        {t("form.location")}
-                        <GeoPicker
-                            countries={geoCountries}
-                            continents={geoContinents}
-                            onCountries={setGeoCountries}
-                            onContinents={setGeoContinents}
-                        />
-                    </div>
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("form.pin")}
-                        <Input
-                            name="password"
-                            type="password"
-                            placeholder={config.hasPassword ? t("form.pinKeep") : t("form.noPin")}
-                            autoComplete="off"
-                        />
-                    </label>
+                    <LinkAdvancedFields
+                        value={advanced}
+                        onChange={setAdvanced}
+                        omit={["uses"]}
+                        passwordSet={config.hasPassword}
+                        idPrefix="drop-point-edit"
+                    />
                     {config.hasPassword ? (
                         <label className="flex items-center gap-2 text-sm">
                             <input type="checkbox" name="removePin" className="size-4" />
@@ -978,7 +1014,9 @@ function EditDropPointDialog({
                                         min="1"
                                         defaultValue={
                                             config.uploaderDeleteWindowSeconds
-                                                ? Math.round(config.uploaderDeleteWindowSeconds / 60)
+                                                ? Math.round(
+                                                      config.uploaderDeleteWindowSeconds / 60
+                                                  )
                                                 : ""
                                         }
                                         placeholder={t("form.anytime")}
@@ -997,9 +1035,7 @@ function EditDropPointDialog({
                             placeholder={t("form.usersPlaceholder")}
                             aria-label={t("form.usersLabel")}
                         />
-                        <span className="text-xs text-muted-foreground">
-                            {t("form.usersHint")}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{t("form.usersHint")}</span>
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end">

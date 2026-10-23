@@ -14,7 +14,11 @@
 
 import { Check, Copy, Link2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { GeoPicker } from "@/components/geo-picker";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { createShareAction } from "./share-actions";
 import { useEffect, useState, type FormEvent } from "react";
 import {
@@ -54,8 +58,7 @@ export function ShareDialog({
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<ShareResult[] | null>(null);
     const [copied, setCopied] = useState<string | null>(null);
-    const [geoCountries, setGeoCountries] = useState<string[]>([]);
-    const [geoContinents, setGeoContinents] = useState<string[]>([]);
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
 
     const items = targets ?? [];
     const many = items.length > 1;
@@ -72,8 +75,7 @@ export function ShareDialog({
         setError(null);
         setResults(null);
         setCopied(null);
-        setGeoCountries([]);
-        setGeoContinents([]);
+        setAdvanced(EMPTY_LINK_ADVANCED);
     }, [targetKey]);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -82,18 +84,11 @@ export function ShareDialog({
         setPending(true);
         setError(null);
         const form = new FormData(event.currentTarget);
-        const maxDownloads = form.get("maxDownloads");
-        const expiresAt = form.get("expiresAt");
-        const password = String(form.get("password") ?? "");
-        const allowedCidrs = String(form.get("allowedCidrs") ?? "")
-            .split(/[\s,]+/)
-            .map((value) => value.trim())
-            .filter(Boolean);
         const guardrails = {
             kind: "public" as const,
-            password: password || undefined,
-            maxDownloads: maxDownloads ? Number(maxDownloads) : undefined,
-            expiresAt: expiresAt ? String(expiresAt) : undefined,
+            password: advanced.password || undefined,
+            maxDownloads: advanced.maxUses ? Number(advanced.maxUses) : undefined,
+            expiresAt: advanced.expiresAt || undefined,
             allowUpload: form.get("allowUpload") === "on",
             allowRename: form.get("allowRename") === "on",
             allowDelete: form.get("allowDelete") === "on",
@@ -101,9 +96,9 @@ export function ShareDialog({
             allowOverwrite: form.get("allowOverwrite") === "on",
             allowDownload: form.get("allowDownload") === "on",
             allowPreview: form.get("allowPreview") === "on",
-            allowedCidrs,
-            allowedCountries: geoCountries,
-            allowedContinents: geoContinents
+            allowedCidrs: advanced.allowedCidrs,
+            allowedCountries: advanced.allowedCountries,
+            allowedContinents: advanced.allowedContinents
         };
 
         // One at a time: each link is its own row, and a target that fails should
@@ -179,7 +174,9 @@ export function ShareDialog({
                                                     onCopy(result.path, result.url ?? "")
                                                 }
                                                 title={t("share.copyLink", { name: result.name })}
-                                                aria-label={t("share.copyLink", { name: result.name })}
+                                                aria-label={t("share.copyLink", {
+                                                    name: result.name
+                                                })}
                                             >
                                                 {copied === result.path ? (
                                                     <Check className="size-4 text-success" />
@@ -219,54 +216,14 @@ export function ShareDialog({
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         {many ? (
-                            <p className="text-sm text-muted-foreground">
-                                {t("share.eachItem")}
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("share.eachItem")}</p>
                         ) : null}
-                        <label className="flex flex-col gap-1 text-sm">
-                            {t("share.password")}
-                            <Input
-                                name="password"
-                                type="password"
-                                placeholder={t("share.noPassword")}
-                                autoComplete="off"
-                            />
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("sharedLinks.maxDownloads")}
-                                <Input
-                                    name="maxDownloads"
-                                    type="number"
-                                    min="1"
-                                    placeholder={t("sharedLinks.unlimited")}
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("sharedLinks.expiresField")}
-                                <Input name="expiresAt" type="date" />
-                            </label>
-                        </div>
-                        <label className="flex flex-col gap-1 text-sm">
-                            {t("share.cidrs")}
-                            <Input
-                                name="allowedCidrs"
-                                placeholder={t("sharedLinks.cidrsPlaceholder")}
-                                autoComplete="off"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                                {t("share.cidrsHint")}
-                            </span>
-                        </label>
-                        <div className="flex flex-col gap-1 text-sm">
-                            {t("share.location")}
-                            <GeoPicker
-                                countries={geoCountries}
-                                continents={geoContinents}
-                                onCountries={setGeoCountries}
-                                onContinents={setGeoContinents}
-                            />
-                        </div>
+                        <LinkAdvancedFields
+                            value={advanced}
+                            onChange={setAdvanced}
+                            usesLabel={t("sharedLinks.maxDownloads")}
+                            idPrefix="drive-share"
+                        />
                         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
                             <label className="flex items-center gap-2">
                                 <input
@@ -294,7 +251,9 @@ export function ShareDialog({
                                             name="allowUpload"
                                             className="size-4"
                                         />
-                                        {many ? t("share.allowUploadMany") : t("share.allowUploadOne")}
+                                        {many
+                                            ? t("share.allowUploadMany")
+                                            : t("share.allowUploadOne")}
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input

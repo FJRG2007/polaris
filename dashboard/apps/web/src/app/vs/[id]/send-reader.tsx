@@ -36,7 +36,7 @@ type State =
     | { kind: "loading" }
     | { kind: "password" }
     | { kind: "open"; name: string; text: string }
-    | { kind: "error"; reason: "incomplete" | "unavailable" | "mismatch" };
+    | { kind: "error"; reason: "incomplete" | "unavailable" | "mismatch" | "blocked" };
 
 export function SendReader({ accessId }: { accessId: string }) {
     const t = useTranslations("publicPages");
@@ -64,6 +64,11 @@ export function SendReader({ accessId }: { accessId: string }) {
             );
             if (response.status === 401) {
                 setState({ kind: "password" });
+                return;
+            }
+            // The owner limited where it opens, and this is not one of them.
+            if (response.status === 403) {
+                setState({ kind: "error", reason: "blocked" });
                 return;
             }
             if (!response.ok) {

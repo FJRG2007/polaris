@@ -13,7 +13,11 @@
 import { useRouter } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, type FormEvent } from "react";
-import { GeoPicker } from "@/components/geo-picker";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { AccountInput } from "@/components/account-input";
 import { DEFAULT_TEXT_REQUEST_MAX_LENGTH } from "@polaris/core";
 import { createTextRequestAction } from "./text-request-actions";
@@ -47,8 +51,7 @@ export function NewTextDropPointButton() {
     const [copied, setCopied] = useState(false);
     const [requireLogin, setRequireLogin] = useState(false);
     const [allowSealed, setAllowSealed] = useState(false);
-    const [countries, setCountries] = useState<string[]>([]);
-    const [continents, setContinents] = useState<string[]>([]);
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
 
     function reset(): void {
         setUrl(null);
@@ -56,8 +59,7 @@ export function NewTextDropPointButton() {
         setCopied(false);
         setRequireLogin(false);
         setAllowSealed(false);
-        setCountries([]);
-        setContinents([]);
+        setAdvanced(EMPTY_LINK_ADVANCED);
     }
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -65,8 +67,8 @@ export function NewTextDropPointButton() {
         const form = new FormData(event.currentTarget);
         const maxLength = String(form.get("maxLength") ?? "").trim();
         const maxSubmissions = String(form.get("maxSubmissions") ?? "").trim();
-        const expiresAt = String(form.get("expiresAt") ?? "").trim();
-        const password = String(form.get("password") ?? "").trim();
+        const expiresAt = advanced.expiresAt;
+        const password = advanced.password.trim();
 
         setPending(true);
         setError(null);
@@ -79,9 +81,9 @@ export function NewTextDropPointButton() {
             maxLength: maxLength ? Number(maxLength) : DEFAULT_TEXT_REQUEST_MAX_LENGTH,
             maxSubmissions: maxSubmissions ? Number(maxSubmissions) : undefined,
             allowedUsers: entries(String(form.get("allowedUsers") ?? "")),
-            allowedCidrs: entries(String(form.get("allowedCidrs") ?? "")),
-            allowedCountries: countries,
-            allowedContinents: continents,
+            allowedCidrs: advanced.allowedCidrs,
+            allowedCountries: advanced.allowedCountries,
+            allowedContinents: advanced.allowedContinents,
             expiresAt: expiresAt || undefined
         });
         setPending(false);
@@ -117,9 +119,7 @@ export function NewTextDropPointButton() {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t("newText.askSomebodyForText")}</DialogTitle>
-                        <DialogDescription>
-                            {t("newText.theyGetAPageTo")}
-                        </DialogDescription>
+                        <DialogDescription>{t("newText.theyGetAPageTo")}</DialogDescription>
                     </DialogHeader>
 
                     {url ? (
@@ -157,10 +157,7 @@ export function NewTextDropPointButton() {
                         <form onSubmit={onSubmit} className="flex flex-col gap-3">
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("newText.title")}
-                                <Input
-                                    name="title"
-                                    placeholder={t("newText.namedForYouIfYou")}
-                                />
+                                <Input name="title" placeholder={t("newText.namedForYouIfYou")} />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("newText.whatToSend")}
@@ -188,21 +185,6 @@ export function NewTextDropPointButton() {
                                         min="1"
                                         placeholder={t("newText.unlimited")}
                                     />
-                                </label>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <label className="flex flex-col gap-1 text-sm">
-                                    {t("newText.passwordOptional")}
-                                    <Input
-                                        name="password"
-                                        type="password"
-                                        placeholder={t("newText.noPassword")}
-                                        autoComplete="off"
-                                    />
-                                </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    {t("newText.closes")}
-                                    <Input name="expiresAt" type="date" />
                                 </label>
                             </div>
                             <label className="flex items-center gap-2 text-sm">
@@ -240,23 +222,12 @@ export function NewTextDropPointButton() {
                                     </span>
                                 </span>
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("newText.restrictToIpsRangesOptional")}
-                                <Input
-                                    name="allowedCidrs"
-                                    placeholder={t("newText.eG2030113")}
-                                    autoComplete="off"
-                                />
-                            </label>
-                            <div className="flex flex-col gap-1 text-sm">
-                                {t("newText.restrictByLocationOptional")}
-                                <GeoPicker
-                                    countries={countries}
-                                    continents={continents}
-                                    onCountries={setCountries}
-                                    onContinents={setContinents}
-                                />
-                            </div>
+                            <LinkAdvancedFields
+                                value={advanced}
+                                onChange={setAdvanced}
+                                omit={["uses"]}
+                                idPrefix="text-drop-point"
+                            />
                             {error ? <p className="text-sm text-danger">{error}</p> : null}
                             <div className="mt-1 flex justify-end">
                                 <Button type="submit" disabled={pending}>

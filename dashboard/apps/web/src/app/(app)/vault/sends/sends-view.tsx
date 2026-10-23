@@ -19,9 +19,34 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useEffect, useState, type FormEvent } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Check, Copy, Loader2, Plus, SendHorizontal, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardBody, Input, Select, Textarea } from "@polaris/ui";
-import { createSendAction, deleteSendAction, vaultContentsAction } from "../vault-actions";
+import { Check, Copy, Loader2, Plus, SendHorizontal, Shield, Trash2 } from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Textarea
+} from "@polaris/ui";
+import {
+    createSendAction,
+    deleteSendAction,
+    setSendRulesAction,
+    vaultContentsAction
+} from "../vault-actions";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    linkExpiry,
+    linkAddressRules,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 
 /** How long a Send lasts unless somebody says otherwise. */
 const EXPIRY_OPTIONS = [
@@ -38,6 +63,8 @@ interface SendRow {
     deletionDate: string;
     disabled: boolean;
     hasPassword: boolean;
+    /** Polaris's own address rules, outside the Send protocol. */
+    rules: LinkAdvancedValue;
 }
 
 export function SendsView() {
@@ -51,6 +78,13 @@ export function SendsView() {
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [days, setDays] = useState("7");
+    // Password, expiry and the cap are the Send's own protocol fields; the
+    // address rules are Polaris's. One section draws them all, as on every link.
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
+    const [limiting, setLimiting] = useState<SendRow | null>(null);
+    const [rulesDraft, setRulesDraft] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
+    const [savingRules, setSavingRules] = useState(false);
+    const [rulesError, setRulesError] = useState<string | null>(null);
     const [confirm, confirmDialog] = useConfirm();
 
     async function load(withKey: SymmetricKey): Promise<void> {
@@ -68,7 +102,8 @@ export function SendsView() {
                         : Number(raw.maxAccessCount),
                 deletionDate: String(raw.deletionDate ?? ""),
                 disabled: raw.disabled === true,
-                hasPassword: raw.password !== null
+                hasPassword: raw.password !== null,
+                rules: { ...EMPTY_LINK_ADVANCED, ...contents.sendRules[String(raw.id ?? "")] }
             });
         }
         setRows(opened);
@@ -86,11 +121,17 @@ export function SendsView() {
         const form = new FormData(event.currentTarget);
         const name = String(form.get("name") ?? "").trim();
         const text = String(form.get("text") ?? "");
-        const password = String(form.get("password") ?? "").trim();
+        const password = advanced.password.trim();
         const lifetime = Number(days);
-        const maxViews = String(form.get("maxViews") ?? "").trim();
+        const deletionDate = new Date(Date.now() + lifetime * 24 * 60 * 60 * 1000);
+        // The expiry is a day; it ends when that day does, in the reader's time.
+        const expirationDate = linkExpiry(advanced.expiresAt);
         if (!name || !text) {
             setError(t("sends.needsBoth"));
+            return;
+        }
+        if (expirationDate && expirationDate.getTime() > deletionDate.getTime()) {
+            setError(t("sends.expiresAfterDeletion"));
             return;
         }
 
@@ -101,20 +142,24 @@ export function SendsView() {
             // derived from it.
             const urlKey = window.crypto.getRandomValues(new Uint8Array(16));
             const sendKey = await crypto.deriveSendKey(urlKey);
-            const result = await createSendAction({
-                type: 0,
-                name: await crypto.encrypt(name, sendKey),
-                notes: null,
-                // The link key, wrapped under the vault key, so this account's
-                // other devices can rebuild the link without being told it.
-                key: await crypto.encryptBytes(urlKey, key),
-                text: { text: await crypto.encrypt(text, sendKey), hidden: false },
-                password: password ? await crypto.sendPasswordHash(password, urlKey) : null,
-                maxAccessCount: maxViews ? Number(maxViews) : null,
-                deletionDate: new Date(Date.now() + lifetime * 24 * 60 * 60 * 1000).toISOString(),
-                disabled: false,
-                hideEmail: true
-            });
+            const result = await createSendAction(
+                {
+                    type: 0,
+                    name: await crypto.encrypt(name, sendKey),
+                    notes: null,
+                    // The link key, wrapped under the vault key, so this account's
+                    // other devices can rebuild the link without being told it.
+                    key: await crypto.encryptBytes(urlKey, key),
+                    text: { text: await crypto.encrypt(text, sendKey), hidden: false },
+                    password: password ? await crypto.sendPasswordHash(password, urlKey) : null,
+                    maxAccessCount: advanced.maxUses ? Number(advanced.maxUses) : null,
+                    expirationDate: expirationDate ? expirationDate.toISOString() : null,
+                    deletionDate: deletionDate.toISOString(),
+                    disabled: false,
+                    hideEmail: true
+                },
+                linkAddressRules(advanced)
+            );
             if (result.error || !result.url) {
                 setError(result.error ?? t("sends.notCreated"));
                 return;
@@ -124,10 +169,25 @@ export function SendsView() {
             );
             setCopied(false);
             event.currentTarget.reset();
+            setAdvanced(EMPTY_LINK_ADVANCED);
             await load(key);
         } finally {
             setCreating(false);
         }
+    }
+
+    async function saveRules() {
+        if (!limiting || !key) return;
+        setSavingRules(true);
+        setRulesError(null);
+        const result = await setSendRulesAction(limiting.id, linkAddressRules(rulesDraft));
+        setSavingRules(false);
+        if (result.error) {
+            setRulesError(result.error);
+            return;
+        }
+        setLimiting(null);
+        await load(key);
     }
 
     async function onDelete(row: SendRow) {
@@ -195,39 +255,25 @@ export function SendsView() {
                             {t("sends.text")}
                             <Textarea name="text" rows={4} className="font-mono text-xs" />
                         </label>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                {t("sends.lasts")}
-                                <Select
-                                    name="days"
-                                    value={days}
-                                    onValueChange={setDays}
-                                    options={EXPIRY_OPTIONS.map((option) => ({
-                                        value: option.value,
-                                        label: t(option.key)
-                                    }))}
-                                    aria-label={t("sends.lastsLabel")}
-                                />
-                            </label>
-                            <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                {t("sends.maxViews")}
-                                <Input
-                                    name="maxViews"
-                                    type="number"
-                                    min="1"
-                                    placeholder={t("sends.unlimited")}
-                                />
-                            </label>
-                            <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                {t("app.fields.password")}
-                                <Input
-                                    name="password"
-                                    type="password"
-                                    placeholder={t("sends.optional")}
-                                    autoComplete="off"
-                                />
-                            </label>
-                        </div>
+                        <label className="flex min-w-0 flex-col gap-1 text-sm sm:max-w-xs">
+                            {t("sends.lasts")}
+                            <Select
+                                name="days"
+                                value={days}
+                                onValueChange={setDays}
+                                options={EXPIRY_OPTIONS.map((option) => ({
+                                    value: option.value,
+                                    label: t(option.key)
+                                }))}
+                                aria-label={t("sends.lastsLabel")}
+                            />
+                        </label>
+                        <LinkAdvancedFields
+                            value={advanced}
+                            onChange={setAdvanced}
+                            usesLabel={t("sends.maxViews")}
+                            idPrefix="send"
+                        />
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="flex justify-end">
                             <Button type="submit" disabled={creating}>
@@ -285,6 +331,21 @@ export function SendsView() {
                                     <Button
                                         size="sm"
                                         variant="ghost"
+                                        title={t("sends.whereItOpens")}
+                                        aria-label={t("sends.whereItOpensNamed", {
+                                            name: row.name
+                                        })}
+                                        onClick={() => {
+                                            setRulesDraft(row.rules);
+                                            setRulesError(null);
+                                            setLimiting(row);
+                                        }}
+                                    >
+                                        <Shield className="size-4" />
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
                                         title={t("vaults.delete")}
                                         aria-label={t("vaults.deleteNamed", { name: row.name })}
                                         onClick={() => onDelete(row)}
@@ -297,6 +358,43 @@ export function SendsView() {
                     ))}
                 </div>
             )}
+            <Dialog
+                open={limiting !== null}
+                onOpenChange={(open) => (open ? undefined : setLimiting(null))}
+            >
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="truncate">
+                            {t("sends.whereItOpensNamed", { name: limiting?.name ?? "" })}
+                        </DialogTitle>
+                        <DialogDescription>{t("sends.whereItOpensHint")}</DialogDescription>
+                    </DialogHeader>
+                    <LinkAdvancedFields
+                        value={rulesDraft}
+                        onChange={setRulesDraft}
+                        omit={["password", "expiry", "uses"]}
+                        idPrefix={`send-${limiting?.id ?? ""}`}
+                    />
+                    {rulesError ? <p className="text-sm text-danger">{rulesError}</p> : null}
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setLimiting(null)}>
+                            {t("sends.cancel")}
+                        </Button>
+                        <Button
+                            disabled={
+                                savingRules ||
+                                !limiting ||
+                                JSON.stringify(linkAddressRules(rulesDraft)) ===
+                                    JSON.stringify(linkAddressRules(limiting.rules))
+                            }
+                            onClick={() => void saveRules()}
+                        >
+                            {savingRules ? <Loader2 className="size-4 animate-spin" /> : null}
+                            {t("sends.saveRules")}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
             {confirmDialog}
         </div>
     );

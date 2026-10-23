@@ -48,6 +48,12 @@
             "package": "nanoid",
             "reason": "@univerjs/core 0.25 pins nanoid 5.1.11 exactly, and npm does not apply an override to it. Univer calls generateRandomId with fixed positive sizes (4 to 21), never a negative one. Univer 1.x drops nanoid.",
             "expires": "2027-01-05"
+        },
+        {
+            "id": "GHSA-mrhx-c7xc-m3w5",
+            "package": "zod",
+            "reason": "No Zod 3 release carries the fix; it ships only in 4.6.6. Every workspace pins zod 3.25.76 and imports the v3 API, so the fix is the Zod 4 migration, its own project. Not unreachable: an unbounded z.array() over request input can be fed a large array, bounded only by the request body size. Transitive 4.x copies (better-auth, MCP SDK, fastmcp) move with their parents.",
+            "expires": "2027-01-05"
         }
     ]
 }

@@ -18,6 +18,10 @@ import { getSession } from "@/lib/session";
 import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
 import { LinkUnavailable } from "@/components/public-shell";
+import { linkDenialMessage } from "@/lib/link-denial";
+import { gateMeetingLink } from "@/lib/chat/meeting-link-access";
+import { LinkPasswordForm } from "@/components/link-password-form";
+import { unlockMeetingLinkAction } from "./actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +30,22 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
     const { token } = await params;
     const session = await getSession();
     const t = await getTranslations("chat");
+
+    // The link's own limits come before anything about the meeting is shown,
+    // its name included.
+    const gate = await gateMeetingLink(token);
+    if (!gate.ok && gate.reason === "password_required") {
+        return <LinkPasswordForm token={token} unlock={unlockMeetingLinkAction} />;
+    }
+    if (!gate.ok && gate.reason !== "not_found") {
+        return (
+            <LinkUnavailable
+                signedIn={Boolean(session?.user)}
+                title={t("guestCall.unavailableTitle")}
+                message={await linkDenialMessage(gate.reason)}
+            />
+        );
+    }
 
     const meeting = await prisma.meeting.findUnique({
         where: { guestToken: token },

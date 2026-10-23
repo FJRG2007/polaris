@@ -598,7 +598,8 @@
             "waiting": "Not started",
             "expired": "Expired",
             "closed": "Outside its hours",
-            "spent": "Used up"
+            "spent": "Used up",
+            "elsewhere": "Not from here"
         },
         "stopTitle": "Stop sharing with {name}?",
         "stopBody": "{who} loses access to {what} at once. You can share it again afterward.",
@@ -681,7 +682,8 @@
                 "notThat": "not allowed",
                 "notNearby": "not nearby",
                 "failed": "failed",
-                "private": "private"
+                "private": "private",
+                "elsewhere": "not from here"
             },
             "actions": {
                 "open": "opened",
@@ -1540,5 +1542,19 @@
     },
     "deviceAddress": {
         "via": "via"
+    },
+    "linkAdvanced": {
+        "title": "Advanced",
+        "none": "No limits",
+        "set": "{count, plural, one {# limit} other {# limits}}",
+        "password": "Password",
+        "replacePassword": "New password",
+        "removePassword": "Remove password",
+        "passwordSet": "Kept unless you type one",
+        "passwordNone": "No password",
+        "expires": "Expires",
+        "uses": "Uses",
+        "noLimit": "No limit",
+        "hint": "Checked on every open. Empty means anyone with the link."
     }
 }

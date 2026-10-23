@@ -30,9 +30,17 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/orgs/org-service", () => ({ teamIdsFor: async () => [] }));
+// The caller's address and region, which a link's address rules are judged on.
+let callerIp: string | undefined = "198.51.100.7";
+vi.mock("@/lib/request-context", () => ({ clientIp: async () => callerIp }));
+vi.mock("@/lib/geo-service", () => ({
+    geoAllowedForIp: async (ip: string | undefined, countries: string[]) =>
+        countries.length === 0 || (ip === "198.51.100.7" && countries.includes("ES"))
+}));
 
 const core = await import("@polaris/core");
-const { linkPrincipalId, linkReach, writeGrantLink } = await import("@/lib/access/grants");
+const { linkPrincipalId, linkReach, linkReachPaid, writeGrantLink } =
+    await import("@/lib/access/grants");
 
 const DOOR = "00000000-0000-4000-8000-0000000000d1";
 
@@ -42,6 +50,7 @@ function link(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     grants = [];
+    callerIp = "198.51.100.7";
 });
 
 describe("making a link", () => {
@@ -149,5 +158,62 @@ describe("following a link", () => {
     it("does not ask the database about something that is not a token", async () => {
         expect(await linkReach("../../etc/passwd")).toBeNull();
         expect(await linkReach("")).toBeNull();
+    });
+});
+
+describe("a link's address rules", () => {
+    it("stores none for a link made without any, so it opens from anywhere", async () => {
+        const { token } = await writeGrantLink("place.device", DOOR, link(), "o");
+        expect(grants[0]).toMatchObject({
+            allowedCidrs: "[]",
+            allowedCountries: "[]",
+            allowedContinents: "[]"
+        });
+        callerIp = "203.0.113.9";
+        expect((await linkReach(token))?.standing).toBe("live");
+    });
+
+    it("opens only for an address inside its IP/CIDR allowlist", async () => {
+        const { token } = await writeGrantLink(
+            "place.device",
+            DOOR,
+            link({ allowedCidrs: ["198.51.100.0/24"] }),
+            "o"
+        );
+        expect((await linkReach(token))?.standing).toBe("live");
+        callerIp = "203.0.113.9";
+        expect((await linkReach(token))?.standing).toBe("elsewhere");
+        callerIp = undefined;
+        expect((await linkReach(token))?.standing).toBe("elsewhere");
+    });
+
+    it("opens only from a country it accepts, on the paid stream too", async () => {
+        const { token } = await writeGrantLink(
+            "place.camera",
+            DOOR,
+            link({ capability: "view", actions: [], allowedCountries: ["es"] }),
+            "o"
+        );
+        expect(grants[0]!.allowedCountries).toBe('["ES"]');
+        expect((await linkReach(token))?.standing).toBe("live");
+        callerIp = "203.0.113.9";
+        expect((await linkReach(token))?.standing).toBe("elsewhere");
+        expect((await linkReachPaid(token))?.standing).toBe("elsewhere");
+    });
+
+    it("says a link that has run out has run out, wherever the caller is", async () => {
+        const { token } = await writeGrantLink(
+            "place.device",
+            DOOR,
+            link({ maxUses: 1, allowedCountries: ["ES"] }),
+            "o"
+        );
+        grants[0]!.uses = 1;
+        callerIp = "203.0.113.9";
+        expect((await linkReach(token))?.standing).toBe("spent");
+    });
+
+    it("refuses a malformed rule when the link is made", () => {
+        expect(() => link({ allowedCidrs: ["not an address"] })).toThrow();
     });
 });
