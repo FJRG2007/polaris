@@ -20,11 +20,21 @@ import {
     STREAMDECK_TAG_PREFIX
 } from "@polaris/ui/account-downloads/app-releases";
 import { initialsInk, tintFor } from "@polaris/core";
-import { appPreview, builtInScenes } from "@/lib/apps/app-screenshots";
-import { builtInApps } from "@/lib/apps/marketplace-store";
+import { appNeeds } from "@/lib/apps/app-needs";
 import { appReplaces } from "@/lib/apps/replaces";
+import type { AppManifest } from "@/lib/apps/catalog";
 import { appProvenance } from "@/lib/apps/provenance";
-import { catalogApps, isOffered } from "@/lib/apps/catalog";
+import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
+import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
+import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
+import { appPreview, appScreenshots, builtInScenes } from "@/lib/apps/app-screenshots";
+import {
+    ADDED_ON,
+    builtInApps,
+    featuredApps,
+    storeApps,
+    storeShelf
+} from "@/lib/apps/marketplace-store";
 import {
     copyFileSync,
     existsSync,
@@ -50,32 +60,169 @@ const appLogosDir = join(dashboard, "packages", "ui", "assets", "app-logos");
 const repo = process.env.GITHUB_REPOSITORY || "FJRG2007/polaris";
 
 const read = (path: string) => readFileSync(path, "utf8");
-
-const catalog: site.CatalogInput[] = catalogApps()
-    .filter(isOffered)
-    .map((app) => ({
-        id: app.id,
-        name: app.name,
-        category: app.category,
-        summary: app.summary,
-        description: app.description,
-        installMethod: app.installMethod,
-        comingSoon: app.comingSoon,
-        // The dashboard's own mark, drawn once here so the site shows the same one.
-        mark: renderToStaticMarkup(createElement(AppMark, { app, size: 40 })),
-        markLarge: renderToStaticMarkup(createElement(AppMark, { app, size: 44 })),
-        logo: ownAppLogo(app.id),
-        tint: tintFor(app.id),
-        ink: initialsInk(tintFor(app.id)),
-        ...appProvenance(app),
-        shots: { en: appPreview(app.id, "en-US"), es: appPreview(app.id, "es-ES") }
-    }));
-
 const logos = new Set(readdirSync(logosDir));
-const words = (locale: string): site.CatalogWords => ({
-    ...JSON.parse(read(join(web, "messages", locale, "catalog.json"))),
-    card: JSON.parse(read(join(web, "messages", locale, "marketplace.json"))).card
-});
+
+/** A dashboard message catalog as the dashboard's translator reads it: `t(key, values)` and `t.has(key)`. */
+function translator(messages: Record<string, unknown>) {
+    const find = (key: string): unknown =>
+        key
+            .split(".")
+            .reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], messages);
+    const t = (key: string, values: Readonly<Record<string, string | number>> = {}) => {
+        const found = find(key);
+        return typeof found === "string" ? site.fill(found, values) : key;
+    };
+    t.has = (key: string) => typeof find(key) === "string";
+    return t;
+}
+
+const messages = (webLocale: string, name: string) =>
+    JSON.parse(read(join(web, "messages", webLocale, `${name}.json`))) as Record<string, unknown>;
+
+/** The version an app's image is pinned to, when its tag says one (the dashboard's `imageVersion`). */
+function imageVersion(image: string | undefined): string | null {
+    if (!image) return null;
+    const tag = image.slice(image.lastIndexOf("/") + 1).split(":")[1];
+    return tag && tag !== "latest" ? tag : null;
+}
+
+/**
+ * The dashboard's Marketplace in one locale: every store app (catalogue apps and
+ * Deploy's templates, `storeApps`), localized by the dashboard's own
+ * `useLocalizeStoreApp` rules, with what its card and its page show.
+ */
+function storeList(webLocale: string, showcase: site.ShowcaseSection[]): site.SiteApp[] {
+    const t = translator(messages(webLocale, "marketplace"));
+    const words = translator(messages(webLocale, "catalog"));
+    const deploy = translator(messages(webLocale, "deploy"));
+    const nav = translator(messages(webLocale, "nav"));
+    const navLabel = (label: string) => (nav.has(`labels.${label}`) ? nav(`labels.${label}`) : label);
+    const localize = (app: AppManifest): AppManifest => {
+        if (!app.deployTemplate) return localizeApp(words as never, app, navLabel);
+        const key = `view.template.catalog.${app.deployTemplate}.description`;
+        const line = deploy.has(key) ? deploy(key) : app.summary;
+        return { ...app, summary: line, description: line };
+    };
+    const language = webLocale.startsWith("es") ? "es" : "en";
+    const all = storeApps().map(localize);
+    const featured = new Set(featuredApps(all).map((app) => app.id));
+    const listed = showcase.flatMap((section) => section.items);
+    const date = new Intl.DateTimeFormat(webLocale, { dateStyle: "medium", timeZone: "UTC" });
+    return all.map((app) => {
+        const from = appProvenance(app);
+        const tint = tintFor(app.id);
+        const image = app.template?.image;
+        const version = imageVersion(image);
+        const added = ADDED_ON[app.id] ?? null;
+        const category = categoryLabel(words as never, app.category, navLabel);
+        const facts: site.AppFact[] = [
+            { label: t("detail.developer"), value: from.developer },
+            { label: t("detail.category"), value: category },
+            ...(version ? [{ label: t("detail.version"), value: version }] : []),
+            ...(added
+                ? [{ label: t("detail.added"), value: date.format(new Date(`${added}T00:00:00Z`)) }]
+                : []),
+            ...(image ? [{ label: t("detail.image"), value: image, code: true }] : []),
+            ...(app.docsUrl
+                ? [{ label: t("detail.docs"), value: app.docsUrl, href: app.docsUrl }]
+                : [])
+        ];
+        // Every capture the dashboard's page shows, as the README or a feature
+        // page captions it, or numbered the way the dashboard's gallery does.
+        const shots = appScreenshots(app.id, webLocale).flatMap((shot, index) => {
+            const file = shot.dark.desktop.slice(shot.dark.desktop.lastIndexOf("/") + 1);
+            const scene = file.replace(/-dark-.*$/, "");
+            const readme = listed.find((item) => item.dark.startsWith(`${scene}-dark-`));
+            if (readme) return [readme];
+            const own = captured(scene, webLocale);
+            if (own.length > 0) return own;
+            const dark = `${scene}-dark-${language}-desktop.webp`;
+            const light = `${scene}-light-${language}-desktop.webp`;
+            const alt = t("detail.screenshotAlt", { name: app.name, index: index + 1 });
+            return existsSync(join(media, dark))
+                ? [
+                      {
+                          name: alt,
+                          caption: "",
+                          dark,
+                          light: existsSync(join(media, light)) ? light : null,
+                          alt
+                      }
+                  ]
+                : [];
+        });
+        return {
+            id: app.id,
+            name: app.name,
+            category: app.category,
+            categoryLabel: category,
+            summary: app.summary,
+            description: app.description,
+            keywords: [...(app.keywords ?? [])],
+            comingSoon: app.comingSoon === true,
+            mark: renderToStaticMarkup(createElement(AppMark, { app, size: 40 })),
+            markLarge: renderToStaticMarkup(createElement(AppMark, { app, size: 72 })),
+            logo: ownAppLogo(app.id),
+            tint,
+            ink: initialsInk(tint),
+            byline:
+                from.developer === from.distributor
+                    ? t("card.by", { developer: from.developer })
+                    : t("card.byImage", {
+                          developer: from.developer,
+                          distributor: from.distributor
+                      }),
+            alt: t("card.preview", { name: app.name }),
+            shot: appPreview(app.id, webLocale),
+            shelf: storeShelf(app),
+            featured: featured.has(app.id),
+            added,
+            capabilities: app.capabilities.map((capability) => t(CAPABILITY_KEYS[capability])),
+            consent: app.consent ? { label: app.consent.label, url: app.consent.url } : null,
+            needs: appNeeds(t as never, app),
+            facts,
+            shots,
+            games:
+                app.id === GAME_SERVERS_APP_ID
+                    ? GAMES.map((game) => ({
+                          id: game.id,
+                          name: game.name,
+                          summary: t.has(`detail.gameSummaries.${game.id}`)
+                              ? t(`detail.gameSummaries.${game.id}`)
+                              : game.summary,
+                          logo: game.logo.replace(/^\//, "")
+                      }))
+                    : []
+        };
+    });
+}
+
+/** The dashboard Marketplace's words the site's list and app pages use. */
+function storeWords(webLocale: string): site.StoreWords {
+    const t = translator(messages(webLocale, "marketplace"));
+    return {
+        search: t("view.search"),
+        sortLabel: t("view.sortLabel"),
+        sorts: {
+            featured: t("view.sort.featured"),
+            name: t("view.sort.name"),
+            recent: t("view.sort.recent")
+        },
+        categories: t("view.categories"),
+        allCategories: t("view.allCategories"),
+        featured: t("view.featured"),
+        shelves: { polaris: t("view.shelves.polaris"), community: t("view.shelves.community") },
+        noMatch: t("view.noMatch"),
+        details: t("card.details"),
+        comingSoon: t("card.comingSoon"),
+        consent: t("card.consent"),
+        about: t("detail.about"),
+        features: t("detail.features"),
+        needs: t("detail.needs"),
+        information: t("detail.information"),
+        games: t("detail.games")
+    };
+}
 
 /** The picture in the page's language where the README has one, the English one otherwise. */
 function localize(sections: site.ShowcaseSection[], locale: "en" | "es"): site.ShowcaseSection[] {
@@ -318,14 +465,16 @@ const data: site.SiteData = {
     install: site.parseInstallLines(readmeEn),
     locales: {
         en: {
-            apps: site.siteApps(catalog, "en", words("en-US")),
+            apps: storeList("en-US", showcaseEn),
+            store: storeWords("en-US"),
             builtIn: builtIn("en-US", showcaseEn),
             builtInWords: builtInWords("en-US"),
             replaces: replacesEn,
             showcase: showcaseEn
         },
         es: {
-            apps: site.siteApps(catalog, "es", words("es-ES")),
+            apps: storeList("es-ES", showcaseEsLocal),
+            store: storeWords("es-ES"),
             // The English table stands in if the Spanish README ever loses its own.
             replaces: replacesEs.length ? replacesEs : replacesEn,
             showcase: showcaseEsLocal,
@@ -363,7 +512,7 @@ for (const locale of Object.values(data.locales))
         for (const item of section.items)
             for (const file of [item.dark, item.light]) if (file) pictures.add(file);
 for (const locale of Object.values(data.locales))
-    for (const app of locale.builtIn)
+    for (const app of [...locale.builtIn, ...locale.apps])
         for (const item of app.shots)
             for (const file of [item.dark, item.light]) if (file) pictures.add(file);
 for (const file of docMedia) pictures.add(file);
@@ -404,15 +553,20 @@ writeFileSync(
         2
     ) + "\n"
 );
+// The games Game servers runs, with the logos the dashboard serves.
+for (const game of data.locales.en.apps.flatMap((app) => app.games)) {
+    mkdirSync(dirname(join(siteDir, "public", game.logo)), { recursive: true });
+    copyFileSync(join(web, "public", game.logo), join(siteDir, "public", game.logo));
+}
 // The marketplace captures, from the dashboard's own public folder.
 mkdirSync(join(siteDir, "public", "marketplace"), { recursive: true });
-for (const app of catalog)
-    for (const shot of Object.values(app.shots))
-        for (const theme of shot ? [shot.dark, shot.light] : [])
+for (const locale of Object.values(data.locales))
+    for (const app of locale.apps)
+        for (const theme of app.shot ? [app.shot.dark, app.shot.light] : [])
             for (const path of [theme.desktop, theme.mobile])
                 copyFileSync(join(web, "public", path), join(siteDir, "public", path));
 
 const operations = data.api.groups.reduce((sum, group) => sum + group.operations.length, 0);
 console.log(
-    `[site] ${catalog.length} apps, ${pictures.size} pictures, ${operations} documented API operations, ${inventory.routes.length} key-reachable of ${routeSources.length} route files, ${docsEn.length} guides`
+    `[site] ${data.locales.en.apps.length} apps, ${pictures.size} pictures, ${operations} documented API operations, ${inventory.routes.length} key-reachable of ${routeSources.length} route files, ${docsEn.length} guides`
 );

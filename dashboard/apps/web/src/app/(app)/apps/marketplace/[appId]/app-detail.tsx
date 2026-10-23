@@ -19,10 +19,11 @@ import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
 import { UninstallDialog } from "@/app/(app)/apps/marketplace/uninstall-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
+import { appNeeds } from "@/lib/apps/app-needs";
+import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
+import type { AppManifest } from "@/lib/apps/catalog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import {
-    CAPABILITY_KEYS,
     InstallWizard,
     by,
     statusLabel,
@@ -30,7 +31,6 @@ import {
 } from "../marketplace-view";
 import { ScreenshotGallery } from "./screenshot-gallery";
 import { AppPreview, PrimaryActionButton, StatusBadge } from "../store-card";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     ADDED_ON,
     findStoreApp,
@@ -93,44 +93,6 @@ function imageVersion(image: string | undefined): string | null {
     if (!image) return null;
     const tag = image.slice(image.lastIndexOf("/") + 1).split(":")[1];
     return tag && tag !== "latest" ? tag : null;
-}
-
-/**
- * What installing the app takes, read off its manifest: a server and what the
- * container asks of it, or nothing at all for an app that is part of the
- * dashboard; and the permission the install action checks.
- */
-export function appNeeds(t: NamespaceTranslator<"marketplace">, app: AppManifest): string[] {
-    const lines: string[] = [];
-    if (app.installMethod === "builtin") lines.push(t("detail.needsNothing"));
-    else if (app.installMethod === "deploy-template") lines.push(t("detail.needsProject"));
-    else {
-        lines.push(t("detail.needsServer"));
-        const ports = app.template?.ports ?? [];
-        if (ports.length > 0)
-            lines.push(
-                t("detail.needsPorts", {
-                    ports: ports
-                        .map((port) => `${port.host ?? port.container}/${port.protocol}`)
-                        .join(", ")
-                })
-            );
-        const volumes = app.template?.volumes ?? [];
-        if (volumes.length > 0)
-            lines.push(
-                t("detail.needsStorage", {
-                    volumes: volumes.map((volume) => volume.label).join(", ")
-                })
-            );
-        const fields = promptedEnvVars(app);
-        if (fields.length > 0)
-            lines.push(
-                t("detail.needsSettings", { fields: fields.map((field) => field.label).join(", ") })
-            );
-    }
-    if (app.instanceWide) lines.push(t("detail.needsOnce"));
-    lines.push(t("detail.needsPermission"));
-    return lines;
 }
 
 export function AppDetail({ appId, children }: { appId: string; children: ReactNode }) {

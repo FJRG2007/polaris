@@ -33,7 +33,8 @@ export default async function Page({ params }: Props) {
                 builtIn={siteData().locales[locale].builtIn}
                 builtInWords={siteData().locales[locale].builtInWords}
                 pages={href(locale, "marketplace/")}
-                t={words(locale).market}
+                locale={locale}
+                words={siteData().locales[locale].store}
             />
         </>
     );

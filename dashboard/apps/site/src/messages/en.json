@@ -47,13 +47,8 @@
     "market": {
         "title": "Marketplace",
         "intro": "Every app in the catalogue, as the dashboard lists it. Built-in apps come with every install; the rest install with one press.",
-        "search": "Search apps",
-        "all": "All",
-        "builtin": "Built in",
-        "optional": "Optional",
-        "soon": "Coming soon",
-        "empty": "No app matches that search.",
-        "count": "{n} apps"
+        "installPolaris": "Install Polaris",
+        "installHint": "Apps are installed from your own Polaris, in one click."
     },
     "downloads": {
         "title": "Downloads",

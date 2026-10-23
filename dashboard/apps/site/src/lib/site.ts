@@ -45,7 +45,7 @@ export function isLocale(value: string): value is SiteLocale {
 }
 
 /** Where the site is published, for the absolute addresses a shared link needs. */
-const SITE_ORIGIN = process.env.SITE_ORIGIN ?? "https://fjrg2007.github.io";
+export const SITE_ORIGIN = process.env.SITE_ORIGIN ?? "https://fjrg2007.github.io";
 
 /** The browser's colour around the page: the dashboard's dark background. */
 export const SITE_VIEWPORT: Viewport = { themeColor: "#0b0c0e" };

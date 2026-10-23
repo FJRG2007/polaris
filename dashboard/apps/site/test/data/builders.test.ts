@@ -7,64 +7,65 @@
 import { describe, expect, it } from "vitest";
 import * as site from "../../src/data/builders";
 
-const app = (id: string, extra: Partial<site.CatalogInput> = {}): site.CatalogInput => ({
+const app = (id: string, extra: Partial<site.SiteApp> = {}): site.SiteApp => ({
     id,
     name: id.toUpperCase(),
     category: "Tools",
+    categoryLabel: "Tools",
     summary: `${id} summary`,
     description: `${id} description`,
-    installMethod: "compose-template",
+    keywords: [],
+    comingSoon: false,
     mark: "<svg></svg>",
     markLarge: "<svg></svg>",
+    logo: null,
     tint: "#123456",
     ink: "#ffffff",
-    developer: "Polaris",
-    distributor: "Polaris",
-    shots: { en: null, es: null },
+    byline: "By Polaris",
+    alt: `${id} preview`,
+    shot: null,
+    shelf: "polaris",
+    featured: false,
+    added: null,
+    capabilities: [],
+    consent: null,
+    needs: [],
+    facts: [],
+    shots: [],
+    games: [],
     ...extra
 });
 
-describe("siteApps", () => {
-    it("lists every catalogue app, so a new one appears with no edit to the site", () => {
-        const apps = site.siteApps(
-            [app("b"), app("a", { installMethod: "builtin" }), app("c", { comingSoon: true })],
-            "en"
-        );
-        expect(apps.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
-        expect(apps[0]!.builtin).toBe(true);
-        expect(apps[1]!.builtin).toBe(false);
-        expect(apps[2]!.comingSoon).toBe(true);
+describe("filterSiteApps", () => {
+    const apps = [
+        app("chat", { category: "Messaging", added: "2026-01-02" }),
+        app("notes", { name: "Bloc", added: "2026-03-04" }),
+        app("soon", { comingSoon: true, added: "2026-09-09" }),
+        app("ark", { shelf: "community" })
+    ];
+    const filter = (extra: Partial<Parameters<typeof site.filterSiteApps>[1]>) =>
+        site
+            .filterSiteApps(apps, { query: "", category: "", sort: "featured", locale: "en", ...extra })
+            .map((entry) => entry.id);
+
+    it("keeps the dashboard's order, with anything not out yet last", () => {
+        expect(filter({})).toEqual(["chat", "notes", "ark", "soon"]);
     });
 
-    it("keeps a Polaris app's logo file, and none for any other app", () => {
-        const apps = site.siteApps([app("home", { logo: "home" }), app("ark")], "en");
-        expect(apps.map((entry) => entry.logo)).toEqual([null, "home"]);
+    it("sorts by name and by the day an app was added, as the dashboard does", () => {
+        expect(filter({ sort: "name" })).toEqual(["ark", "notes", "chat", "soon"]);
+        expect(filter({ sort: "recent" })).toEqual(["notes", "chat", "ark", "soon"]);
     });
 
-    it("takes a locale's words and falls back to the catalogue's own", () => {
-        const [entry] = site.siteApps([app("a", { distributor: "Docker Hub" })], "es", {
-            card: {
-                by: "De {developer}",
-                byImage: "De {developer}, imagen de {distributor}",
-                preview: "Vista de {name}"
-            },
-            apps: { a: { name: "Uno" } },
-            categories: { Tools: "Herramientas" }
-        });
-        expect(entry!.name).toBe("Uno");
-        expect(entry!.summary).toBe("a summary");
-        expect(entry!.categoryLabel).toBe("Herramientas");
-    });
-
-    it("filters by text and category", () => {
-        const apps = site.siteApps([app("chat", { category: "Messaging" }), app("notes")], "en");
-        expect(
-            apps.filter((entry) => site.matchesApp(entry, "cha", "")).map((entry) => entry.id)
-        ).toEqual(["chat"]);
-        expect(
-            apps.filter((entry) => site.matchesApp(entry, "", "Tools")).map((entry) => entry.id)
-        ).toEqual(["notes"]);
+    it("searches and filters by category", () => {
+        expect(filter({ query: "cha" })).toEqual(["chat"]);
+        expect(filter({ category: "Messaging" })).toEqual(["chat"]);
         expect(site.siteCategories(apps).map((entry) => entry.id)).toEqual(["Messaging", "Tools"]);
+    });
+
+    it("splits the shelves Polaris's first and leaves an empty one out", () => {
+        expect(site.siteShelves(apps).map((group) => group.shelf)).toEqual(["polaris", "community"]);
+        expect(site.siteShelves([apps[3]!]).map((group) => group.shelf)).toEqual(["community"]);
     });
 });
 

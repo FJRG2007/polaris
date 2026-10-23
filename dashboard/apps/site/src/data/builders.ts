@@ -8,6 +8,7 @@
 import type { InventoryRoute } from "@/data/api-inventory";
 import type { DocPage } from "@/data/docs";
 import type { AppDownload } from "@polaris/ui/account-downloads/app-releases";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 
 export type SiteLocale = "en" | "es";
 
@@ -17,49 +18,34 @@ export const SITE_LOCALES: readonly SiteLocale[] = ["en", "es"];
 /* Marketplace                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** One catalogue entry, in the fields the site reads. */
-export interface CatalogInput {
-    readonly id: string;
-    readonly name: string;
-    readonly category: string;
-    readonly summary: string;
-    readonly description: string;
-    readonly installMethod: string;
-    readonly comingSoon?: boolean;
-    /** The app's mark, already rendered to markup by the build script, at 40px and at 44px. */
-    readonly mark: string;
-    readonly markLarge: string;
-    /**
-     * The Polaris app logo the entry wears instead of `mark`, by id: the page
-     * shows `app-logos/<id>.svg`, the file the dashboard's logo is written to.
-     */
-    readonly logo?: string | null;
-    /** The placeholder preview's colour and the text colour on it. */
-    readonly tint: string;
-    readonly ink: string;
-    /** Who makes it, and who publishes the image it runs, as the dashboard reads them. */
-    readonly developer: string;
-    readonly distributor: string;
-    /** The app's first capture, per language, as the dashboard's marketplace shows it. */
-    readonly shots: Readonly<Record<SiteLocale, StoreShot | null>>;
-}
-
 /** An app's capture, per theme, for a desktop and a phone (as `@polaris/ui/store-card` takes it). */
 export interface StoreShot {
     readonly dark: { readonly desktop: string; readonly mobile: string };
     readonly light: { readonly desktop: string; readonly mobile: string };
 }
 
-/** A locale's words for the catalogue: per-app overrides and category names. */
-export interface CatalogWords {
-    readonly apps?: Readonly<
-        Record<string, { name?: string; summary?: string; description?: string }>
-    >;
-    readonly categories?: Readonly<Record<string, string>>;
-    /** The dashboard marketplace's card words: `card.by`, `card.byImage`, `card.preview`. */
-    readonly card?: { readonly by: string; readonly byImage: string; readonly preview: string };
+export type StoreSort = "featured" | "name" | "recent";
+
+export const STORE_SORTS: readonly StoreSort[] = ["featured", "name", "recent"];
+
+/** Who is behind an app: Polaris, or another developer whose image Polaris runs. */
+export type StoreShelf = "polaris" | "community";
+
+/** One line of an app page's Information list. */
+export interface AppFact {
+    readonly label: string;
+    readonly value: string;
+    /** A link the value opens, for the documentation. */
+    readonly href?: string;
+    /** Drawn as code, for an image reference. */
+    readonly code?: boolean;
 }
 
+/**
+ * One app of the dashboard's Marketplace - a catalogue app or a Deploy
+ * template - in one locale, already in the dashboard's own words: the build
+ * script reads them with the dashboard's localizer, so the two never differ.
+ */
 export interface SiteApp {
     readonly id: string;
     readonly name: string;
@@ -67,76 +53,82 @@ export interface SiteApp {
     readonly categoryLabel: string;
     readonly summary: string;
     readonly description: string;
-    /** Part of every install, rather than installed from the marketplace. */
-    readonly builtin: boolean;
+    readonly keywords: readonly string[];
     readonly comingSoon: boolean;
+    /** The app's mark, already rendered to markup by the build script, at 40px and at 72px. */
     readonly mark: string;
     readonly markLarge: string;
+    /** The Polaris app logo the entry wears instead of `mark`: `app-logos/<logo>.svg`. */
     readonly logo: string | null;
+    /** The placeholder preview's colour and the text colour on it. */
     readonly tint: string;
     readonly ink: string;
     readonly byline: string;
-    /** What the preview shows, for a screen reader. */
+    /** What the card's preview shows, for a screen reader. */
     readonly alt: string;
+    /** The card's preview: the app's first capture, as the dashboard's card shows it. */
     readonly shot: StoreShot | null;
+    readonly shelf: StoreShelf;
+    /** In the dashboard's Featured row. */
+    readonly featured: boolean;
+    /** The day it joined the catalogue (YYYY-MM-DD), for "Recently added". */
+    readonly added: string | null;
+    /** The dashboard's capability badges, in words. */
+    readonly capabilities: readonly string[];
+    /** The terms installing it accepts, when it has any. */
+    readonly consent: { readonly label: string; readonly url: string } | null;
+    /** "What it needs", line by line, as the dashboard's page lists it. */
+    readonly needs: readonly string[];
+    readonly facts: readonly AppFact[];
+    /** Every capture of it, as its page shows them; none for an app nobody has captured. */
+    readonly shots: readonly ShowcaseItem[];
+    /** The games it runs, for Game servers. */
+    readonly games: readonly { readonly id: string; readonly name: string; readonly summary: string; readonly logo: string }[];
 }
 
-/**
- * Every offered app in one locale, sorted by name. A word the locale has not
- * translated falls back to the catalogue's own English, as the dashboard does.
- */
-export function siteApps(
-    catalog: readonly CatalogInput[],
-    locale: SiteLocale,
-    words: CatalogWords = {}
-): SiteApp[] {
-    const card = words.card ?? {
-        by: "By {developer}",
-        byImage: "By {developer} - image by {distributor}",
-        preview: "{name} preview"
-    };
-    return catalog
-        .map((app) => {
-            const own = words.apps?.[app.id] ?? {};
-            const name = own.name ?? app.name;
-            const from = { developer: app.developer, distributor: app.distributor };
-            return {
-                id: app.id,
-                name,
-                category: app.category,
-                categoryLabel: words.categories?.[app.category] ?? app.category,
-                summary: own.summary ?? app.summary,
-                description: own.description ?? app.description,
-                builtin: app.installMethod === "builtin",
-                comingSoon: app.comingSoon === true,
-                mark: app.mark,
-                markLarge: app.markLarge,
-                logo: app.logo ?? null,
-                tint: app.tint,
-                ink: app.ink,
-                byline: fill(from.developer === from.distributor ? card.by : card.byImage, from),
-                alt: fill(card.preview, { name }),
-                shot: app.shots[locale]
-            };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/** The categories present, in the order they first appear. */
+/** The categories present, in the order they first appear (the dashboard's `storeCategories`). */
 export function siteCategories(apps: readonly SiteApp[]): { id: string; label: string }[] {
     const seen = new Map<string, string>();
     for (const app of apps) if (!seen.has(app.category)) seen.set(app.category, app.categoryLabel);
     return [...seen].map(([id, label]) => ({ id, label }));
 }
 
-/** Whether an app matches a search and a category; empty means any. */
-export function matchesApp(app: SiteApp, query: string, category: string): boolean {
-    if (category && app.category !== category) return false;
-    const needle = query.trim().toLowerCase();
-    if (!needle) return true;
-    return [app.name, app.summary, app.categoryLabel].some((text) =>
-        text.toLowerCase().includes(needle)
-    );
+const APP_FIELDS: readonly SearchField<SiteApp>[] = [
+    { text: (app) => app.name, weight: 3 },
+    { text: (app) => app.summary, weight: 2 },
+    { text: (app) => app.keywords, weight: 1 },
+    { text: (app) => app.category, weight: 1 }
+];
+
+/**
+ * The dashboard's `filterStoreApps`: one category or all, the same weighted
+ * search, the chosen order, and anything announced but not out yet last.
+ */
+export function filterSiteApps(
+    apps: readonly SiteApp[],
+    filter: { query: string; category: string; sort: StoreSort; locale: SiteLocale }
+): SiteApp[] {
+    const inCategory = filter.category ? apps.filter((app) => app.category === filter.category) : [...apps];
+    const term = filter.query.trim();
+    const matched = term ? searchItems(inCategory, term, APP_FIELDS) : inCategory;
+    const order = new Map(apps.map((app, index) => [app.id, index]));
+    const sorted = [...matched];
+    if (filter.sort === "name") {
+        const collator = new Intl.Collator(filter.locale, { sensitivity: "base" });
+        sorted.sort((left, right) => collator.compare(left.name, right.name));
+    } else if (filter.sort === "recent")
+        sorted.sort((left, right) => {
+            const byDate = (right.added ?? "").localeCompare(left.added ?? "");
+            return byDate !== 0 ? byDate : (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0);
+        });
+    return sorted.sort((left, right) => Number(left.comingSoon) - Number(right.comingSoon));
+}
+
+/** The apps split by who is behind them, Polaris's first; an empty shelf is left out. */
+export function siteShelves(apps: readonly SiteApp[]): { shelf: StoreShelf; apps: SiteApp[] }[] {
+    return (["polaris", "community"] as const)
+        .map((shelf) => ({ shelf, apps: apps.filter((app) => app.shelf === shelf) }))
+        .filter((group) => group.apps.length > 0);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -382,8 +374,31 @@ export interface BuiltInWords {
     readonly by: string;
 }
 
+/** The dashboard Marketplace's own words for the list and an app's page. */
+export interface StoreWords {
+    readonly search: string;
+    readonly sortLabel: string;
+    readonly sorts: Readonly<Record<StoreSort, string>>;
+    readonly categories: string;
+    readonly allCategories: string;
+    readonly featured: string;
+    readonly shelves: Readonly<Record<StoreShelf, string>>;
+    readonly noMatch: string;
+    readonly details: string;
+    readonly comingSoon: string;
+    /** "Installing accepts the <link>{label}</link>." */
+    readonly consent: string;
+    readonly about: string;
+    readonly features: string;
+    readonly needs: string;
+    readonly information: string;
+    readonly games: string;
+}
+
 export interface LocaleData {
+    /** The dashboard's Marketplace, in its order. */
     readonly apps: readonly SiteApp[];
+    readonly store: StoreWords;
     /** The apps every Polaris comes with, in the dashboard's order. */
     readonly builtIn: readonly BuiltInSiteApp[];
     readonly builtInWords: BuiltInWords;

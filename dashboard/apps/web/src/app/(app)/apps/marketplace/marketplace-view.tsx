@@ -29,6 +29,7 @@ import { Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { replacedLogos } from "@/lib/apps/replaces";
 import { BuiltInAppsSection } from "@polaris/ui/built-in-apps";
+import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
 import { useLocalizeStoreApp } from "./use-store-words";
 import { TemplateDeployDialog } from "./template-deploy-dialog";
 import { UninstallDialog } from "./uninstall-dialog";
@@ -93,19 +94,6 @@ import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 type Words = NamespaceTranslator<"marketplace">;
 
 /** Each capability's badge, as `capabilities.<key>`. */
-export const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">> = {
-    "messaging-hub": "capabilities.messagingHub",
-    "messaging-channel": "capabilities.messagingChannel",
-    "ai-assistant": "capabilities.aiAssistant",
-    "game-manager": "capabilities.gameManager",
-    "game-server": "capabilities.gameServer",
-    "camera-hub": "capabilities.cameraHub",
-    "mqtt-broker": "capabilities.mqttBroker",
-    "home-hub": "capabilities.homeHub",
-    "mail-server": "capabilities.mailServer",
-    "dns-blocker": "capabilities.dnsBlocker",
-    tool: "capabilities.tool"
-};
 
 /** An install's state, said as `statuses.<status>`; one a newer service adds shows as it came. */
 const STATUSES = new Set(["installing", "running", "stopped", "failed"]);
