@@ -28,8 +28,8 @@ import { translate } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import type { Locale } from "@polaris/core";
 import { TaskRefusal } from "./refusal";
-import { hashLinkPassword } from "@polaris/core/link-password";
-import { readAddressRules, storedAddressRules } from "@/lib/link-guards";
+import { readAddressRules } from "@/lib/link-guards";
+import { linkLimitColumns } from "@/lib/link-limits";
 
 /** A task's public link as its owner sees it. */
 export interface TaskShareView {
@@ -93,20 +93,9 @@ async function toShareView(share: {
     };
 }
 
-/** The columns a saved set of limits writes. The password is only touched when
- *  one is typed or it is being taken off. */
+/** The columns a saved set of limits writes; none when no limits were sent. */
 async function limitColumns(limits: core.TaskShareInput["limits"]) {
-    if (!limits) return {};
-    return {
-        ...(limits.password
-            ? { passwordHash: await hashLinkPassword(limits.password) }
-            : limits.clearPassword
-              ? { passwordHash: null }
-              : {}),
-        expiresAt: limits.expiresAt,
-        maxViews: limits.maxViews,
-        ...storedAddressRules(limits)
-    };
+    return limits ? linkLimitColumns(limits) : {};
 }
 
 export async function getTaskShare(taskId: string): Promise<TaskShareView | null> {

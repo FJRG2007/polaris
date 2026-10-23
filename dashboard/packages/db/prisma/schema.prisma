@@ -7924,6 +7924,14 @@ model TaskForm {
     confirmation    String   @default("")
     requireLogin    Boolean  @default(false)
     enabled         Boolean  @default(true)
+    /// The limits every public link carries (lib/link-guards); the cap counts
+    /// submissions. Null or an empty list means no restriction.
+    passwordHash      String?
+    expiresAt         DateTime?
+    maxSubmissions    Int?
+    allowedCidrs      String    @default("[]")
+    allowedCountries  String    @default("[]")
+    allowedContinents String    @default("[]")
     createdById     String?  @db.Uuid
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt

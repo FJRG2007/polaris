@@ -15,8 +15,8 @@
  * Server-only.
  */
 
-import { hashLinkPassword } from "@polaris/core/link-password";
-import { readAddressRules, storedAddressRules } from "@/lib/link-guards";
+import { readAddressRules } from "@/lib/link-guards";
+import { linkLimitColumns } from "@/lib/link-limits";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
 import { prisma, Prisma, VISIBLE_USER } from "@polaris/db";
@@ -140,16 +140,7 @@ export async function setPolarShareLimits(
     if (!share) return null;
     await prisma.polarThreadShare.update({
         where: { id: share.id },
-        data: {
-            ...(limits.password
-                ? { passwordHash: await hashLinkPassword(limits.password) }
-                : limits.clearPassword
-                  ? { passwordHash: null }
-                  : {}),
-            expiresAt: limits.expiresAt,
-            maxViews: limits.maxViews,
-            ...storedAddressRules(limits)
-        }
+        data: await linkLimitColumns(limits)
     });
     return polarShareLink(userId, threadId);
 }

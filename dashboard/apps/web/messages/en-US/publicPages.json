@@ -218,6 +218,9 @@
         "lastChanged": "Last changed {time}"
     },
     "form": {
+        "typePassword": "Type the password",
+        "tooManyTries": "Too many attempts. Wait a few minutes and try again.",
+        "wrongPassword": "Incorrect password.",
         "unavailableTitle": "This form is not available",
         "unavailable": "The link may have expired, or the form may have been closed.",
         "tooMany": "Too many submissions from here. Try again in a little while.",

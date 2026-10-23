@@ -461,6 +461,25 @@
         "filesInto": "Registra en {list} - {count} {count, plural, one {respuesta} other {respuestas}}",
         "copyLink": "Copiar enlace",
         "delete": "Eliminar formulario",
+        "edit": "Editar",
+        "editNamed": "Editar {name}",
+        "editor": {
+            "title": "Editar {name}",
+            "hint": "Qué pregunta, dónde se registra y quién puede enviarlo.",
+            "intro": "Introducción",
+            "questions": "Preguntas",
+            "question": "Pregunta",
+            "type": "Respuesta",
+            "choices": "Opciones, separadas por comas",
+            "required": "Obligatoria",
+            "removeQuestion": "Quitar pregunta",
+            "addQuestion": "Añadir pregunta",
+            "confirmation": "Mensaje al enviar",
+            "open": "Acepta respuestas",
+            "requireLogin": "Solo personas con cuenta",
+            "maxSubmissions": "Respuestas",
+            "save": "Guardar"
+        },
         "received": "Gracias. Hemos recibido tu solicitud."
     },
     "notify": {

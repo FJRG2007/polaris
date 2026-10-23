@@ -218,6 +218,9 @@
         "lastChanged": "Último cambio: {time}"
     },
     "form": {
+        "typePassword": "Escribe la contraseña",
+        "tooManyTries": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+        "wrongPassword": "Contraseña incorrecta.",
         "unavailableTitle": "Formulario no disponible",
         "unavailable": "Puede que el enlace haya caducado o que el formulario se haya cerrado.",
         "tooMany": "Demasiados envíos desde aquí. Vuelve a intentarlo dentro de un rato.",

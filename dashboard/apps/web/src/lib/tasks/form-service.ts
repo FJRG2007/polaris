@@ -14,6 +14,8 @@ import { createTask } from "./task-service";
 import { generateToken } from "@polaris/core/tokens";
 import { TaskRefusal } from "./refusal";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { readAddressRules } from "@/lib/link-guards";
+import { linkLimitColumns } from "@/lib/link-limits";
 
 export interface FormView {
     readonly id: string;
@@ -27,6 +29,21 @@ export interface FormView {
     readonly requireLogin: boolean;
     readonly enabled: boolean;
     readonly submissionCount: number;
+    readonly defaultStatusId: string | null;
+    readonly hasPassword: boolean;
+    readonly expiresAt: string | null;
+    readonly maxSubmissions: number | null;
+    readonly allowedCidrs: string[];
+    readonly allowedCountries: string[];
+    readonly allowedContinents: string[];
+}
+
+/** The columns a saved set of limits writes. The shared cap is on submissions
+ *  here; none are written when no limits were sent. */
+async function limitColumns(limits: core.FormInput["limits"]) {
+    if (!limits) return {};
+    const { maxViews, ...rest } = await linkLimitColumns(limits);
+    return { ...rest, maxSubmissions: maxViews };
 }
 
 function parseFields(raw: string): core.FormField[] {
@@ -52,6 +69,13 @@ export async function listForms(spaceId: string): Promise<FormView[]> {
             confirmation: true,
             requireLogin: true,
             enabled: true,
+            defaultStatusId: true,
+            passwordHash: true,
+            expiresAt: true,
+            maxSubmissions: true,
+            allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true,
             list: { select: { name: true } },
             _count: { select: { submissions: true } }
         }
@@ -67,7 +91,12 @@ export async function listForms(spaceId: string): Promise<FormView[]> {
         confirmation: form.confirmation,
         requireLogin: form.requireLogin,
         enabled: form.enabled,
-        submissionCount: form._count.submissions
+        submissionCount: form._count.submissions,
+        defaultStatusId: form.defaultStatusId,
+        hasPassword: Boolean(form.passwordHash),
+        expiresAt: form.expiresAt?.toISOString() ?? null,
+        maxSubmissions: form.maxSubmissions,
+        ...readAddressRules(form)
     }));
 }
 
@@ -97,7 +126,8 @@ export async function createForm(
             confirmation: input.confirmation,
             requireLogin: input.requireLogin,
             enabled: input.enabled,
-            createdById: actorId
+            createdById: actorId,
+            ...(await limitColumns(input.limits))
         },
         select: { id: true }
     });
@@ -120,7 +150,8 @@ export async function updateForm(
             defaultStatusId: input.defaultStatusId,
             confirmation: input.confirmation,
             requireLogin: input.requireLogin,
-            enabled: input.enabled
+            enabled: input.enabled,
+            ...(await limitColumns(input.limits))
         }
     });
     if (count === 0) throw new TaskRefusal("refusals.formNotInSpace");

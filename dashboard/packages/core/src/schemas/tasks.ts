@@ -831,7 +831,10 @@ export const formSchema = z.object({
     confirmation: z.string().trim().max(500).default("Thanks. Your request has been received."),
     /** An open form accepts anonymous submissions from anyone with the link. */
     requireLogin: z.boolean().default(false),
-    enabled: z.boolean().default(true)
+    enabled: z.boolean().default(true),
+    /** The link's limits, shared with every public link; `maxViews` caps
+     *  submissions. Absent, a saved form keeps the limits it has. */
+    limits: linkLimitsSchema.optional()
 });
 
 export type FormInput = z.infer<typeof formSchema>;
