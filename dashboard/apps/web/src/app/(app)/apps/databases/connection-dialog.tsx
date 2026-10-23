@@ -89,6 +89,7 @@ import {
     isDirty
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import * as polls from "./databases-polls";
 
 interface Engine {
     id: string;
@@ -198,9 +199,9 @@ export function ConnectionDialog({
     const [error, setError] = useState("");
 
     useEffect(() => {
-        void actions.engineOptionsAction().then((result) => setEngines(result.engines));
-        void actions.listManagedAction().then((result) => setManaged(result.databases ?? []));
-        void actions.listTunnelServersAction().then((result) => {
+        void polls.engineOptions().then((result) => setEngines(result.engines));
+        void polls.managedDatabases().then((result) => setManaged(result.databases ?? []));
+        void polls.tunnelServers().then((result) => {
             setServers(result.servers);
             // Nothing to pick from: the login typed here is the only way in.
             if (result.servers.length === 0 && saved?.mode !== "server") setTunnelKind("manual");

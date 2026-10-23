@@ -140,7 +140,10 @@ const actions = vi.hoisted(() => {
         "getAnalyticsOverviewAction",
         "listBackupKeysAction",
         "listWorkAction",
-        "containerDriveLinkAction"
+        "containerDriveLinkAction",
+        "engineOptionsAction",
+        "listManagedAction",
+        "listTunnelServersAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -401,6 +404,11 @@ vi.mock("@/app/(app)/apps/code/actions", () => ({
 vi.mock("@/app/(app)/apps/containers/[containerId]/drive-link-actions", () => ({
     containerDriveLinkAction: actions.containerDriveLinkAction
 }));
+vi.mock("@/app/(app)/apps/databases/actions", () => ({
+    engineOptionsAction: actions.engineOptionsAction,
+    listManagedAction: actions.listManagedAction,
+    listTunnelServersAction: actions.listTunnelServersAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -551,7 +559,10 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/analytics/overview": () => import("@/app/api/analytics/overview/route"),
     "/api/backups/keys": () => import("@/app/api/backups/keys/route"),
     "/api/code/work": () => import("@/app/api/code/work/route"),
-    "/api/containers/drive-link": () => import("@/app/api/containers/drive-link/route")
+    "/api/containers/drive-link": () => import("@/app/api/containers/drive-link/route"),
+    "/api/databases/engines": () => import("@/app/api/databases/engines/route"),
+    "/api/databases/managed": () => import("@/app/api/databases/managed/route"),
+    "/api/databases/tunnel-servers": () => import("@/app/api/databases/tunnel-servers/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2134,6 +2145,42 @@ const CASES: Case[] = [
             ).containerDriveLink({ kind: "sample" }),
         action: "containerDriveLinkAction",
         args: [{ kind: "sample" }]
+    },
+    {
+        name: "the database engines a connection can be",
+        path: "/api/databases/engines",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/databases/databases-polls")>(
+                    "@/app/(app)/apps/databases/databases-polls"
+                )
+            ).engineOptions(),
+        action: "engineOptionsAction",
+        args: []
+    },
+    {
+        name: "the databases Polaris runs that a connection can point at",
+        path: "/api/databases/managed",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/databases/databases-polls")>(
+                    "@/app/(app)/apps/databases/databases-polls"
+                )
+            ).managedDatabases(),
+        action: "listManagedAction",
+        args: []
+    },
+    {
+        name: "the servers a connection can tunnel through",
+        path: "/api/databases/tunnel-servers",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/databases/databases-polls")>(
+                    "@/app/(app)/apps/databases/databases-polls"
+                )
+            ).tunnelServers(),
+        action: "listTunnelServersAction",
+        args: []
     }
 ];
 

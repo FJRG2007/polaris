@@ -617,3 +617,21 @@ vi.mock("@/app/(app)/apps/containers/containers-polls", () => ({
         1
     )
 }));
+
+vi.mock("@/app/(app)/apps/databases/databases-polls", () => ({
+    engineOptions: forward(
+        () => import("@/app/(app)/apps/databases/actions"),
+        "engineOptionsAction",
+        0
+    ),
+    managedDatabases: forward(
+        () => import("@/app/(app)/apps/databases/actions"),
+        "listManagedAction",
+        0
+    ),
+    tunnelServers: forward(
+        () => import("@/app/(app)/apps/databases/actions"),
+        "listTunnelServersAction",
+        0
+    )
+}));
