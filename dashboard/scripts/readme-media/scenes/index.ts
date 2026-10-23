@@ -28,6 +28,8 @@ import { notes } from "./notes";
 import { polar } from "./polar";
 import { watch } from "./watch";
 import { automations } from "./automations";
+import { tools } from "./tools";
+import { statusPages } from "./status-pages";
 import type { SceneDefinition } from "../runtime/scene";
 
 /** Every scene the README shows, in the order the capture takes them. */
@@ -65,6 +67,8 @@ export const SCENES: readonly SceneDefinition[] = [
     automations,
     watch,
     placesOverview,
+    tools,
+    statusPages,
     marketplace,
     marketplaceInstall,
     launcher,
