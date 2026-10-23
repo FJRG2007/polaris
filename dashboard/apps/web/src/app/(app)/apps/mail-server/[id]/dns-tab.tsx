@@ -45,6 +45,7 @@ import {
     Input,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "../mail-server-polls";
 
 type Domain = Extract<Awaited<ReturnType<typeof listDomainsAction>>, { domains: unknown }>["domains"][number];
 type Reports = Extract<Awaited<ReturnType<typeof scanDnsAction>>, { reports: unknown }>["reports"];
@@ -407,7 +408,7 @@ function PublishDialog({ serverId, domain, onClose }: { serverId: string; domain
         setReplace(false);
         setError(null);
         setPlanning(true);
-        void planDnsAction({ serverId, domainId }).then((answer) => {
+        void polls.dnsPlan({ serverId, domainId }).then((answer) => {
             if (stale) return;
             setPlanning(false);
             if (answer.error) setError(answer.error);

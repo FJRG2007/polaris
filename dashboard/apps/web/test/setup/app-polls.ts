@@ -311,6 +311,12 @@ vi.mock("@/app/(app)/apps/mail-server/mail-server-polls", () => ({
         () => import("@/app/(app)/apps/mail-server/actions"),
         "serverDetailAction",
         1
+    ),
+    dnsPlan: forward(() => import("@/app/(app)/apps/mail-server/actions"), "planDnsAction", 1),
+    placements: forward(
+        () => import("@/app/(app)/apps/mail-server/actions"),
+        "listPlacementsAction",
+        0
     )
 }));
 

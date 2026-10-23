@@ -146,7 +146,9 @@ const actions = vi.hoisted(() => {
         "listTunnelServersAction",
         "getWafAddressActivityAction",
         "getWafRuleAction",
-        "redeployStrategyAction"
+        "redeployStrategyAction",
+        "planDnsAction",
+        "listPlacementsAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -228,7 +230,9 @@ vi.mock("@/app/(app)/admin/inbox/actions", () => ({
     listContactsAction: actions.listContactsAction
 }));
 vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
-    serverDetailAction: actions.serverDetailAction
+    serverDetailAction: actions.serverDetailAction,
+    planDnsAction: actions.planDnsAction,
+    listPlacementsAction: actions.listPlacementsAction
 }));
 vi.mock("@/app/(app)/automations/actions", () => ({
     getRunAction: actions.getRunAction,
@@ -576,7 +580,9 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/firewall/address-activity": () => import("@/app/api/firewall/address-activity/route"),
     "/api/firewall/rule": () => import("@/app/api/firewall/rule/route"),
     "/api/apps/installed/redeploy-strategy": () =>
-        import("@/app/api/apps/installed/redeploy-strategy/route")
+        import("@/app/api/apps/installed/redeploy-strategy/route"),
+    "/api/mail-server/dns-plan": () => import("@/app/api/mail-server/dns-plan/route"),
+    "/api/mail-server/placements": () => import("@/app/api/mail-server/placements/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2231,6 +2237,30 @@ const CASES: Case[] = [
             ).redeployStrategy("installId-1"),
         action: "redeployStrategyAction",
         args: ["installId-1"]
+    },
+    {
+        name: "the DNS records a mail domain needs",
+        path: "/api/mail-server/dns-plan",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/mail-server/mail-server-polls")>(
+                    "@/app/(app)/apps/mail-server/mail-server-polls"
+                )
+            ).dnsPlan({ kind: "sample" }),
+        action: "planDnsAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "the machines a mail server can run on",
+        path: "/api/mail-server/placements",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/mail-server/mail-server-polls")>(
+                    "@/app/(app)/apps/mail-server/mail-server-polls"
+                )
+            ).placements(),
+        action: "listPlacementsAction",
+        args: []
     }
 ];
 

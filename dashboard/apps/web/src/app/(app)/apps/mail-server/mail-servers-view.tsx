@@ -20,7 +20,6 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { mailSchemaText } from "@/lib/mail-server/words";
 import { mailServerRefusalText } from "@/lib/mail-server/refusal-text";
 import {
-    listPlacementsAction,
     listServersAction,
     startSetupAction,
     uninstallMailServerAppAction,
@@ -39,6 +38,7 @@ import {
     Select,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./mail-server-polls";
 
 export function MailServersView({ canUninstall }: { canUninstall: boolean }) {
     const t = useTranslations("mailServer");
@@ -216,7 +216,7 @@ function SetupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
 
     useEffect(() => {
         if (!open) return;
-        listPlacementsAction()
+        polls.placements()
             .then(setPlacements)
             .catch(() => setPlacements([{ id: "local", name: t("common.thisMachine") }]));
     }, [open, t]);
