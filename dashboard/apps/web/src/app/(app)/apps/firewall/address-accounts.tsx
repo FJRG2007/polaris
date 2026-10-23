@@ -20,7 +20,7 @@
 import Link from "next/link";
 import { Badge } from "@polaris/ui";
 import { Users } from "lucide-react";
-import { grouped } from "./page-parts";
+import { grouped } from "./grouped";
 import { Avatar } from "@/components/avatar";
 import { signInText } from "@/lib/sign-in-words";
 import { RelativeTime } from "@/components/relative-time";

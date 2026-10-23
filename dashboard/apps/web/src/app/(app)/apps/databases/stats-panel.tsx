@@ -38,7 +38,7 @@ import { formatBytes } from "@polaris/core";
 import { Loader2, RefreshCw } from "lucide-react";
 import { dataText, statText } from "@/lib/data/words";
 import type { DatabaseInsights } from "@/lib/data/insights";
-import { grouped } from "@/app/(app)/apps/firewall/page-parts";
+import { grouped } from "@/app/(app)/apps/firewall/grouped";
 import type { DatabaseStats, StatValue } from "@/lib/data/stats";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";

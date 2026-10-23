@@ -10,6 +10,7 @@
  */
 
 import type { ReactNode } from "react";
+import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
 import { AiKeysPanel } from "@/app/(app)/account/ai-keys/ai-keys-panel";
 import { listTrackers } from "@/lib/tasks/trackers/service";
@@ -33,7 +34,12 @@ export async function hubCoreSections(user: SessionUser): Promise<HubCoreSection
             id: TASK_TRACKERS_SECTION,
             title: t("connections.core.trackers.title"),
             intro: t("connections.core.trackers.intro"),
-            body: <TrackersView trackers={trackers} />
+            // Tasks' own words: the account layout does not hand them down.
+            body: (
+                <Messages namespaces={["tasks"]}>
+                    <TrackersView trackers={trackers} />
+                </Messages>
+            )
         });
     sections.push({
         id: AI_KEYS_SECTION,
