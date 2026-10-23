@@ -16,7 +16,8 @@ const BUCKET = (60 * 60 * 1000) / POINTS;
 /** A line around `base` with a little noise and, when asked, a climb at the end. */
 function spark(now: number, base: number, seed: number, climb = 0): SparkPoint[] {
     return Array.from({ length: POINTS }, (_, i) => {
-        const wave = Math.sin((i + seed) * 0.9) * 4 + Math.cos((i * seed) % 7) * 2;
+        // Noise in proportion to the load, so a quiet machine draws a calm line.
+        const wave = (Math.sin((i + seed) * 0.9) * 0.1 + Math.cos((i * seed) % 7) * 0.05) * base;
         const rise = climb && i > POINTS - 8 ? ((i - (POINTS - 8)) / 8) * climb : 0;
         return { t: now - (POINTS - 1 - i) * BUCKET, v: Math.max(1, Math.round(base + wave + rise)) };
     });

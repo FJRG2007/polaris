@@ -25,6 +25,7 @@ import { vault, vaultSends } from "./vault";
 import { deploy, deployLogs, deployProject } from "./deploy";
 import { taskPanel, tasks } from "./tasks";
 import { notes } from "./notes";
+import { polar } from "./polar";
 import { watch } from "./watch";
 import { automations } from "./automations";
 import type { SceneDefinition } from "../runtime/scene";
@@ -60,6 +61,7 @@ export const SCENES: readonly SceneDefinition[] = [
     vault,
     vaultSends,
     notes,
+    polar,
     automations,
     watch,
     placesOverview,
