@@ -57,13 +57,28 @@ export const SITE_VIEWPORT: Viewport = { themeColor: "#0b0c0e" };
  */
 export function pageMetadata(
     locale: SiteLocale,
-    { title, description, page = "" }: { title?: string; description?: string; page?: string }
+    {
+        title,
+        description,
+        page = "",
+        picture
+    }: {
+        title?: string;
+        description?: string;
+        page?: string;
+        /** The page's own preview picture under `media/`; the README's lead capture otherwise. */
+        picture?: { file: string; alt: string };
+    }
 ): Metadata {
     const t = words(locale).meta;
     const full = title ? `${title} - Polaris` : "Polaris";
     const summary = description ?? t.description;
     const lead = siteData().locales[locale].showcase[0]?.items[0];
-    const image = lead ? { url: asset(`media/${lead.dark}`), alt: t.ogAlt } : undefined;
+    const image = picture
+        ? { url: asset(`media/${picture.file}`), alt: picture.alt }
+        : lead
+          ? { url: asset(`media/${lead.dark}`), alt: t.ogAlt }
+          : undefined;
     const url = asset(href(locale, page));
     return {
         metadataBase: new URL(SITE_ORIGIN),

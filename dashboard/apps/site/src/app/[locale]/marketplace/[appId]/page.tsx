@@ -20,7 +20,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return pageMetadata(locale, {
         title: app.name,
         description: app.description,
-        page: `marketplace/${app.id}/`
+        page: `marketplace/${app.id}/`,
+        picture: app.shots[0] && { file: app.shots[0].dark, alt: app.shots[0].alt }
     });
 }
 
