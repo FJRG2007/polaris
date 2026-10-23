@@ -148,9 +148,9 @@ export const crm = defineScene({
             }),
             listRecordsAction: () => ({ ok: true, records, total: records.length }),
             listGroupsAction: () => ({ ok: true, groups: [] }),
-            totalsAction: (input: { asked?: { key: string; aggregate: string }[] }) => ({
+            totalsAction: (input?: { asked?: { key: string; aggregate: string }[] }) => ({
                 ok: true,
-                totals: (input.asked ?? []).map((asked) =>
+                totals: (input?.asked ?? []).map((asked) =>
                     asked.key === "annualRevenue"
                         ? { ...asked, value: null, money: [{ amount: revenue, currency: "EUR" }] }
                         : { ...asked, value: records.length }

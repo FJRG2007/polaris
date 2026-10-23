@@ -52,3 +52,44 @@ todo lo hecho en ella, incluidos archivos como las grabaciones de cámaras - y
 no deja nada atrás. Si desmarcas esa opción en el diálogo, los datos se
 conservan para una reinstalación; se quedan en el servidor y aparecen en
 Almacenamiento, donde puedes liberarlos más tarde.
+
+## Algunas de las apps que añade
+
+Cada una como se ve una vez instalada: Herramientas, Páginas de estado,
+Servidor de correo, Servidores en la nube, Análisis de seguridad, CRM y Filtro
+de red.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/tools-light-es-desktop.webp">
+  <img src="../assets/media/tools-dark-es-desktop.webp" alt="Herramientas">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/status-pages-light-es-desktop.webp">
+  <img src="../assets/media/status-pages-dark-es-desktop.webp" alt="Páginas de estado">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/mail-server-light-es-desktop.webp">
+  <img src="../assets/media/mail-server-dark-es-desktop.webp" alt="Servidor de correo">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/cloud-servers-light-es-desktop.webp">
+  <img src="../assets/media/cloud-servers-dark-es-desktop.webp" alt="Servidores en la nube">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/security-scans-light-es-desktop.webp">
+  <img src="../assets/media/security-scans-dark-es-desktop.webp" alt="Análisis de seguridad">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/crm-light-es-desktop.webp">
+  <img src="../assets/media/crm-dark-es-desktop.webp" alt="CRM">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/network-filter-light-es-desktop.webp">
+  <img src="../assets/media/network-filter-dark-es-desktop.webp" alt="Filtro de red">
+</picture>

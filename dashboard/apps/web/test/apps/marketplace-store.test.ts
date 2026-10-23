@@ -97,7 +97,9 @@ describe("shelves and the featured row", () => {
         const featured = featuredApps(offered());
         expect(featured.length).toBeGreaterThan(0);
         for (const item of featured) expect(hasScreenshots(item.id), item.id).toBe(true);
-        expect(ids(featured)).not.toContain("crm");
+        const uncaptured = offered().filter((item) => !hasScreenshots(item.id));
+        expect(uncaptured.length).toBeGreaterThan(0);
+        for (const item of uncaptured) expect(ids(featured)).not.toContain(item.id);
     });
 });
 
@@ -112,7 +114,7 @@ describe("the preview a card shows", () => {
     });
 
     it("is null for an app nobody has captured, so the card draws its placeholder", () => {
-        expect(appPreview("crm", "en-US")).toBeNull();
+        expect(appPreview("messaging-bridge", "en-US")).toBeNull();
         expect(appPreview("not-an-app", "en-US")).toBeNull();
     });
 });
