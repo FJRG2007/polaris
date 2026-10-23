@@ -18,6 +18,17 @@ import { bumpRevision } from "@/lib/vault/account";
 import { deleteVaultBlob } from "@/lib/vault/blobs";
 import { generateToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
+import { linkAddressDenial, readAddressRules, storedAddressRules } from "@/lib/link-guards";
+
+/** The address rules a Send can carry. Polaris's own, outside the Send
+ *  protocol: set from the Sends screen, never from a client's request body. */
+export interface SendAddressRules {
+    readonly allowedCidrs: string[];
+    readonly allowedCountries: string[];
+    readonly allowedContinents: string[];
+}
+
+const RULE_SELECT = { allowedCidrs: true, allowedCountries: true, allowedContinents: true } as const;
 
 /** What lives inside a Send's encrypted document. */
 interface SendDocument {
@@ -145,7 +156,8 @@ export async function getSend(
  */
 export async function createSend(
     userId: string,
-    input: SendInput
+    input: SendInput,
+    rules?: SendAddressRules
 ): Promise<Record<string, unknown>> {
     const row = await prisma.vaultSend.create({
         data: {
@@ -159,7 +171,8 @@ export async function createSend(
             deletionDate: input.deletionDate,
             disabled: input.disabled,
             hideEmail: input.hideEmail,
-            accessId: generateToken()
+            accessId: generateToken(),
+            ...(rules ? storedAddressRules(rules) : {})
         },
         select: SEND_SELECT
     });
@@ -167,7 +180,9 @@ export async function createSend(
     return toSendResponse(row);
 }
 
-/** Rewrite a Send. Owner-scoped; a password of null leaves the old one alone. */
+/** Rewrite a Send. Owner-scoped; a password of null leaves the old one alone.
+ *  Only protocol fields are written, so the address rules a client cannot see
+ *  survive every client's update. */
 export async function updateSend(
     userId: string,
     sendId: string,
@@ -212,6 +227,26 @@ export async function removeSendPassword(
     return row ? toSendResponse(row) : null;
 }
 
+/** The address rules of every Send this account has, by Send id. */
+export async function listSendRules(userId: string): Promise<Record<string, SendAddressRules>> {
+    const rows = await prisma.vaultSend.findMany({
+        where: { userId },
+        select: { id: true, ...RULE_SELECT }
+    });
+    return Object.fromEntries(rows.map((row) => [row.id, readAddressRules(row)]));
+}
+
+/** Replace one Send's address rules. Owner-scoped; false when it is not theirs. */
+export async function setSendRules(userId: string, sendId: string, rules: SendAddressRules): Promise<boolean> {
+    const { count } = await prisma.vaultSend.updateMany({
+        where: { id: sendId, userId },
+        data: { ...storedAddressRules(rules), revisionDate: new Date() }
+    });
+    if (count === 0) return false;
+    await bumpRevision(userId);
+    return true;
+}
+
 /** Delete a Send and whatever file it was holding. */
 export async function deleteSend(userId: string, sendId: string): Promise<boolean> {
     const row = await prisma.vaultSend.findFirst({
@@ -242,7 +277,7 @@ export async function attachSendFile(
 /** Why a Send cannot be served, or the Send. */
 export type SendAccess =
     | { ok: true; send: SendRow & { storedPath: string | null }; document: SendDocument }
-    | { ok: false; reason: "not_found" | "expired" | "exhausted" | "disabled" | "password" };
+    | { ok: false; reason: "not_found" | "expired" | "exhausted" | "disabled" | "address" | "password" };
 
 /**
  * Open a Send from its public link.
@@ -252,18 +287,24 @@ export type SendAccess =
  * past its deletion date answers as if it were never there: it is about to be
  * swept, and telling a stranger that it existed says more than it should.
  */
-export async function accessSend(accessId: string, password?: string): Promise<SendAccess> {
-    const send = await prisma.vaultSend.findUnique({
+export async function accessSend(accessId: string, password?: string, ip?: string): Promise<SendAccess> {
+    const found = await prisma.vaultSend.findUnique({
         where: { accessId },
-        select: { ...SEND_SELECT, storedPath: true }
+        select: { ...SEND_SELECT, ...RULE_SELECT, storedPath: true }
     });
-    if (!send) return { ok: false, reason: "not_found" };
+    if (!found) return { ok: false, reason: "not_found" };
+    const { allowedCidrs, allowedCountries, allowedContinents, ...send } = found;
 
     const now = Date.now();
     if (send.deletionDate.getTime() <= now) return { ok: false, reason: "not_found" };
     if (send.disabled) return { ok: false, reason: "disabled" };
     if (send.expirationDate && send.expirationDate.getTime() <= now) {
         return { ok: false, reason: "expired" };
+    }
+    // Before the password, so a refused address cannot even guess at it, and
+    // before the count, so a refused open spends nothing.
+    if (await linkAddressDenial({ allowedCidrs, allowedCountries, allowedContinents }, ip)) {
+        return { ok: false, reason: "address" };
     }
     if (send.passwordHash) {
         if (!password) return { ok: false, reason: "password" };

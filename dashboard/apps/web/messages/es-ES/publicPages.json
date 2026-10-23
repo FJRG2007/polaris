@@ -242,6 +242,7 @@
         "incomplete": "Este enlace está incompleto. La parte que va tras el # es la clave que necesita.",
         "unavailable": "Este enlace no está disponible. Puede que haya caducado o se haya agotado.",
         "mismatch": "No se ha podido abrir este enlace. Su clave no coincide.",
+        "blocked": "Este enlace no está disponible desde tu red o tu ubicación.",
         "opening": "Abriéndolo...",
         "passwordTitle": "Contraseña necesaria",
         "passwordHint": "Quien lo envió le puso una contraseña.",

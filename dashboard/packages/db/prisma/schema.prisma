@@ -3372,6 +3372,12 @@ model VaultSend {
     deletionDate   DateTime
     disabled       Boolean   @default(false)
     hideEmail      Boolean   @default(false)
+    /// Polaris-only address rules (lib/link-guards), set from the Sends screen.
+    /// No Send protocol field carries them, so a client's PUT never touches
+    /// them. An empty list means no restriction.
+    allowedCidrs      String @default("[]")
+    allowedCountries  String @default("[]")
+    allowedContinents String @default("[]")
     // The id in the public link, separate from the primary key so the URL does
     // not hand out a database identifier.
     accessId       String    @unique

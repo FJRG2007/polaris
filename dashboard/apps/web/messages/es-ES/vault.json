@@ -424,6 +424,7 @@
         "sendNotEncrypted": "Ese envío no está cifrado.",
         "notAUse": "Un elemento no se puede usar para eso.",
         "sendNotYours": "Ese envío no es tuyo.",
+        "sendRules": "Revisa las direcciones y los países.",
         "tooManyVaults": "Puedes tener {count} bóvedas propias. Elimina una primero.",
         "schema": {
             "encrypted": "Tiene que ser un valor cifrado",
@@ -604,13 +605,17 @@
         "lasts": "Dura",
         "lastsLabel": "Cuánto dura",
         "maxViews": "Vistas máx.",
-        "unlimited": "Sin límite",
-        "optional": "Opcional",
         "create": "Crear un envío",
         "loading": "Cargando...",
         "empty": "Todavía no hay nada enviado.",
         "untitled": "Sin título",
-        "off": "Parado"
+        "off": "Parado",
+        "expiresAfterDeletion": "No puede caducar después de borrarse. Elige más duración o un día antes.",
+        "whereItOpens": "Dónde se abre",
+        "whereItOpensNamed": "Dónde se abre \"{name}\"",
+        "whereItOpensHint": "Se comprueba al abrirlo, desde Polaris y desde cualquier app Bitwarden.",
+        "saveRules": "Guardar",
+        "cancel": "Cancelar"
     },
     "port": {
         "exportBody": "El archivo contendrá todas las contraseñas en texto plano. Guárdalo donde guardarías las propias contraseñas y elimínalo cuando termines.",

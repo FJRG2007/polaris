@@ -242,6 +242,7 @@
         "incomplete": "This link is incomplete. The part after the # is the key it needs.",
         "unavailable": "This link is not available. It may have expired or been used up.",
         "mismatch": "This link could not be opened. Its key does not match.",
+        "blocked": "This link is not available from your network or location.",
         "opening": "Opening it...",
         "passwordTitle": "Password required",
         "passwordHint": "Whoever sent this put a password on it.",

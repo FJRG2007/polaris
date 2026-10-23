@@ -424,6 +424,7 @@
         "sendNotEncrypted": "That send is not encrypted.",
         "notAUse": "That is not something an item can be used for.",
         "sendNotYours": "That send is not yours.",
+        "sendRules": "Check the addresses and countries.",
         "tooManyVaults": "You can keep {count} vaults of your own. Delete one first.",
         "schema": {
             "encrypted": "Must be an encrypted value",
@@ -604,13 +605,17 @@
         "lasts": "Lasts",
         "lastsLabel": "How long it lasts",
         "maxViews": "Max views",
-        "unlimited": "Unlimited",
-        "optional": "Optional",
         "create": "Create a send",
         "loading": "Loading...",
         "empty": "Nothing out there yet.",
         "untitled": "Untitled",
-        "off": "Off"
+        "off": "Off",
+        "expiresAfterDeletion": "It cannot expire after it is deleted. Pick a longer life or an earlier day.",
+        "whereItOpens": "Where it opens",
+        "whereItOpensNamed": "Where \"{name}\" opens",
+        "whereItOpensHint": "Checked on every open, from Polaris and from any Bitwarden app.",
+        "saveRules": "Save",
+        "cancel": "Cancel"
     },
     "port": {
         "exportBody": "The file will hold every password in plain text. Put it somewhere you would put the passwords themselves, and delete it when you are done.",
