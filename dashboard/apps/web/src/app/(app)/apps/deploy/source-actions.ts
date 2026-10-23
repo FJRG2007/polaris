@@ -192,11 +192,12 @@ export async function changeSourceAction(
 
 /**
  * Whether "Wait for CI" can work for this service as GitHub is set up now: what
- * is missing, and the page on GitHub where it is turned on.
+ * is missing, and the page on GitHub where it is turned on. Only an administrator
+ * is told what to change on GitHub; anybody else learns that it is theirs to fix.
  */
 export async function ciAccessAction(applicationId: unknown): Promise<{
     error?: string;
-    access?: { gap: "app" | "install" | "events" | null; url: string | null };
+    access?: { gap: "app" | "install" | "events" | "admins" | null; url: string | null };
 }> {
     const user = await requirePermission("deploy.read");
     const id = z.string().uuid().safeParse(applicationId);
@@ -211,7 +212,9 @@ export async function ciAccessAction(applicationId: unknown): Promise<{
         const source = JSON.parse(app.sourceConfig || "{}") as Record<string, unknown>;
         const repo = typeof source.repoUrl === "string" ? parseGithubRepo(source.repoUrl) : null;
         if (!repo) return { access: { gap: null, url: null } };
-        return { access: (await githubChecksAccess(repo.owner)) ?? { gap: null, url: null } };
+        const found = (await githubChecksAccess(repo.owner)) ?? { gap: null, url: null };
+        if (user.isAdmin) return { access: found };
+        return { access: { gap: found.gap === "app" || found.gap === "install" ? "admins" : null, url: null } };
     } catch (caught) {
         return failure(caught, "source.loadFailed");
     }

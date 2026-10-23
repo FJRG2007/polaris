@@ -33,6 +33,7 @@ const state = vi.hoisted(() => ({
     },
     lines: [] as { action: string; fromValue?: string | null; toValue?: string | null }[],
     checks: { status: 200, runs: [] as unknown[] },
+    commitStatuses: { status: 200, statuses: [] as unknown[] },
     deploys: [] as string[]
 }));
 
@@ -96,14 +97,21 @@ vi.mock("@/lib/deploy/pushed-commit", () => ({
 vi.mock("@/lib/github-access", () => ({ githubTokenForOwner: vi.fn(async () => "token") }));
 vi.mock("@/lib/github-service", () => ({ githubAppHandle: vi.fn(async () => "polaris-here") }));
 
-globalThis.fetch = vi.fn(async () =>
-    state.checks.status === 200
+globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+    if (String(url).includes("/status?")) {
+        return state.commitStatuses.status === 200
+            ? new Response(JSON.stringify({ state: "pending", statuses: state.commitStatuses.statuses }), {
+                  status: 200
+              })
+            : new Response("{}", { status: state.commitStatuses.status });
+    }
+    return state.checks.status === 200
         ? new Response(
               JSON.stringify({ total_count: state.checks.runs.length, check_runs: state.checks.runs }),
               { status: 200 }
           )
-        : new Response("{}", { status: state.checks.status })
-) as typeof fetch;
+        : new Response("{}", { status: state.checks.status });
+}) as typeof fetch;
 
 const ciWait = await import("@/lib/deploy/ci-wait");
 
@@ -114,6 +122,11 @@ const run = (name: string, status: string, conclusion: string | null, slug = "gi
     status,
     conclusion,
     app: { slug }
+});
+const status = (context: string, value: string, login = "jenkins") => ({
+    context,
+    state: value,
+    creator: { login }
 });
 const push = (sha: string) => ({
     commitSha: sha,
@@ -138,6 +151,7 @@ beforeEach(() => {
     state.app.waitForCi = true;
     state.app.autoDeploy = true;
     state.checks = { status: 200, runs: [] };
+    state.commitStatuses = { status: 200, statuses: [] };
 });
 
 describe("judging the checks on a commit", () => {
@@ -164,6 +178,18 @@ describe("judging the checks on a commit", () => {
     it("takes a commit with no checks as green only after the grace minute", () => {
         expect(judge(200, [], 5_000).state).toBe("pending");
         expect(judge(200, [], ciWait.NO_CHECKS_GRACE_MS).state).toBe("green");
+    });
+    it("reads commit statuses as checks too", () => {
+        const judgeStatuses = (statuses: ReturnType<typeof status>[], runs: ReturnType<typeof run>[] = []) =>
+            ciWait.judgeChecks({ status: 200, runs, statuses, ownSlug: "polaris-here", ageMs: 120_000 });
+        expect(judgeStatuses([status("ci/jenkins", "pending")]).state).toBe("pending");
+        expect(judgeStatuses([status("ci/jenkins", "failure")])).toEqual({ state: "failed", check: "ci/jenkins" });
+        expect(judgeStatuses([status("ci/jenkins", "error")]).state).toBe("failed");
+        expect(judgeStatuses([status("ci/jenkins", "pending")], [run("test", "completed", "success")]).state).toBe(
+            "pending"
+        );
+        expect(judgeStatuses([status("ci/jenkins", "success")]).state).toBe("green");
+        expect(judgeStatuses([status("deploy", "pending", "polaris-here[bot]")]).state).toBe("green");
     });
     it("tells a refusal from a blink", () => {
         expect(judge(403, []).state).toBe("unreadable");
@@ -257,6 +283,38 @@ describe("a push held for CI", () => {
         // Seen again by the poller, the same commit is not waited on again.
         await ciWait.deployOrHold(state.app, "owner-1", push(SHA_A));
         expect(state.waits[0]?.status).toBe("expired");
+    });
+
+    it("waits for CI that reports through commit statuses, and deploys once it passes", async () => {
+        await ciWait.deployOrHold(state.app, "owner-1", push(SHA_A));
+        age(ciWait.NO_CHECKS_GRACE_MS + 5_000);
+        state.commitStatuses.statuses = [status("ci/jenkins", "pending")];
+        await ciWait.pollCiWaits();
+        expect(state.deploys).toEqual([]);
+        state.commitStatuses.statuses = [status("ci/jenkins", "failure")];
+        await ciWait.onChecksFinished("owner/repo", SHA_A);
+        expect(state.deploys).toEqual([]);
+        expect(state.lines.find((line) => line.action === "ci-failed")).toMatchObject({ toValue: "ci/jenkins" });
+        state.commitStatuses.statuses = [status("ci/jenkins", "success")];
+        await ciWait.onChecksFinished("owner/repo", SHA_A);
+        expect(state.deploys).toEqual([SHA_A]);
+    });
+
+    it("takes statuses GitHub will not show as none", async () => {
+        await ciWait.deployOrHold(state.app, "owner-1", push(SHA_A));
+        state.checks.runs = [run("test", "completed", "success")];
+        state.commitStatuses.status = 403;
+        await ciWait.onChecksFinished("owner/repo", SHA_A);
+        expect(state.deploys).toEqual([SHA_A]);
+    });
+
+    it("keeps waiting when the statuses could not be read for a moment", async () => {
+        await ciWait.deployOrHold(state.app, "owner-1", push(SHA_A));
+        state.checks.runs = [run("test", "completed", "success")];
+        state.commitStatuses.status = 502;
+        await ciWait.onChecksFinished("owner/repo", SHA_A);
+        expect(state.deploys).toEqual([]);
+        expect(state.waits[0]?.status).toBe("waiting");
     });
 
     it("says when GitHub will not show the checks", async () => {

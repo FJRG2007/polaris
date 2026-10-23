@@ -6,8 +6,10 @@
  * autodeploys - Wait for CI"): the push is held while checks run, skipped while
  * one has failed, and deployed when they are all green. What is read is the
  * commit's check runs, latest run per name, so a re-run that turns green
- * replaces the failure it re-ran. Polaris's own rows on the commit (the deploy
- * line it writes there) are left out, or it would wait for itself.
+ * replaces the failure it re-ran, and its commit statuses, latest per context,
+ * which is how CI outside GitHub Actions (Jenkins, Buildkite, CircleCI) reports.
+ * Polaris's own rows on the commit (the deploy line it writes there) are left
+ * out, or it would wait for itself.
  *
  * The push waiting is a row (`DeployCiWait`, one per service), so a restart does
  * not lose it. It is settled by GitHub's check_suite / workflow_run / check_run
@@ -61,6 +63,19 @@ const checkRunsResponse = z.object({
 
 export type CheckRun = z.infer<typeof checkRunsResponse>["check_runs"][number];
 
+/** The part of GitHub's combined-status answer this reads. */
+const combinedStatusResponse = z.object({
+    statuses: z.array(
+        z.object({
+            context: z.string().max(500),
+            state: z.string(),
+            creator: z.object({ login: z.string().nullable().optional() }).nullable().optional()
+        })
+    )
+});
+
+export type CommitStatus = z.infer<typeof combinedStatusResponse>["statuses"][number];
+
 /** A conclusion that passes. GitHub's own branch protection counts these. */
 const PASSING = new Set(["success", "neutral", "skipped"]);
 
@@ -79,6 +94,8 @@ export type CiVerdict =
 export function judgeChecks(input: {
     status: number;
     runs: readonly CheckRun[];
+    /** The commit statuses, latest per context. */
+    statuses?: readonly CommitStatus[];
     /** The App Polaris signs in as, whose own rows are not CI. */
     ownSlug: string | null;
     /** How long ago the push arrived. */
@@ -90,33 +107,63 @@ export function judgeChecks(input: {
     if (input.status !== 200) return { state: "pending" };
     const own = input.ownSlug?.toLowerCase() ?? null;
     const runs = input.runs.filter((run) => !own || run.app?.slug?.toLowerCase() !== own);
+    const statuses = (input.statuses ?? []).filter(
+        (status) => !own || status.creator?.login?.toLowerCase() !== `${own}[bot]`
+    );
     const failed = runs.find(
         (run) => run.status === "completed" && !PASSING.has(run.conclusion ?? "")
     );
     if (failed) return { state: "failed", check: failed.name };
+    const failedStatus = statuses.find((status) => status.state === "failure" || status.state === "error");
+    if (failedStatus) return { state: "failed", check: failedStatus.context };
     if (runs.some((run) => run.status !== "completed")) return { state: "pending" };
-    if (runs.length === 0) {
+    if (statuses.some((status) => status.state !== "success")) return { state: "pending" };
+    if (runs.length === 0 && statuses.length === 0) {
         return input.ageMs >= NO_CHECKS_GRACE_MS ? { state: "green" } : { state: "pending" };
     }
     return { state: "green" };
 }
 
-/** Every check run on a commit, latest per name, or the status that refused it. */
+/**
+ * Every check run on a commit, latest per name, and its commit statuses, or the
+ * status that refused the check runs. Statuses GitHub will not show are taken as
+ * none, the way a repository without that kind of CI reads.
+ */
 export async function readCommitChecks(
     owner: string,
     repo: string,
     sha: string,
     token: string | null
-): Promise<{ status: number; runs: CheckRun[] }> {
+): Promise<{ status: number; runs: CheckRun[]; statuses: CommitStatus[] }> {
     const headers: Record<string, string> = {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "polaris"
     };
     if (token) headers.Authorization = `Bearer ${token}`;
+    const checks = await readCheckRuns(owner, repo, sha, headers);
+    if (checks.status !== 200) return { ...checks, statuses: [] };
+    const statuses = await readCommitStatuses(owner, repo, sha, headers);
+    if (statuses.status === 401 || statuses.status === 403 || statuses.status === 404) {
+        return { ...checks, statuses: [] };
+    }
+    if (statuses.status !== 200) return { status: statuses.status, runs: [], statuses: [] };
+    return { ...checks, statuses: statuses.statuses };
+}
+
+function commitUrl(owner: string, repo: string, sha: string): string {
+    return `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(sha)}`;
+}
+
+async function readCheckRuns(
+    owner: string,
+    repo: string,
+    sha: string,
+    headers: Record<string, string>
+): Promise<{ status: number; runs: CheckRun[] }> {
     const runs: CheckRun[] = [];
     for (let page = 1; page <= MAX_PAGES; page += 1) {
-        const url = `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(sha)}/check-runs?filter=latest&per_page=100&page=${page}`;
+        const url = `${commitUrl(owner, repo, sha)}/check-runs?filter=latest&per_page=100&page=${page}`;
         let res: Response;
         try {
             res = await fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(10_000) });
@@ -130,6 +177,28 @@ export async function readCommitChecks(
         if (runs.length >= parsed.data.total_count || parsed.data.check_runs.length < 100) break;
     }
     return { status: 200, runs };
+}
+
+async function readCommitStatuses(
+    owner: string,
+    repo: string,
+    sha: string,
+    headers: Record<string, string>
+): Promise<{ status: number; statuses: CommitStatus[] }> {
+    let res: Response;
+    try {
+        res = await fetch(`${commitUrl(owner, repo, sha)}/status?per_page=100`, {
+            headers,
+            cache: "no-store",
+            signal: AbortSignal.timeout(10_000)
+        });
+    } catch {
+        return { status: 0, statuses: [] };
+    }
+    if (res.status !== 200) return { status: res.status, statuses: [] };
+    const parsed = combinedStatusResponse.safeParse(await res.json().catch(() => null));
+    if (!parsed.success) return { status: 0, statuses: [] };
+    return { status: 200, statuses: parsed.data.statuses };
 }
 
 /** The service and push a hold is for. */

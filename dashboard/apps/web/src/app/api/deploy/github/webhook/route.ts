@@ -68,14 +68,34 @@ interface WorkflowJobPayload {
     workflow_job?: { labels?: string[] };
 }
 
-/** Settle any push held for CI on the commit a finished check ran on. Not
- *  awaited by the caller: a deploy it starts can outlast GitHub's ten seconds. */
+/** How long a commit's check events are gathered before its checks are read. */
+const SETTLE_QUIET_MS = 3_000;
+/** The longest a steady stream of them may put that read off. */
+const SETTLE_MAX_DELAY_MS = 15_000;
+const settling = new Map<string, { timer: ReturnType<typeof setTimeout>; since: number }>();
+
+/**
+ * Settle any push held for CI on the commit a finished check ran on. Every job of
+ * a run reports on its own, so the events for one commit are gathered and its
+ * checks read once they go quiet, not once per job. Not awaited by the caller: a
+ * deploy it starts can outlast GitHub's ten seconds.
+ */
 function settleHeldPushes(event: string, payload: unknown): void {
     const finished = finishedCheckOf(event, payload);
     if (!finished) return;
-    void onChecksFinished(finished.repoFullName, finished.sha).catch((error: unknown) => {
-        console.error("polaris: a push held for CI could not be settled:", error);
-    });
+    const key = `${finished.repoFullName.toLowerCase()}@${finished.sha.toLowerCase()}`;
+    const prior = settling.get(key);
+    if (prior) clearTimeout(prior.timer);
+    const since = prior?.since ?? Date.now();
+    const delay = Math.max(0, Math.min(SETTLE_QUIET_MS, since + SETTLE_MAX_DELAY_MS - Date.now()));
+    const timer = setTimeout(() => {
+        settling.delete(key);
+        void onChecksFinished(finished.repoFullName, finished.sha).catch((error: unknown) => {
+            console.error("polaris: a push held for CI could not be settled:", error);
+        });
+    }, delay);
+    timer.unref?.();
+    settling.set(key, { timer, since });
 }
 
 /** The fields of a `pull_request` event a preview needs, validated rather than

@@ -26,7 +26,10 @@ let started = false;
 export async function pollAutoDeploys(): Promise<void> {
     const apps = await prisma.application.findMany({
         where: { autoDeploy: true, sourceType: { in: ["dockerfile", "nixpacks"] } },
-        include: { environment: { include: { project: true } } }
+        include: {
+            environment: { include: { project: true } },
+            ciWait: { select: { commitSha: true } }
+        }
     });
     const commitCache = new Map<string, Awaited<ReturnType<typeof getLatestCommit>>>();
 
@@ -55,6 +58,8 @@ export async function pollAutoDeploys(): Promise<void> {
             commitCache.set(key, latest);
         }
         if (!latest || latest.sha === app.lastDeployedSha) continue;
+        // Already held for CI: the wait settles it, not another look from here.
+        if (app.waitForCi && app.ciWait?.commitSha === latest.sha) continue;
 
         // First sighting: baseline to the current head without deploying, so only a
         // genuinely new commit triggers a deploy (never a redeploy just for enabling).

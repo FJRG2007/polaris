@@ -3,7 +3,7 @@
  * always did, and the pushes Deploy is holding for CI.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     handleAgentWebhook: vi.fn(async () => [{ id: "run-1" }]),
@@ -45,8 +45,14 @@ function delivery(event: string, body: unknown): Request {
 }
 
 beforeEach(() => {
+    vi.useFakeTimers();
     mocks.handleAgentWebhook.mockClear();
     mocks.onChecksFinished.mockClear();
+});
+
+afterEach(async () => {
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
 });
 
 describe("a finished check suite", () => {
@@ -57,6 +63,7 @@ describe("a finished check suite", () => {
         expect(mocks.handleAgentWebhook).toHaveBeenCalledWith(
             expect.objectContaining({ event: "check_suite", payload })
         );
+        await vi.runAllTimersAsync();
         expect(mocks.onChecksFinished).toHaveBeenCalledWith("acme/web", SHA);
     });
 
@@ -64,12 +71,14 @@ describe("a finished check suite", () => {
         const payload = { action: "completed", repository, workflow_run: { head_sha: SHA } };
         await POST(delivery("workflow_run", payload));
         expect(mocks.handleAgentWebhook).toHaveBeenCalledTimes(1);
+        await vi.runAllTimersAsync();
         expect(mocks.onChecksFinished).toHaveBeenCalledWith("acme/web", SHA);
     });
 
     it("settles nothing for one that has only been requested", async () => {
         await POST(delivery("check_suite", { action: "requested", repository, check_suite: { head_sha: SHA } }));
         expect(mocks.handleAgentWebhook).toHaveBeenCalledTimes(1);
+        await vi.runAllTimersAsync();
         expect(mocks.onChecksFinished).not.toHaveBeenCalled();
     });
 });
@@ -77,7 +86,30 @@ describe("a finished check suite", () => {
 describe("a finished check run", () => {
     it("settles held pushes, and the Agents app is not asked", async () => {
         await POST(delivery("check_run", { action: "completed", repository, check_run: { head_sha: SHA } }));
+        await vi.runAllTimersAsync();
         expect(mocks.onChecksFinished).toHaveBeenCalledWith("acme/web", SHA);
         expect(mocks.handleAgentWebhook).not.toHaveBeenCalled();
+    });
+
+    it("reads a commit's checks once for a burst of its jobs finishing", async () => {
+        const payload = { action: "completed", repository, check_run: { head_sha: SHA } };
+        for (let job = 0; job < 20; job += 1) {
+            await POST(delivery("check_run", payload));
+            await vi.advanceTimersByTimeAsync(500);
+        }
+        await POST(delivery("check_suite", { action: "completed", repository, check_suite: { head_sha: SHA } }));
+        expect(mocks.onChecksFinished).not.toHaveBeenCalled();
+        await vi.runAllTimersAsync();
+        expect(mocks.onChecksFinished).toHaveBeenCalledTimes(1);
+        expect(mocks.onChecksFinished).toHaveBeenCalledWith("acme/web", SHA);
+    });
+
+    it("is not put off past the longest delay by a steady stream", async () => {
+        const payload = { action: "completed", repository, check_run: { head_sha: SHA } };
+        for (let job = 0; job < 40; job += 1) {
+            await POST(delivery("check_run", payload));
+            await vi.advanceTimersByTimeAsync(1_000);
+        }
+        expect(mocks.onChecksFinished.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 });

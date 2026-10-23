@@ -1130,7 +1130,9 @@ function WaitForCiRow({
               ? t("settings.ciGapInstall")
               : gap === "events"
                 ? t("settings.ciGapEvents")
-                : null;
+                : gap === "admins"
+                  ? t("settings.ciGapAdmins")
+                  : null;
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5">
             <div className="flex min-w-0 items-start justify-between gap-3">
