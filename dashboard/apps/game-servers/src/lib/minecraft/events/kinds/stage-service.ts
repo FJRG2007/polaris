@@ -2432,9 +2432,7 @@ async function spleefTick(
 /** An acid rain's weather, from "Go!" to the end of the run. */
 function acidForecast(loop: StageLoop, acid: acidRain.Acid): acidRain.Spell[] {
     const { goAt } = state(loop);
-    return goAt === null
-        ? []
-        : acidRain.forecast(loop.run.endsAt - goAt, acid.huts.length);
+    return goAt === null ? [] : acidRain.forecast(loop.run.endsAt - goAt, acid.huts.length);
 }
 
 /**

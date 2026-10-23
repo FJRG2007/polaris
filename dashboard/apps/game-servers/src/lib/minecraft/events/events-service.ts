@@ -5235,7 +5235,8 @@ async function abandon(
         podium: [],
         disqualified: [],
         delivered: [],
-        search: null
+        search: null,
+        keptOut: run.keptOut ?? []
     };
     // An arena and whoever is in it are the minute sweep's to undo from here.
     const arenaLeftover = catalog.playsInArena(run.preset)
@@ -5996,7 +5997,8 @@ async function skip(
             podium: [],
             disqualified: [],
             delivered: [],
-            search: null
+            search: null,
+            keptOut: []
         })
     );
 }

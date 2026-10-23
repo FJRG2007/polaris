@@ -322,8 +322,8 @@ function drawn(options: EventOptions<"parkour">, seed: string, specials: boolean
             plainJump(current) &&
             index + 1 < total &&
             roleOf(index + 1) === "jump";
-        const climbing = mayBeSpecial && random() < CLIMB_CHANCE;
-        let gap = climbing ? 1 : pick(step.gaps);
+        const climbing: boolean = mayBeSpecial && random() < CLIMB_CHANCE;
+        let gap: number = climbing ? 1 : pick(step.gaps);
         // After a slime pad: as far as its bounce carries, at its height.
         if (after?.trap === "slime") gap = 1;
         const shift =
