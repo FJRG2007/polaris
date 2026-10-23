@@ -95,7 +95,11 @@ function presentConnections(userId: string, now: number): string[] {
     const relay = state();
     const seen = relay.seen.get(userId);
     if (!seen) return [];
-    for (const [id, at] of seen) if (now - at > PRESENT_MS) seen.delete(id);
+    for (const [id, at] of seen) {
+        if (now - at <= PRESENT_MS) continue;
+        seen.delete(id);
+        relay.sites.delete(id);
+    }
     if (seen.size === 0) {
         relay.seen.delete(userId);
         relay.pinned.delete(userId);
@@ -148,16 +152,16 @@ function chosenConnection(userId: string, now: number): string | null {
 
 function markSeen(userId: string, connectionId: string, now: number): void {
     const relay = state();
-    if (now - relay.sweptAt > PRESENT_MS) {
-        relay.sweptAt = now;
-        for (const user of [...relay.seen.keys()]) presentConnections(user, now);
-    }
     let seen = relay.seen.get(userId);
     if (!seen) {
         seen = new Map();
         relay.seen.set(userId, seen);
     }
     seen.set(connectionId, now);
+    if (now - relay.sweptAt > PRESENT_MS) {
+        relay.sweptAt = now;
+        for (const user of [...relay.seen.keys()]) presentConnections(user, now);
+    }
 }
 
 /** Hand the oldest queued command to a waiting poll of the chosen connection. */

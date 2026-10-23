@@ -21,12 +21,15 @@ interface Fake {
     windows: string[];
     sent: unknown[];
     tabs: Map<number, { url: string; title: string }>;
+    /** Tabs whose next change the page agent judges risky. */
+    risky: Set<number>;
 }
 
 function fake(store: Record<string, unknown> = {}): Fake {
     const tabs = new Map<number, { url: string; title: string }>();
     const windows: string[] = [];
     const sent: unknown[] = [];
+    const risky = new Set<number>();
     let next = 10;
     const api: BrowserApi = {
         runtime: {
@@ -57,6 +60,7 @@ function fake(store: Record<string, unknown> = {}): Fake {
                 sent.push(message);
                 const op = (message as { polarAgent: { op: string } }).polarAgent.op;
                 if (op === "read") return { ok: true, text: "# Title", truncated: false };
+                if (op === "risk") return { ok: true, risky: risky.has(_id), name: "Delete repo" };
                 if (op === "click" || op === "scroll" || op === "key") return { ok: true };
                 return { ok: true, elements: [] };
             }
@@ -69,7 +73,7 @@ function fake(store: Record<string, unknown> = {}): Fake {
             }
         }
     };
-    return { api, store, windows, sent, tabs };
+    return { api, store, windows, sent, tabs, risky };
 }
 
 function worker(env: Fake, fetcher?: typeof fetch): PolarBrowser {
@@ -209,6 +213,47 @@ describe("Polar using this browser", () => {
             refusal: "wrong-site"
         });
         expect(env.sent.some((message) => JSON.stringify(message).includes('"click"'))).toBe(false);
+    });
+
+    it("asks here before a change the chat did not ask about, when the page says it is risky", async () => {
+        const env = fake({ [SITES_KEY]: ["github.com"] });
+        const agent = worker(env);
+        const opened = await agent.run({ kind: "open", url: "https://github.com/a/b" });
+        const tab = opened.ok ? opened.tab : -1;
+        const clicks = () =>
+            env.sent.filter(
+                (message) => (message as { polarAgent: { op: string } }).polarAgent.op === "click"
+            ).length;
+        await expect(
+            agent.run({ kind: "click", tab, ref: "e1", site: "github.com" })
+        ).resolves.toMatchObject({ ok: true });
+        expect(env.windows).toHaveLength(0);
+        expect(clicks()).toBe(1);
+
+        env.risky.add(tab);
+        answering(agent, env, "deny");
+        await expect(
+            agent.run({ kind: "click", tab, ref: "e1", site: "github.com" })
+        ).resolves.toEqual({ ok: false, refusal: "action-denied" });
+        expect(new URL(env.windows[0]!).searchParams.get("action")).toBe("Delete repo");
+        expect(clicks()).toBe(1);
+
+        // The chat's card already asked for this one: no second question.
+        await expect(
+            agent.run({ kind: "click", tab, ref: "e1", site: "github.com", grant: "once" })
+        ).resolves.toMatchObject({ ok: true });
+        expect(env.windows).toHaveLength(1);
+        expect(clicks()).toBe(2);
+    });
+
+    it("forgets a site even right after Stop", async () => {
+        const env = fake({ [SITES_KEY]: ["github.com", "x.com"] });
+        const agent = worker(env);
+        await agent.stop();
+        await expect(agent.run({ kind: "forget", site: "x.com" })).resolves.toMatchObject({
+            ok: true
+        });
+        expect(env.store[SITES_KEY]).toEqual(["github.com"]);
     });
 
     it("stops when the person presses Stop", async () => {

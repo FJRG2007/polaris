@@ -120,6 +120,9 @@ export const BROWSER_REFUSALS = [
     "wrong-site",
     /** A password box: never read, never typed into. */
     "password-field",
+    /** The person did not allow an action that sends, buys, deletes or
+     *  touches a secret, or did not answer. */
+    "action-denied",
     /** The person pressed Stop on the bar Polar shows in the tab. */
     "stopped",
     /** The page cannot be scripted (a browser page, a store, a PDF viewer). */
@@ -187,7 +190,7 @@ export function browserCommandWrites(command: Pick<BrowserCommand, "kind">): boo
  *  deletes or touches a secret - English and Spanish, the languages Polaris
  *  speaks. */
 const RISKY =
-    /\b(submit|send|post|publish|tweet|reply|buy|purchase|order|pay|payment|checkout|check out|card|cvv|iban|transfer|donate|subscribe|delete|remove|erase|destroy|cancel|unsubscribe|confirm|accept|sign out|log out|password|passcode|pin|enviar|env[ií]a|publicar|responder|comprar|compra|pedido|pagar|pago|tarjeta|transferir|transferencia|donar|suscribw*|borrar|elimina|eliminar|quitar|cancelar|confirmar|aceptar|cerrar sesi[oó]n|contrase[nñ]a)\b/i;
+    /\b(submit|send|post|publish|tweet|reply|buy|purchase|order|pay|payment|checkout|check out|card|cvv|iban|transfer|donate|subscribe|delete|remove|erase|destroy|cancel|unsubscribe|confirm|accept|sign out|log out|password|passcode|pin|enviar|env[ií]a|publicar|responder|comprar|compra|pedido|pagar|pago|tarjeta|transferir|transferencia|donar|suscrib\w*|borrar|elimina|eliminar|quitar|cancelar|confirmar|aceptar|cerrar sesi[oó]n|contrase[nñ]a)\b/i;
 
 /**
  * Whether an action is one the person approves every time, whatever site they
@@ -198,9 +201,15 @@ export function browserHighRisk(command: BrowserCommand, element = ""): boolean 
     if (!browserCommandWrites(command)) return false;
     if (command.kind === "type" && command.submit) return true;
     if (command.kind === "key" && /enter/i.test(command.keys)) return true;
-    if (RISKY.test(element)) return true;
-    if (command.kind === "select") return RISKY.test(command.value);
+    if (command.kind !== "key" && !element.trim()) return true;
+    if (browserRiskyWords(element)) return true;
+    if (command.kind === "select") return browserRiskyWords(command.value);
     return false;
+}
+
+/** Whether a text has a word that sends, pays, deletes or touches a secret. Pure. */
+export function browserRiskyWords(text: string): boolean {
+    return RISKY.test(text);
 }
 
 /** The site of an address as the grant and the card name it: the host,

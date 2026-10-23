@@ -87,6 +87,8 @@ export default defineUnlistedScript({
                     return agent.hoverRef(refs, op.ref);
                 case "select":
                     return agent.selectRef(refs, op.ref, op.value);
+                case "risk":
+                    return { ok: true, ...agent.riskOf(document, refs, op.of) };
             }
         };
 

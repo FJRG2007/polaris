@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     browserPresent,
+    PRESENT_MS,
     noteSites,
     sitesHeader,
     grantedSites,
@@ -20,6 +21,7 @@ import {
     cardAnswerFor,
     sitesApprovedIn,
     browserNeedsCard,
+    siteOfTab,
     polarBrowserTools,
     EXTENSION_DOWNLOADS,
     elementLine,
@@ -263,6 +265,43 @@ describe("approval", () => {
         );
         expect(ask({ action: "key", site: "x.com", keys: "Enter" })).toBe(true);
         expect(ask({ action: "key", site: "x.com", keys: "PageDown" })).toBe(false);
+        expect(ask({ action: "click", site: "x.com", ref: "e1", element: "Suscribirse" })).toBe(
+            true
+        );
+        // An element the model did not name is asked about, whatever the site.
+        expect(ask({ action: "click", site: "x.com", ref: "e1" })).toBe(true);
+        expect(ask({ action: "type", site: "x.com", ref: "e1", text: "hi" })).toBe(true);
+    });
+
+    it("knows the site of a tab from its earlier answer, so a read does not ask again", () => {
+        const opened = [
+            ...approved("x.com"),
+            {
+                role: "tool",
+                content: [
+                    {
+                        type: "tool-result",
+                        toolCallId: "c1",
+                        toolName: "browser",
+                        output: {
+                            type: "json",
+                            value: {
+                                ok: true,
+                                tab: 5,
+                                url: "https://x.com/",
+                                title: "X",
+                                site: "x.com"
+                            }
+                        }
+                    }
+                ]
+            }
+        ];
+        expect(siteOfTab(5, opened)).toBe("x.com");
+        expect(siteOfTab(6, opened)).toBeNull();
+        expect(browserNeedsCard({ action: "read", tab: 5 }, opened, [])).toBe(false);
+        expect(browserNeedsCard({ action: "find", tab: 5 }, opened, ["x.com"])).toBe(false);
+        expect(browserNeedsCard({ action: "read", tab: 6 }, opened, [])).toBe(true);
     });
 
     it("asks before opening an address the model made up, not one the person gave", () => {
@@ -334,6 +373,15 @@ describe("approval", () => {
         expect(sitesHeader(null)).toEqual([]);
         noteSites("conn-1", ["x.com"]);
         expect(grantedSites("nobody")).toEqual([]);
+    });
+
+    it("drops what a browser reported once it stops polling", async () => {
+        noteSites("conn-gone", ["x.com"]);
+        await nextCommand("user-gone", "conn-gone", 0);
+        expect(grantedSites("user-gone")).toEqual(["x.com"]);
+        expect(grantedSites("user-gone", Date.now() + PRESENT_MS + 1)).toEqual([]);
+        await nextCommand("user-gone", "conn-gone", 0);
+        expect(grantedSites("user-gone")).toEqual([]);
     });
 });
 

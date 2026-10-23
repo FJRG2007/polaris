@@ -15,7 +15,9 @@
  *   skips the question for a site the browser reports allowed always or one
  *   approved earlier in the conversation (`browserApprovalFor`).
  * - An action that submits, sends, buys, deletes or touches a password or card
- *   asks every time (`browserHighRisk`, Claude in Chrome's high-risk rule).
+ *   asks every time (`browserHighRisk`, Claude in Chrome's high-risk rule). The
+ *   chat can only judge what the model called the element, so the extension
+ *   judges the real one again before any change the chat did not ask about.
  * - Every page action names the site it is for; the extension refuses it if
  *   the tab moved to another site by the time it runs.
  * - Opening an address the model composed itself asks too (`readPageApproval`):
@@ -74,7 +76,7 @@ const browserInput = z.object({
     site: browserSite
         .optional()
         .describe(
-            "The site the tab is on, like x.com, from the shared page or an earlier answer. Needed for every action that is not open, read, find, wait or close."
+            "The site the tab is on, like x.com, from the shared page or an earlier answer. Needed for every action that is not open, wait or close, and asked for again when read or find leave it out."
         ),
     ref: browserRef.optional().describe("An element's ref from find, like e12."),
     element: z
@@ -124,6 +126,8 @@ export function refusalSentence(refusal: BrowserRefusal, detail?: string): strin
             return "The tab is not on the site that action was for, so it was not done. Check the page with find, or ask the person which site it is.";
         case "password-field":
             return "That is a password box. Polar never reads or types passwords: ask the person to type it themselves.";
+        case "action-denied":
+            return "The person did not allow that action in their browser, so it was not done. Do not try it again unless they ask.";
         case "stopped":
             return "The person pressed Stop on Polar using their browser. Do not use the browser again in this conversation unless they ask.";
         case "unscriptable":
@@ -231,6 +235,7 @@ interface ContentPart {
     toolCallId?: string;
     toolName?: string;
     input?: unknown;
+    output?: unknown;
     approvalId?: string;
     approved?: boolean;
     reason?: string;
@@ -268,6 +273,25 @@ function siteOfInput(name: string, input: unknown): string | null {
     return typeof record.site === "string" ? record.site.trim().toLowerCase() || null : null;
 }
 
+/** The site a tab Polar used was on, from the latest answer in this
+ *  conversation that names that tab. Pure. */
+export function siteOfTab(tab: number, messages: readonly ModelMessageLike[]): string | null {
+    let site: string | null = null;
+    for (const part of partsOf(messages)) {
+        if (part.type !== "tool-result" || part.toolName !== BROWSER_TOOL) continue;
+        const output = part.output as { type?: unknown; value?: unknown } | null;
+        const value = (output && output.type === "json" ? output.value : output) as {
+            ok?: unknown;
+            tab?: unknown;
+            site?: unknown;
+        } | null;
+        if (value?.ok !== true || value.tab !== tab || typeof value.site !== "string") continue;
+        const parsed = browserSite.safeParse(value.site);
+        if (parsed.success && parsed.data) site = parsed.data;
+    }
+    return site;
+}
+
 /** The sites the person approved a browser call on earlier in this
  *  conversation. Pure. */
 export function sitesApprovedIn(messages: readonly ModelMessageLike[]): Set<string> {
@@ -299,7 +323,8 @@ export function sitesApprovedIn(messages: readonly ModelMessageLike[]): Set<stri
 /**
  * Whether one call of the browser tool waits for the person's card. Pure.
  *
- * - High-risk actions (submit, send, buy, delete, passwords, cards) always do.
+ * - High-risk actions (submit, send, buy, delete, passwords, cards) always do,
+ *   and so does a click, type or pick on an element the model did not name.
  * - Opening an address the model composed itself does.
  * - Anything on a site the browser does not report allowed always, and that
  *   was not approved earlier in this conversation, does - including a site
@@ -320,7 +345,10 @@ export function browserNeedsCard(
     if (kind === "wait" || kind === "close" || kind === "forget") return false;
     if (browserHighRisk(command.data, parsed.data.element ?? "")) return true;
     if (kind === "open" && readPageApproval(input, messages) === "user-approval") return true;
-    const site = siteOfInput(BROWSER_TOOL, parsed.data);
+    const tab = parsed.data.tab;
+    const site =
+        siteOfInput(BROWSER_TOOL, parsed.data) ??
+        (tab !== undefined ? siteOfTab(tab, messages) : null);
     if (!site) return true;
     return !granted.includes(site) && !sitesApprovedIn(messages).has(site);
 }

@@ -15,7 +15,8 @@ import {
     hoverRef,
     pressKeys,
     selectRef,
-    scrollPage
+    scrollPage,
+    riskOf
 } from "../src/lib/page-agent";
 
 function page(html: string): Document {
@@ -174,5 +175,34 @@ describe("scrolling, keys, pointing and picking", () => {
         doc.getElementById("m")!.addEventListener("mouseover", () => seen.push("over"));
         expect(hoverRef(refs, link.ref)).toEqual({ ok: true });
         expect(seen).toEqual(["over"]);
+    });
+});
+
+describe("judging an action from the real element", () => {
+    it("finds what sends, deletes or takes a card, whatever the model called it", () => {
+        const doc = page(`
+            <form><input aria-label="Title"><button id="go">Go</button></form>
+            <button id="red" aria-label="Red button">Delete</button>
+            <button id="like" type="button">Like</button>
+            <input id="cc" autocomplete="cc-number" aria-label="Number">
+            <select id="plan"><option>Free</option><option>Pay yearly</option></select>
+        `);
+        const refs = new RefTable();
+        const ref = (id: string) => refs.refOf(doc.getElementById(id)!);
+        expect(riskOf(doc, refs, { op: "click", ref: ref("go") })).toMatchObject({
+            risky: true,
+            name: "Go"
+        });
+        expect(riskOf(doc, refs, { op: "click", ref: ref("red") }).risky).toBe(true);
+        expect(riskOf(doc, refs, { op: "click", ref: ref("like") }).risky).toBe(false);
+        expect(riskOf(doc, refs, { op: "type", ref: ref("cc"), text: "4242" }).risky).toBe(true);
+        expect(riskOf(doc, refs, { op: "select", ref: ref("plan"), value: "Free" }).risky).toBe(
+            false
+        );
+        expect(
+            riskOf(doc, refs, { op: "select", ref: ref("plan"), value: "Pay yearly" }).risky
+        ).toBe(true);
+        expect(riskOf(doc, refs, { op: "key", keys: "Enter" }).risky).toBe(true);
+        expect(riskOf(doc, refs, { op: "key", keys: "PageDown" }).risky).toBe(false);
     });
 });

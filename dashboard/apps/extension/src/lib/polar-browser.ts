@@ -19,6 +19,9 @@
  *   has one, and every tab Polar acts in carries a bar with a Stop button.
  * - Every action names the site it was approved for; if the tab is not on
  *   that site when it runs, it is refused.
+ * - A click, a type, a key or a pick the chat did not ask about is judged
+ *   from the real element (`riskOf`), and one that sends, buys, deletes or
+ *   touches a secret is asked about here, once, before it runs.
  * - Stop ends it: what is waiting is refused, the once-grants are forgotten,
  *   and commands are refused for a minute so the turn that was running ends.
  *
@@ -35,7 +38,7 @@ import {
     type BrowserCommand,
     type BrowserResult
 } from "@polaris/core/browser-agent";
-import type { AgentOp, AgentReply } from "@/lib/polar-browser-ops";
+import type { AgentOp, AgentReply, WriteOp } from "@/lib/polar-browser-ops";
 
 export const POLAR_BROWSER_ALARM = "polar-browser";
 /** The switch this used to have. Read once, to carry an install over. */
@@ -106,6 +109,10 @@ export interface PolarBrowserDeps {
 }
 
 type Grant = "once" | "always" | "deny";
+
+function writes(op: AgentOp | null): op is WriteOp {
+    return op !== null && ["click", "type", "key", "select"].includes(op.op);
+}
 
 /** Actions on a page, and the op the script in the tab runs for each. */
 function opOf(command: BrowserCommand): AgentOp | null {
@@ -223,25 +230,7 @@ export class PolarBrowser {
     ): Promise<boolean> {
         if ((await this.sites()).includes(site)) return true;
         if (tab !== null && this.tabs.get(tab)?.has(site)) return true;
-        const windows = this.deps.api.windows;
-        if (!windows) return false;
-        const id = crypto.randomUUID();
-        const grant = await new Promise<Grant>((resolve) => {
-            const timer = setTimeout(() => {
-                this.asking.delete(id);
-                resolve("deny");
-            }, GRANT_WAIT_MS);
-            this.asking.set(id, (answer) => {
-                clearTimeout(timer);
-                resolve(answer);
-            });
-            const url = this.deps.api.runtime.getURL(
-                `/${GRANT_PAGE}?id=${encodeURIComponent(id)}&site=${encodeURIComponent(site)}${hint ? `&hint=${hint}` : ""}`
-            );
-            windows.create({ url, type: "popup", width: 440, height: 340 }).catch(() => {
-                this.answer(id, "deny");
-            });
-        });
+        const grant = await this.question({ site, ...(hint ? { hint } : {}) });
         if (grant === "deny") return false;
         if (grant === "always") {
             const list = await this.sites();
@@ -250,6 +239,41 @@ export class PolarBrowser {
             }
         }
         return true;
+    }
+
+    /** Asks the person in the grant window, and waits for the answer. */
+    private async question(params: Record<string, string>): Promise<Grant> {
+        const windows = this.deps.api.windows;
+        if (!windows) return "deny";
+        const id = crypto.randomUUID();
+        return new Promise<Grant>((resolve) => {
+            const timer = setTimeout(() => {
+                this.asking.delete(id);
+                resolve("deny");
+            }, GRANT_WAIT_MS);
+            this.asking.set(id, (answer) => {
+                clearTimeout(timer);
+                resolve(answer);
+            });
+            const query = new URLSearchParams({ id, ...params }).toString();
+            const url = this.deps.api.runtime.getURL(`/${GRANT_PAGE}?${query}`);
+            windows.create({ url, type: "popup", width: 440, height: 340 }).catch(() => {
+                this.answer(id, "deny");
+            });
+        });
+    }
+
+    /**
+     * Whether a change to the page may go ahead without the chat having asked
+     * for it: only once the real element shows it sends, buys, deletes or
+     * touches nothing secret, or the person allowed it here. Whatever the
+     * model called the element, the page decides.
+     */
+    private async confirmed(tab: number, site: string, op: WriteOp): Promise<boolean> {
+        const risk = await this.ask(tab, { op: "risk", of: op });
+        if (risk?.ok && risk.risky === false) return true;
+        const element = (risk?.ok ? risk.name : undefined) || op.op;
+        return (await this.question({ site, action: element.slice(0, 80) })) !== "deny";
     }
 
     private async inject(tab: number): Promise<boolean> {
@@ -308,12 +332,12 @@ export class PolarBrowser {
 
     /** Run one command. Never throws: every way it can end is an answer. */
     async run(command: BrowserCommand): Promise<BrowserResult> {
-        if (this.isStopped()) return { ok: false, refusal: "stopped" };
-        const { api } = this.deps;
         if (command.kind === "forget") {
             await this.forgetSites(command.site);
             return { ok: true, tab: 0, url: "", title: "" };
         }
+        if (this.isStopped()) return { ok: false, refusal: "stopped" };
+        const { api } = this.deps;
         if (command.kind === "wait") {
             await new Promise((resolve) => setTimeout(resolve, command.seconds * 1000));
             return { ok: true, tab: 0, url: "", title: "" };
@@ -377,14 +401,23 @@ export class PolarBrowser {
             await this.waitLoaded(tab);
             return this.page(tab, null);
         }
-        return this.page(tab, opOf(command));
+        return this.page(tab, opOf(command), command.grant === undefined ? site : null);
     }
 
     /** The agent in a tab, with its bar, asked one thing (or only where it is). */
-    private async page(tab: number, op: AgentOp | null): Promise<BrowserResult> {
+    private async page(
+        tab: number,
+        op: AgentOp | null,
+        unasked: string | null = null
+    ): Promise<BrowserResult> {
         if (!(await this.inject(tab))) return { ok: false, refusal: "unscriptable" };
         const [text, stop] = await Promise.all([this.deps.say("bar"), this.deps.say("stop")]);
         const banner = await this.ask(tab, { op: "banner", text, stop });
+        if (unasked !== null && writes(op)) {
+            if (!(await this.confirmed(tab, unasked, op)))
+                return { ok: false, refusal: "action-denied" };
+            if (this.isStopped()) return { ok: false, refusal: "stopped" };
+        }
         const reply = op ? await this.ask(tab, op) : banner;
         if (!reply) return { ok: false, refusal: "failed" };
         if (!reply.ok)

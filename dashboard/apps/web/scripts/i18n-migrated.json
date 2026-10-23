@@ -2158,6 +2158,7 @@
         "web/src/components/polar/elements/confirmation.tsx",
         "web/src/app/(app)/polar/settings/polar-tool-grants.tsx",
         "web/src/app/(app)/polar/settings/polar-connectors.tsx",
+        "web/src/app/(app)/polar/settings/polar-browser-sites.tsx",
         "web/src/app/(app)/polar/settings/page.tsx",
         "web/src/app/(app)/polar/settings/settings-back.tsx",
         "web/src/app/(app)/polar/settings/settings-sidebar.tsx",

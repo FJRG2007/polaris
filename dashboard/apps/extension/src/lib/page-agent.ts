@@ -21,8 +21,10 @@
 import {
     BROWSER_ELEMENTS_MOST,
     BROWSER_TEXT_MOST,
+    browserRiskyWords,
     type BrowserElement
 } from "@polaris/core/browser-agent";
+import type { WriteOp } from "@/lib/polar-browser-ops";
 
 const INTERACTIVE =
     'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="tab"], [role="menuitem"], [contenteditable=""], [contenteditable="true"]';
@@ -460,4 +462,87 @@ export function selectRef(refs: RefTable, ref: string, value: string): ActOutcom
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
     return { ok: true };
+}
+
+/** What an action would touch, judged from the page rather than from what the
+ *  model called it. */
+export interface Risk {
+    readonly risky: boolean;
+    /** The element as the person would recognise it. */
+    readonly name: string;
+}
+
+/** Whether a button or link sends its form: a submit button, or a button in a
+ *  form that does not say otherwise. */
+function submits(element: Element): boolean {
+    if (element.tagName === "INPUT") {
+        const type = ((element as HTMLInputElement).type || "").toLowerCase();
+        return type === "submit" || type === "image";
+    }
+    if (element.tagName !== "BUTTON") return false;
+    const type = (element.getAttribute("type") ?? "").toLowerCase();
+    return type === "submit" || (type === "" && element.closest("form") !== null);
+}
+
+/** Whether a box takes a card's details or a one-time code. */
+function secretBox(element: Element): boolean {
+    const auto = (element.getAttribute("autocomplete") ?? "").toLowerCase();
+    return auto.startsWith("cc-") || auto.includes(" cc-") || auto === "one-time-code";
+}
+
+/** Every word on an element a person could read it by. */
+function wordsOf(element: Element): string {
+    return [
+        nameOf(element),
+        element.textContent ?? "",
+        element.getAttribute("aria-label") ?? "",
+        element.getAttribute("title") ?? "",
+        element.getAttribute("name") ?? "",
+        element.getAttribute("id") ?? "",
+        (element as HTMLInputElement).value ?? ""
+    ]
+        .join(" ")
+        .slice(0, 2000);
+}
+
+/**
+ * Whether a click, a type, a key or a pick would send, buy, delete or touch a
+ * secret, from the real element: what it says, whether it submits a form, and
+ * whether it takes a card. A ref that is gone is not risky - the action itself
+ * refuses it.
+ */
+export function riskOf(doc: Document, refs: RefTable, action: WriteOp): Risk {
+    if (action.op === "key") {
+        const target = (doc.activeElement as HTMLElement | null) ?? doc.body;
+        const risky = /enter/i.test(action.keys) || secretBox(target) || isPasswordBox(target);
+        return { risky, name: clean(action.keys, 80) };
+    }
+    const element = refs.lookup(action.ref);
+    if (!element) return { risky: false, name: "" };
+    if (action.op === "click") {
+        const name = clean(nameOf(element) || roleOf(element), 80);
+        const button = element.closest("button, input, a, [role]") ?? element;
+        const risky =
+            submits(button) ||
+            browserRiskyWords(wordsOf(element)) ||
+            browserRiskyWords(wordsOf(button));
+        return { risky, name };
+    }
+    // A box or a list is judged by its label, never by what it already holds.
+    const labels = [...((element as HTMLInputElement).labels ?? [])]
+        .map((label) => label.textContent ?? "")
+        .join(" ");
+    const own = ["aria-label", "title", "name", "id", "placeholder"]
+        .map((attribute) => element.getAttribute(attribute) ?? "")
+        .join(" ");
+    const name = clean(labels || element.getAttribute("aria-label") || roleOf(element), 80);
+    if (action.op === "select") {
+        return { risky: browserRiskyWords(`${labels} ${own} ${action.value}`), name };
+    }
+    const risky =
+        Boolean(action.submit) ||
+        secretBox(element) ||
+        isPasswordBox(element) ||
+        browserRiskyWords(`${labels} ${own}`);
+    return { risky, name };
 }
