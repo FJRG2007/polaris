@@ -34,7 +34,7 @@ import { wordsFor } from "./words";
 import { folderTarget, type FolderSettings } from "./folder";
 import { DIAL_UUID, FOLDER_UUID, KEY_UUID, TIMER_UUID, surfaceOf, type Surface } from "./surfaces";
 import { CONFIRM_MS, Confirmations, DOUBLE_MS, PressTimer, type Gesture } from "./presses";
-import { DialBurst, predict } from "./optimistic";
+import { beginAlso, DialBurst, predict } from "./optimistic";
 import {
     alternates,
     bindingFor,
@@ -123,10 +123,22 @@ export class PolarisKey extends SingletonAction<KeySettings> {
         // Polaris refuses or does not answer. Only its own action's: another
         // gesture's state is not what this key draws. One already done is
         // still sent: Polaris reads it again, and this reading may be old.
+        // The other keys it moves - the microphone's, when deafening - are
+        // drawn with it and go back with it.
         const before = hub.state(id);
         const guess = drawsOwnState(settings, binding) ? predict(entry, before) : null;
         hub.inFlight.begin(id, before);
         if (guess && "face" in guess) hub.setState(id, guess.face);
+        const linked =
+            guess && "face" in guess
+                ? beginAlso(
+                      hub.inFlight,
+                      guess.also,
+                      (also) => hub.keysShowing(also),
+                      (key) => hub.state(key)
+                  )
+                : [];
+        for (const { key, state } of linked) hub.setState(key, state);
         const result = await hub.run(id, undefined, binding);
         const settled = hub.inFlight.settle(
             id,
@@ -134,6 +146,10 @@ export class PolarisKey extends SingletonAction<KeySettings> {
             result?.ok ? result.state : undefined
         );
         if (settled) hub.setState(id, settled);
+        for (const { key } of linked) {
+            const state = hub.inFlight.settle(key, result?.ok === true);
+            if (state) hub.setState(key, state);
+        }
         if (result?.ok) {
             if (gesture === "press" && alternates(settings, main)) {
                 const next: KeySettings = { ...settings, side: settings.side === "b" ? "a" : "b" };

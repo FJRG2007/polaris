@@ -7,7 +7,7 @@
 import { faceFor } from "../src/face";
 import { wordsFor } from "../src/words";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DialBurst, InFlight, predict } from "../src/optimistic";
+import { beginAlso, DialBurst, InFlight, predict, shows } from "../src/optimistic";
 import { PolarisClient, readLocked, TimedOut, type DeckState } from "../src/polaris";
 
 const toggle = { kind: "toggle" as const };
@@ -72,6 +72,76 @@ describe("InFlight", () => {
         const flight = new InFlight();
         flight.begin("k", before);
         expect(flight.settle("k", true)).toBeUndefined();
+    });
+});
+
+describe("a press that moves other keys", () => {
+    const muted: DeckState = { tone: "warn", on: true, icon: "mic-off" };
+    const heard: DeckState = { tone: "idle", on: false, icon: "mic" };
+    const deafened: DeckState = { tone: "warn", on: true, icon: "headphone-off" };
+    const deafen: DeckState = {
+        tone: "idle",
+        on: false,
+        icon: "headphones",
+        press: { face: deafened, also: [{ action: "call.mic", face: muted }] }
+    };
+    /** Two keys on the deck: deafen (pressed) and the microphone. */
+    const keys: Record<string, string> = { d: "call.deafen", m: "call.mic" };
+    const keysOf = (also: { action: string }) =>
+        Object.keys(keys).filter((key) => keys[key] === also.action);
+
+    it("carries what Polaris said a press does to other keys", () => {
+        expect(predict(toggle, deafen)).toEqual({
+            face: deafened,
+            also: [{ action: "call.mic", face: muted }]
+        });
+    });
+
+    it("draws deafening's mute on the microphone's key at once", () => {
+        const flight = new InFlight();
+        flight.begin("d", deafen);
+        const states: Record<string, DeckState> = { d: deafen, m: heard };
+        const drawn = beginAlso(flight, deafen.press!.also, keysOf, (key) => states[key]);
+        expect(drawn).toEqual([{ key: "m", state: muted }]);
+        expect(flight.busy("m")).toBe(true);
+        // A reading from before the press does not flick it back meanwhile.
+        expect(flight.hold("m", heard)).toBe(true);
+    });
+
+    it("puts the microphone back when the deafen is refused or unanswered", () => {
+        const flight = new InFlight();
+        flight.begin("d", deafen);
+        beginAlso(flight, deafen.press!.also, keysOf, () => heard);
+        expect(flight.settle("d", false)).toEqual(deafen);
+        expect(flight.settle("m", false)).toEqual(heard);
+        expect(flight.busy("m")).toBe(false);
+    });
+
+    it("keeps the guess when the press worked, until the stream says otherwise", () => {
+        const flight = new InFlight();
+        flight.begin("d", deafen);
+        beginAlso(flight, deafen.press!.also, keysOf, () => heard);
+        expect(flight.settle("m", true)).toBeUndefined();
+        flight.begin("d", deafen);
+        beginAlso(flight, deafen.press!.also, keysOf, () => heard);
+        flight.hold("m", muted);
+        expect(flight.settle("m", true)).toEqual(muted);
+    });
+
+    it("leaves alone a key with its own press on the way, or nothing to put back", () => {
+        const flight = new InFlight();
+        flight.begin("m", heard);
+        expect(beginAlso(flight, deafen.press!.also, keysOf, () => heard)).toEqual([]);
+        expect(beginAlso(new InFlight(), deafen.press!.also, keysOf, () => undefined)).toEqual([]);
+    });
+
+    it("names keys by action, and by settings when it gives them", () => {
+        const away = { action: "status.presence", options: { choice: "away" }, face: heard };
+        expect(shows(away, "status.presence", { choice: "away" })).toBe(true);
+        expect(shows(away, "status.presence", { choice: "busy" })).toBe(false);
+        expect(shows(away, "status.presence", {})).toBe(false);
+        expect(shows(away, "call.mic", { choice: "away" })).toBe(false);
+        expect(shows({ action: "call.mic", face: muted }, "call.mic", {})).toBe(true);
     });
 });
 
