@@ -198,7 +198,9 @@
             "notHereHint": "Stop drawing anything inside this site's pages",
             "showHereHint": "Show the fill mark, the generator and the save offer on this site",
             "notHere": "Not here",
-            "showHere": "Show it here"
+            "showHere": "Show it here",
+            "pagesOff": "Filling inside pages is off.",
+            "openSettings": "Settings"
         },
         "clipboard": {
             "refused": "The browser refused the clipboard. Try again.",
@@ -377,6 +379,16 @@
         "sharedChat": "Same on every tab",
         "tabChat": "A new one per tab",
         "sharedChatHint": "The chat carries on as you switch tabs.",
-        "tabChatHint": "Each tab keeps its own chat."
+        "tabChatHint": "Each tab keeps its own chat.",
+        "pages": "On web pages",
+        "fillOnPages": "Fill in from the vault",
+        "on": "On",
+        "off": "Off",
+        "fillOnHint": "Your logins, codes and new passwords are offered under the boxes on each site.",
+        "fillOffHint": "Nothing is drawn inside pages. The popup and the shortcut still fill.",
+        "offSites": "Switched off on",
+        "noOffSites": "No site is switched off.",
+        "turnBackOn": "Turn back on",
+        "turnBackOnFor": "Turn Polaris back on for {host}"
     }
 }

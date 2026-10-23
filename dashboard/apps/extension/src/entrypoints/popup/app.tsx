@@ -3,6 +3,7 @@ import { storage } from "#imports";
 import { screenFor } from "@/lib/screen";
 import { timeoutChoices } from "@/lib/lock";
 import { EVERY_SITE } from "@/lib/injection";
+import { PAGE_FILLING_KEY } from "@/lib/page-filling";
 import { readIntendedLogin } from "@/lib/save";
 import { isNewer, type UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
@@ -320,7 +321,11 @@ export function App(): React.JSX.Element {
                     ) : shown === "unlock" ? (
                         <Unlock onDone={refresh} onApprove={askPolaris} />
                     ) : (
-                        <Items status={status} onChange={refresh} />
+                        <Items
+                            status={status}
+                            onChange={refresh}
+                            onSettings={() => setSection("settings")}
+                        />
                     )}
                     {/* Making a password needs no vault: it is arithmetic in this
                         popup, the same generator the item list offers. Somebody
@@ -819,6 +824,8 @@ function Unlock({
 /** The answer the worker reads when it registers the inline script. Written
  *  here and nowhere else, from the press that asked the browser for the grant. */
 const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fallback: true });
+/** Settings' "Fill in from the vault"; off draws nothing inside any page. */
+const PAGE_FILLING = storage.defineItem<boolean>(PAGE_FILLING_KEY, { fallback: true });
 
 /**
  * "Show Polaris on every site": the list under a login box on every page, the
@@ -1688,10 +1695,12 @@ function Accounts({
 
 function Items({
     status,
-    onChange
+    onChange,
+    onSettings
 }: {
     status: VaultStatus;
     onChange: () => Promise<void>;
+    onSettings: () => void;
 }): React.JSX.Element {
     const t = useWords();
     const [suggested, setSuggested] = useState<readonly ItemSummary[]>([]);
@@ -1719,6 +1728,13 @@ function Items({
         blocked: false
     });
     const inline = useEverywhere(t);
+    const [pagesOn, setPagesOn] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        void PAGE_FILLING.getValue()
+            .then(setPagesOn)
+            .catch(() => setPagesOn(true));
+    }, []);
 
     useEffect(() => {
         void (async () => {
@@ -1902,11 +1918,26 @@ function Items({
                 />
             ) : null}
 
-            {inline.possible && inline.everywhere !== null ? (
-                <OnEverySite everywhere={inline.everywhere} turn={inline.turn} />
-            ) : null}
-            {inline.everywhere ? null : (
-                <OnThisSite url={pageUrl} host={here.host} server={status.server} />
+            {pagesOn === null ? null : !pagesOn ? (
+                inline.possible ? (
+                    <div className="row">
+                        <span className="muted small">{t("popup.sites.pagesOff")}</span>
+                        <div className="acts">
+                            <button className="ghost" onClick={onSettings}>
+                                {t("popup.sites.openSettings")}
+                            </button>
+                        </div>
+                    </div>
+                ) : null
+            ) : (
+                <>
+                    {inline.possible && inline.everywhere !== null ? (
+                        <OnEverySite everywhere={inline.everywhere} turn={inline.turn} />
+                    ) : null}
+                    {inline.everywhere ? null : (
+                        <OnThisSite url={pageUrl} host={here.host} server={status.server} />
+                    )}
+                </>
             )}
 
             {here.host ? (

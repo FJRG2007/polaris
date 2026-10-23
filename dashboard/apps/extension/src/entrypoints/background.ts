@@ -26,6 +26,7 @@ import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import * as update from "@/lib/update";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
+import { BLOCKED_HOSTS_KEY, PAGE_FILLING_KEY } from "@/lib/page-filling";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
 import {
     MENU,
@@ -250,7 +251,7 @@ const LINK_CHECKED = storage.defineItem<number | null>("session:link.checkedAt",
     fallback: null
 });
 
-const BLOCKED = storage.defineItem<string[]>("local:blocked.hosts", { fallback: [] });
+const BLOCKED = storage.defineItem<string[]>(BLOCKED_HOSTS_KEY, { fallback: [] });
 const DEVICE = storage.defineItem<string | null>("local:vault.device", { fallback: null });
 /**
  * A published build newer than this one, once a check has found it.
@@ -3066,6 +3067,20 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     }
 
     const answer = async (): Promise<messages.Reply> => {
+        // "Fill in on web pages" switched off: a page that still runs the script
+        // from before (it stays until a reload) is told this site is off, and
+        // gets nothing else. Stopping Polar is the one request that is not
+        // about filling.
+        if (
+            page &&
+            !ours &&
+            request.kind !== "polarBrowserStop" &&
+            !(await PAGE_FILLING.getValue())
+        ) {
+            return request.kind === "blocked"
+                ? { ok: true, host: hostOf(page.url), blocked: true }
+                : { ok: false, error: await say("errors.offForSite") };
+        }
         switch (request.kind) {
             case "status":
                 // Asked at most once a minute, and never awaited: the popup draws
@@ -3650,7 +3665,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "setBlocked": {
-                const { host } = await blockedHere();
+                const host =
+                    typeof request.host === "string" && request.host !== ""
+                        ? request.host
+                        : (await blockedHere()).host;
                 if (!host) return { ok: false, error: await say("errors.noSiteToSwitch") };
                 const held = await BLOCKED.getValue();
                 const without = held.filter((entry) => entry !== host);
@@ -3686,6 +3704,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     return { ok: false, error: await say("errors.noInline") };
                 }
                 await syncAutofill();
+                // Switched off in settings: the sync above took it out, and
+                // nothing goes into the open tab either.
+                if (!(await PAGE_FILLING.getValue())) return { ok: true };
                 const target = await activeTab();
                 // And into the tab that is already open, because registering only
                 // covers the next load: without this, turning it on does nothing
@@ -4305,6 +4326,9 @@ browser.tabs.onRemoved.addListener((id) => {
  */
 const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fallback: true });
 
+/** The settings screen's "Fill in on web pages". Off registers nothing anywhere. */
+const PAGE_FILLING = storage.defineItem<boolean>(PAGE_FILLING_KEY, { fallback: true });
+
 /** The id the inline script is registered under, so the old registration can be
  *  found and replaced rather than piling up. */
 const AUTOFILL_ID = "polaris-autofill";
@@ -4339,7 +4363,7 @@ async function syncAutofill(): Promise<void> {
     const homeOrigin = home ? readOrigin(home) : null;
 
     await browser.scripting.unregisterContentScripts({ ids: [AUTOFILL_ID] }).catch(() => undefined);
-    if (matches.length === 0) return;
+    if (matches.length === 0 || !(await PAGE_FILLING.getValue())) return;
     await browser.scripting
         .registerContentScripts([
             {

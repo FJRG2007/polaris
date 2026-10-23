@@ -198,7 +198,9 @@
             "notHereHint": "Dejar de mostrar nada dentro de las páginas de este sitio",
             "showHereHint": "Mostrar la marca de relleno, el generador y la oferta de guardar en este sitio",
             "notHere": "Aquí no",
-            "showHere": "Mostrarlo aquí"
+            "showHere": "Mostrarlo aquí",
+            "pagesOff": "El relleno dentro de las páginas está desactivado.",
+            "openSettings": "Ajustes"
         },
         "clipboard": {
             "refused": "El navegador rechazó el portapapeles. Vuelve a intentarlo.",
@@ -377,6 +379,16 @@
         "sharedChat": "La misma siempre",
         "tabChat": "Una por pestaña",
         "sharedChatHint": "El chat sigue al cambiar de pestaña.",
-        "tabChatHint": "Cada pestaña tiene su chat."
+        "tabChatHint": "Cada pestaña tiene su chat.",
+        "pages": "En las páginas web",
+        "fillOnPages": "Rellenar desde el vault",
+        "on": "Sí",
+        "off": "No",
+        "fillOnHint": "Tus accesos, códigos y contraseñas nuevas salen bajo las casillas de cada web.",
+        "fillOffHint": "No se dibuja nada en las páginas. El popup y el atajo siguen rellenando.",
+        "offSites": "Desactivado en",
+        "noOffSites": "Ninguna web está desactivada.",
+        "turnBackOn": "Reactivar",
+        "turnBackOnFor": "Volver a activar Polaris en {host}"
     }
 }
