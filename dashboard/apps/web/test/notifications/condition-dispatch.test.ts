@@ -60,7 +60,12 @@ vi.mock("../../src/lib/notifications/sms-service", () => ({ sendSms: async () =>
 
 const { notify } = await import("../../src/lib/notifications/dispatch");
 
-const alert = { userId: "user-1", event: "deploy.failed", title: "Still failing", condition: "deploy:s1" };
+const alert = {
+    userId: "user-1",
+    event: "deploy.failed",
+    title: "Still failing",
+    condition: "deploy:s1"
+};
 
 beforeEach(() => {
     created.mockClear();
@@ -73,7 +78,10 @@ describe("notify with a condition", () => {
     it("writes through raiseCondition, never as a new one-off row", async () => {
         expect(await notify(alert)).toEqual({ inapp: "sent" });
         expect(created).not.toHaveBeenCalled();
-        expect(raised).toHaveBeenCalledWith("deploy:s1", expect.objectContaining({ title: "Still failing" }));
+        expect(raised).toHaveBeenCalledWith(
+            "deploy:s1",
+            expect.objectContaining({ title: "Still failing" })
+        );
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(hooks).toHaveBeenCalledTimes(1);
         expect(deliveries).toHaveLength(1);

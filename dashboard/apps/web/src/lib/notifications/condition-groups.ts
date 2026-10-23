@@ -21,7 +21,9 @@ export interface GroupText {
 
 function membersOf(metadata: Record<string, unknown>): string[] {
     const members = metadata.members;
-    return Array.isArray(members) ? members.filter((member): member is string => typeof member === "string") : [];
+    return Array.isArray(members)
+        ? members.filter((member): member is string => typeof member === "string")
+        : [];
 }
 
 function sameMembers(a: readonly string[], b: readonly string[]): boolean {
@@ -43,7 +45,10 @@ export async function raiseGroup(
 ): Promise<NotifyReport> {
     const sorted = [...new Set(members)].sort();
     const taken = new Map(
-        (await openConditions(input.userId, prefix)).map((open) => [open.conditionKey, membersOf(open.metadata)])
+        (await openConditions(input.userId, prefix)).map((open) => [
+            open.conditionKey,
+            membersOf(open.metadata)
+        ])
     );
     const base = `${prefix}${sorted[0] ?? ""}`;
     let condition = base;
@@ -83,7 +88,11 @@ export async function settleGroup(
             const text = back(ended);
             await resolveCondition(open.conditionKey, {
                 userIds: [userId],
-                recovery: { ...text, level: text.level ?? "success", metadata: { ...open.metadata, members } }
+                recovery: {
+                    ...text,
+                    level: text.level ?? "success",
+                    metadata: { ...open.metadata, members }
+                }
             });
         } else {
             const text = still(remaining, open.metadata);

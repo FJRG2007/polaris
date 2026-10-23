@@ -91,7 +91,9 @@ let tunnelRunning = true;
 // The dispatcher is mocked, but a condition still lands in an in-memory table
 // through the real service, so a recovery can be seen closing its notice.
 const bell = vi.hoisted(() => ({
-    store: null as ReturnType<typeof import("../notifications/fixtures/condition-store").conditionStore> | null
+    store: null as ReturnType<
+        typeof import("../notifications/fixtures/condition-store").conditionStore
+    > | null
 }));
 const notify = vi.fn(async (input: { condition?: string; event?: string; userId?: string }) => {
     if (!input.condition) return;
@@ -236,7 +238,11 @@ describe("probing what a deployment answers on", () => {
         expect(notices).toHaveLength(2);
         for (const notice of notices) {
             expect(notice.title).toContain("answering again");
-            expect(notice).toMatchObject({ level: "success", conditionKey: null, actionRequired: false });
+            expect(notice).toMatchObject({
+                level: "success",
+                conditionKey: null,
+                actionRequired: false
+            });
         }
     });
 
@@ -256,18 +262,27 @@ describe("probing what a deployment answers on", () => {
         await sweep();
         expect(forOne()).toHaveLength(1);
         expect(forOne()[0]?.title).toBe("3 addresses answer again");
-        expect(forOne()[0]?.body).toBe("polaris.example.com, plr.example.com, mc.example.com are reachable again.");
+        expect(forOne()[0]?.body).toBe(
+            "polaris.example.com, plr.example.com, mc.example.com are reachable again."
+        );
     });
 
     it("keeps a group open, rewritten, while part of it is still down", async () => {
-        addresses.push({ url: "http://plr.example.com/status", host: "plr.example.com", kind: "domain" });
+        addresses.push({
+            url: "http://plr.example.com/status",
+            host: "plr.example.com",
+            kind: "domain"
+        });
         answering.delete("polaris.example.com");
         await sweep();
         answering.add("polaris.example.com");
         await sweep();
         const mine = bell.store!.rows.filter((row) => row.userId === "user-1");
         expect(mine).toHaveLength(1);
-        expect(mine[0]).toMatchObject({ title: "plr.example.com is not answering", conditionKey: "network.address:plr.example.com" });
+        expect(mine[0]).toMatchObject({
+            title: "plr.example.com is not answering",
+            conditionKey: "network.address:plr.example.com"
+        });
         expect(mine[0]?.body).toContain("Nothing answered at http://plr.example.com/status.");
     });
 

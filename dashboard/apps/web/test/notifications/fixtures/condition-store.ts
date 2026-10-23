@@ -29,8 +29,12 @@ function matches(row: StoredNotice, where: Where): boolean {
     if (typeof where.userId === "string" && row.userId !== where.userId) return false;
     if (typeof where.userId === "object" && !where.userId.in.includes(row.userId)) return false;
     if (where.type && !where.type.in.includes(row.type)) return false;
-    if (typeof where.conditionKey === "string" && row.conditionKey !== where.conditionKey) return false;
-    if (typeof where.conditionKey === "object" && !(row.conditionKey ?? "").startsWith(where.conditionKey.startsWith)) {
+    if (typeof where.conditionKey === "string" && row.conditionKey !== where.conditionKey)
+        return false;
+    if (
+        typeof where.conditionKey === "object" &&
+        !(row.conditionKey ?? "").startsWith(where.conditionKey.startsWith)
+    ) {
         return false;
     }
     return true;
@@ -48,7 +52,12 @@ export function conditionStore() {
         },
         create: async ({ data }: { data: Omit<StoredNotice, "id" | "updatedAt"> }) => {
             await tick();
-            if (data.conditionKey && rows.some((row) => row.userId === data.userId && row.conditionKey === data.conditionKey)) {
+            if (
+                data.conditionKey &&
+                rows.some(
+                    (row) => row.userId === data.userId && row.conditionKey === data.conditionKey
+                )
+            ) {
                 throw Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
             }
             const row = { ...data, id: `n${rows.length + 1}`, updatedAt: null } as StoredNotice;

@@ -320,7 +320,10 @@ function spanIn(t: NamespaceTranslator<"notices">, ms: number): string {
  * first. Answers what the probe found, for the pass's verdict on the connection -
  * or null for a tunnel that was dropped, which is no longer an address at all.
  */
-async function sweepAddress(address: DeploymentAddress, news: PassNews): Promise<ProbeResult | null> {
+async function sweepAddress(
+    address: DeploymentAddress,
+    news: PassNews
+): Promise<ProbeResult | null> {
     const { state, detail, code, notRouted } = await probe(address);
     const result: ProbeResult = { host: address.host, up: state === "up", detail, code };
     const now = Date.now();
@@ -345,7 +348,11 @@ async function sweepAddress(address: DeploymentAddress, news: PassNews): Promise
     if (state === "up") {
         // A first sighting that works is not news; a recovery is.
         if (claim === "changed") {
-            news.back.push({ host: address.host, url: address.url, downFor: changedAt === null ? null : now - changedAt });
+            news.back.push({
+                host: address.host,
+                url: address.url,
+                downFor: changedAt === null ? null : now - changedAt
+            });
         }
         return result;
     }
@@ -415,7 +422,10 @@ function backText(t: NamespaceTranslator<"notices">, back: PassNews["back"]): Gr
             body:
                 one.downFor === null
                     ? t("address.backBody", { url: one.url })
-                    : t("address.backBodyAfter", { url: one.url, duration: spanIn(t, one.downFor) }),
+                    : t("address.backBodyAfter", {
+                          url: one.url,
+                          duration: spanIn(t, one.downFor)
+                      }),
             level: "success"
         };
     }
@@ -429,7 +439,8 @@ function backText(t: NamespaceTranslator<"notices">, back: PassNews["back"]): Gr
 /** The address a group notice recorded for one of its hosts; the host alone when it recorded none. */
 function urlIn(metadata: Record<string, unknown>, host: string): string {
     const urls = metadata.urls;
-    const url = urls && typeof urls === "object" ? (urls as Record<string, unknown>)[host] : undefined;
+    const url =
+        urls && typeof urls === "object" ? (urls as Record<string, unknown>)[host] : undefined;
     return typeof url === "string" ? url : host;
 }
 
@@ -446,7 +457,12 @@ async function tellPass(news: PassNews, anyUp: boolean): Promise<void> {
         recipients.map(async (userId) => {
             const t = await wordsFor(userId, "notices");
             if (anyUp) await resolveCondition(OFFLINE_CONDITION, { userIds: [userId] });
-            const base = { userId, event: "network.address", href: "/admin/settings", audience: "admins" as const };
+            const base = {
+                userId,
+                event: "network.address",
+                href: "/admin/settings",
+                audience: "admins" as const
+            };
             if (news.down.length > 0) {
                 await raiseGroup(
                     DOWN_CONDITION,
@@ -455,7 +471,11 @@ async function tellPass(news: PassNews, anyUp: boolean): Promise<void> {
                         ...base,
                         ...downText(t, news.down),
                         actionRequired: true,
-                        metadata: { urls: Object.fromEntries(news.down.map((entry) => [entry.host, entry.url])) }
+                        metadata: {
+                            urls: Object.fromEntries(
+                                news.down.map((entry) => [entry.host, entry.url])
+                            )
+                        }
                     }
                 );
             }
@@ -465,8 +485,16 @@ async function tellPass(news: PassNews, anyUp: boolean): Promise<void> {
                 userId,
                 DOWN_CONDITION,
                 news.back.map((entry) => entry.host),
-                (hosts) => backText(t, news.back.filter((entry) => hosts.includes(entry.host))),
-                (hosts, metadata) => downText(t, hosts.map((host) => ({ host, url: urlIn(metadata, host), detail: null })))
+                (hosts) =>
+                    backText(
+                        t,
+                        news.back.filter((entry) => hosts.includes(entry.host))
+                    ),
+                (hosts, metadata) =>
+                    downText(
+                        t,
+                        hosts.map((host) => ({ host, url: urlIn(metadata, host), detail: null }))
+                    )
             );
             const unannounced = left.map((host) => byHost.get(host)!).filter(Boolean);
             if (unannounced.length > 0) await notify({ ...base, ...backText(t, unannounced) });
@@ -504,9 +532,10 @@ export async function sweepAddresses(): Promise<PassOutcome | null> {
         });
         if (result) results.push(result);
     }
-    await tellPass(news, results.some((result) => result.up)).catch((error) =>
-        console.error("polaris: telling an address sweep's news failed:", error)
-    );
+    await tellPass(
+        news,
+        results.some((result) => result.up)
+    ).catch((error) => console.error("polaris: telling an address sweep's news failed:", error));
     const internet = results.some((result) => result.up)
         ? null
         : await hasInternet().catch(() => null);

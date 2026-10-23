@@ -32,7 +32,9 @@ const find = vi.fn(async (_t: string, _z: string, _type: string, name: string) =
 // The real notification service over an in-memory table, so "told once" is
 // asserted on the rows the bell would show rather than on calls.
 const bell = vi.hoisted(() => ({
-    store: null as ReturnType<typeof import("../notifications/fixtures/condition-store").conditionStore> | null
+    store: null as ReturnType<
+        typeof import("../notifications/fixtures/condition-store").conditionStore
+    > | null
 }));
 const rows = () => bell.store!.rows;
 const ofType = (type: string) => rows().filter((row) => row.type === type);
@@ -254,7 +256,10 @@ describe("a run", () => {
         await syncZoneAddress();
         await syncZoneAddress();
         expect(ofType("domain.address-stale")).toHaveLength(1);
-        expect(ofType("domain.address-stale")[0]).toMatchObject({ conditionKey: "domain.address-stale", readAt: null });
+        expect(ofType("domain.address-stale")[0]).toMatchObject({
+            conditionKey: "domain.address-stale",
+            readAt: null
+        });
         expect(settings.get(PUBLISHED_KEY)).toBe(OLD);
     });
 
@@ -286,7 +291,9 @@ describe("a run", () => {
         repoint.mockRejectedValue(new Error("Authentication error"));
         probe.mockResolvedValue("52.10.0.3");
         await syncZoneAddress();
-        expect(ofType("domain.address-stale").filter((row) => row.conditionKey !== null)).toHaveLength(1);
+        expect(
+            ofType("domain.address-stale").filter((row) => row.conditionKey !== null)
+        ).toHaveLength(1);
     });
 
     it("marks an older stale notice read once the records are right, though it has no key", async () => {
@@ -305,7 +312,8 @@ describe("a run", () => {
         });
         settings.set(PUBLISHED_KEY, NEW);
         settings.set("network.dnsFollowFailing", "failed:52.10.0.2");
-        for (const list of records.values()) for (const entry of list) if (entry.content === OLD) entry.content = NEW;
+        for (const list of records.values())
+            for (const entry of list) if (entry.content === OLD) entry.content = NEW;
         await syncZoneAddress();
         expect(rows()[0]).toMatchObject({ id: "legacy", actionRequired: false });
         expect(rows()[0]!.readAt).toBeInstanceOf(Date);
@@ -315,9 +323,14 @@ describe("a run", () => {
     it("leaves keyless rows alone once nothing from before conditions is left", async () => {
         const sweep = vi.spyOn(bell.store!.notification, "updateMany");
         settings.set(PUBLISHED_KEY, NEW);
-        for (const list of records.values()) for (const entry of list) if (entry.content === OLD) entry.content = NEW;
+        for (const list of records.values())
+            for (const entry of list) if (entry.content === OLD) entry.content = NEW;
         await syncZoneAddress();
-        expect(sweep.mock.calls.some(([args]) => (args as { where: { type?: unknown } }).where.type !== undefined)).toBe(false);
+        expect(
+            sweep.mock.calls.some(
+                ([args]) => (args as { where: { type?: unknown } }).where.type !== undefined
+            )
+        ).toBe(false);
     });
 
     it("puts the open failure back to unread when the problem changes", async () => {

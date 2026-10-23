@@ -184,7 +184,10 @@ export async function createNotification(input: NotificationInput): Promise<void
 export type ConditionOutcome = "created" | "updated" | "failed";
 
 /** The text a condition's notice is rewritten with. */
-type ConditionText = Pick<NotificationInput, "title" | "body" | "href" | "level" | "actionRequired" | "metadata">;
+type ConditionText = Pick<
+    NotificationInput,
+    "title" | "body" | "href" | "level" | "actionRequired" | "metadata"
+>;
 
 function conditionText(input: ConditionText): Record<string, unknown> {
     return {
@@ -200,7 +203,11 @@ function conditionText(input: ConditionText): Record<string, unknown> {
 
 /** Prisma's unique-constraint violation: somebody else wrote the row first. */
 function isUniqueViolation(caught: unknown): boolean {
-    return typeof caught === "object" && caught !== null && (caught as { code?: unknown }).code === "P2002";
+    return (
+        typeof caught === "object" &&
+        caught !== null &&
+        (caught as { code?: unknown }).code === "P2002"
+    );
 }
 
 /**

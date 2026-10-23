@@ -22,7 +22,11 @@ import { sendAuthEmail } from "@/lib/auth-mail";
 import { appBaseUrl } from "@/lib/domain-service";
 import { wordsFor } from "./notice-words";
 import { getNotificationPreferences, getQuietHours } from "./preferences";
-import { createNotification, raiseCondition, type NotificationAudience } from "@/lib/notification-service";
+import {
+    createNotification,
+    raiseCondition,
+    type NotificationAudience
+} from "@/lib/notification-service";
 import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
 import {
     clearsMinLevel,
@@ -401,7 +405,9 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
         if (input.condition) {
             // Still the same condition: the open notice now says the latest, and
             // that is all. Telling every channel again is the spam this prevents.
-            const outcome = await raiseCondition(input.condition, row, { resurface: input.resurface });
+            const outcome = await raiseCondition(input.condition, row, {
+                resurface: input.resurface
+            });
             if (outcome === "updated") return { inapp: "updated" };
         } else {
             await createNotification(row);

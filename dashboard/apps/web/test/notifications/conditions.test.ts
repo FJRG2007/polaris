@@ -7,7 +7,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { conditionStore } from "./fixtures/condition-store";
 
-const store = vi.hoisted(() => ({ current: null as ReturnType<typeof import("./fixtures/condition-store").conditionStore> | null }));
+const store = vi.hoisted(() => ({
+    current: null as ReturnType<typeof import("./fixtures/condition-store").conditionStore> | null
+}));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -20,9 +22,15 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/shelf", () => ({ shelfFilter: () => ({}) }));
 
-const { raiseCondition, resolveCondition, openConditions } = await import("../../src/lib/notification-service");
+const { raiseCondition, resolveCondition, openConditions } =
+    await import("../../src/lib/notification-service");
 
-const notice = (title: string) => ({ userId: "u1", type: "domain.address-stale", title, level: "warning" as const });
+const notice = (title: string) => ({
+    userId: "u1",
+    type: "domain.address-stale",
+    title,
+    level: "warning" as const
+});
 
 beforeEach(() => {
     store.current = conditionStore();
@@ -69,9 +77,16 @@ describe("raiseCondition", () => {
 describe("resolveCondition", () => {
     it("closes the open notice, rewritten with the recovery, and frees the key", async () => {
         await raiseCondition("dns", { ...notice("broken"), actionRequired: true });
-        const closed = await resolveCondition("dns", { recovery: { title: "fixed", level: "success" } });
+        const closed = await resolveCondition("dns", {
+            recovery: { title: "fixed", level: "success" }
+        });
         expect(closed).toBe(1);
-        expect(store.current!.rows[0]).toMatchObject({ title: "fixed", level: "success", conditionKey: null, actionRequired: false });
+        expect(store.current!.rows[0]).toMatchObject({
+            title: "fixed",
+            level: "success",
+            conditionKey: null,
+            actionRequired: false
+        });
         expect(store.current!.rows[0]!.readAt).toBeInstanceOf(Date);
         // The next occurrence is a new notice, not the closed one reopened.
         expect(await raiseCondition("dns", notice("broken again"))).toBe("created");

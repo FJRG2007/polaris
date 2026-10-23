@@ -12,7 +12,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { conditionStore } from "../notifications/fixtures/condition-store";
 
 const bell = vi.hoisted(() => ({
-    store: null as ReturnType<typeof import("../notifications/fixtures/condition-store").conditionStore> | null,
+    store: null as ReturnType<
+        typeof import("../notifications/fixtures/condition-store").conditionStore
+    > | null,
     plain: [] as Array<{ userId: string; event: string; title: string }>
 }));
 
@@ -27,7 +29,11 @@ vi.mock("@polaris/db", () => ({
                 where.id.in.map((id) => ({
                     id,
                     hostname: `${id}.example.test`,
-                    application: { id: "app-shop", name: "web", environment: { project: project() } }
+                    application: {
+                        id: "app-shop",
+                        name: "web",
+                        environment: { project: project() }
+                    }
                 }))
         },
         projectMember: { findMany: async () => [] },
@@ -53,7 +59,8 @@ vi.mock("@/lib/notifications/dispatch", () => ({
     }
 }));
 
-const { notifyDomainHealthChanges, notifyDomainHealthChanged } = await import("@/lib/notifications/domain-events");
+const { notifyDomainHealthChanges, notifyDomainHealthChanged } =
+    await import("@/lib/notifications/domain-events");
 
 const rows = () => bell.store!.rows;
 
@@ -67,12 +74,20 @@ describe("a domain that comes back", () => {
         await notifyDomainHealthChanged({ domainId: "a", status: "down", detail: "HTTP 502" });
         await notifyDomainHealthChanged({ domainId: "a", status: "down", detail: "HTTP 502" });
         expect(rows()).toHaveLength(1);
-        expect(rows()[0]).toMatchObject({ type: "domain.down", conditionKey: "domain.down:a", actionRequired: true });
+        expect(rows()[0]).toMatchObject({
+            type: "domain.down",
+            conditionKey: "domain.down:a",
+            actionRequired: true
+        });
 
         await notifyDomainHealthChanged({ domainId: "a", status: "up", detail: null });
         expect(bell.plain).toHaveLength(0);
         expect(rows()).toHaveLength(1);
-        expect(rows()[0]).toMatchObject({ conditionKey: null, level: "success", actionRequired: false });
+        expect(rows()[0]).toMatchObject({
+            conditionKey: null,
+            level: "success",
+            actionRequired: false
+        });
         expect(rows()[0]!.title).toContain("a.example.test");
         expect(rows()[0]!.readAt).toBeInstanceOf(Date);
     });

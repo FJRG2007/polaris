@@ -326,7 +326,8 @@ async function tellOne(
         return;
     }
     const byId = new Map(bucket.map((item) => [item.domainId, item]));
-    const pick = (ids: readonly string[]) => ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+    const pick = (ids: readonly string[]) =>
+        ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
     const left = await settleGroup(
         userId,
         DOWN_CONDITION,
@@ -334,7 +335,19 @@ async function tellOne(
         (ids) => ({ ...say(pick(ids), "up"), level: "success" }),
         // Still down: named by id when this pass did not describe them, which
         // only happens for a domain deleted while it was down.
-        (ids) => say(ids.map((id) => byId.get(id) ?? { domainId: id, context: { label: id } as DomainContext, detail: null, downSince: null }), "down")
+        (ids) =>
+            say(
+                ids.map(
+                    (id) =>
+                        byId.get(id) ?? {
+                            domainId: id,
+                            context: { label: id } as DomainContext,
+                            detail: null,
+                            downSince: null
+                        }
+                ),
+                "down"
+            )
     );
     const unannounced = pick(left);
     if (unannounced.length === 0) return;

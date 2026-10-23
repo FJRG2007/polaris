@@ -386,15 +386,27 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
               ? plan.conflicts.map((entry) => `${entry.name} -> ${entry.content}`).join(", ")
               : null;
     if (problem === "failed") await fail(config.baseDomain, current, "failed", detail);
-    else if (problem === "conflict") await fail(config.baseDomain, current, "conflict", null, plan.conflicts);
+    else if (problem === "conflict")
+        await fail(config.baseDomain, current, "conflict", null, plan.conflicts);
     if (reach !== "unreached") await notices.resolveCondition(UNREACHED_CONDITION);
     // One notice per change: what was repointed, or that it moved with nothing to do.
     // A problem has its own notice above, which names the new address. When one
     // is open, the good news is written over it instead of beside it.
     if (problem === null) {
-        await settle(config.baseDomain, current, repointed.length > 0 ? from ?? [...former][0] ?? null : null, repointed.length, from);
+        await settle(
+            config.baseDomain,
+            current,
+            repointed.length > 0 ? (from ?? [...former][0] ?? null) : null,
+            repointed.length,
+            from
+        );
     } else if (repointed.length > 0) {
-        await announceUpdated(config.baseDomain, from ?? [...former][0] ?? null, current, repointed.length);
+        await announceUpdated(
+            config.baseDomain,
+            from ?? [...former][0] ?? null,
+            current,
+            repointed.length
+        );
     }
 
     await save({
@@ -429,13 +441,17 @@ async function checkReach(
     const seen = await publicA(probe);
     if (seen.length > 0 && seen.every((address) => address === current)) return "reached";
     if (now.getTime() < new Date(reachBy).getTime()) return "pending";
-    await notifyAdmins(UNREACHED_CONDITION, async (t) => ({
-        type: "domain.address-unreached",
-        title: t("domainAddress.unreachedTitle", { domain }),
-        body: t("domainAddress.unreachedBody", { current, seen: seen.join(", ") || "-" }),
-        level: "warning",
-        actionRequired: true
-    }), current);
+    await notifyAdmins(
+        UNREACHED_CONDITION,
+        async (t) => ({
+            type: "domain.address-unreached",
+            title: t("domainAddress.unreachedTitle", { domain }),
+            body: t("domainAddress.unreachedBody", { current, seen: seen.join(", ") || "-" }),
+            level: "warning",
+            actionRequired: true
+        }),
+        current
+    );
     return "unreached";
 }
 
@@ -447,7 +463,10 @@ async function administrators(): Promise<string[]> {
     return rows.map((row) => row.id);
 }
 
-type Notice = Pick<notices.NotificationInput, "type" | "title" | "body" | "level" | "actionRequired">;
+type Notice = Pick<
+    notices.NotificationInput,
+    "type" | "title" | "body" | "level" | "actionRequired"
+>;
 type Words = Awaited<ReturnType<typeof wordsFor<"notices">>>;
 
 /**
@@ -467,9 +486,16 @@ async function notifyAdmins(
             await notices.createNotification(input);
             continue;
         }
-        const open = (await notices.openConditions(userId, condition)).find((entry) => entry.conditionKey === condition);
-        const resurface = signature !== undefined && open !== undefined && open.metadata.signature !== signature;
-        await notices.raiseCondition(condition, { ...input, metadata: signature === undefined ? null : { signature } }, { resurface });
+        const open = (await notices.openConditions(userId, condition)).find(
+            (entry) => entry.conditionKey === condition
+        );
+        const resurface =
+            signature !== undefined && open !== undefined && open.metadata.signature !== signature;
+        await notices.raiseCondition(
+            condition,
+            { ...input, metadata: signature === undefined ? null : { signature } },
+            { resurface }
+        );
     }
 }
 
@@ -479,7 +505,13 @@ async function notifyAdmins(
  * move is announced on its own, as before. Rows from before conditions existed
  * carry no key, so they are marked read by type as well.
  */
-async function settle(domain: string, current: string, from: string | null, count: number, moved: string | null): Promise<void> {
+async function settle(
+    domain: string,
+    current: string,
+    from: string | null,
+    count: number,
+    moved: string | null
+): Promise<void> {
     const legacy = await getSetting(FAILING_KEY);
     if (legacy !== null) await setSetting(FAILING_KEY, null);
     let closed = 0;
@@ -488,7 +520,10 @@ async function settle(domain: string, current: string, from: string | null, coun
         closed += await notices.resolveCondition(STALE_CONDITION, {
             userIds: [userId],
             recovery: {
-                title: count > 0 ? t("domainAddress.pointsTitle", { domain, to: current }) : t("domainAddress.fixedTitle", { domain }),
+                title:
+                    count > 0
+                        ? t("domainAddress.pointsTitle", { domain, to: current })
+                        : t("domainAddress.fixedTitle", { domain }),
                 body:
                     count > 0
                         ? from
@@ -499,7 +534,8 @@ async function settle(domain: string, current: string, from: string | null, coun
             }
         });
     }
-    if (legacy !== null) await notices.markNotificationsReadByType([STALE_CONDITION]).catch(() => {});
+    if (legacy !== null)
+        await notices.markNotificationsReadByType([STALE_CONDITION]).catch(() => {});
     if (closed > 0) return;
     if (count > 0) await announceUpdated(domain, from, current, count);
     else if (moved) await announceMoved(moved, current);
@@ -527,7 +563,12 @@ async function announceMoved(from: string, to: string): Promise<void> {
     }));
 }
 
-async function announceUpdated(domain: string, from: string | null, to: string, count: number): Promise<void> {
+async function announceUpdated(
+    domain: string,
+    from: string | null,
+    to: string,
+    count: number
+): Promise<void> {
     await notifyAdmins(null, (t) => ({
         type: "domain.address-changed",
         title: t("domainAddress.pointsTitle", { domain, to }),
@@ -546,20 +587,26 @@ async function fail(
     detail: string | null,
     conflicts: readonly { name: string; content: string }[] = []
 ): Promise<void> {
-    await notifyAdmins(STALE_CONDITION, (t) => ({
-        type: "domain.address-stale",
-        title: t("domainAddress.staleTitle", { domain }),
-        body:
-            problem === "no-token"
-                ? t("domainAddress.noToken", { current, domain })
-                : problem === "conflict"
-                  ? t("domainAddress.conflict", {
-                        current,
-                        names: conflicts.map((entry) => entry.name).join(", "),
-                        contents: [...new Set(conflicts.map((entry) => entry.content))].join(", ")
-                    })
-                  : t("domainAddress.notUpdated", { current, detail: detail ?? "-" }),
-        level: "warning",
-        actionRequired: true
-    }), `${problem}:${current}`);
+    await notifyAdmins(
+        STALE_CONDITION,
+        (t) => ({
+            type: "domain.address-stale",
+            title: t("domainAddress.staleTitle", { domain }),
+            body:
+                problem === "no-token"
+                    ? t("domainAddress.noToken", { current, domain })
+                    : problem === "conflict"
+                      ? t("domainAddress.conflict", {
+                            current,
+                            names: conflicts.map((entry) => entry.name).join(", "),
+                            contents: [...new Set(conflicts.map((entry) => entry.content))].join(
+                                ", "
+                            )
+                        })
+                      : t("domainAddress.notUpdated", { current, detail: detail ?? "-" }),
+            level: "warning",
+            actionRequired: true
+        }),
+        `${problem}:${current}`
+    );
 }
