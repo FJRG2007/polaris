@@ -697,7 +697,8 @@ export async function destroyRecords(
     });
     for (const one of cleared) await logEvents(actor, one.object, one.events);
     // Nobody keeps reading a record that no longer exists.
-    for (const id of destroyed) await host.accessGrants.dropGrantsFor("crm.record", `${object}:${id}`);
+    for (const id of destroyed)
+        await host.accessGrants.dropGrantsFor("crm.record", `${object}:${id}`);
     return count;
 }
 

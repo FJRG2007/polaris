@@ -346,7 +346,10 @@ export async function getSession(sessionId: string, ownerId: string): Promise<Se
  * owner sees it, or null without a grant. Only for reading: every control goes
  * through `getSession`, which a grant does not reach.
  */
-export async function sharedSession(sessionId: string, userId: string): Promise<SessionView | null> {
+export async function sharedSession(
+    sessionId: string,
+    userId: string
+): Promise<SessionView | null> {
     const { grantedCapability } = await import("@/lib/access/grants");
     const held = await grantedCapability(userId, "agents.session", sessionId);
     if (!core.atLeast("agents.session", held, "view")) return null;

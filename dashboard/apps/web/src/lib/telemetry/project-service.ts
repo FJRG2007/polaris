@@ -226,7 +226,7 @@ export async function listProjects(
             lastSeen: row.issues[0]?.lastSeen.toISOString() ?? null,
             // Who may report and who was turned away name addresses and agents:
             // the owner's business, not a reader's.
-                rules: shared
+            rules: shared
                 ? rulesOf({
                       ...row,
                       allowedCidrs: "[]",
@@ -349,7 +349,10 @@ export interface IngestProject {
  * What comes back with it is the rules, so admission is decided from one read
  * rather than two.
  */
-export async function projectForIngest(number: number, publicKey: string): Promise<IngestProject | null> {
+export async function projectForIngest(
+    number: number,
+    publicKey: string
+): Promise<IngestProject | null> {
     const project = await prisma.telemetryProject.findUnique({
         where: { number },
         select: {
@@ -419,7 +422,13 @@ export async function recordRefusal(
 export async function clearRefusals(projectId: string): Promise<void> {
     await prisma.telemetryProject.update({
         where: { id: projectId },
-        data: { refusedCount: 0, refusedAt: null, refusedIp: null, refusedAgent: null, refusedReason: null }
+        data: {
+            refusedCount: 0,
+            refusedAt: null,
+            refusedIp: null,
+            refusedAgent: null,
+            refusedReason: null
+        }
     });
 }
 
@@ -535,7 +544,15 @@ export async function requireProject(
     actor: TelemetryActor,
     projectId: string,
     lent: ReadonlySet<string> = new Set()
-): Promise<{ id: string; name: string; number: number; publicKey: string; system: boolean; retentionDays: number; enabled: boolean }> {
+): Promise<{
+    id: string;
+    name: string;
+    number: number;
+    publicKey: string;
+    system: boolean;
+    retentionDays: number;
+    enabled: boolean;
+}> {
     const project = await prisma.telemetryProject.findUnique({
         where: { id: projectId },
         select: {

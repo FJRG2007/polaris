@@ -376,357 +376,368 @@ export function BookingPageEditor({
                         </StatusNote>
                     ) : null}
                     <fieldset disabled={shared === "view"} className="contents">
-                    <Section title={t("bookingPage.sectionAbout")}>
-                        <FieldRow
-                            label={`${t("bookingPage.title")} *`}
-                            htmlFor="bp-title"
-                            error={errorOf("title")}
-                        >
-                            <Input
-                                id="bp-title"
-                                value={draft.title}
-                                onChange={(event) => set("title", event.target.value)}
-                                onBlur={() => touch("title")}
-                                maxLength={120}
-                                aria-required
-                            />
-                        </FieldRow>
-                        {pageId ? (
+                        <Section title={t("bookingPage.sectionAbout")}>
                             <FieldRow
-                                label={t("bookingPage.slug")}
-                                htmlFor="bp-slug"
-                                hint={base ? bookingUrl(base, draft.slug || "...") : undefined}
-                                error={errorOf("slug")}
+                                label={`${t("bookingPage.title")} *`}
+                                htmlFor="bp-title"
+                                error={errorOf("title")}
                             >
                                 <Input
-                                    id="bp-slug"
-                                    value={draft.slug}
-                                    onChange={(event) => set("slug", event.target.value)}
-                                    onBlur={() => touch("slug")}
-                                    maxLength={60}
+                                    id="bp-title"
+                                    value={draft.title}
+                                    onChange={(event) => set("title", event.target.value)}
+                                    onBlur={() => touch("title")}
+                                    maxLength={120}
+                                    aria-required
                                 />
                             </FieldRow>
-                        ) : null}
-                        <FieldRow
-                            label={t("bookingPage.description")}
-                            htmlFor="bp-description"
-                            error={errorOf("description")}
-                        >
-                            <Textarea
-                                id="bp-description"
-                                value={draft.description}
-                                onChange={(event) => set("description", event.target.value)}
-                                rows={3}
-                                maxLength={4000}
-                            />
-                        </FieldRow>
-                        <FieldRow
-                            label={t("bookingPage.location")}
-                            htmlFor="bp-location"
-                            error={errorOf("location")}
-                        >
-                            <Input
-                                id="bp-location"
-                                value={draft.location}
-                                onChange={(event) => set("location", event.target.value)}
-                                maxLength={500}
-                            />
-                        </FieldRow>
-                        <FieldRow
-                            label={t("bookingPage.visibility")}
-                            hint={
-                                draft.visibility === "public"
-                                    ? t("bookingPage.visibilityPublicHint")
-                                    : t("bookingPage.visibilityLinkHint")
-                            }
-                        >
-                            <SegmentedControl
-                                value={draft.visibility}
-                                onValueChange={(value) => set("visibility", value)}
-                                aria-label={t("bookingPage.visibility")}
-                                options={[
-                                    { value: "link", label: t("bookingPage.visibilityLink") },
-                                    { value: "public", label: t("bookingPage.visibilityPublic") }
-                                ]}
-                            />
-                        </FieldRow>
-                        <label className="flex items-center justify-between gap-3">
-                            <span className="flex flex-col">
-                                <span>{t("bookingPage.enabled")}</span>
-                                <span className="text-xs text-foreground-subtle">
-                                    {t("bookingPage.enabledHint")}
+                            {pageId ? (
+                                <FieldRow
+                                    label={t("bookingPage.slug")}
+                                    htmlFor="bp-slug"
+                                    hint={base ? bookingUrl(base, draft.slug || "...") : undefined}
+                                    error={errorOf("slug")}
+                                >
+                                    <Input
+                                        id="bp-slug"
+                                        value={draft.slug}
+                                        onChange={(event) => set("slug", event.target.value)}
+                                        onBlur={() => touch("slug")}
+                                        maxLength={60}
+                                    />
+                                </FieldRow>
+                            ) : null}
+                            <FieldRow
+                                label={t("bookingPage.description")}
+                                htmlFor="bp-description"
+                                error={errorOf("description")}
+                            >
+                                <Textarea
+                                    id="bp-description"
+                                    value={draft.description}
+                                    onChange={(event) => set("description", event.target.value)}
+                                    rows={3}
+                                    maxLength={4000}
+                                />
+                            </FieldRow>
+                            <FieldRow
+                                label={t("bookingPage.location")}
+                                htmlFor="bp-location"
+                                error={errorOf("location")}
+                            >
+                                <Input
+                                    id="bp-location"
+                                    value={draft.location}
+                                    onChange={(event) => set("location", event.target.value)}
+                                    maxLength={500}
+                                />
+                            </FieldRow>
+                            <FieldRow
+                                label={t("bookingPage.visibility")}
+                                hint={
+                                    draft.visibility === "public"
+                                        ? t("bookingPage.visibilityPublicHint")
+                                        : t("bookingPage.visibilityLinkHint")
+                                }
+                            >
+                                <SegmentedControl
+                                    value={draft.visibility}
+                                    onValueChange={(value) => set("visibility", value)}
+                                    aria-label={t("bookingPage.visibility")}
+                                    options={[
+                                        { value: "link", label: t("bookingPage.visibilityLink") },
+                                        {
+                                            value: "public",
+                                            label: t("bookingPage.visibilityPublic")
+                                        }
+                                    ]}
+                                />
+                            </FieldRow>
+                            <label className="flex items-center justify-between gap-3">
+                                <span className="flex flex-col">
+                                    <span>{t("bookingPage.enabled")}</span>
+                                    <span className="text-xs text-foreground-subtle">
+                                        {t("bookingPage.enabledHint")}
+                                    </span>
                                 </span>
-                            </span>
-                            <Switch
-                                checked={draft.enabled}
-                                onChange={(value) => set("enabled", value)}
-                                disabled={off && !draft.enabled}
-                                aria-label={t("bookingPage.enabled")}
-                            />
-                        </label>
-                    </Section>
+                                <Switch
+                                    checked={draft.enabled}
+                                    onChange={(value) => set("enabled", value)}
+                                    disabled={off && !draft.enabled}
+                                    aria-label={t("bookingPage.enabled")}
+                                />
+                            </label>
+                        </Section>
 
-                    {shared ? null : (
-                    <Section title={t("bookingPage.sectionCalendars")}>
-                        <FieldRow
-                            label={`${t("bookingPage.calendar")} *`}
-                            hint={t("bookingPage.calendarHint")}
-                            error={errorOf("calendarId")}
-                        >
-                            <Select
-                                value={draft.calendarId}
-                                onValueChange={(value) => set("calendarId", value)}
-                                options={bookable.map((calendar) => ({
-                                    value: calendar.id,
-                                    label: calendar.name
-                                }))}
-                                placeholder={t("bookingPage.pickCalendar")}
-                                aria-label={t("bookingPage.calendar")}
-                                className="w-full sm:w-72"
+                        {shared ? null : (
+                            <Section title={t("bookingPage.sectionCalendars")}>
+                                <FieldRow
+                                    label={`${t("bookingPage.calendar")} *`}
+                                    hint={t("bookingPage.calendarHint")}
+                                    error={errorOf("calendarId")}
+                                >
+                                    <Select
+                                        value={draft.calendarId}
+                                        onValueChange={(value) => set("calendarId", value)}
+                                        options={bookable.map((calendar) => ({
+                                            value: calendar.id,
+                                            label: calendar.name
+                                        }))}
+                                        placeholder={t("bookingPage.pickCalendar")}
+                                        aria-label={t("bookingPage.calendar")}
+                                        className="w-full sm:w-72"
+                                    />
+                                </FieldRow>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                        {t("bookingPage.conflicts")}
+                                    </span>
+                                    <p className="text-xs text-foreground-subtle">
+                                        {t("bookingPage.conflictsHint")}
+                                    </p>
+                                    {others.length === 0 ? (
+                                        <p className="text-foreground-subtle">
+                                            {t("bookingPage.noOtherCalendars")}
+                                        </p>
+                                    ) : (
+                                        <ul className="flex flex-col gap-1.5">
+                                            {others.map((calendar) => {
+                                                const checked = draft.conflictIds.includes(
+                                                    calendar.id
+                                                );
+                                                return (
+                                                    <li key={calendar.id}>
+                                                        <label className="flex min-w-0 items-center gap-2">
+                                                            <Checkbox
+                                                                checked={checked}
+                                                                onChange={(event) =>
+                                                                    set(
+                                                                        "conflictIds",
+                                                                        event.target.checked
+                                                                            ? [
+                                                                                  ...draft.conflictIds,
+                                                                                  calendar.id
+                                                                              ]
+                                                                            : draft.conflictIds.filter(
+                                                                                  (id) =>
+                                                                                      id !==
+                                                                                      calendar.id
+                                                                              )
+                                                                    )
+                                                                }
+                                                            />
+                                                            <span
+                                                                aria-hidden
+                                                                className="inline-block size-2.5 shrink-0 rounded-full"
+                                                                style={{
+                                                                    backgroundColor: calendar.color
+                                                                }}
+                                                            />
+                                                            <span
+                                                                className="truncate"
+                                                                title={calendar.name}
+                                                            >
+                                                                {calendar.name}
+                                                            </span>
+                                                        </label>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    )}
+                                </div>
+                            </Section>
+                        )}
+
+                        <Section title={t("bookingPage.sectionTiming")}>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <FieldRow
+                                    label={t("bookingPage.duration")}
+                                    htmlFor="bp-duration"
+                                    error={errorOf("durationMinutes")}
+                                >
+                                    <NumberInput
+                                        id="bp-duration"
+                                        value={draft.durationMinutes}
+                                        min={5}
+                                        max={720}
+                                        onChange={(value) => set("durationMinutes", value ?? 0)}
+                                        onBlur={() => touch("durationMinutes")}
+                                    />
+                                </FieldRow>
+                                <FieldRow
+                                    label={t("bookingPage.slotEvery")}
+                                    htmlFor="bp-slot"
+                                    error={errorOf("slotMinutes")}
+                                >
+                                    <NumberInput
+                                        id="bp-slot"
+                                        value={draft.slotMinutes}
+                                        min={5}
+                                        max={720}
+                                        onChange={(value) => set("slotMinutes", value ?? 0)}
+                                        onBlur={() => touch("slotMinutes")}
+                                    />
+                                </FieldRow>
+                                <FieldRow
+                                    label={t("bookingPage.bufferBefore")}
+                                    htmlFor="bp-before"
+                                    error={errorOf("bufferBefore")}
+                                >
+                                    <NumberInput
+                                        id="bp-before"
+                                        value={draft.bufferBefore}
+                                        min={0}
+                                        max={240}
+                                        onChange={(value) => set("bufferBefore", value ?? 0)}
+                                        onBlur={() => touch("bufferBefore")}
+                                    />
+                                </FieldRow>
+                                <FieldRow
+                                    label={t("bookingPage.bufferAfter")}
+                                    htmlFor="bp-after"
+                                    error={errorOf("bufferAfter")}
+                                >
+                                    <NumberInput
+                                        id="bp-after"
+                                        value={draft.bufferAfter}
+                                        min={0}
+                                        max={240}
+                                        onChange={(value) => set("bufferAfter", value ?? 0)}
+                                        onBlur={() => touch("bufferAfter")}
+                                    />
+                                </FieldRow>
+                                <FieldRow
+                                    label={t("bookingPage.notice")}
+                                    htmlFor="bp-notice"
+                                    hint={t("bookingPage.noticeHint")}
+                                    error={errorOf("noticeMinutes")}
+                                >
+                                    <NumberInput
+                                        id="bp-notice"
+                                        value={draft.noticeMinutes}
+                                        min={0}
+                                        max={86_400}
+                                        onChange={(value) => set("noticeMinutes", value ?? 0)}
+                                        onBlur={() => touch("noticeMinutes")}
+                                    />
+                                </FieldRow>
+                                <FieldRow
+                                    label={t("bookingPage.horizon")}
+                                    htmlFor="bp-horizon"
+                                    error={errorOf("horizonDays")}
+                                >
+                                    <NumberInput
+                                        id="bp-horizon"
+                                        value={draft.horizonDays}
+                                        min={1}
+                                        max={365}
+                                        onChange={(value) => set("horizonDays", value ?? 0)}
+                                        onBlur={() => touch("horizonDays")}
+                                    />
+                                </FieldRow>
+                                <FieldRow
+                                    label={t("bookingPage.maxPerDay")}
+                                    htmlFor="bp-max"
+                                    hint={t("bookingPage.maxPerDayHint")}
+                                    error={errorOf("maxPerDay")}
+                                >
+                                    <NumberInput
+                                        id="bp-max"
+                                        value={draft.maxPerDay}
+                                        min={1}
+                                        max={100}
+                                        onChange={(value) => set("maxPerDay", value)}
+                                        onBlur={() => touch("maxPerDay")}
+                                    />
+                                </FieldRow>
+                            </div>
+                            <FieldRow
+                                label={`${t("bookingPage.timezone")} *`}
+                                htmlFor="bp-zone"
+                                error={errorOf("timezone")}
+                            >
+                                <ZonePicker
+                                    id="bp-zone"
+                                    value={draft.timezone}
+                                    onChange={(zone) => set("timezone", zone)}
+                                    label={t("bookingPage.timezone")}
+                                />
+                            </FieldRow>
+                        </Section>
+
+                        <Section title={t("bookingPage.sectionHours")}>
+                            <AvailabilityEditor
+                                value={draft.availability}
+                                onChange={(value) => set("availability", value)}
+                                error={errorOf("availability")}
                             />
-                        </FieldRow>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">
-                                {t("bookingPage.conflicts")}
-                            </span>
+                        </Section>
+
+                        <Section title={t("bookingPage.sectionQuestions")}>
                             <p className="text-xs text-foreground-subtle">
-                                {t("bookingPage.conflictsHint")}
+                                {t("bookingPage.questionsHint")}
                             </p>
-                            {others.length === 0 ? (
-                                <p className="text-foreground-subtle">
-                                    {t("bookingPage.noOtherCalendars")}
-                                </p>
-                            ) : (
-                                <ul className="flex flex-col gap-1.5">
-                                    {others.map((calendar) => {
-                                        const checked = draft.conflictIds.includes(calendar.id);
-                                        return (
-                                            <li key={calendar.id}>
-                                                <label className="flex min-w-0 items-center gap-2">
-                                                    <Checkbox
-                                                        checked={checked}
-                                                        onChange={(event) =>
-                                                            set(
-                                                                "conflictIds",
-                                                                event.target.checked
-                                                                    ? [
-                                                                          ...draft.conflictIds,
-                                                                          calendar.id
-                                                                      ]
-                                                                    : draft.conflictIds.filter(
-                                                                          (id) => id !== calendar.id
-                                                                      )
-                                                            )
-                                                        }
-                                                    />
-                                                    <span
-                                                        aria-hidden
-                                                        className="inline-block size-2.5 shrink-0 rounded-full"
-                                                        style={{ backgroundColor: calendar.color }}
-                                                    />
-                                                    <span
-                                                        className="truncate"
-                                                        title={calendar.name}
-                                                    >
-                                                        {calendar.name}
-                                                    </span>
-                                                </label>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            )}
-                        </div>
-                    </Section>
-                    )}
-
-                    <Section title={t("bookingPage.sectionTiming")}>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <FieldRow
-                                label={t("bookingPage.duration")}
-                                htmlFor="bp-duration"
-                                error={errorOf("durationMinutes")}
-                            >
-                                <NumberInput
-                                    id="bp-duration"
-                                    value={draft.durationMinutes}
-                                    min={5}
-                                    max={720}
-                                    onChange={(value) => set("durationMinutes", value ?? 0)}
-                                    onBlur={() => touch("durationMinutes")}
-                                />
-                            </FieldRow>
-                            <FieldRow
-                                label={t("bookingPage.slotEvery")}
-                                htmlFor="bp-slot"
-                                error={errorOf("slotMinutes")}
-                            >
-                                <NumberInput
-                                    id="bp-slot"
-                                    value={draft.slotMinutes}
-                                    min={5}
-                                    max={720}
-                                    onChange={(value) => set("slotMinutes", value ?? 0)}
-                                    onBlur={() => touch("slotMinutes")}
-                                />
-                            </FieldRow>
-                            <FieldRow
-                                label={t("bookingPage.bufferBefore")}
-                                htmlFor="bp-before"
-                                error={errorOf("bufferBefore")}
-                            >
-                                <NumberInput
-                                    id="bp-before"
-                                    value={draft.bufferBefore}
-                                    min={0}
-                                    max={240}
-                                    onChange={(value) => set("bufferBefore", value ?? 0)}
-                                    onBlur={() => touch("bufferBefore")}
-                                />
-                            </FieldRow>
-                            <FieldRow
-                                label={t("bookingPage.bufferAfter")}
-                                htmlFor="bp-after"
-                                error={errorOf("bufferAfter")}
-                            >
-                                <NumberInput
-                                    id="bp-after"
-                                    value={draft.bufferAfter}
-                                    min={0}
-                                    max={240}
-                                    onChange={(value) => set("bufferAfter", value ?? 0)}
-                                    onBlur={() => touch("bufferAfter")}
-                                />
-                            </FieldRow>
-                            <FieldRow
-                                label={t("bookingPage.notice")}
-                                htmlFor="bp-notice"
-                                hint={t("bookingPage.noticeHint")}
-                                error={errorOf("noticeMinutes")}
-                            >
-                                <NumberInput
-                                    id="bp-notice"
-                                    value={draft.noticeMinutes}
-                                    min={0}
-                                    max={86_400}
-                                    onChange={(value) => set("noticeMinutes", value ?? 0)}
-                                    onBlur={() => touch("noticeMinutes")}
-                                />
-                            </FieldRow>
-                            <FieldRow
-                                label={t("bookingPage.horizon")}
-                                htmlFor="bp-horizon"
-                                error={errorOf("horizonDays")}
-                            >
-                                <NumberInput
-                                    id="bp-horizon"
-                                    value={draft.horizonDays}
-                                    min={1}
-                                    max={365}
-                                    onChange={(value) => set("horizonDays", value ?? 0)}
-                                    onBlur={() => touch("horizonDays")}
-                                />
-                            </FieldRow>
-                            <FieldRow
-                                label={t("bookingPage.maxPerDay")}
-                                htmlFor="bp-max"
-                                hint={t("bookingPage.maxPerDayHint")}
-                                error={errorOf("maxPerDay")}
-                            >
-                                <NumberInput
-                                    id="bp-max"
-                                    value={draft.maxPerDay}
-                                    min={1}
-                                    max={100}
-                                    onChange={(value) => set("maxPerDay", value)}
-                                    onBlur={() => touch("maxPerDay")}
-                                />
-                            </FieldRow>
-                        </div>
-                        <FieldRow
-                            label={`${t("bookingPage.timezone")} *`}
-                            htmlFor="bp-zone"
-                            error={errorOf("timezone")}
-                        >
-                            <ZonePicker
-                                id="bp-zone"
-                                value={draft.timezone}
-                                onChange={(zone) => set("timezone", zone)}
-                                label={t("bookingPage.timezone")}
+                            <QuestionsEditor
+                                value={draft.questions}
+                                onChange={(value) => set("questions", value)}
+                                error={errorOf("questions")}
                             />
-                        </FieldRow>
-                    </Section>
+                        </Section>
 
-                    <Section title={t("bookingPage.sectionHours")}>
-                        <AvailabilityEditor
-                            value={draft.availability}
-                            onChange={(value) => set("availability", value)}
-                            error={errorOf("availability")}
-                        />
-                    </Section>
-
-                    <Section title={t("bookingPage.sectionQuestions")}>
-                        <p className="text-xs text-foreground-subtle">
-                            {t("bookingPage.questionsHint")}
-                        </p>
-                        <QuestionsEditor
-                            value={draft.questions}
-                            onChange={(value) => set("questions", value)}
-                            error={errorOf("questions")}
-                        />
-                    </Section>
-
-                    <Section title={t("bookingPage.sectionMeeting")}>
-                        <label className="flex items-center justify-between gap-3">
-                            <span className="flex flex-col">
-                                <span>{t("bookingPage.meetingLink")}</span>
-                                <span className="text-xs text-foreground-subtle">
-                                    {t("bookingPage.meetingLinkHint")}
+                        <Section title={t("bookingPage.sectionMeeting")}>
+                            <label className="flex items-center justify-between gap-3">
+                                <span className="flex flex-col">
+                                    <span>{t("bookingPage.meetingLink")}</span>
+                                    <span className="text-xs text-foreground-subtle">
+                                        {t("bookingPage.meetingLinkHint")}
+                                    </span>
                                 </span>
-                            </span>
-                            <Switch
-                                checked={draft.meetingLink}
-                                onChange={(value) => set("meetingLink", value)}
-                                aria-label={t("bookingPage.meetingLink")}
-                            />
-                        </label>
-                    </Section>
+                                <Switch
+                                    checked={draft.meetingLink}
+                                    onChange={(value) => set("meetingLink", value)}
+                                    aria-label={t("bookingPage.meetingLink")}
+                                />
+                            </label>
+                        </Section>
                     </fieldset>
 
                     {shared === "view" ? null : (
-                    <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 py-3">
-                        {attempted && !valid ? (
-                            <span className="mr-auto text-xs text-danger">
-                                {t("bookingPage.fixFirst")}
-                            </span>
-                        ) : null}
-                        {dirty && baseline ? (
+                        <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 py-3">
+                            {attempted && !valid ? (
+                                <span className="mr-auto text-xs text-danger">
+                                    {t("bookingPage.fixFirst")}
+                                </span>
+                            ) : null}
+                            {dirty && baseline ? (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setDraft(baseline);
+                                        setTouched(new Set());
+                                        setAttempted(false);
+                                    }}
+                                >
+                                    {t("bookingPage.discard")}
+                                </Button>
+                            ) : null}
                             <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => {
-                                    setDraft(baseline);
-                                    setTouched(new Set());
-                                    setAttempted(false);
-                                }}
+                                type="submit"
+                                disabled={
+                                    saving ||
+                                    (!dirty && pageId !== null) ||
+                                    (off && pageId === null)
+                                }
+                                aria-disabled={!valid || undefined}
                             >
-                                {t("bookingPage.discard")}
+                                {saving
+                                    ? t("bookingPage.saving")
+                                    : pageId
+                                      ? t("bookingPage.save")
+                                      : t("bookingPage.create")}
                             </Button>
-                        ) : null}
-                        <Button
-                            type="submit"
-                            disabled={
-                                saving || (!dirty && pageId !== null) || (off && pageId === null)
-                            }
-                            aria-disabled={!valid || undefined}
-                        >
-                            {saving
-                                ? t("bookingPage.saving")
-                                : pageId
-                                  ? t("bookingPage.save")
-                                  : t("bookingPage.create")}
-                        </Button>
-                    </div>
+                        </div>
                     )}
                 </form>
             )}

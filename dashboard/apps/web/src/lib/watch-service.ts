@@ -151,7 +151,10 @@ async function targetLabels(
     const ids = (type: string) =>
         rows.filter((row) => row.targetType === type).map((row) => row.targetId);
     const [hosts, apps, domains] = await Promise.all([
-        prisma.host.findMany({ where: { id: { in: ids("host") } }, select: { id: true, name: true } }),
+        prisma.host.findMany({
+            where: { id: { in: ids("host") } },
+            select: { id: true, name: true }
+        }),
         prisma.application.findMany({
             where: { id: { in: ids("application") } },
             select: { id: true, name: true }

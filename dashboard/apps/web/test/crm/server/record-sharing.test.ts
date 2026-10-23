@@ -100,7 +100,9 @@ describe("a shared CRM record", () => {
     });
 
     it("may be handed out by its owner on a personal shelf, and by nobody else", async () => {
-        await expect(requireMayShare(owner, "crm.record", `companies:${ID}`)).resolves.toBeUndefined();
+        await expect(
+            requireMayShare(owner, "crm.record", `companies:${ID}`)
+        ).resolves.toBeUndefined();
         await expect(requireMayShare(reader, "crm.record", `companies:${ID}`)).rejects.toThrow();
         await expect(requireMayShare(owner, "crm.record", `widgets:${ID}`)).rejects.toThrow();
     });
@@ -109,6 +111,8 @@ describe("a shared CRM record", () => {
         state.rows = new Map([[ID, { orgId: "org1", userId: null }]]);
         await expect(requireMayShare(reader, "crm.record", `companies:${ID}`)).rejects.toThrow();
         state.orgPermissions = ["crm.companies.edit"];
-        await expect(requireMayShare(reader, "crm.record", `companies:${ID}`)).resolves.toBeUndefined();
+        await expect(
+            requireMayShare(reader, "crm.record", `companies:${ID}`)
+        ).resolves.toBeUndefined();
     });
 });

@@ -21,7 +21,16 @@ import {
     useLinkBase
 } from "./reads";
 import { CalendarClock, Copy, CopyPlus, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, CopyButton, EmptyState, Skeleton, Switch, buttonVariants, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    CopyButton,
+    EmptyState,
+    Skeleton,
+    Switch,
+    buttonVariants,
+    cn
+} from "@polaris/ui";
 import {
     deleteBookingPageAction,
     duplicateBookingPageAction,

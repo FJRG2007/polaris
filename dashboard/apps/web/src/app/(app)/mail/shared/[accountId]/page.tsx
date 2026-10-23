@@ -156,7 +156,9 @@ export default async function SharedMailboxPage({
                                 <dd className="break-words">{open.to.join(", ")}</dd>
                                 {open.cc.length > 0 ? (
                                     <>
-                                        <dt className="text-muted-foreground">{t("delegate.cc")}</dt>
+                                        <dt className="text-muted-foreground">
+                                            {t("delegate.cc")}
+                                        </dt>
                                         <dd className="break-words">{open.cc.join(", ")}</dd>
                                     </>
                                 ) : null}

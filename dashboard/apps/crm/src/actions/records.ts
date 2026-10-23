@@ -163,8 +163,7 @@ export async function openRecordAction(input: unknown): Promise<Outcome<page.Rec
         if (opening.record) return opening;
         // Not on the reader's shelf: it may be somebody else's, shared with them.
         return (
-            (await page.openSharedRecord(actor.user, parsed.data.object, parsed.data.id)) ??
-            opening
+            (await page.openSharedRecord(actor.user, parsed.data.object, parsed.data.id)) ?? opening
         );
     });
 }

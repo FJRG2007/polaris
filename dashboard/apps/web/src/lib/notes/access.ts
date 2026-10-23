@@ -288,7 +288,10 @@ export async function requirePlacement(
  * nothing is. Never consulted by moving, archiving, deleting or sharing a note,
  * which stay with whoever reaches it on its shelf.
  */
-export async function sharedNote(actor: NoteActor, noteId: string): Promise<"view" | "edit" | null> {
+export async function sharedNote(
+    actor: NoteActor,
+    noteId: string
+): Promise<"view" | "edit" | null> {
     const held = await grantedCapability(actor.id, "note.note", noteId);
     return held === "edit" || held === "view" ? held : null;
 }

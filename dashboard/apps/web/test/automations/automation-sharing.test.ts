@@ -108,7 +108,11 @@ describe("a shared automation", () => {
     });
 
     it("may be handed out by whoever may change it, and by nobody else", async () => {
-        await expect(requireMayShare(owner as never, "automation.automation", ID)).resolves.toBeUndefined();
-        await expect(requireMayShare(reader as never, "automation.automation", ID)).rejects.toThrow();
+        await expect(
+            requireMayShare(owner as never, "automation.automation", ID)
+        ).resolves.toBeUndefined();
+        await expect(
+            requireMayShare(reader as never, "automation.automation", ID)
+        ).rejects.toThrow();
     });
 });

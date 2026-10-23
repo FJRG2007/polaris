@@ -164,7 +164,9 @@ export async function heldSectionPermissions({
     reachesSubject
 }: AppAccessInput): Promise<string[]> {
     const sections = Object.values(APP_SECTIONS).flat();
-    const named = [...new Set(sections.flatMap((section) => (section.needs ? [section.needs] : [])))];
+    const named = [
+        ...new Set(sections.flatMap((section) => (section.needs ? [section.needs] : [])))
+    ];
     const subjects = [
         ...new Set(sections.flatMap((section) => (section.reachedBy ? [section.reachedBy] : [])))
     ];

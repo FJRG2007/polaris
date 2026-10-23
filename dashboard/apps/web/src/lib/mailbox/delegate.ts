@@ -69,7 +69,10 @@ export async function delegatedMailboxes(userId: string): Promise<DelegatedMailb
 
 /** One delegated mailbox, if it is still lent to this person. The same refusal
  *  whether it was never lent, was taken back or no longer exists. */
-export async function delegatedMailbox(userId: string, accountId: string): Promise<DelegatedMailbox> {
+export async function delegatedMailbox(
+    userId: string,
+    accountId: string
+): Promise<DelegatedMailbox> {
     if (!(await grantedCapability(userId, "mail.mailbox", accountId))) throw new MailAccessError();
     const account = await prisma.mailAccount.findFirst({
         where: { id: accountId, userId: { not: userId } },

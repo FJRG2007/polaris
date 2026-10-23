@@ -12,8 +12,7 @@ import { host } from "@polaris/app-host";
 import type { StatusKey } from "../../messages";
 
 export type Outcome<T> =
-    | ({ readonly ok: true } & T)
-    | { readonly ok: false; readonly error: string };
+    ({ readonly ok: true } & T) | { readonly ok: false; readonly error: string };
 
 /** A refusal the reader can act on, named by its message key. */
 export class StatusRefusal extends Error {

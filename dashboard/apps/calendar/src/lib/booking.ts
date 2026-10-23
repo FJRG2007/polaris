@@ -1105,8 +1105,7 @@ export async function cancelBookingAsOwner(user: SessionUser, bookingId: string)
     const t = await calendarT();
     const booking =
         found &&
-        (found.page.ownerId === user.id ||
-            (await coHosted(user.id)).get(found.page.id) === "edit")
+        (found.page.ownerId === user.id || (await coHosted(user.id)).get(found.page.id) === "edit")
             ? found
             : null;
     if (!booking) throw new CalendarRefusal(t("booking.notFound"));

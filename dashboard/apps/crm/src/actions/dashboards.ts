@@ -108,7 +108,9 @@ export async function saveWidgetsAction(
 }
 
 /** One chart of a dashboard somebody shared with the reader, by its id. */
-export async function sharedWidgetDataAction(input: unknown): Promise<Outcome<{ data: WidgetData }>> {
+export async function sharedWidgetDataAction(
+    input: unknown
+): Promise<Outcome<{ data: WidgetData }>> {
     const parsed = z.object({ id, widgetId: id }).safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({

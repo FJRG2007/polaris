@@ -65,7 +65,11 @@ export function StatusPagesScreen({
     pageId: string | null;
     manager: boolean;
 }) {
-    return pageId ? <PageEditor pageId={pageId} manager={manager} /> : <PagesList manager={manager} />;
+    return pageId ? (
+        <PageEditor pageId={pageId} manager={manager} />
+    ) : (
+        <PagesList manager={manager} />
+    );
 }
 
 /** The marker on a page somebody shared with this reader. */
@@ -682,7 +686,9 @@ function PageEditor({ pageId, manager }: { pageId: string; manager: boolean }) {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="text-sm font-medium">{t("page.deleteTitle")}</p>
-                                <p className="text-xs text-muted-foreground">{t("page.deleteBody")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("page.deleteBody")}
+                                </p>
                             </div>
                             <Button variant="danger" onClick={() => setDeleting({ kind: "page" })}>
                                 {t("page.delete")}

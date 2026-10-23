@@ -50,14 +50,18 @@ export default async function NotesPage({
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("archive.notesTitle")}</h1>
-                    <p className="text-sm text-muted-foreground">
-                        {t("archive.notesDescription")}
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("archive.notesTitle")}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">{t("archive.notesDescription")}</p>
                 </div>
                 <NewNoteButton />
             </div>
-            <NotesView shelves={withNotes} note={note?.view ?? null} shared={note?.shared ?? null} />
+            <NotesView
+                shelves={withNotes}
+                note={note?.view ?? null}
+                shared={note?.shared ?? null}
+            />
         </div>
     );
 }

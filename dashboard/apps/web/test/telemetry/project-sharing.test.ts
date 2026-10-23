@@ -30,7 +30,7 @@ const row = {
     deployProjectId: null,
     orgId: null,
     reporters: "{}",
-    allowedCidrs: "[\"10.0.0.0/8\"]",
+    allowedCidrs: '["10.0.0.0/8"]',
     allowedUserAgents: "[]",
     deniedUserAgents: "[]",
     requireSecret: false,
@@ -75,7 +75,9 @@ vi.mock("@/lib/telemetry/report-service", () => ({
     getIssue: vi.fn(async () => ({ id: "i1" })),
     setIssueStatus: vi.fn()
 }));
-vi.mock("@/lib/domain-service", () => ({ appBaseUrl: vi.fn(async () => "https://polaris.example.test") }));
+vi.mock("@/lib/domain-service", () => ({
+    appBaseUrl: vi.fn(async () => "https://polaris.example.test")
+}));
 vi.mock("@/lib/workspace-scope", () => ({ scopeOrgIdFor: vi.fn(async () => null) }));
 vi.mock("@polaris/deploy", () => ({ slugify: (value: string) => value }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -116,8 +118,13 @@ describe("a shared telemetry project", () => {
     it("lists it marked shared, without the owner's rules or refusals, and opens its issues", async () => {
         state.granted = new Map([[PROJECT, "view"]]);
         const { data } = await actions.telemetryOverviewAction({ projectId: PROJECT });
-        expect(state.where).toMatchObject({ OR: [{ ownerId: "reader" }, { id: { in: [PROJECT] } }] });
-        expect(data?.projects[0]).toMatchObject({ shared: true, refused: { ip: null, agent: null } });
+        expect(state.where).toMatchObject({
+            OR: [{ ownerId: "reader" }, { id: { in: [PROJECT] } }]
+        });
+        expect(data?.projects[0]).toMatchObject({
+            shared: true,
+            refused: { ip: null, agent: null }
+        });
         expect(data?.projects[0]?.rules.allowedCidrs).toEqual([]);
         expect(data?.issues).toEqual([{ id: "i1" }]);
         expect(await actions.openIssueAction(PROJECT, "i1")).toEqual({ issue: { id: "i1" } });
@@ -134,7 +141,11 @@ describe("a shared telemetry project", () => {
     it("may be handed out by its owner or an administrator, and by nobody else", async () => {
         const as = (id: string, isAdmin = false) => ({ id, isAdmin }) as Sharer;
         await expect(requireMayShare(as("reader"), "telemetry.project", PROJECT)).rejects.toThrow();
-        await expect(requireMayShare(as("owner"), "telemetry.project", PROJECT)).resolves.toBeUndefined();
-        await expect(requireMayShare(as("admin", true), "telemetry.project", PROJECT)).resolves.toBeUndefined();
+        await expect(
+            requireMayShare(as("owner"), "telemetry.project", PROJECT)
+        ).resolves.toBeUndefined();
+        await expect(
+            requireMayShare(as("admin", true), "telemetry.project", PROJECT)
+        ).resolves.toBeUndefined();
     });
 });

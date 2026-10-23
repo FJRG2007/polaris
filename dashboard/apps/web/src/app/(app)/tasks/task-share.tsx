@@ -470,7 +470,11 @@ export function ShareDialog({
                         )}
                         {canShare ? (
                             <div className="flex justify-end">
-                                <Button size="sm" variant="ghost" onClick={() => setSharingPeople(true)}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setSharingPeople(true)}
+                                >
                                     <Users className="size-4" />
                                     {t("share.people.open")}
                                 </Button>

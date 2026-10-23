@@ -29,7 +29,8 @@ export async function TaskCard({ task }: { task: PublicTaskView }) {
         getTranslations("tasksDetail"),
         getTranslations("tasks")
     ]);
-    const showDate = (iso: string | null): string => (iso ? (task.timed ? format.dateTime(iso) : format.date(iso)) : "-");
+    const showDate = (iso: string | null): string =>
+        iso ? (task.timed ? format.dateTime(iso) : format.date(iso)) : "-";
 
     return (
         <Card>
@@ -51,7 +52,9 @@ export async function TaskCard({ task }: { task: PublicTaskView }) {
                             </span>
                         </span>
                     </Row>
-                    {task.assignees.length > 0 && <Row label={tp("props.assignees")}>{task.assignees.join(", ")}</Row>}
+                    {task.assignees.length > 0 && (
+                        <Row label={tp("props.assignees")}>{task.assignees.join(", ")}</Row>
+                    )}
                     {(task.startDate || task.dueDate) && (
                         <Row label={tp("props.dates")}>
                             {showDate(task.startDate)} - {showDate(task.dueDate)}
@@ -72,7 +75,10 @@ export async function TaskCard({ task }: { task: PublicTaskView }) {
                                     <Badge
                                         key={tag.name}
                                         className="border-transparent text-[0.6875rem]"
-                                        style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
+                                        style={{
+                                            backgroundColor: `${tag.color}22`,
+                                            color: tag.color
+                                        }}
                                     >
                                         {tag.name}
                                     </Badge>
@@ -96,7 +102,10 @@ export async function TaskCard({ task }: { task: PublicTaskView }) {
                         <h2 className="text-sm font-medium">{tp("subwork.subtasks")}</h2>
                         <ul className="divide-y divide-border rounded-md border border-border">
                             {task.subtasks.map((subtask, index) => (
-                                <li key={index} className="flex items-center gap-2 px-3 py-2 text-sm">
+                                <li
+                                    key={index}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm"
+                                >
                                     <span
                                         aria-hidden
                                         className="size-2.5 shrink-0 rounded-full"
@@ -104,12 +113,16 @@ export async function TaskCard({ task }: { task: PublicTaskView }) {
                                     />
                                     <span
                                         className={
-                                            subtask.finished ? "flex-1 text-muted-foreground" : "flex-1"
+                                            subtask.finished
+                                                ? "flex-1 text-muted-foreground"
+                                                : "flex-1"
                                         }
                                     >
                                         {subtask.name}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{subtask.statusName}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {subtask.statusName}
+                                    </span>
                                 </li>
                             ))}
                         </ul>

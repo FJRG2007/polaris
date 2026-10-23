@@ -76,7 +76,13 @@ vi.mock("@polaris/db", () => ({
                 return found ? row(found) : null;
             }),
             update: vi.fn(
-                async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+                async ({
+                    where,
+                    data
+                }: {
+                    where: { id: string };
+                    data: Record<string, unknown>;
+                }) => {
                     state.updates.push(data);
                     return { ...row(state.pages.find((one) => one.id === where.id)!), ...data };
                 }

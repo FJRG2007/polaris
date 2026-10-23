@@ -24,7 +24,10 @@ import { GrantError } from "@/lib/access/grants";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { mayEditShelf as mayEditAutomationShelf } from "@/lib/automations/runner";
 import { memberOrgIds, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
-import { requireNote as requireNoteOnShelf, requireSpace as requireNoteSpace } from "@/lib/notes/access";
+import {
+    requireNote as requireNoteOnShelf,
+    requireSpace as requireNoteSpace
+} from "@/lib/notes/access";
 import { requireShareable as requireOfficeShareable } from "@/lib/office/documents";
 import { requireSpace as requireChatSpace, requireChannel } from "@/lib/chat/access";
 import { requireSpace as requireTaskSpace, requireFolder, requireTask } from "@/lib/tasks/access";
@@ -208,7 +211,8 @@ export async function requireMayShare(
             // Whoever reaches it as its owner - the repository's, or whoever
             // started a workspace - lets somebody else read it.
             const { getSession } = await import("@/lib/agents/session-service");
-            if (!(await getSession(subjectId, user.id))) throw new GrantError("You cannot share that");
+            if (!(await getSession(subjectId, user.id)))
+                throw new GrantError("You cannot share that");
             return;
         }
         case "mail.mailbox":
@@ -218,7 +222,8 @@ export async function requireMayShare(
             try {
                 await ownedMailbox(user.id, subjectId);
             } catch (caught) {
-                if (caught instanceof MailAccessError) throw new GrantError("You cannot share that");
+                if (caught instanceof MailAccessError)
+                    throw new GrantError("You cannot share that");
                 throw caught;
             }
             return;
@@ -228,7 +233,8 @@ export async function requireMayShare(
                 where: { id: subjectId },
                 select: { ownerId: true }
             });
-            if (!project || project.ownerId !== user.id) throw new GrantError("You cannot share that");
+            if (!project || project.ownerId !== user.id)
+                throw new GrantError("You cannot share that");
             return;
         }
         case "task.task":
@@ -248,7 +254,10 @@ export async function requireMayShare(
             // Whoever may open the project as its owner (or an administrator)
             // decides who else reads its issues.
             const { requireProject } = await import("@/lib/telemetry/project-service");
-            const owns = await requireProject({ id: user.id, isAdmin: user.isAdmin }, subjectId).then(
+            const owns = await requireProject(
+                { id: user.id, isAdmin: user.isAdmin },
+                subjectId
+            ).then(
                 () => true,
                 () => false
             );

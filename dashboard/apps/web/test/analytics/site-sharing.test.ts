@@ -47,11 +47,13 @@ vi.mock("@/lib/deploy-project-access", () => ({
     })
 }));
 vi.mock("@/lib/analytics-service", () => ({
-    ensureAnalyticsSite: vi.fn(async (_type: string, id: string, name: string, hosts: string[]) => ({
-        id: `site-${id}`,
-        name,
-        hosts
-    })),
+    ensureAnalyticsSite: vi.fn(
+        async (_type: string, id: string, name: string, hosts: string[]) => ({
+            id: `site-${id}`,
+            name,
+            hosts
+        })
+    ),
     readAnalytics: vi.fn(async () => ({ online: 0 })),
     recentVisits: vi.fn(async () => []),
     getAnalyticsSettings: vi.fn(async () => ({}))
@@ -79,7 +81,8 @@ const { requireAnalyticsReader } = await import("@/app/(app)/apps/analytics/read
 const { requireMayShare } = await import("@/lib/access/sharing-service");
 
 const reader = { id: "reader", isAdmin: false } as Parameters<typeof requireMayShare>[0];
-const overview = () => actions.getAnalyticsOverviewAction({ scopeType: "application", scopeId: APP, range: "24h" });
+const overview = () =>
+    actions.getAnalyticsOverviewAction({ scopeType: "application", scopeId: APP, range: "24h" });
 
 describe("a shared Analytics site", () => {
     beforeEach(() => {
@@ -92,7 +95,9 @@ describe("a shared Analytics site", () => {
         await expect(requireAnalyticsReader()).rejects.toThrow("denied");
         state.granted = new Map([[APP, "view"]]);
         expect((await requireAnalyticsReader()).lent).toEqual(new Set([APP]));
-        expect((await actions.listAnalyticsSitesAction()).sites).toEqual([{ id: APP, label: "shop" }]);
+        expect((await actions.listAnalyticsSitesAction()).sites).toEqual([
+            { id: APP, label: "shop" }
+        ]);
     });
 
     it("reads the shared numbers marked shared, and nothing without a grant", async () => {

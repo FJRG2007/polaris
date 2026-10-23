@@ -74,7 +74,11 @@ export function ShareCalendarDialog({
                             />
                             {isOwner ? (
                                 <div className="flex justify-end">
-                                    <Button variant="outline" size="sm" onClick={() => setRoles(true)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setRoles(true)}
+                                    >
                                         {t("shareDialog.roles")}
                                     </Button>
                                 </div>
@@ -350,22 +354,18 @@ function TargetSearch({
                         return;
                     }
                     setResults([
-                        ...answer.people.map(
-                            (person): Target => ({
-                                kind: "user",
-                                id: person.id,
-                                name: person.name,
-                                detail: person.username ? `@${person.username}` : ""
-                            })
-                        ),
-                        ...answer.teams.map(
-                            (team): Target => ({
-                                kind: "team",
-                                id: team.id,
-                                name: team.name,
-                                detail: t("shareDialog.teamOf", { org: team.orgName })
-                            })
-                        )
+                        ...answer.people.map((person): Target => ({
+                            kind: "user",
+                            id: person.id,
+                            name: person.name,
+                            detail: person.username ? `@${person.username}` : ""
+                        })),
+                        ...answer.teams.map((team): Target => ({
+                            kind: "team",
+                            id: team.id,
+                            name: team.name,
+                            detail: t("shareDialog.teamOf", { org: team.orgName })
+                        }))
                     ]);
                     setActive(0);
                 });

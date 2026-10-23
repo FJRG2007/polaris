@@ -23,11 +23,7 @@ export async function connectivityReach(
     user: Pick<SessionUser, "id" | "isAdmin">
 ): Promise<ConnectivityReach> {
     if (user.isAdmin) return "admin";
-    const held = await grantedCapability(
-        user.id,
-        "watch.connectivity",
-        core.WATCH_CONNECTIVITY_ID
-    );
+    const held = await grantedCapability(user.id, "watch.connectivity", core.WATCH_CONNECTIVITY_ID);
     return core.atLeast("watch.connectivity", held, "view") ? "shared" : null;
 }
 

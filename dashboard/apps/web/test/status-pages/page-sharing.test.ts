@@ -53,7 +53,9 @@ vi.mock("@polaris/db", () => ({
         },
         statusComponent: {
             findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
-                where.id.in.filter((id) => componentPage[id]).map((id) => ({ pageId: componentPage[id] }))
+                where.id.in
+                    .filter((id) => componentPage[id])
+                    .map((id) => ({ pageId: componentPage[id] }))
             )
         },
         statusCheck: {

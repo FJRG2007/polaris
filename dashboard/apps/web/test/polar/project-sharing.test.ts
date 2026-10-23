@@ -56,13 +56,20 @@ describe("a shared Polar project", () => {
         state.lent = [PROJECT];
         const { projects } = await polarSidebar("reader");
         expect(state.sharedWhere).toEqual({ id: { in: [PROJECT] }, ownerId: { not: "reader" } });
-        expect(projects[1]).toEqual({ id: PROJECT, name: "Theirs", instructions: "Be brief.", shared: true });
+        expect(projects[1]).toEqual({
+            id: PROJECT,
+            name: "Theirs",
+            instructions: "Be brief.",
+            shared: true
+        });
     });
 
     it("is handed out by its owner and by nobody else", async () => {
         const as = (id: string) => ({ id, isAdmin: true }) as Sharer;
         await expect(requireMayShare(as("reader"), "polar.project", PROJECT)).rejects.toThrow();
-        await expect(requireMayShare(as("owner"), "polar.project", PROJECT)).resolves.toBeUndefined();
+        await expect(
+            requireMayShare(as("owner"), "polar.project", PROJECT)
+        ).resolves.toBeUndefined();
         expect(subjectHref("polar.project", PROJECT)).toBe("/polar");
     });
 });

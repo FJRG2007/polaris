@@ -117,33 +117,35 @@ export function PlansPanel({
                                     {plan.shared ? (
                                         <Badge variant="neutral">{t("plans.sharedWithYou")}</Badge>
                                     ) : (
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            aria-label={t("plans.share")}
-                                            title={t("plans.share")}
-                                            onClick={() => setSharing(plan)}
-                                        >
-                                            <Share2 className="size-4" />
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => setEditing(plan)}
-                                        >
-                                            {t("plans.edit")}
-                                        </Button>
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            aria-label={t("plans.deleteNamed", { name: plan.name })}
-                                            title={t("plans.delete")}
-                                            onClick={() => setRemoving(plan)}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </Button>
-                                    </div>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                aria-label={t("plans.share")}
+                                                title={t("plans.share")}
+                                                onClick={() => setSharing(plan)}
+                                            >
+                                                <Share2 className="size-4" />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => setEditing(plan)}
+                                            >
+                                                {t("plans.edit")}
+                                            </Button>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                aria-label={t("plans.deleteNamed", {
+                                                    name: plan.name
+                                                })}
+                                                title={t("plans.delete")}
+                                                onClick={() => setRemoving(plan)}
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </Button>
+                                        </div>
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">

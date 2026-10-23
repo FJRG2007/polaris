@@ -72,7 +72,7 @@ const core = await import("@polaris/core");
 const GUEST = { id: "u7", isAdmin: false } as unknown as SessionUser;
 
 beforeEach(() => {
-    devicePlaces = { "front-door": PLACE, "garage": PLACE, "office-door": OTHER };
+    devicePlaces = { "front-door": PLACE, garage: PLACE, "office-door": OTHER };
     cameraPlaces = { "cam-yard": PLACE, "cam-office": OTHER };
     lent = {
         [`place.place:${PLACE}`]: [
@@ -109,7 +109,11 @@ describe("a whole place lent as one key", () => {
 
     it("opens a door with the place's grant, and says it was the place's", async () => {
         const grant = await sharing.requireDeviceControl(GUEST, "front-door", "unlock");
-        expect(grant).toMatchObject({ id: "g-place", subjectType: "place.place", subjectId: PLACE });
+        expect(grant).toMatchObject({
+            id: "g-place",
+            subjectType: "place.place",
+            subjectId: PLACE
+        });
         await expect(sharing.requireDeviceView(GUEST, "garage")).resolves.toBeUndefined();
     });
 
@@ -118,7 +122,9 @@ describe("a whole place lent as one key", () => {
         expect(recordGrantUse).toHaveBeenCalledWith(
             expect.objectContaining({ grantId: "g-place", subjectType: "place.place" })
         );
-        await expect(sharing.requireDeviceControl(GUEST, "office-door", "unlock")).rejects.toThrow();
+        await expect(
+            sharing.requireDeviceControl(GUEST, "office-door", "unlock")
+        ).rejects.toThrow();
         await expect(sharing.requireDeviceView(GUEST, "office-door")).rejects.toThrow();
     });
 

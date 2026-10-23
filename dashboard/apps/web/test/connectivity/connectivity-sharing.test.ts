@@ -15,9 +15,7 @@ vi.mock("@/lib/access/grants", () => ({
     GrantError: class GrantError extends Error {}
 }));
 
-const { connectivityReach, sharedConnectivityReport } = await import(
-    "@/lib/connectivity/access"
-);
+const { connectivityReach, sharedConnectivityReport } = await import("@/lib/connectivity/access");
 const { sectionOffered, APP_SECTIONS } = await import("@/lib/apps");
 
 const person = { id: "u1", isAdmin: false };

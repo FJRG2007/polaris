@@ -22,7 +22,10 @@ export default async function SharedMailboxesPage() {
         <div className="mx-auto w-full max-w-3xl px-4 py-6">
             <div className="mb-4 flex flex-wrap items-baseline gap-3">
                 <h1 className="text-[17px] font-semibold tracking-tight">{t("delegate.title")}</h1>
-                <Link href="/mail" className="text-[12px] text-muted-foreground hover:text-foreground">
+                <Link
+                    href="/mail"
+                    className="text-[12px] text-muted-foreground hover:text-foreground"
+                >
                     {t("delegate.back")}
                 </Link>
             </div>
@@ -36,8 +39,14 @@ export default async function SharedMailboxesPage() {
                                 href={`/mail/shared/${mailbox.id}`}
                                 className="flex min-w-0 items-center gap-3 px-3 py-2.5 hover:bg-muted/50"
                             >
-                                <Inbox className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                <span className="min-w-0 flex-1 truncate text-sm" title={mailbox.address}>
+                                <Inbox
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                    aria-hidden
+                                />
+                                <span
+                                    className="min-w-0 flex-1 truncate text-sm"
+                                    title={mailbox.address}
+                                >
                                     {mailbox.label || mailbox.address}
                                 </span>
                                 <Badge variant="neutral">{t("delegate.readOnly")}</Badge>

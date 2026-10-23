@@ -34,9 +34,11 @@ vi.mock("@/lib/tasks/access", () => ({ requireSpace: vi.fn(), requireFolder: vi.
 vi.mock("@/lib/machines/machine-access", () => ({ domainOwner: vi.fn(), lendableServer: vi.fn() }));
 vi.mock("@/lib/agents/session-service", async () => ({
     getSession: vi.fn(async () => (state.owned ? { id: SESSION } : null)),
-    sharedSession: (await vi.importActual<typeof import("@/lib/agents/session-service")>(
-        "@/lib/agents/session-service"
-    )).sharedSession
+    sharedSession: (
+        await vi.importActual<typeof import("@/lib/agents/session-service")>(
+            "@/lib/agents/session-service"
+        )
+    ).sharedSession
 }));
 
 const { sharedSession } = await import("@/lib/agents/session-service");

@@ -138,7 +138,11 @@ export function DnsHistoryCard({ shared = false }: { shared?: boolean }) {
                                         ? undefined
                                         : (search) =>
                                               router.push(
-                                                  logHref({ search, outcome: "blocked", range: "30d" })
+                                                  logHref({
+                                                      search,
+                                                      outcome: "blocked",
+                                                      range: "30d"
+                                                  })
                                               )
                                 }
                             />
@@ -149,7 +153,9 @@ export function DnsHistoryCard({ shared = false }: { shared?: boolean }) {
                                     names={shown?.clientNames}
                                     empty={t("insights.none")}
                                     hint={t("insights.filterClient")}
-                                    onPick={(client) => router.push(logHref({ client, range: "30d" }))}
+                                    onPick={(client) =>
+                                        router.push(logHref({ client, range: "30d" }))
+                                    }
                                 />
                             )}
                             <ShareList

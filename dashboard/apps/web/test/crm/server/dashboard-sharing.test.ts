@@ -50,7 +50,9 @@ vi.mock("@polaris/db", () => ({
             findMany: vi.fn(
                 async ({ where }: { where: { id: { in: string[] }; shelf: { not: string } } }) =>
                     [...state.rows.entries()]
-                        .filter(([id, row]) => where.id.in.includes(id) && row.shelf !== where.shelf.not)
+                        .filter(
+                            ([id, row]) => where.id.in.includes(id) && row.shelf !== where.shelf.not
+                        )
                         .map(([id]) => ({ id, name: "Pipeline", widgets: WIDGETS }))
             )
         }
@@ -96,9 +98,8 @@ vi.mock("@/lib/local-server", () => ({
     LOCAL_SERVER_FALLBACK_NAME: "This server"
 }));
 
-const { listSharedDashboards, sharedWidgetData } = await import(
-    "@polaris-app/crm/src/lib/dashboards"
-);
+const { listSharedDashboards, sharedWidgetData } =
+    await import("@polaris-app/crm/src/lib/dashboards");
 const { requireMayShare } = await import("@/lib/access/sharing-service");
 
 const reader = { id: "reader", isAdmin: false } as Parameters<typeof requireMayShare>[0];
@@ -123,14 +124,24 @@ describe("a shared CRM dashboard", () => {
 
     it("counts a stored chart as a reader of only its kind, on the owner's shelf", async () => {
         state.granted = new Map([[ID, "view"]]);
-        await expect(sharedWidgetData(reader as never, ID, "0192f0aa-0000-7000-8000-0000000000a1")).rejects.toThrow("counted");
-        expect(state.readerArgs).toEqual([reader, expect.objectContaining({ userId: "owner" }), ["people"]]);
+        await expect(
+            sharedWidgetData(reader as never, ID, "0192f0aa-0000-7000-8000-0000000000a1")
+        ).rejects.toThrow("counted");
+        expect(state.readerArgs).toEqual([
+            reader,
+            expect.objectContaining({ userId: "owner" }),
+            ["people"]
+        ]);
     });
 
     it("refuses a chart without a grant, or one the dashboard does not hold", async () => {
-        await expect(sharedWidgetData(reader as never, ID, "0192f0aa-0000-7000-8000-0000000000a1")).rejects.toThrow("errors.missing");
+        await expect(
+            sharedWidgetData(reader as never, ID, "0192f0aa-0000-7000-8000-0000000000a1")
+        ).rejects.toThrow("errors.missing");
         state.granted = new Map([[ID, "view"]]);
-        await expect(sharedWidgetData(reader as never, ID, "0192f0aa-0000-7000-8000-0000000000a2")).rejects.toThrow("errors.missing");
+        await expect(
+            sharedWidgetData(reader as never, ID, "0192f0aa-0000-7000-8000-0000000000a2")
+        ).rejects.toThrow("errors.missing");
         expect(state.readerArgs).toBeNull();
     });
 

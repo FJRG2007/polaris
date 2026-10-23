@@ -66,7 +66,10 @@ export async function ConnectivityGuest({
                                     <span className="text-foreground">
                                         {t(`guestConnectivity.kind.${outage.kind}`)}
                                     </span>
-                                    <GuestWhen at={outage.startedAt} message="guestConnectivity.started" />
+                                    <GuestWhen
+                                        at={outage.startedAt}
+                                        message="guestConnectivity.started"
+                                    />
                                     <span>
                                         {outage.endedAt === null
                                             ? t("guestConnectivity.ongoing")

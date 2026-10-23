@@ -457,7 +457,9 @@ function ProjectMenu({
                     </ContextMenuItem>
                     {canManage && (
                         <>
-                            <ContextMenuItem onSelect={() => router.push(`${href}/settings/members`)}>
+                            <ContextMenuItem
+                                onSelect={() => router.push(`${href}/settings/members`)}
+                            >
                                 <Share2 className="size-4" /> {t("projects.share")}
                             </ContextMenuItem>
                             <ContextMenuSeparator />

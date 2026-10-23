@@ -26,10 +26,7 @@ export default async function WatchServersPage() {
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-            <PageHeader
-                title={t("overview.servers")}
-                description={t("servers.description")}
-            />
+            <PageHeader title={t("overview.servers")} description={t("servers.description")} />
             <WatchCardList
                 cards={[...own, ...lent]}
                 label={t("servers.listLabel")}

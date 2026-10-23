@@ -68,8 +68,8 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/access/grants", () => ({
     grantedSubjects: vi.fn(async () => state.lent),
-    grantedCapability: vi.fn(async (_user: string, _subject: string, id: string) =>
-        state.lent.get(id) ?? ""
+    grantedCapability: vi.fn(
+        async (_user: string, _subject: string, id: string) => state.lent.get(id) ?? ""
     ),
     dropGrantsFor: vi.fn(async (_subject: string, id: string) => {
         state.dropped.push(id);

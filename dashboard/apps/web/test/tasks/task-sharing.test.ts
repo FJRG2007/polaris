@@ -74,7 +74,12 @@ describe("a task shared on its own", () => {
         expect(state.reads).toBe(0);
         state.held = "view";
         const view = await sharedTaskView(TASK, "reader");
-        expect(view).toMatchObject({ reference: "OPS-4", name: "Ship it", assignees: ["Ana"], comments: [] });
+        expect(view).toMatchObject({
+            reference: "OPS-4",
+            name: "Ship it",
+            assignees: ["Ana"],
+            comments: []
+        });
         expect(view).not.toHaveProperty("id");
     });
 

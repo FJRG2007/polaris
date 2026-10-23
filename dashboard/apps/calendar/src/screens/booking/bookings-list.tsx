@@ -144,7 +144,9 @@ export function BookingsList({
                                 </span>
                                 <StatusChip status={booking.status} />
                                 <span className="ml-auto flex items-center gap-1">
-                                    {!shared && booking.objectId && booking.status === "confirmed" ? (
+                                    {!shared &&
+                                    booking.objectId &&
+                                    booking.status === "confirmed" ? (
                                         <Link
                                             href={`/calendar/e/${booking.objectId}`}
                                             aria-label={t("booking.openEvent")}

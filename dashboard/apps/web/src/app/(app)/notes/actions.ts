@@ -95,11 +95,16 @@ export async function updateNoteAction(input: unknown): Promise<{ error?: string
         };
 
     try {
-        await access.requireNote(caller, parsed.data.noteId, "member").catch(async (refused: unknown) => {
-            // A note shared to edit on its own: its title and text, nothing else.
-            const textOnly = Object.keys(parsed.data).every((key) => ["noteId", "title", "body"].includes(key));
-            if (!textOnly || (await access.sharedNote(caller, parsed.data.noteId)) !== "edit") throw refused;
-        });
+        await access
+            .requireNote(caller, parsed.data.noteId, "member")
+            .catch(async (refused: unknown) => {
+                // A note shared to edit on its own: its title and text, nothing else.
+                const textOnly = Object.keys(parsed.data).every((key) =>
+                    ["noteId", "title", "body"].includes(key)
+                );
+                if (!textOnly || (await access.sharedNote(caller, parsed.data.noteId)) !== "edit")
+                    throw refused;
+            });
         if (!(await notes.updateNote(parsed.data)))
             return { error: (await getTranslations("notes"))("errors.noteGone") };
         refresh();

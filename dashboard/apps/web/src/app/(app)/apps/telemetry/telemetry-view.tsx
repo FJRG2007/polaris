@@ -256,7 +256,9 @@ export function TelemetryView({
                 ) : (
                     <Skeleton className="h-4 w-32" />
                 )}
-                {project?.shared ? <Badge variant="neutral">{t("view.sharedWithYou")}</Badge> : null}
+                {project?.shared ? (
+                    <Badge variant="neutral">{t("view.sharedWithYou")}</Badge>
+                ) : null}
                 {project && !project.shared ? (
                     <Button
                         variant="ghost"
@@ -398,31 +400,35 @@ function SectionNav({
                 as="ul"
                 className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
             >
-                {SECTIONS.filter((section) => only === null || section.key === only).map((section) => {
-                    const active = section.key === open;
-                    const Icon = section.icon;
-                    return (
-                        <li key={section.key} className="shrink-0 lg:shrink">
-                            <button
-                                type="button"
-                                title={t(
-                                    `sections.${section.key}.hint` as NamespaceKey<"telemetry">
-                                )}
-                                aria-current={active ? "page" : undefined}
-                                onClick={() => onOpen(section.key)}
-                                className={cn(
-                                    "flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
-                                    active
-                                        ? "bg-muted font-medium text-foreground"
-                                        : "text-muted-foreground"
-                                )}
-                            >
-                                <Icon className="size-3.5 shrink-0" />
-                                {t(`sections.${section.key}.label` as NamespaceKey<"telemetry">)}
-                            </button>
-                        </li>
-                    );
-                })}
+                {SECTIONS.filter((section) => only === null || section.key === only).map(
+                    (section) => {
+                        const active = section.key === open;
+                        const Icon = section.icon;
+                        return (
+                            <li key={section.key} className="shrink-0 lg:shrink">
+                                <button
+                                    type="button"
+                                    title={t(
+                                        `sections.${section.key}.hint` as NamespaceKey<"telemetry">
+                                    )}
+                                    aria-current={active ? "page" : undefined}
+                                    onClick={() => onOpen(section.key)}
+                                    className={cn(
+                                        "flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
+                                        active
+                                            ? "bg-muted font-medium text-foreground"
+                                            : "text-muted-foreground"
+                                    )}
+                                >
+                                    <Icon className="size-3.5 shrink-0" />
+                                    {t(
+                                        `sections.${section.key}.label` as NamespaceKey<"telemetry">
+                                    )}
+                                </button>
+                            </li>
+                        );
+                    }
+                )}
             </ScrollRow>
         </nav>
     );
@@ -747,39 +753,39 @@ function IssuePanel({
                     <p className="truncate text-xs text-muted-foreground">{issue.culprit}</p>
                 </div>
                 {!readOnly && (
-                <div className="flex items-center gap-2">
-                    <Button
-                        size="sm"
-                        variant={issue.status === "resolved" ? "secondary" : "primary"}
-                        disabled={busy}
-                        onClick={() =>
-                            onStatus(issue.status === "resolved" ? "unresolved" : "resolved")
-                        }
-                    >
-                        <CircleCheck className="size-4" />
-                        {issue.status === "resolved" ? t("issue.resolved") : t("issue.resolve")}
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() =>
-                            onStatus(issue.status === "ignored" ? "unresolved" : "ignored")
-                        }
-                    >
-                        <CircleSlash className="size-4" />
-                        {issue.status === "ignored" ? t("issue.ignored") : t("issue.ignore")}
-                    </Button>
-                    <button
-                        type="button"
-                        title={t("issue.delete")}
-                        aria-label={t("issue.delete")}
-                        onClick={() => setRemoving(true)}
-                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                    >
-                        <Trash2 className="size-4" />
-                    </button>
-                </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            size="sm"
+                            variant={issue.status === "resolved" ? "secondary" : "primary"}
+                            disabled={busy}
+                            onClick={() =>
+                                onStatus(issue.status === "resolved" ? "unresolved" : "resolved")
+                            }
+                        >
+                            <CircleCheck className="size-4" />
+                            {issue.status === "resolved" ? t("issue.resolved") : t("issue.resolve")}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() =>
+                                onStatus(issue.status === "ignored" ? "unresolved" : "ignored")
+                            }
+                        >
+                            <CircleSlash className="size-4" />
+                            {issue.status === "ignored" ? t("issue.ignored") : t("issue.ignore")}
+                        </Button>
+                        <button
+                            type="button"
+                            title={t("issue.delete")}
+                            aria-label={t("issue.delete")}
+                            onClick={() => setRemoving(true)}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                        >
+                            <Trash2 className="size-4" />
+                        </button>
+                    </div>
                 )}
             </div>
 

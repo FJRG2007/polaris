@@ -42,14 +42,13 @@ export default async function WatchPage() {
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
-                <PageHeader
-                    title={t("overview.title")}
-                    description={t("overview.description")}
-                />
+                <PageHeader title={t("overview.title")} description={t("overview.description")} />
                 <Button asChild variant={overview.firing > 0 ? "danger" : "ghost"} size="sm">
                     <Link href="/watch/alarms">
                         <Bell className="size-4" />
-                        {overview.firing > 0 ? t("overview.firing", { count: overview.firing }) : t("overview.alarms")}
+                        {overview.firing > 0
+                            ? t("overview.firing", { count: overview.firing })
+                            : t("overview.alarms")}
                     </Link>
                 </Button>
             </div>

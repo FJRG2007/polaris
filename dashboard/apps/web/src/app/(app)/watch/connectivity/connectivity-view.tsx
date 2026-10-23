@@ -157,7 +157,9 @@ export function ConnectivityView({ admin }: { admin: boolean }) {
                                     aria-hidden="true"
                                 />
                                 <span className="hidden sm:inline">
-                                    {checking ? t("connectivity.checking") : t("connectivity.checkNow")}
+                                    {checking
+                                        ? t("connectivity.checking")
+                                        : t("connectivity.checkNow")}
                                 </span>
                             </Button>
                         </div>

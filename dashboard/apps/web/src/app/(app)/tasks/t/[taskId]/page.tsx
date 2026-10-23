@@ -24,7 +24,11 @@ import { TaskCard } from "@/app/t/[token]/task-card";
 
 export const dynamic = "force-dynamic";
 
-export default async function TaskPermalinkPage({ params }: { params: Promise<{ taskId: string }> }) {
+export default async function TaskPermalinkPage({
+    params
+}: {
+    params: Promise<{ taskId: string }>;
+}) {
     const { taskId } = await params;
     const user = await requirePermission("tasks.read");
     const mayManage = await sessionCan(user, "tasks.manage");
@@ -62,7 +66,9 @@ export default async function TaskPermalinkPage({ params }: { params: Promise<{ 
             where: {
                 spaceId: resolved.spaceId,
                 archived: false,
-                ...(scope.partialSpaceIds.includes(resolved.spaceId) ? { id: { in: scope.listIds } } : {})
+                ...(scope.partialSpaceIds.includes(resolved.spaceId)
+                    ? { id: { in: scope.listIds } }
+                    : {})
             },
             orderBy: { order: "asc" },
             // The space and the folder come with it: work only moves between lists of
@@ -86,7 +92,9 @@ export default async function TaskPermalinkPage({ params }: { params: Promise<{ 
                 defaultListId={resolved.listId}
                 initialTaskId={taskId}
                 title={list.name}
-                subtitle={list.folderName ? `${list.spaceName} / ${list.folderName}` : list.spaceName}
+                subtitle={
+                    list.folderName ? `${list.spaceName} / ${list.folderName}` : list.spaceName
+                }
                 tasks={tasks}
                 savedViews={views}
                 context={context}

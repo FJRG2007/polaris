@@ -54,15 +54,24 @@ describe("the network filter's statistics, shared", () => {
             clientNames: [{ address: "192.0.2.10", name: "laptop" }]
         } as never;
         const shared = sharedDnsHistory(history);
-        expect(shared).toMatchObject({ queries: 10, topClients: [], topBlockedClients: [], clientNames: [] });
+        expect(shared).toMatchObject({
+            queries: 10,
+            topClients: [],
+            topBlockedClients: [],
+            clientNames: []
+        });
         expect(shared.topPermitted).toHaveLength(1);
     });
 
     it("are handed out by an administrator only, and lead to the filter", async () => {
         const as = (isAdmin: boolean) => ({ id: "u", isAdmin }) as Sharer;
-        await expect(requireMayShare(as(false), "dns.filter", core.DNS_FILTER_ID)).rejects.toThrow();
+        await expect(
+            requireMayShare(as(false), "dns.filter", core.DNS_FILTER_ID)
+        ).rejects.toThrow();
         await expect(requireMayShare(as(true), "dns.filter", "elsewhere")).rejects.toThrow();
-        await expect(requireMayShare(as(true), "dns.filter", core.DNS_FILTER_ID)).resolves.toBeUndefined();
+        await expect(
+            requireMayShare(as(true), "dns.filter", core.DNS_FILTER_ID)
+        ).resolves.toBeUndefined();
         expect(subjectHref("dns.filter", core.DNS_FILTER_ID)).toBe("/apps/network-filter");
     });
 });

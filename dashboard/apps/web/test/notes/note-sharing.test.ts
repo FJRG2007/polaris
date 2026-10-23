@@ -46,7 +46,10 @@ vi.mock("@/lib/orgs/org-service", () => ({
     listAdministeredOrgs: vi.fn(async () => [])
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
+vi.mock("next/headers", () => ({
+    cookies: async () => ({ get: () => undefined }),
+    headers: async () => new Headers()
+}));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/lib/office/documents", () => ({ requireShareable: vi.fn() }));
 vi.mock("@/lib/chat/access", () => ({ requireSpace: vi.fn(), requireChannel: vi.fn() }));
@@ -85,13 +88,16 @@ describe("a note shared on its own", () => {
         expect((await actions.updateNoteAction({ noteId: NOTE, title: "x" })).error).toBeTruthy();
         state.held = "edit";
         expect(await actions.updateNoteAction({ noteId: NOTE, title: "x", body: "y" })).toEqual({});
-        expect((await actions.updateNoteAction({ noteId: NOTE, archived: true })).error).toBeTruthy();
+        expect(
+            (await actions.updateNoteAction({ noteId: NOTE, archived: true })).error
+        ).toBeTruthy();
         expect((await actions.updateNoteAction({ noteId: NOTE, pinned: true })).error).toBeTruthy();
         expect(state.updated).toHaveLength(1);
     });
 
     it("may be handed out by its owner and by nobody else", async () => {
-        const as = (id: string) => ({ id, isAdmin: false }) as Parameters<typeof requireMayShare>[0];
+        const as = (id: string) =>
+            ({ id, isAdmin: false }) as Parameters<typeof requireMayShare>[0];
         await expect(requireMayShare(as("reader"), "note.note", NOTE)).rejects.toThrow();
         await expect(requireMayShare(as("owner"), "note.note", NOTE)).resolves.toBeUndefined();
     });

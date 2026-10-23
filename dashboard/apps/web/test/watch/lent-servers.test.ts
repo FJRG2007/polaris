@@ -41,7 +41,9 @@ const { sectionOffered, APP_SECTIONS } = await import("@/lib/apps");
 /** The cards the page hands its list. */
 async function cardsShown(): Promise<{ id: string; detail: string }[]> {
     const page = (await WatchServersPage()) as ReactElement<{ children: ReactElement[] }>;
-    const list = page.props.children[1] as ReactElement<{ cards: { id: string; detail: string }[] }>;
+    const list = page.props.children[1] as ReactElement<{
+        cards: { id: string; detail: string }[];
+    }>;
     return list.props.cards;
 }
 

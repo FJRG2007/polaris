@@ -76,8 +76,18 @@ describe("a shared backup plan", () => {
     });
 
     it("is never replaced by somebody it was shared with", async () => {
-        const input = { name: "x", every: "daily", keepLast: 1, keepDays: 0, maxBytes: 0, notifyOnFailure: true, destinationIds: [] };
-        await expect(manage.savePlan("reader", input as never, PLAN)).rejects.toThrow("That plan does not exist");
+        const input = {
+            name: "x",
+            every: "daily",
+            keepLast: 1,
+            keepDays: 0,
+            maxBytes: 0,
+            notifyOnFailure: true,
+            destinationIds: []
+        };
+        await expect(manage.savePlan("reader", input as never, PLAN)).rejects.toThrow(
+            "That plan does not exist"
+        );
     });
 
     it("may be handed out by its owner and by nobody else", async () => {

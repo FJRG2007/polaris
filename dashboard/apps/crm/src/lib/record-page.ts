@@ -17,13 +17,7 @@ import type { ObjectRule } from "../model/roles";
 import { host } from "@polaris/app-host";
 import { CRM_VERBS } from "@polaris/core";
 import { OPEN_RULES } from "../model/roles";
-import {
-    recordWhere,
-    type Abilities,
-    type CrmActor,
-    type SessionUser,
-    type Shelf
-} from "./access";
+import { recordWhere, type Abilities, type CrmActor, type SessionUser, type Shelf } from "./access";
 import {
     CRM_OBJECTS,
     recordName,

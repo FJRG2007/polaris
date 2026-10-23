@@ -15,11 +15,20 @@ const doc = readFileSync(join(process.cwd(), "../../../docs/sharing-inventory.md
 /** The table's rows, as their cells. The header and the divider are skipped. */
 const rows = doc
     .split("\n")
-    .filter((line) => line.startsWith("| ") && !line.startsWith("| App ") && !line.startsWith("| ---"))
-    .map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()));
+    .filter(
+        (line) => line.startsWith("| ") && !line.startsWith("| App ") && !line.startsWith("| ---")
+    )
+    .map((line) =>
+        line
+            .split("|")
+            .slice(1, -1)
+            .map((cell) => cell.trim())
+    );
 
 /** Every subject the Subject column names, in backticks. */
-const named = rows.flatMap((cells) => [...(cells[2] ?? "").matchAll(/`([^`]+)`/g)].map((m) => m[1]));
+const named = rows.flatMap((cells) =>
+    [...(cells[2] ?? "").matchAll(/`([^`]+)`/g)].map((m) => m[1])
+);
 
 describe("the sharing inventory", () => {
     it("has a row for each object, with a decision", () => {

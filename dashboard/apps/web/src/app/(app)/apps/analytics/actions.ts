@@ -273,8 +273,7 @@ export async function rotateTrackerKeyAction(input: {
 export async function setAnalyticsSettingsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = analyticsSettingsSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: await say("errors.settings") };
+    if (!parsed.success) return { error: await say("errors.settings") };
     await setAnalyticsSettings(parsed.data);
     await recordAudit({
         actorId: user.id,

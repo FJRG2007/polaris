@@ -157,7 +157,10 @@ async function roomGrants(userId: string, roomIds: readonly string[]): Promise<L
 }
 
 /** Live grants over the place a device or a camera is at, if it is at one. */
-async function placeGrants(userId: string, placeId: string | null | undefined): Promise<LentGrant[]> {
+async function placeGrants(
+    userId: string,
+    placeId: string | null | undefined
+): Promise<LentGrant[]> {
     if (!placeId) return [];
     return (await liveGrants(userId, "place.place", placeId)).map((grant) => ({
         ...grant,
