@@ -46,6 +46,7 @@ import {
     type SeenDevice
 } from "./query-log";
 import { DNS_ENGINE_HTTP_PORT } from "./render";
+import { QueryLogFollower, type LogSource } from "./log-follow";
 
 const BLOCKY = "/app/blocky";
 
@@ -78,6 +79,19 @@ interface LogRead {
 }
 
 const logReads = new Map<string, { readonly at: number; readonly read: Promise<LogRead> }>();
+
+/** Bytes of a file one command carries, as base64 under the 16 KiB a command
+ *  returns. */
+const APPEND_CHUNK = 11_000;
+/** Past this much new text a file is streamed instead, from where it was left:
+ *  the first read of a day, or one after a long quiet spell. */
+const STREAM_PAST = 8 * APPEND_CHUNK;
+
+/** The unfiltered 24 hours, followed per DNS server container (see `log-follow`). */
+const followers = new Map<
+    string,
+    { readonly follower: QueryLogFollower; readonly current: { target: Engine } }
+>();
 
 /** The DNS server's container and the runtime that reaches it, for the other
  *  modules that ask it something. */
@@ -128,6 +142,124 @@ async function readDays(target: Engine, days: readonly Date[], reader: QueryLogR
     return found;
 }
 
+/** A file's bytes from `from` on, through the runtime's file stream: no limit
+ *  on its length, but it starts at the file's beginning. */
+async function* streamFrom(target: Engine, path: string, from: number): AsyncIterable<Uint8Array> {
+    const stream = await target.ports.readFile(target.container, path);
+    let skip = from;
+    for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) {
+        if (skip >= chunk.length) {
+            skip -= chunk.length;
+            continue;
+        }
+        yield skip > 0 ? chunk.subarray(skip) : chunk;
+        skip = 0;
+    }
+}
+
+/** A piece of a file from `from`, as base64, with the file's size first when
+ *  `$4` is set: under `STREAM_PAST` new bytes the piece is read here, past it
+ *  only the size is said. The path and the numbers are arguments, never part
+ *  of the script. */
+const PIECE_SCRIPT = [
+    'if [ -n "$4" ]; then size=$(stat -c %s "$1") || exit 1; echo "$size";',
+    '[ "$size" -gt "$2" ] && [ $((size - $2)) -le "$4" ] || exit 0; fi;',
+    'tail -c +$(($2 + 1)) "$1" | head -c "$3" | base64'
+].join(" ");
+
+/** The DNS server's log files as the follower reads them: what was written
+ *  since the last ask, a command's worth at a time, or the file streamed when
+ *  more than a few of those are waiting. */
+function engineSource(current: () => Engine): LogSource {
+    const piece = (path: string, from: number, sized: boolean) =>
+        current().ports.runIn(current().container, [
+            "sh",
+            "-c",
+            PIECE_SCRIPT,
+            "sh",
+            path,
+            String(from),
+            String(APPEND_CHUNK),
+            sized ? String(STREAM_PAST) : ""
+        ]);
+    async function* pieces(path: string, from: number, size: number, first: string | null) {
+        let at = from;
+        let encoded = first;
+        while (at < size) {
+            if (encoded === null) {
+                yield* streamFrom(current(), path, at);
+                return;
+            }
+            const bytes = Buffer.from(encoded, "base64");
+            if (bytes.length === 0) return;
+            yield bytes;
+            at += bytes.length;
+            if (at >= size) return;
+            const next = await piece(path, at, false);
+            // A command that could not read it: the stream can.
+            encoded = next.code === 0 ? next.output : null;
+        }
+    }
+    return {
+        async open(path, from) {
+            const result = await piece(path, from, true);
+            const newline = result.output.indexOf("\n");
+            const head = result.output.slice(0, newline < 0 ? undefined : newline).trim();
+            // No size: no such file (or no way to tell, which reads the same).
+            if (!/^\d+$/.test(head)) return null;
+            const size = Number(head);
+            const rest = newline < 0 ? "" : result.output.slice(newline + 1);
+            const streamed = result.code !== 0 || size - from > STREAM_PAST;
+            return { size, pieces: pieces(path, from, size, streamed ? null : rest) };
+        }
+    };
+}
+
+/** The unfiltered last 24 hours, followed rather than read again whole. */
+function followedLog(target: Engine, now: number): Promise<LogRead> {
+    let followed = followers.get(target.container);
+    if (!followed) {
+        // One DNS server at a time: a container left behind by a reinstall is
+        // not followed any further.
+        followers.clear();
+        const current = { target };
+        followed = { current, follower: new QueryLogFollower(engineSource(() => current.target)) };
+        followers.set(target.container, followed);
+    }
+    followed.current.target = target;
+    return followed.follower
+        .read(rangeWindow("24h", now))
+        .then(({ found, reader }) => ({ found, stats: reader.stats(), reader }));
+}
+
+/** Whether a filter is the unfiltered last 24 hours: the Overview, the summary
+ *  card and the devices seen, which the follower answers. */
+function isFollowed(filter: Omit<QueryFilter, "page">): boolean {
+    const { search, outcome, client, type, range } = filter;
+    return range === "24h" && !search && outcome === "all" && !client && !type;
+}
+
+/**
+ * Start following the last 24 hours, so the first visit after an update finds
+ * it read. Quiet when there is no DNS server to read, and never in anybody's
+ * way: run by the `dns-blocker-log` job.
+ */
+export async function followQueryLog(): Promise<void> {
+    let target: Engine;
+    try {
+        target = await engine();
+    } catch (error) {
+        if (error instanceof DnsBlockerRefusal) return;
+        throw error;
+    }
+    await cachedLog(target, rowsOf(queryFilterSchema.parse({})), true);
+}
+
+function rowsOf(filter: QueryFilter): Omit<QueryFilter, "page"> {
+    const { page: _page, ...rows } = filter;
+    return rows;
+}
+
 /** One read of the log per filter for a few seconds, shared by whoever asks
  *  meanwhile and by every page, so refreshes, paging and several admins do not
  *  each copy the files. */
@@ -143,12 +275,16 @@ function cachedLog(
     const key = JSON.stringify([target.container, search, outcome, client, type, range]);
     const hit = logReads.get(key);
     if (hit && !fresh && now - hit.at < ttl) return hit.read;
-    const reader = new QueryLogReader(filter, window);
-    const read = readDays(target, window.days, reader).then((found) => ({
-        found,
-        stats: reader.stats(),
-        reader
-    }));
+    const read = isFollowed(filter)
+        ? followedLog(target, now)
+        : (() => {
+              const reader = new QueryLogReader(filter, window);
+              return readDays(target, window.days, reader).then((found) => ({
+                  found,
+                  stats: reader.stats(),
+                  reader
+              }));
+          })();
     const entry = { at: now, read };
     read.catch(() => {
         if (logReads.get(key) === entry) logReads.delete(key);

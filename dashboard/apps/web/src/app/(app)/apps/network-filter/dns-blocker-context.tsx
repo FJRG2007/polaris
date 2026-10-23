@@ -23,12 +23,9 @@ import * as dns from "@/lib/dns-blocker/settings";
 import { browserTimeZone, lines, rejected } from "./fields";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DnsBlockerState, DnsBlockerStatus } from "@/lib/dns-blocker/service";
-import {
-    dnsBlockerStatusAction,
-    saveDnsSettingsAction,
-    turnOffDnsBlockerAction,
-    turnOnDnsBlockerAction
-} from "./actions";
+import { saveDnsSettingsAction, turnOffDnsBlockerAction, turnOnDnsBlockerAction } from "./actions";
+import * as polls from "./dns-blocker-polls";
+import { keepStatus, lastStatus } from "./dns-blocker-cache";
 
 /** How many times a starting server is looked at on its own, 4 s apart. */
 const STARTING_CHECKS = 15;
@@ -219,17 +216,24 @@ export function DnsBlockerProvider({
 
     const check = useCallback(() => {
         startChecking(async () => {
-            const result = await dnsBlockerStatusAction();
+            const result = await polls.dnsStatus();
             if (result.error !== undefined) {
                 setStatusError(result.error);
                 return;
             }
             setStatusError(null);
             setStatus(result.status);
+            keepStatus(result.status);
         });
     }, []);
 
-    useEffect(() => check(), [check]);
+    // The last status this browser saw first, so what depends on it draws at
+    // once; the check then replaces it.
+    useEffect(() => {
+        const held = lastStatus(initial);
+        if (held) setStatus((current) => current ?? held);
+        check();
+    }, [check, initial]);
 
     /** A check somebody asked for, which also starts the automatic ones over. */
     const recheck = useCallback(() => {

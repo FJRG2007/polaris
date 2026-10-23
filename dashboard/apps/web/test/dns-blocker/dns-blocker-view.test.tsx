@@ -143,6 +143,7 @@ async function shown(Section: () => React.ReactElement = Overview): Promise<stri
 
 afterEach(() => {
     cleanup();
+    window.sessionStorage.clear();
     search = "";
     replace.mockClear();
     push.mockClear();

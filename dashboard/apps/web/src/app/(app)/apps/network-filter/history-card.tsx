@@ -14,7 +14,7 @@ import {
     type DnsHistory,
     type DnsHistoryRange
 } from "@/lib/dns-blocker/history";
-import { dnsHistoryAction } from "./actions";
+import * as polls from "./dns-blocker-polls";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     ALLOWED_COLOR,
@@ -37,7 +37,7 @@ export function DnsHistoryCard() {
 
     useEffect(() => {
         let live = true;
-        void dnsHistoryAction({ range }).then((result) => {
+        void polls.dnsHistory({ range }).then((result) => {
             if (!live) return;
             if (result.error !== undefined) {
                 setError(result.error);

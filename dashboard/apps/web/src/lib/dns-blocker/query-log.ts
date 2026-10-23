@@ -245,10 +245,89 @@ function ranked(counts: Map<string, number>, limit = TOP_COUNT): NameCount[] {
         .map(([name, count]) => ({ name, count }));
 }
 
-function bump(counts: Map<string, number>, key: string): void {
+function bump(counts: Map<string, number>, key: string, by = 1): void {
+    const held = counts.get(key);
+    if (held !== undefined) counts.set(key, held + by);
+    else if (counts.size < DISTINCT_MAX) counts.set(key, by);
+}
+
+/** Rows one read keeps for the log's pages: one past the last page says
+ *  whether there is an older one. */
+export const QUERY_ROWS_KEPT = QUERY_LOG_PAGES * QUERY_LOG_ROWS + 1;
+
+/**
+ * A string of its own rather than a piece of the text it was cut from: a key
+ * kept for a day must not keep the whole chunk of the file it came out of.
+ */
+function own(text: string): string {
+    return text.length > 12 ? (JSON.parse(JSON.stringify(text)) as string) : text;
+}
+
+function count(counts: Map<string, number>, key: string): void {
     const held = counts.get(key);
     if (held !== undefined) counts.set(key, held + 1);
-    else if (counts.size < DISTINCT_MAX) counts.set(key, 1);
+    else if (counts.size < DISTINCT_MAX) counts.set(own(key), 1);
+}
+
+/**
+ * One bar's lookups added up, unfiltered, as `QueryLogReader` adds them: what a
+ * reader that follows a growing file keeps instead of the lines, so the window
+ * can move on by a bar without the files being read again.
+ */
+export class QueryBar {
+    public queries = 0;
+    public blocked = 0;
+    public readonly types = new Map<string, number>();
+    public readonly destinations = new Map<string, number>();
+    public readonly clients = new Map<string, number>();
+    public readonly seen = new Map<string, { first: number; last: number }>();
+    public readonly names = new Map<string, string>();
+    public readonly lists = new Map<string, number>();
+    public readonly permitted = new Map<string, number>();
+    public readonly blockedDomains = new Map<string, number>();
+    public readonly blockedClients = new Map<string, number>();
+    private sealed = false;
+
+    public constructor(public readonly start: number) {}
+
+    public add(row: QueryRow): void {
+        this.queries += 1;
+        count(this.types, row.type || "?");
+        count(this.destinations, row.via);
+        count(this.clients, row.client);
+        const seen = this.seen.get(row.client);
+        if (seen) {
+            seen.first = Math.min(seen.first, row.at);
+            seen.last = Math.max(seen.last, row.at);
+        } else if (this.seen.size < DISTINCT_MAX)
+            this.seen.set(own(row.client), { first: row.at, last: row.at });
+        if (
+            row.clientName &&
+            this.names.size < DISTINCT_MAX &&
+            this.names.get(row.client) !== row.clientName
+        )
+            this.names.set(own(row.client), own(row.clientName));
+        if (row.outcome === "blocked") {
+            this.blocked += 1;
+            count(this.blockedDomains, row.domain);
+            count(this.blockedClients, row.client);
+            if (row.list) count(this.lists, row.list);
+        } else count(this.permitted, row.domain);
+    }
+
+    /** A bar the window has moved past keeps only its busiest `limit` names of
+     *  each domain list: a name past them there is too rare to reach a top list,
+     *  and every other bar of the day would otherwise hold its own copy. */
+    public seal(limit: number): void {
+        if (this.sealed) return;
+        this.sealed = true;
+        for (const counts of [this.permitted, this.blockedDomains]) {
+            if (counts.size <= limit) continue;
+            const kept = [...counts].sort((a, b) => b[1] - a[1]).slice(0, limit);
+            counts.clear();
+            for (const [key, by] of kept) counts.set(key, by);
+        }
+    }
 }
 
 /**
@@ -274,8 +353,7 @@ export class QueryLogReader {
     private readonly names = new Map<string, string>();
     private readonly seen = new Map<string, { first: number; last: number }>();
     private readonly rows: QueryRow[] = [];
-    // One row past the last page says whether there is an older one.
-    private readonly keep = QUERY_LOG_PAGES * QUERY_LOG_ROWS + 1;
+    private readonly keep = QUERY_ROWS_KEPT;
 
     public constructor(
         private readonly filter: Omit<QueryFilter, "page">,
@@ -318,10 +396,58 @@ export class QueryLogReader {
             this.allowedBars[bar] = (this.allowedBars[bar] ?? 0) + 1;
             bump(this.permitted, row.domain);
         }
+        this.keepRow(row);
+    }
+
+    private keepRow(row: QueryRow): void {
         if (!rowMatches(row, this.filter)) return;
         this.rows.push(row);
         // The files are oldest first: keep only the newest rows the page needs.
         if (this.rows.length > this.keep * 2) this.rows.splice(0, this.rows.length - this.keep);
+    }
+
+    /** A bar added up elsewhere, folded in as if its lines had been added: the
+     *  same numbers, for a bar inside the window. */
+    public addBar(bar: QueryBar): void {
+        if (!(bar.start >= this.window.from && bar.start < this.window.to)) return;
+        const at = Math.floor((bar.start - this.window.from) / this.window.bucketMs);
+        this.queries += bar.queries;
+        this.blocked += bar.blocked;
+        this.allowedBars[at] = (this.allowedBars[at] ?? 0) + bar.queries - bar.blocked;
+        this.blockedBars[at] = (this.blockedBars[at] ?? 0) + bar.blocked;
+        const fold = (into: Map<string, number>, from: Map<string, number>) => {
+            for (const [key, count] of from) bump(into, key, count);
+        };
+        fold(this.types, bar.types);
+        fold(this.destinations, bar.destinations);
+        fold(this.clients, bar.clients);
+        fold(this.lists, bar.lists);
+        fold(this.permitted, bar.permitted);
+        fold(this.blockedDomains, bar.blockedDomains);
+        fold(this.blockedClients, bar.blockedClients);
+        for (const [client, { first, last }] of bar.seen) {
+            const seen = this.seen.get(client);
+            if (seen) {
+                seen.first = Math.min(seen.first, first);
+                seen.last = Math.max(seen.last, last);
+            } else if (this.seen.size < DISTINCT_MAX) this.seen.set(client, { first, last });
+        }
+        for (const [client, name] of bar.names)
+            if (this.names.size < DISTINCT_MAX) this.names.set(client, name);
+        for (const [client, count] of bar.clients) {
+            let series = this.perClient.get(client);
+            if (!series && this.perClient.size < SERIES_CLIENTS_MAX) {
+                series = new Array<number>(this.buckets).fill(0);
+                this.perClient.set(client, series);
+            }
+            if (series) series[at] = (series[at] ?? 0) + count;
+        }
+    }
+
+    /** Rows read elsewhere, oldest first, kept for the pages as `add` keeps them. */
+    public addRows(rows: readonly QueryRow[]): void {
+        for (const row of rows)
+            if (row.at >= this.window.from && row.at < this.window.to) this.keepRow(row);
     }
 
     public stats(): QueryStats {

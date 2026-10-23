@@ -5,6 +5,7 @@
  * and - until the network uses it - what to type into the router.
  */
 
+import { useEffect } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import {
     Badge,
@@ -19,7 +20,8 @@ import {
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DnsBlockerState } from "@/lib/dns-blocker/service";
 import { useDnsBlocker } from "./dns-blocker-context";
-import { DnsInsightsCard } from "./dns-insights";
+import { DnsInsightsCard, EMPTY_FILTER } from "./dns-insights";
+import { primeInsights } from "./dns-blocker-cache";
 import { DnsHistoryCard } from "./history-card";
 import { RouterDnsGuide, type RouterBrandOption } from "./router-dns-guide";
 
@@ -49,6 +51,10 @@ export function DnsOverviewSection({ brands }: { brands: RouterBrandOption[] }) 
         adoptRules
     } = useDnsBlocker();
     const state = status?.state;
+
+    // Asked alongside the status rather than after it: the card that shows it
+    // waits for the status, the read does not.
+    useEffect(() => primeInsights(EMPTY_FILTER), []);
 
     return (
         <div className="flex flex-col gap-4">

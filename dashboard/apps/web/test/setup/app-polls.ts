@@ -8,11 +8,24 @@ import { vi } from "vitest";
 
 type Loader = () => Promise<unknown>;
 
+/** Imports already under way, by loader. Two first imports of a mocked module at
+ *  the same moment hand one of them the real module, so a screen that asks two
+ *  reads at once would reach the server code; the second waits on the first. */
+const loading = new Map<Loader, Promise<unknown>>();
+
+function loadOnce(load: Loader): Promise<unknown> {
+    const pending = loading.get(load);
+    if (pending) return pending;
+    const started = load().finally(() => loading.delete(load));
+    loading.set(load, started);
+    return started;
+}
+
 /** Call `name` from the module `load` imports, with the first `arity` arguments
  *  (the poll's trailing abort signal is not the action's). */
 function forward(load: Loader, name: string, arity: number) {
     return async (...args: unknown[]) => {
-        const loaded = (await load()) as Record<string, (...args: unknown[]) => unknown>;
+        const loaded = (await loadOnce(load)) as Record<string, (...args: unknown[]) => unknown>;
         return loaded[name](...args.slice(0, arity));
     };
 }
@@ -50,14 +63,13 @@ vi.mock("@/app/(app)/apps/deploy/deploy-polls", () => {
     };
 });
 
-vi.mock("@/app/(app)/apps/servers/servers-polls", () => ({
-    serverEdge: forward(() => import("@/app/(app)/apps/servers/actions"), "serverEdgeAction", 1),
-    enrollmentStatus: forward(
-        () => import("@/app/(app)/apps/servers/actions"),
-        "enrollmentStatusAction",
-        1
-    )
-}));
+vi.mock("@/app/(app)/apps/servers/servers-polls", () => {
+    const actions = () => import("@/app/(app)/apps/servers/actions");
+    return {
+        serverEdge: forward(actions, "serverEdgeAction", 1),
+        enrollmentStatus: forward(actions, "enrollmentStatusAction", 1)
+    };
+});
 
 vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
     sessionScreen: forward(
@@ -71,7 +83,13 @@ vi.mock("@/app/(app)/apps/network-filter/dns-blocker-polls", () => {
     const actions = () => import("@/app/(app)/apps/network-filter/actions");
     return {
         dnsInsights: forward(actions, "dnsInsightsAction", 2),
-        dnsTail: forward(actions, "dnsTailAction", 1)
+        dnsTail: forward(actions, "dnsTailAction", 1),
+        dnsStatus: forward(actions, "dnsBlockerStatusAction", 0),
+        dnsLists: forward(actions, "dnsListsAction", 0),
+        dnsHistory: forward(actions, "dnsHistoryAction", 1),
+        dnsDevices: forward(actions, "dnsDevicesAction", 1),
+        dnsClients: forward(actions, "dnsClientsAction", 1),
+        dnsReputation: forward(actions, "dnsReputationAction", 1)
     };
 });
 

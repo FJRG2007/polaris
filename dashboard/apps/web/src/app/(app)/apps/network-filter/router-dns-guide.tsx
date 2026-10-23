@@ -24,7 +24,8 @@ import {
     type RouterBrand,
     type RouterDnsSetting
 } from "@/lib/router-guide";
-import { dnsClientsAction } from "./actions";
+import type { dnsClientsAction } from "./actions";
+import * as polls from "./dns-blocker-polls";
 
 const BRAND_KEY = "polaris.dnsBlocker.routerBrand";
 const LOOPBACK = new Set(["127.0.0.1", "::1", "localhost"]);
@@ -236,7 +237,7 @@ function DnsUseCheck({ address, relay }: { address: string | null; relay: boolea
             setChecking(true);
             let result: Awaited<ReturnType<typeof dnsClientsAction>>;
             try {
-                result = await dnsClientsAction(fresh);
+                result = await polls.dnsClients(fresh);
             } catch {
                 setError(t("routerGuide.check.failed"));
                 return;
