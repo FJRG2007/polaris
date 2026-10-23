@@ -26,7 +26,10 @@ describe("the deck on the local network", () => {
             return Response.json({ actions: [], releases: null });
         }) as typeof fetch;
         const client = new PolarisClient("0.0.0-test", fetcher);
+        let moved = 0;
+        client.onAddress = () => (moved += 1);
         await client.listing(credentials!);
+        expect(moved).toBe(1);
         expect(seen.at(-1)).toEqual({ url: `${LOCAL}/api/deck/actions`, authorization: "Bearer plr_deck" });
         expect(client.addressWords(credentials!)).toBe("Using your local network address");
     });

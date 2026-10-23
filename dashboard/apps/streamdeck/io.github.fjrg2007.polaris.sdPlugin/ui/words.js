@@ -19,6 +19,7 @@
             disconnect: "Disconnect",
             disconnectHint: "Disconnecting forgets the key here and revokes it in Polaris.",
             connectedTo: "Connected to {address} as {account}.",
+            local: "Using your local network address",
             offline:
                 "Polaris cannot be reached right now. The keys show it and try again on their own.",
             unauthorized:
@@ -98,6 +99,7 @@
             disconnect: "Desconectar",
             disconnectHint: "Al desconectar se olvida la clave aquí y se revoca en Polaris.",
             connectedTo: "Conectado a {address} como {account}.",
+            local: "Usando la dirección de tu red local",
             offline:
                 "No se puede contactar con Polaris ahora. Las teclas lo indican y lo reintentan solas.",
             unauthorized:

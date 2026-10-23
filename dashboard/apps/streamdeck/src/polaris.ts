@@ -225,7 +225,10 @@ export class PolarisClient {
      * Send to the deck's Polaris: its own address first, then - only after it
      * proved it is the same Polaris - one of its local addresses.
      */
-    #send(credentials: Credentials, path: string, init: RequestInit): Promise<Response> {
+    /** Called when the deck moves between its usual address and a local one. */
+    onAddress: () => void = () => undefined;
+
+    async #send(credentials: Credentials, path: string, init: RequestInit): Promise<Response> {
         if (!credentials.instance) return this.fetcher(`${credentials.address}${path}`, init);
         const key = `${credentials.address} ${credentials.instance.id}`;
         let failover = this.#failovers.get(key);
@@ -237,7 +240,12 @@ export class PolarisClient {
             });
             this.#failovers.set(key, failover);
         }
-        return failover.request(path, init);
+        const before = failover.status().local;
+        try {
+            return await failover.request(path, init);
+        } finally {
+            if (failover.status().local !== before) this.onAddress();
+        }
     }
 
     /** Which address the deck is on, in words, or null on its usual one. */

@@ -94,6 +94,30 @@ describe("the settings screen", () => {
         }
     });
 
+    it("says when the deck is on its local network address", () => {
+        const { dom, listeners } = openScreen("key");
+        const tell = (local: boolean) =>
+            listeners.get("message")?.({
+                data: JSON.stringify({
+                    event: "sendToPropertyInspector",
+                    payload: {
+                        type: "status",
+                        link: "online",
+                        address: "https://polaris.example.com",
+                        account: "Ada",
+                        local,
+                        connecting: { phase: "idle" },
+                        update: null,
+                        catalogue: []
+                    }
+                })
+            });
+        tell(false);
+        expect(dom.window.document.body.textContent).not.toContain("Using your local network address");
+        tell(true);
+        expect(dom.window.document.body.textContent).toContain("Using your local network address");
+    });
+
     function showUpdate(update: Record<string, unknown>) {
         const opened = openScreen("key");
         opened.listeners.get("message")?.({

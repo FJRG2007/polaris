@@ -83,6 +83,7 @@ class Hub {
 
     async start(): Promise<void> {
         this.client = new PolarisClient(streamDeck.info.plugin.version);
+        this.client.onAddress = () => this.onChange();
         this.words = wordsFor(streamDeck.info.application.language);
         this.credentials = readCredentials(await streamDeck.settings.getGlobalSettings());
         this.link = this.credentials ? "connecting" : "unset";
@@ -167,6 +168,22 @@ class Hub {
         }
     }
 
+    #learnTried = false;
+
+    /**
+     * A deck connected before Polaris described itself has no local addresses.
+     * Learned once, over the usual address that just answered, and kept with the
+     * key so the deck can carry on over the local network from then on.
+     */
+    async #learnInstance(credentials: Credentials): Promise<void> {
+        if (credentials.instance || this.#learnTried) return;
+        this.#learnTried = true;
+        const instance = await this.client.learn(credentials.address).catch(() => null);
+        if (!instance || this.credentials !== credentials) return;
+        this.credentials = { ...credentials, instance };
+        await streamDeck.settings.setGlobalSettings({ ...this.credentials });
+    }
+
     async refreshCatalogue(force: boolean): Promise<void> {
         const credentials = this.credentials;
         if (!credentials) return;
@@ -178,6 +195,7 @@ class Hub {
             this.latest = listing.latest;
             this.locked = listing.locked;
             this.link = "online";
+            void this.#learnInstance(credentials);
         } catch (caught) {
             this.#failed(caught);
         }
