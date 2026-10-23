@@ -138,6 +138,23 @@ describe("createFailover", () => {
         expect(failover.status()).toMatchObject({ origin: PRIMARY, local: false, words: null });
     });
 
+    it("calls an alternate untrusted when it answers only without TLS", async () => {
+        const { fetchImpl } = network({ [PRIMARY]: { behaviour: "down" } });
+        const asked: string[] = [];
+        const failover = createFailover({
+            primary: PRIMARY,
+            instance: record,
+            fetch: fetchImpl,
+            answersWithoutTls: async (origin) => {
+                asked.push(origin);
+                return origin === LOCAL;
+            }
+        });
+        await expect(failover.request("/x")).rejects.toThrow();
+        expect(asked).toEqual([LOCAL, LAN]);
+        expect(failover.status().untrusted).toEqual([LOCAL]);
+    });
+
     it("has no alternates without a learned instance", async () => {
         const { fetchImpl, seen } = network({ [PRIMARY]: { behaviour: "down" }, [LOCAL]: { behaviour: "up" } });
         const failover = createFailover({ primary: PRIMARY, instance: null, fetch: fetchImpl });

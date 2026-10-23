@@ -307,6 +307,14 @@ export interface FailoverOptions {
     readonly holdMs?: number;
     readonly verifiedMs?: number;
     readonly timeoutMs?: number;
+    /**
+     * Whether an alternate that could not be opened answers at all, asked without
+     * TLS. A browser reports an untrusted certificate as the same bare TypeError
+     * as an address that is not there, so a browser client passes this to tell the
+     * two apart: the host answering plain HTTP while its HTTPS fails is the
+     * certificate. Never sends anything of the client's.
+     */
+    readonly answersWithoutTls?: (origin: string) => Promise<boolean>;
 }
 
 export interface Failover {
@@ -360,6 +368,9 @@ export function createFailover(options: FailoverOptions): Failover {
         verifiedUntil.delete(origin);
         if (verdict.kind === "different") refused.add(origin);
         else if (verdict.certificate) untrusted.add(origin);
+        else if (options.answersWithoutTls && (await options.answersWithoutTls(origin).catch(() => false))) {
+            untrusted.add(origin);
+        } else untrusted.delete(origin);
         return false;
     }
 
