@@ -218,17 +218,26 @@ export async function liveGrants(
     // One row is enough to know whether anything is shared at all, and the
     // rows that matter are then only the caller's: a thing shared with
     // thousands of people is never read whole on the way into it.
-    const any = await prisma.accessGrant.findFirst({
+    const any = await prisma.accessGrant.findMany({
         where: { subjectType: subject, subjectId },
-        select: { id: true }
+        select: { id: true },
+        take: 1
     });
-    if (!any) return [];
+    if (any.length === 0) return [];
 
     const principals = await principalsOf(userId);
-    const rows = await prisma.accessGrant.findMany({
-        where: { subjectType: subject, subjectId, ...addressedTo(principals) },
-        select: { ...GRANT_FIELDS, principalType: true, principalId: true }
-    });
+    const held = new Set([
+        `user:${principals.userId}`,
+        ...principals.teamIds.map((id) => `team:${id}`),
+        ...principals.roleIds.map((id) => `role:${id}`)
+    ]);
+    // Matched again in memory: the query narrows, and this is what decides.
+    const rows = (
+        await prisma.accessGrant.findMany({
+            where: { subjectType: subject, subjectId, ...addressedTo(principals) },
+            select: { ...GRANT_FIELDS, principalType: true, principalId: true }
+        })
+    ).filter((row) => held.has(`${row.principalType}:${row.principalId}`));
     if (rows.length === 0) return [];
 
     const zone = await houseZone(rows);
