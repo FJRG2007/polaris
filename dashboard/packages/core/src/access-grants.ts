@@ -90,7 +90,8 @@ export const GRANT_SUBJECTS = [
     "analytics.site",
     "telemetry.project",
     "backup.plan",
-    "note.note"
+    "note.note",
+    "dns.filter"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -216,7 +217,11 @@ export const GRANT_CAPABILITIES = {
     "backup.plan": ["view"],
     // One note on its own: open it, or also change its title and text. Moving,
     // archiving, deleting and sharing it stay with whoever reaches its shelf.
-    "note.note": ["view", "edit"]
+    "note.note": ["view", "edit"],
+    // The network filter's long-term statistics: lookups, the blocked share and the
+    // domains most asked for. Which device asked, the live log, the rules and the
+    // settings stay with administrators.
+    "dns.filter": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -267,7 +272,8 @@ export const GRANT_ACTIONS = {
     "analytics.site": [],
     "telemetry.project": [],
     "backup.plan": [],
-    "note.note": []
+    "note.note": [],
+    "dns.filter": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**
@@ -689,6 +695,12 @@ export const LINK_WATCH_ONLY_SUBJECTS = [
  * row: a grant over it reads the whole record.
  */
 export const WATCH_CONNECTIVITY_ID = "deployment";
+
+/**
+ * The one network filter a deployment runs (`dns.filter`): like the
+ * connectivity record it has no row of its own, so a grant names this id.
+ */
+export const DNS_FILTER_ID = "network";
 
 /** The capabilities a link to this subject may carry, weakest first. */
 export function linkCapabilities(subject: GrantLinkSubject): readonly string[] {

@@ -196,6 +196,12 @@ export async function requireMayShare(
             }
             return;
         }
+        case "dns.filter":
+            // The network filter is the house's: whoever runs the house shares it.
+            if (!user.isAdmin || subjectId !== core.DNS_FILTER_ID) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
         case "backup.plan": {
             // Only its owner shows a plan to somebody else.
             const plan = await prisma.backupPlan.findUnique({
@@ -516,6 +522,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return `/notes?note=${encodeURIComponent(subjectId)}`;
         case "backup.plan":
             return "/apps/backups";
+        case "dns.filter":
+            return "/apps/network-filter";
         case "telemetry.project":
             return `/apps/telemetry?project=${encodeURIComponent(subjectId)}`;
         case "analytics.site":

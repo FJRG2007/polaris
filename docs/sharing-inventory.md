@@ -54,7 +54,7 @@ reason).
 | Backups | Plan | `backup.plan` | owner + AccessGrant per plan | none | people (view its schedule, what it keeps and where, beside their own plans; Backups stays an administrators-only app, so the reader has to be one; changing, deleting and putting things on it stay with the owner) | add | done |
 | Backups | Recovery point | - | owner | none | - | no: a restore writes over live data; view through the plan | - |
 | Game servers | Server (players) | - | `GamePlayerAccess` | invite link | operators via the dialog | add | todo |
-| Network filter | Stats, rules | - | administrators | none | people (view) | add | todo |
+| Network filter | Stats, rules | `dns.filter` | administrators + AccessGrant over the one filter | none | people (view the long-term statistics: totals, per-day chart, top domains, blocked by list; which device asked, the live log, the rules and the settings stay with administrators - rules are not shared, they name the network) | add | done |
 | Firewall | Rules, views | - | administrators | none | - | no: edge security, administrators only | - |
 | Agents | Session | - | owner | none | people (view) | add | todo |
 | Polar | Thread | - | `PolarShareRecipient` | Polar share link | dialog fronting it | fine | - |

@@ -11,7 +11,8 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { findApp } from "@/lib/apps/catalog";
-import { requireAdmin } from "@/lib/session";
+import { requireAdmin, requireUser } from "@/lib/session";
+import { dnsFilterReach, sharedDnsHistory } from "@/lib/dns-blocker/access";
 import { recordAudit } from "@/lib/audit-service";
 import * as blocker from "@/lib/dns-blocker/service";
 import * as insights from "@/lib/dns-blocker/insights";
@@ -282,10 +283,17 @@ export async function dnsDevicesAction(
 
 /** The finished days of a range, added up from the rows kept for the long term. */
 export async function dnsHistoryAction(input: unknown): Promise<Result<{ history: DnsHistory }>> {
-    await requireAdmin();
+    // Also read by whoever an administrator shared the statistics with, without
+    // the devices (`lib/dns-blocker/access`).
+    const reach = await dnsFilterReach(await requireUser());
+    if (!reach) {
+        const t = await getTranslations("dnsBlocker");
+        return { error: t("shared.denied") };
+    }
     try {
         const { range } = dnsHistoryInputSchema.parse(input);
-        return { history: await insights.dnsHistory(range) };
+        const history = await insights.dnsHistory(range);
+        return { history: reach === "admin" ? history : sharedDnsHistory(history) };
     } catch (error) {
         return failed(error);
     }

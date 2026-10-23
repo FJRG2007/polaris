@@ -3,6 +3,11 @@
         "title": "Network filter",
         "description": "Blocks ads, trackers and malware for every device on your network."
     },
+    "shared": {
+        "share": "Share statistics",
+        "sharedWithYou": "Shared with you",
+        "denied": "The network filter was not shared with you"
+    },
     "install": {
         "title": "Network filter is not installed",
         "body": "Install it to block ads, trackers and malware on every device that uses your network. Installing starts nothing; you turn the filter on afterwards.",

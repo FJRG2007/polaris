@@ -909,7 +909,8 @@ export function TopList({
     names?: readonly { address: string; name: string }[];
     empty: string;
     hint: string;
-    onPick: (name: string) => void;
+    /** Left out where the log is not the reader's to open: the rows are text. */
+    onPick?: (name: string) => void;
 }) {
     const nameOf = (address: string) =>
         names?.find((client) => client.address === address)?.name ?? "";
@@ -927,14 +928,18 @@ export function TopList({
                         const shown = name ? `${name} (${item.name})` : item.name;
                         return (
                             <li key={item.name} className="flex min-w-0 items-center gap-2 text-sm">
-                                <button
-                                    type="button"
-                                    title={`${shown} - ${hint}`}
-                                    className="min-w-0 flex-1 break-all text-left hover:underline"
-                                    onClick={() => onPick(item.name)}
-                                >
-                                    {shown}
-                                </button>
+                                {onPick ? (
+                                    <button
+                                        type="button"
+                                        title={`${shown} - ${hint}`}
+                                        className="min-w-0 flex-1 break-all text-left hover:underline"
+                                        onClick={() => onPick(item.name)}
+                                    >
+                                        {shown}
+                                    </button>
+                                ) : (
+                                    <span className="min-w-0 flex-1 break-all">{shown}</span>
+                                )}
                                 <span className="shrink-0 tabular-nums text-muted-foreground">
                                     {item.count.toLocaleString()}
                                 </span>
