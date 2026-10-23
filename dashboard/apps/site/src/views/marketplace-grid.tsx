@@ -72,29 +72,24 @@ export interface MarketWords {
 function BuiltIn({
     apps,
     words,
-    query,
     pageOf
 }: {
     apps: readonly BuiltInSiteApp[];
     words: BuiltInWords;
-    query: string;
     pageOf: (id: string) => string;
 }) {
-    const needle = query.trim().toLowerCase();
     const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
     return (
         <BuiltInAppsSection
-            apps={apps
-                .filter((app) => !needle || app.name.toLowerCase().includes(needle))
-                .map((app) => ({
-                    id: app.id,
-                    label: app.name,
-                    href: pageOf(app.id),
-                    replaces: app.replaces.map((item) => ({
-                        name: item.name,
-                        src: `${base}/logos/${item.logo}.svg`
-                    }))
-                }))}
+            apps={apps.map((app) => ({
+                id: app.id,
+                label: app.name,
+                href: pageOf(app.id),
+                replaces: app.replaces.map((item) => ({
+                    name: item.name,
+                    src: `${base}/logos/${item.logo}.svg`
+                }))
+            }))}
             words={words}
             link={Link}
         />
@@ -118,6 +113,10 @@ export function MarketplaceGrid({
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState("");
     const shown = apps.filter((app) => matchesApp(app, query, category));
+    const needle = query.trim().toLowerCase();
+    const builtInShown = builtIn.filter(
+        (app) => !needle || app.name.toLowerCase().includes(needle)
+    );
     const options = [
         { value: "", label: t.all },
         ...siteCategories(apps).map((entry) => ({ value: entry.id, label: entry.label }))
@@ -142,19 +141,16 @@ export function MarketplaceGrid({
                     />
                 </div>
                 <span className="text-xs text-muted-foreground">
-                    {fill(t.count, { n: shown.length })}
+                    {fill(t.count, { n: shown.length + builtInShown.length })}
                 </span>
             </div>
-            <BuiltIn
-                apps={builtIn}
-                words={builtInWords}
-                query={query}
-                pageOf={(id) => `${pages}${id}/`}
-            />
+            <BuiltIn apps={builtInShown} words={builtInWords} pageOf={(id) => `${pages}${id}/`} />
             {shown.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                    {t.empty}
-                </p>
+                builtInShown.length > 0 ? null : (
+                    <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                        {t.empty}
+                    </p>
+                )
             ) : (
                 <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {shown.map((app) => (
