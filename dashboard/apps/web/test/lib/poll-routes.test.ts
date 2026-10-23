@@ -148,7 +148,10 @@ const actions = vi.hoisted(() => {
         "getWafRuleAction",
         "redeployStrategyAction",
         "planDnsAction",
-        "listPlacementsAction"
+        "listPlacementsAction",
+        "listInstallTargetsAction",
+        "listStorageConnectionsAction",
+        "listTemplateTargetsAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -190,7 +193,8 @@ vi.mock("@/app/(app)/apps/deploy/actions", () => ({
     namedTunnelStatusAction: actions.namedTunnelStatusAction,
     domainHealthAction: actions.domainHealthAction,
     cloudflareAccountStatusAction: actions.cloudflareAccountStatusAction,
-    listNasConnectionsAction: actions.listNasConnectionsAction
+    listNasConnectionsAction: actions.listNasConnectionsAction,
+    listTemplateTargetsAction: actions.listTemplateTargetsAction
 }));
 vi.mock("@/app/(app)/apps/deploy/project-actions", () => ({
     listPromotionsAction: actions.listPromotionsAction,
@@ -423,6 +427,10 @@ vi.mock("@/app/(app)/apps/firewall/actions", () => ({
 vi.mock("@/app/(app)/apps/installed/[id]/actions", () => ({
     redeployStrategyAction: actions.redeployStrategyAction
 }));
+vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
+    listInstallTargetsAction: actions.listInstallTargetsAction,
+    listStorageConnectionsAction: actions.listStorageConnectionsAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -582,7 +590,12 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/apps/installed/redeploy-strategy": () =>
         import("@/app/api/apps/installed/redeploy-strategy/route"),
     "/api/mail-server/dns-plan": () => import("@/app/api/mail-server/dns-plan/route"),
-    "/api/mail-server/placements": () => import("@/app/api/mail-server/placements/route")
+    "/api/mail-server/placements": () => import("@/app/api/mail-server/placements/route"),
+    "/api/marketplace/install-targets": () => import("@/app/api/marketplace/install-targets/route"),
+    "/api/marketplace/storage-connections": () =>
+        import("@/app/api/marketplace/storage-connections/route"),
+    "/api/marketplace/template-targets": () =>
+        import("@/app/api/marketplace/template-targets/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2260,6 +2273,42 @@ const CASES: Case[] = [
                 )
             ).placements(),
         action: "listPlacementsAction",
+        args: []
+    },
+    {
+        name: "the machines an app can be installed on",
+        path: "/api/marketplace/install-targets",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/marketplace/marketplace-polls")>(
+                    "@/app/(app)/apps/marketplace/marketplace-polls"
+                )
+            ).installTargets(),
+        action: "listInstallTargetsAction",
+        args: []
+    },
+    {
+        name: "the storage an app's volumes can live on",
+        path: "/api/marketplace/storage-connections",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/marketplace/marketplace-polls")>(
+                    "@/app/(app)/apps/marketplace/marketplace-polls"
+                )
+            ).storageConnections(),
+        action: "listStorageConnectionsAction",
+        args: []
+    },
+    {
+        name: "the projects a template can be deployed into",
+        path: "/api/marketplace/template-targets",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/marketplace/marketplace-polls")>(
+                    "@/app/(app)/apps/marketplace/marketplace-polls"
+                )
+            ).templateTargets(),
+        action: "listTemplateTargetsAction",
         args: []
     }
 ];
