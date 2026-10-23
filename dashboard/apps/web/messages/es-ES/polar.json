@@ -535,6 +535,7 @@
         "breakdownReasoning": "Razonamiento: {count}"
     },
     "sharing": {
+        "saveLimits": "Guardar límites",
         "notice": "{name} compartió un chat de Polar contigo",
         "somebody": "Alguien",
         "linkSection": "Enlace público",

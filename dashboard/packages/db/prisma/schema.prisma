@@ -15543,6 +15543,15 @@ model PolarThreadShare {
     // The answer the snapshot ends at, when it was shared from that answer's
     // own row: the path to it, not the newest one. Null shows the whole chat.
     upToMessageId  String?
+    /// The limits every public link carries (lib/link-guards), and the opens
+    /// the cap is measured against. Null or an empty list is no restriction.
+    passwordHash      String?
+    expiresAt         DateTime?
+    maxViews          Int?
+    views             Int       @default(0)
+    allowedCidrs      String    @default("[]")
+    allowedCountries  String    @default("[]")
+    allowedContinents String    @default("[]")
     recipients     PolarShareRecipient[]
 }
 

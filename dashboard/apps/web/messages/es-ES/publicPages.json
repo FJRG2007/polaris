@@ -281,6 +281,9 @@
         "canRead": "Puedes leerlo"
     },
     "polarShare": {
+        "typePassword": "Escribe la contraseña",
+        "tooMany": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+        "wrongPassword": "Contraseña incorrecta.",
         "sharedOn": "Compartido el {date}",
         "empty": "Esta conversación no tiene mensajes que mostrar.",
         "readOnly": "Una copia de solo lectura de una conversación con Polar.",

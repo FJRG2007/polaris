@@ -15,6 +15,8 @@
  * Server-only.
  */
 
+import { hashLinkPassword } from "@polaris/core/link-password";
+import { readAddressRules, storedAddressRules } from "@/lib/link-guards";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
 import { prisma, Prisma, VISIBLE_USER } from "@polaris/db";
@@ -95,11 +97,61 @@ export async function polarShareLink(
             tokenNonce: true,
             tokenKeyId: true,
             sharedAt: true,
-            linkEnabled: true
+            linkEnabled: true,
+            views: true,
+            passwordHash: true,
+            expiresAt: true,
+            maxViews: true,
+            allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true
         }
     });
     if (!share || share.linkEnabled === false) return null;
-    return { url: await linkFor(tokenOf(share)), sharedAt: share.sharedAt.toISOString() };
+    return {
+        url: await linkFor(tokenOf(share)),
+        sharedAt: share.sharedAt.toISOString(),
+        views: share.views ?? 0,
+        hasPassword: Boolean(share.passwordHash),
+        expiresAt: share.expiresAt?.toISOString() ?? null,
+        maxViews: share.maxViews ?? null,
+        ...readAddressRules({
+            allowedCidrs: share.allowedCidrs ?? "[]",
+            allowedCountries: share.allowedCountries ?? "[]",
+            allowedContinents: share.allowedContinents ?? "[]"
+        })
+    };
+}
+
+/**
+ * Save the link's limits, without moving its snapshot. The password is only
+ * touched when one is typed or it is being taken off. Null when the chat is not
+ * this person's or its link is off.
+ */
+export async function setPolarShareLimits(
+    userId: string,
+    threadId: string,
+    limits: core.LinkLimitsInput
+): Promise<PolarShareLink | null> {
+    const share = await prisma.polarThreadShare.findFirst({
+        where: { threadId, thread: { userId }, linkEnabled: true },
+        select: { id: true }
+    });
+    if (!share) return null;
+    await prisma.polarThreadShare.update({
+        where: { id: share.id },
+        data: {
+            ...(limits.password
+                ? { passwordHash: await hashLinkPassword(limits.password) }
+                : limits.clearPassword
+                  ? { passwordHash: null }
+                  : {}),
+            expiresAt: limits.expiresAt,
+            maxViews: limits.maxViews,
+            ...storedAddressRules(limits)
+        }
+    });
+    return polarShareLink(userId, threadId);
 }
 
 /**

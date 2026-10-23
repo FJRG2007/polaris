@@ -14,6 +14,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    linkAddressRules,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { Link2, MessageSquareShare, Share2, Trash2, X } from "lucide-react";
 import {
     Button,
@@ -96,7 +102,13 @@ export function PolarShareDialog({
     const t = useTranslations("polar");
     const toast = useToast();
     const { copied, copy } = useCopied();
-    const [link, setLink] = useState<PolarShareLink | null | undefined>(undefined);
+    const [link, setLinkState] = useState<PolarShareLink | null | undefined>(undefined);
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
+    /** Every new state of the link reseeds the Advanced section from it. */
+    const setLink = useCallback((next: PolarShareLink | null | undefined) => {
+        setLinkState(next);
+        setAdvanced(advancedOf(next ?? null));
+    }, []);
     const [people, setPeople] = useState<PolarShareRecipientView[] | null>(null);
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [note, setNote] = useState("");
@@ -148,6 +160,34 @@ export function PolarShareDialog({
         const data = (await response.json()) as { link: PolarShareLink };
         setLink(data.link);
         if (await copy(data.link.url)) toast.show({ title: t("history.shareCopied") });
+    };
+
+    // A typed password is always a change: a stored one cannot be read back.
+    const limitsChanged =
+        Boolean(link) &&
+        (advanced.password !== "" ||
+            JSON.stringify(advanced) !== JSON.stringify(advancedOf(link ?? null)));
+
+    const saveLimits = async () => {
+        setWorking(true);
+        const response = await fetch(`/api/polar/threads/${row.id}/share`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                limits: {
+                    ...(advanced.password ? { password: advanced.password } : {}),
+                    maxViews: advanced.maxUses ? Number(advanced.maxUses) : null,
+                    expiresAt: advanced.expiresAt || null,
+                    ...linkAddressRules(advanced)
+                }
+            })
+        }).catch(() => null);
+        setWorking(false);
+        if (!response?.ok) {
+            toast.show({ title: t("history.shareFailed") });
+            return;
+        }
+        setLink(((await response.json()) as { link: PolarShareLink }).link);
     };
 
     const send = async () => {
@@ -249,6 +289,24 @@ export function PolarShareDialog({
                                         })
                                     })}
                                 </p>
+                                <LinkAdvancedFields
+                                    value={advanced}
+                                    onChange={setAdvanced}
+                                    passwordSet={link.hasPassword}
+                                    idPrefix="polar-share"
+                                />
+                                {limitsChanged ? (
+                                    <div className="flex justify-end">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            disabled={working}
+                                            onClick={() => void saveLimits()}
+                                        >
+                                            {t("sharing.saveLimits")}
+                                        </Button>
+                                    </div>
+                                ) : null}
                             </div>
                         ) : null}
                         <div className="flex flex-wrap justify-end gap-2">
@@ -562,4 +620,17 @@ export function SharedLinksDialog({
             </DialogContent>
         </Dialog>
     );
+}
+
+/** A saved link's limits as the Advanced section edits them. */
+function advancedOf(link: PolarShareLink | null): LinkAdvancedValue {
+    if (!link) return EMPTY_LINK_ADVANCED;
+    return {
+        password: "",
+        expiresAt: link.expiresAt ? link.expiresAt.slice(0, 10) : "",
+        maxUses: link.maxViews === null ? "" : String(link.maxViews),
+        allowedCidrs: link.allowedCidrs,
+        allowedCountries: link.allowedCountries,
+        allowedContinents: link.allowedContinents
+    };
 }

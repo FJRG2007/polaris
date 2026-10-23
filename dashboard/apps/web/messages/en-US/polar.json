@@ -535,6 +535,7 @@
         "breakdownReasoning": "Reasoning: {count}"
     },
     "sharing": {
+        "saveLimits": "Save the limits",
         "notice": "{name} shared a Polar chat with you",
         "somebody": "Somebody",
         "linkSection": "Public link",
