@@ -687,6 +687,8 @@
     },
     "dashboards": {
         "title": "Paneles",
+        "share": "Compartir panel",
+        "sharedWithYou": "Compartido contigo",
         "picker": "Elegir un panel",
         "create": "Nuevo panel",
         "rename": "Renombrar panel",

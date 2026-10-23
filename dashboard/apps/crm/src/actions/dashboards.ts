@@ -10,7 +10,7 @@ import * as views from "../lib/views";
 import * as fields from "../lib/fields";
 import type { Abilities } from "../lib/access";
 import * as dashboards from "../lib/dashboards";
-import { requireCrmActor } from "../lib/access";
+import { requireCrmActor, requireCrmUser } from "../lib/access";
 import type { ViewSummary } from "../model/views";
 import type { CustomField } from "../model/fields";
 import { CRM_OBJECTS, type CrmObject } from "../model/objects";
@@ -38,8 +38,9 @@ export async function openDashboardsAction(): Promise<Outcome<DashboardsOpening>
     return outcome(async () => {
         const actor = await requireCrmActor();
         const readable = CRM_OBJECTS.filter((object) => actor.can[object].read);
-        const [list, perObject] = await Promise.all([
+        const [list, shared, perObject] = await Promise.all([
             dashboards.listDashboards(actor),
+            dashboards.listSharedDashboards(actor),
             Promise.all(
                 readable.map(async (object) => {
                     const [all, added] = await Promise.all([
@@ -51,7 +52,7 @@ export async function openDashboardsAction(): Promise<Outcome<DashboardsOpening>
             )
         ]);
         return {
-            dashboards: list,
+            dashboards: [...list, ...shared],
             can: actor.can,
             canManage: dashboards.canManage(actor),
             objects: Object.fromEntries(perObject)
@@ -102,6 +103,19 @@ export async function saveWidgetsAction(
             await requireCrmActor(),
             parsed.data.id,
             parsed.data.widgets
+        )
+    }));
+}
+
+/** One chart of a dashboard somebody shared with the reader, by its id. */
+export async function sharedWidgetDataAction(input: unknown): Promise<Outcome<{ data: WidgetData }>> {
+    const parsed = z.object({ id, widgetId: id }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        data: await dashboards.sharedWidgetData(
+            await requireCrmUser(),
+            parsed.data.id,
+            parsed.data.widgetId
         )
     }));
 }

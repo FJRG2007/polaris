@@ -64,6 +64,34 @@ export interface RecordOpening {
  * as a reader who may see that one kind and change nothing. Null without a live
  * grant, or once the record is gone or in the trash.
  */
+/**
+ * Somebody reading one shared thing on another shelf: that shelf, the kinds of
+ * record named and only to read them, no role narrowing them further.
+ */
+export function readerOn(
+    user: SessionUser,
+    row: { orgId: string | null; userId: string | null },
+    objects: readonly CrmObject[]
+): CrmActor {
+    const shelf: Shelf = row.orgId
+        ? { orgId: row.orgId, userId: null, key: `org:${row.orgId}`, orgName: null }
+        : { orgId: null, userId: row.userId, key: `user:${row.userId}`, orgName: null };
+    return {
+        user,
+        shelf,
+        can: Object.fromEntries(
+            CRM_OBJECTS.map((kind) => [
+                kind,
+                Object.fromEntries(
+                    CRM_VERBS.map((verb) => [verb, objects.includes(kind) && verb === "read"])
+                )
+            ])
+        ) as unknown as Abilities,
+        rules: OPEN_RULES,
+        manageRoles: false
+    };
+}
+
 export async function openSharedRecord(
     user: SessionUser,
     object: CrmObject,
@@ -76,21 +104,8 @@ export async function openSharedRecord(
         select: { orgId: true, userId: true }
     })) as { orgId: string | null; userId: string | null } | null;
     if (!row) return null;
-    const shelf: Shelf = row.orgId
-        ? { orgId: row.orgId, userId: null, key: `org:${row.orgId}`, orgName: null }
-        : { orgId: null, userId: row.userId, key: `user:${row.userId}`, orgName: null };
-    const reader: CrmActor = {
-        user,
-        shelf,
-        can: Object.fromEntries(
-            CRM_OBJECTS.map((kind) => [
-                kind,
-                Object.fromEntries(CRM_VERBS.map((verb) => [verb, kind === object && verb === "read"]))
-            ])
-        ) as unknown as Abilities,
-        rules: OPEN_RULES,
-        manageRoles: false
-    };
+    const reader = readerOn(user, row, [object]);
+    const shelf = reader.shelf;
     const [record, fields] = await Promise.all([
         getRecord(reader, object, id),
         loadFields(shelf, object)

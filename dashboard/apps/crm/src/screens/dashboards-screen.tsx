@@ -39,10 +39,12 @@ import {
     MoreHorizontal,
     Pencil,
     Plus,
+    Share2,
     Table2,
     Trash2
 } from "lucide-react";
 import {
+    Badge,
     Button,
     cn,
     Dialog,
@@ -61,6 +63,8 @@ import {
 } from "@polaris/ui";
 
 const REMEMBERED = "crm:dashboard";
+
+const { ShareDialog } = hostUi.accessShareDialog;
 
 function remembered(): string | null {
     try {
@@ -105,7 +109,10 @@ export function DashboardsScreen() {
         { mode: "create" } | { mode: "rename"; dashboard: DashboardSummary } | null
     >(null);
     const [editing, setEditing] = useState<model.Widget | null>(null);
-    const manage = Boolean(data?.canManage);
+    const [sharing, setSharing] = useState(false);
+    // A dashboard shared from another shelf is looked at, never changed.
+    const manage = Boolean(data?.canManage) && !current?.shared;
+    const canCreate = Boolean(data?.canManage);
 
     const choices: WidgetChoices = useMemo(
         () => ({
@@ -249,7 +256,8 @@ export function DashboardsScreen() {
                     <WidgetCard
                         key={widget.id}
                         widget={widget}
-                        canRead={Boolean(data.can[widget.object]?.read)}
+                        sharedFrom={current.shared ? current.id : null}
+                        canRead={current.shared || Boolean(data.can[widget.object]?.read)}
                         custom={choices.objects[widget.object]?.custom ?? []}
                         manage={manage}
                         first={index === 0}
@@ -308,12 +316,17 @@ export function DashboardsScreen() {
                                     <span className="min-w-0 flex-1 truncate" title={one.name}>
                                         {one.name}
                                     </span>
+                                    {one.shared ? (
+                                        <Badge variant="neutral">
+                                            {t("dashboards.sharedWithYou")}
+                                        </Badge>
+                                    ) : null}
                                     {one.id === current?.id ? (
                                         <Check className="size-3.5 shrink-0" />
                                     ) : null}
                                 </DropdownMenuItem>
                             ))}
-                            {manage ? (
+                            {canCreate ? (
                                 <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
@@ -322,7 +335,7 @@ export function DashboardsScreen() {
                                         <Plus className="size-3.5" />
                                         {t("dashboards.create")}
                                     </DropdownMenuItem>
-                                    {current ? (
+                                    {current && !current.shared ? (
                                         <>
                                             <DropdownMenuItem
                                                 onSelect={() =>
@@ -349,7 +362,21 @@ export function DashboardsScreen() {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 ) : null}
+                {current?.shared ? (
+                    <Badge variant="neutral">{t("dashboards.sharedWithYou")}</Badge>
+                ) : null}
                 <span className="mr-auto" />
+                {manage && current ? (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSharing(true)}
+                        aria-label={t("dashboards.share")}
+                        title={t("dashboards.share")}
+                    >
+                        <Share2 className="size-4" />
+                    </Button>
+                ) : null}
                 {manage && current ? (
                     <Button
                         size="sm"
@@ -402,6 +429,17 @@ export function DashboardsScreen() {
                     }
                     onSubmit={name}
                     onClose={() => setNaming(null)}
+                />
+            ) : null}
+            {sharing && current && !current.shared ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(next) => {
+                        if (!next) setSharing(false);
+                    }}
+                    subject="crm.dashboard"
+                    subjectId={current.id}
+                    name={current.name}
                 />
             ) : null}
             {confirmElement}
@@ -487,20 +525,24 @@ function NameDialog({
 }
 
 /** A widget's figures: kept from last time first, then read again. */
-function useWidgetData(widget: model.Widget, enabled: boolean) {
+function useWidgetData(widget: model.Widget, enabled: boolean, sharedFrom: string | null) {
     const t = useCrmT();
     const key = JSON.stringify({ ...widget, id: undefined, title: undefined, wide: undefined });
     const load = useCallback(
         () =>
-            unwrap(() => actions.widgetDataAction({ widget }), t("errors.loadFailed")).then(
-                (answer) => answer.data
-            ),
+            unwrap(
+                () =>
+                    sharedFrom
+                        ? actions.sharedWidgetDataAction({ id: sharedFrom, widgetId: widget.id })
+                        : actions.widgetDataAction({ widget }),
+                t("errors.loadFailed")
+            ).then((answer) => answer.data),
         // The widget is read through its key: a new title does not count again.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [key, t]
+        [key, t, sharedFrom]
     );
     return hostUi.liveRead.useLiveRead<model.WidgetData>({
-        cacheKey: `crm:widget:${key}`,
+        cacheKey: sharedFrom ? `crm:widget:${sharedFrom}:${key}` : `crm:widget:${key}`,
         load,
         enabled
     });
@@ -508,6 +550,7 @@ function useWidgetData(widget: model.Widget, enabled: boolean) {
 
 function WidgetCard({
     widget,
+    sharedFrom,
     canRead,
     custom,
     manage,
@@ -518,6 +561,7 @@ function WidgetCard({
     onRemove
 }: {
     widget: model.Widget;
+    sharedFrom: string | null;
     canRead: boolean;
     custom: readonly FieldDef[];
     manage: boolean;
@@ -530,7 +574,7 @@ function WidgetCard({
     const t = useCrmT();
     const format = hostUi.displayFormat.useDisplayFormat();
     const [asTable, setAsTable] = useState(false);
-    const reading = useWidgetData(widget, canRead);
+    const reading = useWidgetData(widget, canRead, sharedFrom);
     const measured = widget.field ? fieldOf(widget.object, widget.field, custom) : undefined;
     const split = widget.groupBy ? fieldOf(widget.object, widget.groupBy, custom) : undefined;
     const title = widget.title || autoTitle(t, widget, measured, split);

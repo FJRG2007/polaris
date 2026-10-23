@@ -64,7 +64,8 @@
             "status.page": "a public status page",
             "calendar.calendar": "a calendar",
             "calendar.booking": "a page for bookings",
-            "crm.record": "a record in the CRM"
+            "crm.record": "a record in the CRM",
+            "crm.dashboard": "a CRM dashboard"
         }
     },
     "mentions": {

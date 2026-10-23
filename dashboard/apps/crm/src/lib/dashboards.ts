@@ -25,6 +25,9 @@ import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
 import { loadOdds } from "./forecast";
 import { shelfPeople } from "./records";
+import { readerOn } from "./record-page";
+import { host } from "@polaris/app-host";
+import type { SessionUser } from "./access";
 import { WON_STAGE } from "../model/forecast";
 import { readConfig } from "../model/views";
 import * as model from "../model/dashboards";
@@ -42,6 +45,8 @@ export interface DashboardSummary {
     readonly id: string;
     readonly name: string;
     readonly widgets: model.Widget[];
+    /** Somebody else's dashboard, shared with this reader to look at. */
+    readonly shared?: boolean;
 }
 
 const SELECT = { id: true, name: true, widgets: true } as const;
@@ -161,6 +166,44 @@ export async function deleteDashboard(actor: CrmActor, id: string): Promise<void
     await requireManage(actor);
     await owned(actor, id);
     await prisma.crmDashboard.deleteMany({ where: { id, shelf: actor.shelf.key } });
+    // Nobody keeps looking at a dashboard that no longer exists.
+    await host.accessGrants.dropGrantsFor("crm.dashboard", id);
+}
+
+/** Dashboards from other shelves shared with this reader, read-only. */
+export async function listSharedDashboards(actor: CrmActor): Promise<DashboardSummary[]> {
+    const held = await host.accessGrants.grantedSubjects(actor.user.id, "crm.dashboard");
+    const ids = [...held.keys()];
+    if (ids.length === 0) return [];
+    const rows = await prisma.crmDashboard.findMany({
+        where: { id: { in: ids }, shelf: { not: actor.shelf.key } },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: model.MAX_DASHBOARDS,
+        select: SELECT
+    });
+    return rows.map((row) => ({ ...summary(row), shared: true }));
+}
+
+/**
+ * One chart of a dashboard shared with this reader, counted over the shelf it
+ * lives on as somebody who may read only the kind of record it counts. The
+ * chart is the stored one, never what the browser sent, so a grant reaches
+ * exactly what its owner put on it.
+ */
+export async function sharedWidgetData(
+    user: SessionUser,
+    dashboardId: string,
+    widgetId: string
+): Promise<model.WidgetData> {
+    const held = await host.accessGrants.grantedSubjects(user.id, "crm.dashboard");
+    if (!held.has(dashboardId)) return refuse("missing");
+    const row = await prisma.crmDashboard.findFirst({
+        where: { id: dashboardId },
+        select: { orgId: true, userId: true, widgets: true }
+    });
+    const widget = row ? readWidgets(row.widgets).find((one) => one.id === widgetId) : undefined;
+    if (!row || !widget) return refuse("missing");
+    return widgetData(readerOn(user, row, [widget.object]), widget);
 }
 
 /** Keep a dashboard's widgets, each checked against its kind of record now. */

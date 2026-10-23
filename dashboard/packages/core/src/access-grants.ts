@@ -84,7 +84,8 @@ export const GRANT_SUBJECTS = [
     "status.page",
     "calendar.calendar",
     "calendar.booking",
-    "crm.record"
+    "crm.record",
+    "crm.dashboard"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -192,7 +193,10 @@ export const GRANT_CAPABILITIES = {
     // One CRM record - a company, a person or an opportunity - named
     // "<kind>:<id>", handed to somebody outside its shelf: its fields, read.
     // Its timeline, the records around it and every change stay on the shelf.
-    "crm.record": ["view"]
+    "crm.record": ["view"],
+    // One CRM dashboard: its charts, counted over its shelf as somebody who
+    // may read only the kinds of record they count. Changing it stays on the shelf.
+    "crm.dashboard": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -237,7 +241,8 @@ export const GRANT_ACTIONS = {
     "status.page": [],
     "calendar.calendar": [],
     "calendar.booking": [],
-    "crm.record": []
+    "crm.record": [],
+    "crm.dashboard": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

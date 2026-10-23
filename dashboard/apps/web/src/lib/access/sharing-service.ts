@@ -176,6 +176,28 @@ export async function requireMayShare(
             }
             return;
         }
+        case "crm.dashboard": {
+            // Whoever may change dashboards where it lives may show one to
+            // somebody else: its owner on a personal shelf, a role that edits
+            // some kind of record on an organization's.
+            const row = /^[0-9a-f-]{36}$/i.test(subjectId)
+                ? await prisma.crmDashboard.findFirst({
+                      where: { id: subjectId },
+                      select: { orgId: true, userId: true }
+                  })
+                : null;
+            if (!row) throw new GrantError("You cannot share that");
+            if (row.orgId) {
+                const access = await resolveOrgAccess(user, row.orgId);
+                const edits = ["companies", "people", "opportunities"].some((kind) =>
+                    orgCan(access, `crm.${kind}.edit` as core.OrgPermission)
+                );
+                if (!edits) throw new GrantError("You cannot share that");
+            } else if (row.userId !== user.id) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
+        }
         case "status.page": {
             // Whoever runs status pages decides who else keeps one up to date.
             if (!(await sessionCan(user, "status.manage"))) {
@@ -435,6 +457,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             const [kind, id] = subjectId.split(":");
             return `/crm/${kind}/${encodeURIComponent(id ?? "")}`;
         }
+        case "crm.dashboard":
+            return "/crm/dashboards";
         case "office.document":
             return "/office/shared";
         case "place.ups":
