@@ -42,7 +42,11 @@
         "lookIntro": "Screenshots of the real interface with sample data. Select one to enlarge it.",
         "seeApps": "See every app",
         "ctaTitle": "Your own Polaris is one line away",
-        "ctaBody": "Free and open source under the AGPL-3.0 license."
+        "ctaBody": "Free and open source under the AGPL-3.0 license.",
+        "tourTitle": "See it in use",
+        "tourIntro": "Pick a part of Polaris and watch it work with sample data.",
+        "tourMore": "More",
+        "tourOpen": "See its page"
     },
     "market": {
         "title": "Marketplace",

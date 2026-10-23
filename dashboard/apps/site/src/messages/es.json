@@ -42,7 +42,11 @@
         "lookIntro": "Capturas de la interfaz real con datos de ejemplo. Elige una para ampliarla.",
         "seeApps": "Ver todas las apps",
         "ctaTitle": "Tu propio Polaris está a una línea",
-        "ctaBody": "Gratis y de código abierto con licencia AGPL-3.0."
+        "ctaBody": "Gratis y de código abierto con licencia AGPL-3.0.",
+        "tourTitle": "Míralo en uso",
+        "tourIntro": "Elige una parte de Polaris y mírala trabajar con datos de muestra.",
+        "tourMore": "Más",
+        "tourOpen": "Ver su página"
     },
     "market": {
         "title": "Tienda",
