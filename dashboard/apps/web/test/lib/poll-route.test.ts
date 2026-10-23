@@ -54,6 +54,26 @@ describe("pollRoute", () => {
         expect(response.status).toBe(403);
     });
 
+    it("refuses another site's request to a read kept to this origin", async () => {
+        const read = vi.fn(async () => "secret");
+        const guarded = pollRoute(z.object({ id: z.string().uuid() }), read, { sameOrigin: true });
+        const from = (headers: Record<string, string>) =>
+            new Request(`http://polaris.test/api/thing?id=${ID}`, { headers });
+        expect((await guarded(from({ "sec-fetch-site": "cross-site" }))).status).toBe(403);
+        expect((await guarded(from({ "sec-fetch-site": "same-site" }))).status).toBe(403);
+        expect((await guarded(from({ "sec-fetch-site": "none" }))).status).toBe(403);
+        expect(
+            (await guarded(from({ origin: "https://evil.test", host: "polaris.test" }))).status
+        ).toBe(403);
+        expect((await guarded(from({}))).status).toBe(403);
+        expect(read).not.toHaveBeenCalled();
+        expect((await guarded(from({ "sec-fetch-site": "same-origin" }))).status).toBe(200);
+        expect(
+            (await guarded(from({ origin: "http://polaris.test", host: "polaris.test" }))).status
+        ).toBe(200);
+        expect(read).toHaveBeenCalledTimes(2);
+    });
+
     it("answers a failure without naming it", async () => {
         const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
         const response = await route(async () => {

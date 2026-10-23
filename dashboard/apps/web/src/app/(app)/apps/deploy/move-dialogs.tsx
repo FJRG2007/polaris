@@ -183,11 +183,17 @@ export function MoveOutDialog({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [planned, linked] = await Promise.all([
+            const answers = await Promise.all([
                 polls.moveOutPlan(projectId, application.id),
                 polls.providerAccounts()
-            ]);
+            ]).catch(() => null);
             if (cancelled) return;
+            if (!answers) {
+                setError(t("move.loadFailed"));
+                setAccounts([]);
+                return;
+            }
+            const [planned, linked] = answers;
             if (planned.error) setError(planned.error);
             if (planned.plan) setPlan(planned.plan);
             if (planned.canCopyVariables === false) {
@@ -210,7 +216,9 @@ export function MoveOutDialog({
         setChosen("");
         setChild("");
         void (async () => {
-            const result = await polls.providerChoices(account);
+            const result = await polls
+                .providerChoices(account)
+                .catch(() => ({ error: t("move.choicesFailed"), choices: [] }));
             if (cancelled) return;
             if (result.error) setError(result.error);
             setChoices(result.choices ?? []);
@@ -485,8 +493,12 @@ export function MoveHomeDialog({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const result = await polls.moveHomePlan(projectId, service.id);
+            const result = await polls.moveHomePlan(projectId, service.id).catch(() => null);
             if (cancelled) return;
+            if (!result) {
+                setError(t("move.loadFailed"));
+                return;
+            }
             if (result.error) setError(result.error);
             if (result.canCopyVariables === false) {
                 setCanCopy(false);

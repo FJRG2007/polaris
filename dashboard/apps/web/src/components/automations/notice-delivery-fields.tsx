@@ -86,11 +86,14 @@ export function NoticeDeliveryFields({
 
     useEffect(() => {
         let cancelled = false;
-        void polls.noticeChannels().then((answer) => {
-            if (cancelled) return;
-            if (answer.ok) setChannels(answer);
-            else setError(answer.error);
-        });
+        void polls.noticeChannels().then(
+            (answer) => {
+                if (cancelled) return;
+                if (answer.ok) setChannels(answer);
+                else setError(answer.error);
+            },
+            () => !cancelled && setError(t("errors.generic"))
+        );
         return () => {
             cancelled = true;
         };

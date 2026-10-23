@@ -95,11 +95,18 @@ export function MetricBreakdownDialog({
         // question, and last question's rows under this question's title is the
         // one thing worse than a skeleton.
         setResult(null);
-        void polls
-            .subjectBreakdown({ kind: subject.kind, id: subject.id, ...open })
-            .then((answer) => {
-                if (live) setResult(answer);
-            });
+        void polls.subjectBreakdown({ kind: subject.kind, id: subject.id, ...open }).then(
+            (answer) => live && setResult(answer),
+            () =>
+                live &&
+                setResult({
+                    rows: [],
+                    total: null,
+                    note: "",
+                    unavailable: t("text.breakdownFailed"),
+                    at: null
+                })
+        );
         return () => {
             live = false;
         };

@@ -97,11 +97,14 @@ function HistoryList({
 
     useEffect(() => {
         let live = true;
-        void polls.restoreHistory(target).then((result) => {
-            if (!live) return;
-            if (result.error || !result.points) setError(t("history.unavailable"));
-            else setPoints(result.points);
-        });
+        void polls.restoreHistory(target).then(
+            (result) => {
+                if (!live) return;
+                if (result.error || !result.points) setError(t("history.unavailable"));
+                else setPoints(result.points);
+            },
+            () => live && setError(t("history.unavailable"))
+        );
         return () => {
             live = false;
         };

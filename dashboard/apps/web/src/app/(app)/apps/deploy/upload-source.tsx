@@ -411,10 +411,16 @@ export function UploadedSourceSection({
 
     useEffect(() => {
         let active = true;
-        void polls.uploadedSource(applicationId).then((result) => {
-            if (active && !result.error)
-                setState({ upload: result.upload ?? null, uploadable: Boolean(result.uploadable) });
-        });
+        void polls.uploadedSource(applicationId).then(
+            (result) => {
+                if (active && !result.error)
+                    setState({
+                        upload: result.upload ?? null,
+                        uploadable: Boolean(result.uploadable)
+                    });
+            },
+            () => undefined
+        );
         return () => {
             active = false;
         };

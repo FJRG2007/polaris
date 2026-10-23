@@ -36,11 +36,14 @@ export function GpuCard({
 
     useEffect(() => {
         let active = true;
-        void polls.serviceGpu(applicationId).then((result) => {
-            if (!active) return;
-            if (result.gpu) setView(result.gpu);
-            else setError(result.error ?? null);
-        });
+        void polls.serviceGpu(applicationId).then(
+            (result) => {
+                if (!active) return;
+                if (result.gpu) setView(result.gpu);
+                else setError(result.error ?? null);
+            },
+            () => active && setError(t("gpu.loadFailed"))
+        );
         return () => {
             active = false;
         };

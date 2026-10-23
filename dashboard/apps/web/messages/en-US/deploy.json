@@ -494,7 +494,9 @@
             "setByHand": "Anything that could not be read has to be set by hand on the service's Variables tab.",
             "settingUp": "Setting it up",
             "submit": "Run it here"
-        }
+        },
+        "loadFailed": "Could not read what this move would do.",
+        "choicesFailed": "Could not list what is on that account."
     },
     "elsewhere": {
         "status": {

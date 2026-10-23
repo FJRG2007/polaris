@@ -596,9 +596,12 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
     const [tick, setTick] = useState(0);
     useEffect(() => {
         let active = true;
-        void polls.serviceCronRuns(applicationId, cronId).then((result) => {
-            if (active) setRuns(result.runs ?? []);
-        });
+        void polls.serviceCronRuns(applicationId, cronId).then(
+            (result) => {
+                if (active) setRuns(result.runs ?? []);
+            },
+            () => active && setRuns((held) => held ?? [])
+        );
         return () => {
             active = false;
         };

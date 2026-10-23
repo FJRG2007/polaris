@@ -1230,7 +1230,9 @@ beforeEach(() => {
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {
-            const request = new Request(`http://polaris.test${url}`);
+            const request = new Request(`http://polaris.test${url}`, {
+                headers: { "sec-fetch-site": "same-origin" }
+            });
             const load = ROUTES[new URL(request.url).pathname];
             if (!load) return new Response("{}", { status: 404 });
             return (await load()).GET(request);

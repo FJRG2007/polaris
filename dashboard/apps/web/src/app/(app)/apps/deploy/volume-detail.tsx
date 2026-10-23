@@ -157,7 +157,7 @@ export function VolumeDetailDialog({
                 return;
             }
             setData({ volume: result.volume, canManage: result.canManage ?? false });
-        });
+        }, () => active && setError(t("volume.loadFailed")));
 
         // Measured alongside, not after: the panel is already on screen and
         // usable while this is still walking the volume - and it shows the last

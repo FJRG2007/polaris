@@ -21,9 +21,12 @@ export function BuildMachineSection({ applicationId }: { applicationId: string }
 
     useEffect(() => {
         let active = true;
-        void polls.buildMachine(applicationId).then((result) => {
-            if (active && result.view) setView(result.view);
-        });
+        void polls.buildMachine(applicationId).then(
+            (result) => {
+                if (active && result.view) setView(result.view);
+            },
+            () => undefined
+        );
         return () => {
             active = false;
         };

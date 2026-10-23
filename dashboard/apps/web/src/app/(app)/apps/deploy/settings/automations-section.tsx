@@ -615,19 +615,22 @@ function RunHistory({
     useEffect(() => {
         let alive = true;
         function fetchRuns() {
-            void polls.automationRuns({ projectId, automationId }).then((result) => {
-                if (!alive) return;
-                if (result.error) {
-                    setError(result.error);
-                    return;
-                }
-                const next = result.runs ?? [];
-                setError(null);
-                setRuns(next);
-                setExpanded((held) => held ?? next[0]?.id ?? null);
-                if (next.some((entry) => entry.status === "running"))
-                    timer.current = setTimeout(fetchRuns, 3000);
-            });
+            void polls.automationRuns({ projectId, automationId }).then(
+                (result) => {
+                    if (!alive) return;
+                    if (result.error) {
+                        setError(result.error);
+                        return;
+                    }
+                    const next = result.runs ?? [];
+                    setError(null);
+                    setRuns(next);
+                    setExpanded((held) => held ?? next[0]?.id ?? null);
+                    if (next.some((entry) => entry.status === "running"))
+                        timer.current = setTimeout(fetchRuns, 3000);
+                },
+                () => alive && setError(t("automations.runsFailed"))
+            );
         }
         fetchRuns();
         return () => {

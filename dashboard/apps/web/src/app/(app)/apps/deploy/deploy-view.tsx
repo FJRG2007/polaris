@@ -730,11 +730,14 @@ function DatabaseConnectionDialog({
         setError(null);
         setRevealed(false);
         let active = true;
-        void polls.databaseConnection(database.id).then((result) => {
-            if (!active) return;
-            if (result.connection) setConnection(result.connection);
-            else setError(result.error ?? t("view.connection.unreadable"));
-        });
+        void polls.databaseConnection(database.id).then(
+            (result) => {
+                if (!active) return;
+                if (result.connection) setConnection(result.connection);
+                else setError(result.error ?? t("view.connection.unreadable"));
+            },
+            () => active && setError(t("view.connection.unreadable"))
+        );
         return () => {
             active = false;
         };
@@ -1471,9 +1474,12 @@ function NewDatabaseFields({
             return;
         }
         let active = true;
-        void polls.databaseInstances(environmentId, engine).then((rows) => {
-            if (active) setInstances(rows);
-        });
+        void polls.databaseInstances(environmentId, engine).then(
+            (rows) => {
+                if (active) setInstances(rows);
+            },
+            () => active && setInstances([])
+        );
         return () => {
             active = false;
         };

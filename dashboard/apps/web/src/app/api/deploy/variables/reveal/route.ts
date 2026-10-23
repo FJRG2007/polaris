@@ -11,5 +11,6 @@ export const GET = pollRoute(
         scope: z.string().trim().min(1).max(200),
         scopeId: z.string().trim().min(1).max(200)
     }),
-    ({ scope, scopeId }) => revealEnvScopeAction({ scope, scopeId })
+    ({ scope, scopeId }) => revealEnvScopeAction({ scope, scopeId }),
+    { sameOrigin: true }
 );

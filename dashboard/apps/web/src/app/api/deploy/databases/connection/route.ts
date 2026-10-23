@@ -8,5 +8,6 @@ export const dynamic = "force-dynamic";
 
 export const GET = pollRoute(
     z.object({ databaseId: z.string().trim().min(1).max(200) }),
-    ({ databaseId }) => databaseConnectionAction(databaseId)
+    ({ databaseId }) => databaseConnectionAction(databaseId),
+    { sameOrigin: true }
 );

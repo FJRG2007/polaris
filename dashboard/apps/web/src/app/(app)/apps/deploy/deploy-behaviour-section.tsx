@@ -77,13 +77,16 @@ export function useDeployBehaviour(applicationId: string) {
 
     useEffect(() => {
         let active = true;
-        void polls.deployBehaviour(applicationId).then((result) => {
-            if (!active) return;
-            if (result.view) {
-                setView(result.view);
-                setRows(rowsOf(result.view));
-            } else setLoadError(result.error ?? t("behaviour.loadFailed"));
-        });
+        void polls.deployBehaviour(applicationId).then(
+            (result) => {
+                if (!active) return;
+                if (result.view) {
+                    setView(result.view);
+                    setRows(rowsOf(result.view));
+                } else setLoadError(result.error ?? t("behaviour.loadFailed"));
+            },
+            () => active && setLoadError(t("behaviour.loadFailed"))
+        );
         return () => {
             active = false;
         };

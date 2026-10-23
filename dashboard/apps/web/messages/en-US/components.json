@@ -1252,7 +1252,8 @@
         "banReason": "Ban reason (optional)",
         "banPlaceholder": "Why is this account being banned?",
         "banning": "Banning...",
-        "ban": "Ban user"
+        "ban": "Ban user",
+        "loadFailed": "Could not load this user."
     },
     "agentSelect": {
         "custom": "Something else",

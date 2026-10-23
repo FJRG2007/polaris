@@ -56,6 +56,10 @@ export function UserProfileDialog({
             if (result.error) setError(result.error);
             else setProfile(result.profile ?? null);
             setLoading(false);
+        }, () => {
+            if (!active) return;
+            setError(t("userProfile.loadFailed"));
+            setLoading(false);
         });
         return () => {
             active = false;

@@ -208,10 +208,13 @@ function GroupDetail({
     const dirty = name.trim() !== group.name || description.trim() !== group.description;
 
     useEffect(() => {
-        void polls.variableGroupReach({ groupId: group.id }).then((result) => {
-            setDeployed(result.deployed ?? 0);
-            setUsedBy({ services: result.services ?? [], hidden: result.hidden ?? 0 });
-        });
+        void polls.variableGroupReach({ groupId: group.id }).then(
+            (result) => {
+                setDeployed(result.deployed ?? 0);
+                setUsedBy({ services: result.services ?? [], hidden: result.hidden ?? 0 });
+            },
+            () => undefined
+        );
     }, [group.id]);
 
     function save(): void {
@@ -731,11 +734,10 @@ export function TagsEditor({
 export function ServiceTags({ applicationId }: { applicationId: string }) {
     const [state, setState] = useState<{ tags: string[]; canEdit: boolean } | null>(null);
     useEffect(() => {
-        void polls
-            .serviceTags({ applicationId })
-            .then((result) =>
-                setState({ tags: result.tags ?? [], canEdit: Boolean(result.canEdit) })
-            );
+        void polls.serviceTags({ applicationId }).then(
+            (result) => setState({ tags: result.tags ?? [], canEdit: Boolean(result.canEdit) }),
+            () => setState({ tags: [], canEdit: false })
+        );
     }, [applicationId]);
     if (state === null)
         return <div className="h-8 animate-pulse rounded-md bg-muted" aria-busy="true" />;

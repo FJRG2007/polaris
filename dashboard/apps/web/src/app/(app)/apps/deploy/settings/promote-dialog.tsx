@@ -85,19 +85,22 @@ export function PromoteDialog({
                 sourceEnvironmentId: source.id,
                 targetEnvironmentId: targetId
             })
-            .then((result) => {
-                if (!current) return;
-                if (result.error || !result.preview)
-                    setError(result.error ?? t("promotion.loadFailed"));
-                else {
-                    setError(null);
-                    setPreview({
-                        preview: result.preview,
-                        canDeploy: result.canDeploy ?? false,
-                        canCopyData: result.canCopyData ?? false
-                    });
-                }
-            });
+            .then(
+                (result) => {
+                    if (!current) return;
+                    if (result.error || !result.preview)
+                        setError(result.error ?? t("promotion.loadFailed"));
+                    else {
+                        setError(null);
+                        setPreview({
+                            preview: result.preview,
+                            canDeploy: result.canDeploy ?? false,
+                            canCopyData: result.canCopyData ?? false
+                        });
+                    }
+                },
+                () => current && setError(t("promotion.loadFailed"))
+            );
         return () => {
             current = false;
         };

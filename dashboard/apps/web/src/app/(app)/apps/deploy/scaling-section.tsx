@@ -143,18 +143,21 @@ export function ScalingSection({
 
     useEffect(() => {
         let active = true;
-        void polls.serviceScaling(applicationId).then((result) => {
-            if (!active) return;
-            const fresh = result.scaling;
-            if (fresh) {
-                answered.current = applicationId;
-                writeSnapshot(cacheKey, fresh);
-                setView((current) => (current ? mergeUnchanged(current, fresh) : fresh));
-                setDraft(draftOf(fresh));
-                setBase(draftOf(fresh));
-                setKept(false);
-            } else setError(result.error ?? t("scaling.unreadable"));
-        });
+        void polls.serviceScaling(applicationId).then(
+            (result) => {
+                if (!active) return;
+                const fresh = result.scaling;
+                if (fresh) {
+                    answered.current = applicationId;
+                    writeSnapshot(cacheKey, fresh);
+                    setView((current) => (current ? mergeUnchanged(current, fresh) : fresh));
+                    setDraft(draftOf(fresh));
+                    setBase(draftOf(fresh));
+                    setKept(false);
+                } else setError(result.error ?? t("scaling.unreadable"));
+            },
+            () => active && setError(t("scaling.unreadable"))
+        );
         return () => {
             active = false;
         };

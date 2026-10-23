@@ -86,7 +86,7 @@ export function VolumeForm({
             const usable = rows.filter((row) => row.active);
             const only = usable[0];
             if (only && usable.length === 1) setConnectionId(only.id);
-        });
+        }, () => undefined);
     }, [editing]);
 
     function save() {
