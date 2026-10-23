@@ -33,7 +33,7 @@ import { isPublicIpv4 } from "@polaris/core";
 import { backupAccessActive } from "@/lib/backup-access";
 import { publicA } from "@/lib/dns/authoritative";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { createNotification } from "@/lib/notification-service";
+import * as notices from "@/lib/notification-service";
 import { emitAutomationEvent } from "@/lib/automations/outbox";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { getDomainZones, polarisZoneHost } from "@/lib/domain-zones";
@@ -57,8 +57,12 @@ export const WRITTEN_KEY = "network.dnsWrittenIps";
 const WRITTEN_MAX = 8;
 /** The address the last confirmed run saw, so a change is announced once. */
 const LAST_SEEN_KEY = "network.dnsFollowLastIp";
-/** The problem the current failure streak was announced for, so it is told once. */
+/** The setting the once-per-streak check used before conditions existed. Cleared
+ *  on the next run so nothing is left behind; never read. */
 const FAILING_KEY = "network.dnsFollowFailing";
+/** The open problems this job raises, one notice each, rewritten while they hold. */
+const STALE_CONDITION = "domain.address-stale";
+const UNREACHED_CONDITION = "domain.address-unreached";
 /** What the last run found, for Admin -> Domains. */
 export const STATUS_KEY = "network.dnsFollowStatus";
 
@@ -382,19 +386,16 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
               ? plan.conflicts.map((entry) => `${entry.name} -> ${entry.content}`).join(", ")
               : null;
     if (problem === "failed") await fail(config.baseDomain, current, "failed", detail);
-    else if (problem === "conflict")
-        await fail(config.baseDomain, current, "conflict", null, plan.conflicts);
-    else if (problem === null) await setSetting(FAILING_KEY, null);
+    else if (problem === "conflict") await fail(config.baseDomain, current, "conflict", null, plan.conflicts);
+    if (reach !== "unreached") await notices.resolveCondition(UNREACHED_CONDITION);
     // One notice per change: what was repointed, or that it moved with nothing to do.
-    // A problem has its own notice above, which names the new address.
-    if (repointed.length > 0) {
-        await announceUpdated(
-            config.baseDomain,
-            from ?? [...former][0] ?? null,
-            current,
-            repointed.length
-        );
-    } else if (from && problem === null) await announceMoved(from, current);
+    // A problem has its own notice above, which names the new address. When one
+    // is open, the good news is written over it instead of beside it.
+    if (problem === null) {
+        await settle(config.baseDomain, current, repointed.length > 0 ? from ?? [...former][0] ?? null : null, repointed.length, from);
+    } else if (repointed.length > 0) {
+        await announceUpdated(config.baseDomain, from ?? [...former][0] ?? null, current, repointed.length);
+    }
 
     await save({
         ip: current,
@@ -428,7 +429,7 @@ async function checkReach(
     const seen = await publicA(probe);
     if (seen.length > 0 && seen.every((address) => address === current)) return "reached";
     if (now.getTime() < new Date(reachBy).getTime()) return "pending";
-    await notifyAdmins(async (t) => ({
+    await notifyAdmins(UNREACHED_CONDITION, async (t) => ({
         type: "domain.address-unreached",
         title: t("domainAddress.unreachedTitle", { domain }),
         body: t("domainAddress.unreachedBody", { current, seen: seen.join(", ") || "-" }),
@@ -446,18 +447,48 @@ async function administrators(): Promise<string[]> {
     return rows.map((row) => row.id);
 }
 
-type Notice = Pick<
-    Parameters<typeof createNotification>[0],
-    "type" | "title" | "body" | "level" | "actionRequired"
->;
+type Notice = Pick<notices.NotificationInput, "type" | "title" | "body" | "level" | "actionRequired">;
+type Words = Awaited<ReturnType<typeof wordsFor<"notices">>>;
 
-async function notifyAdmins(
-    build: (t: Awaited<ReturnType<typeof wordsFor<"notices">>>) => Promise<Notice> | Notice
-): Promise<void> {
+/** One notice per administrator. With a condition, the open one is rewritten. */
+async function notifyAdmins(condition: string | null, build: (t: Words) => Promise<Notice> | Notice): Promise<void> {
     for (const userId of await administrators()) {
         const t = await wordsFor(userId, "notices");
-        await createNotification({ userId, href: "/admin/domains", ...(await build(t)) });
+        const input = { userId, href: "/admin/domains", ...(await build(t)) };
+        if (condition) await notices.raiseCondition(condition, input);
+        else await notices.createNotification(input);
     }
+}
+
+/**
+ * Nothing is wrong now. An open "does not point at this server" notice is closed
+ * with what happened (repointed, or fixed by hand); without one, a repoint or a
+ * move is announced on its own, as before. Rows from before conditions existed
+ * carry no key, so they are marked read by type as well.
+ */
+async function settle(domain: string, current: string, from: string | null, count: number, moved: string | null): Promise<void> {
+    await setSetting(FAILING_KEY, null);
+    let closed = 0;
+    for (const userId of await administrators()) {
+        const t = await wordsFor(userId, "notices");
+        closed += await notices.resolveCondition(STALE_CONDITION, {
+            userIds: [userId],
+            recovery: {
+                title: count > 0 ? t("domainAddress.pointsTitle", { domain, to: current }) : t("domainAddress.fixedTitle", { domain }),
+                body:
+                    count > 0
+                        ? from
+                            ? t("domainAddress.changedBody", { from, to: current, count })
+                            : t("domainAddress.setBody", { to: current, count })
+                        : t("domainAddress.fixedBody", { current }),
+                level: "success"
+            }
+        });
+    }
+    await notices.markNotificationsReadByType([STALE_CONDITION]).catch(() => {});
+    if (closed > 0) return;
+    if (count > 0) await announceUpdated(domain, from, current, count);
+    else if (moved) await announceMoved(moved, current);
 }
 
 /** The address moved: handed to automations, whatever happens to the records. */
@@ -474,7 +505,7 @@ async function announceChange(from: string, to: string): Promise<void> {
 
 /** The address moved and there was nothing to repoint and nothing wrong: still said. */
 async function announceMoved(from: string, to: string): Promise<void> {
-    await notifyAdmins((t) => ({
+    await notifyAdmins(null, (t) => ({
         type: "domain.address-moved",
         title: t("domainAddress.movedTitle", { to }),
         body: t("domainAddress.movedBody", { from, to }),
@@ -482,13 +513,8 @@ async function announceMoved(from: string, to: string): Promise<void> {
     }));
 }
 
-async function announceUpdated(
-    domain: string,
-    from: string | null,
-    to: string,
-    count: number
-): Promise<void> {
-    await notifyAdmins((t) => ({
+async function announceUpdated(domain: string, from: string | null, to: string, count: number): Promise<void> {
+    await notifyAdmins(null, (t) => ({
         type: "domain.address-changed",
         title: t("domainAddress.pointsTitle", { domain, to }),
         body: from
@@ -498,7 +524,7 @@ async function announceUpdated(
     }));
 }
 
-/** A problem, told once per streak: the same problem on the next run is silent. */
+/** A problem: one notice while it lasts, kept current rather than repeated. */
 async function fail(
     domain: string,
     current: string,
@@ -506,10 +532,7 @@ async function fail(
     detail: string | null,
     conflicts: readonly { name: string; content: string }[] = []
 ): Promise<void> {
-    const signature = `${problem}:${current}`;
-    if ((await getSetting(FAILING_KEY)) === signature) return;
-    await setSetting(FAILING_KEY, signature);
-    await notifyAdmins((t) => ({
+    await notifyAdmins(STALE_CONDITION, (t) => ({
         type: "domain.address-stale",
         title: t("domainAddress.staleTitle", { domain }),
         body:

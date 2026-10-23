@@ -19,11 +19,16 @@ export interface StoredNotice {
     updatedAt: Date | null;
 }
 
-type Where = { userId?: string | { in: string[] }; conditionKey?: string | { startsWith: string } };
+type Where = {
+    userId?: string | { in: string[] };
+    type?: { in: string[] };
+    conditionKey?: string | { startsWith: string };
+};
 
 function matches(row: StoredNotice, where: Where): boolean {
     if (typeof where.userId === "string" && row.userId !== where.userId) return false;
     if (typeof where.userId === "object" && !where.userId.in.includes(row.userId)) return false;
+    if (where.type && !where.type.in.includes(row.type)) return false;
     if (typeof where.conditionKey === "string" && row.conditionKey !== where.conditionKey) return false;
     if (typeof where.conditionKey === "object" && !(row.conditionKey ?? "").startsWith(where.conditionKey.startsWith)) {
         return false;
