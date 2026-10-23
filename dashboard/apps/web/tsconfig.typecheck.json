@@ -1,0 +1,18 @@
+{
+    // The dashboard plus the app bundles it loads (game servers, places), in one
+    // program. The bundles' `host` services are typed by `lib/app-host/server.ts`
+    // augmenting @polaris/app-host, so they cannot be checked without the
+    // dashboard; checking them here costs a third more than the dashboard alone,
+    // where a program per bundle would check the whole dashboard again each time.
+    // Nothing else type-checks these sources: the bundler strips types.
+    "extends": "./tsconfig.json",
+    "include": [
+        "next-env.d.ts",
+        "src",
+        ".next/types/**/*.ts",
+        "../game-servers/src",
+        "../game-servers/messages",
+        "../places/src",
+        "../places/messages"
+    ]
+}
