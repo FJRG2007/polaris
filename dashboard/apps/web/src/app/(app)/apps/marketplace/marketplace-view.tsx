@@ -39,7 +39,7 @@ import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
-import { findApp, promptedEnvVars, type AppCapability, type AppManifest } from "@/lib/apps/catalog";
+import { findApp, promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
 import {
     POLARIS_APPS_PATH,
     STORE_SORTS,
