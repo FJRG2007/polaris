@@ -110,6 +110,15 @@ export async function requireMayShare(
                 throw new GrantError("You cannot share that");
             return;
         }
+        case "watch.alarm": {
+            // An alarm is shared by whoever made it, as every change to it is.
+            const alarm = await prisma.alarm.findFirst({
+                where: { id: subjectId, ownerId: user.id },
+                select: { id: true }
+            });
+            if (!alarm) throw new GrantError("You cannot share that");
+            return;
+        }
         case "watch.connectivity":
             // The record the internet alert writes, which only administrators
             // receive and read; one of them decides who else may.
@@ -343,6 +352,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
     switch (subject) {
         case "watch.connectivity":
             return "/watch/connectivity";
+        case "watch.alarm":
+            return "/watch/alarms";
         case "office.document":
             return "/office/shared";
         case "place.ups":

@@ -79,7 +79,8 @@ export const GRANT_SUBJECTS = [
     "place.server",
     "place.domain",
     "place.room",
-    "watch.connectivity"
+    "watch.connectivity",
+    "watch.alarm"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -153,7 +154,10 @@ export const GRANT_CAPABILITIES = {
     // This deployment's connectivity record: its state, its outages and their
     // history. Reading is all there is - checking now and the merge window stay
     // with the administrators the internet alert goes to.
-    "watch.connectivity": ["view"]
+    "watch.connectivity": ["view"],
+    // One alarm: its rule, its state and whether it is firing. Changing,
+    // pausing and deleting it stay with whoever made it.
+    "watch.alarm": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -193,7 +197,8 @@ export const GRANT_ACTIONS = {
     "place.server": ["watch"],
     "place.domain": ["watch"],
     "place.room": ["watch", "open", "close", "operate"],
-    "watch.connectivity": []
+    "watch.connectivity": [],
+    "watch.alarm": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

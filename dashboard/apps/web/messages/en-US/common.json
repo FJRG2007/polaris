@@ -59,7 +59,8 @@
             "place.server": "a server",
             "place.domain": "a website",
             "place.room": "a room",
-            "watch.connectivity": "the connectivity record"
+            "watch.connectivity": "the connectivity record",
+            "watch.alarm": "an alarm"
         }
     },
     "mentions": {

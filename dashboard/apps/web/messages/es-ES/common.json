@@ -59,7 +59,8 @@
             "place.server": "un servidor",
             "place.domain": "una web",
             "place.room": "una sala",
-            "watch.connectivity": "el registro de conexión"
+            "watch.connectivity": "el registro de conexión",
+            "watch.alarm": "una alarma"
         }
     },
     "mentions": {

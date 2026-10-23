@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { dropGrantsFor, grantedSubjects } from "@/lib/access/grants";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 import type { AlarmInput } from "@/lib/watch/watch-schema";
 import { WATCH_ALARM_PREFIX } from "@/lib/watch/alarm-carry";
@@ -25,6 +26,11 @@ export interface AlarmView {
     lastEvaluatedAt: string | null;
     /** The automation it was carried into, when it was; Watch no longer evaluates it. */
     carriedToId: string | null;
+    /** Somebody else's alarm, shared with this reader to watch and nothing more. */
+    shared?: boolean;
+    /** What a shared alarm watches, by name: the reader's own targets do not
+     *  hold it. */
+    targetLabel?: string | null;
 }
 
 export interface AlarmEventView {
@@ -114,11 +120,52 @@ function toView(row: {
 }
 
 export async function listAlarms(ownerId: string): Promise<AlarmView[]> {
-    const rows = await prisma.alarm.findMany({
-        where: { ownerId },
+    const [rows, granted] = await Promise.all([
+        prisma.alarm.findMany({
+            where: { ownerId },
+            orderBy: { createdAt: "desc" }
+        }),
+        grantedSubjects(ownerId, "watch.alarm")
+    ]);
+    const lent = [...granted.keys()];
+    if (lent.length === 0) return rows.map(toView);
+    const shared = await prisma.alarm.findMany({
+        where: { id: { in: lent }, ownerId: { not: ownerId } },
         orderBy: { createdAt: "desc" }
     });
-    return rows.map(toView);
+    const labels = await targetLabels(shared);
+    return [
+        ...rows.map(toView),
+        ...shared.map((row) => ({
+            ...toView(row),
+            shared: true,
+            targetLabel: labels.get(row.targetId) ?? null
+        }))
+    ];
+}
+
+/** Names for what a set of alarms watch, one query per kind of target. */
+async function targetLabels(
+    rows: readonly { targetType: string; targetId: string }[]
+): Promise<Map<string, string>> {
+    const ids = (type: string) =>
+        rows.filter((row) => row.targetType === type).map((row) => row.targetId);
+    const [hosts, apps, domains] = await Promise.all([
+        prisma.host.findMany({ where: { id: { in: ids("host") } }, select: { id: true, name: true } }),
+        prisma.application.findMany({
+            where: { id: { in: ids("application") } },
+            select: { id: true, name: true }
+        }),
+        prisma.domain.findMany({
+            where: { id: { in: ids("domain") } },
+            select: { id: true, hostname: true }
+        })
+    ]);
+    return new Map([
+        ...hosts.map((one) => [one.id, one.name] as const),
+        ...apps.map((one) => [one.id, one.name] as const),
+        ...domains.map((one) => [one.id, one.hostname] as const)
+    ]);
 }
 
 /** Confirm the target belongs to the owner before creating an alarm. */
@@ -209,6 +256,8 @@ export async function deleteAlarm(ownerId: string, id: string): Promise<void> {
             : []),
         prisma.alarm.delete({ where: { id: alarm.id } })
     ]);
+    // Nobody keeps watching an alarm that no longer exists.
+    await dropGrantsFor("watch.alarm", alarm.id);
 }
 
 /** Recent alarm events across the owner's alarms, newest first. */

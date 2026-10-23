@@ -94,7 +94,9 @@
         "routeInApp": "In-app",
         "routeEmail": "Email",
         "carried": "Moved to Automations, which tells you now.",
-        "carriedOpen": "Open it"
+        "carriedOpen": "Open it",
+        "share": "Share access",
+        "sharedWithYou": "Shared with you"
     },
     "notices": {
         "alarm": "Alarm: {name}",
