@@ -200,8 +200,22 @@ export const COLORS = {
     ok: 0x15803d,
     warn: 0xb45309,
     bad: 0xb91c1c,
-    off: 0x404040
+    off: 0x404040,
+    /** Polaris violet, the colour of its mark: where a call button rests. */
+    call: 0x7632ec,
+    /** A hang-up button with no call to leave: dim red, still unmistakable. */
+    hangup: 0x4a2328
 } as const;
+
+/**
+ * The colour a call button rests on, like the Stream Deck's call tiles: violet
+ * for every call control, red for hanging up so it is never mistaken for the
+ * others. Null for anything that is not a call control.
+ */
+export function restColor(deckId: string): number | null {
+    if (deckId === "call.hangup") return COLORS.hangup;
+    return deckId.startsWith("call.") ? COLORS.call : null;
+}
 
 /**
  * The colour a toggle's "is on" feedback lights a button with: green, but for
@@ -224,11 +238,16 @@ export function onStyle(entry: DeckAction): { bgcolor: number; color: number } {
 export function stateStyle(
     label: string,
     state: DeckState | undefined,
-    withText: boolean
+    withText: boolean,
+    deckId = ""
 ): { bgcolor: number; color: number; text?: string } {
-    if (!state) return { bgcolor: COLORS.idle, color: COLORS.white };
+    // A call control at rest keeps its call colour rather than going grey.
+    const rest = restColor(deckId);
+    if (!state) return { bgcolor: rest ?? COLORS.idle, color: COLORS.white };
+    const resting = state.on === false || state.tone === "idle";
     const style: { bgcolor: number; color: number; text?: string } = {
-        bgcolor: state.on === false ? COLORS.off : COLORS[state.tone],
+        bgcolor:
+            rest !== null && resting ? rest : state.on === false ? COLORS.off : COLORS[state.tone],
         color: COLORS.white
     };
     const shown = state.value ?? state.detail;
@@ -331,6 +350,8 @@ export interface PresetSpec {
     readonly actionId: string | null;
     readonly options: Record<string, unknown>;
     readonly feedbackId: string | null;
+    /** What the button is drawn on before Polaris says anything. */
+    readonly bgcolor: number;
 }
 
 /**
@@ -350,7 +371,8 @@ export function presetSpecs(catalogue: readonly DeckAction[]): PresetSpec[] {
             name: entry.label,
             actionId: entry.kind === "state" ? null : companionId(entry.id),
             options,
-            feedbackId: entry.live ? companionId(entry.id) : null
+            feedbackId: entry.live ? companionId(entry.id) : null,
+            bgcolor: restColor(entry.id) ?? COLORS.black
         });
     }
     return specs;

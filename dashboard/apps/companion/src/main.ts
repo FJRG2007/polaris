@@ -504,7 +504,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
                     return mapping.stateStyle(
                         entry.label,
                         this.#states.get(feedback.id),
-                        feedback.options[mapping.TEXT_OPTION] !== false
+                        feedback.options[mapping.TEXT_OPTION] !== false,
+                        this.#connection.current.phase === "online" ? entry.id : ""
                     );
                 },
                 unsubscribe: (feedback) => this.#unwatchFeedback(feedback.id)
@@ -611,7 +612,7 @@ export default class PolarisInstance extends InstanceBase<Schema> {
                     text: spec.name,
                     size: "auto",
                     color: mapping.COLORS.white,
-                    bgcolor: mapping.COLORS.black
+                    bgcolor: spec.bgcolor
                 },
                 steps: [
                     {

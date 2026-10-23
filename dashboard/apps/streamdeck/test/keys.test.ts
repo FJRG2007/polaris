@@ -170,3 +170,75 @@ describe("drawsOwnState", () => {
         ).toBe(false);
     });
 });
+
+describe("call keys", () => {
+    const mute: DeckAction = {
+        id: "call.mic",
+        kind: "toggle",
+        area: "call",
+        label: "Mute",
+        icon: "mic",
+        options: [],
+        live: true
+    };
+    const hangup: DeckAction = {
+        ...mute,
+        id: "call.hangup",
+        kind: "run",
+        label: "Hang up",
+        icon: "phone-off"
+    };
+
+    it("draws every call control as a call tile, and hanging up as its own", () => {
+        expect(faceFor("online", { action: "call.mic" }, mute, undefined, words).look).toBe("call");
+        expect(
+            faceFor(
+                "online",
+                { action: "call.mic" },
+                mute,
+                { tone: "warn", icon: "mic-off", on: true },
+                words
+            ).look
+        ).toBe("call");
+        expect(faceFor("online", { action: "call.hangup" }, hangup, undefined, words).look).toBe(
+            "hangup"
+        );
+        expect(
+            faceFor("online", { action: "chat.unread" }, unread, undefined, words).look
+        ).toBeUndefined();
+    });
+
+    it("keeps an offline call key grey, like every other key", () => {
+        expect(
+            faceFor("offline", { action: "call.hangup" }, hangup, undefined, words).look
+        ).toBeUndefined();
+    });
+
+    it("fills a call tile in Polaris violet with the mark behind a white glyph", () => {
+        const svg = renderKey({ icon: "mic", tone: "idle", look: "call", label: "Mute" });
+        expect(svg).toContain('fill="#7632EC"');
+        expect(svg).toContain('fill-opacity="0.14"');
+        expect(svg).toContain('stroke="#FFFFFF"');
+    });
+
+    it("makes hanging up red: bright in a call, dim with a pink glyph outside one", () => {
+        expect(renderKey({ icon: "phone-off", tone: "bad", look: "hangup" })).toContain(
+            'fill="#D83A3A"'
+        );
+        const idle = renderKey({ icon: "phone-off", tone: "idle", look: "hangup" });
+        expect(idle).toContain('fill="#4A2328"');
+        expect(idle).toContain('stroke="#F87171"');
+    });
+
+    it("still warns on a call tile while nobody can hear you", () => {
+        expect(renderKey({ icon: "mic-off", tone: "warn", look: "call", on: true })).toContain(
+            'fill="#78350f"'
+        );
+    });
+
+    it("turns a call tile green while the camera or a shared screen is live, as Companion does", () => {
+        expect(renderKey({ icon: "video", tone: "ok", look: "call", on: true })).toContain(
+            'fill="#15803D"'
+        );
+    });
+});
