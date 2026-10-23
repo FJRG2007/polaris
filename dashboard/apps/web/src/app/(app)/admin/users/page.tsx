@@ -61,22 +61,24 @@ export default async function UsersAdminPage({
                 title={t("users.page.title")}
                 description={t("users.page.description")}
             />
-            <UsersAdmin
-                first={users}
-                invites={invites}
-                recoveries={recoveries}
-                groups={groups.map((group) => ({ id: group.id, name: group.name }))}
-                roles={roles}
-                canSendMail={mail.ready}
-                viewerId={admin.id}
-                openUserId={user ?? null}
-            />
-            <SharingPolicyForm
-                policy={sharing}
-                roles={roles.map((role) => ({ value: role.name, label: role.name }))}
-            />
-            <UsernameCooldownForm days={usernameCooldownDays(cooldown)} />
-            <PublicProfilesForm enabled={publicProfiles} followerDefault={followerDefault} />
+            <div className="flex flex-col gap-4">
+                <UsersAdmin
+                    first={users}
+                    invites={invites}
+                    recoveries={recoveries}
+                    groups={groups.map((group) => ({ id: group.id, name: group.name }))}
+                    roles={roles}
+                    canSendMail={mail.ready}
+                    viewerId={admin.id}
+                    openUserId={user ?? null}
+                />
+                <SharingPolicyForm
+                    policy={sharing}
+                    roles={roles.map((role) => ({ value: role.name, label: role.name }))}
+                />
+                <UsernameCooldownForm days={usernameCooldownDays(cooldown)} />
+                <PublicProfilesForm enabled={publicProfiles} followerDefault={followerDefault} />
+            </div>
         </>
     );
 }

@@ -46,30 +46,32 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
                 }
             />
 
-            <RatesCard rates={rates} onChange={refresh} />
+            <div className="flex flex-col gap-4">
+                <RatesCard rates={rates} onChange={refresh} />
 
-            <section className="flex flex-col gap-4">
-                <parts.StatementToolbar
-                    month={month}
-                    months={months}
-                    exportEndpoint="/api/admin/billing/export"
-                />
-                {error ? <p className="text-danger text-sm">{error}</p> : null}
-                {stale ? (
-                    <p className="text-warning-ink text-sm">{t("billing.stale", { reason: stale })}</p>
-                ) : null}
-                <parts.StatementTotals view={data} />
-                <OwnersTable view={data} />
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-sm font-medium">{t("billing.projects")}</h2>
-                    <parts.StatementTable
-                        view={data}
-                        showOwner
-                        emptyLabel={t("billing.noProjects")}
+                <section className="flex flex-col gap-4">
+                    <parts.StatementToolbar
+                        month={month}
+                        months={months}
+                        exportEndpoint="/api/admin/billing/export"
                     />
-                </div>
-                <parts.StatementNotes view={data} />
-            </section>
+                    {error ? <p className="text-danger text-sm">{error}</p> : null}
+                    {stale ? (
+                        <p className="text-warning-ink text-sm">{t("billing.stale", { reason: stale })}</p>
+                    ) : null}
+                    <parts.StatementTotals view={data} />
+                    <OwnersTable view={data} />
+                    <div className="flex flex-col gap-2">
+                        <h2 className="text-sm font-medium">{t("billing.projects")}</h2>
+                        <parts.StatementTable
+                            view={data}
+                            showOwner
+                            emptyLabel={t("billing.noProjects")}
+                        />
+                    </div>
+                    <parts.StatementNotes view={data} />
+                </section>
+            </div>
         </>
     );
 }

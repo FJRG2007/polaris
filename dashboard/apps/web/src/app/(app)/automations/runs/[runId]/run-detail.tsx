@@ -214,55 +214,57 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                     </div>
                 }
             />
-            {run.error ? <p className="text-sm text-danger">{words(run.error)}</p> : null}
-            {run.canSeeData && run.episode ? <AlarmEpisodeCard episode={run.episode} /> : null}
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
-                <div className="h-[60vh] min-h-[22rem] min-w-0">
-                    {graph ? (
-                        <CanvasBoard
-                            graph={graph}
-                            readOnly
-                            selection={selection}
-                            onSelect={setSelection}
-                            onChange={() => undefined}
-                            onOpen={(id) =>
-                                setSelection({ nodes: new Set([id]), notes: new Set(), edge: null })
-                            }
-                            onPalette={() => undefined}
-                            onAddNote={() => undefined}
-                            onRefused={() => undefined}
-                            title={(node) => nodeLabel(t, node)}
-                            subtitle={() => null}
-                            incomplete={() => false}
-                            states={states}
-                        />
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            {t("runErrors.graphUnreadable")}
-                        </p>
-                    )}
-                </div>
-                <section className="min-w-0 space-y-2" aria-label={t("runView.steps")}>
-                    <h2 className="text-sm font-semibold">{t("runView.steps")}</h2>
-                    {!run.canSeeData ? (
-                        <p className="text-xs text-muted-foreground">{t("runView.hiddenData")}</p>
-                    ) : null}
-                    <ol className="space-y-2">
-                        {steps.map((step) => (
-                            <StepItem
-                                key={step.id}
-                                step={step}
-                                label={nodeLabel(t, byId.get(step.nodeId))}
-                                node={byId.get(step.nodeId)}
-                                finallyLane={
-                                    step.iteration.split("/")[0] === core.FINALLY_ITERATION
+            <div className="flex flex-col gap-4">
+                {run.error ? <p className="text-sm text-danger">{words(run.error)}</p> : null}
+                {run.canSeeData && run.episode ? <AlarmEpisodeCard episode={run.episode} /> : null}
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
+                    <div className="h-[60vh] min-h-[22rem] min-w-0">
+                        {graph ? (
+                            <CanvasBoard
+                                graph={graph}
+                                readOnly
+                                selection={selection}
+                                onSelect={setSelection}
+                                onChange={() => undefined}
+                                onOpen={(id) =>
+                                    setSelection({ nodes: new Set([id]), notes: new Set(), edge: null })
                                 }
-                                pass={passOf(step.iteration)}
-                                showData={run.canSeeData}
+                                onPalette={() => undefined}
+                                onAddNote={() => undefined}
+                                onRefused={() => undefined}
+                                title={(node) => nodeLabel(t, node)}
+                                subtitle={() => null}
+                                incomplete={() => false}
+                                states={states}
                             />
-                        ))}
-                    </ol>
-                </section>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                {t("runErrors.graphUnreadable")}
+                            </p>
+                        )}
+                    </div>
+                    <section className="min-w-0 space-y-2" aria-label={t("runView.steps")}>
+                        <h2 className="text-sm font-semibold">{t("runView.steps")}</h2>
+                        {!run.canSeeData ? (
+                            <p className="text-xs text-muted-foreground">{t("runView.hiddenData")}</p>
+                        ) : null}
+                        <ol className="space-y-2">
+                            {steps.map((step) => (
+                                <StepItem
+                                    key={step.id}
+                                    step={step}
+                                    label={nodeLabel(t, byId.get(step.nodeId))}
+                                    node={byId.get(step.nodeId)}
+                                    finallyLane={
+                                        step.iteration.split("/")[0] === core.FINALLY_ITERATION
+                                    }
+                                    pass={passOf(step.iteration)}
+                                    showData={run.canSeeData}
+                                />
+                            ))}
+                        </ol>
+                    </section>
+                </div>
             </div>
         </>
     );

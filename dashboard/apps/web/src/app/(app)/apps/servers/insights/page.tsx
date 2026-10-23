@@ -39,27 +39,29 @@ export default async function ServerInsightsPage({
     return (
         <>
             <PageHeader title={t("insights.heading")} description={t("insights.description")} />
-            {pages > 1 ? (
-                <nav
-                    className="mb-4 flex items-center gap-2"
-                    aria-label={t("insights.pages.label")}
-                >
-                    <span className="min-w-0 text-xs text-muted-foreground">
-                        {t("insights.pages.range", {
-                            from: first + 1,
-                            to: first + servers.length,
-                            total: rows.length
-                        })}
-                    </span>
-                    <PageLink page={page - 1} pages={pages} label={t("insights.pages.previous")}>
-                        <ChevronLeft className="size-4" aria-hidden />
-                    </PageLink>
-                    <PageLink page={page + 1} pages={pages} label={t("insights.pages.next")}>
-                        <ChevronRight className="size-4" aria-hidden />
-                    </PageLink>
-                </nav>
-            ) : null}
-            <ServerInsightsPanel key={page} servers={servers} initialFilter={filter} />
+            <div className="flex flex-col gap-4">
+                {pages > 1 ? (
+                    <nav
+                        className="flex items-center gap-2"
+                        aria-label={t("insights.pages.label")}
+                    >
+                        <span className="min-w-0 text-xs text-muted-foreground">
+                            {t("insights.pages.range", {
+                                from: first + 1,
+                                to: first + servers.length,
+                                total: rows.length
+                            })}
+                        </span>
+                        <PageLink page={page - 1} pages={pages} label={t("insights.pages.previous")}>
+                            <ChevronLeft className="size-4" aria-hidden />
+                        </PageLink>
+                        <PageLink page={page + 1} pages={pages} label={t("insights.pages.next")}>
+                            <ChevronRight className="size-4" aria-hidden />
+                        </PageLink>
+                    </nav>
+                ) : null}
+                <ServerInsightsPanel key={page} servers={servers} initialFilter={filter} />
+            </div>
         </>
     );
 }

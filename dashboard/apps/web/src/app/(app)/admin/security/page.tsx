@@ -38,9 +38,11 @@ export default async function AdminSecurityPage() {
                 title={t("security.title")}
                 description={t("security.description")}
             />
-            <SecurityAdmin policy={policy} mailReady={mail.channelId !== null} />
-            <div className="mt-3 max-w-2xl">
-                <PlayerAddressesCard shared={addressesShared} />
+            <div className="flex flex-col gap-4">
+                <SecurityAdmin policy={policy} mailReady={mail.channelId !== null} />
+                <div className="max-w-2xl">
+                    <PlayerAddressesCard shared={addressesShared} />
+                </div>
             </div>
         </>
     );
