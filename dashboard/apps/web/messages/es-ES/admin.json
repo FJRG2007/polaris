@@ -644,6 +644,63 @@
                 "outdated": "El borde de esta máquina es anterior a este ajuste y sigue usando la dirección de la instalación. <link>Instala la última actualización</link> y usará esta.",
                 "unknown": "El borde lee esto al arrancar y esta máquina no deja que Polaris lo reinicie, así que un cambio se aplica la próxima vez que se reinicie la máquina."
             }
+        },
+        "backup": {
+            "title": "Acceso de respaldo",
+            "description": "Mantiene tu dominio accesible desde fuera cuando la línea de casa deja de recibir visitas. Mientras la ruta directa funciona se usa esa, así que no añade retraso.",
+            "now": "Sirviendo",
+            "lastFlip": "Último cambio",
+            "checked": "Comprobado",
+            "never": "Nunca",
+            "path": "Ruta de respaldo",
+            "server": "Servidor relé",
+            "mode": "Modo",
+            "paths": {
+                "off": "Apagado",
+                "direct": "Directa",
+                "tunnel": "Túnel de Cloudflare",
+                "relay": "Relé propio"
+            },
+            "modes": {
+                "automatic": "Automático",
+                "always": "Siempre activo",
+                "manual": "Manual"
+            },
+            "useBackup": "Pasar al respaldo",
+            "useDirect": "Volver a directa",
+            "needsToken": "Conecta antes un token de Cloudflare",
+            "needsServer": "Añade antes un servidor en la nube",
+            "connectCloudflare": "El túnel y cada cambio necesitan un token de Cloudflare. <link>Conecta uno en Integraciones</link>.",
+            "dataSaver": "Ahorro de datos en respaldo",
+            "dataSaverHint": "Pausa descargas de imágenes, búsquedas de actualizaciones, despliegues y copias programadas hasta que vuelva la ruta directa.",
+            "state": {
+                "direct": "Directa",
+                "backup": "En respaldo desde",
+                "noUplink": "Sin salida: nada sale de casa, así que ninguna ruta puede ayudar aún. Un punto de acceso móvil lo cubrirá más adelante."
+            },
+            "reasons": {
+                "outage": "la ruta directa dejó de responder",
+                "recovered": "la ruta directa volvió a responder",
+                "always": "siempre activo",
+                "manual": "cambiado a mano",
+                "unconfigured": "se apagó la ruta de respaldo"
+            },
+            "latency": "Tiempo de conexión",
+            "notSet": "Sin configurar",
+            "noAnswer": "Sin respuesta",
+            "ms": "{ms} ms",
+            "insideOnly": "Comprobado desde dentro. Este router no vuelve a su propia dirección pública, así que una línea con CGNAT puede pasar desapercibida.",
+            "udpSkipped": "El relé solo lleva TCP. Los puertos UDP {ports} no llegan por él.",
+            "physics": "Las dos rutas salen desde aquí. Ayudan si el router pasa a una línea móvil o se bloquea la entrada, no si no sale nada.",
+            "conflicts": "No se tocaron porque alguien los cambió durante el respaldo: {names}.",
+            "problems": {
+                "no-token": "Conecta un token de Cloudflare en Integraciones para usar esta ruta.",
+                "no-domain": "Este dominio aún no tiene nombres configurados.",
+                "no-daemon": "Esta edición no puede ejecutar el conector. La edición completa sí.",
+                "no-server": "El servidor relé ya no existe. Elige otro.",
+                "no-address": "El servidor relé no tiene dirección pública.",
+                "failed": "La última pasada falló: {detail}"
+            }
         }
     },
     "domainsPorts": {

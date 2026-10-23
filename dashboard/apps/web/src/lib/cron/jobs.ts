@@ -354,7 +354,12 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // dumps databases. A pass bounds itself, so twice that bound leaves room
         // for the copy in flight when the budget ran out.
         leaseMs: 20 * MINUTE,
-        run: sweepDueBackups
+        // Held by the data saver while the domain is on backup access: a world
+        // archive or database dump copied off-site would fill the backup line.
+        run: async () =>
+            (await (await import("@/lib/backup-access")).dataSaverActive())
+                ? { skipped: "Data saver: on backup access" }
+                : sweepDueBackups()
     },
     {
         key: "connection-health",
@@ -764,6 +769,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // records and both announce it.
         leaseMs: 5 * MINUTE,
         run: async () => (await import("@/lib/domain-address-sync")).syncZoneAddress()
+    },
+    {
+        key: "backup-access",
+        // Every minute: three failed checks in a row move the domain to the backup
+        // path, so this is what sets how long visitors wait. A quiet pass is two
+        // connection attempts and one echo request; DNS is only read when it moves.
+        everyMs: MINUTE,
+        // Leased: two web containers during an update must not flip twice.
+        leaseMs: 3 * MINUTE,
+        run: async () => (await import("@/lib/backup-access/service")).runBackupAccess()
     },
     {
         key: "domain-security",

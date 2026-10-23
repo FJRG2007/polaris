@@ -27,6 +27,7 @@ import { GamePortsCard } from "./game-ports-card";
 import { DomainSetupWizard } from "./setup-wizard";
 import { DnsRecordsCard } from "./dns-records-card";
 import { AddressFollowCard } from "./address-follow-card";
+import { BackupAccessCard } from "./backup-access-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
 import { CertificateContactCard } from "./certificate-contact-card";
@@ -181,6 +182,7 @@ export function DomainsView() {
             <CertificateContactCard />
 
             <AddressFollowCard />
+            <BackupAccessCard />
 
             <DnsRecordsCard />
 

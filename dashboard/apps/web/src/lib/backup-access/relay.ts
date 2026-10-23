@@ -133,6 +133,7 @@ export function relaySpec(end: "relay" | "home", config: string, ports: readonly
         listenPort: end === "relay" ? RELAY_LISTEN_PORT : undefined
     });
     const [helper, ...rest] = spec.services;
+    if (!helper) throw new Error("A WireGuard end has no helper container");
     return {
         ...spec,
         services: [
@@ -140,7 +141,7 @@ export function relaySpec(end: "relay" | "home", config: string, ports: readonly
                 ...helper,
                 ports:
                     end === "relay"
-                        ? [...helper.ports, ...ports.map((port) => ({ host: port, container: port }))]
+                        ? [...helper.ports, ...ports.map((port) => ({ host: port, container: port, protocol: "tcp" as const }))]
                         : helper.ports,
                 extraHosts: end === "home" ? [HOST_GATEWAY] : helper.extraHosts
             },

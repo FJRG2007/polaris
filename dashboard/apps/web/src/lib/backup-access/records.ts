@@ -114,9 +114,9 @@ export function planFlip(live: readonly LiveRecord[], target: BackupTarget): Fli
     const ops: RecordOp[] = [];
     for (const [name, records] of byName(live)) {
         const wanted = backupRecord(target, name, records.some((record) => record.proxied));
-        if (records.length === 1 && same(records[0], wanted)) continue;
-        originals.push(...records.map(plain));
         const [first, ...rest] = records;
+        if (!first || (rest.length === 0 && same(first, wanted))) continue;
+        originals.push(...records.map(plain));
         ops.push({ op: "put", id: first.id, record: wanted });
         for (const extra of rest) ops.push({ op: "delete", id: extra.id });
     }
@@ -178,9 +178,10 @@ export function planTtl(
             if (record.ttl === ARMED_TTL) continue;
             next[key] = record.ttl;
             ops.push({ op: "ttl", id: record.id, ttl: ARMED_TTL });
-        } else if (key in remembered) {
-            if (record.ttl !== remembered[key])
-                ops.push({ op: "ttl", id: record.id, ttl: remembered[key] });
+        } else {
+            const own = remembered[key];
+            if (own === undefined) continue;
+            if (record.ttl !== own) ops.push({ op: "ttl", id: record.id, ttl: own });
             delete next[key];
         }
     }

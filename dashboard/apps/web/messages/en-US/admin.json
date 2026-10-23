@@ -644,6 +644,63 @@
                 "outdated": "The edge on this machine predates this setting and still uses the address it was installed with. <link>Install the latest update</link> and it uses this one.",
                 "unknown": "The edge reads this when it starts, and this machine does not let Polaris restart it, so a change applies the next time the machine restarts."
             }
+        },
+        "backup": {
+            "title": "Backup access",
+            "description": "Keeps your domain reachable from outside when the home line stops taking visitors. The direct path is used while it works, so normal use adds no delay.",
+            "now": "Serving",
+            "lastFlip": "Last switch",
+            "checked": "Checked",
+            "never": "Never",
+            "path": "Backup path",
+            "server": "Relay server",
+            "mode": "Mode",
+            "paths": {
+                "off": "Off",
+                "direct": "Direct",
+                "tunnel": "Cloudflare tunnel",
+                "relay": "Own relay"
+            },
+            "modes": {
+                "automatic": "Automatic",
+                "always": "Always on",
+                "manual": "Manual"
+            },
+            "useBackup": "Switch to backup",
+            "useDirect": "Back to direct",
+            "needsToken": "Connect a Cloudflare token first",
+            "needsServer": "Add a cloud server first",
+            "connectCloudflare": "The tunnel and every switch need a Cloudflare token. <link>Connect one under Integrations</link>.",
+            "dataSaver": "Data saver while on backup",
+            "dataSaverHint": "Holds image pulls, update checks, auto-deploys and scheduled backups until the direct path is back.",
+            "state": {
+                "direct": "Direct",
+                "backup": "On backup since",
+                "noUplink": "No uplink: nothing gets out of the house, so no path can help yet. A phone hotspot will cover this later."
+            },
+            "reasons": {
+                "outage": "the direct path stopped answering",
+                "recovered": "the direct path answered again",
+                "always": "always on",
+                "manual": "switched by hand",
+                "unconfigured": "the backup path was turned off"
+            },
+            "latency": "Time to connect",
+            "notSet": "Not set up",
+            "noAnswer": "No answer",
+            "ms": "{ms} ms",
+            "insideOnly": "Checked from inside. This router does not loop back to its own public address, so a carrier-NAT line can go unnoticed.",
+            "udpSkipped": "The relay carries TCP only. UDP ports {ports} are not reachable through it.",
+            "physics": "Both paths dial out from here. They help when the router fails over to a mobile line or inbound is blocked, not when nothing gets out at all.",
+            "conflicts": "Left alone because someone changed them while on backup: {names}.",
+            "problems": {
+                "no-token": "Connect a Cloudflare token under Integrations to use this path.",
+                "no-domain": "No hostnames are set up on this domain yet.",
+                "no-daemon": "This edition cannot run the connector. The full edition can.",
+                "no-server": "The relay server is gone. Pick another one.",
+                "no-address": "The relay server has no public address.",
+                "failed": "The last pass failed: {detail}"
+            }
         }
     },
     "domainsPorts": {

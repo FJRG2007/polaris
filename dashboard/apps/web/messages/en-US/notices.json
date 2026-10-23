@@ -477,5 +477,11 @@
         "ipBody": "Your connection's public address went from {previous} to {current}. Anything outside that points at the old one stops reaching you until it is updated.",
         "unreachableTitle": "Polaris is not reachable from outside",
         "unreachableBody": "The internet works, but this dashboard's public name no longer points at your connection's address, so nobody outside your network can reach it. Check the domain in Settings."
+    },
+    "backupAccess": {
+        "onTitle": "{domain} is on backup access",
+        "onBody": "The direct path stopped answering, so visitors now reach Polaris through the backup path. It switches back by itself.",
+        "offTitle": "{domain} is direct again",
+        "offBody": "The direct path answers again and the original DNS records are back."
     }
 }

@@ -23,6 +23,12 @@ import {
 } from "@/lib/tls/acme-edge";
 import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
 import { addressFollowView, type AddressFollowView } from "@/lib/domain-address-sync";
+import {
+    backupView,
+    configSchema as backupConfigSchema,
+    saveConfig as saveBackupConfig,
+    type BackupView
+} from "@/lib/backup-access/service";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import {
     getPortBlocks,
@@ -408,4 +414,23 @@ export async function checkPublicAddressAction(): Promise<AddressFollowView> {
     await requireAdmin();
     await runScheduledJob("public-ip-follow");
     return addressFollowView();
+}
+
+/**
+ * Save the backup access choices and run a pass now, so the path comes up and the
+ * card shows what it found. Through the scheduler, so a pass already running is
+ * not doubled.
+ */
+export async function saveBackupAccessAction(input: unknown): Promise<BackupView> {
+    const actor = await requireAdmin();
+    const config = backupConfigSchema.parse(input);
+    await saveBackupConfig(config);
+    await recordAudit({
+        actorId: actor.id,
+        action: "domains.backup-access",
+        targetType: "setting",
+        targetId: "backup-access"
+    }).catch(() => undefined);
+    await runScheduledJob("backup-access");
+    return backupView();
 }
