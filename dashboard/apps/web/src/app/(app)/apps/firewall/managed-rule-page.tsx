@@ -83,10 +83,14 @@ export function ManagedRulePage({
             <Section title={t("managedPage.whatItDoes")}>
                 <p className="text-sm text-muted-foreground">{rule.description}</p>
                 <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{t("managedPage.reads")}</span> {rule.inspects}
+                    <span className="font-medium text-foreground">{t("managedPage.reads")}</span>{" "}
+                    {rule.inspects}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{t("managedPage.acrossScopes")}</span> {rule.combines}
+                    <span className="font-medium text-foreground">
+                        {t("managedPage.acrossScopes")}
+                    </span>{" "}
+                    {rule.combines}
                 </p>
                 {rule.caution ? (
                     <p className="flex items-start gap-1.5 text-xs text-warning">
@@ -102,13 +106,23 @@ export function ManagedRulePage({
                         checked={on}
                         disabled={disabled || decidedElsewhere !== undefined}
                         onChange={onToggle}
-                        aria-label={on ? t("list.disable", { name: rule.label }) : t("list.enable", { name: rule.label })}
+                        aria-label={
+                            on
+                                ? t("list.disable", { name: rule.label })
+                                : t("list.enable", { name: rule.label })
+                        }
                     />
                     <span className="flex items-center gap-1.5 text-sm">
                         {on ? (
-                            <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden="true" />
+                            <ShieldCheck
+                                className="size-4 shrink-0 text-success"
+                                aria-hidden="true"
+                            />
                         ) : (
-                            <CircleOff className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <CircleOff
+                                className="size-4 shrink-0 text-muted-foreground"
+                                aria-hidden="true"
+                            />
                         )}
                         {decidedElsewhere
                             ? decidedElsewhere.label
@@ -129,7 +143,9 @@ export function ManagedRulePage({
                             <span className="font-medium tabular-nums">{grouped(feed.count)}</span>{" "}
                             <span className="text-muted-foreground">
                                 {feed.fetchedAt
-                                    ? t("managedPage.addressesUpdated", { when: format.dateTime(feed.fetchedAt) })
+                                    ? t("managedPage.addressesUpdated", {
+                                          when: format.dateTime(feed.fetchedAt)
+                                      })
                                     : t("managedPage.addresses")}
                             </span>
                         </p>
@@ -154,8 +170,12 @@ export function ManagedRulePage({
                             <div key={index} className="flex flex-col gap-2">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-sm font-medium">{entry.name}</span>
-                                    <Badge variant={entry.action === "block" ? "danger" : "success"}>
-                                        {entry.action === "block" ? t("actions.block") : t("actions.allow")}
+                                    <Badge
+                                        variant={entry.action === "block" ? "danger" : "success"}
+                                    >
+                                        {entry.action === "block"
+                                            ? t("actions.block")
+                                            : t("actions.allow")}
                                     </Badge>
                                 </div>
                                 <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
@@ -178,7 +198,10 @@ export function ManagedRulePage({
                 <Section title={t("managedPage.matches")} hint={t("managedPage.matchesHint")}>
                     <ul className="flex flex-col divide-y divide-border">
                         {rule.signatures.map((family) => (
-                            <li key={family.reason} className="flex flex-col gap-1 py-2.5 first:pt-0 last:pb-0">
+                            <li
+                                key={family.reason}
+                                className="flex flex-col gap-1 py-2.5 first:pt-0 last:pb-0"
+                            >
                                 <code className="w-fit rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
                                     {family.reason}
                                 </code>
@@ -186,7 +209,9 @@ export function ManagedRulePage({
                                 {family.example ? (
                                     <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
                                         {t("managedPage.example")}{" "}
-                                        <code className="font-mono text-foreground">?{family.example}</code>
+                                        <code className="font-mono text-foreground">
+                                            ?{family.example}
+                                        </code>
                                     </p>
                                 ) : null}
                             </li>
@@ -196,7 +221,13 @@ export function ManagedRulePage({
             ) : null}
 
             <Section title={t("managedPage.exceptions")} hint={t("managedPage.exceptionsHint")}>
-                <Button type="button" variant="secondary" size="sm" className="w-fit" onClick={onCreateException}>
+                <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-fit"
+                    onClick={onCreateException}
+                >
                     <Plus className="size-3.5 shrink-0" aria-hidden="true" />
                     {t("managedPage.createException")}
                 </Button>
