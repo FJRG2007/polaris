@@ -1338,7 +1338,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             // their network. Only here once it is installed, and only for an
             // administrator - it answers every device's lookups.
             label: "Network filter", // i18n-ignore
-            href: "/apps/dns-blocker",
+            href: "/apps/network-filter",
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: ShieldBan,
@@ -2610,12 +2610,12 @@ export const APP_SUBAPPS: AppSubapp[] = [
         id: "dns-blocker",
         label: "Network filter", // i18n-ignore
         icon: ShieldBan,
-        base: "/apps/dns-blocker",
+        base: "/apps/network-filter",
         parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
         sections: [
             {
                 label: "Overview", // i18n-ignore
-                href: "/apps/dns-blocker",
+                href: "/apps/network-filter",
                 adminOnly: true,
                 requiresApp: "dns-blocker",
                 icon: LayoutDashboard,
@@ -2623,7 +2623,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             },
             {
                 label: "Query log", // i18n-ignore
-                href: "/apps/dns-blocker/log",
+                href: "/apps/network-filter/log",
                 adminOnly: true,
                 requiresApp: "dns-blocker",
                 icon: ScrollText,
@@ -2631,7 +2631,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             },
             {
                 label: "Lists", // i18n-ignore
-                href: "/apps/dns-blocker/lists",
+                href: "/apps/network-filter/lists",
                 adminOnly: true,
                 requiresApp: "dns-blocker",
                 icon: ShieldBan,
@@ -2646,7 +2646,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             },
             {
                 label: "Devices", // i18n-ignore
-                href: "/apps/dns-blocker/devices",
+                href: "/apps/network-filter/devices",
                 adminOnly: true,
                 requiresApp: "dns-blocker",
                 icon: MonitorSmartphone,
@@ -2654,7 +2654,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             },
             {
                 label: "Local DNS", // i18n-ignore
-                href: "/apps/dns-blocker/local-dns",
+                href: "/apps/network-filter/local-dns",
                 adminOnly: true,
                 requiresApp: "dns-blocker",
                 icon: Network,
@@ -2662,7 +2662,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             },
             {
                 label: "Settings", // i18n-ignore
-                href: "/apps/dns-blocker/settings",
+                href: "/apps/network-filter/settings",
                 adminOnly: true,
                 requiresApp: "dns-blocker",
                 icon: SlidersHorizontal,

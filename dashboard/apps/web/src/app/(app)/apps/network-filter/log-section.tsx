@@ -35,7 +35,7 @@ export function DnsLogSection() {
                             {t("log.off")}
                         </p>
                         <Button asChild size="sm" variant="outline">
-                            <Link href="/apps/dns-blocker">{t("log.overview")}</Link>
+                            <Link href="/apps/network-filter">{t("log.overview")}</Link>
                         </Button>
                     </>
                 ) : (

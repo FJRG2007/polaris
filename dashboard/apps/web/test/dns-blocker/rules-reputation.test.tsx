@@ -17,7 +17,7 @@ const editDnsRuleAction = vi.fn(async (..._args: unknown[]): Promise<unknown> =>
     error: "Saving failed"
 }));
 
-vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
+vi.mock("../../src/app/(app)/apps/network-filter/actions", () => ({
     dnsBlockerStatusAction: async () => ({ error: "x" }),
     saveDnsSettingsAction: async () => ({}),
     editDnsRuleAction,
@@ -233,9 +233,9 @@ describe("reputation", () => {
 describe("the rules editor", () => {
     async function draw(settings: Partial<dns.DnsSettings>) {
         const { DnsBlockerProvider } =
-            await import("../../src/app/(app)/apps/dns-blocker/dns-blocker-context");
+            await import("../../src/app/(app)/apps/network-filter/dns-blocker-context");
         const { DnsRulesEditor } =
-            await import("../../src/app/(app)/apps/dns-blocker/rules-editor");
+            await import("../../src/app/(app)/apps/network-filter/rules-editor");
         render(
             <MessagesWrapper>
                 <DnsBlockerProvider initial={{ ...dns.DEFAULT_DNS_SETTINGS, ...settings }}>
@@ -276,10 +276,53 @@ describe("the rules editor", () => {
         await draw({});
         fireEvent.click(screen.getAllByRole("button", { name: "Add rule" })[0]!);
         const field = await screen.findByPlaceholderText("ads.example.com");
-        fireEvent.change(field, { target: { value: "bad name" } });
+        fireEvent.change(field, { target: { value: "bad_name" } });
         expect(field.getAttribute("aria-invalid")).toBe("true");
         fireEvent.change(field, { target: { value: "*.ads.example" } });
         expect(field.getAttribute("aria-invalid")).toBe("false");
         expect(screen.getByText("Read as: Wildcard")).toBeTruthy();
+    });
+
+    it("adds several pasted at once, naming the ones left out and why", async () => {
+        await draw({ deny: ["kept.example"] });
+        fireEvent.click(screen.getAllByRole("button", { name: "Add rule" })[0]!);
+        const field = await screen.findByPlaceholderText("ads.example.com");
+        fireEvent.change(field, {
+            target: { value: "google.*, https://ads.example/x\nbad_name kept.example ADS.example" }
+        });
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+        expect(screen.getByText("2 rules to add")).toBeTruthy();
+        expect(screen.getByText("3 entries left out")).toBeTruthy();
+        expect(screen.getByText("not a name, *.name, name.* or /regex/")).toBeTruthy();
+        expect(screen.getByText("already a rule for this action")).toBeTruthy();
+        expect(screen.getByText("repeated in this list")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Add 2 rules" }));
+        expect(editDnsRuleAction).toHaveBeenCalledWith({
+            op: "addMany",
+            next: { action: "deny", rules: ["google.*", "ads.example"] }
+        });
+    });
+
+    it("says a paste is more than the list has room for instead of sending it", async () => {
+        const full = Array.from({ length: dns.DNS_LIMITS.rules - 1 }, (_, at) => `n${at}.example`);
+        await draw({ deny: full });
+        fireEvent.click(screen.getAllByRole("button", { name: "Add rule" })[0]!);
+        const field = await screen.findByPlaceholderText("ads.example.com");
+        fireEvent.change(field, { target: { value: "one.example two.example" } });
+        expect(screen.getByText("That is as many rules as one list holds.")).toBeTruthy();
+        const add = screen.getByRole("button", { name: "Add 2 rules" });
+        expect(add.getAttribute("aria-disabled")).toBe("true");
+        fireEvent.click(add);
+        expect(editDnsRuleAction).not.toHaveBeenCalled();
+        fireEvent.change(field, { target: { value: "one.example" } });
+        expect(screen.queryByText("That is as many rules as one list holds.")).toBeNull();
+    });
+
+    it("says in words what a pattern covers", async () => {
+        await draw({ deny: ["google.*", "*.tracker.example"] });
+        expect(
+            screen.getByText("google with any ending, like .com or .co.uk, and what is under it")
+        ).toBeTruthy();
+        expect(screen.getByText("tracker.example and everything under it")).toBeTruthy();
     });
 });

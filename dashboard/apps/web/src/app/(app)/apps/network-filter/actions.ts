@@ -39,7 +39,7 @@ async function failed(error: unknown): Promise<{ error: string }> {
 }
 
 function refresh(): void {
-    revalidatePath("/apps/dns-blocker");
+    revalidatePath("/apps/network-filter");
 }
 
 /** Install the app from its own screen. Runs nothing: the DNS server starts only
@@ -371,8 +371,10 @@ export async function editDnsRuleAction(
     const user = await requireAdmin();
     try {
         const edit = dnsRuleEditSchema.parse(input);
+        let before = 0;
         const outcome = await blocker
             .editSettings((current) => {
+                if (edit.op === "addMany") before = current[edit.next.action].length;
                 const rules = applyRuleEdit(current, edit);
                 return typeof rules === "string" ? rules : { ...current, ...rules };
             }, user.id)
@@ -390,7 +392,12 @@ export async function editDnsRuleAction(
             action: "dnsBlocker.settings",
             targetType: "installedApp",
             targetId: DNS_BLOCKER_APP,
-            metadata: { rule: edit.op }
+            metadata: {
+                rule: edit.op,
+                ...(edit.op === "addMany" && !(outcome instanceof blocker.DnsBlockerRefusal)
+                    ? { count: outcome[edit.next.action].length - before }
+                    : {})
+            }
         });
         refresh();
         return outcome instanceof blocker.DnsBlockerRefusal

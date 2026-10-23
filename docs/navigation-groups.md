@@ -65,7 +65,7 @@ appear only once installed.
 | Containers | `/apps/containers` | Machines | Machines |
 | Tunnels | `/apps/tunnels` | Machines | Network |
 | Firewall | `/apps/firewall` | Operations | Network |
-| Network filter | `/apps/dns-blocker` | Operations | Network |
+| Network filter | `/apps/network-filter` | Operations | Network |
 | Databases | `/apps/databases` | Operations | Data & services |
 | Backups | `/apps/backups` | Operations | Data & services |
 | Mail server | `/apps/mail-server` | Operations | Data & services |

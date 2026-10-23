@@ -206,7 +206,7 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         description: "The last 24 hours' lookups on your network, and how many were blocked.", // i18n-ignore
         icon: ShieldBan,
         adminOnly: true,
-        href: "/apps/dns-blocker",
+        href: "/apps/network-filter",
         sizes: ["sm", "md", "lg"],
         requires: "dnsBlocker"
     },

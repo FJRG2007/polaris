@@ -276,15 +276,24 @@ jobs:
       # out of memory" on the next. The runner has 16 GB, so the build gets room
       # instead of a coin toss.
       #
-      # Not more than 6 GB, though: Next type-checks in a child process that
-      # inherits NODE_OPTIONS while the compiler's heap is still held, so the cap
-      # applies twice. At 8 GB each the pair outgrew the runner and the job was
-      # killed mid type check with only "The operation was canceled" to show.
+      # 6 GB stopped being enough for the compile itself (heap out of memory
+      # before the type check began, on several branches the same day), and it
+      # could not simply go up: Next type-checks in a child process that inherits
+      # NODE_OPTIONS while the compiler's heap is still held, so the cap applied
+      # twice, and at 8 GB each the pair outgrew the runner.
+      #
+      # So the build skips its own type check (next.config.mjs) and the step after
+      # it runs `tsc` alone, over the same tsconfig - which includes the route
+      # types Next generated under .next/types, so nothing goes unchecked. With
+      # one process at a time, each gets the room.
       #
       # The checks job runs ESLint over the same sources in this same run, so the
-      # build skips its own copy (next.config.mjs). It keeps its type check, which
-      # alone sees the route types Next generates during the build.
+      # build skips its own copy of that too.
       - run: npm run build -w @polaris/web
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: --max-old-space-size=10240
           POLARIS_BUILD_SKIP_LINT: "1"
+          POLARIS_BUILD_SKIP_TYPECHECK: "1"
+      - run: npm run typecheck -w @polaris/web
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192

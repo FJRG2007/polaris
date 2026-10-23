@@ -29,7 +29,7 @@ export function DnsBlockerInstallState() {
                 return;
             }
             // A full load: the rail and the search above this page gain the app too.
-            window.location.assign("/apps/dns-blocker");
+            window.location.assign("/apps/network-filter");
         });
     }
 

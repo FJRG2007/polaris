@@ -1,4 +1,4 @@
-/** Network filter, Devices (/apps/dns-blocker/devices). The layout carries the settings. */
+/** Network filter, Devices (/apps/network-filter/devices). The layout carries the settings. */
 
 import { requireAdmin } from "@/lib/session";
 import { DnsDevicesSection } from "../devices-section";

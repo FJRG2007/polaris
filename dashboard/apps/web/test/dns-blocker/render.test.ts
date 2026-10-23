@@ -85,6 +85,46 @@ describe("blockyConfig", () => {
         );
     });
 
+    it("writes a name with any ending as the anchored pattern the engine reads", () => {
+        const files = render.ruleFiles({ allow: [], deny: ["google.*", "mail.google.*"] });
+        const [heading, first, second, end] = files.get(render.RULES_DENY_PATH)!.split("\n");
+        expect(heading).toBe("# Polaris: your rules");
+        expect(first!.startsWith("/^(.+\\.)?google(\\.(")).toBe(true);
+        expect(second!.startsWith("/^(.+\\.)?mail\\.google(\\.(")).toBe(true);
+        expect(first!.endsWith("\\.[a-z0-9-]+$/")).toBe(true);
+        expect(end).toBe("");
+        // The pattern, read the way the engine reads it, covers every ending
+        // and what is under it, and nothing that only shares the name or puts
+        // it in front of someone else's domain.
+        const pattern = new RegExp(first!.slice(1, -1));
+        for (const name of [
+            "google.com",
+            "google.es",
+            "google.co.uk",
+            "google.com.br",
+            "www.google.es",
+            "mail.google.co.jp"
+        ])
+            expect(pattern.test(name)).toBe(true);
+        for (const name of [
+            "google",
+            "notgoogle.com",
+            "google-analytics.com",
+            "google.a.b.c",
+            "google.evil.com",
+            "google.mycompany.net",
+            "www.google.evil.co.uk"
+        ])
+            expect(pattern.test(name)).toBe(false);
+        const mail = new RegExp(second!.slice(1, -1));
+        expect(mail.test("mail.google.com")).toBe(true);
+        expect(mail.test("mailxgoogle.com")).toBe(false);
+        // A list whose rules all read the same way the operator typed them stays as it was.
+        expect(
+            render.ruleFiles({ allow: ["ok.test"], deny: [] }).get(render.RULES_ALLOW_PATH)
+        ).toBe("# Polaris: your rules\nok.test\n");
+    });
+
     it("uses the preset's resolvers, and a fallback bootstrap only for encrypted custom ones", () => {
         const preset = dns.DNS_UPSTREAM_PRESETS.find((item) => item.id === "cloudflare");
         expect(servers(render.blockyConfig(settings()))).toEqual(preset?.servers);
