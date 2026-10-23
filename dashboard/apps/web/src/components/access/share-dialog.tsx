@@ -130,6 +130,10 @@ export function ShareDialog({
     extra?: ReactNode;
 }) {
     const toast = useToast();
+    // Read through a ref where an effect needs it: opening the dialog must not
+    // depend on whether the toast's identity is stable.
+    const toastRef = useRef(toast);
+    toastRef.current = toast;
     const t = useTranslations("components");
     const locale = useLocale();
     const format = useDisplayFormat();
@@ -197,12 +201,12 @@ export function ShareDialog({
         setFilter("");
         setHistory(false);
         void shareSetupAction(subject, subjectId).then((answer) => {
-            if (answer.error) toast.show({ title: answer.error });
+            if (answer.error) toastRef.current.show({ title: answer.error });
             setSetup(answer.setup ?? null);
         });
         void loadPeople("", null);
         void loadLinks();
-    }, [open, subject, subjectId, loadPeople, loadLinks, toast]);
+    }, [open, subject, subjectId, loadPeople, loadLinks]);
 
     // Searching who has access is on the server, after a beat.
     const firstFilter = useRef(true);
@@ -239,7 +243,9 @@ export function ShareDialog({
     useEffect(() => {
         const term = query.trim();
         if (term.length < 2) {
-            setFound([]);
+            // The same empty list, not a new one: a fresh array here is a
+            // render, and a render runs this again.
+            setFound((held) => (held.length === 0 ? held : []));
             setSearching(false);
             return;
         }
@@ -259,7 +265,10 @@ export function ShareDialog({
             );
         }, 250);
         return () => clearTimeout(timer);
-    }, [query, subject, subjectId, principals, staged]);
+        // `principals` by its contents: a caller's default is a new array on
+        // every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query, subject, subjectId, principals.join(","), staged]);
 
     const stage = (target: ShareTarget): void => {
         setStaged((held) => [...held, target]);

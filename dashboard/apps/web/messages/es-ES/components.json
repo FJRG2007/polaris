@@ -746,7 +746,7 @@
         "audienceOf": "Para quién es el enlace",
         "noLinks": "Solo abre quien tiene acceso",
         "anotherLink": "Otro enlace",
-        "linkRole": "Acceso del enlace",
+        "linkRole": "Rol del enlace",
         "copyHint": "Copia la dirección de esta página. Abre para quien tiene acceso.",
         "history": "Historial",
         "back": "Volver",

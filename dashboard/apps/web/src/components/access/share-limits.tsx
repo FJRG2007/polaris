@@ -66,7 +66,12 @@ export function limitsOf(grant: GrantView): LimitsValue {
     const from = split(schedule.startsAt);
     const to = split(schedule.endsAt);
     return {
-        limited: core.grantIsBounded({ ...schedule }),
+        limited:
+            schedule.startsAt !== null ||
+            schedule.endsAt !== null ||
+            schedule.days !== core.EVERY_DAY ||
+            schedule.startMinute !== null ||
+            schedule.maxUses !== null,
         startsAt: from.day,
         endsAt: to.day,
         checkIn: from.clock,
