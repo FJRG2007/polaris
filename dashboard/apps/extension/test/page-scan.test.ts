@@ -13,7 +13,7 @@
  */
 
 import { readForm, type PageFields } from "@/lib/fields";
-import { describeInput, formOf, scanInputs } from "@/lib/page-scan";
+import { changeNeeds, describeInput, formOf, scanInputs } from "@/lib/page-scan";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /** jsdom lays nothing out, so every box would read as invisible: give each one
@@ -290,5 +290,74 @@ describe("what a form is for", () => {
                 <input type="password" name="a2">
             </form>`);
         expect(nameAt(inputs, fields.username)).toBe("a1");
+    });
+});
+
+describe("how much looking a page change calls for", () => {
+    /** The records `change` makes on the page, the way the observer sees them. */
+    function recordsOf(change: () => void): MutationRecord[] {
+        const observer = new MutationObserver(() => undefined);
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["style", "class", "hidden", "aria-hidden", "disabled", "type"]
+        });
+        change();
+        const records = observer.takeRecords();
+        observer.disconnect();
+        return records;
+    }
+    const nobody = (): boolean => false;
+
+    it("walks again when a box, a frame or a component arrives", () => {
+        for (const markup of [
+            "<input>",
+            "<div><p><input></p></div>",
+            "<iframe></iframe>",
+            "<x-field></x-field>",
+            "<div><x-field></x-field></div>"
+        ]) {
+            const records = recordsOf(() => {
+                const holder = document.createElement("div");
+                holder.innerHTML = markup;
+                document.body.append(holder.firstElementChild as Element);
+            });
+            expect(changeNeeds(records, nobody, 0)).toBe("rescan");
+        }
+    });
+
+    it("walks again when a box is taken away", () => {
+        document.body.innerHTML = "<form><input name=a></form>";
+        const records = recordsOf(() => document.querySelector("form")?.remove());
+        expect(changeNeeds(records, nobody, 1)).toBe("rescan");
+    });
+
+    it("leaves a video player's own churn alone", () => {
+        document.body.innerHTML =
+            "<div class=player><span class=bar></span><p class=subs></p></div>";
+        const records = recordsOf(() => {
+            document.querySelector(".bar")?.setAttribute("style", "width: 40%");
+            document.querySelector(".player")?.classList.add("playing");
+            const line = document.createElement("span");
+            line.textContent = "subtitle";
+            document.querySelector(".subs")?.replaceChildren(line);
+        });
+        expect(changeNeeds(records, nobody, 0)).toBe("none");
+    });
+
+    it("re-reads the boxes it has when a style or class may have shown one", () => {
+        document.body.innerHTML = "<div class=step hidden><input type=password></div>";
+        const records = recordsOf(() => document.querySelector(".step")?.removeAttribute("hidden"));
+        expect(changeNeeds(records, nobody, 1)).toBe("reread");
+    });
+
+    it("never counts its own marks", () => {
+        const mark = document.createElement("x-mark");
+        const records = recordsOf(() => {
+            document.body.append(mark);
+            mark.style.top = "10px";
+        });
+        expect(changeNeeds(records, (node) => node === mark, 1)).toBe("none");
     });
 });
