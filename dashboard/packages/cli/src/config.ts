@@ -32,7 +32,21 @@ export const profileSchema = z.object({
     scopes: z.array(z.string()),
     /** Where the token is: the OS keychain, or the fallback file. */
     storage: z.enum(["keychain", "file"]),
-    signedInAt: z.string()
+    signedInAt: z.string(),
+    /**
+     * Who the Polaris is and the other addresses it answers on, learned over
+     * `url` at login. Lets a command reach it on the local network when `url`
+     * stops answering, after it proves it is the same one. Absent on profiles
+     * signed in before this existed, and on a Polaris too old to say.
+     */
+    instance: z
+        .object({
+            id: z.string().max(64),
+            publicKey: z.string().max(64),
+            addresses: z.array(z.string().url()).max(16)
+        })
+        .nullable()
+        .optional()
 });
 
 export type Profile = z.infer<typeof profileSchema>;

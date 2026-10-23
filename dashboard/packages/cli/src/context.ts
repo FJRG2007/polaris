@@ -143,5 +143,9 @@ export async function requireSession(context: Context, flags: Flags): Promise<Se
             `The sign-in for "${name}" is missing from the ${profile.storage === "keychain" ? "keychain" : "credentials file"}. Run plr login --profile ${name}.`
         );
     }
-    return { connection: { url: profile.url, token }, profileName: name, profile };
+    return {
+        connection: { url: profile.url, token, instance: profile.instance ?? null },
+        profileName: name,
+        profile
+    };
 }
