@@ -25,7 +25,8 @@ import type { ReputationOff } from "@/lib/dns-blocker/reputation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DNS_REPUTATION_CATEGORIES } from "@/lib/dns-blocker/settings";
 import type { FlaggedDomain } from "@/lib/dns-blocker/reputation-service";
-import { dnsReputationAction, recheckDnsReputationAction, ruleFromLogAction } from "./actions";
+import { recheckDnsReputationAction, ruleFromLogAction } from "./actions";
+import * as polls from "./dns-blocker-polls";
 
 export function DnsReputationCard() {
     const t = useTranslations("dnsBlocker");
@@ -41,7 +42,7 @@ export function DnsReputationCard() {
     useEffect(() => {
         let live = true;
         const timer = setTimeout(() => {
-            void dnsReputationAction({ search }).then((result) => {
+            void polls.dnsReputation({ search }).then((result) => {
                 if (!live) return;
                 if (result.error !== undefined) setLoadError(result.error);
                 else {

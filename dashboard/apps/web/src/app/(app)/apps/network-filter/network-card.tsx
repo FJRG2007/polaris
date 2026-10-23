@@ -9,7 +9,7 @@
 import Link from "next/link";
 import { logHref } from "./dns-insights";
 import { useEffect, useState } from "react";
-import { dnsDevicesAction } from "./actions";
+import * as polls from "./dns-blocker-polls";
 import { Loader2, RefreshCw, Tag } from "lucide-react";
 import type { NetworkDevice } from "@/lib/dns-blocker/devices";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -28,7 +28,7 @@ export function DnsNetworkCard({ onName }: { onName: (address: string) => void }
     useEffect(() => {
         let live = true;
         setLoading(true);
-        void dnsDevicesAction({ range, fresh: fresh > 0 }).then((result) => {
+        void polls.dnsDevices({ range, fresh: fresh > 0 }).then((result) => {
             if (!live) return;
             setLoading(false);
             if (result.error !== undefined) {

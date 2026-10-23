@@ -71,7 +71,13 @@ vi.mock("@/app/(app)/apps/network-filter/dns-blocker-polls", () => {
     const actions = () => import("@/app/(app)/apps/network-filter/actions");
     return {
         dnsInsights: forward(actions, "dnsInsightsAction", 2),
-        dnsTail: forward(actions, "dnsTailAction", 1)
+        dnsTail: forward(actions, "dnsTailAction", 1),
+        dnsStatus: forward(actions, "dnsBlockerStatusAction", 0),
+        dnsLists: forward(actions, "dnsListsAction", 0),
+        dnsHistory: forward(actions, "dnsHistoryAction", 1),
+        dnsDevices: forward(actions, "dnsDevicesAction", 1),
+        dnsClients: forward(actions, "dnsClientsAction", 1),
+        dnsReputation: forward(actions, "dnsReputationAction", 1)
     };
 });
 
