@@ -56,6 +56,7 @@ Accepted today (until 2027-01-05):
 | GHSA-vfj7-8cjw-p6xm                      | braces      | No fixed release. Expands globs written in this repository (Tailwind 3 content paths, patch-package, sass's unused watch mode). | Tailwind 4 migration; patch-package replaced.                        |
 | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | postcss     | Next 15 and dymo-api's tw-to-css pin 8.4.31; see Overrides. Build-time CSS and an SDK path Polaris does not call.               | Next 16; dymo-api replaced by direct calls.                          |
 | GHSA-28wg-ghj8-5hjv                      | nanoid      | @univerjs/core 0.25 pins 5.1.11; every call passes a fixed positive size.                                                       | Univer 1.x, which drops nanoid.                                      |
+| GHSA-mrhx-c7xc-m3w5                      | zod         | Fixed only in 4.6.6; every workspace pins 3.25.76. Reachable through an unbounded `z.array()` on request input.                 | The Zod 4 migration.                                                 |
 
 ## Overrides
 
