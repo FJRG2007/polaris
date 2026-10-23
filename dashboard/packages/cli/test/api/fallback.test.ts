@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { send } from "../src/api.js";
-import { challengeMessage } from "../../core/src/instance-fallback.js";
+import { send } from "../../src/api.js";
+import { challengeMessage } from "../../../core/src/instance-fallback.js";
 
 const PRIMARY = "https://polaris.example.com";
 const LOCAL = "https://polaris.local";
