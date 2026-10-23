@@ -324,7 +324,10 @@ function pointOf(t: number, sum: SampleSum): LinePoint {
     if (sum.samples === 0) return { t, latencyMs: null, lossPct: null, upPct: null };
     return {
         t,
-        latencyMs: sum.latencyCount === 0 ? null : Math.round((sum.latencySum / sum.latencyCount) * 10) / 10,
+        latencyMs:
+            sum.latencyCount === 0
+                ? null
+                : Math.round((sum.latencySum / sum.latencyCount) * 10) / 10,
         lossPct: Math.round((sum.lossSum / sum.samples) * 10) / 10,
         upPct: Math.round(((sum.upSamples - sum.dnsFailSamples) / sum.samples) * 1000) / 10
     };

@@ -15,7 +15,10 @@ export type { LineReport, PublicIpChangeView } from "./line-samples";
 /** The most address changes sent; a line that changes more often than this in a year is its own story. */
 const IP_LIMIT = 200;
 
-export async function lineReport(range: rules.LineRange, at = Date.now()): Promise<rules.LineReport> {
+export async function lineReport(
+    range: rules.LineRange,
+    at = Date.now()
+): Promise<rules.LineReport> {
     const { spanMs } = rules.RANGE_SPEC[range];
     const from = at - spanMs;
     const raw = range === "24h";
@@ -63,7 +66,8 @@ export async function lineReport(range: rules.LineRange, at = Date.now()): Promi
                       at: new Date(state.lastAt).toISOString(),
                       up: state.status === "up",
                       kind: state.kind,
-                      since: state.failSince === null ? null : new Date(state.failSince).toISOString(),
+                      since:
+                          state.failSince === null ? null : new Date(state.failSince).toISOString(),
                       publicIp: state.publicIp
                   },
         ipChanges: ips.map((change) => ({

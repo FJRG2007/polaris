@@ -18,7 +18,10 @@ vi.mock("@/lib/automations/runner", () => ({ automationRunner: async () => null 
 
 const triggers = await import("@/lib/automations/triggers");
 
-const WORDS = { title: "The internet is back", body: "It was down for {{trigger.durationSeconds}} seconds." };
+const WORDS = {
+    title: "The internet is back",
+    body: "It was down for {{trigger.durationSeconds}} seconds."
+};
 
 describe("connectivity triggers", () => {
     it("arms on the event it names", () => {
@@ -40,9 +43,9 @@ describe("connectivity triggers", () => {
     });
 
     it("refuses an event that does not exist", () => {
-        expect(
-            core.connectivityTriggerConfigSchema.safeParse({ event: "sideways" }).success
-        ).toBe(false);
+        expect(core.connectivityTriggerConfigSchema.safeParse({ event: "sideways" }).success).toBe(
+            false
+        );
     });
 
     it("builds a publishable 'internet comes back' automation", () => {

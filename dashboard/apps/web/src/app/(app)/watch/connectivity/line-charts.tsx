@@ -46,12 +46,10 @@ export function LineCharts({ admin }: { admin: boolean }) {
         select: (body) => body as LineReport
     });
     const report = data && data.range === range ? data : null;
-    const formatTime = (at: number) =>
-        range === "24h" ? format.time(at) : format.dateTime(at);
+    const formatTime = (at: number) => (range === "24h" ? format.time(at) : format.dateTime(at));
     const ms = (value: number) =>
         t("connectivity.line.ms", { value: format.number(value, { maximumFractionDigits: 0 }) });
-    const pct = (value: number) =>
-        `${format.number(value, { maximumFractionDigits: 1 })}%`;
+    const pct = (value: number) => `${format.number(value, { maximumFractionDigits: 1 })}%`;
 
     const series = (pick: (point: rules.LinePoint) => number | null) =>
         (report?.points ?? []).map((point) => ({ t: point.t, v: pick(point) }));

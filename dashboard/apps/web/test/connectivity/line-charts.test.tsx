@@ -60,10 +60,24 @@ function fixture(): LineReport {
         to: NOW,
         points: rules.lineSeries(sums, "24h", NOW),
         totals: rules.lineTotals(sums),
-        now: { at: new Date(NOW).toISOString(), up: true, kind: null, since: null, publicIp: "203.0.113.5" },
+        now: {
+            at: new Date(NOW).toISOString(),
+            up: true,
+            kind: null,
+            since: null,
+            publicIp: "203.0.113.5"
+        },
         ipChanges: [
-            { at: new Date(NOW - 3_600_000).toISOString(), previous: "198.51.100.7", current: "203.0.113.5" },
-            { at: new Date(NOW - 86_400_000).toISOString(), previous: null, current: "198.51.100.7" }
+            {
+                at: new Date(NOW - 3_600_000).toISOString(),
+                previous: "198.51.100.7",
+                current: "203.0.113.5"
+            },
+            {
+                at: new Date(NOW - 86_400_000).toISOString(),
+                previous: null,
+                current: "198.51.100.7"
+            }
         ]
     };
 }
@@ -93,7 +107,11 @@ describe("the line's card", () => {
     });
 
     it("says so when the range has no measurements", () => {
-        report = { ...fixture(), points: rules.lineSeries([], "24h", NOW), totals: rules.lineTotals([]) };
+        report = {
+            ...fixture(),
+            points: rules.lineSeries([], "24h", NOW),
+            totals: rules.lineTotals([])
+        };
         const html = renderToStaticMarkup(withMessages(<LineCharts admin />));
         expect(html).toContain("No measurements in this range yet");
     });

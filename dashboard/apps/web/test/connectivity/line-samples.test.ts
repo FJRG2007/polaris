@@ -70,9 +70,7 @@ describe("down and up", () => {
 
     it("says DNS only when the line answered and the name did not", () => {
         const { events } = run([DNS_ONLY, DNS_ONLY]);
-        expect(events).toEqual([
-            { event: "down", kind: "dns", since: new Date(T0).toISOString() }
-        ]);
+        expect(events).toEqual([{ event: "down", kind: "dns", since: new Date(T0).toISOString() }]);
     });
 
     it("keeps the worst kind an outage went through", () => {
@@ -158,10 +156,22 @@ describe("charts", () => {
     it("buckets samples into steps and leaves gaps where nothing was measured", () => {
         const to = T0;
         const sums = [
-            { at: to - 5 * MIN, sum: rules.sumOfSample({ up: true, dnsOk: true, latencyMs: 10, lossPct: 0 }) },
-            { at: to - 4 * MIN, sum: rules.sumOfSample({ up: true, dnsOk: true, latencyMs: 30, lossPct: 50 }) },
-            { at: to - 3 * MIN, sum: rules.sumOfSample({ up: false, dnsOk: false, latencyMs: null, lossPct: 100 }) },
-            { at: to - 2 * MIN, sum: rules.sumOfSample({ up: true, dnsOk: false, latencyMs: 20, lossPct: 0 }) }
+            {
+                at: to - 5 * MIN,
+                sum: rules.sumOfSample({ up: true, dnsOk: true, latencyMs: 10, lossPct: 0 })
+            },
+            {
+                at: to - 4 * MIN,
+                sum: rules.sumOfSample({ up: true, dnsOk: true, latencyMs: 30, lossPct: 50 })
+            },
+            {
+                at: to - 3 * MIN,
+                sum: rules.sumOfSample({ up: false, dnsOk: false, latencyMs: null, lossPct: 100 })
+            },
+            {
+                at: to - 2 * MIN,
+                sum: rules.sumOfSample({ up: true, dnsOk: false, latencyMs: 20, lossPct: 0 })
+            }
         ];
         const points = rules.lineSeries(sums, "24h", to);
         expect(points).toHaveLength(144);

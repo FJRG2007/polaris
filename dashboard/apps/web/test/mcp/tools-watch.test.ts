@@ -40,9 +40,17 @@ vi.mock("@/lib/connectivity/outage-tracker", () => ({
 vi.mock("@/lib/connectivity/line-report", () => ({
     lineReport: async (range: string) => ({
         range,
-        now: { at: "2026-10-23T12:00:00.000Z", up: true, kind: null, since: null, publicIp: "203.0.113.5" },
+        now: {
+            at: "2026-10-23T12:00:00.000Z",
+            up: true,
+            kind: null,
+            since: null,
+            publicIp: "203.0.113.5"
+        },
         totals: { samples: 60, latencyMs: 14, latencyMaxMs: 40, lossPct: 0.5, upPct: 99.5 },
-        ipChanges: [{ at: "2026-10-23T09:00:00.000Z", previous: "198.51.100.7", current: "203.0.113.5" }]
+        ipChanges: [
+            { at: "2026-10-23T09:00:00.000Z", previous: "198.51.100.7", current: "203.0.113.5" }
+        ]
     })
 }));
 

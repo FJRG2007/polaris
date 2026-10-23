@@ -328,7 +328,9 @@ const connectivityTool: McpTool<z.infer<typeof connectivityInput>> = {
         });
         const ips = (line.ipChanges ?? [])
             .slice(0, IPS_LISTED)
-            .map((change) => `${change.at}  ${change.previous ?? "first seen"} -> ${change.current}`);
+            .map(
+                (change) => `${change.at}  ${change.previous ?? "first seen"} -> ${change.current}`
+            );
         return {
             text: [
                 `Now: ${now}`,
@@ -380,4 +382,9 @@ export const WATCH_SEARCH = defineMcpSearch({
     }
 });
 
-export const WATCH_TOOLS = [listTool, createTool, changeTool, connectivityTool] as unknown as McpTool<never>[];
+export const WATCH_TOOLS = [
+    listTool,
+    createTool,
+    changeTool,
+    connectivityTool
+] as unknown as McpTool<never>[];
