@@ -73,7 +73,8 @@
             "note.note": "una nota",
             "dns.filter": "las estadísticas del filtro de red",
             "agents.session": "una sesión de agente",
-            "polar.project": "proyecto de Polar"
+            "polar.project": "proyecto de Polar",
+            "task.task": "una tarea"
         }
     },
     "mentions": {

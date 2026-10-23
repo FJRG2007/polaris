@@ -63,7 +63,7 @@ reason).
 | Notes | Single note | `note.note` | shelf members + AccessGrant per note | `NoteShare` | people (open it, or also change its title and text; moving, pinning, archiving, deleting and sharing stay on its shelf; the reader needs the Notes app itself and opens it from the bell link, as it is not listed in their tree) | add | done |
 | Tasks | Space | `task.space` | `TaskSpaceMember` + AccessGrant | `TaskShare` | - | fine | - |
 | Tasks | Folder / list | `task.folder` | `TaskFolderMember` + AccessGrant | `TaskShare` | - | fine | - |
-| Tasks | Single task | - | assignees | `TaskShare` | people | add | todo |
+| Tasks | Single task | `task.task` | assignees + AccessGrant per task | `TaskShare` | people (view: from the task's Share dialog, by whoever may make its public link; the reader opens /tasks/t/<id> and sees the same names-only card a link shows, with its discussion, and nothing of its list; changing it stays with the list's members) | add | done |
 | Tasks | Intake form | - | space members | `TaskForm` link | - | fine | - |
 | Chat | Space | `chat.space` | `ChatSpaceMember` + AccessGrant | space invite | - | fine | - |
 | Chat | Channel | `chat.channel` | `ChatChannelMember` + AccessGrant | - | - | fine | - |

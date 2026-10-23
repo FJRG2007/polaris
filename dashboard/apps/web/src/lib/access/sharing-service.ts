@@ -27,7 +27,7 @@ import { memberOrgIds, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
 import { requireNote as requireNoteOnShelf, requireSpace as requireNoteSpace } from "@/lib/notes/access";
 import { requireShareable as requireOfficeShareable } from "@/lib/office/documents";
 import { requireSpace as requireChatSpace, requireChannel } from "@/lib/chat/access";
-import { requireSpace as requireTaskSpace, requireFolder } from "@/lib/tasks/access";
+import { requireSpace as requireTaskSpace, requireFolder, requireTask } from "@/lib/tasks/access";
 import { domainOwner, lendableServer } from "@/lib/machines/machine-access";
 
 /**
@@ -218,6 +218,10 @@ export async function requireMayShare(
             if (!project || project.ownerId !== user.id) throw new GrantError("You cannot share that");
             return;
         }
+        case "task.task":
+            // Whoever may make it a public link may show it to a person.
+            await requireTask(actor, subjectId, "member");
+            return;
         case "backup.plan": {
             // Only its owner shows a plan to somebody else.
             const plan = await prisma.backupPlan.findUnique({
@@ -538,6 +542,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return `/notes?note=${encodeURIComponent(subjectId)}`;
         case "backup.plan":
             return "/apps/backups";
+        case "task.task":
+            return `/tasks/t/${subjectId}`;
         case "polar.project":
             return "/polar";
         case "agents.session":

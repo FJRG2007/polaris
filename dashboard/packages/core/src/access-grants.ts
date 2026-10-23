@@ -93,7 +93,8 @@ export const GRANT_SUBJECTS = [
     "note.note",
     "dns.filter",
     "agents.session",
-    "polar.project"
+    "polar.project",
+    "task.task"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -230,7 +231,10 @@ export const GRANT_CAPABILITIES = {
     "agents.session": ["view"],
     // One Polar project: its name and its instructions, to read and to copy into a
     // project of one's own. Its chats stay private; a chat is shared on its own.
-    "polar.project": ["view"]
+    "polar.project": ["view"],
+    // One task, read on its own: its status, dates, people, subtasks, checklists and
+    // discussion. Not the list it sits in, and nothing is changed by the reader.
+    "task.task": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -284,7 +288,8 @@ export const GRANT_ACTIONS = {
     "note.note": [],
     "dns.filter": [],
     "agents.session": [],
-    "polar.project": []
+    "polar.project": [],
+    "task.task": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

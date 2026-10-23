@@ -17,6 +17,10 @@ import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { buildSpaceContext } from "@/lib/tasks/screen-context";
 import { getList, listSpaceTree } from "@/lib/tasks/space-service";
 import { requireTask, visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { Badge, PageHeader } from "@polaris/ui";
+import { getTranslations } from "@/lib/i18n/request";
+import { sharedTaskView } from "@/lib/tasks/share-service";
+import { TaskCard } from "@/app/t/[token]/task-card";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +34,19 @@ export default async function TaskPermalinkPage({ params }: { params: Promise<{ 
     try {
         resolved = await requireTask(actor, taskId, "guest");
     } catch {
-        redirect("/tasks");
+        // Shared on its own (`task.task`): the task and nothing of its list.
+        const shared = await sharedTaskView(taskId, user.id);
+        if (!shared) redirect("/tasks");
+        const t = await getTranslations("tasksDetail");
+        return (
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+                <PageHeader
+                    title={shared.name}
+                    actions={<Badge variant="neutral">{t("share.people.sharedWithYou")}</Badge>}
+                />
+                <TaskCard task={shared} />
+            </div>
+        );
     }
 
     const list = await getList(resolved.listId);

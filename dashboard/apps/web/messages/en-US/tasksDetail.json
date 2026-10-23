@@ -71,6 +71,10 @@
         "showEmpty": "Show {count} empty {count, plural, one {field} other {fields}}"
     },
     "share": {
+        "people": {
+            "open": "Share with people",
+            "sharedWithYou": "Shared with you"
+        },
         "validEmail": "Enter a valid email",
         "title": "Share this task",
         "send": {
