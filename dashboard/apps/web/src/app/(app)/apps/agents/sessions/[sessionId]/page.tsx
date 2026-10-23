@@ -1,8 +1,14 @@
-import { PageHeader } from "@polaris/ui";
+import { Badge, PageHeader } from "@polaris/ui";
+import { SessionShareButton } from "./share-button";
 import { notFound } from "next/navigation";
 import { SessionDetail } from "./session-detail";
 import { requirePermission, sessionCan } from "@/lib/session";
-import { getSession, sessionEvents, sessionMessages } from "@/lib/agents/session-service";
+import {
+    getSession,
+    sessionEvents,
+    sessionMessages,
+    sharedSession
+} from "@/lib/agents/session-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { readSessionWaiting } from "@/lib/agents/agent-notices";
 
@@ -15,8 +21,11 @@ export default async function AgentSessionPage({
 }) {
     const { sessionId } = await params;
     const user = await requirePermission("agents.read");
-    const session = await getSession(sessionId, user.id);
+    const owned = await getSession(sessionId, user.id);
+    // Somebody it was shared with (`agents.session`) reads it and nothing more.
+    const session = owned ?? (await sharedSession(sessionId, user.id));
     if (!session) notFound();
+    const shared = owned === null;
     const t = await getTranslations("agents");
 
     // Opening the session is reading what the bell said about it.
@@ -24,7 +33,7 @@ export default async function AgentSessionPage({
         sessionEvents(sessionId),
         sessionMessages(sessionId),
         readSessionWaiting(sessionId, user.id),
-        sessionCan(user, "agents.manage")
+        shared ? false : sessionCan(user, "agents.manage")
     ]);
 
     return (
@@ -42,12 +51,20 @@ export default async function AgentSessionPage({
                           })
                         : t("pages.sessionWorkspace")
                 }
+                actions={
+                    shared ? (
+                        <Badge variant="neutral">{t("session.sharedWithYou")}</Badge>
+                    ) : (
+                        <SessionShareButton sessionId={session.id} title={session.title} />
+                    )
+                }
             />
             <SessionDetail
                 session={session}
                 events={events}
                 messages={messages}
                 canControl={canControl}
+                shared={shared}
             />
         </>
     );

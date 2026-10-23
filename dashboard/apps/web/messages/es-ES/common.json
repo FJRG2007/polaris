@@ -71,7 +71,8 @@
             "telemetry.project": "los fallos de un proyecto",
             "backup.plan": "un plan de copias",
             "note.note": "una nota",
-            "dns.filter": "las estadísticas del filtro de red"
+            "dns.filter": "las estadísticas del filtro de red",
+            "agents.session": "una sesión de agente"
         }
     },
     "mentions": {

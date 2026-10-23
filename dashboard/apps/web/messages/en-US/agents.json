@@ -234,6 +234,8 @@
         "start": "Starting the agent"
     },
     "session": {
+        "share": "Share session",
+        "sharedWithYou": "Shared with you",
         "events": {
             "sessionStart": "Started",
             "prompt": "Asked",

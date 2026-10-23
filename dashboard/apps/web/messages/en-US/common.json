@@ -71,7 +71,8 @@
             "telemetry.project": "a telemetry project's issues",
             "backup.plan": "a backup plan",
             "note.note": "a note",
-            "dns.filter": "the network filter's statistics"
+            "dns.filter": "the network filter's statistics",
+            "agents.session": "an agent session"
         }
     },
     "mentions": {

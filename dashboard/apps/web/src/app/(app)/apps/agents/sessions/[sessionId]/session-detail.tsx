@@ -61,9 +61,18 @@ interface Props {
     /** Whether this account may steer the session: read its checkout and ship
      *  from it. The actions check the same thing again. */
     canControl?: boolean;
+    /** Shared with this account to read (`agents.session`): no terminal, no
+     *  typing to it, no stopping it. */
+    shared?: boolean;
 }
 
-export function SessionDetail({ session, events, messages, canControl = false }: Props) {
+export function SessionDetail({
+    session,
+    events,
+    messages,
+    canControl = false,
+    shared = false
+}: Props) {
     const t = useTranslations("agents");
     const [view, setView] = useState<"session" | "changes">("session");
     const reviewable = canControl && Boolean(session.repoFullName);
@@ -112,7 +121,7 @@ export function SessionDetail({ session, events, messages, canControl = false }:
     // and reading it on a timer would be polling somebody's session for a bar
     // that has nothing left to say.
     useEffect(() => {
-        if (session.state !== "starting") {
+        if (session.state !== "starting" || shared) {
             setBoot(null);
             return;
         }
@@ -137,7 +146,7 @@ export function SessionDetail({ session, events, messages, canControl = false }:
             controller.abort();
             clearInterval(timer);
         };
-    }, [session.id, session.state]);
+    }, [session.id, session.state, shared]);
 
     // The server's copy has landed, so the local one goes. Matched on the body
     // rather than an id, because the row the server writes has one of its own
@@ -245,7 +254,7 @@ export function SessionDetail({ session, events, messages, canControl = false }:
                         ? (session.hostName ?? t("sessions.aServer"))
                         : t("sessions.thisBox")}
                 </Badge>
-                {over ? null : (
+                {over || shared ? null : (
                     <>
                         {session.place === "local" ? (
                             <Button
@@ -349,7 +358,9 @@ export function SessionDetail({ session, events, messages, canControl = false }:
                         <span>{agentText(t, session.error)}</span>
                     </div>
                 ) : null}
-                {session.work ? <WorkOutcome session={session} setError={setError} /> : null}
+                {session.work && !shared ? (
+                    <WorkOutcome session={session} setError={setError} />
+                ) : null}
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
 
                 {attached ? (
@@ -479,7 +490,7 @@ export function SessionDetail({ session, events, messages, canControl = false }:
                     <p className="text-sm text-muted-foreground">
                         {t("session.ended", { branch: session.branch })}
                     </p>
-                ) : (
+                ) : shared ? null : (
                     <div className="space-y-2">
                         <Textarea
                             value={text}

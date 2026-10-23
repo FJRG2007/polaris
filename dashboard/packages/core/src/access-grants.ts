@@ -91,7 +91,8 @@ export const GRANT_SUBJECTS = [
     "telemetry.project",
     "backup.plan",
     "note.note",
-    "dns.filter"
+    "dns.filter",
+    "agents.session"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -221,7 +222,11 @@ export const GRANT_CAPABILITIES = {
     // The network filter's long-term statistics: lookups, the blocked share and the
     // domains most asked for. Which device asked, the live log, the rules and the
     // settings stay with administrators.
-    "dns.filter": ["view"]
+    "dns.filter": ["view"],
+    // One agent session: what was said, what it reported and where it got to.
+    // Typing to it, stopping it, its terminal and its changes stay with whoever
+    // steers it.
+    "agents.session": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -273,7 +278,8 @@ export const GRANT_ACTIONS = {
     "telemetry.project": [],
     "backup.plan": [],
     "note.note": [],
-    "dns.filter": []
+    "dns.filter": [],
+    "agents.session": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

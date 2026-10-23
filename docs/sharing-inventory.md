@@ -56,7 +56,7 @@ reason).
 | Game servers | Server (players) | - | `GamePlayerAccess` | invite link | operators via the dialog | add | todo |
 | Network filter | Stats, rules | `dns.filter` | administrators + AccessGrant over the one filter | none | people (view the long-term statistics: totals, per-day chart, top domains, blocked by list; which device asked, the live log, the rules and the settings stay with administrators - rules are not shared, they name the network) | add | done |
 | Firewall | Rules, views | - | administrators | none | - | no: edge security, administrators only | - |
-| Agents | Session | - | owner | none | people (view) | add | todo |
+| Agents | Session | `agents.session` | owner + AccessGrant per session | none | people (view what was said, what it reported and where it got to, from the bell link; typing to it, stopping it, its terminal, its screen and its changes stay with whoever steers it; the reader needs the Agents app's read permission) | add | done |
 | Polar | Thread | - | `PolarShareRecipient` | Polar share link | dialog fronting it | fine | - |
 | Polar | Project | - | owner | none | people | add | todo |
 | Notes | Space | `note.space` | `NoteSpaceMember` + AccessGrant | `NoteShare` | - | fine | - |
