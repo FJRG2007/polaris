@@ -189,6 +189,7 @@
         }
     },
     "scripts": {
+        "logos": "node scripts/app-logo-files.mjs",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },

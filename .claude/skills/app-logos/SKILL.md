@@ -56,15 +56,20 @@ shows. Follow the existing entries:
 
 ## Check it
 
-1. `packages/ui/test/app-logo.test.tsx` covers every id in `LOGOS`, and
+1. Write the logo's file: `npm run logos -w @polaris/ui` renders every entry in
+   `LOGOS` to `packages/ui/assets/app-logos/<id>.svg`, the file the public site
+   and every other surface outside the dashboard shows. Commit the files with
+   the change; `packages/ui/test/app-logo-files.test.ts` fails while they differ.
+   Never edit those files by hand, and never point a surface at another copy.
+2. `packages/ui/test/app-logo.test.tsx` covers every id in `LOGOS`, and
    `apps/web/test/navigation/app-launcher.test.tsx` fails for a registered app
    with no logo. Run both.
-2. Render it before calling it done. Draw the new logo next to three existing
+3. Render it before calling it done. Draw the new logo next to three existing
    ones at 16, 24 and 40 px, on a light and a dark background, in a headless
    browser (never a visible window). Look at the screenshot. At 16px the glyph
    must still be recognisable, and its weight must match its neighbours. Keep
    the preview page and screenshots in the scratchpad, never in the repo.
-3. The logo is decorative: `AppLogo` already sets `aria-hidden`, and the app's
+4. The logo is decorative: `AppLogo` already sets `aria-hidden`, and the app's
    name is always written beside it. Do not add a title or label.
 
 Surfaces that show an app reuse `AppLogo` with the app's previous icon as
