@@ -151,7 +151,10 @@ const actions = vi.hoisted(() => {
         "listPlacementsAction",
         "listInstallTargetsAction",
         "listStorageConnectionsAction",
-        "listTemplateTargetsAction"
+        "listTemplateTargetsAction",
+        "probeRunnerHostAction",
+        "runnerPrincipalsAction",
+        "previewScopeAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -431,6 +434,11 @@ vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
     listInstallTargetsAction: actions.listInstallTargetsAction,
     listStorageConnectionsAction: actions.listStorageConnectionsAction
 }));
+vi.mock("@/app/(app)/apps/runners/actions", () => ({
+    probeRunnerHostAction: actions.probeRunnerHostAction,
+    runnerPrincipalsAction: actions.runnerPrincipalsAction,
+    previewScopeAction: actions.previewScopeAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -595,7 +603,10 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/marketplace/storage-connections": () =>
         import("@/app/api/marketplace/storage-connections/route"),
     "/api/marketplace/template-targets": () =>
-        import("@/app/api/marketplace/template-targets/route")
+        import("@/app/api/marketplace/template-targets/route"),
+    "/api/runners/probe": () => import("@/app/api/runners/probe/route"),
+    "/api/runners/principals": () => import("@/app/api/runners/principals/route"),
+    "/api/runners/scope-preview": () => import("@/app/api/runners/scope-preview/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2310,6 +2321,42 @@ const CASES: Case[] = [
             ).templateTargets(),
         action: "listTemplateTargetsAction",
         args: []
+    },
+    {
+        name: "what a machine can offer as a runner",
+        path: "/api/runners/probe",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/runners/runners-polls")>(
+                    "@/app/(app)/apps/runners/runners-polls"
+                )
+            ).runnerHost("serverId-1"),
+        action: "probeRunnerHostAction",
+        args: ["serverId-1"]
+    },
+    {
+        name: "the people and groups a runner can be scoped to",
+        path: "/api/runners/principals",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/runners/runners-polls")>(
+                    "@/app/(app)/apps/runners/runners-polls"
+                )
+            ).runnerPrincipals(),
+        action: "runnerPrincipalsAction",
+        args: []
+    },
+    {
+        name: "the repositories a runner scope reaches",
+        path: "/api/runners/scope-preview",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/runners/runners-polls")>(
+                    "@/app/(app)/apps/runners/runners-polls"
+                )
+            ).scopePreview({ kind: "sample" }),
+        action: "previewScopeAction",
+        args: [{ kind: "sample" }]
     }
 ];
 

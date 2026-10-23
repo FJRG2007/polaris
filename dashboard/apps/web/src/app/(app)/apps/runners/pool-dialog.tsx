@@ -26,7 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { knownRunnerText, runnerText } from "@/lib/runners/words";
 import type { RunnerHostReadiness } from "@/lib/runners/runner-service";
-import { createRunnerPoolAction, probeRunnerHostAction } from "./actions";
+import { createRunnerPoolAction } from "./actions";
 import { EMPTY_SCOPE, ScopeField, toScope, type ScopeState } from "./scope-field";
 import {
     Button,
@@ -48,6 +48,7 @@ import {
     type RunnerIsolation,
     type RunnerWindow
 } from "@polaris/core";
+import * as polls from "./runners-polls";
 
 export interface ServerOption {
     id: string;
@@ -130,7 +131,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
         setProbing(true);
         setReadiness(null);
         setProbeError(null);
-        void probeRunnerHostAction(serverId).then((result) => {
+        void polls.runnerHost(serverId).then((result) => {
             if (!live) return;
             setProbing(false);
             const machine = result.readiness;

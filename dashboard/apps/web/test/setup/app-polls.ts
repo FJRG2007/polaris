@@ -676,3 +676,17 @@ vi.mock("@/app/(app)/apps/marketplace/marketplace-polls", () => ({
         0
     )
 }));
+
+vi.mock("@/app/(app)/apps/runners/runners-polls", () => ({
+    runnerHost: forward(
+        () => import("@/app/(app)/apps/runners/actions"),
+        "probeRunnerHostAction",
+        1
+    ),
+    runnerPrincipals: forward(
+        () => import("@/app/(app)/apps/runners/actions"),
+        "runnerPrincipalsAction",
+        0
+    ),
+    scopePreview: forward(() => import("@/app/(app)/apps/runners/actions"), "previewScopeAction", 1)
+}));
