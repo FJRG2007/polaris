@@ -63,7 +63,13 @@ export function describeServiceSource(app: {
                 : null;
         if (github) {
             const name = `${github.owner}/${github.repo}`;
-            return { kind: "repository", provider: "github", name, url: `https://github.com/${name}`, branch };
+            return {
+                kind: "repository",
+                provider: "github",
+                name,
+                url: `https://github.com/${name}`,
+                branch
+            };
         }
         const name = withoutCredentials(repoUrl);
         const scheme = /^(https?):\/\//i.exec(repoUrl)?.[1]?.toLowerCase();

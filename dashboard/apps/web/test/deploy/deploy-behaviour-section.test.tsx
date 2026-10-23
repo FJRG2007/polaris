@@ -15,7 +15,10 @@ import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { DeployBehaviourView } from "@/lib/deploy/deploy-behaviour";
-import { DeployBehaviourCards, useDeployBehaviour } from "@/app/(app)/apps/deploy/deploy-behaviour-section";
+import {
+    DeployBehaviourCards,
+    useDeployBehaviour
+} from "@/app/(app)/apps/deploy/deploy-behaviour-section";
 
 const behaviourAction = vi.fn();
 const blockAction = vi.fn();
@@ -28,7 +31,13 @@ vi.mock("@/app/(app)/apps/deploy/deploy-behaviour-actions", () => ({
     setExternalNetworksAction: vi.fn(async () => ({}))
 }));
 
-function DeployBehaviourSection({ applicationId, canConfigure }: { applicationId: string; canConfigure: boolean }) {
+function DeployBehaviourSection({
+    applicationId,
+    canConfigure
+}: {
+    applicationId: string;
+    canConfigure: boolean;
+}) {
     const state = useDeployBehaviour(applicationId);
     return <DeployBehaviourCards state={state} canConfigure={canConfigure} />;
 }

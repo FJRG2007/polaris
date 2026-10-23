@@ -28,12 +28,7 @@ export interface MountedCard {
 /** Lowercase, without accents, with runs of spacing folded: "Cabeceras  de
  *  SEGURIDAD" and "cabeceras de seguridad" are the same search. */
 export function foldText(text: string): string {
-    return text
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .toLowerCase()
-        .replace(/\s+/g, " ")
-        .trim();
+    return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /** Whether every word of the query appears somewhere in the haystack. */

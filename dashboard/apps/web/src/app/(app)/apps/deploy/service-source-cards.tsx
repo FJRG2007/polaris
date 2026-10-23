@@ -71,7 +71,10 @@ export function SourceRepositoryView({
                             <ArrowUpRight className="size-3.5 shrink-0" aria-hidden />
                         </a>
                     ) : (
-                        <span title={source.name} className="min-w-0 flex-1 truncate text-sm font-medium">
+                        <span
+                            title={source.name}
+                            className="min-w-0 flex-1 truncate text-sm font-medium"
+                        >
                             {source.name}
                         </span>
                     )}
@@ -118,7 +121,10 @@ export function SourceRepositoryView({
             {source.kind === "image" && (
                 <div className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2.5">
                     <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-                    <span title={source.image} className="min-w-0 flex-1 truncate font-mono text-xs">
+                    <span
+                        title={source.image}
+                        className="min-w-0 flex-1 truncate font-mono text-xs"
+                    >
                         {source.image}
                     </span>
                     <CopyButton value={source.image} className="shrink-0" />
@@ -129,7 +135,13 @@ export function SourceRepositoryView({
 }
 
 /** The Source card, loaded for one service. */
-export function SourceRepositoryCard({ app, canConfigure }: { app: ProjectApp; canConfigure: boolean }) {
+export function SourceRepositoryCard({
+    app,
+    canConfigure
+}: {
+    app: ProjectApp;
+    canConfigure: boolean;
+}) {
     const t = useTranslations("deployService");
     const [source, setSource] = useState<ServiceSourceView | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -176,9 +188,9 @@ export function SourceRepositoryCard({ app, canConfigure }: { app: ProjectApp; c
 }
 
 /** What builds the service, as stored: the facts the Builder card states. */
-export function builderOf(app: Pick<ProjectApp, "sourceType" | "rootDirectory" | "dockerfilePath">):
-    | { kind: "dockerfile"; path: string }
-    | { kind: "auto" | "image" | "other" } {
+export function builderOf(
+    app: Pick<ProjectApp, "sourceType" | "rootDirectory" | "dockerfilePath">
+): { kind: "dockerfile"; path: string } | { kind: "auto" | "image" | "other" } {
     if (app.sourceType === "dockerfile") {
         const root = (app.rootDirectory ?? "").trim().replace(/^\/+|\/+$/g, "");
         const file = (app.dockerfilePath ?? "").trim() || "Dockerfile";

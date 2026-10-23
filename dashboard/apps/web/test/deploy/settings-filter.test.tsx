@@ -11,7 +11,11 @@ import { MessagesWrapper } from "../setup/i18n";
 import { GitBranch, ShieldCheck } from "lucide-react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { SettingsCard, SettingsLayout, SettingsSection } from "@/app/(app)/apps/deploy/settings-kit";
+import {
+    SettingsCard,
+    SettingsLayout,
+    SettingsSection
+} from "@/app/(app)/apps/deploy/settings-kit";
 import {
     filterSettings,
     foldText,
@@ -55,7 +59,11 @@ describe("matching a typed filter", () => {
     });
 
     it("leaves out a card that is not drawn, and one the page never declared", () => {
-        const result = filterSettings(INDEX, [{ entry: "unknown", text: "Security headers" }], "security");
+        const result = filterSettings(
+            INDEX,
+            [{ entry: "unknown", text: "Security headers" }],
+            "security"
+        );
         expect(result.cards.size).toBe(0);
         expect(result.sections.size).toBe(0);
     });
@@ -70,8 +78,18 @@ function Page() {
                 { id: "s-security", group: "security", label: "Security & edge", icon: ShieldCheck }
             ]}
         >
-            <SettingsSection id="s-source" group="source" icon={GitBranch} title="Source" intro="Code.">
-                <SettingsCard entry="repository" title="Repository" description="The code it builds." />
+            <SettingsSection
+                id="s-source"
+                group="source"
+                icon={GitBranch}
+                title="Source"
+                intro="Code."
+            >
+                <SettingsCard
+                    entry="repository"
+                    title="Repository"
+                    description="The code it builds."
+                />
             </SettingsSection>
             <SettingsSection
                 id="s-security"
@@ -80,7 +98,11 @@ function Page() {
                 title="Security & edge"
                 intro="Guards."
             >
-                <SettingsCard entry="securityHeaders" title="Security headers" description="Sent on every answer." />
+                <SettingsCard
+                    entry="securityHeaders"
+                    title="Security headers"
+                    description="Sent on every answer."
+                />
             </SettingsSection>
         </SettingsLayout>
     );

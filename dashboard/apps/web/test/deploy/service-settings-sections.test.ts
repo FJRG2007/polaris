@@ -55,7 +55,9 @@ describe("the sections of a service's Settings tab", () => {
 
     it("draw every entry of the index from exactly one file", () => {
         for (const entry of Object.keys(SERVICE_SETTINGS_INDEX)) {
-            const files = new Set(tags.filter(({ tag }) => entryOf(tag) === entry).map(({ file }) => file));
+            const files = new Set(
+                tags.filter(({ tag }) => entryOf(tag) === entry).map(({ file }) => file)
+            );
             expect([entry, files.size]).toEqual([entry, 1]);
         }
     });
@@ -67,7 +69,9 @@ describe("the sections of a service's Settings tab", () => {
             if (entry) counts.set(entry, (counts.get(entry) ?? 0) + 1);
         }
         // The Source card is one card with a shape per kind of source.
-        const repeated = [...counts].filter(([entry, count]) => count > 1 && entry !== "repository");
+        const repeated = [...counts].filter(
+            ([entry, count]) => count > 1 && entry !== "repository"
+        );
         expect(repeated).toEqual([]);
     });
 
