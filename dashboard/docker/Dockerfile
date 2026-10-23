@@ -260,7 +260,11 @@ ENV NODE_ENV=production \
     # SMB (NTLM) auth needs MD4, which OpenSSL 3 gates behind the legacy provider;
     # without this the SMB client throws ERR_OSSL_EVP_UNSUPPORTED as an uncaught
     # exception and takes the whole web process down.
-    NODE_OPTIONS=--openssl-legacy-provider
+    NODE_OPTIONS=--openssl-legacy-provider     # Name lookups run on libuv's thread pool, four threads by default. With the
+    # internet down each outside lookup hangs ~10 s, and four of them stall every
+    # other lookup (localhost too), file read and hash behind them. Set here, in
+    # the image, so an existing install gets it from the Update button.
+    UV_THREADPOOL_SIZE=64
 
 # openssl for the Prisma engines; ca-certificates for TLS to Postgres; smbclient
 # so Polaris can enumerate and reach SMB shares (e.g. a UniFi UNAS) itself -
