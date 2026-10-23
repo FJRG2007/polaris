@@ -165,7 +165,13 @@ const actions = vi.hoisted(() => {
         "thresholdChoicesAction",
         "appWidgetTargetsAction",
         "listDraftsAction",
-        "itemUsesAction"
+        "itemUsesAction",
+        "noteShareAction",
+        "noteSpaceOwnersAction",
+        "officeGoogleLinkAction",
+        "officeGoogleStateAction",
+        "listGoogleFilesAction",
+        "listLinksAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -469,6 +475,18 @@ vi.mock("@/app/(app)/mail/actions", () => ({
 vi.mock("@/app/(app)/vault/vault-actions", () => ({
     itemUsesAction: actions.itemUsesAction
 }));
+vi.mock("@/app/(app)/notes/actions", () => ({
+    noteShareAction: actions.noteShareAction,
+    noteSpaceOwnersAction: actions.noteSpaceOwnersAction
+}));
+vi.mock("@/app/(app)/office/google-actions", () => ({
+    officeGoogleLinkAction: actions.officeGoogleLinkAction,
+    officeGoogleStateAction: actions.officeGoogleStateAction,
+    listGoogleFilesAction: actions.listGoogleFilesAction
+}));
+vi.mock("@/app/(app)/office/link-actions", () => ({
+    listLinksAction: actions.listLinksAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -648,7 +666,13 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
         import("@/app/api/automations/threshold-choices/route"),
     "/api/home/app-widget-targets": () => import("@/app/api/home/app-widget-targets/route"),
     "/api/mail/draft-list": () => import("@/app/api/mail/draft-list/route"),
-    "/api/vault/item-uses": () => import("@/app/api/vault/item-uses/route")
+    "/api/vault/item-uses": () => import("@/app/api/vault/item-uses/route"),
+    "/api/notes/share": () => import("@/app/api/notes/share/route"),
+    "/api/notes/space-owners": () => import("@/app/api/notes/space-owners/route"),
+    "/api/office/google-link": () => import("@/app/api/office/google-link/route"),
+    "/api/office/google-state": () => import("@/app/api/office/google-state/route"),
+    "/api/office/google-files": () => import("@/app/api/office/google-files/route"),
+    "/api/office/links": () => import("@/app/api/office/links/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2531,6 +2555,78 @@ const CASES: Case[] = [
             ).itemUses("itemId-1"),
         action: "itemUsesAction",
         args: ["itemId-1"]
+    },
+    {
+        name: "a note's public link, if it has one",
+        path: "/api/notes/share",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/notes/notes-polls")>(
+                    "@/app/(app)/notes/notes-polls"
+                )
+            ).noteShare("noteId-1"),
+        action: "noteShareAction",
+        args: ["noteId-1"]
+    },
+    {
+        name: "the organizations a notebook can belong to",
+        path: "/api/notes/space-owners",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/notes/notes-polls")>(
+                    "@/app/(app)/notes/notes-polls"
+                )
+            ).spaceOwners(),
+        action: "noteSpaceOwnersAction",
+        args: []
+    },
+    {
+        name: "the Google file a document saves to",
+        path: "/api/office/google-link",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/office/office-polls")>(
+                    "@/app/(app)/office/office-polls"
+                )
+            ).googleLink("documentId-1"),
+        action: "officeGoogleLinkAction",
+        args: ["documentId-1"]
+    },
+    {
+        name: "whether Google import is available, and with which accounts",
+        path: "/api/office/google-state",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/office/office-polls")>(
+                    "@/app/(app)/office/office-polls"
+                )
+            ).googleState(),
+        action: "officeGoogleStateAction",
+        args: []
+    },
+    {
+        name: "a page of an account's Google files",
+        path: "/api/office/google-files",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/office/office-polls")>(
+                    "@/app/(app)/office/office-polls"
+                )
+            ).googleFiles({ kind: "sample" }),
+        action: "listGoogleFilesAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "a document's share links",
+        path: "/api/office/links",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/office/office-polls")>(
+                    "@/app/(app)/office/office-polls"
+                )
+            ).links("documentId-1"),
+        action: "listLinksAction",
+        args: ["documentId-1"]
     }
 ];
 

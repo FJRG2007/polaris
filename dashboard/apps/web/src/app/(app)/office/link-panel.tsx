@@ -31,12 +31,8 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { OfficeLinkView } from "@/lib/office/links";
 import { Copy, Link2, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button, Input, Select, Switch, useToast } from "@polaris/ui";
-import {
-    createLinkAction,
-    listLinksAction,
-    revealLinkAction,
-    revokeLinkAction
-} from "./link-actions";
+import { createLinkAction, revealLinkAction, revokeLinkAction } from "./link-actions";
+import * as polls from "./office-polls";
 
 /** What each standing means, said as the person who made the link would say it. */
 const STANDING = {
@@ -66,7 +62,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
     useEffect(() => {
         let current = true;
         void runAction(
-            () => listLinksAction(documentId),
+            () => polls.links(documentId),
             (message) => toast.show({ title: message })
         ).then((answer) => {
             if (!current || !answer) return;

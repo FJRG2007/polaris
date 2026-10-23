@@ -737,3 +737,27 @@ vi.mock("@/app/(app)/mail/mail-polls", () => ({
 vi.mock("@/app/(app)/vault/vault-polls", () => ({
     itemUses: forward(() => import("@/app/(app)/vault/vault-actions"), "itemUsesAction", 1)
 }));
+
+vi.mock("@/app/(app)/notes/notes-polls", () => ({
+    noteShare: forward(() => import("@/app/(app)/notes/actions"), "noteShareAction", 1),
+    spaceOwners: forward(() => import("@/app/(app)/notes/actions"), "noteSpaceOwnersAction", 0)
+}));
+
+vi.mock("@/app/(app)/office/office-polls", () => ({
+    googleLink: forward(
+        () => import("@/app/(app)/office/google-actions"),
+        "officeGoogleLinkAction",
+        1
+    ),
+    googleState: forward(
+        () => import("@/app/(app)/office/google-actions"),
+        "officeGoogleStateAction",
+        0
+    ),
+    googleFiles: forward(
+        () => import("@/app/(app)/office/google-actions"),
+        "listGoogleFilesAction",
+        1
+    ),
+    links: forward(() => import("@/app/(app)/office/link-actions"), "listLinksAction", 1)
+}));

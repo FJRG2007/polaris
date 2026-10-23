@@ -32,6 +32,7 @@ import {
     isDirty,
     Switch
 } from "@polaris/ui";
+import * as polls from "./notes-polls";
 
 /** A date the browser's date field can hold, from a stored instant. */
 function asDateField(iso: string | null): string {
@@ -68,7 +69,7 @@ export function NoteShareDialog({
         if (!open) return;
         let alive = true;
         setLoading(true);
-        void actions.noteShareAction(noteId).then(async (result) => {
+        void polls.noteShare(noteId).then(async (result) => {
             if (!alive) return;
             if (result.error) setError(result.error);
             const found = result.share ?? null;
