@@ -7254,6 +7254,13 @@ model AccessGrant {
     allowedCidrs      String @default("[]")
     allowedCountries  String @default("[]")
     allowedContinents String @default("[]")
+    /// A link only: who it opens for besides being held - restricted (signed
+    /// in and already given access), org (signed in to linkOrgId) or anyone (no
+    /// account). Every link written before this was a no-account link, so the
+    /// default is what they already meant.
+    linkAudience      String  @default("anyone")
+    /// The organization an `org` link opens for, fixed when it is written.
+    linkOrgId         String? @db.Uuid
 
     /// Why it exists, in the words of whoever wrote it ("Cleaner, Tuesdays").
     note        String  @default("")
@@ -7269,6 +7276,8 @@ model AccessGrant {
     // a screen, and "what does this person reach" runs on the way into one.
     @@index([subjectType, subjectId])
     @@index([principalType, principalId])
+    // "People with access", a page at a time, oldest first.
+    @@index([subjectType, subjectId, createdAt, id])
 }
 
 // ---------------------------------------------------------------------------

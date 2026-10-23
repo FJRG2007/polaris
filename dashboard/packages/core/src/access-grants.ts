@@ -528,9 +528,19 @@ export function grantIsBounded(schedule: GrantSchedule): boolean {
     );
 }
 
-/** The most grants one thing may carry. Far above what anybody writes, and a
- *  ceiling on what a screen has to draw and a check has to walk. */
-export const MAX_GRANTS_PER_SUBJECT = 100;
+/**
+ * The most grants one thing may carry.
+ *
+ * Each row is one person, one team or one role, and a team or a role is one row
+ * however many people it reaches - that is how a thing is shared with thousands.
+ * The ceiling bounds what an access check may have to match against when a
+ * subject is shared person by person; the screen pages through the rows and
+ * never draws them all.
+ */
+export const MAX_GRANTS_PER_SUBJECT = 5_000;
+
+/** The most rows one page of "People with access" carries. */
+export const GRANT_PAGE_SIZE = 50;
 
 /**
  * The moment a picked day begins, in the reader's own zone.
@@ -683,7 +693,15 @@ export type AccessGrantInput = z.infer<typeof accessGrantSchema>;
  * bounds, nobody named. Whoever holds the link holds the grant, so what a link
  * may do is narrower than what a person may (`linkCapabilities`).
  */
-export const grantLinkSchema = withGrantRules(grantBounds.extend(addressRuleFields));
+export const grantLinkSchema = withGrantRules(
+    grantBounds.extend({
+        ...addressRuleFields,
+        // Absent is "anyone": every link written before audiences existed was
+        // a link for somebody with no account, and a caller that names none
+        // still means that.
+        audience: z.enum(["restricted", "org", "anyone"]).default("anyone")
+    })
+);
 
 export type GrantLinkInput = z.infer<typeof grantLinkSchema>;
 
@@ -746,6 +764,34 @@ export function linkCapabilities(subject: GrantLinkSubject): readonly string[] {
 
 /** The principal a link grant is written under; its id is the link's hash. */
 export const LINK_PRINCIPAL = "link";
+
+/**
+ * Who a link opens for, besides being held.
+ *
+ * - `restricted`: only somebody signed in who already has access to the thing -
+ *   the address works for them and for nobody else.
+ * - `org`: anybody signed in to the organization the thing belongs to.
+ * - `anyone`: whoever has the address, with no account. What every link was
+ *   before this existed, and what an old row reads as.
+ */
+export const LINK_AUDIENCES = ["restricted", "org", "anyone"] as const;
+
+export type LinkAudience = (typeof LINK_AUDIENCES)[number];
+
+export function isLinkAudience(value: unknown): value is LinkAudience {
+    return (LINK_AUDIENCES as readonly unknown[]).includes(value);
+}
+
+/** A stored audience, read total: anything unknown is the old meaning. */
+export function linkAudienceOf(value: unknown): LinkAudience {
+    return isLinkAudience(value) ? value : "anyone";
+}
+
+/** What a grant may be changed to after it is written: its capability, which
+ *  actions it allows, and its bounds - never who it is to. */
+export const grantUpdateSchema = withGrantRules(grantBounds);
+
+export type GrantUpdateInput = z.infer<typeof grantUpdateSchema>;
 
 /** Where the browser says it is, at the moment of an act. */
 export interface ReportedLocation {
