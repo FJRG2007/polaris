@@ -21,7 +21,8 @@
     },
     "servers": {
         "description": "Load on every server Polaris can reach, read from the machine itself.",
-        "listLabel": "servers"
+        "listLabel": "servers",
+        "sharedWithYou": "Shared with you"
     },
     "services": {
         "description": "Every deployed service, with the last hour of its consumption.",

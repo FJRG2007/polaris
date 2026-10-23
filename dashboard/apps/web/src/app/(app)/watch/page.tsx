@@ -5,6 +5,7 @@ import { sortByConsumption } from "@/lib/watch/card-order";
 import { Button, PageHeader } from "@polaris/ui";
 import { redirect } from "next/navigation";
 import { connectivityReach } from "@/lib/connectivity/access";
+import { reachesAnySubject } from "@/lib/access/grants";
 import { requirePermission, requireUser, sessionCan } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { WatchContainersSection } from "./watch-containers";
@@ -26,11 +27,13 @@ const GROUP_LIMIT = 6;
  * after it rather than holding it up.
  */
 export default async function WatchPage() {
-    // Somebody given only the connectivity record reaches Watch through it,
-    // so the app's own address lands them there rather than on a refusal.
+    // Somebody given only the connectivity record or a server reaches Watch
+    // through it, so the app's own address lands them there rather than on a
+    // refusal.
     const viewer = await requireUser();
-    if (!(await sessionCan(viewer, "deploy.read")) && (await connectivityReach(viewer))) {
-        redirect("/watch/connectivity");
+    if (!(await sessionCan(viewer, "deploy.read"))) {
+        if (await connectivityReach(viewer)) redirect("/watch/connectivity");
+        if (await reachesAnySubject(viewer.id, ["place.server"])) redirect("/watch/servers");
     }
     const user = await requirePermission("deploy.read");
     const overview = await getWatchOverview(user.id);

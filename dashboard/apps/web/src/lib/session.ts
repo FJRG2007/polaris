@@ -221,11 +221,13 @@ export function accessFor(user: SessionUser): AppAccessInput {
         // rather than in the app registry because that one is read in the
         // browser.
         alsoReaches: async (appId) =>
-            // Watch is reached by a person its connectivity record was shared
-            // with; every other app that lends single things is an extension.
+            // Watch is reached by a person its connectivity record or a server
+            // was shared with; every other app that lends single things is an
+            // extension.
             appId === "watch"
                 ? (await import("@/lib/access/grants")).reachesAnySubject(user.id, [
-                      "watch.connectivity"
+                      "watch.connectivity",
+                      "place.server"
                   ])
                 : (await import("@/lib/app-extensions/registry")).appReaches(appId, user.id),
         reachesSubject: async (subject) =>

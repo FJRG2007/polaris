@@ -21,7 +21,8 @@
     },
     "servers": {
         "description": "La carga de cada servidor al que llega Polaris, leída de la propia máquina.",
-        "listLabel": "servidores"
+        "listLabel": "servidores",
+        "sharedWithYou": "Compartido contigo"
     },
     "services": {
         "description": "Todos los servicios desplegados, con su consumo de la última hora.",

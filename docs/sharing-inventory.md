@@ -38,7 +38,7 @@ reason).
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Watch | Connectivity (outages, history) | `watch.connectivity` | none (administrators only) | none | people + link | add | done |
 | Watch | Alarms | `watch.alarm` | owner only | none | people (view; reader needs Watch itself) | add | done |
-| Watch | Servers, services, containers (metrics, uptime) | `place.server`, `place.domain` | AccessGrant via Places device | AccessGrant link `/k` | shared-with marker in Watch | add | todo |
+| Watch | Servers, services, containers (metrics, uptime) | `place.server`, `place.domain` | AccessGrant via Places device | AccessGrant link `/k` | shared-with marker in Watch (servers; a lent domain is read in Places, Watch lists no domains) | add | done |
 | Watch | Webhooks | - | none | none | - | no: carries delivery secrets | - |
 | Status pages | Status page (editors) | - | owner only | public page itself | editors | add | todo |
 | Calendar | Calendar | - | `CalendarShare` (user, team) | none | dialog fronting CalendarShare, roles, link (read-only feed) | add | todo |

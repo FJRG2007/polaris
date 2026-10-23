@@ -1449,6 +1449,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Servers", // i18n-ignore
             href: "/watch/servers",
             needs: "deploy.read",
+            reachedBy: "place.server",
             icon: Server,
             keywords: ["hosts", "machines", "load"]
         },
