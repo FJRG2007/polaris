@@ -223,10 +223,10 @@ export function VolumeForm({
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     {t("volumeForm.sizeLimit")}
-                    {/* i18n-ignore: an example size */}
                     <Input
                         value={sizeLimit}
                         onChange={(event) => setSizeLimit(event.target.value)}
+                        // i18n-ignore: an example size
                         placeholder="10G"
                     />
                 </label>
