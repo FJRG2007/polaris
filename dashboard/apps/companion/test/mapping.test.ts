@@ -222,7 +222,8 @@ describe("presets", () => {
                 name: "Unread messages",
                 actionId: null,
                 options: {},
-                feedbackId: "chat_unread"
+                feedbackId: "chat_unread",
+                bgcolor: mapping.COLORS.black
             },
             {
                 id: "status_presence",
@@ -230,7 +231,8 @@ describe("presets", () => {
                 name: "Set yourself busy",
                 actionId: "status_presence",
                 options: { choice: "busy" },
-                feedbackId: "status_presence"
+                feedbackId: "status_presence",
+                bgcolor: mapping.COLORS.black
             }
         ]);
     });
@@ -341,6 +343,32 @@ describe("your call and your places on Companion buttons", () => {
             sound: "default-applause"
         });
         expect(specs.find((spec) => spec.id === "call_mic")?.feedbackId).toBe("call_mic");
+    });
+
+    it("rests the call buttons on Polaris violet and hanging up on red", () => {
+        const specs = mapping.presetSpecs(CALL);
+        expect(specs.find((spec) => spec.id === "call_mic")?.bgcolor).toBe(mapping.COLORS.call);
+        expect(specs.find((spec) => spec.id === "call_hangup")?.bgcolor).toBe(
+            mapping.COLORS.hangup
+        );
+        expect(specs.find((spec) => spec.id === "places_device")?.bgcolor).toBe(
+            mapping.COLORS.black
+        );
+        expect(mapping.stateStyle("Mute", { tone: "idle" }, false, "call.mic").bgcolor).toBe(
+            mapping.COLORS.call
+        );
+        expect(
+            mapping.stateStyle("Camera", { tone: "idle", on: false }, false, "call.camera").bgcolor
+        ).toBe(mapping.COLORS.call);
+        expect(
+            mapping.stateStyle("Mute", { tone: "warn", on: true }, false, "call.mic").bgcolor
+        ).toBe(mapping.COLORS.warn);
+        expect(mapping.stateStyle("Hang up", { tone: "bad" }, false, "call.hangup").bgcolor).toBe(
+            mapping.COLORS.bad
+        );
+        expect(mapping.stateStyle("Hang up", { tone: "idle" }, false, "call.hangup").bgcolor).toBe(
+            mapping.COLORS.hangup
+        );
     });
 });
 

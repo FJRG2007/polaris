@@ -6,7 +6,7 @@
 
 import { ICONS } from "./icons";
 import type { WordKey } from "./words";
-import type { KeyFace } from "./render";
+import type { KeyFace, KeyLook } from "./render";
 import { DOUBLE_MS, HOLD_MS, windowMs, type Gesture, type GestureSet } from "./presses";
 import type { DeckAction, DeckState, Link } from "./polaris";
 
@@ -81,6 +81,13 @@ export function drawsOwnState(settings: KeySettings, binding: Binding | null): b
     return sorted(runOptions(binding)) === sorted(watchOptions(settings, "key"));
 }
 
+/** How a catalogue entry's key is drawn: the call keys as tiles, the rest as
+ *  the plugin's tinted squares. */
+export function lookOf(entry: DeckAction): { look?: KeyLook } {
+    if (entry.id === "call.hangup") return { look: "hangup" };
+    return entry.id.startsWith("call.") ? { look: "call" } : {};
+}
+
 export function faceFor(
     link: Link,
     settings: KeySettings,
@@ -106,10 +113,11 @@ export function faceFor(
     if (alternates(settings, entry)) {
         // On once the first of the two has run, until the second puts it back.
         const on = settings.side === "b";
-        return { icon: entry.icon, tone: on ? "ok" : "idle", on, label };
+        return { icon: entry.icon, tone: on ? "ok" : "idle", on, label, ...lookOf(entry) };
     }
-    if (!state) return { icon: entry.icon, tone: "idle", label };
+    if (!state) return { icon: entry.icon, tone: "idle", label, ...lookOf(entry) };
     return {
+        ...lookOf(entry),
         // The state's own icon when this plugin can draw it; a name newer than
         // the plugin keeps the action's.
         icon: state.icon && ICONS[state.icon] ? state.icon : entry.icon,
