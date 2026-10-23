@@ -14,12 +14,7 @@ import type { BackupKeyView } from "@/lib/backups/keyring";
 import { KeyRound, Loader2, RefreshCw } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import {
-    addRecoveryKeyAction,
-    listBackupKeysAction,
-    revealRecoveryKeyAction,
-    rotateBackupKeyAction
-} from "./actions";
+import { addRecoveryKeyAction, revealRecoveryKeyAction, rotateBackupKeyAction } from "./actions";
 import {
     Badge,
     Button,
@@ -35,6 +30,7 @@ import {
     Input,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./backups-polls";
 
 const RECOVERY_SHAPE = /^polaris-backup-key:[0-9a-f-]{36}:[A-Za-z0-9_-]{43}$/;
 
@@ -52,7 +48,7 @@ export function KeysPanel() {
     const [note, setNote] = useState<string | null>(null);
 
     const load = useCallback(async () => {
-        const result = await listBackupKeysAction();
+        const result = await polls.backupKeys();
         if (result.error !== undefined) {
             setError(result.error);
             setKeys([]);

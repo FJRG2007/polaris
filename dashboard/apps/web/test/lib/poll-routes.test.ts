@@ -137,7 +137,8 @@ const actions = vi.hoisted(() => {
         "createContextAction",
         "trackerTargetsAction",
         "listAnalyticsSitesAction",
-        "getAnalyticsOverviewAction"
+        "getAnalyticsOverviewAction",
+        "listBackupKeysAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -389,6 +390,9 @@ vi.mock("@/app/(app)/apps/analytics/actions", () => ({
     listAnalyticsSitesAction: actions.listAnalyticsSitesAction,
     getAnalyticsOverviewAction: actions.getAnalyticsOverviewAction
 }));
+vi.mock("@/app/(app)/apps/backups/actions", () => ({
+    listBackupKeysAction: actions.listBackupKeysAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -536,7 +540,8 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/tasks/create-context": () => import("@/app/api/tasks/create-context/route"),
     "/api/tasks/trackers/targets": () => import("@/app/api/tasks/trackers/targets/route"),
     "/api/analytics/sites": () => import("@/app/api/analytics/sites/route"),
-    "/api/analytics/overview": () => import("@/app/api/analytics/overview/route")
+    "/api/analytics/overview": () => import("@/app/api/analytics/overview/route"),
+    "/api/backups/keys": () => import("@/app/api/backups/keys/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2083,6 +2088,18 @@ const CASES: Case[] = [
             }),
         action: "getAnalyticsOverviewAction",
         args: [{ scopeType: "scopeType-1", scopeId: "scopeId-1", range: "range-1" }]
+    },
+    {
+        name: "the backup keys, without their recovery keys",
+        path: "/api/backups/keys",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/backups/backups-polls")>(
+                    "@/app/(app)/apps/backups/backups-polls"
+                )
+            ).backupKeys(),
+        action: "listBackupKeysAction",
+        args: []
     }
 ];
 
