@@ -168,6 +168,9 @@ export async function takeBackMailbox(
     await removeAccountUploads(row.id).catch(() => undefined);
     await prisma.mailAccount.delete({ where: { id: row.id } });
     await settleRefusalNotices(row.userId, row.id);
+    // Taking it back takes it back from whoever its holder lent it to as well.
+    const { dropGrantsFor } = await import("@/lib/access/grants");
+    await dropGrantsFor("mail.mailbox", row.id);
 
     await recordAudit({
         actorId: actor.id,

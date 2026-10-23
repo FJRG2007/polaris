@@ -40,6 +40,8 @@ class FakeAuthError extends Error {}
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // Removing a mailbox also drops what its holder lent of it.
+        accessGrant: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         mailAccount: {
             update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
                 state.written.push(data);

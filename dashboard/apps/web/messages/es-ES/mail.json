@@ -1,4 +1,26 @@
 {
+    "delegate": {
+        "title": "Buzones compartidos contigo",
+        "back": "Volver a Correo",
+        "none": "Nadie ha compartido un buzón contigo.",
+        "readOnly": "Solo lectura",
+        "sharedWithYou": "Compartido contigo",
+        "allShared": "Todos los compartidos",
+        "note": "Puedes leer este buzón. Responder, enviar y cambiarlo quedan para su dueño.",
+        "inbox": "Entrada",
+        "empty": "Aún no hay mensajes aquí.",
+        "unknownSender": "Sin remitente",
+        "attachments": "Con adjuntos",
+        "noSubject": "(sin asunto)",
+        "older": "Más antiguos",
+        "message": "Mensaje",
+        "from": "De",
+        "to": "Para",
+        "cc": "Cc",
+        "date": "Fecha",
+        "bodyPending": "De momento solo se ha descargado la vista previa.",
+        "pick": "Elige un mensaje para leerlo."
+    },
     "labels": {
         "signatureAuto": {
             "never": "Solo cuando la inserto",

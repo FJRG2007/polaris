@@ -81,7 +81,7 @@ reason).
 | Places | Domain | `place.domain` | AccessGrant | AccessGrant link `/k` | - | fine | - |
 | Places | Room | `place.room` | AccessGrant | AccessGrant link `/k` | - | fine | - |
 | Places | Whole place | `place.place` | instance permission + AccessGrant | none | people, teams and roles: every door, switch and camera at the place as one key (devices brought there later are covered) | add | done |
-| Mail | Mailbox | - | owner | none | delegate (read, send) | add | todo |
+| Mail | Mailbox | `mail.mailbox` | owner + AccessGrant (read only) | none | delegate to read (people, teams, roles); sending on the owner's behalf is not offered - it needs a product decision | add | done |
 | Clock | Timer, alarm, stopwatch | - | owner | none | - | no: personal and short-lived | - |
 | Containers, Servers, Tunnels, Runners | Infrastructure | - | instance permissions | none | - | no: host control stays with permissions | - |
 | Mail server, Code, Marketplace, Installed apps | Instance tools | - | instance permissions | none | - | no: instance administration | - |

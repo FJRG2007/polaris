@@ -29,6 +29,7 @@ import { requireShareable as requireOfficeShareable } from "@/lib/office/documen
 import { requireSpace as requireChatSpace, requireChannel } from "@/lib/chat/access";
 import { requireSpace as requireTaskSpace, requireFolder, requireTask } from "@/lib/tasks/access";
 import { domainOwner, lendableServer } from "@/lib/machines/machine-access";
+import { MailAccessError, ownedAccount as ownedMailbox } from "@/lib/mailbox/access";
 
 /**
  * Refuse unless this account may hand this thing to somebody else.
@@ -210,6 +211,17 @@ export async function requireMayShare(
             if (!(await getSession(subjectId, user.id))) throw new GrantError("You cannot share that");
             return;
         }
+        case "mail.mailbox":
+            // Only the person who linked a mailbox lends it, as only they read
+            // it. Whoever runs the organization it is part of cannot: they can
+            // take it back, never open it.
+            try {
+                await ownedMailbox(user.id, subjectId);
+            } catch (caught) {
+                if (caught instanceof MailAccessError) throw new GrantError("You cannot share that");
+                throw caught;
+            }
+            return;
         case "polar.project": {
             // Only its owner shows a project to somebody else.
             const project = await prisma.polarProject.findUnique({
@@ -548,6 +560,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return `/tasks/t/${subjectId}`;
         case "polar.project":
             return "/polar";
+        case "mail.mailbox":
+            return `/mail/shared/${subjectId}`;
         case "agents.session":
             return `/apps/agents/sessions/${subjectId}`;
         case "dns.filter":

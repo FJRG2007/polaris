@@ -25,6 +25,7 @@
  */
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { SendCheck } from "./send-check";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -38,7 +39,23 @@ import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { Button, ConfirmDeleteDialog, Select, Switch, cn, useToast } from "@polaris/ui";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
-import { AlertTriangle, CheckCircle2, Mail, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+    AlertTriangle,
+    CheckCircle2,
+    Mail,
+    Pencil,
+    Plus,
+    RefreshCw,
+    Share2,
+    Trash2
+} from "lucide-react";
+
+// Loaded on demand: the dialog reads the session's environment, which a test
+// that renders this screen does not have.
+const ShareDialog = dynamic(
+    () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
+    { ssr: false }
+);
 import {
     editAccountAction,
     removeAccountAction,
@@ -265,6 +282,7 @@ function AccountRow({
     const tm = useTranslations("mail");
     const [busy, startBusy] = useBusy();
     const [removing, setRemoving] = useState(false);
+    const [sharing, setSharing] = useState(false);
     const [unified, setUnified] = useState(account.unified);
     const [notify, setNotify] = useState(account.notify);
     const [trashDays, setTrashDays] = useState(account.trashKeepDays);
@@ -445,6 +463,15 @@ function AccountRow({
                 <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={t("accounts.share")}
+                    title={t("accounts.share")}
+                    onClick={() => setSharing(true)}
+                >
+                    <Share2 className="size-4 shrink-0" aria-hidden />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
                     aria-label={t("accounts.remove")}
                     title={t("accounts.remove")}
                     onClick={() => setRemoving(true)}
@@ -457,6 +484,15 @@ function AccountRow({
                 send a message that cannot be sent and report the refusal the
                 line above already states. */}
             {refused ? null : <SendCheck accountId={account.id} />}
+            {sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(next: boolean) => (next ? undefined : setSharing(false))}
+                    subject="mail.mailbox"
+                    subjectId={account.id}
+                    name={account.address}
+                />
+            ) : null}
 
             {removing ? (
                 <ConfirmDeleteDialog

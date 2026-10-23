@@ -75,7 +75,8 @@
             "agents.session": "una sesión de agente",
             "polar.project": "proyecto de Polar",
             "task.task": "una tarea",
-            "place.place": "un lugar"
+            "place.place": "un lugar",
+            "mail.mailbox": "un buzón"
         }
     },
     "mentions": {

@@ -1,4 +1,26 @@
 {
+    "delegate": {
+        "title": "Mailboxes shared with you",
+        "back": "Back to Mail",
+        "none": "Nobody has shared a mailbox with you.",
+        "readOnly": "Read only",
+        "sharedWithYou": "Shared with you",
+        "allShared": "All shared mailboxes",
+        "note": "You can read this mailbox. Replying, sending and changing it stay with its owner.",
+        "inbox": "Inbox",
+        "empty": "No messages in this inbox yet.",
+        "unknownSender": "Unknown sender",
+        "attachments": "Has attachments",
+        "noSubject": "(no subject)",
+        "older": "Older messages",
+        "message": "Message",
+        "from": "From",
+        "to": "To",
+        "cc": "Cc",
+        "date": "Date",
+        "bodyPending": "Only the preview has been downloaded so far.",
+        "pick": "Pick a message to read it."
+    },
     "labels": {
         "signatureAuto": {
             "never": "Only when I insert it",

@@ -95,7 +95,8 @@ export const GRANT_SUBJECTS = [
     "agents.session",
     "polar.project",
     "task.task",
-    "place.place"
+    "place.place",
+    "mail.mailbox"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -240,7 +241,11 @@ export const GRANT_CAPABILITIES = {
     // room key is, for the building. Devices brought to the place later are
     // covered; ones moved to another place are not. Its settings, its people
     // and connecting things to it stay with the people who run the house.
-    "place.place": ["view", "control"]
+    "place.place": ["view", "control"],
+    // A mailbox, lent by the person who linked it: its inbox and its messages,
+    // read as Polaris already holds them. Never sending, replying, moving or
+    // marking anything - sending on somebody's behalf is another trust entirely.
+    "mail.mailbox": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -296,7 +301,8 @@ export const GRANT_ACTIONS = {
     "agents.session": [],
     "polar.project": [],
     "task.task": [],
-    "place.place": ["watch", "open", "close", "operate"]
+    "place.place": ["watch", "open", "close", "operate"],
+    "mail.mailbox": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**
