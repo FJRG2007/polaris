@@ -1,5 +1,6 @@
 /** Vault: the password manager, open on a login with its one-time code. */
 
+import { once } from "../runtime/interact";
 import { tourScene } from "../runtime/tour";
 import { Chrome } from "../runtime/chrome";
 import { VIEWER } from "../fixtures/people";
@@ -73,9 +74,24 @@ export const vaultSends = defineScene({
     }
 });
 
+/**
+ * Open the login. On a phone the list and the login stack in one column, so
+ * the login's card is brought up the way a thumb scrolls to it.
+ */
+async function openOnPhone(ctx: Parameters<NonNullable<typeof vaultStill.prepare>>[0]) {
+    await vaultStill.prepare?.(ctx);
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
+    const name = OPEN_ITEM_NAME(ctx);
+    await once(() => {
+        const title = [...document.querySelectorAll("h2")].find((heading) => heading.textContent === name);
+        if (!title) throw new Error("the login did not open");
+        (title.closest("[class*='rounded']") ?? title).scrollIntoView({ block: "start" });
+    });
+}
+
 /** The vault, a login opened with its one-time code, then what was sent out of it. */
 export const vault = tourScene([{ ...vaultStill, prepare: undefined }, vaultSends], [
     { hold: 1500 },
-    { run: (ctx) => vaultStill.prepare?.(ctx), hold: 3000 },
+    { run: (ctx) => openOnPhone(ctx), hold: 3000 },
     { view: 1, hold: 2600 }
 ]);
