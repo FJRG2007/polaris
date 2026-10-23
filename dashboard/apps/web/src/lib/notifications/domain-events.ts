@@ -15,6 +15,7 @@
  */
 
 import { notify } from "./dispatch";
+import { raiseGroup, settleGroup } from "./condition-groups";
 import { prisma } from "@polaris/db";
 import { parseProjectCapabilities } from "@polaris/core";
 import { dispatchProjectWebhooks } from "../deploy-project-service";
@@ -236,25 +237,14 @@ export async function notifyDomainHealthChanged(input: DomainHealthChange): Prom
             downFor
         );
 
+        const moved: Moved = {
+            domainId: input.domainId,
+            context,
+            detail: input.detail,
+            downSince: input.downSince ?? null
+        };
         for (const userId of context.recipients) {
-            // Each recipient reads it in their own language.
-            const said = domainHealthMessage(
-                input.status,
-                [context.label],
-                input.detail,
-                await wordsFor(userId, "notices"),
-                downFor
-            );
-            await notify({
-                userId,
-                event,
-                title: said.title,
-                body: said.body,
-                href: context.href,
-                shelf: { orgId: context.orgId },
-                actionRequired: down,
-                metadata: { domainId: input.domainId, status: input.status }
-            });
+            await tellOne(userId, context.orgId, input.status, [moved]);
         }
 
         await dispatchProjectWebhooks({
@@ -291,6 +281,65 @@ interface Moved {
 
 /** Where a sweep's alert points, since the domains in one span projects. */
 const SWEEP_HREF = "/apps/deploy";
+
+/** The open "stopped serving" notices, one per pass that found domains down. */
+const DOWN_CONDITION = "domain.down:";
+
+/**
+ * Tell one person about domains that moved together. Down is one notice for the
+ * lot, kept open while they stay down. Up closes the notice that said they went
+ * down, rewritten as the recovery; only domains no open notice covered (an outage
+ * from before this, or a notice since deleted) get a new "back" notice.
+ */
+async function tellOne(
+    userId: string,
+    orgId: string | null,
+    status: "up" | "down",
+    bucket: readonly Moved[]
+): Promise<void> {
+    const t = await wordsFor(userId, "notices");
+    const say = (items: readonly Moved[], as: "up" | "down") =>
+        domainHealthMessage(
+            as,
+            items.map((item) => item.context.label),
+            items.length === 1 ? (items[0]!.detail ?? null) : null,
+            t,
+            as === "up" ? longestDown(items) : null
+        );
+    const base = (items: readonly Moved[]) => {
+        const one = items.length === 1 ? items[0]! : null;
+        return {
+            userId,
+            href: one?.context.href ?? SWEEP_HREF,
+            shelf: { orgId },
+            metadata: one
+                ? { domainId: one.domainId, status }
+                : { status, domainIds: items.map((item) => item.domainId) }
+        };
+    };
+    if (status === "down") {
+        await raiseGroup(
+            DOWN_CONDITION,
+            bucket.map((item) => item.domainId),
+            { ...base(bucket), event: "domain.down", ...say(bucket, "down"), actionRequired: true }
+        );
+        return;
+    }
+    const byId = new Map(bucket.map((item) => [item.domainId, item]));
+    const pick = (ids: readonly string[]) => ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+    const left = await settleGroup(
+        userId,
+        DOWN_CONDITION,
+        bucket.map((item) => item.domainId),
+        (ids) => ({ ...say(pick(ids), "up"), level: "success" }),
+        // Still down: named by id when this pass did not describe them, which
+        // only happens for a domain deleted while it was down.
+        (ids) => say(ids.map((id) => byId.get(id) ?? { domainId: id, context: { label: id } as DomainContext, detail: null, downSince: null }), "down")
+    );
+    const unannounced = pick(left);
+    if (unannounced.length === 0) return;
+    await notify({ ...base(unannounced), event: "domain.up", ...say(unannounced, "up") });
+}
 
 /**
  * The same, for everything one sweep found, said once.
@@ -357,26 +406,7 @@ export async function notifyDomainHealthChanges(
             for (const status of ["down", "up"] as const) {
                 const bucket = held[status];
                 if (bucket.length === 0) continue;
-                const one = bucket.length === 1 ? bucket[0]! : null;
-                const { title, body } = domainHealthMessage(
-                    status,
-                    bucket.map((item) => item.context.label),
-                    one?.detail ?? null,
-                    await wordsFor(userId, "notices"),
-                    status === "up" ? longestDown(bucket) : null
-                );
-                await notify({
-                    userId,
-                    event: status === "down" ? "domain.down" : "domain.up",
-                    title,
-                    body,
-                    href: one?.context.href ?? SWEEP_HREF,
-                    shelf: { orgId },
-                    actionRequired: status === "down",
-                    metadata: one
-                        ? { domainId: one.domainId, status }
-                        : { status, domainIds: bucket.map((item) => item.domainId) }
-                });
+                await tellOne(userId, orgId, status, bucket);
             }
         }
 
