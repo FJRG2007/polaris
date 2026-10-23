@@ -6,6 +6,8 @@ import { EVERY_SITE } from "@/lib/injection";
 import { readIntendedLogin } from "@/lib/save";
 import { isNewer, type UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
+import { alternatesOf, localPermissions, type ReachStatus } from "@/lib/local-address";
+import { learnInstance, type InstanceRecord } from "@polaris/core/instance-fallback";
 import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { Picker } from "./picker";
@@ -279,6 +281,7 @@ export function App(): React.JSX.Element {
         <div className="app">
             <UpdateBanner notice={update} pending={pending} server={status.server} />
             <TopBar status={status} onChange={refresh} onOpen={setSection} />
+            {status.reach ? <LocalAddress reach={status.reach} onChange={refresh} /> : null}
             {section === "home" ? (
                 <Home status={status} onOpen={setSection} />
             ) : section === "settings" ? (
@@ -336,6 +339,64 @@ export function App(): React.JSX.Element {
     );
 }
 
+/**
+ * Which address of the server the extension is on, when it is not the usual one,
+ * and what keeps a local address out of use.
+ *
+ * The button is here and not in the worker for the reason every permission in
+ * this popup is: a browser grants one only from a click, and the worker never
+ * has one. Nothing is asked until it is pressed.
+ */
+function LocalAddress({
+    reach,
+    onChange
+}: {
+    reach: ReachStatus;
+    onChange: () => Promise<void>;
+}): React.JSX.Element | null {
+    const t = useWords();
+    const [asking, setAsking] = useState(false);
+    const [denied, setDenied] = useState(false);
+
+    const allow = async (): Promise<void> => {
+        setAsking(true);
+        setDenied(false);
+        let granted = false;
+        try {
+            granted = await browser.permissions.request({ origins: localPermissions(reach.missing) });
+        } catch {
+            granted = false;
+        }
+        setAsking(false);
+        setDenied(!granted);
+        if (granted) await onChange();
+    };
+
+    const lines: React.JSX.Element[] = [];
+    if (reach.local) lines.push(<p key="local">{t("popup.reach.local")}</p>);
+    if (reach.untrusted) lines.push(<p key="untrusted">{t("popup.reach.untrusted")}</p>);
+    for (const host of reach.refused) {
+        lines.push(<p key={`refused-${host}`}>{t("popup.reach.refused", { host })}</p>);
+    }
+    if (reach.missing.length > 0) {
+        lines.push(
+            <div key="missing" className="row wrap">
+                <p className="muted small">{t("popup.reach.missing")}</p>
+                <button className="ghost" disabled={asking} onClick={() => void allow()}>
+                    {asking ? t("popup.reach.asking") : t("popup.reach.allow")}
+                </button>
+                {denied ? <p className="problem inline">{t("popup.reach.denied")}</p> : null}
+            </div>
+        );
+    }
+    if (lines.length === 0) return null;
+    return (
+        <div className="notice" role="status">
+            {lines}
+        </div>
+    );
+}
+
 function Problem({ text }: { text: string | null }): React.JSX.Element | null {
     return text ? <p className="problem">{text}</p> : null;
 }
@@ -349,6 +410,26 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
     // front of it, so the button went live on the first keystroke and pressing
     // it spent the one prompt a gesture is good for on a host that cannot exist.
     const usable = looksLikeAddress(typed);
+
+    // Who is at the address, read while it is typed, so the click that connects
+    // can ask for its local addresses in the same prompt: the click is the only
+    // moment a permission may be asked, and a fetch inside it would come too late
+    // for some browsers. Public, no credential, and only ever this address.
+    const [learned, setLearned] = useState<{ origin: string; record: InstanceRecord } | null>(null);
+    useEffect(() => {
+        const origin = usable ? readOrigin(typed) : null;
+        if (!origin) return;
+        let live = true;
+        const timer = setTimeout(() => {
+            void learnInstance(origin).then((record) => {
+                if (live && record) setLearned({ origin, record });
+            });
+        }, 500);
+        return () => {
+            live = false;
+            clearTimeout(timer);
+        };
+    }, [typed, usable]);
 
     const connect = async (): Promise<void> => {
         const origin = readOrigin(typed);
@@ -364,9 +445,15 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
         // the worker this used to be sent to has none. It failed with "This
         // function must be called during a user gesture", which reached the
         // screen as "Something went wrong." on a perfectly good address.
+        // Its local addresses go in the same prompt, so the extension keeps working
+        // on the day the internet is down at home. Already granted on Chromium,
+        // where every page is; Firefox asks.
+        const local = learned?.origin === origin ? alternatesOf(learned.record, origin) : [];
         let granted = false;
         try {
-            granted = await browser.permissions.request({ origins: [`${origin}/*`] });
+            granted = await browser.permissions.request({
+                origins: [`${origin}/*`, ...localPermissions(local)]
+            });
         } catch {
             granted = false;
         }

@@ -264,6 +264,15 @@
             "store": "Tu navegador la instala",
             "auto": "Se instala sola en horas",
             "manual": "Cómo actualizar"
+        },
+        "reach": {
+            "local": "Usando la dirección de tu red local",
+            "untrusted": "Tu dirección local usa el certificado propio de Polaris, en el que este navegador aún no confía. Abre Admin -> Dominios en Polaris y usa Confiar en este dispositivo.",
+            "refused": "{host} responde como otro Polaris, así que no se le ha enviado nada.",
+            "missing": "Permite la dirección local para que este navegador siga funcionando sin internet en casa.",
+            "allow": "Permitir la dirección local",
+            "asking": "Preguntando al navegador",
+            "denied": "El navegador no lo ha permitido. Vuelve a intentarlo cuando quieras."
         }
     },
     "inline": {
