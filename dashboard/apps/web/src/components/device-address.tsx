@@ -25,12 +25,7 @@ export interface DeviceAddresses {
 
 /** The addresses as one line, for the places with no room for a column: a narrow
  *  layout, or a card that is not a table at all. */
-export function addressLine(
-    address: DeviceAddresses,
-    // The reader's word for it where there is a reader; the English default keeps
-    // the callers that have none, and the tests, as they were.
-    via = "via" // i18n-ignore
-): string {
+export function addressLine(address: DeviceAddresses, via: string): string {
     if (!address.ip) return "";
     const seen = address.publicIp ? `${address.ip} ${via} ${address.publicIp}` : address.ip;
     return address.country ? `${seen} - ${address.country}` : seen;

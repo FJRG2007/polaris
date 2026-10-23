@@ -104,13 +104,7 @@ export function HostName({ host }: { host: string | null }) {
 
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
-export function sessionOrigin(
-    session: SessionView,
-    // The reader's words for it where there is a reader; the English default
-    // keeps callers that have none, and the tests, as they were.
-    unknown = "Unknown location", // i18n-ignore
-    via = "via" // i18n-ignore
-): string {
+export function sessionOrigin(session: SessionView, unknown: string, via: string): string {
     return [addressLine(session, via), session.host].filter(Boolean).join(" - ") || unknown;
 }
 
