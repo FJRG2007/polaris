@@ -59,6 +59,8 @@ export interface ObservedRow {
     /** Its battery, where it reports one. Absent reads as none. */
     readonly batteryPercent?: number | null;
     readonly batteryCritical?: boolean;
+    /** The line set on it, or null/absent for its kind's. */
+    readonly batteryLowPercent?: number | null;
     /** An air conditioner's settings, as stored; anything else for the rest. */
     readonly climate?: unknown;
     /** A purifier's settings and readings, as stored. */
@@ -86,7 +88,8 @@ function readout(row: ObservedRow): DeviceReadout {
         row.kind === "air" ? (air?.mode ?? "") : (climateSettings(row.climate)?.mode ?? "");
     const filter = wornFilter(air)?.state;
     const figures = figuresOf(air);
-    const battery = batteryWord(row);
+    // The reading decides a smoke or leak sensor's line, so it goes in too.
+    const battery = batteryWord({ ...row, reading: row.value ? { value: row.value } : null });
     return {
         id: row.id,
         kind: row.kind,
@@ -162,7 +165,8 @@ export function automationEngine(): AutomationEngine {
                         air: true,
                         online: true,
                         batteryPercent: true,
-                        batteryCritical: true
+                        batteryCritical: true,
+                        batteryLowPercent: true
                     }
                 });
                 return row ? readout(row) : null;

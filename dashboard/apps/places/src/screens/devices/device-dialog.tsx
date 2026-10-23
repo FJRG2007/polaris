@@ -18,7 +18,17 @@
 
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
-import { deviceEditSchema, normalizeRoomInput, roomInputSchema } from "../../lib/schemas";
+import {
+    batteryLineSchema,
+    deviceEditSchema,
+    normalizeRoomInput,
+    roomInputSchema
+} from "../../lib/schemas";
+import {
+    hasBattery as reportsBattery,
+    defaultBatteryLine,
+    makerFlagsBattery
+} from "../../lib/automation-kinds";
 import { floorNames } from "../../lib/room-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceView } from "../../lib/device-kinds";
@@ -62,6 +72,8 @@ export function DeviceDialog({
     const [placeId, setPlaceId] = useState("");
     const [controllable, setControllable] = useState(true);
     const [roomId, setRoomId] = useState("");
+    // Where its battery reads as low, as typed; empty is its kind's line.
+    const [batteryLine, setBatteryLine] = useState("");
     // The rooms of the place it is at, read again when another place is picked.
     const [rooms, setRooms] = usePlaceRooms(device ? placeId : "");
     const [roomName, setRoomName] = useState("");
@@ -76,6 +88,7 @@ export function DeviceDialog({
         setPlaceId(device.placeId ?? "");
         setControllable(device.controllable);
         setRoomId(device.roomId ?? "");
+        setBatteryLine(device.batteryLowPercent ? String(device.batteryLowPercent) : "");
         setRoomName("");
         setFloor("");
         setError("");
@@ -90,6 +103,15 @@ export function DeviceDialog({
         ? (roomInputSchema.shape.name.safeParse(roomName).error?.issues[0]?.message ?? null)
         : null;
     const roomIssue = roomIssueRaw ? placesRefusalText(t, roomIssueRaw) : null;
+    // Only a device that reports a battery is asked where it is low.
+    const hasBattery = device !== null && reportsBattery(device);
+    const lineTyped = batteryLine.trim();
+    const lineValue = lineTyped ? Number(lineTyped) : null;
+    const lineIssueRaw =
+        lineValue === null
+            ? null
+            : (batteryLineSchema.safeParse(lineValue).error?.issues[0]?.message ?? null);
+    const lineIssue = lineIssueRaw ? placesRefusalText(t, lineIssueRaw) : null;
     // A new room is always a change; otherwise the fields are held against the
     // device as it was opened.
     const changed =
@@ -101,13 +123,15 @@ export function DeviceDialog({
                     zone: device.zone,
                     placeId: device.placeId ?? "",
                     controllable: device.controllable,
-                    roomId: device.roomId ?? ""
+                    roomId: device.roomId ?? "",
+                    batteryLine: device.batteryLowPercent ? String(device.batteryLowPercent) : ""
                 },
-                { name, zone, placeId, controllable, roomId }
+                { name, zone, placeId, controllable, roomId, batteryLine: lineTyped }
             ));
     const canSubmit =
         name.trim().length > 0 &&
         !nameIssue &&
+        !lineIssue &&
         !saving &&
         changed &&
         (!making || (roomName.trim().length > 0 && !roomIssue));
@@ -153,7 +177,8 @@ export function DeviceDialog({
                     zone,
                     placeId: placeId || null,
                     controllable,
-                    roomId: placeId ? room : null
+                    roomId: placeId ? room : null,
+                    ...(hasBattery ? { batteryLowPercent: lineValue } : {})
                 }),
             setError
         );
@@ -318,6 +343,41 @@ export function DeviceDialog({
                             aria-label={t("deviceDialog.operate")}
                         />
                     </label>
+
+                    {device && hasBattery && (
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-xs text-muted-foreground">
+                                {t("deviceDialog.batteryLine")}{" "}
+                                <span className="text-foreground-subtle">
+                                    {t("deviceDialog.optional")}
+                                </span>
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <Input
+                                    value={batteryLine}
+                                    inputMode="numeric"
+                                    maxLength={2}
+                                    className="w-20"
+                                    aria-label={t("deviceDialog.batteryLine")}
+                                    aria-invalid={lineIssue ? true : undefined}
+                                    placeholder={String(defaultBatteryLine(device))}
+                                    onChange={(event) =>
+                                        setBatteryLine(event.target.value.replace(/[^0-9]/g, ""))
+                                    }
+                                />
+                                <span className="text-sm text-muted-foreground">%</span>
+                            </span>
+                            {lineIssue && <span className="text-xs text-danger">{lineIssue}</span>}
+                            <span className="text-xs text-foreground-subtle">
+                                {t("deviceDialog.batteryLineHint", {
+                                    percent: defaultBatteryLine(device)
+                                })}
+                                {makerFlagsBattery(device.vendor)
+                                    ? ` ${t("deviceDialog.batteryLineFlag")}`
+                                    : ""}
+                            </span>
+                        </label>
+                    )}
 
                     {error && (
                         <p

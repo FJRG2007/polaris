@@ -47,6 +47,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.nearbyUnplaced"
     ],
     ["Give it a name", "refusals.giveName"],
+    ["Between 1 and 99", "refusals.batteryLine"],
     ["Choose what it should tell you about", "refusals.chooseKinds"],
     ["Choose who to tell", "refusals.chooseWho"],
     ["Alert not found", "refusals.alertGone"],

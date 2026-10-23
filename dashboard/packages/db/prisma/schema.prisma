@@ -11408,6 +11408,9 @@ model PlaceDevice {
     doorState      String    @default("none")
     batteryPercent Int?
     batteryCritical Boolean  @default(false)
+    /// At or under this share its battery reads as low, set by somebody on this
+    /// device. Null is its kind's line (`batteryLine` in places' automation-kinds).
+    batteryLowPercent Int?
     /// Whether the vendor could reach it when last asked. A lock nobody can
     /// reach still draws, saying so, rather than disappearing.
     online         Boolean   @default(true)

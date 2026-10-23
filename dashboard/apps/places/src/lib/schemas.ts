@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { reportsOwnAlerts } from "./vendors";
+import { BATTERY_LINE_LIMITS } from "./automation-kinds";
 import {
     POWER_SOURCES,
     askPowerFor,
@@ -403,6 +404,14 @@ export const devicePairingSchema = deviceAccountSchema.extend({
 
 /** What somebody can change about a device here. The rest belongs to the account
  *  it came from and is read back by every sync. */
+/** A low-battery line, as a whole share between the limits. An empty field is
+ *  NaN, which reads as the same complaint rather than a type error. */
+export const batteryLineSchema = z
+    .number({ invalid_type_error: "Between 1 and 99" })
+    .int("Between 1 and 99")
+    .min(BATTERY_LINE_LIMITS.min, "Between 1 and 99")
+    .max(BATTERY_LINE_LIMITS.max, "Between 1 and 99");
+
 export const deviceEditSchema = z.object({
     name: z.string().trim().min(1, "Give it a name").max(80),
     /** Where at the place it is ("Front door"), matching a camera's zone so the
@@ -414,7 +423,10 @@ export const deviceEditSchema = z.object({
     controllable: z.boolean().default(true),
     /** Which of its place's rooms it is in; null is none. Absent leaves it as it
      *  is, so a screen from before rooms saves without losing one. */
-    roomId: z.string().trim().max(64).nullable().optional()
+    roomId: z.string().trim().max(64).nullable().optional(),
+    /** Where its battery reads as low, 1-99; null is its kind's line. Absent
+     *  leaves it as it is, so a screen from before this saves without one. */
+    batteryLowPercent: batteryLineSchema.nullable().optional()
 });
 
 export type DeviceEditInput = z.infer<typeof deviceEditSchema>;

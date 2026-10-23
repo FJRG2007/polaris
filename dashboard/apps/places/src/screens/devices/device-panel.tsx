@@ -21,6 +21,7 @@
 import { ruleToneClass } from "@polaris/ui/automation-rules";
 import * as actions from "../actions";
 import * as kinds from "../../lib/device-kinds";
+import { batteryLine, batteryLow } from "../../lib/automation-kinds";
 import { useLentActions } from "./lent-actions";
 import { usePlacesT } from "../use-places-t";
 import { placesRefusalText } from "../../lib/refusal-text";
@@ -452,9 +453,11 @@ export function DevicePanel({
                                         device.firmware &&
                                             t("devicePanel.firmware", { version: device.firmware }),
                                         device.batteryPercent !== null &&
-                                            t("devicePanel.battery", {
+                                            `${t("devicePanel.battery", {
                                                 percent: device.batteryPercent
-                                            }),
+                                            })} (${t("devicePanel.batteryLine", {
+                                                percent: batteryLine(device)
+                                            })})`,
                                         device.stateAt &&
                                             t("devicePanel.readAt", {
                                                 time: format.time(device.stateAt)
@@ -463,7 +466,7 @@ export function DevicePanel({
                                         .filter(Boolean)
                                         .join(" - ")}
                                 </p>
-                                {device.batteryCritical && (
+                                {batteryLow(device) && (
                                     <p className="flex items-center gap-1.5 text-xs text-danger">
                                         <BatteryLow className="size-3.5 shrink-0" />
                                         {t("devicePanel.batteryLow")}

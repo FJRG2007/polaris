@@ -66,6 +66,7 @@ const DEVICE_FIELDS = {
     doorState: true,
     batteryPercent: true,
     batteryCritical: true,
+    batteryLowPercent: true,
     online: true,
     controllable: true,
     value: true,
@@ -93,6 +94,7 @@ type DeviceRow = {
     doorState: string;
     batteryPercent: number | null;
     batteryCritical: boolean;
+    batteryLowPercent: number | null;
     online: boolean;
     controllable: boolean;
     value: string | null;
@@ -186,6 +188,7 @@ function toView(row: DeviceRow): kinds.DeviceView {
         doorState: kinds.doorState(row.doorState),
         batteryPercent: row.batteryPercent,
         batteryCritical: row.batteryCritical,
+        batteryLowPercent: row.batteryLowPercent,
         online: row.online,
         controllable: row.controllable,
         // Both or neither: a unit with nothing to put it after is not a reading,
@@ -253,6 +256,9 @@ export interface DeviceEdit {
     readonly controllable: boolean;
     /** Its room at that place, or null for none; absent leaves it as it is. */
     readonly roomId?: string | null;
+    /** Where its battery reads as low, or null for its kind's line; absent
+     *  leaves it as it is. */
+    readonly batteryLowPercent?: number | null;
 }
 
 export async function updateDevice(
@@ -277,7 +283,10 @@ export async function updateDevice(
             zone: edit.zone || null,
             placeId: edit.placeId,
             controllable: edit.controllable,
-            ...(roomId !== undefined ? { roomId } : {})
+            ...(roomId !== undefined ? { roomId } : {}),
+            ...(edit.batteryLowPercent !== undefined
+                ? { batteryLowPercent: edit.batteryLowPercent }
+                : {})
         },
         select: DEVICE_FIELDS
     });

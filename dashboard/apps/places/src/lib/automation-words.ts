@@ -118,6 +118,25 @@ export function valueText(
     return kinds.readingLine({ value, unit: "" }, t);
 }
 
+/**
+ * A battery word for one device, with the line it is read against: "Low (at or
+ * under 30%)", and the maker's own flag named where that device has one. Without
+ * a device it is the bare word.
+ */
+export function batteryValueText(
+    value: string,
+    device: auto.BatteryReport | undefined,
+    t: PlacesTranslator
+): string {
+    if (!device) return valueText("battery", "", value, t);
+    const percent = auto.batteryLine(device);
+    if (value === "ok") return t("automations.battery.okOver", { percent });
+    if (value !== "low") return value;
+    return auto.makerFlagsBattery(device.vendor)
+        ? t("automations.battery.lowAtOrFlag", { percent })
+        : t("automations.battery.lowAt", { percent });
+}
+
 /** One of a purifier's figures, in the reader's words: "PM2.5", "Filter life". */
 export function measureText(measure: auto.ReadingMeasure, t: PlacesTranslator): string {
     if (measure === "filter") return t("automations.measures.filter");

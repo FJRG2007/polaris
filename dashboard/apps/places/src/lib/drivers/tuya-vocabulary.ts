@@ -168,7 +168,7 @@ export function tuyaSnapshots(
                 state: device.online ? (on ? "on" : "off") : "unknown",
                 doorState: "none",
                 batteryPercent: battery,
-                batteryCritical: battery !== null && battery <= 15,
+                batteryCritical: false,
                 online: device.online
             });
         }

@@ -60,7 +60,9 @@ function base(device: ikea.DirigeraDevice) {
         firmware: text(device.attributes.firmwareVersion) || null,
         doorState: "none" as const,
         batteryPercent: battery,
-        batteryCritical: battery !== null && battery <= 15,
+        // IKEA send a share and no flag of their own; when it is low is the
+        // device's line in Polaris (`batteryLine`), not a number fixed here.
+        batteryCritical: false,
         online: device.isReachable
     };
 }

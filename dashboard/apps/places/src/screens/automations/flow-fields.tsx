@@ -598,7 +598,10 @@ export function ValuePicker({
 
     const options: SelectOption[] = offered.map((word) => ({
         value: word,
-        label: words.valueText(attribute, kind, word, t)
+        label:
+            attribute === "battery"
+                ? words.batteryValueText(word, device, t)
+                : words.valueText(attribute, kind, word, t)
     }));
     if (allowAny) options.unshift({ value: ANY, label: t("automations.anyValue") });
     return (

@@ -706,7 +706,8 @@
         "floorGone": "Floor not found",
         "floorElsewhere": "That floor is at another place",
         "floorTaken": "A floor with that name is already here",
-        "notOnEarth": "That is not a place on the Earth"
+        "notOnEarth": "That is not a place on the Earth",
+        "batteryLine": "Between 1 and 99"
     },
     "connections": {
         "nuki-web": {
@@ -1748,7 +1749,8 @@
         "filterSoon": "Change filter soon",
         "filterNow": "Change filter",
         "connectLocally": "Connect {name} locally",
-        "accountSettings": "Settings for {name}"
+        "accountSettings": "Settings for {name}",
+        "batteryLowTitle": "Battery at or under {percent}%"
     },
     "devicePanel": {
         "watchOnly": "Set to be watched rather than operated.",
@@ -1756,7 +1758,7 @@
         "firmware": "firmware {version}",
         "battery": "battery {percent}%",
         "readAt": "read at {time}",
-        "batteryLow": "The battery is nearly empty. Once it runs out it stops answering, and whatever it does has to be done by hand.",
+        "batteryLow": "The battery is low. Once it runs out it stops answering, and whatever it does has to be done by hand.",
         "usage": "Times used, last {days} days",
         "failed": "That did not work.",
         "edit": "Edit",
@@ -1844,7 +1846,8 @@
             "dumpBody": "The box tips every bit of litter into its waste bin. You will need to refill it before your cat can use it again.",
             "dumpConfirm": "Empty litter",
             "cancel": "Cancel"
-        }
+        },
+        "batteryLine": "low at {percent}%"
     },
     "roomsDialog": {
         "title": "Rooms and floors",
@@ -1897,7 +1900,10 @@
         "roomName": "Room name",
         "roomNamePlaceholder": "Kitchen",
         "floor": "Floor",
-        "floorPlaceholder": "Ground floor"
+        "floorPlaceholder": "Ground floor",
+        "batteryLine": "Low battery at",
+        "batteryLineHint": "At or under this share its battery counts as low, for automations and the overview. Leave it empty to use {percent}%, the default for this kind of device.",
+        "batteryLineFlag": "The device also reports a low battery itself, which counts whatever this says."
     },
     "connect": {
         "reconnectTitle": "Reconnect {name}",
@@ -2614,7 +2620,7 @@
                     "unlocked": "When a lock reports it is unlocked.",
                     "motion": "When a motion sensor sees movement.",
                     "still": "When a motion sensor stops seeing it.",
-                    "batteryLow": "When a device says its battery is low, or it falls to 20% or under.",
+                    "batteryLow": "When a battery falls to its device's low line, set in the device's settings, or the device says it is low.",
                     "unavailable": "When a device can no longer be reached."
                 },
                 "condition": {
@@ -2635,7 +2641,10 @@
         },
         "battery": {
             "low": "Low",
-            "ok": "Fine"
+            "ok": "Fine",
+            "lowAt": "Low (at or under {percent}%)",
+            "lowAtOrFlag": "Low (at or under {percent}%, or when the device itself reports it)",
+            "okOver": "Fine (over {percent}%)"
         },
         "start": {
             "title": "Start an automation",

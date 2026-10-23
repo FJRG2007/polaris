@@ -13,6 +13,7 @@
  */
 
 import * as kinds from "./device-kinds";
+import { batteryLow } from "./automation-kinds";
 import type { DeviceView } from "./device-kinds";
 
 /** Why a device is on the "needs attention" list, worst first. */
@@ -74,7 +75,8 @@ export function attentionFor(device: DeviceView): AttentionReason | null {
         return "jammed";
     }
     if (!device.online) return "offline";
-    if (device.batteryCritical) return "battery";
+    // The same line automations read, so the overview and an alert agree.
+    if (batteryLow(device)) return "battery";
     if (device.doorState === "open" && isLock(device)) return "door-open";
     return null;
 }
