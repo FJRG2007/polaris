@@ -150,6 +150,14 @@ export type StorageErrorCode =
  *
  * The grace exists because not every writable emits `close`, and waiting forever
  * for an event that is not coming would be a worse bug than the one this avoids.
+ *
+ * A failed copy lets go of the handle too. `pipe` leaves the destination open
+ * when the source errors - an upload whose sender hung up - so the caller's
+ * cleanup deleted a file that was still open: on a CIFS-mounted share the kernel
+ * renames such a file to `.__smbXXXX` instead, and with the handle never closed it
+ * stayed there, a truncated copy under a name nobody chose. So the destination is
+ * destroyed and its close awaited (within the same grace) before the error is
+ * handed back.
  */
 export function pipeAndClose(
     source: Readable,
@@ -165,12 +173,24 @@ export function pipeAndClose(
             if (grace) clearTimeout(grace);
             resolve();
         };
+        const fail = (error: unknown) => {
+            if (settled) return;
+            settled = true;
+            if (grace) clearTimeout(grace);
+            source.unpipe(out);
+            const writable = out as NodeJS.WritableStream & { destroy?: () => void; closed?: boolean };
+            if (typeof writable.destroy !== "function" || writable.closed) return reject(error);
+            const release = () => reject(error);
+            out.once("close", release);
+            setTimeout(release, graceMs);
+            writable.destroy();
+        };
         out.on("close", done);
         out.on("finish", () => {
             grace = setTimeout(done, graceMs);
         });
-        out.on("error", reject);
-        source.on("error", reject);
+        out.on("error", fail);
+        source.on("error", fail);
         source.pipe(out);
     });
 }
