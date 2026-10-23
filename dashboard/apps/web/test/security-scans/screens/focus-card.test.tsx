@@ -111,7 +111,7 @@ describe("FocusCard", () => {
         const onTarget = show({ target: TARGET, scan: SCAN, ids: ["GO-2026-6612", "GO-2026-1"] });
         expect(focus).toHaveBeenCalledWith({ scanId: SCAN });
         expect(await screen.findByText("Network filter DNS server")).toBeTruthy();
-        expect(onTarget).toHaveBeenCalledWith(TARGET);
+        await waitFor(() => expect(onTarget).toHaveBeenCalledWith(TARGET));
         expect(
             await screen.findByText(
                 "3 issues (Critical 1, High 1, Medium 1). All of them are fixed in a newer version."
