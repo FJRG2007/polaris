@@ -102,7 +102,6 @@ function settledDetector(vendor: string, detector: Detector): Detector {
     return detector === "camera" && !reportsOwnAlerts(vendor) ? "none" : detector;
 }
 
-/** What the database will accept where it wants a uuid. */
 /** What a camera may keep: nothing, the moments something moved, or everything. */
 export const RECORDING_MODES = ["off", "motion", "continuous"] as const;
 
@@ -121,6 +120,7 @@ export const cameraSwitchSchema = z
 
 export type CameraSwitch = z.infer<typeof cameraSwitchSchema>;
 
+/** What the database will accept where it wants a uuid. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A host or address, once normalized. Deliberately permissive about shape - a

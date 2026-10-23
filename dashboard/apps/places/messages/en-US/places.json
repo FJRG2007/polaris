@@ -44,6 +44,7 @@
             "list": "List",
             "wall": "Wall"
         },
+        "listFailed": "The cameras could not be listed",
         "moreFor": "More for {name}",
         "noArea": "No area",
         "noMatch": {

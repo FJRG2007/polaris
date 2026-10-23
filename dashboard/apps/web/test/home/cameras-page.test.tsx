@@ -22,6 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@/components/app-host/client";
 
 let cameras: CameraView[] = [];
+let listed: () => Promise<{ cameras?: CameraView[]; error?: string }>;
 const switched = vi.fn();
 
 vi.mock("@/app/(app)/access-actions", () => ({
@@ -32,7 +33,7 @@ vi.mock("@/app/(app)/access-actions", () => ({
 }));
 
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
-    listCamerasAction: async () => ({ cameras }),
+    listCamerasAction: () => listed(),
     liveCamerasAction: async () => ({ live: [] }),
     listCameraSetsAction: async () => ({ sets: [] }),
     listRoomsAction: async () => ({ rooms: [] }),
@@ -114,6 +115,7 @@ function memoryStorage(): Storage {
 
 beforeEach(() => {
     cameras = [];
+    listed = async () => ({ cameras });
     switched.mockClear();
     Object.defineProperty(window, "localStorage", { value: memoryStorage(), configurable: true });
     // jsdom has neither; a tile only needs them to exist.
@@ -258,6 +260,56 @@ describe("switching a camera from the page", () => {
         expect(cameraSwitchSchema.safeParse({}).success).toBe(false);
         expect(cameraSwitchSchema.safeParse({ recording: "always" }).success).toBe(false);
         expect(cameraSwitchSchema.safeParse({ enabled: true, name: "x" }).success).toBe(false);
+    });
+});
+
+describe("switching a camera from its menu", () => {
+    it("puts it back and says so when the switch does not take", async () => {
+        cameras = [camera({ id: "a", name: "Front door", enabled: true })];
+        render(<CamerasView canManage canControl openId={null} header={null} />);
+        await painted();
+
+        fireEvent.keyDown(screen.getByRole("button", { name: "More for Front door" }), {
+            key: "Enter"
+        });
+        await painted();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Switch off" }));
+        await painted();
+
+        expect(switched).toHaveBeenCalledWith("a", { enabled: false });
+        expect(screen.getByRole("alert").textContent).toBe("refused");
+        fireEvent.keyDown(screen.getByRole("button", { name: "More for Front door" }), {
+            key: "Enter"
+        });
+        await painted();
+        expect(screen.getByRole("menuitem", { name: "Switch off" })).toBeDefined();
+        expect(screen.queryByRole("menuitem", { name: "Switch on" })).toBeNull();
+    });
+});
+
+describe("a house whose cameras could not be read", () => {
+    it("says the list failed rather than that there are no cameras", async () => {
+        listed = async () => ({ error: "The database is not answering" });
+        render(<CamerasView canManage canControl openId={null} header={null} />);
+        await painted();
+
+        expect(screen.getByText("The cameras could not be listed")).toBeDefined();
+        expect(screen.getByText("The database is not answering")).toBeDefined();
+        expect(screen.queryByText("No cameras yet")).toBeNull();
+    });
+
+    it("says so too when the read itself throws, instead of waiting forever", async () => {
+        listed = async () => {
+            throw new Error("socket closed");
+        };
+        render(<CamerasView canManage canControl openId={null} header={null} />);
+        await painted();
+
+        expect(screen.getByText("The cameras could not be listed")).toBeDefined();
+        expect(
+            screen.getByText("Your cameras could not be read. Reload the page to try again.")
+        ).toBeDefined();
+        expect(screen.queryByText("No cameras yet")).toBeNull();
     });
 });
 

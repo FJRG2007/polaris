@@ -175,6 +175,7 @@ export function CamerasView({
     /** The camera whose areas are being drawn. */
     const [drawing, setDrawing] = useState<CameraView | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [listFailed, setListFailed] = useState(false);
     // The row the keyboard is on. One at a time: there is no action here that
     // takes several cameras, so a multi-selection would only be decoration.
     const [focused, setFocused] = useState<string | null>(null);
@@ -246,6 +247,7 @@ export function CamerasView({
             (list) => {
                 if (cancelled) return;
                 if (list.error) setError(list.error);
+                setListFailed(Boolean(list.error) && !list.cameras?.length);
                 setCameras(list.cameras ?? []);
                 // A link that names a camera lands on its settings rather than on
                 // a list to find it in.
@@ -264,7 +266,10 @@ export function CamerasView({
                 }
             },
             () => {
-                if (!cancelled) setError(t("cameras.readFailed"));
+                if (cancelled) return;
+                setError(t("cameras.readFailed"));
+                setListFailed(true);
+                setCameras([]);
             }
         );
         // The machines, disks and defaults only the dialogs read, asked only of
@@ -437,7 +442,7 @@ export function CamerasView({
                 </div>
             </div>
 
-            {error ? (
+            {error && !(listFailed && cameras?.length === 0) ? (
                 <p role="alert" className="text-[0.75rem] text-danger">
                     {error}
                 </p>
@@ -530,6 +535,12 @@ export function CamerasView({
                 ) : (
                     <ListSkeleton />
                 )
+            ) : listFailed && cameras.length === 0 ? (
+                <EmptyState
+                    icon={<Cctv />}
+                    title={t("cameras.listFailed")}
+                    description={error ?? undefined}
+                />
             ) : cameras.length === 0 ? (
                 <EmptyState
                     icon={<Cctv />}
