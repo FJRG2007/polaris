@@ -244,12 +244,8 @@ export async function register(): Promise<void> {
     const { startDuckDnsSync } = await import("./lib/domain-service");
     startDuckDnsSync();
 
-    // The same job for the operator's own domain. A DuckDNS name has been kept
-    // pointed at this server's current address since the day it was added; the
-    // domain they actually use was written once and never revisited, so an ISP
-    // rotating the address took every one of them down silently.
-    const { startZoneAddressSync } = await import("./lib/domain-address-sync");
-    startZoneAddressSync();
+    // The operator's own domain follows the address too: the leased
+    // `public-ip-follow` job in lib/cron/jobs.ts, every two minutes and at boot.
 
     // Carry Watch alarms into Automations, once each: an enabled alarm on a
     // reading becomes a published automation and Watch stops evaluating it. After

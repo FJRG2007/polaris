@@ -29,6 +29,7 @@ import { setDomainConfig } from "./domain-service";
 import { detectPublicIp, getLocalEnvironment } from "./network-service";
 import { reportRouterAdvice, type RouterAdvice } from "./network-advice";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
+import { authoritativeA, propagationLeft } from "./dns/authoritative";
 import {
     findDnsRecords,
     pruneDnsRecords,
@@ -58,6 +59,9 @@ export interface ZoneDnsCheck {
     ok: boolean;
     /** True when something answered on the hostname from here (see the probe). */
     reachable: boolean;
+    /** Seconds until resolvers drop the old address, when the zone's own nameservers
+     *  already answer this server and only cached copies still name another. */
+    propagating?: number | null;
     detail: string;
 }
 
@@ -75,6 +79,8 @@ export interface GameZoneDnsCheck {
     wildcard: string;
     addresses: string[];
     ok: boolean;
+    /** As on a zone: seconds left while only cached answers still name another address. */
+    propagating?: number | null;
     detail: string;
 }
 
@@ -98,6 +104,18 @@ async function resolveOrEmpty(hostname: string): Promise<string[]> {
     }
 }
 
+/** The sentence for a name the public resolvers still answer with an old address. */
+function staleDetail(
+    addresses: readonly string[],
+    expectedIp: string | null,
+    left: number | null
+): string {
+    if (expectedIp && left !== null) {
+        return `Updated: the domain's nameservers already answer ${expectedIp}. Resolvers that cached ${addresses.filter((address) => address !== expectedIp).join(", ")} drop it within ${left} seconds.`;
+    }
+    return `Resolves to ${addresses.join(", ")}, but this server is at ${expectedIp}.`;
+}
+
 /** Check both names a zone needs - its wildcard and its own host - against this
  *  server's public IP, and whether the hostname actually serves Polaris. */
 export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<ZoneDnsReport> {
@@ -115,8 +133,9 @@ export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<Z
     const gameZones = await checkGameZoneDns(config, expectedIp);
     const zones = await Promise.all(
         records.map(async (record) => {
+            const wildcardProbe = `${randomLabel(3)}.${record.host}`;
             const [wildcardAddresses, hostAddresses] = await Promise.all([
-                resolveOrEmpty(`${randomLabel(3)}.${record.host}`),
+                resolveOrEmpty(wildcardProbe),
                 resolveOrEmpty(record.host)
             ]);
             const missing = [
@@ -142,13 +161,26 @@ export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<Z
                   )
                 : [];
             if (elsewhere.length > 0) {
+                const left = expectedIp
+                    ? propagationLeft(
+                          await Promise.all([
+                              authoritativeA(record.host),
+                              authoritativeA(wildcardProbe)
+                          ]),
+                          expectedIp
+                      )
+                    : null;
+                // The verdict is the zone's own: when its nameservers already answer
+                // this server, the record is right and only cached copies lag behind,
+                // which is a note with a countdown and not a failure.
                 return {
                     host: record.host,
                     wildcard: record.wildcard,
                     addresses,
-                    ok: false,
-                    reachable: false,
-                    detail: `Resolves to ${addresses.join(", ")}, but this server is at ${expectedIp}.`
+                    ok: left !== null,
+                    reachable: left !== null ? await answersHere(record.host) : false,
+                    propagating: left,
+                    detail: staleDetail(addresses, expectedIp, left)
                 };
             }
             // DNS pointing here is not the same as traffic arriving here: on a home
@@ -208,9 +240,8 @@ async function checkGameZoneDns(
         records.map(async (record) => {
             // A random label is the whole test: nothing but the wildcard could answer
             // for a name that was never created.
-            const addresses = await resolveOrEmpty(
-                `${randomLabel(3)}.${record.label}.${config.baseDomain}`
-            );
+            const probe = `${randomLabel(3)}.${record.label}.${config.baseDomain}`;
+            const addresses = await resolveOrEmpty(probe);
             if (addresses.length === 0) {
                 return {
                     game: record.game,
@@ -224,12 +255,16 @@ async function checkGameZoneDns(
                 ? addresses.filter((address) => address !== expectedIp)
                 : [];
             if (elsewhere.length > 0) {
+                const left = expectedIp
+                    ? propagationLeft([await authoritativeA(probe)], expectedIp)
+                    : null;
                 return {
                     game: record.game,
                     wildcard: record.wildcard,
                     addresses,
-                    ok: false,
-                    detail: `Resolves to ${addresses.join(", ")}, but this server is at ${expectedIp}.`
+                    ok: left !== null,
+                    propagating: left,
+                    detail: staleDetail(addresses, expectedIp, left)
                 };
             }
             return {
@@ -325,6 +360,21 @@ export interface ZoneDnsProvisionResult {
 }
 
 /**
+ * Every name the guided setup asks for and the Cloudflare button writes: each zone's
+ * host and wildcard, then each installed game's wildcard. The address follower owns
+ * exactly these and nothing else in the zone.
+ */
+export async function ownedZoneNames(
+    config: Awaited<ReturnType<typeof getDomainZones>>
+): Promise<string[]> {
+    const games = await installedGames().catch(() => []);
+    return [
+        ...zoneRecords(config).flatMap((record) => [record.host, record.wildcard]),
+        ...gameZoneRecords(config, games).map((record) => record.wildcard)
+    ];
+}
+
+/**
  * Create the zone and wildcard A records through the connected Cloudflare account,
  * so an operator whose domain is already on Cloudflare never opens its dashboard.
  * Idempotent: a record that already points here is left as it is. Throws when there
@@ -362,11 +412,7 @@ export async function provisionZoneDns(
         conflicts: [],
         failed: []
     };
-    const games = await installedGames().catch(() => []);
-    const names = [
-        ...zoneRecords(config).flatMap((record) => [record.host, record.wildcard]),
-        ...gameZoneRecords(config, games).map((record) => record.wildcard)
-    ];
+    const names = await ownedZoneNames(config);
     // Sequential on purpose: Cloudflare rate-limits per account, and a handful of
     // records is not worth risking a 429 that leaves the layout half-created.
     for (const name of names) {

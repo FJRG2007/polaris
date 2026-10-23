@@ -26,6 +26,7 @@ import { CallPortsCard } from "./call-ports-card";
 import { GamePortsCard } from "./game-ports-card";
 import { DomainSetupWizard } from "./setup-wizard";
 import { DnsRecordsCard } from "./dns-records-card";
+import { AddressFollowCard } from "./address-follow-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
 import { CertificateContactCard } from "./certificate-contact-card";
@@ -178,6 +179,8 @@ export function DomainsView() {
                 daemon about the edge, which the overview above does not wait on. */}
             <CertificateContactCard />
 
+            <AddressFollowCard />
+
             <DnsRecordsCard />
 
             <div className="flex flex-col gap-6 border-t border-border pt-6">
@@ -187,14 +190,21 @@ export function DomainsView() {
                     onClick={() => setAdvanced((value) => !value)}
                     className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
-                    {advanced ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                    {advanced ? (
+                        <ChevronDown className="size-3.5" />
+                    ) : (
+                        <ChevronRight className="size-3.5" />
+                    )}
                     {t("domains.advancedToggle")}
                 </button>
                 {advanced && (
                     <>
                         <NetworkExposure nonce={setupNonce} />
                         {overview ? (
-                            <DuckDns config={overview.config} onConfig={(config) => apply({ config })} />
+                            <DuckDns
+                                config={overview.config}
+                                onConfig={(config) => apply({ config })}
+                            />
                         ) : (
                             // i18n-ignore: a brand name
                             <PendingCard title="DuckDNS">
@@ -249,7 +259,15 @@ export function DomainsView() {
  * a page an operator can already navigate by is the entire point of painting before
  * the data lands. Only what is genuinely waiting pulses, in the shape it will take.
  */
-function PendingCard({ title, wide, children }: { title: ReactNode; wide?: boolean; children: ReactNode }) {
+function PendingCard({
+    title,
+    wide,
+    children
+}: {
+    title: ReactNode;
+    wide?: boolean;
+    children: ReactNode;
+}) {
     return (
         <PageSection title={title} wide={wide}>
             {children}
@@ -341,7 +359,8 @@ function AppDomains({
 
     /** Nothing to save until a field differs from what is stored. */
     const changed =
-        appDomain.value.trim() !== config.appDomain || sharingDomain.value.trim() !== config.sharingDomain;
+        appDomain.value.trim() !== config.appDomain ||
+        sharingDomain.value.trim() !== config.sharingDomain;
 
     async function save() {
         setSaving(true);
@@ -376,7 +395,11 @@ function AppDomains({
                 <span className="text-xs text-muted-foreground">
                     {t("domains.own.appDomainHint", { url: effectiveAppUrl })}
                 </span>
-                <Suggestion value={appDomain.value} suggestion={suggestions.app} onUse={appDomain.setValue} />
+                <Suggestion
+                    value={appDomain.value}
+                    suggestion={suggestions.app}
+                    onUse={appDomain.setValue}
+                />
             </label>
 
             <label className="flex flex-col gap-1 text-sm">
@@ -390,7 +413,9 @@ function AppDomains({
                     placeholder={suggestions.sharing ?? "share.example.com"}
                     autoComplete="off"
                 />
-                <span className="text-xs text-muted-foreground">{t("domains.own.sharingDomainHint")}</span>
+                <span className="text-xs text-muted-foreground">
+                    {t("domains.own.sharingDomainHint")}
+                </span>
                 <Suggestion
                     value={sharingDomain.value}
                     suggestion={suggestions.sharing}
@@ -401,7 +426,9 @@ function AppDomains({
             {error ? <ErrorNote message={error} /> : null}
 
             <div className="flex items-center justify-end gap-3">
-                {saved && !changed ? <span className="text-sm text-success">{t("domains.saved")}</span> : null}
+                {saved && !changed ? (
+                    <span className="text-sm text-success">{t("domains.saved")}</span>
+                ) : null}
                 <Button onClick={save} disabled={saving || !changed}>
                     {saving ? tc("actions.saving") : tc("actions.save")}
                 </Button>
@@ -440,9 +467,15 @@ function DashboardDomains({
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const candidate = draft.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const candidate = draft
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/.*$/, "");
     const known = addresses.some((address) => address.host === candidate);
-    const valid = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(candidate);
+    const valid = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(
+        candidate
+    );
 
     /**
      * Add one name to the stored list and re-read the addresses, so the row appears
@@ -483,14 +516,21 @@ function DashboardDomains({
                         aria-invalid={draft.trim() !== "" && !valid}
                     />
                     <Button onClick={() => void add()} disabled={adding || !valid || known}>
-                        {adding ? <Loader2 className="size-4 animate-spin" /> : null} {t("domains.answers.add")}
+                        {adding ? <Loader2 className="size-4 animate-spin" /> : null}{" "}
+                        {t("domains.answers.add")}
                     </Button>
                 </div>
-                <span className="text-xs text-muted-foreground">{t("domains.answers.addHint")}</span>
+                <span className="text-xs text-muted-foreground">
+                    {t("domains.answers.addHint")}
+                </span>
                 {draft.trim() !== "" && !valid ? (
                     <span className="text-xs text-danger">{t("domains.answers.notADomain")}</span>
                 ) : null}
-                {known ? <span className="text-xs text-muted-foreground">{t("domains.answers.known")}</span> : null}
+                {known ? (
+                    <span className="text-xs text-muted-foreground">
+                        {t("domains.answers.known")}
+                    </span>
+                ) : null}
             </div>
 
             {error ? <ErrorNote message={error} /> : null}
@@ -544,7 +584,9 @@ function LocalCertificate() {
     const t = useTranslations("admin");
     return (
         <PageSection title={t("domains.certificate.title")}>
-            <p className="text-xs text-muted-foreground">{t.rich("domains.certificate.body", { code })}</p>
+            <p className="text-xs text-muted-foreground">
+                {t.rich("domains.certificate.body", { code })}
+            </p>
             <a
                 href="/api/system/local-ca"
                 className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
@@ -560,7 +602,13 @@ function LocalCertificate() {
  * the chosen strategy, and this is where an operator who uses it for something else -
  * or who only wants to replace the token - edits it.
  */
-function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: DomainConfig) => void }) {
+function DuckDns({
+    config,
+    onConfig
+}: {
+    config: DomainConfig;
+    onConfig: (next: DomainConfig) => void;
+}) {
     const t = useTranslations("admin");
     const tc = useTranslations("common");
     // The guided setup asks for the same subdomain, so a save there has to land here
@@ -602,7 +650,10 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
         try {
             setSyncResult(await syncDuckDnsAction());
         } catch (caught) {
-            setSyncResult({ ok: false, detail: caught instanceof Error ? caught.message : t("domains.duckdns.syncFailed") });
+            setSyncResult({
+                ok: false,
+                detail: caught instanceof Error ? caught.message : t("domains.duckdns.syncFailed")
+            });
         } finally {
             setSyncing(false);
         }
@@ -624,11 +675,18 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
                 <>
                     {/* i18n-ignore: a brand name */}
                     DuckDNS
-                    {config.hasDuckdnsToken ? <Badge variant="success">{t("domains.duckdns.configured")}</Badge> : null}
+                    {config.hasDuckdnsToken ? (
+                        <Badge variant="success">{t("domains.duckdns.configured")}</Badge>
+                    ) : null}
                 </>
             }
             actions={
-                <Button size="sm" variant="secondary" onClick={sync} disabled={syncing || !config.hasDuckdnsToken}>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={sync}
+                    disabled={syncing || !config.hasDuckdnsToken}
+                >
                     <RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} />
                     {syncing ? t("domains.duckdns.syncing") : t("domains.duckdns.sync")}
                 </Button>
@@ -648,7 +706,9 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
                     placeholder="mypolaris"
                     autoComplete="off"
                 />
-                <span className="text-xs text-muted-foreground">{t.rich("domains.duckdns.subdomainHint", { code })}</span>
+                <span className="text-xs text-muted-foreground">
+                    {t.rich("domains.duckdns.subdomainHint", { code })}
+                </span>
             </label>
             <label className="flex flex-col gap-1 text-sm">
                 {t("domains.duckdns.token")}
@@ -656,7 +716,11 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
                     type="password"
                     value={duckToken}
                     onChange={(event) => setDuckToken(event.target.value)}
-                    placeholder={config.hasDuckdnsToken ? t("domains.duckdns.tokenSaved") : t("domains.duckdns.tokenPlaceholder")}
+                    placeholder={
+                        config.hasDuckdnsToken
+                            ? t("domains.duckdns.tokenSaved")
+                            : t("domains.duckdns.tokenPlaceholder")
+                    }
                     autoComplete="off"
                 />
             </label>
@@ -670,15 +734,23 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
                 </button>
             ) : null}
             {syncResult ? (
-                <p className={`flex items-center gap-1.5 text-sm ${syncResult.ok ? "text-success" : "text-danger"}`}>
-                    {syncResult.ok ? <CheckCircle2 className="size-4" /> : <TriangleAlert className="size-4" />}
+                <p
+                    className={`flex items-center gap-1.5 text-sm ${syncResult.ok ? "text-success" : "text-danger"}`}
+                >
+                    {syncResult.ok ? (
+                        <CheckCircle2 className="size-4" />
+                    ) : (
+                        <TriangleAlert className="size-4" />
+                    )}
                     {syncResult.ok ? t("domains.duckdns.updated") : syncResult.detail}
                 </p>
             ) : null}
             {error ? <ErrorNote message={error} /> : null}
 
             <div className="flex items-center justify-end gap-3">
-                {saved && !changed ? <span className="text-sm text-success">{t("domains.saved")}</span> : null}
+                {saved && !changed ? (
+                    <span className="text-sm text-success">{t("domains.saved")}</span>
+                ) : null}
                 <Button onClick={save} disabled={saving || !changed}>
                     {saving ? tc("actions.saving") : tc("actions.save")}
                 </Button>
@@ -735,10 +807,14 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };
                 setStatus(next);
                 setMode((current) => (current === previous.mode ? next.mode : current));
-                setWildcard((current) => (current === previous.wildcard ? next.wildcardDomain : current));
+                setWildcard((current) =>
+                    current === previous.wildcard ? next.wildcardDomain : current
+                );
             })
             .catch((caught: unknown) => {
-                setError(caught instanceof Error ? caught.message : t("domains.network.readFailed"));
+                setError(
+                    caught instanceof Error ? caught.message : t("domains.network.readFailed")
+                );
             })
             .finally(() => setLoading(false));
     }
@@ -753,7 +829,9 @@ function NetworkExposure({ nonce }: { nonce: number }) {
         try {
             setStatus(await networkStatusAction(true));
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : t("domains.network.redetectFailed"));
+            setError(
+                caught instanceof Error ? caught.message : t("domains.network.redetectFailed")
+            );
         } finally {
             setBusy(false);
         }
@@ -824,7 +902,8 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             title={t("domains.network.title")}
             actions={
                 <Button size="sm" variant="secondary" onClick={redetect} disabled={busy}>
-                    <RefreshCw className={`size-4 ${busy ? "animate-spin" : ""}`} /> {t("domains.network.redetect")}
+                    <RefreshCw className={`size-4 ${busy ? "animate-spin" : ""}`} />{" "}
+                    {t("domains.network.redetect")}
                 </Button>
             }
         >
@@ -849,7 +928,11 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 />
                 <StatusRow
                     label={t("domains.network.status.behindNat")}
-                    value={status.natted ? t("domains.network.status.yes") : t("domains.network.status.no")}
+                    value={
+                        status.natted
+                            ? t("domains.network.status.yes")
+                            : t("domains.network.status.no")
+                    }
                     tone={status.natted ? "warn" : "ok"}
                 />
                 <StatusRow
@@ -860,7 +943,11 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 <StatusRow
                     // i18n-ignore: a brand name
                     label="DuckDNS"
-                    value={status.duckdns ? t("domains.network.status.configured") : t("domains.network.status.notSet")}
+                    value={
+                        status.duckdns
+                            ? t("domains.network.status.configured")
+                            : t("domains.network.status.notSet")
+                    }
                     tone={status.duckdns ? "ok" : undefined}
                 />
             </div>
@@ -872,16 +959,28 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 </p>
             )}
 
-            {status.placement === "home" && !status.duckdns && status.effectiveMode !== "wildcard" && (
-                <p className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                    <span>{t.rich("domains.network.homeAdvice", { base: DUCKDNS_BASE, b: bold, code })}</span>
-                </p>
-            )}
+            {status.placement === "home" &&
+                !status.duckdns &&
+                status.effectiveMode !== "wildcard" && (
+                    <p className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                        <span>
+                            {t.rich("domains.network.homeAdvice", {
+                                base: DUCKDNS_BASE,
+                                b: bold,
+                                code
+                            })}
+                        </span>
+                    </p>
+                )}
 
             <label className="flex flex-col gap-1 text-sm">
                 {t("domains.network.exposureMode")}
-                <Select value={mode} onValueChange={(value) => setMode(value as NetworkMode)} options={modeOptions(t)} />
+                <Select
+                    value={mode}
+                    onValueChange={(value) => setMode(value as NetworkMode)}
+                    options={modeOptions(t)}
+                />
             </label>
 
             {mode === "wildcard" && (
@@ -895,10 +994,14 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                         disabled={status.wildcardManaged}
                     />
                     {status.wildcardManaged && (
-                        <span className="text-xs text-muted-foreground">{t("domains.network.wildcardManaged")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("domains.network.wildcardManaged")}
+                        </span>
                     )}
                     {status.wildcardManaged && !status.wildcardReady && (
-                        <span className="text-xs text-warning">{t("domains.network.wildcardNotReady")}</span>
+                        <span className="text-xs text-warning">
+                            {t("domains.network.wildcardNotReady")}
+                        </span>
                     )}
                 </label>
             )}
@@ -908,7 +1011,9 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             {error ? <ErrorNote message={error} /> : null}
 
             <div className="flex items-center justify-end gap-3">
-                {saved && !changed ? <span className="text-sm text-success">{t("domains.saved")}</span> : null}
+                {saved && !changed ? (
+                    <span className="text-sm text-success">{t("domains.saved")}</span>
+                ) : null}
                 <Button onClick={save} disabled={busy || !changed}>
                     {busy ? tc("actions.saving") : t("domains.network.saveExposure")}
                 </Button>
@@ -918,7 +1023,8 @@ function NetworkExposure({ nonce }: { nonce: number }) {
 }
 
 function StatusRow({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
-    const color = tone === "ok" ? "text-success" : tone === "warn" ? "text-warning" : "text-foreground";
+    const color =
+        tone === "ok" ? "text-success" : tone === "warn" ? "text-warning" : "text-foreground";
     return (
         <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">{label}</span>
@@ -927,14 +1033,24 @@ function StatusRow({ label, value, tone }: { label: string; value: string; tone?
     );
 }
 
-function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; mode: NetworkMode; wildcard: string }) {
+function ExposureGuidance({
+    status,
+    mode,
+    wildcard
+}: {
+    status: NetworkStatus;
+    mode: NetworkMode;
+    wildcard: string;
+}) {
     const t = useTranslations("admin");
     const effective = mode === "auto" ? status.effectiveMode : mode;
     const base = wildcard.trim() || "apps.example.com";
 
     if (effective === "public") {
         return (
-            <GuidanceNote ok>{t("domains.guidance.public", { ip: status.publicIp ?? status.subdomainIp ?? "" })}</GuidanceNote>
+            <GuidanceNote ok>
+                {t("domains.guidance.public", { ip: status.publicIp ?? status.subdomainIp ?? "" })}
+            </GuidanceNote>
         );
     }
     if (effective === "wildcard") {
@@ -958,12 +1074,23 @@ function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; m
                     </li>
                     <li>
                         {status.subdomainIp
-                            ? t.rich("domains.guidance.wildcardForwardIp", { ip: status.subdomainIp, code })
+                            ? t.rich("domains.guidance.wildcardForwardIp", {
+                                  ip: status.subdomainIp,
+                                  code
+                              })
                             : t.rich("domains.guidance.wildcardForward", { code })}
                     </li>
-                    <li>{t.rich("domains.guidance.wildcardSave", { host: `<app>.${base}`, code })}</li>
+                    <li>
+                        {t.rich("domains.guidance.wildcardSave", { host: `<app>.${base}`, code })}
+                    </li>
                 </ol>
-                <p className="mt-2">{t.rich("domains.guidance.wildcardNoDomain", { base: DUCKDNS_BASE, b: bold, code })}</p>
+                <p className="mt-2">
+                    {t.rich("domains.guidance.wildcardNoDomain", {
+                        base: DUCKDNS_BASE,
+                        b: bold,
+                        code
+                    })}
+                </p>
             </GuidanceNote>
         );
     }
@@ -972,7 +1099,11 @@ function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; m
             <GuidanceNote>
                 {t.rich("domains.guidance.tunnel", {
                     link: (chunks) => (
-                        <a key="link" className="text-primary hover:underline" href="/admin/integrations">
+                        <a
+                            key="link"
+                            className="text-primary hover:underline"
+                            href="/admin/integrations"
+                        >
                             {chunks}
                         </a>
                     ),
@@ -983,7 +1114,9 @@ function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; m
     }
     return (
         <GuidanceNote>
-            {t("domains.guidance.lan", { ip: status.subdomainIp ?? t("domains.network.status.unknown") })}
+            {t("domains.guidance.lan", {
+                ip: status.subdomainIp ?? t("domains.network.status.unknown")
+            })}
         </GuidanceNote>
     );
 }

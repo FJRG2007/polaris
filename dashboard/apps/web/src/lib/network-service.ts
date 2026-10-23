@@ -43,6 +43,7 @@ const KEYS = {
     wildcardDomain: "network.wildcardDomain",
     detectedIp: "network.detectedPublicIp",
     detectedAt: "network.detectedPublicIpAt",
+    history: "network.publicIpHistory",
     environment: "network.environment",
     detectedEnvironment: "network.detectedEnvironment",
     detectedEnvironmentAt: "network.detectedEnvironmentAt",
@@ -183,18 +184,26 @@ export async function detectPlacement(force = false): Promise<ServerPlacement> {
 /** Re-detect the public IP if the cached value is older than this. */
 const DETECT_TTL_MS = 6 * 60 * 60 * 1000;
 
-/** Fetch the box's external public IP from an echo service, cached with a TTL. */
-export async function detectPublicIp(force = false): Promise<string | null> {
-    if (!force) {
-        const at = Number(await getSetting(KEYS.detectedAt));
-        const cached = await getSetting(KEYS.detectedIp);
-        if (cached && Number.isFinite(at) && Date.now() - at < DETECT_TTL_MS) return cached;
-    }
-    for (const url of [
-        "https://api.ipify.org",
-        "https://ifconfig.me/ip",
-        "https://icanhazip.com"
-    ]) {
+/** The echo services asked for the public address, in the order a plain lookup tries them. */
+const ECHO_SERVICES = [
+    "https://api.ipify.org",
+    "https://ifconfig.me/ip",
+    "https://icanhazip.com"
+] as const;
+
+/** How many addresses this box answered on before the current one are remembered. */
+const HISTORY_SIZE = 10;
+
+/**
+ * Ask the echo services for the public address, starting at `first` and walking
+ * round the list, and answer null when none of them gave one. Never falls back
+ * to a remembered value: a caller about to rewrite DNS must be able to tell "the
+ * address is X" from "nobody answered". Starting two reads at different services
+ * makes them independent.
+ */
+export async function probePublicIp(first = 0): Promise<string | null> {
+    for (let step = 0; step < ECHO_SERVICES.length; step += 1) {
+        const url = ECHO_SERVICES[(first + step) % ECHO_SERVICES.length] ?? ECHO_SERVICES[0];
         try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 4000);
@@ -202,14 +211,55 @@ export async function detectPublicIp(force = false): Promise<string | null> {
             clearTimeout(timer);
             if (!res.ok) continue;
             const ip = (await res.text()).trim();
-            if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
-                await setSetting(KEYS.detectedIp, ip);
-                await setSetting(KEYS.detectedAt, String(Date.now()));
-                return ip;
-            }
+            if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return ip;
         } catch {
             // Try the next provider (offline, blocked, or a slow endpoint).
         }
+    }
+    return null;
+}
+
+/**
+ * The addresses this box answered on before, newest first. Written whenever a
+ * detection finds a new address, so the DNS follower can still recognise a record
+ * as one of ours after something else has refreshed the remembered address.
+ */
+export async function publicIpHistory(): Promise<string[]> {
+    try {
+        const parsed: unknown = JSON.parse((await getSetting(KEYS.history)) ?? "[]");
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
+    } catch {
+        return [];
+    }
+}
+
+/** Remember a freshly detected address, keeping the one it replaces in the history. */
+export async function rememberPublicIp(ip: string): Promise<void> {
+    const previous = await getSetting(KEYS.detectedIp);
+    if (previous && previous !== ip) {
+        const history = [
+            previous,
+            ...(await publicIpHistory()).filter((entry) => entry !== previous && entry !== ip)
+        ];
+        await setSetting(KEYS.history, JSON.stringify(history.slice(0, HISTORY_SIZE)));
+    }
+    await setSetting(KEYS.detectedIp, ip);
+    await setSetting(KEYS.detectedAt, String(Date.now()));
+}
+
+/** Fetch the box's external public IP from an echo service, cached with a TTL. */
+export async function detectPublicIp(force = false): Promise<string | null> {
+    if (!force) {
+        const at = Number(await getSetting(KEYS.detectedAt));
+        const cached = await getSetting(KEYS.detectedIp);
+        if (cached && Number.isFinite(at) && Date.now() - at < DETECT_TTL_MS) return cached;
+    }
+    const ip = await probePublicIp();
+    if (ip) {
+        await rememberPublicIp(ip);
+        return ip;
     }
     return getSetting(KEYS.detectedIp);
 }

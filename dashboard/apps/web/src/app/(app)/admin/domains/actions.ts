@@ -12,12 +12,24 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
+import { runScheduledJob } from "@/lib/cron/scheduler";
 import { repairCallAddress } from "@/lib/chat/call-address-watch";
 import { acmeEmailSchema } from "@/lib/tls/acme-contact";
-import { acmeContactStatus, restartEdge, saveAcmeEmail, type AcmeContactStatus } from "@/lib/tls/acme-edge";
+import {
+    acmeContactStatus,
+    restartEdge,
+    saveAcmeEmail,
+    type AcmeContactStatus
+} from "@/lib/tls/acme-edge";
 import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
+import { addressFollowView, type AddressFollowView } from "@/lib/domain-address-sync";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
-import { getPortBlocks, getPortPolicy, setPortBlock, setPortPolicy } from "@/lib/apps/port-block-store";
+import {
+    getPortBlocks,
+    getPortPolicy,
+    setPortBlock,
+    setPortPolicy
+} from "@/lib/apps/port-block-store";
 import {
     clearDuckdnsToken,
     getDomainConfig,
@@ -66,12 +78,20 @@ const domainsSchema = z.object({
  * a mistyped key is stripped in silence, so a caller that sends `duckdnsTokn` would be
  * told the settings were saved while the token never reached the database.
  */
-export async function saveDomainsAction(input: z.input<typeof domainsSchema>): Promise<{ config: DomainConfig }> {
+export async function saveDomainsAction(
+    input: z.input<typeof domainsSchema>
+): Promise<{ config: DomainConfig }> {
     const user = await requireAdmin();
     const parsed = domainsSchema.safeParse(input);
-    if (!parsed.success) throw new Error((await getTranslations("admin"))("domains.errors.invalidSettings"));
+    if (!parsed.success)
+        throw new Error((await getTranslations("admin"))("domains.errors.invalidSettings"));
     await setDomainConfig(parsed.data);
-    await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "domains" });
+    await recordAudit({
+        actorId: user.id,
+        action: "domains.configure",
+        targetType: "setting",
+        targetId: "domains"
+    });
     revalidatePath("/admin/domains");
     return { config: await getDomainConfig() };
 }
@@ -90,9 +110,15 @@ const extraDomainsSchema = z.array(z.string().max(253)).max(64);
 export async function saveExtraDomainsAction(input: unknown): Promise<{ config: DomainConfig }> {
     const user = await requireAdmin();
     const parsed = extraDomainsSchema.safeParse(input);
-    if (!parsed.success) throw new Error((await getTranslations("admin"))("domains.errors.invalidList"));
+    if (!parsed.success)
+        throw new Error((await getTranslations("admin"))("domains.errors.invalidList"));
     await setExtraDomains(parsed.data);
-    await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "domains" });
+    await recordAudit({
+        actorId: user.id,
+        action: "domains.configure",
+        targetType: "setting",
+        targetId: "domains"
+    });
     revalidatePath("/admin/domains");
     return { config: await getDomainConfig() };
 }
@@ -116,7 +142,9 @@ const REMOVAL_ERRORS = {
  * wherever it was set. Admin-only - both change where Polaris answers. Returns the
  * list as it now stands, so a page never has to predict what the removal left.
  */
-export async function removeAddressAction(host: unknown): Promise<{ addresses: CheckedAddress[]; error?: string }> {
+export async function removeAddressAction(
+    host: unknown
+): Promise<{ addresses: CheckedAddress[]; error?: string }> {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
     if (typeof host !== "string" || !host.trim()) {
@@ -124,10 +152,18 @@ export async function removeAddressAction(host: unknown): Promise<{ addresses: C
     }
     const result = await removeAddress(host);
     if (result === "removed") {
-        await recordAudit({ actorId: user.id, action: "domains.remove", targetType: "setting", targetId: host });
+        await recordAudit({
+            actorId: user.id,
+            action: "domains.remove",
+            targetType: "setting",
+            targetId: host
+        });
         revalidatePath("/admin/domains");
     }
-    return { addresses: await checkedAddresses(), error: result === "removed" ? undefined : t(REMOVAL_ERRORS[result]) };
+    return {
+        addresses: await checkedAddresses(),
+        error: result === "removed" ? undefined : t(REMOVAL_ERRORS[result])
+    };
 }
 
 /**
@@ -139,7 +175,9 @@ export async function removeAddressAction(host: unknown): Promise<{ addresses: C
  * and have Polaris ask Let's Encrypt to certify hostnames under them. Whoever runs
  * the instance decides that, and nobody else can.
  */
-export async function saveOwnerDomainPolicyAction(input: unknown): Promise<{ policy?: OwnerDomainPolicy; error?: string }> {
+export async function saveOwnerDomainPolicyAction(
+    input: unknown
+): Promise<{ policy?: OwnerDomainPolicy; error?: string }> {
     const user = await requireAdmin();
     try {
         const policy = await setOwnerDomainPolicy(input);
@@ -153,7 +191,10 @@ export async function saveOwnerDomainPolicyAction(input: unknown): Promise<{ pol
         return { policy };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : (await getTranslations("admin"))("domains.errors.couldNotSave")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("admin"))("domains.errors.couldNotSave")
         };
     }
 }
@@ -198,7 +239,10 @@ export async function savePortPolicyAction(
         }
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : (await getTranslations("admin"))("domains.errors.couldNotSave")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("admin"))("domains.errors.couldNotSave")
         };
     }
     await recordAudit({
@@ -247,12 +291,20 @@ const networkSchema = z.object({
     wildcardDomain: z.string().max(253).optional()
 });
 
-export async function saveNetworkConfigAction(input: z.input<typeof networkSchema>): Promise<NetworkStatus> {
+export async function saveNetworkConfigAction(
+    input: z.input<typeof networkSchema>
+): Promise<NetworkStatus> {
     const user = await requireAdmin();
     const parsed = networkSchema.safeParse(input);
-    if (!parsed.success) throw new Error((await getTranslations("admin"))("domains.errors.invalidNetwork"));
+    if (!parsed.success)
+        throw new Error((await getTranslations("admin"))("domains.errors.invalidNetwork"));
     await setNetworkConfig(parsed.data);
-    await recordAudit({ actorId: user.id, action: "network.configure", targetType: "setting", targetId: "network" });
+    await recordAudit({
+        actorId: user.id,
+        action: "network.configure",
+        targetType: "setting",
+        targetId: "network"
+    });
     revalidatePath("/admin/domains");
     return getNetworkStatus();
 }
@@ -292,7 +344,9 @@ const EDGE_RESTART_DELAY_MS = 1_500;
 function restartEdgeAfterAnswer(): void {
     after(async () => {
         await new Promise((resolve) => setTimeout(resolve, EDGE_RESTART_DELAY_MS));
-        await restartEdge().catch((error) => console.error("polaris: could not restart the edge:", error));
+        await restartEdge().catch((error) =>
+            console.error("polaris: could not restart the edge:", error)
+        );
     });
 }
 
@@ -319,7 +373,12 @@ export async function saveAcmeEmailAction(
         console.error("polaris: could not save the certificate contact:", error);
         return { error: t("domains.acme.errors.saveFailed") };
     }
-    await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "edge.acmeEmail" });
+    await recordAudit({
+        actorId: user.id,
+        action: "domains.configure",
+        targetType: "setting",
+        targetId: "edge.acmeEmail"
+    });
     const status = await acmeContactStatus();
     const restarting = status.canRestart && status.edge === "pending";
     if (restarting) restartEdgeAfterAnswer();
@@ -331,7 +390,22 @@ export async function restartEdgeAction(): Promise<{ restarting: boolean }> {
     const user = await requireAdmin();
     const status = await acmeContactStatus();
     if (!status.canRestart) return { restarting: false };
-    await recordAudit({ actorId: user.id, action: "domains.restartEdge", targetType: "setting", targetId: "edge.acmeEmail" });
+    await recordAudit({
+        actorId: user.id,
+        action: "domains.restartEdge",
+        targetType: "setting",
+        targetId: "edge.acmeEmail"
+    });
     restartEdgeAfterAnswer();
     return { restarting: true };
+}
+
+/**
+ * Check the public address now instead of on the next pass. Through the scheduler,
+ * so a pass already running is not doubled; the card reads what it found.
+ */
+export async function checkPublicAddressAction(): Promise<AddressFollowView> {
+    await requireAdmin();
+    await runScheduledJob("public-ip-follow");
+    return addressFollowView();
 }
