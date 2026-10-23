@@ -20,7 +20,9 @@ import {
     STREAMDECK_TAG_PREFIX
 } from "@polaris/ui/account-downloads/app-releases";
 import { initialsInk, tintFor } from "@polaris/core";
-import { appPreview } from "@/lib/apps/app-screenshots";
+import { appPreview, builtInScenes } from "@/lib/apps/app-screenshots";
+import { builtInApps } from "@/lib/apps/marketplace-store";
+import { appReplaces } from "@/lib/apps/replaces";
 import { appProvenance } from "@/lib/apps/provenance";
 import { catalogApps, isOffered } from "@/lib/apps/catalog";
 import {
@@ -89,6 +91,42 @@ function localize(sections: site.ShowcaseSection[], locale: "en" | "es"): site.S
             light: item.light ? swap(item.light) : null
         }))
     }));
+}
+
+
+/**
+ * The apps every Polaris comes with, named and described in the dashboard's own
+ * words, with what each replaces and the README captures that show it.
+ */
+function builtIn(webLocale: string, showcase: site.ShowcaseSection[]): site.BuiltInSiteApp[] {
+    const nav = JSON.parse(read(join(web, "messages", webLocale, "nav.json")));
+    const items = showcase.flatMap((section) => section.items);
+    return builtInApps().map((app) => ({
+        id: app.id,
+        name: nav.labels?.[app.label] ?? app.label,
+        description: nav.apps?.[app.id]?.description ?? app.description,
+        replaces: appReplaces(app.id)
+            .filter((item) => logos.has(`${item.logo}.svg`))
+            .map((item) => ({ name: item.name, logo: item.logo })),
+        shots: builtInScenes(app.id).flatMap((scene) =>
+            items.filter((item) => new RegExp(`^${scene}-dark-[a-z]{2}-`).test(item.dark)).slice(0, 1)
+        )
+    }));
+}
+
+/** The dashboard's marketplace words the built-in row and an app's page use. */
+function builtInWords(webLocale: string): site.BuiltInWords {
+    const all = JSON.parse(read(join(web, "messages", webLocale, "marketplace.json")));
+    return {
+        title: all.polaris.builtIn,
+        open: all.card.open,
+        replaces: all.detail.replaces,
+        back: all.detail.back,
+        screenshots: all.detail.screenshots,
+        about: all.detail.about,
+        needsNothing: all.detail.needsNothing,
+        by: all.card.by
+    };
 }
 
 const readmeEn = read(join(root, "README.md"));
@@ -221,20 +259,27 @@ async function guides(spanish: boolean): Promise<docs.DocPage[]> {
 }
 const [docsEn, docsEs] = await Promise.all([guides(false), guides(true)]);
 
+const showcaseEn = localize(site.parseShowcase(readmeEn), "en");
+const showcaseEsLocal = localize(showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn), "es");
+
 const data: site.SiteData = {
     repo,
     install: site.parseInstallLines(readmeEn),
     locales: {
         en: {
             apps: site.siteApps(catalog, "en", words("en-US")),
+            builtIn: builtIn("en-US", showcaseEn),
+            builtInWords: builtInWords("en-US"),
             replaces: replacesEn,
-            showcase: localize(site.parseShowcase(readmeEn), "en")
+            showcase: showcaseEn
         },
         es: {
             apps: site.siteApps(catalog, "es", words("es-ES")),
             // The English table stands in if the Spanish README ever loses its own.
             replaces: replacesEs.length ? replacesEs : replacesEn,
-            showcase: localize(showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn), "es")
+            showcase: showcaseEsLocal,
+            builtIn: builtIn("es-ES", showcaseEsLocal),
+            builtInWords: builtInWords("es-ES")
         }
     },
     docs: { en: docsEn, es: docsEs },

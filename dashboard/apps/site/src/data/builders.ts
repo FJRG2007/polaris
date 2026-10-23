@@ -358,8 +358,35 @@ export function apiOperations(doc: Json): { tag: string; operations: ApiOperatio
 /* The whole document                                                          */
 /* -------------------------------------------------------------------------- */
 
+/** One app every Polaris comes with, as its row and its own page show it. */
+export interface BuiltInSiteApp {
+    readonly id: string;
+    readonly name: string;
+    readonly description: string;
+    /** The products it replaces; `logo` names a tile in `public/logos`. */
+    readonly replaces: readonly { readonly name: string; readonly logo: string }[];
+    /** Its README captures; none for an app nobody has captured yet. */
+    readonly shots: readonly ShowcaseItem[];
+}
+
+/** The dashboard's own words for the built-in row and an app's page. */
+export interface BuiltInWords {
+    readonly title: string;
+    readonly open: string;
+    readonly replaces: string;
+    readonly back: string;
+    readonly screenshots: string;
+    readonly about: string;
+    readonly needsNothing: string;
+    /** "By {developer}". */
+    readonly by: string;
+}
+
 export interface LocaleData {
     readonly apps: readonly SiteApp[];
+    /** The apps every Polaris comes with, in the dashboard's order. */
+    readonly builtIn: readonly BuiltInSiteApp[];
+    readonly builtInWords: BuiltInWords;
     readonly replaces: readonly ReplacesRow[];
     readonly showcase: readonly ShowcaseSection[];
 }

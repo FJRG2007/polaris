@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isLocale, words, pageMetadata } from "@/lib/site";
+import { href, isLocale, words, pageMetadata } from "@/lib/site";
 import { siteData } from "@/lib/site";
 import { MarketplaceGrid } from "@/views/marketplace-grid";
 
@@ -28,7 +28,13 @@ export default async function Page({ params }: Props) {
                 </h1>
                 <p className="text-muted-foreground">{words(locale).market.intro}</p>
             </div>
-            <MarketplaceGrid apps={siteData().locales[locale].apps} t={words(locale).market} />
+            <MarketplaceGrid
+                apps={siteData().locales[locale].apps}
+                builtIn={siteData().locales[locale].builtIn}
+                builtInWords={siteData().locales[locale].builtInWords}
+                pages={href(locale, "marketplace/")}
+                t={words(locale).market}
+            />
         </>
     );
 }
