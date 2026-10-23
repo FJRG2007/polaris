@@ -426,8 +426,11 @@ export function AppLogo({
     fallback?: ReactNode;
 }) {
     // `useId` returns characters (colons, guillemets) that a `url(#...)`
-    // reference does not resolve reliably; keep the letters and digits.
-    const uid = `al${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+    // reference does not resolve reliably; keep the letters and digits. The app
+    // is part of the id too: a page rendered as several separate trees (the
+    // public site's marketplace) hands every tree the same `useId`, and every
+    // logo then painted the first one's gradient.
+    const uid = `al${appId.replace(/[^a-zA-Z0-9]/g, "")}${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
     const logo = hasAppLogo(appId) ? LOGOS[appId]! : null;
     if (!logo) return <>{fallback}</>;
     const [light, mid, deep] = logo.palette;

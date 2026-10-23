@@ -64,6 +64,21 @@ describe("app logos", () => {
         for (const ref of refs) expect(ids).toContain(ref);
     });
 
+    it("keeps two apps' gradients apart when each is rendered as its own tree", () => {
+        // Separate trees hand out the same useId; the public site renders its
+        // marketplace that way, and every logo there showed the first gradient.
+        const ids = (id: string) =>
+            [
+                ...renderToStaticMarkup(createElement(AppLogo, { appId: id })).matchAll(
+                    /id="([^"]+)"/g
+                )
+            ].map((match) => match[1]);
+        const mail = ids("mail");
+        const tasks = ids("tasks");
+        expect(mail.length).toBeGreaterThan(0);
+        expect(mail.filter((id) => tasks.includes(id))).toEqual([]);
+    });
+
     it("gives every app a colour of its own", () => {
         const middles = APP_LOGO_IDS.map((id) => appLogoPalette(id)![1]);
         expect(new Set(middles).size).toBe(middles.length);
