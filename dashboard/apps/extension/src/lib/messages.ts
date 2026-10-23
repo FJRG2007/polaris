@@ -363,8 +363,9 @@ export type Request =
      * changes a few times a year.
      */
     | { readonly kind: "updateStatus" }
-    /** Shut this extension out of the current site, or let it back in. */
-    | { readonly kind: "setBlocked"; readonly blocked: boolean }
+    /** Shut this extension out of the current site, or let it back in. `host`
+     *  names a site from the settings list instead of the tab in front. */
+    | { readonly kind: "setBlocked"; readonly blocked: boolean; readonly host?: string }
     /**
      * Start offering Polaris inside the page in front of somebody.
      *

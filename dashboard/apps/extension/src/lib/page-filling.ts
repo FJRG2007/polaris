@@ -5,7 +5,8 @@
  * Two keys in the browser's local area, read here straight from it rather than
  * through WXT's storage items so the settings screen, which a test draws with no
  * WXT, can use them too. The worker defines items under the same names; the
- * names are the contract.
+ * names are the contract. The blocked list is only ever written by the worker
+ * (`setBlocked`), so a change from a page and one from here cannot cross.
  *
  * Off means the inline script is not registered anywhere: no mark under a login
  * box, no generator on a sign-up form, no offer to save. The popup and the fill
@@ -56,12 +57,4 @@ export async function readPageFilling(api: unknown): Promise<PageFilling> {
 
 export async function savePageFilling(api: unknown, on: boolean): Promise<void> {
     await localArea(api)?.set({ [nameOf(PAGE_FILLING_KEY)]: on });
-}
-
-/** Let one site back in. Returns the list as it now stands. */
-export async function unblockHost(api: unknown, host: string): Promise<string[]> {
-    const { blocked } = await readPageFilling(api);
-    const left = blocked.filter((entry) => entry !== host);
-    await localArea(api)?.set({ [nameOf(BLOCKED_HOSTS_KEY)]: left });
-    return left;
 }

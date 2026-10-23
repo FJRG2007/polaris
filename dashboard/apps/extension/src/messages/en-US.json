@@ -198,7 +198,9 @@
             "notHereHint": "Stop drawing anything inside this site's pages",
             "showHereHint": "Show the fill mark, the generator and the save offer on this site",
             "notHere": "Not here",
-            "showHere": "Show it here"
+            "showHere": "Show it here",
+            "pagesOff": "Filling inside pages is off.",
+            "openSettings": "Settings"
         },
         "clipboard": {
             "refused": "The browser refused the clipboard. Try again.",

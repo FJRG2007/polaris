@@ -11,8 +11,7 @@ import {
     PAGE_FILLING_KEY,
     readPageFilling,
     readPageFillingValues,
-    savePageFilling,
-    unblockHost
+    savePageFilling
 } from "../src/lib/page-filling";
 import {
     PageFillingSheet,
@@ -113,8 +112,10 @@ describe("filling inside web pages", () => {
             }
         };
         await savePageFilling(api, false);
-        expect(await unblockHost(api, "a.example")).toEqual(["b.example"]);
-        expect(await readPageFilling(api)).toEqual({ on: false, blocked: ["b.example"] });
+        expect(await readPageFilling(api)).toEqual({
+            on: false,
+            blocked: ["a.example", "b.example"]
+        });
         expect(PAGE_FILLING_KEY).toBe("local:inline.enabled");
         expect(BLOCKED_HOSTS_KEY).toBe("local:blocked.hosts");
     });

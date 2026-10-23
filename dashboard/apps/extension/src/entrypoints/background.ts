@@ -3665,7 +3665,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "setBlocked": {
-                const { host } = await blockedHere();
+                const host =
+                    typeof request.host === "string" && request.host !== ""
+                        ? request.host
+                        : (await blockedHere()).host;
                 if (!host) return { ok: false, error: await say("errors.noSiteToSwitch") };
                 const held = await BLOCKED.getValue();
                 const without = held.filter((entry) => entry !== host);

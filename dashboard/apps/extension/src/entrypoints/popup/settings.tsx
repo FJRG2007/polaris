@@ -394,9 +394,12 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
         if (!pages) return;
         const before = pages;
         setPages({ ...pages, blocked: pages.blocked.filter((entry) => entry !== host) });
-        void filling
-            .unblockHost(browser, host)
-            .then((left) => setPages((now) => (now ? { ...now, blocked: left } : now)))
+        void askBackground({ kind: "setBlocked", blocked: false, host })
+            .then((reply) => {
+                if (!reply.ok) throw new Error(reply.error);
+                return filling.readPageFilling(browser);
+            })
+            .then((now) => setPages((held) => (held ? { ...held, blocked: now.blocked } : held)))
             .catch(() => setPages(before));
     };
 
