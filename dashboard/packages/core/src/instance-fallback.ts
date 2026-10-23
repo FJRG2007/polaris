@@ -54,7 +54,6 @@ export interface InstanceRecord {
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 const KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const SIGNATURE_PATTERN = /^[A-Za-z0-9_-]{86}$/;
-const NONCE_PATTERN = /^[A-Za-z0-9_-]{22,128}$/;
 const MAX_ADDRESSES = 16;
 
 /** An `http(s)` origin with no path, or null. */
@@ -97,7 +96,7 @@ export function challengeMessage(id: string, origin: string, nonce: string): str
     return `${SIGNATURE_CONTEXT}\n${id}\n${origin}\n${nonce}`;
 }
 
-function fromBase64Url(value: string): Uint8Array {
+function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
     const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
     const binary = atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4));
     const bytes = new Uint8Array(binary.length);
@@ -127,7 +126,7 @@ export async function verifyChallenge(
     try {
         const key = await globalThis.crypto.subtle.importKey(
             "raw",
-            fromBase64Url(record.publicKey) as BufferSource,
+            fromBase64Url(record.publicKey),
             { name: "Ed25519" },
             false,
             ["verify"]
@@ -136,8 +135,8 @@ export async function verifyChallenge(
         return await globalThis.crypto.subtle.verify(
             { name: "Ed25519" },
             key,
-            fromBase64Url(signature) as BufferSource,
-            message as BufferSource
+            fromBase64Url(signature),
+            message
         );
     } catch {
         return false;
@@ -202,7 +201,7 @@ export async function learnInstance(
         const response = await timedFetch(
             fetchImpl,
             `${primary}${INSTANCE_PATH}`,
-            { credentials: "omit", cache: "no-store", headers: { accept: "application/json" } },
+            { credentials: "omit", headers: { accept: "application/json" } },
             timeoutMs
         );
         if (!response.ok) return null;
@@ -237,7 +236,6 @@ export async function verifyAlternate(
             {
                 method: "POST",
                 credentials: "omit",
-                cache: "no-store",
                 headers: { "content-type": "application/json", accept: "application/json" },
                 body: JSON.stringify({ nonce })
             },
@@ -402,7 +400,7 @@ export function createFailover(options: FailoverOptions): Failover {
                 const response = await timedFetch(
                     fetchImpl,
                     `${origin}${INSTANCE_PATH}`,
-                    { credentials: "omit", cache: "no-store" },
+                    { credentials: "omit" },
                     timeoutMs
                 );
                 if (isGatewayFailure(response.status)) continue;
