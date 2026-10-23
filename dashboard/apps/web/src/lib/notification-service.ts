@@ -180,6 +180,154 @@ export async function createNotification(input: NotificationInput): Promise<void
     }
 }
 
+/** What raising a condition came to: a new notice, the open one rewritten, or nothing. */
+export type ConditionOutcome = "created" | "updated" | "failed";
+
+/** The text a condition's notice is rewritten with. */
+type ConditionText = Pick<
+    NotificationInput,
+    "title" | "body" | "href" | "level" | "actionRequired" | "metadata"
+>;
+
+function conditionText(input: ConditionText): Record<string, unknown> {
+    return {
+        title: input.title,
+        body: input.body ?? null,
+        ...(input.href !== undefined ? { href: input.href } : {}),
+        level: input.level ?? "info",
+        actionRequired: input.actionRequired ?? false,
+        metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+        updatedAt: new Date()
+    };
+}
+
+/** Prisma's unique-constraint violation: somebody else wrote the row first. */
+function isUniqueViolation(caught: unknown): boolean {
+    return (
+        typeof caught === "object" &&
+        caught !== null &&
+        (caught as { code?: unknown }).code === "P2002"
+    );
+}
+
+/**
+ * Raise an ongoing condition for one reader: a new notice the first time, and
+ * the same notice rewritten in place on every later call while the condition
+ * holds - no new row, and the read state is left as the reader left it, so a
+ * checker running every ten minutes is one line on the bell, not one an hour.
+ * `resurface` puts a rewritten notice back to unread, for when the condition
+ * got worse (a second address failing) rather than merely still holding.
+ *
+ * Safe under concurrent callers: the key is unique per reader, so of two raises
+ * racing to create, one creates and the other finds that row and updates it.
+ */
+export async function raiseCondition(
+    conditionKey: string,
+    input: NotificationInput,
+    options: { resurface?: boolean } = {}
+): Promise<ConditionOutcome> {
+    const rewrite = async (): Promise<boolean> => {
+        const done = await prisma.notification.updateMany({
+            where: { userId: input.userId, conditionKey },
+            data: { ...conditionText(input), ...(options.resurface ? { readAt: null } : {}) }
+        });
+        return done.count > 0;
+    };
+    try {
+        if (await rewrite()) return "updated";
+        try {
+            await prisma.notification.create({
+                data: {
+                    userId: input.userId,
+                    type: input.type,
+                    title: input.title,
+                    body: input.body ?? null,
+                    href: input.href ?? null,
+                    level: input.level ?? "info",
+                    audience: input.audience ?? "you",
+                    audienceLabel: input.audienceLabel ?? null,
+                    actionRequired: input.actionRequired ?? false,
+                    metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+                    shelf: input.shelf ?? null,
+                    conditionKey,
+                    readAt: input.read ? new Date() : null
+                }
+            });
+            return "created";
+        } catch (caught) {
+            if (isUniqueViolation(caught) && (await rewrite())) return "updated";
+            throw caught;
+        }
+    } catch {
+        // Like createNotification: an alert failing never breaks the checker.
+        return "failed";
+    }
+}
+
+/**
+ * End a condition: its open notice is marked read and no longer waiting on
+ * anybody, and loses its key, so the next time the condition starts it is a new
+ * notice. `recovery` rewrites the text ("answers again") instead of adding a
+ * second row for the good news. `userIds` narrows it to those readers; left
+ * out, the condition ends for everyone it was raised for (an instance-wide one).
+ * Returns how many notices it closed.
+ */
+export async function resolveCondition(
+    conditionKey: string,
+    options: { userIds?: readonly string[]; recovery?: ConditionText } = {}
+): Promise<number> {
+    try {
+        const done = await prisma.notification.updateMany({
+            where: {
+                conditionKey,
+                ...(options.userIds ? { userId: { in: [...options.userIds] } } : {})
+            },
+            data: {
+                ...(options.recovery ? conditionText(options.recovery) : { updatedAt: new Date() }),
+                conditionKey: null,
+                readAt: new Date(),
+                actionRequired: false
+            }
+        });
+        return done.count;
+    } catch {
+        return 0;
+    }
+}
+
+/** An open condition as a checker reads it back. */
+export interface OpenCondition {
+    conditionKey: string;
+    type: string;
+    metadata: Record<string, unknown>;
+}
+
+/** The conditions still open for one reader under a key prefix, for a checker
+ *  that has to tell which of its conditions a recovery ends. */
+export async function openConditions(userId: string, prefix: string): Promise<OpenCondition[]> {
+    let rows: Array<{ conditionKey: string | null; type: string; metadata: string | null }>;
+    try {
+        rows = await prisma.notification.findMany({
+            where: { userId, conditionKey: { startsWith: prefix } },
+            select: { conditionKey: true, type: true, metadata: true },
+            take: 500
+        });
+    } catch {
+        return [];
+    }
+    return rows.flatMap((row) => {
+        if (!row.conditionKey) return [];
+        let metadata: Record<string, unknown> = {};
+        try {
+            const parsed: unknown = row.metadata ? JSON.parse(row.metadata) : null;
+            if (parsed && typeof parsed === "object") metadata = parsed as Record<string, unknown>;
+        } catch {
+            // Unreadable metadata names no members; the notice is still open.
+        }
+        return [{ conditionKey: row.conditionKey, type: row.type, metadata }];
+    });
+}
+
 /** How many notifications the live feed carries. The bell and the page share it,
  *  so there is a single list to keep in sync rather than two. */
 export const NOTIFICATION_FEED_LIMIT = 50;
@@ -214,7 +362,8 @@ export async function listNotifications(
  * and the count move), a row deleted (the count moves), or a row marked read,
  * which is always stamped with the time it happened - including the clearing
  * of "Action needed", which sets `readAt` alongside it - so the latest
- * `readAt` moves. Nothing edits a row's text in place. What this cannot see is
+ * `readAt` moves. A condition rewriting its notice in place stamps `updatedAt`,
+ * which is read here too. What this cannot see is
  * a name changing on the person an alert is about; the stream re-reads the list
  * on a slower clock for that.
  */
@@ -222,12 +371,13 @@ export async function notificationFeedVersion(userId: string, shelf: string): Pr
     const probe = await prisma.notification.aggregate({
         where: { userId, ...shelfFilter(shelf) },
         _count: { _all: true },
-        _max: { createdAt: true, readAt: true }
+        _max: { createdAt: true, readAt: true, updatedAt: true }
     });
     return [
         probe._count._all,
         probe._max.createdAt?.getTime() ?? 0,
-        probe._max.readAt?.getTime() ?? 0
+        probe._max.readAt?.getTime() ?? 0,
+        probe._max.updatedAt?.getTime() ?? 0
     ].join(":");
 }
 

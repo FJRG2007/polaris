@@ -3844,8 +3844,17 @@ model Notification {
     // No foreign key, like AuditLog.orgId: a row about an organization that is
     // gone simply stops matching any shelf anybody can open.
     shelf          String?
+    // The ongoing condition this notice is about ("domain.address-stale", a
+    // service's id...), set only while the condition holds. A checker that runs
+    // every few minutes updates this row in place instead of writing another,
+    // and clears the key when the condition ends, so the next occurrence is a
+    // new notice. Null for an alert about a one-off event.
+    conditionKey   String?
     readAt         DateTime?
     createdAt      DateTime  @default(now())
+    // Last time an open condition rewrote the text in place. Null for a row that
+    // was never edited after it was written.
+    updatedAt      DateTime?
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -3858,6 +3867,10 @@ model Notification {
     // The friend-request sweep walks the open requests' alerts by kind, a page
     // at a time, to drop the ones whose request has ended.
     @@index([type, actionRequired, id])
+    // One open notice per condition per reader; NULLs never collide, so
+    // resolved and one-off rows are unaffected. Also what makes two checkers
+    // raising the same condition at once end in one row.
+    @@unique([userId, conditionKey])
 }
 
 // Somewhere an alert can be sent besides the bell and the account's mailbox: a

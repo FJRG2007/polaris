@@ -9,6 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { conditionStore } from "../notifications/fixtures/condition-store";
 
 const OLD = "52.10.0.1";
 const NEW = "52.10.0.2";
@@ -28,12 +29,27 @@ const remove = vi.fn(async () => undefined);
 const find = vi.fn(async (_t: string, _z: string, _type: string, name: string) =>
     (records.get(name) ?? []).map((record) => ({ ...record }))
 );
-const notify = vi.fn(async (_input: { type: string; body?: string }) => undefined);
+// The real notification service over an in-memory table, so "told once" is
+// asserted on the rows the bell would show rather than on calls.
+const bell = vi.hoisted(() => ({
+    store: null as ReturnType<
+        typeof import("../notifications/fixtures/condition-store").conditionStore
+    > | null
+}));
+const rows = () => bell.store!.rows;
+const ofType = (type: string) => rows().filter((row) => row.type === type);
 const emit = vi.fn(async () => "event-1");
 const publicA = vi.fn<(name: string) => Promise<string[]>>(async () => [NEW]);
 
 vi.mock("@polaris/db", () => ({
-    prisma: { user: { findMany: async () => [{ id: "admin-1" }] } }
+    prisma: {
+        user: { findMany: async () => [{ id: "admin-1" }] },
+        notification: {
+            updateMany: (args: never) => bell.store!.notification.updateMany(args),
+            create: (args: never) => bell.store!.notification.create(args),
+            findMany: (args: never) => bell.store!.notification.findMany(args)
+        }
+    }
 }));
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async (key: string) => settings.get(key) ?? null,
@@ -69,7 +85,7 @@ vi.mock("@/lib/integrations/cloudflare-api", () => ({
     deleteDnsRecord: remove,
     resolveZoneForHostname: async () => ({ id: "zone-1", name: "example.com" })
 }));
-vi.mock("@/lib/notification-service", () => ({ createNotification: notify }));
+vi.mock("@/lib/shelf", () => ({ shelfFilter: () => ({}) }));
 vi.mock("@/lib/automations/outbox", () => ({ emitAutomationEvent: emit }));
 vi.mock("@/lib/notifications/notice-words", () => ({
     wordsFor: async () => (key: string) => key
@@ -97,6 +113,7 @@ function staleZone(): void {
 
 beforeEach(() => {
     settings.clear();
+    bell.store = conditionStore();
     vi.clearAllMocks();
     repoint.mockImplementation(editRecord);
     probe.mockResolvedValue(NEW);
@@ -203,20 +220,19 @@ describe("a run", () => {
     it("is idempotent: a second run writes nothing and says nothing", async () => {
         await syncZoneAddress();
         repoint.mockClear();
-        notify.mockClear();
+        const before = JSON.stringify(rows());
         const second = await syncZoneAddress();
         expect(second.repointed).toEqual([]);
         expect(repoint).not.toHaveBeenCalled();
         expect(remove).not.toHaveBeenCalled();
-        expect(notify).not.toHaveBeenCalled();
+        expect(JSON.stringify(rows())).toBe(before);
     });
 
     it("announces a change once, with the event automations listen for", async () => {
         settings.set(PUBLISHED_KEY, OLD);
         settings.set("network.dnsFollowLastIp", OLD);
         await syncZoneAddress();
-        expect(notify).toHaveBeenCalledTimes(1);
-        expect(notify.mock.calls[0][0].type).toBe("domain.address-changed");
+        expect(rows().map((row) => row.type)).toEqual(["domain.address-changed"]);
         expect(emit).toHaveBeenCalledWith(
             "core.event",
             expect.objectContaining({
@@ -230,20 +246,104 @@ describe("a run", () => {
         for (const list of records.values())
             for (const entry of list) if (entry.content === OLD) entry.content = NEW;
         await syncZoneAddress();
-        expect(notify.mock.calls.map((call) => call[0].type)).toEqual(["domain.address-moved"]);
+        expect(rows().map((row) => row.type)).toEqual(["domain.address-moved"]);
     });
 
-    it("notifies a failure once per streak, not once per run", async () => {
+    it("keeps one notice for a failure however many runs it lasts", async () => {
         settings.set(PUBLISHED_KEY, OLD);
         repoint.mockRejectedValue(new Error("Authentication error"));
         await syncZoneAddress();
         await syncZoneAddress();
         await syncZoneAddress();
-        const failures = notify.mock.calls.filter(
-            (call) => call[0].type === "domain.address-stale"
-        );
-        expect(failures).toHaveLength(1);
+        expect(ofType("domain.address-stale")).toHaveLength(1);
+        expect(ofType("domain.address-stale")[0]).toMatchObject({
+            conditionKey: "domain.address-stale",
+            readAt: null
+        });
         expect(settings.get(PUBLISHED_KEY)).toBe(OLD);
+    });
+
+    it("keeps one notice for a record it did not write, run after run", async () => {
+        settings.set(PUBLISHED_KEY, NEW);
+        records.set("plr.example.com", [record("c", ELSEWHERE)]);
+        for (let run = 0; run < 6; run++) await syncZoneAddress();
+        expect(ofType("domain.address-stale")).toHaveLength(1);
+        expect(ofType("domain.address-stale")[0]).toMatchObject({ body: "domainAddress.conflict" });
+    });
+
+    it("closes the failure notice with the fix instead of adding a second one", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        repoint.mockRejectedValue(new Error("Authentication error"));
+        await syncZoneAddress();
+        await syncZoneAddress();
+        repoint.mockImplementation(editRecord);
+        await syncZoneAddress();
+        expect(rows()).toHaveLength(1);
+        expect(rows()[0]).toMatchObject({
+            type: "domain.address-stale",
+            title: "domainAddress.pointsTitle",
+            level: "success",
+            conditionKey: null,
+            actionRequired: false
+        });
+        expect(rows()[0]!.readAt).toBeInstanceOf(Date);
+        // A later failure is news again: a new notice, not the closed one reopened.
+        repoint.mockRejectedValue(new Error("Authentication error"));
+        probe.mockResolvedValue("52.10.0.3");
+        await syncZoneAddress();
+        expect(
+            ofType("domain.address-stale").filter((row) => row.conditionKey !== null)
+        ).toHaveLength(1);
+    });
+
+    it("marks an older stale notice read once the records are right, though it has no key", async () => {
+        bell.store!.rows.push({
+            id: "legacy",
+            userId: "admin-1",
+            type: "domain.address-stale",
+            title: "old",
+            body: null,
+            level: "warning",
+            actionRequired: true,
+            metadata: null,
+            conditionKey: null,
+            readAt: null,
+            updatedAt: null
+        });
+        settings.set(PUBLISHED_KEY, NEW);
+        settings.set("network.dnsFollowFailing", "failed:52.10.0.2");
+        for (const list of records.values())
+            for (const entry of list) if (entry.content === OLD) entry.content = NEW;
+        await syncZoneAddress();
+        expect(rows()[0]).toMatchObject({ id: "legacy", actionRequired: false });
+        expect(rows()[0]!.readAt).toBeInstanceOf(Date);
+        expect(settings.has("network.dnsFollowFailing")).toBe(false);
+    });
+
+    it("leaves keyless rows alone once nothing from before conditions is left", async () => {
+        const sweep = vi.spyOn(bell.store!.notification, "updateMany");
+        settings.set(PUBLISHED_KEY, NEW);
+        for (const list of records.values())
+            for (const entry of list) if (entry.content === OLD) entry.content = NEW;
+        await syncZoneAddress();
+        expect(
+            sweep.mock.calls.some(
+                ([args]) => (args as { where: { type?: unknown } }).where.type !== undefined
+            )
+        ).toBe(false);
+    });
+
+    it("puts the open failure back to unread when the problem changes", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        repoint.mockRejectedValue(new Error("Authentication error"));
+        await syncZoneAddress();
+        ofType("domain.address-stale")[0]!.readAt = new Date();
+        await syncZoneAddress();
+        expect(ofType("domain.address-stale")[0]!.readAt).toBeInstanceOf(Date);
+        probe.mockResolvedValue("52.10.0.3");
+        await syncZoneAddress();
+        expect(ofType("domain.address-stale")).toHaveLength(1);
+        expect(ofType("domain.address-stale")[0]!.readAt).toBeNull();
     });
 
     it("tells the operator plainly when there is no token to update with", async () => {
@@ -251,11 +351,9 @@ describe("a run", () => {
         token.mockResolvedValue(null);
         await syncZoneAddress();
         await syncZoneAddress();
-        const failures = notify.mock.calls.filter(
-            (call) => call[0].type === "domain.address-stale"
-        );
+        const failures = ofType("domain.address-stale");
         expect(failures).toHaveLength(1);
-        expect(failures[0][0].body).toBe("domainAddress.noToken");
+        expect(failures[0]!.body).toBe("domainAddress.noToken");
     });
 
     it("checks the outside world after the TTL and says so once if it still sees the old address", async () => {
@@ -263,17 +361,18 @@ describe("a run", () => {
         vi.useFakeTimers({ now: new Date("2026-10-23T10:00:00Z"), toFake: ["Date"] });
         try {
             await syncZoneAddress();
-            expect(
-                notify.mock.calls.some((call) => call[0].type === "domain.address-unreached")
-            ).toBe(false);
+            expect(ofType("domain.address-unreached")).toHaveLength(0);
             vi.setSystemTime(new Date("2026-10-23T10:10:00Z"));
             await syncZoneAddress();
             vi.setSystemTime(new Date("2026-10-23T10:12:00Z"));
             await syncZoneAddress();
-            const unreached = notify.mock.calls.filter(
-                (call) => call[0].type === "domain.address-unreached"
-            );
-            expect(unreached).toHaveLength(1);
+            expect(ofType("domain.address-unreached")).toHaveLength(1);
+            // Seen at last: the same notice closes.
+            publicA.mockResolvedValue([NEW]);
+            vi.setSystemTime(new Date("2026-10-23T10:14:00Z"));
+            await syncZoneAddress();
+            expect(ofType("domain.address-unreached")).toHaveLength(1);
+            expect(ofType("domain.address-unreached")[0]!.conditionKey).toBeNull();
         } finally {
             vi.useRealTimers();
         }
@@ -288,9 +387,7 @@ describe("a run", () => {
             await syncZoneAddress();
             vi.setSystemTime(new Date("2026-10-23T10:30:00Z"));
             await syncZoneAddress();
-            expect(
-                notify.mock.calls.some((call) => call[0].type === "domain.address-unreached")
-            ).toBe(false);
+            expect(ofType("domain.address-unreached")).toHaveLength(0);
             expect(publicA).not.toHaveBeenCalled();
         } finally {
             vi.useRealTimers();

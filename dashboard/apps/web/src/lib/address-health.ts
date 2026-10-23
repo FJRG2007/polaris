@@ -31,6 +31,11 @@ import { publicHostname, syncDashboardRoute } from "@/lib/domain-edge";
 import { checkDomain } from "@/lib/domain-health-probe";
 import { removeDashboardDomain } from "@/lib/domain-service";
 import { notifyOperators } from "@/lib/notifications/operators";
+import { usersWithPermission } from "@polaris/auth";
+import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import { resolveCondition } from "@/lib/notification-service";
+import { raiseGroup, settleGroup, type GroupText } from "@/lib/notifications/condition-groups";
 import { reachableAddresses, type DeploymentAddress } from "@/lib/deployment-addresses";
 import { getPolarisTunnelStatus, stopPolarisTunnel } from "@/lib/polaris-tunnel-service";
 import { hasInternet } from "@/lib/internet-reach";
@@ -44,6 +49,17 @@ function inWords(say: (t: NamespaceTranslator<"notices">) => { title: string; bo
     return { ...say(translatorFor(DEFAULT_LOCALE, "notices")), say };
 }
 import { settleShareTunnel } from "@/lib/public-reach";
+
+/** The open "stopped answering" notices, one per pass that found addresses down. */
+const DOWN_CONDITION = "network.address:";
+/** The open "this box cannot reach the internet" notice. */
+const OFFLINE_CONDITION = "network.address-offline";
+
+/** What one pass found changed, told once at the end of it. */
+interface PassNews {
+    readonly down: Array<{ host: string; url: string; detail: string | null }>;
+    readonly back: Array<{ host: string; url: string; downFor: number | null }>;
+}
 
 /** Who hears about an address going down - the people who can fix one. */
 const ADDRESS_PERMISSION: Permission = "system.manage";
@@ -304,7 +320,10 @@ function spanIn(t: NamespaceTranslator<"notices">, ms: number): string {
  * first. Answers what the probe found, for the pass's verdict on the connection -
  * or null for a tunnel that was dropped, which is no longer an address at all.
  */
-async function sweepAddress(address: DeploymentAddress): Promise<ProbeResult | null> {
+async function sweepAddress(
+    address: DeploymentAddress,
+    news: PassNews
+): Promise<ProbeResult | null> {
     const { state, detail, code, notRouted } = await probe(address);
     const result: ProbeResult = { host: address.host, up: state === "up", detail, code };
     const now = Date.now();
@@ -329,22 +348,10 @@ async function sweepAddress(address: DeploymentAddress): Promise<ProbeResult | n
     if (state === "up") {
         // A first sighting that works is not news; a recovery is.
         if (claim === "changed") {
-            const downFor = changedAt === null ? null : now - changedAt;
-            await notifyOperators({
-                permission: ADDRESS_PERMISSION,
-                event: "network.address",
-                ...inWords((t) => ({
-                    title: t("address.backTitle", { host: address.host }),
-                    body:
-                        downFor === null
-                            ? t("address.backBody", { url: address.url })
-                            : t("address.backBodyAfter", {
-                                  url: address.url,
-                                  duration: spanIn(t, downFor)
-                              })
-                })),
-                href: "/admin/settings",
-                level: "success"
+            news.back.push({
+                host: address.host,
+                url: address.url,
+                downFor: changedAt === null ? null : now - changedAt
             });
         }
         return result;
@@ -370,9 +377,11 @@ async function sweepAddress(address: DeploymentAddress): Promise<ProbeResult | n
     // and somebody is sent to check DNS records on a morning when the router is
     // unplugged.
     if (!(await hasInternet())) {
+        // One notice however many addresses the dead line takes with it.
         await notifyOperators({
             permission: ADDRESS_PERMISSION,
             event: "network.address",
+            condition: OFFLINE_CONDITION,
             ...inWords((t) => ({
                 title: t("address.offlineTitle"),
                 body: t("address.offlineBody", { url: address.url, host: address.host })
@@ -383,19 +392,114 @@ async function sweepAddress(address: DeploymentAddress): Promise<ProbeResult | n
         return result;
     }
 
-    await notifyOperators({
-        permission: ADDRESS_PERMISSION,
-        event: "network.address",
-        ...inWords((t) => ({
-            title: t("address.downTitle", { host: address.host }),
-            body: detail
-                ? t("address.downBodyDetail", { url: address.url, detail })
-                : t("address.downBody", { url: address.url })
-        })),
-        href: "/admin/settings",
-        actionRequired: true
-    });
+    news.down.push({ host: address.host, url: address.url, detail });
     return result;
+}
+
+/** What is said about addresses that stopped answering, one or several. */
+function downText(t: NamespaceTranslator<"notices">, down: PassNews["down"]): GroupText {
+    const one = down.length === 1 ? down[0]! : null;
+    if (one) {
+        return {
+            title: t("address.downTitle", { host: one.host }),
+            body: one.detail
+                ? t("address.downBodyDetail", { url: one.url, detail: one.detail })
+                : t("address.downBody", { url: one.url })
+        };
+    }
+    return {
+        title: t("address.downManyTitle", { count: down.length }),
+        body: t("address.downManyBody", { names: down.map((entry) => entry.host).join(", ") })
+    };
+}
+
+/** What is said about addresses answering again, one or several. */
+function backText(t: NamespaceTranslator<"notices">, back: PassNews["back"]): GroupText {
+    const one = back.length === 1 ? back[0]! : null;
+    if (one) {
+        return {
+            title: t("address.backTitle", { host: one.host }),
+            body:
+                one.downFor === null
+                    ? t("address.backBody", { url: one.url })
+                    : t("address.backBodyAfter", {
+                          url: one.url,
+                          duration: spanIn(t, one.downFor)
+                      }),
+            level: "success"
+        };
+    }
+    return {
+        title: t("address.backManyTitle", { count: back.length }),
+        body: t("address.backManyBody", { names: back.map((entry) => entry.host).join(", ") }),
+        level: "success"
+    };
+}
+
+/** The address a group notice recorded for one of its hosts; the host alone when it recorded none. */
+function urlIn(metadata: Record<string, unknown>, host: string): string {
+    const urls = metadata.urls;
+    const url =
+        urls && typeof urls === "object" ? (urls as Record<string, unknown>)[host] : undefined;
+    return typeof url === "string" ? url : host;
+}
+
+/**
+ * Tell a pass's news once. Everything that stopped answering together is one
+ * notice; everything that came back closes the notice that said it was down,
+ * rewritten as the recovery, and only a recovery nothing announced is a new
+ * notice - one for the whole pass, however many addresses it names.
+ */
+async function tellPass(news: PassNews, anyUp: boolean): Promise<void> {
+    if (news.down.length === 0 && news.back.length === 0 && !anyUp) return;
+    const recipients = await usersWithPermission(ADDRESS_PERMISSION);
+    await Promise.allSettled(
+        recipients.map(async (userId) => {
+            const t = await wordsFor(userId, "notices");
+            if (anyUp) await resolveCondition(OFFLINE_CONDITION, { userIds: [userId] });
+            const base = {
+                userId,
+                event: "network.address",
+                href: "/admin/settings",
+                audience: "admins" as const
+            };
+            if (news.down.length > 0) {
+                await raiseGroup(
+                    DOWN_CONDITION,
+                    news.down.map((entry) => entry.host),
+                    {
+                        ...base,
+                        ...downText(t, news.down),
+                        actionRequired: true,
+                        metadata: {
+                            urls: Object.fromEntries(
+                                news.down.map((entry) => [entry.host, entry.url])
+                            )
+                        }
+                    }
+                );
+            }
+            if (news.back.length === 0) return;
+            const byHost = new Map(news.back.map((entry) => [entry.host, entry]));
+            const left = await settleGroup(
+                userId,
+                DOWN_CONDITION,
+                news.back.map((entry) => entry.host),
+                (hosts) =>
+                    backText(
+                        t,
+                        news.back.filter((entry) => hosts.includes(entry.host))
+                    ),
+                (hosts, metadata) =>
+                    downText(
+                        t,
+                        hosts.map((host) => ({ host, url: urlIn(metadata, host), detail: null }))
+                    )
+            );
+            const unannounced = left.map((host) => byHost.get(host)!).filter(Boolean);
+            if (unannounced.length > 0) await notify({ ...base, ...backText(t, unannounced) });
+        })
+    );
 }
 
 /**
@@ -420,13 +524,18 @@ export async function sweepAddresses(): Promise<PassOutcome | null> {
     const addresses = (await reachableAddresses()).filter(checkable);
     await forgetMissing(addresses.map((address) => address.host));
     const results: ProbeResult[] = [];
+    const news: PassNews = { down: [], back: [] };
     for (const address of addresses) {
-        const result = await sweepAddress(address).catch((error) => {
+        const result = await sweepAddress(address, news).catch((error) => {
             console.error(`polaris: checking ${address.host} failed:`, error);
             return null;
         });
         if (result) results.push(result);
     }
+    await tellPass(
+        news,
+        results.some((result) => result.up)
+    ).catch((error) => console.error("polaris: telling an address sweep's news failed:", error));
     const internet = results.some((result) => result.up)
         ? null
         : await hasInternet().catch(() => null);

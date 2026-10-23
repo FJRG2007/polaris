@@ -22,7 +22,11 @@ import { sendAuthEmail } from "@/lib/auth-mail";
 import { appBaseUrl } from "@/lib/domain-service";
 import { wordsFor } from "./notice-words";
 import { getNotificationPreferences, getQuietHours } from "./preferences";
-import { createNotification, type NotificationAudience } from "@/lib/notification-service";
+import {
+    createNotification,
+    raiseCondition,
+    type NotificationAudience
+} from "@/lib/notification-service";
 import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
 import {
     clearsMinLevel,
@@ -67,6 +71,15 @@ export interface NotifyInput {
      * itself through `emailNotice` and `deliverToDestination`.
      */
     bellOnly?: boolean;
+    /**
+     * The ongoing condition this alert is about, for a checker that runs on a
+     * clock. The first raise is an ordinary alert; while the condition holds,
+     * every later one rewrites that same notice in place and goes nowhere else -
+     * no second row, no mail, no webhook. End it with `resolveCondition`.
+     */
+    condition?: string;
+    /** With `condition`: put a rewritten notice back to unread (it got worse). */
+    resurface?: boolean;
 }
 
 /** What one attempt came to, as the delivery log recorded it. */
@@ -78,10 +91,11 @@ export interface DeliveryOutcome {
 /**
  * What became of the bell row. `read`: written, but already marked read because
  * the page it points at was open; `off`: the account turned this event off;
- * `refused`: the event is not in the catalogue, so nothing was written.
+ * `refused`: the event is not in the catalogue, so nothing was written;
+ * `updated`: a condition already open, whose notice was rewritten in place.
  */
 export interface NotifyReport {
-    inapp: "sent" | "read" | "off" | "refused";
+    inapp: "sent" | "read" | "off" | "refused" | "updated";
     /**
      * The channels of the account's rule the alert was handed to in the
      * background (never with `bellOnly`). Left out when there were none.
@@ -374,7 +388,7 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
         // Test in its editor is looking at the editor, not at the message.
         watching =
             !event.critical && !event.unreadWhenViewing && isViewing(input.userId, input.href);
-        await createNotification({
+        const row = {
             userId: input.userId,
             type: input.event,
             title: input.title,
@@ -387,7 +401,17 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
             metadata: input.metadata,
             shelf: await recipientShelf(input.userId, input.shelf).catch(() => null),
             read: watching
-        });
+        };
+        if (input.condition) {
+            // Still the same condition: the open notice now says the latest, and
+            // that is all. Telling every channel again is the spam this prevents.
+            const outcome = await raiseCondition(input.condition, row, {
+                resurface: input.resurface
+            });
+            if (outcome === "updated") return { inapp: "updated" };
+        } else {
+            await createNotification(row);
+        }
         await record({
             userId: input.userId,
             event: input.event,

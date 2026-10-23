@@ -198,6 +198,10 @@
         "failedBody": "Build {sha}. The updater stopped with exit code {code}; Settings has the log and can report it."
     },
     "address": {
+        "downManyTitle": "{count} addresses are not answering",
+        "downManyBody": "Nothing answered at {names}. Polaris can reach the internet, so this is about those addresses.",
+        "backManyTitle": "{count} addresses answer again",
+        "backManyBody": "{names} are reachable again.",
         "backTitle": "{host} is answering again",
         "backBody": "{url} is reachable again.",
         "tunnelGoneTitle": "The tunnel address is gone",
@@ -232,6 +236,8 @@
         "pointsTitle": "{domain} now points at {to}",
         "changedBody": "This server's public address changed from {from} to {to}, so {count} DNS {count, plural, one {record was} other {records were}} repointed. Nothing else was touched.",
         "setBody": "This server's public address is {to}, so {count} DNS {count, plural, one {record was} other {records were}} repointed.",
+        "fixedTitle": "{domain} points at this server again",
+        "fixedBody": "Every record Polaris looks after names {current} again.",
         "staleTitle": "{domain} does not point at this server",
         "notUpdated": "This server now answers on {current}, but the records could not be updated: {detail}",
         "conflict": "This server now answers on {current}, but {names} points at {contents}. Polaris does not repoint a record it did not write - change it yourself if it should name this server.",
