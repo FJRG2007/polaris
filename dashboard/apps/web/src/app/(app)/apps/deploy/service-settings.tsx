@@ -796,7 +796,7 @@ export function SettingsTab({
     return (
         <SettingsLayout sections={shown} index={SERVICE_SETTINGS_SEARCH}>
             <SettingsSection {...head("source")}>
-                <SourceRepositoryCard app={app} />
+                <SourceRepositoryCard app={app} canConfigure={configure} />
                 <SourceCards {...sourceProps} part="root" />
                 <SourceCards {...sourceProps} part="autoDeploy" />
                 {configure && (

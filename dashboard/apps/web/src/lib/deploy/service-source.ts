@@ -66,7 +66,8 @@ export function describeServiceSource(app: {
             return { kind: "repository", provider: "github", name, url: `https://github.com/${name}`, branch };
         }
         const name = withoutCredentials(repoUrl);
-        const url = /^https?:\/\//i.test(repoUrl) ? `https://${name}` : null;
+        const scheme = /^(https?):\/\//i.exec(repoUrl)?.[1]?.toLowerCase();
+        const url = scheme ? `${scheme}://${name}` : null;
         return { kind: "repository", provider: "git", name, url, branch };
     }
     if (app.sourceType === "image") {

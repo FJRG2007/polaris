@@ -51,6 +51,12 @@ describe("what the stored source says", () => {
         expect(JSON.stringify(source)).not.toContain("secret-token");
     });
 
+    it("links a plain-http repository over http, as stored", () => {
+        expect(read("dockerfile", { repoUrl: "http://git.lan/team/app.git" })).toMatchObject({
+            url: "http://git.lan/team/app"
+        });
+    });
+
     it("tells an upload, an image and no source apart", () => {
         expect(read("nixpacks", {})).toEqual({ kind: "upload", uploaded: false });
         expect(read("image", { imageRef: "nginx:1.27" })).toEqual({ kind: "image", image: "nginx:1.27" });
@@ -66,6 +72,7 @@ describe("the Source card", () => {
                 source={{ kind: "repository", provider: "github", name: "acme/shop", url: "https://github.com/acme/shop", branch: "main" }}
                 rootDirectory="apps/web"
                 autoDeploy={true}
+                canConfigure={true}
             />,
             { wrapper: MessagesWrapper }
         );
@@ -83,6 +90,7 @@ describe("the Source card", () => {
                 source={{ kind: "repository", provider: "git", name: "git.example.test/team/app", url: null, branch: "" }}
                 rootDirectory={null}
                 autoDeploy={false}
+                canConfigure={true}
             />,
             { wrapper: MessagesWrapper }
         );
@@ -93,15 +101,27 @@ describe("the Source card", () => {
     });
 
     it("describes an upload instead of a repository", () => {
-        render(<SourceRepositoryView source={{ kind: "upload", uploaded: true }} rootDirectory={null} autoDeploy={false} />, {
+        render(<SourceRepositoryView source={{ kind: "upload", uploaded: true }} rootDirectory={null} autoDeploy={false} canConfigure={true} />, {
             wrapper: MessagesWrapper
         });
         expect(screen.getByRole("heading", { name: "Uploaded folder" })).toBeDefined();
         expect(screen.getByText("Built from a folder you upload. No repository is connected.")).toBeDefined();
     });
 
+    it("offers the drop zone only to someone who can use it", () => {
+        render(<SourceRepositoryView source={{ kind: "upload", uploaded: false }} rootDirectory={null} autoDeploy={false} canConfigure={true} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(screen.getByText("Nothing uploaded yet. Drop a folder below to deploy it.")).toBeDefined();
+        cleanup();
+        render(<SourceRepositoryView source={{ kind: "upload", uploaded: false }} rootDirectory={null} autoDeploy={false} canConfigure={false} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(screen.getByText("Nothing uploaded yet.")).toBeDefined();
+    });
+
     it("says when nothing is connected yet", () => {
-        render(<SourceRepositoryView source={{ kind: "none" }} rootDirectory={null} autoDeploy={false} />, {
+        render(<SourceRepositoryView source={{ kind: "none" }} rootDirectory={null} autoDeploy={false} canConfigure={true} />, {
             wrapper: MessagesWrapper
         });
         expect(screen.getByText("No repository, upload or image is connected yet.")).toBeDefined();

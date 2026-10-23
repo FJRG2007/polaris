@@ -58,18 +58,6 @@ const PART_ENTRY = {
     networks: "externalNetworks"
 } as const satisfies Record<DeployBehaviourPart, string>;
 
-/** All three cards together, each reading and saving through one shared state. */
-export function DeployBehaviourSection({
-    applicationId,
-    canConfigure
-}: {
-    applicationId: string;
-    canConfigure: boolean;
-}) {
-    const state = useDeployBehaviour(applicationId);
-    return <DeployBehaviourCards state={state} canConfigure={canConfigure} />;
-}
-
 /**
  * What the cards read and write, loaded once. The cards sit in different
  * sections of the tab, and each instance holding a copy would let one card save

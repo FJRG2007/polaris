@@ -34,11 +34,13 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 export function SourceRepositoryView({
     source,
     rootDirectory,
-    autoDeploy
+    autoDeploy,
+    canConfigure
 }: {
     source: ServiceSourceView;
     rootDirectory: string | null;
     autoDeploy: boolean;
+    canConfigure: boolean;
 }) {
     const t = useTranslations("deployService");
 
@@ -101,7 +103,11 @@ export function SourceRepositoryView({
             ? {
                   icon: FolderUp,
                   title: t("sourceCard.upload"),
-                  text: source.uploaded ? t("sourceCard.uploadShort") : t("sourceCard.uploadEmpty")
+                  text: source.uploaded
+                      ? t("sourceCard.uploadShort")
+                      : canConfigure
+                        ? t("sourceCard.uploadEmpty")
+                        : t("sourceCard.uploadEmptyReadOnly")
               }
             : source.kind === "image"
               ? { icon: Box, title: t("sourceCard.image"), text: t("sourceCard.imageShort") }
@@ -123,7 +129,7 @@ export function SourceRepositoryView({
 }
 
 /** The Source card, loaded for one service. */
-export function SourceRepositoryCard({ app }: { app: ProjectApp }) {
+export function SourceRepositoryCard({ app, canConfigure }: { app: ProjectApp; canConfigure: boolean }) {
     const t = useTranslations("deployService");
     const [source, setSource] = useState<ServiceSourceView | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -164,6 +170,7 @@ export function SourceRepositoryCard({ app }: { app: ProjectApp }) {
             source={source}
             rootDirectory={app.rootDirectory}
             autoDeploy={app.autoDeploy}
+            canConfigure={canConfigure}
         />
     );
 }
