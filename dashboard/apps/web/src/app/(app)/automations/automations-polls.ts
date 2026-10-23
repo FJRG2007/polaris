@@ -12,3 +12,29 @@ type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnTy
 
 export const run = (runId: string, signal?: AbortSignal) =>
     readPoll<Answer<typeof actions.getRunAction>>("/api/automations/run", { runId }, signal);
+
+export const hookAddress = (
+    automationId: string,
+    nodeId: string,
+    rotation: Parameters<typeof actions.hookAddressAction>[2],
+    signal?: AbortSignal
+) =>
+    readPoll<Answer<typeof actions.hookAddressAction>>(
+        "/api/automations/hook-address",
+        { automationId, nodeId, rotation: JSON.stringify(rotation) },
+        signal
+    );
+
+export const chatWebhooks = (signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.chatWebhooksAction>>(
+        "/api/automations/chat-webhooks",
+        {},
+        signal
+    );
+
+export const thresholdChoices = (signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.thresholdChoicesAction>>(
+        "/api/automations/threshold-choices",
+        {},
+        signal
+    );

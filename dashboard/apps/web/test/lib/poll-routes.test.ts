@@ -159,7 +159,10 @@ const actions = vi.hoisted(() => {
         "openIssueAction",
         "sessionChoicesAction",
         "sessionChangesAction",
-        "adviseRepoAction"
+        "adviseRepoAction",
+        "hookAddressAction",
+        "chatWebhooksAction",
+        "thresholdChoicesAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -250,7 +253,10 @@ vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
 }));
 vi.mock("@/app/(app)/automations/actions", () => ({
     getRunAction: actions.getRunAction,
-    noticeChannelsAction: actions.noticeChannelsAction
+    noticeChannelsAction: actions.noticeChannelsAction,
+    hookAddressAction: actions.hookAddressAction,
+    chatWebhooksAction: actions.chatWebhooksAction,
+    thresholdChoicesAction: actions.thresholdChoicesAction
 }));
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
     checkUpdatesAction: actions.checkUpdatesAction,
@@ -625,7 +631,11 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/telemetry/issue": () => import("@/app/api/telemetry/issue/route"),
     "/api/agents/sessions/choices": () => import("@/app/api/agents/sessions/choices/route"),
     "/api/agents/sessions/changes": () => import("@/app/api/agents/sessions/changes/route"),
-    "/api/agents/repo-advice": () => import("@/app/api/agents/repo-advice/route")
+    "/api/agents/repo-advice": () => import("@/app/api/agents/repo-advice/route"),
+    "/api/automations/hook-address": () => import("@/app/api/automations/hook-address/route"),
+    "/api/automations/chat-webhooks": () => import("@/app/api/automations/chat-webhooks/route"),
+    "/api/automations/threshold-choices": () =>
+        import("@/app/api/automations/threshold-choices/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2436,6 +2446,42 @@ const CASES: Case[] = [
             ).repoAdvice({ kind: "sample" }),
         action: "adviseRepoAction",
         args: [{ kind: "sample" }]
+    },
+    {
+        name: "the address a webhook trigger answers on",
+        path: "/api/automations/hook-address",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/automations/automations-polls")>(
+                    "@/app/(app)/automations/automations-polls"
+                )
+            ).hookAddress("automationId-1", "nodeId-1", { kind: "sample" }),
+        action: "hookAddressAction",
+        args: ["automationId-1", "nodeId-1", { kind: "sample" }]
+    },
+    {
+        name: "the channel webhooks a chat step can post through",
+        path: "/api/automations/chat-webhooks",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/automations/automations-polls")>(
+                    "@/app/(app)/automations/automations-polls"
+                )
+            ).chatWebhooks(),
+        action: "chatWebhooksAction",
+        args: []
+    },
+    {
+        name: "what a threshold trigger can watch",
+        path: "/api/automations/threshold-choices",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/automations/automations-polls")>(
+                    "@/app/(app)/automations/automations-polls"
+                )
+            ).thresholdChoices(),
+        action: "thresholdChoicesAction",
+        args: []
     }
 ];
 

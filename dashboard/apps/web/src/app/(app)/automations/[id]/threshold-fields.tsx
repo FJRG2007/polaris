@@ -11,13 +11,14 @@ import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Input, Select, Switch, type SelectOption } from "@polaris/ui";
-import { thresholdChoicesAction, type ThresholdKindChoice } from "../actions";
+import { type ThresholdKindChoice } from "../actions";
 import {
     numberFromInput,
     sourceKey,
     thresholdFieldStates,
     type FieldState
 } from "@/lib/automations/threshold-form";
+import * as polls from "../automations-polls";
 
 type Config = Record<string, any>;
 
@@ -73,7 +74,7 @@ export function ThresholdFields({
     );
     useEffect(() => {
         let cancelled = false;
-        void thresholdChoicesAction().then((answer) => {
+        void polls.thresholdChoices().then((answer) => {
             if (cancelled) return;
             if (answer.ok) setKinds(answer.kinds);
             else setError(answer.error);

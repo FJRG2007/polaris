@@ -331,7 +331,14 @@ vi.mock("@/app/(app)/apps/mail-server/mail-server-polls", () => ({
 }));
 
 vi.mock("@/app/(app)/automations/automations-polls", () => ({
-    run: forward(() => import("@/app/(app)/automations/actions"), "getRunAction", 1)
+    run: forward(() => import("@/app/(app)/automations/actions"), "getRunAction", 1),
+    hookAddress: forward(() => import("@/app/(app)/automations/actions"), "hookAddressAction", 3),
+    chatWebhooks: forward(() => import("@/app/(app)/automations/actions"), "chatWebhooksAction", 0),
+    thresholdChoices: forward(
+        () => import("@/app/(app)/automations/actions"),
+        "thresholdChoicesAction",
+        0
+    )
 }));
 
 vi.mock("@/app/(app)/admin/settings/settings-polls", () => ({
