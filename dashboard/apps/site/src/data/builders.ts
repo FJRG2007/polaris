@@ -29,6 +29,11 @@ export interface CatalogInput {
     /** The app's mark, already rendered to markup by the build script, at 40px and at 44px. */
     readonly mark: string;
     readonly markLarge: string;
+    /**
+     * The Polaris app logo the entry wears instead of `mark`, by id: the page
+     * shows `app-logos/<id>.svg`, the file the dashboard's logo is written to.
+     */
+    readonly logo?: string | null;
     /** The placeholder preview's colour and the text colour on it. */
     readonly tint: string;
     readonly ink: string;
@@ -67,6 +72,7 @@ export interface SiteApp {
     readonly comingSoon: boolean;
     readonly mark: string;
     readonly markLarge: string;
+    readonly logo: string | null;
     readonly tint: string;
     readonly ink: string;
     readonly byline: string;
@@ -105,6 +111,7 @@ export function siteApps(
                 comingSoon: app.comingSoon === true,
                 mark: app.mark,
                 markLarge: app.markLarge,
+                logo: app.logo ?? null,
                 tint: app.tint,
                 ink: app.ink,
                 byline: fill(from.developer === from.distributor ? card.by : card.byImage, from),

@@ -15,6 +15,26 @@ function Markup({ html }: { html: string }) {
     return <span className="contents" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+/**
+ * An app's mark at `size` pixels: a Polaris app's own logo file, the same one
+ * the dashboard draws, or the mark the build rendered for any other app.
+ */
+function AppMark({ app, size }: { app: SiteApp; size: number }) {
+    if (!app.logo) return <Markup html={size > 40 ? app.markLarge : app.mark} />;
+    const logo = Math.round(size * 0.9);
+    return (
+        <span className="grid shrink-0 place-items-center" style={{ width: size, height: size }}>
+            <img
+                src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/app-logos/${app.logo}.svg`}
+                width={logo}
+                height={logo}
+                alt=""
+                aria-hidden="true"
+            />
+        </span>
+    );
+}
+
 /** The capture's paths under the base path Pages serves the site from. */
 function withBase(shot: store.StoreShot | null): store.StoreShot | null {
     if (!shot) return null;
@@ -82,14 +102,14 @@ export function MarketplaceGrid({ apps, t }: { apps: readonly SiteApp[]; t: Mark
                                         className="border-b border-border"
                                         name={app.name}
                                         summary={app.summary}
-                                        mark={<Markup html={app.markLarge} />}
+                                        mark={<AppMark app={app} size={44} />}
                                         tint={app.tint}
                                         ink={app.ink}
                                         shot={withBase(app.shot)}
                                         alt={app.alt}
                                     />
                                 }
-                                mark={<Markup html={app.mark} />}
+                                mark={<AppMark app={app} size={40} />}
                                 title={
                                     <p className="truncate text-sm font-medium" title={app.name}>
                                         {app.name}

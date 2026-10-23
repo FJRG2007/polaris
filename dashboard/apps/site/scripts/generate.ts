@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildOpenApi } from "@/lib/api-docs/openapi";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AppMark } from "@/components/app-mark";
+import { AppMark, ownAppLogo } from "@/components/app-mark";
 import { STREAMDECK_MARKETPLACE_URL } from "@/lib/deck/marketplace";
 import {
     appDownload,
@@ -43,6 +43,8 @@ const root = join(dashboard, "..");
 const web = join(dashboard, "apps", "web");
 const media = join(root, "docs", "assets", "media");
 const logosDir = join(root, "docs", "assets", "logos");
+// Polaris's own app logos, the files `@polaris/ui` writes from its `AppLogo`.
+const appLogosDir = join(dashboard, "packages", "ui", "assets", "app-logos");
 const repo = process.env.GITHUB_REPOSITORY || "FJRG2007/polaris";
 
 const read = (path: string) => readFileSync(path, "utf8");
@@ -60,6 +62,7 @@ const catalog: site.CatalogInput[] = catalogApps()
         // The dashboard's own mark, drawn once here so the site shows the same one.
         mark: renderToStaticMarkup(createElement(AppMark, { app, size: 40 })),
         markLarge: renderToStaticMarkup(createElement(AppMark, { app, size: 44 })),
+        logo: ownAppLogo(app.id),
         tint: tintFor(app.id),
         ink: initialsInk(tintFor(app.id)),
         ...appProvenance(app),
@@ -253,6 +256,7 @@ const data: site.SiteData = {
 mkdirSync(join(siteDir, "generated"), { recursive: true });
 mkdirSync(join(siteDir, "public", "media"), { recursive: true });
 mkdirSync(join(siteDir, "public", "logos"), { recursive: true });
+mkdirSync(join(siteDir, "public", "app-logos"), { recursive: true });
 writeFileSync(join(siteDir, "generated", "site-data.json"), JSON.stringify(data));
 writeFileSync(join(siteDir, "public", "openapi.json"), JSON.stringify(openapi, null, 2) + "\n");
 
@@ -267,6 +271,8 @@ for (const file of pictures)
     copyFileSync(join(media, file), join(siteDir, "public", "media", file));
 for (const file of logos)
     copyFileSync(join(logosDir, file), join(siteDir, "public", "logos", file));
+for (const file of readdirSync(appLogosDir))
+    copyFileSync(join(appLogosDir, file), join(siteDir, "public", "app-logos", file));
 // The dashboard's own mark, so a tab, a home screen and a shared link show the
 // same Polaris icon the product does.
 copyFileSync(join(web, "src", "app", "icon.svg"), join(siteDir, "public", "icon.svg"));

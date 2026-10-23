@@ -64,6 +64,15 @@ const OWN_APPS: Readonly<Record<string, string>> = {
     "game-servers": "games"
 };
 
+/**
+ * The Polaris app logo a catalog entry wears, by its `AppLogo` id, or null for
+ * an entry that is not one of Polaris's own apps.
+ */
+export function ownAppLogo(catalogId: string): string | null {
+    const own = Object.hasOwn(OWN_APPS, catalogId) ? OWN_APPS[catalogId]! : null;
+    return own && hasAppLogo(own) ? own : null;
+}
+
 export function AppMark({
     app,
     size = 36,
@@ -76,8 +85,8 @@ export function AppMark({
     const Brand = BRAND_MARKS[app.id];
     const Icon = app.icon;
 
-    const own = OWN_APPS[app.id];
-    if (own && hasAppLogo(own)) {
+    const own = ownAppLogo(app.id);
+    if (own) {
         return (
             <span
                 className={cn("grid shrink-0 place-items-center", className)}
