@@ -48,7 +48,7 @@ reason).
 | Automations | Automation | `automation.automation` | org shelf + AccessGrant per automation | none | people (view its steps, versions and runs; editing is not shared, as an automation runs as whoever published it; a folder is not shared) | add | done |
 | Analytics | Site | `analytics.site` | whoever sees the service + AccessGrant per service | none | people (view its numbers; the tracker switch and key stay with whoever configures it; a public link is not built) | add | done |
 | Telemetry | Project | `telemetry.project` | owner (administrators see every one) + AccessGrant per project | none | people (view its issues and their events; resolving, ignoring, deleting, its address, reporters and settings stay with the owner) | add | done |
-| Deploy | Project | - | `ProjectMember` | none | dialog fronting ProjectMember | add | todo |
+| Deploy | Project | - | `ProjectMember` | none | a Share entry on the project that opens its Members settings (the ProjectMember list stays the one system; no AccessGrant copy) | add | done |
 | Deploy | Service | - | through its project | none | - | no: reached through its project | - |
 | Databases | Database | - | through its Deploy project | none | - | no: credentials, reached through its project | - |
 | Backups | Plan | - | owner | none | people (view) | add | todo |

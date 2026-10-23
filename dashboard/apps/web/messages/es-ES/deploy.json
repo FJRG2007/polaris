@@ -592,6 +592,7 @@
         "removeLinkBetween": "Quitar el enlace entre {source} y {target}"
     },
     "projects": {
+        "share": "Dar acceso",
         "title": "Proyectos",
         "notDeleted": "{name} no se eliminó. {reason}",
         "dismiss": "Cerrar",
