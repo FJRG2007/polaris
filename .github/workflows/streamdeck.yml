@@ -28,9 +28,10 @@ name: Stream Deck plugin
 #
 # The install scripts are not the plugin: a new version closes and reopens the
 # Stream Deck app on every machine the one-line install keeps current, so a
-# change to nothing but `scripts/` cuts no version. Its scripts replace the ones
-# attached to the newest release instead, which is where those machines fetch
-# their updater from.
+# change to nothing but `install.ps1` / `install.sh` cuts no version. They
+# replace the ones attached to the newest release instead, which is where those
+# machines fetch their updater from. The rest of `scripts/` builds the plugin
+# (`profiles.mjs` writes the bundled pages) and ships like its source.
 
 on:
   push:
@@ -115,9 +116,11 @@ jobs:
             elif [ -n "$newest" ] && git diff --quiet "$newest" HEAD -- apps/streamdeck \
                 ':(exclude)apps/streamdeck/test' \
                 ':(exclude)apps/streamdeck/vitest.config.ts' \
-                ':(exclude)apps/streamdeck/*.md'                 ':(exclude)apps/streamdeck/scripts'; then
+                ':(exclude)apps/streamdeck/*.md' \
+                ':(exclude)apps/streamdeck/scripts/install.ps1' \
+                ':(exclude)apps/streamdeck/scripts/install.sh'; then
               version="${newest#"$PREFIX"}"
-              if git diff --quiet "$newest" HEAD -- apps/streamdeck/scripts; then
+              if git diff --quiet "$newest" HEAD -- apps/streamdeck/scripts/install.ps1 apps/streamdeck/scripts/install.sh; then
                 echo "Nothing the plugin ships changed since $newest; nothing to release."
               else
                 echo "Only the install scripts changed since $newest; attaching them to it."
