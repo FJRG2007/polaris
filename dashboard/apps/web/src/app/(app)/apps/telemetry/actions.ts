@@ -19,6 +19,8 @@ import { revalidatePath } from "next/cache";
 import { slugify } from "@polaris/deploy";
 import { appBaseUrl } from "@/lib/domain-service";
 import { requirePermission } from "@/lib/session";
+import { dropGrantsFor } from "@/lib/access/grants";
+import { requireTelemetryReader } from "@/lib/telemetry/reader";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as report from "@/lib/telemetry/report-service";
 import * as projects from "@/lib/telemetry/project-service";
@@ -78,11 +80,11 @@ export async function telemetryOverviewAction(input: {
     status?: string;
     query?: string;
 }): Promise<{ data?: TelemetryOverview; error?: string }> {
-    const caller = await actor();
+    const { actor: caller, lent } = await requireTelemetryReader();
     try {
         const orgId = await scopeOrgIdFor(caller.id);
         const [rows, origin] = await Promise.all([
-            projects.listProjects(caller, orgId),
+            projects.listProjects(caller, orgId, lent),
             appBaseUrl()
         ]);
         const withDsn = rows.map((row) => ({ ...row, dsn: projects.dsnFor(row, origin) }));
@@ -91,7 +93,7 @@ export async function telemetryOverviewAction(input: {
         if (!chosen) {
             return { data: { projects: withDsn, issues: [], counts: {}, windowDays: report.TELEMETRY_WINDOW_DAYS } };
         }
-        await projects.requireProject(caller, chosen.id);
+        await projects.requireProject(caller, chosen.id, lent);
 
         const [issues, counts] = await Promise.all([
             report.listIssues(chosen.id, { status: input.status ?? "unresolved", query: input.query }),
@@ -109,9 +111,9 @@ export async function openIssueAction(
     projectId: string,
     issueId: string
 ): Promise<{ issue?: report.IssueDetail; error?: string }> {
-    const caller = await actor();
+    const { actor: caller, lent } = await requireTelemetryReader();
     try {
-        await projects.requireProject(caller, projectId);
+        await projects.requireProject(caller, projectId, lent);
         const issue = await report.getIssue(projectId, issueId);
         if (!issue) return { error: await say("errors.issueGone") };
         return { issue };
@@ -212,6 +214,7 @@ export async function deleteTelemetryProjectAction(projectId: string): Promise<{
         if (!(await projects.deleteProject(projectId))) {
             return { error: await say("errors.ownProject") };
         }
+        await dropGrantsFor("telemetry.project", projectId);
         revalidatePath(PATH);
         return {};
     } catch (caught) {

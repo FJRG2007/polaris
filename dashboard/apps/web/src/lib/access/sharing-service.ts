@@ -192,6 +192,17 @@ export async function requireMayShare(
             }
             return;
         }
+        case "telemetry.project": {
+            // Whoever may open the project as its owner (or an administrator)
+            // decides who else reads its issues.
+            const { requireProject } = await import("@/lib/telemetry/project-service");
+            const owns = await requireProject({ id: user.id, isAdmin: user.isAdmin }, subjectId).then(
+                () => true,
+                () => false
+            );
+            if (!owns) throw new GrantError("You cannot share that");
+            return;
+        }
         case "analytics.site": {
             // Whoever may configure a service decides who else reads its numbers.
             const configurable = await requireApplicationAccess(
@@ -488,6 +499,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         }
         case "crm.dashboard":
             return "/crm/dashboards";
+        case "telemetry.project":
+            return `/apps/telemetry?project=${encodeURIComponent(subjectId)}`;
         case "analytics.site":
             return `/apps/analytics?scope=application&id=${encodeURIComponent(subjectId)}`;
         case "automation.automation":

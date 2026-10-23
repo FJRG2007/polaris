@@ -67,7 +67,8 @@
             "crm.record": "a record in the CRM",
             "crm.dashboard": "a CRM dashboard",
             "automation.automation": "a saved automation",
-            "analytics.site": "a site's visitor numbers"
+            "analytics.site": "a site's visitor numbers",
+            "telemetry.project": "a telemetry project's issues"
         }
     },
     "mentions": {

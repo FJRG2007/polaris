@@ -12,7 +12,7 @@
  */
 
 import { TelemetryView } from "./telemetry-view";
-import { requirePermission } from "@/lib/session";
+import { requireTelemetryReader } from "@/lib/telemetry/reader";
 import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ export default async function TelemetryPage({
         section?: string;
     }>;
 }) {
-    await requirePermission("deploy.manage");
+    await requireTelemetryReader();
     const { project, issue, status, section } = await searchParams;
     const t = await getTranslations("telemetry");
 
