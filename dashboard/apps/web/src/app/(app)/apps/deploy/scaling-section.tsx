@@ -180,13 +180,13 @@ export function ScalingSection({
     // A failed read shows only why, as it did before anything was kept.
     if (!draft || !view || !base || !checks || (kept && error)) {
         return error ? (
-            <CardError title={t("scaling.copies")} message={error} />
+            <CardError entry="replicas" title={t("scaling.copies")} message={error} />
         ) : (
             <>
-                <CardSkeleton title={t("scaling.copies")} />
-                <CardSkeleton title={t("scaling.sleep")} rows={1} />
-                <CardSkeleton title={t("scaling.resources")} rows={1} />
-                <CardSkeleton title={t("scaling.balancing")} rows={1} />
+                <CardSkeleton entry="replicas" title={t("scaling.copies")} />
+                <CardSkeleton entry="sleep" title={t("scaling.sleep")} rows={1} />
+                <CardSkeleton entry="resources" title={t("scaling.resources")} rows={1} />
+                <CardSkeleton entry="balancing" title={t("scaling.balancing")} rows={1} />
             </>
         );
     }
@@ -241,6 +241,7 @@ export function ScalingSection({
     return (
         <>
             <SettingsCard
+                entry="replicas"
                 title={t("scaling.copies")}
                 description={t("scaling.copiesHint", { max: core.REPLICAS_MAX })}
                 footer={bar("copies")}
@@ -355,6 +356,7 @@ export function ScalingSection({
             </SettingsCard>
 
             <SettingsCard
+                entry="sleep"
                 title={t("scaling.sleep")}
                 description={t("scaling.sleepShort")}
                 badge={
@@ -396,6 +398,7 @@ export function ScalingSection({
             </SettingsCard>
 
             <SettingsCard
+                entry="resources"
                 title={t("scaling.resources")}
                 description={t("scaling.resourcesHint")}
                 footer={bar("resources")}
@@ -430,6 +433,7 @@ export function ScalingSection({
             </SettingsCard>
 
             <SettingsCard
+                entry="balancing"
                 title={t("scaling.balancing")}
                 description={t("scaling.balancingShort")}
                 footer={bar("balancing")}

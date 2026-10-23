@@ -164,15 +164,24 @@ export function EdgeSettings({
     const preview = useMemo(() => (draft ? core.securityHeaderMap(draft.headers) : {}), [draft]);
 
     if (loadError) {
-        return <CardError title={t("edge.traffic")} message={loadError} onRetry={load} />;
+        return (
+            <CardError
+                entry="traffic"
+                title={t("edge.traffic")}
+                message={loadError}
+                onRetry={load}
+            />
+        );
     }
     if (!draft || !saved || !facts) {
         return (
             <>
-                {canConfigure && <CardSkeleton title={t("edge.publishPort")} rows={1} />}
-                <CardSkeleton title={t("edge.traffic")} />
-                <CardSkeleton title={t("edge.headers")} />
-                <CardSkeleton title={t("edge.redirects")} rows={1} />
+                {canConfigure && (
+                    <CardSkeleton entry="publishPort" title={t("edge.publishPort")} rows={1} />
+                )}
+                <CardSkeleton entry="traffic" title={t("edge.traffic")} />
+                <CardSkeleton entry="securityHeaders" title={t("edge.headers")} />
+                <CardSkeleton entry="edgeRules" title={t("edge.redirects")} rows={1} />
             </>
         );
     }
@@ -259,6 +268,7 @@ export function EdgeSettings({
         <>
             {canConfigure && (
                 <SettingsCard
+                    entry="publishPort"
                     title={t("edge.publishPort")}
                     description={
                         facts.publishPort ? t("edge.publishPortOpen") : t("edge.publishPortClosed")
@@ -286,6 +296,7 @@ export function EdgeSettings({
             )}
 
             <SettingsCard
+                entry="traffic"
                 title={t("edge.traffic")}
                 description={t("edge.trafficHint")}
                 footer={bar("traffic")}
@@ -512,6 +523,7 @@ export function EdgeSettings({
             </SettingsCard>
 
             <SettingsCard
+                entry="securityHeaders"
                 title={t("edge.headers")}
                 description={t("edge.headersHint")}
                 footer={bar("headers")}
@@ -680,6 +692,7 @@ export function EdgeSettings({
             </SettingsCard>
 
             <SettingsCard
+                entry="edgeRules"
                 title={t("edge.redirects")}
                 description={t("edge.redirectsHint")}
                 footer={bar("redirects")}

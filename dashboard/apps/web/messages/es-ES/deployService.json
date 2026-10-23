@@ -298,7 +298,6 @@
         "tunnelUrl": "Es una URL de túnel - su túnel ya la expone, así que no se puede añadir como dominio.",
         "connectorToken": "Token del conector de Cloudflare (eyJhIjoi...)",
         "setUpDuckdns": "Configurar DuckDNS",
-        "source": "Código",
         "rootDirectory": "Directorio raíz",
         "rootDirectoryHint": "Dónde está este servicio dentro del repositorio. La compilación recibe igualmente el repositorio entero, así que los paquetes compartidos y el lockfile de niveles superiores siguen disponibles. En blanco = la raíz del repositorio.",
         "dockerfilePath": "Ruta del Dockerfile",
@@ -324,14 +323,14 @@
         "keepReleasesHint": "Mantén en marcha las últimas versiones, cada una en su propia dirección, mientras la dirección de este servicio sigue en la más reciente. Un servicio con un volumen o en otro servidor conserva el historial pero no los contenedores.",
         "containerPortShort": "El puerto en el que escucha la app dentro del contenedor. Vacío lo detecta de la imagen.",
         "portInvalid": "Escribe un puerto del 1 al 65535.",
-        "sourceShort": "Desde qué parte del repositorio se construye.",
         "buildShort": "Se detectan en el repositorio. Rellena uno solo para cambiarlo.",
         "autoDeployShort": "Despliega cada push a la rama, filtrado por commit o ruta.",
         "watchPathsShort": "Un glob por línea, ! para excluir. Vacío es cualquier cambio.",
         "keepReleasesShort": "Las versiones anteriores siguen activas, cada una en su dirección.",
         "disableDomainNamed": "Desactivar {hostname}",
         "enableDomainNamed": "Activar {hostname}",
-        "removeDomainNamed": "Quitar {hostname}"
+        "removeDomainNamed": "Quitar {hostname}",
+        "rootDirectoryShort": "La carpeta del servicio, si el repositorio contiene varios."
     },
     "exposureHint": {
         "zoneBase": "Un nombre directamente en {host}, con un certificado de Let's Encrypt. Este no está cubierto por un comodín, así que necesita su propio registro DNS - Polaris lo crea si el dominio está en tu cuenta de Cloudflare conectada y, si no, te dice qué registro añadir. Para un nombre en otro dominio, elige Dominio personalizado.",
@@ -616,11 +615,8 @@
         "discard": "Descartar",
         "retry": "Reintentar",
         "networkingIntro": "Dónde responde el servicio, dentro del proyecto y en internet.",
-        "source": "Código y despliegue",
         "sourceIntro": "De dónde sale el código y cuándo sale una versión nueva.",
         "scalingIntro": "Cuántas copias corren, qué puede usar cada una y cuándo duerme.",
-        "advanced": "Avanzado",
-        "advancedIntro": "Dónde corre y se construye, y llevarlo a otro proveedor.",
         "danger": "Zona de riesgo",
         "dangerIntro": "Acciones que no se pueden deshacer.",
         "on": "Activado",
@@ -637,7 +633,21 @@
         "serverShort": "Moverlo para el contenedor aquí; despliega para arrancarlo allí.",
         "move": "Mover",
         "disableNamed": "Desactivar {name}",
-        "enableNamed": "Activar {name}"
+        "enableNamed": "Activar {name}",
+        "sourceTitle": "Origen",
+        "securityTitle": "Seguridad y borde",
+        "securityIntro": "Qué llega al servicio y las reglas que el borde aplica antes.",
+        "buildTitle": "Build",
+        "buildIntro": "Cómo el código se vuelve una imagen, y dónde ocurre.",
+        "deployTitle": "Despliegue",
+        "deployIntro": "Qué hace una versión nueva con la que corre, y cómo lanzarla.",
+        "otherTitle": "Otros",
+        "otherIntro": "Etiquetas, y mover el servicio a otro proveedor.",
+        "filterPlaceholder": "Filtrar ajustes",
+        "filterLabel": "Filtrar ajustes",
+        "filterEmpty": "Ningún ajuste coincide con \"{query}\"",
+        "filterEmptyHint": "Prueba otra palabra, en español o inglés.",
+        "filterClear": "Quitar filtro"
     },
     "tabIntro": {
         "deployments": "Cada build del servicio, de la más reciente a la más antigua. Revierte o redespliega desde aquí.",
@@ -824,5 +834,35 @@
             "negligible": "Mínima",
             "unknown": "Sin datos"
         }
+    },
+    "sourceCard": {
+        "repository": "Repositorio",
+        "repositoryShort": "El código que este servicio construye y despliega.",
+        "branch": "Rama",
+        "defaultBranch": "Rama por defecto",
+        "root": "Directorio raíz",
+        "rootNone": "Raíz del repo",
+        "onPush": "Desplegar al subir",
+        "upload": "Carpeta subida",
+        "uploadShort": "Se construye con una carpeta que subes. Sin repositorio.",
+        "uploadEmpty": "Aún no hay nada subido. Suelta una carpeta abajo.",
+        "uploadEmptyReadOnly": "Aún no hay nada subido.",
+        "image": "Imagen",
+        "imageShort": "Ejecuta esta imagen tal cual. Aquí no se construye nada.",
+        "none": "Origen",
+        "noneShort": "Aún no hay repositorio, carpeta ni imagen conectados.",
+        "loadFailed": "No se pudo leer el origen. Inténtalo en un momento."
+    },
+    "builder": {
+        "title": "Compilador",
+        "short": "Cómo el código se vuelve una imagen.",
+        "dockerfile": "Dockerfile",
+        "dockerfileShort": "Construye con {path}.",
+        "auto": "Automático",
+        "autoShort": "Sin Dockerfile: el build lee el código para saber su lenguaje y framework.",
+        "image": "Imagen ya hecha",
+        "imageShort": "Aquí no se construye nada. La imagen corre tal cual.",
+        "other": "Fijado al crearlo",
+        "otherShort": "Se construye como se configuró al crear el servicio."
     }
 }

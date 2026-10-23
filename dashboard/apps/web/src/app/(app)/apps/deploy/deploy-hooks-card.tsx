@@ -98,6 +98,7 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
 
     return (
         <SettingsCard
+            entry="deployHooks"
             title={t("deployHooks.title")}
             description={t("deployHooks.description")}
             actions={

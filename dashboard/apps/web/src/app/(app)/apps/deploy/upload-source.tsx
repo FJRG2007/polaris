@@ -444,6 +444,7 @@ export function UploadedSourceSection({
 
     return (
         <SettingsCard
+            entry="uploadedSource"
             title={t("upload.title")}
             description={
                 state.upload

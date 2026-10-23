@@ -47,9 +47,9 @@ export function GpuCard({
 
     if (!view) {
         return error ? (
-            <CardError title={t("gpu.title")} message={error} />
+            <CardError entry="gpu" title={t("gpu.title")} message={error} />
         ) : (
-            <CardSkeleton title={t("gpu.title")} rows={1} />
+            <CardSkeleton entry="gpu" title={t("gpu.title")} rows={1} />
         );
     }
 
@@ -109,7 +109,7 @@ export function GpuCardBody({
           ? t(`gpu.${view.refusal}`)
           : null;
     return (
-        <SettingsCard title={t("gpu.title")} description={t("gpu.hint")}>
+        <SettingsCard entry="gpu" title={t("gpu.title")} description={t("gpu.hint")}>
             <div className="flex min-w-0 flex-col gap-2">
                 <div className="flex items-start justify-between gap-3 rounded-md bg-surface p-3">
                     <span className="min-w-0">

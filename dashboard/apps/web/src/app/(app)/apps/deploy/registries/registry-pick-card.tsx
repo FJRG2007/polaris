@@ -70,6 +70,7 @@ export function RegistryPickCard({
 
     return (
         <SettingsCard
+            entry="registry"
             title={t("pick.title")}
             description={t("pick.description")}
             badge={

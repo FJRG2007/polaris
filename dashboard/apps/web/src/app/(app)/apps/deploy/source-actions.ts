@@ -15,10 +15,14 @@ import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as buildMachine from "@/lib/deploy/build-machine";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { uploadedSourceOf, type UploadedSource } from "@/lib/deploy/source-upload";
+import { describeServiceSource, type ServiceSourceView } from "@/lib/deploy/service-source";
 
 const DEPLOY_PATH = "/apps/deploy";
 
-async function failure(caught: unknown, fallback: NamespaceKey<"deployServer">): Promise<{ error: string }> {
+async function failure(
+    caught: unknown,
+    fallback: NamespaceKey<"deployServer">
+): Promise<{ error: string }> {
     return { error: caught instanceof Error ? caught.message : await reply(fallback) };
 }
 
@@ -34,7 +38,10 @@ export async function buildMachineAction(
     }
 }
 
-export async function setBuildMachineAction(applicationId: string, value: unknown): Promise<{ error?: string }> {
+export async function setBuildMachineAction(
+    applicationId: string,
+    value: unknown
+): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = buildMachine.buildOnSchema.safeParse(value);
     if (!parsed.success) return { error: await reply("source.machineUnknown") };
@@ -73,8 +80,43 @@ export async function uploadedSourceAction(
         if (!app) return { error: await reply("common.serviceNotFound") };
         const source = JSON.parse(app.sourceConfig || "{}") as Record<string, unknown>;
         const fromRepository = typeof source.repoUrl === "string" && source.repoUrl.length > 0;
-        const uploadable = !fromRepository && (app.sourceType === "dockerfile" || app.sourceType === "nixpacks");
+        const uploadable =
+            !fromRepository && (app.sourceType === "dockerfile" || app.sourceType === "nixpacks");
         return { upload: uploadedSourceOf(source), uploadable };
+    } catch (caught) {
+        return failure(caught, "source.loadFailed");
+    }
+}
+
+/**
+ * Where the service's code or image comes from, for the Source card: the
+ * repository and the branch it follows, an uploaded folder, or an image. Read
+ * by anybody who can see the project, like the rest of the tab.
+ */
+export async function serviceSourceAction(
+    applicationId: string
+): Promise<{ error?: string; source?: ServiceSourceView }> {
+    const user = await requirePermission("deploy.read");
+    try {
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        const app = await prisma.application.findFirst({
+            where: { id: applicationId, environment: { project: { ownerId: access.ownerId } } },
+            select: {
+                sourceType: true,
+                sourceConfig: true,
+                deployBranch: true,
+                environment: { select: { branch: true } }
+            }
+        });
+        if (!app) return { error: await reply("common.serviceNotFound") };
+        return {
+            source: describeServiceSource({
+                sourceType: app.sourceType,
+                sourceConfig: app.sourceConfig,
+                deployBranch: app.deployBranch,
+                environmentBranch: app.environment.branch
+            })
+        };
     } catch (caught) {
         return failure(caught, "source.loadFailed");
     }
