@@ -15,8 +15,19 @@ const ADA = "ada";
 const JOINED = new Date("2026-09-28T10:00:00.000Z");
 
 const fake = vi.hoisted(() => ({
-    links: [] as { installedAppId: string; player: string; userId: string; followSignIns: boolean }[],
-    installs: [] as { id: string; ownerId: string; catalogId: string; name: string; status: string }[],
+    links: [] as {
+        installedAppId: string;
+        player: string;
+        userId: string;
+        followSignIns: boolean;
+    }[],
+    installs: [] as {
+        id: string;
+        ownerId: string;
+        catalogId: string;
+        name: string;
+        status: string;
+    }[],
     connections: [] as { userId: string; label: string }[],
     sessions: [] as { installedAppId: string; name: string; joinedAt: Date; leftAt: Date | null }[]
 }));
@@ -41,27 +52,36 @@ vi.mock("@polaris/db", () => ({
         installedApp: {
             findMany: async ({ where }: { where: { id?: { in: string[] } } }) =>
                 fake.installs.filter(
-                    (install) => (!where.id || where.id.in.includes(install.id)) && install.status !== "removed"
+                    (install) =>
+                        (!where.id || where.id.in.includes(install.id)) &&
+                        install.status !== "removed"
                 )
         },
         userConnection: {
-            findMany: async ({ where }: { where: { userId: { in: string[] }; provider: string } }) =>
+            findMany: async ({
+                where
+            }: {
+                where: { userId: { in: string[] }; provider: string };
+            }) =>
                 where.provider === "minecraft"
-                    ? fake.connections.filter((connection) => where.userId.in.includes(connection.userId))
+                    ? fake.connections.filter((connection) =>
+                          where.userId.in.includes(connection.userId)
+                      )
                     : []
         },
         gamePlayerSession: {
             findMany: async ({ where }: { where: { installedAppId: { in: string[] } } }) =>
                 fake.sessions.filter(
-                    (visit) => where.installedAppId.in.includes(visit.installedAppId) && visit.leftAt === null
+                    (visit) =>
+                        where.installedAppId.in.includes(visit.installedAppId) &&
+                        visit.leftAt === null
                 )
         }
     }
 }));
 
-const { playingMinecraftNow, accountsOfPlayers, accountsPlayingMinecraftNow } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/playing-now"
-);
+const { playingMinecraftNow, accountsOfPlayers, accountsPlayingMinecraftNow } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/playing-now");
 
 beforeEach(() => {
     fake.links = [];
@@ -75,7 +95,9 @@ beforeEach(() => {
 
 describe("who is playing on a server here", () => {
     it("is an account whose link follows its sign-ins, with the server's name", async () => {
-        fake.links = [{ installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: true }];
+        fake.links = [
+            { installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: true }
+        ];
         expect(await playingMinecraftNow([ADA])).toEqual([
             {
                 userId: ADA,
@@ -92,13 +114,17 @@ describe("who is playing on a server here", () => {
     });
 
     it("is an account whose connected Minecraft name is the player", async () => {
-        fake.links = [{ installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: false }];
+        fake.links = [
+            { installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: false }
+        ];
         fake.connections = [{ userId: ADA, label: "adaplays" }];
         expect(await playingMinecraftNow([ADA])).toHaveLength(1);
     });
 
     it("is not an account that only an operator says is that player", async () => {
-        fake.links = [{ installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: false }];
+        fake.links = [
+            { installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: false }
+        ];
         expect(await playingMinecraftNow([ADA])).toEqual([]);
     });
 
@@ -115,8 +141,12 @@ describe("who is playing on a server here", () => {
     });
 
     it("is nobody on a server that is not Minecraft", async () => {
-        fake.installs = [{ id: "s1", ownerId: "owner", catalogId: "ark", name: "Island", status: "running" }];
-        fake.links = [{ installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: true }];
+        fake.installs = [
+            { id: "s1", ownerId: "owner", catalogId: "ark", name: "Island", status: "running" }
+        ];
+        fake.links = [
+            { installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: true }
+        ];
         expect(await playingMinecraftNow([ADA])).toEqual([]);
     });
 });
@@ -134,7 +164,13 @@ describe("whose screens are told a player arrived", () => {
 
 describe("the accounts a Chat message in a channel is looked at for", () => {
     it("are the accounts linked to a player on now, matched whatever the case, on a live Minecraft server", async () => {
-        fake.installs.push({ id: "ark", ownerId: "owner", catalogId: "ark", name: "Ark", status: "running" });
+        fake.installs.push({
+            id: "ark",
+            ownerId: "owner",
+            catalogId: "ark",
+            name: "Ark",
+            status: "running"
+        });
         fake.sessions.push(
             { installedAppId: "s1", name: "Gone", joinedAt: JOINED, leftAt: JOINED },
             { installedAppId: "ark", name: "Rex", joinedAt: JOINED, leftAt: null },
@@ -151,7 +187,9 @@ describe("the accounts a Chat message in a channel is looked at for", () => {
 
     it("are nobody when nobody is on", async () => {
         fake.sessions = [];
-        fake.links = [{ installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: true }];
+        fake.links = [
+            { installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: true }
+        ];
         expect(await accountsPlayingMinecraftNow()).toEqual([]);
     });
 });

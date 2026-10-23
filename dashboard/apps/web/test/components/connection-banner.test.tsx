@@ -24,9 +24,8 @@ vi.mock("@/lib/host-internet", () => ({
     subscribeHostOffline: () => () => {}
 }));
 
-const { BANNER_HEIGHT_VAR, ConnectionBanner, SlowConnectionNotice } = await import(
-    "@/components/connection-banner"
-);
+const { BANNER_HEIGHT_VAR, ConnectionBanner, SlowConnectionNotice } =
+    await import("@/components/connection-banner");
 const { noteStreamTrouble, probeNow, resetReachability } = await import("@/lib/reachability");
 const { clearUpdateInProgress, markUpdateInProgress } = await import("@/lib/update-in-progress");
 
@@ -34,7 +33,9 @@ const { clearUpdateInProgress, markUpdateInProgress } = await import("@/lib/upda
 let answering = true;
 const fetchMock = vi.fn(async () =>
     answering
-        ? new Response(JSON.stringify({ build: "b1" }), { headers: { "content-type": "application/json" } })
+        ? new Response(JSON.stringify({ build: "b1" }), {
+              headers: { "content-type": "application/json" }
+          })
         : Promise.reject(new TypeError("Failed to fetch"))
 );
 
@@ -184,7 +185,9 @@ describe("when Polaris itself does not answer", () => {
         answering = false;
         const { unmount } = render(withMessages(<ConnectionBanner />, "es-ES"));
         await streamDrops();
-        expect(screen.getByRole("status").textContent).toContain("No se puede contactar con Polaris");
+        expect(screen.getByRole("status").textContent).toContain(
+            "No se puede contactar con Polaris"
+        );
         expect(screen.getByRole("button", { name: "Reintentar" })).toBeTruthy();
         unmount();
         markUpdateInProgress();

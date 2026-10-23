@@ -68,9 +68,7 @@ export default async function NotificationsPage() {
                 destinations={destinations}
                 senders={senders}
                 deliveries={deliveries}
-                messagesInGame={
-                    inGameOffered ? inGameChoice(account?.inGameMessages) : null
-                }
+                messagesInGame={inGameOffered ? inGameChoice(account?.inGameMessages) : null}
                 inGameReady={inGameReady}
                 quiet={{ hours: quietHours, timeZone: display.timeZone }}
                 paused={paused?.on ? paused : null}

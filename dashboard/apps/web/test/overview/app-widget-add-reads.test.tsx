@@ -25,7 +25,11 @@ vi.mock("@/app/(app)/home/app-widget-actions", () => ({
 }));
 vi.mock("@/app/(app)/home/home-polls", () => ({ appWidgets }));
 
-import { AppWidgetGridItems, useAppWidgets, type AppWidgetsState } from "@/app/(app)/home/app-widgets";
+import {
+    AppWidgetGridItems,
+    useAppWidgets,
+    type AppWidgetsState
+} from "@/app/(app)/home/app-widgets";
 
 afterEach(cleanup);
 
@@ -54,7 +58,9 @@ describe("adding a card to the Overview", () => {
                     {
                         ok: true,
                         view: {
-                            items: [{ id: "ac", title: "Living room AC", readings: [], controls: [] }]
+                            items: [
+                                { id: "ac", title: "Living room AC", readings: [], controls: [] }
+                            ]
                         }
                     }
                 ])

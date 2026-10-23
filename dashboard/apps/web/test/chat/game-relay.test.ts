@@ -263,9 +263,7 @@ describe("relaying a message into a game", () => {
         fake.direct = new Set([BEN]);
         await relayToGames("m1");
         expect(fake.relayed.map((one) => one.userId)).toEqual(
-            fake.members
-                .map((one) => one.userId)
-                .filter((id) => id !== AUTHOR && id !== BEN)
+            fake.members.map((one) => one.userId).filter((id) => id !== AUTHOR && id !== BEN)
         );
     });
 

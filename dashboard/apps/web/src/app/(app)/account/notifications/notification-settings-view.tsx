@@ -247,9 +247,7 @@ function InGameRow({ initial, ready }: { initial: inGame.InGameChoice; ready: bo
             </div>
             {ready ? null : (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                    <p className="min-w-0 text-xs text-muted-foreground">
-                        {t("inGame.notReady")}
-                    </p>
+                    <p className="min-w-0 text-xs text-muted-foreground">{t("inGame.notReady")}</p>
                     <Button asChild size="sm" variant="outline" className="shrink-0">
                         <Link href={connectionsLink}>{t("inGame.connectedAccounts")}</Link>
                     </Button>

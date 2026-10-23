@@ -88,7 +88,14 @@ describe("service panel", () => {
         };
 
         it(`${theme}: overrides nothing about a field, a card or a border`, () => {
-            for (const name of ["field", "field-edge", "border", "border-strong", "card", "card-hover"]) {
+            for (const name of [
+                "field",
+                "field-edge",
+                "border",
+                "border-strong",
+                "card",
+                "card-hover"
+            ]) {
                 expect(panel[name]).toBeUndefined();
             }
         });
