@@ -74,7 +74,8 @@
             "dns.filter": "the network filter's statistics",
             "agents.session": "an agent session",
             "polar.project": "a Polar project",
-            "task.task": "one task"
+            "task.task": "one task",
+            "place.place": "a place"
         }
     },
     "mentions": {

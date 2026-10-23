@@ -306,6 +306,7 @@
         "up": "Arriba"
     },
     "switcher": {
+        "share": "Compartir {name}",
         "add": "Añadir sitio",
         "label": "Qué sitio"
     },

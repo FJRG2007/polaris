@@ -94,7 +94,8 @@ export const GRANT_SUBJECTS = [
     "dns.filter",
     "agents.session",
     "polar.project",
-    "task.task"
+    "task.task",
+    "place.place"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -234,7 +235,12 @@ export const GRANT_CAPABILITIES = {
     "polar.project": ["view"],
     // One task, read on its own: its status, dates, people, subtasks, checklists and
     // discussion. Not the list it sits in, and nothing is changed by the reader.
-    "task.task": ["view"]
+    "task.task": ["view"],
+    // A whole place: every door, switch and camera at it, as one key - what a
+    // room key is, for the building. Devices brought to the place later are
+    // covered; ones moved to another place are not. Its settings, its people
+    // and connecting things to it stay with the people who run the house.
+    "place.place": ["view", "control"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -289,7 +295,8 @@ export const GRANT_ACTIONS = {
     "dns.filter": [],
     "agents.session": [],
     "polar.project": [],
-    "task.task": []
+    "task.task": [],
+    "place.place": ["watch", "open", "close", "operate"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

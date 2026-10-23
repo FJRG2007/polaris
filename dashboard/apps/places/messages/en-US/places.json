@@ -306,6 +306,7 @@
         "up": "Up"
     },
     "switcher": {
+        "share": "Share {name}",
         "add": "Add a place",
         "label": "Which place"
     },

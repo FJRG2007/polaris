@@ -80,7 +80,7 @@ reason).
 | Places | Server | `place.server` | AccessGrant | AccessGrant link `/k` | - | fine | - |
 | Places | Domain | `place.domain` | AccessGrant | AccessGrant link `/k` | - | fine | - |
 | Places | Room | `place.room` | AccessGrant | AccessGrant link `/k` | - | fine | - |
-| Places | Whole place | - | instance permission | none | people | add | todo |
+| Places | Whole place | `place.place` | instance permission + AccessGrant | none | people, teams and roles: every door, switch and camera at the place as one key (devices brought there later are covered) | add | done |
 | Mail | Mailbox | - | owner | none | delegate (read, send) | add | todo |
 | Clock | Timer, alarm, stopwatch | - | owner | none | - | no: personal and short-lived | - |
 | Containers, Servers, Tunnels, Runners | Infrastructure | - | instance permissions | none | - | no: host control stays with permissions | - |

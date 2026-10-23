@@ -75,6 +75,7 @@ export async function requireMayShare(
         case "place.device":
         case "place.camera":
         case "place.room":
+        case "place.place":
             // Deciding who gets a key to the house is the same standing as
             // deciding what Polaris is connected to. Being able to open a door
             // is deliberately not enough: a visitor must not be able to lend it
@@ -493,6 +494,7 @@ export function shareIsBounded(subject: core.GrantSubject): boolean {
         subject === "place.server" ||
         subject === "place.domain" ||
         subject === "place.room" ||
+        subject === "place.place" ||
         subject === "watch.connectivity"
     );
 }

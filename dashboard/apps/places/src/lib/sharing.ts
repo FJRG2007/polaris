@@ -43,7 +43,7 @@ type LiveGrant = AppHostTypes["LiveGrant"];
 /** A grant as it was used, with what it was over - a device itself, or the
  *  room the device is in - so the access log can say which key opened it. */
 export type LentGrant = LiveGrant & {
-    readonly subjectType: "place.device" | "place.camera" | "place.room";
+    readonly subjectType: "place.device" | "place.camera" | "place.room" | "place.place";
     readonly subjectId: string;
 };
 
@@ -156,6 +156,54 @@ async function roomGrants(userId: string, roomIds: readonly string[]): Promise<L
     return found.flat();
 }
 
+/** Live grants over the place a device or a camera is at, if it is at one. */
+async function placeGrants(userId: string, placeId: string | null | undefined): Promise<LentGrant[]> {
+    if (!placeId) return [];
+    return (await liveGrants(userId, "place.place", placeId)).map((grant) => ({
+        ...grant,
+        subjectType: "place.place" as const,
+        subjectId: placeId
+    }));
+}
+
+/** The place a device is at, if it has been put at one. */
+async function placeOfDevice(deviceId: string): Promise<string | null> {
+    const row = await prisma.placeDevice
+        .findUnique({ where: { id: deviceId }, select: { placeId: true } })
+        .catch(() => null);
+    return row?.placeId ?? null;
+}
+
+/** The place a camera is at, if it has been put at one. */
+async function placeOfCamera(cameraId: string): Promise<string | null> {
+    const row = await prisma.camera
+        .findUnique({ where: { id: cameraId }, select: { placeId: true } })
+        .catch(() => null);
+    return row?.placeId ?? null;
+}
+
+/** What whole places cover right now: every device and camera at them, by id,
+ *  each tagged with its place. */
+async function placeContents(
+    placeIds: readonly string[]
+): Promise<{ devices: Map<string, string>; cameras: Map<string, string> }> {
+    const [deviceRows, cameraRows] = await Promise.all([
+        prisma.placeDevice.findMany({
+            where: { placeId: { in: [...placeIds] } },
+            select: { id: true, placeId: true }
+        }),
+        prisma.camera.findMany({
+            where: { placeId: { in: [...placeIds] } },
+            select: { id: true, placeId: true }
+        })
+    ]);
+    const devices = new Map<string, string>();
+    const cameras = new Map<string, string>();
+    for (const row of deviceRows) if (row.placeId) devices.set(row.id, row.placeId);
+    for (const row of cameraRows) if (row.placeId) cameras.set(row.id, row.placeId);
+    return { devices, cameras };
+}
+
 /** The stronger of two capabilities on the same device ladder. */
 function stronger(held: string | undefined, other: string): string {
     if (!held) return other;
@@ -198,35 +246,50 @@ export async function placesReach(user: SessionUser): Promise<PlacesReach> {
             upses: new Map()
         };
     }
-    const [cameraGrants, deviceGrants, deviceGrantActions, upses, rooms, roomActions] =
-        await Promise.all([
-            grantedSubjects(user.id, "place.camera"),
-            grantedSubjects(user.id, "place.device"),
-            grantedActions(user.id, "place.device"),
-            grantedSubjects(user.id, "place.ups"),
-            grantedSubjects(user.id, "place.room"),
-            grantedActions(user.id, "place.room")
-        ]);
+    const [
+        cameraGrants,
+        deviceGrants,
+        deviceGrantActions,
+        upses,
+        rooms,
+        roomActions,
+        places,
+        placeActions
+    ] = await Promise.all([
+        grantedSubjects(user.id, "place.camera"),
+        grantedSubjects(user.id, "place.device"),
+        grantedActions(user.id, "place.device"),
+        grantedSubjects(user.id, "place.ups"),
+        grantedSubjects(user.id, "place.room"),
+        grantedActions(user.id, "place.room"),
+        grantedSubjects(user.id, "place.place"),
+        grantedActions(user.id, "place.place")
+    ]);
     const cameras = new Map(cameraGrants);
     const devices = new Map(deviceGrants);
     const deviceActions = new Map(deviceGrantActions);
-    // A room lent is everything in it, read now: what was put in it since the
-    // grant was written is in, what was taken out is not.
-    if (rooms.size > 0) {
-        const inside = await roomContents([...rooms.keys()]);
-        for (const [deviceId, roomId] of inside.devices) {
-            const held = rooms.get(roomId)!;
-            devices.set(deviceId, stronger(devices.get(deviceId), held));
-            const actions = (roomActions.get(roomId) ?? []).filter((one) => one !== "watch");
+    // A key over many things - a room, or a whole place - is everything in it,
+    // read now: what was put in it since the grant was written is in, what was
+    // taken out is not.
+    const lendInside = (
+        inside: { devices: ReadonlyMap<string, string>; cameras: ReadonlyMap<string, string> },
+        held: ReadonlyMap<string, string>,
+        heldActions: ReadonlyMap<string, readonly string[]>
+    ) => {
+        for (const [deviceId, keyId] of inside.devices) {
+            devices.set(deviceId, stronger(devices.get(deviceId), held.get(keyId)!));
+            const actions = (heldActions.get(keyId) ?? []).filter((one) => one !== "watch");
             deviceActions.set(deviceId, [
                 ...new Set([...(deviceActions.get(deviceId) ?? []), ...actions])
             ]);
         }
-        for (const [cameraId, roomId] of inside.cameras) {
-            const watches = (roomActions.get(roomId) ?? []).includes("watch");
+        for (const [cameraId, keyId] of inside.cameras) {
+            const watches = (heldActions.get(keyId) ?? []).includes("watch");
             if (watches && !cameras.has(cameraId)) cameras.set(cameraId, "view");
         }
-    }
+    };
+    if (rooms.size > 0) lendInside(await roomContents([...rooms.keys()]), rooms, roomActions);
+    if (places.size > 0) lendInside(await placeContents([...places.keys()]), places, placeActions);
     return { everything: false, cameras, devices, deviceActions, upses };
 }
 
@@ -258,7 +321,8 @@ export const reachesPlaces = cache(async (userId: string): Promise<boolean> =>
         "place.nas",
         "place.server",
         "place.domain",
-        "place.room"
+        "place.room",
+        "place.place"
     ])
 );
 
@@ -302,7 +366,8 @@ export function onlyReachable<T extends { id: string }>(
 export async function mayWatchCamera(user: SessionUser, cameraId: string): Promise<boolean> {
     if (await sessionCan(user, "home.read")) return true;
     if ((await liveGrants(user.id, "place.camera", cameraId)).length > 0) return true;
-    return (await roomGrants(user.id, await roomsOfCamera(cameraId))).some(watchesRoom);
+    if ((await roomGrants(user.id, await roomsOfCamera(cameraId))).some(watchesRoom)) return true;
+    return (await placeGrants(user.id, await placeOfCamera(cameraId))).some(watchesRoom);
 }
 
 /**
@@ -315,7 +380,8 @@ export async function logCameraWatch(user: SessionUser, cameraId: string): Promi
     const direct = await liveGrants(user.id, "place.camera", cameraId);
     const grant: LentGrant | undefined = direct[0]
         ? { ...direct[0], subjectType: "place.camera", subjectId: cameraId }
-        : (await roomGrants(user.id, await roomsOfCamera(cameraId))).find(watchesRoom);
+        : ((await roomGrants(user.id, await roomsOfCamera(cameraId))).find(watchesRoom) ??
+          (await placeGrants(user.id, await placeOfCamera(cameraId))).find(watchesRoom));
     if (!grant) return;
     await host.accessGrants.recordGrantUse({
         grantId: grant.id,
@@ -356,7 +422,8 @@ export async function requireDeviceControl(
             subjectType: "place.device" as const,
             subjectId: deviceId
         })),
-        ...(await roomGrants(user.id, await roomsOfDevice(deviceId)))
+        ...(await roomGrants(user.id, await roomsOfDevice(deviceId))),
+        ...(await placeGrants(user.id, await placeOfDevice(deviceId)))
     ];
     // The grant has to allow this direction: a key lent to open the door does
     // not lock it, and one lent to lock it at night does not open it.
@@ -395,7 +462,9 @@ export async function requireDeviceView(user: SessionUser, deviceId: string): Pr
     const held = await liveGrants(user.id, "place.device", deviceId);
     if (held.length > 0) return;
     const viaRoom = await roomGrants(user.id, await roomsOfDevice(deviceId));
-    if (viaRoom.length === 0) throw new HomeError("That device is not shared with you");
+    if (viaRoom.length > 0) return;
+    const viaPlace = await placeGrants(user.id, await placeOfDevice(deviceId));
+    if (viaPlace.length === 0) throw new HomeError("That device is not shared with you");
 }
 
 /**
