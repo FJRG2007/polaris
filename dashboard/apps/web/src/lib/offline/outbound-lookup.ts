@@ -33,6 +33,7 @@ import dns from "node:dns";
 import { isIP } from "node:net";
 import { Breaker } from "./breaker";
 import { readFileSync } from "node:fs";
+import { promisify } from "node:util";
 
 type Address = { address: string; family: number };
 type Options = { family?: number | string; all?: boolean; hints?: number; order?: string; verbatim?: boolean };
@@ -191,6 +192,18 @@ export function createOutboundLookup(input: {
         });
     }
 
+    // `util.promisify(dns.lookup)` answers `{ address, family }` through this; a
+    // replacement without it would resolve to the bare address.
+    Object.defineProperty(lookup, promisify.custom, {
+        value: (hostname: string, options?: unknown) =>
+            new Promise((resolve, reject) =>
+                lookup(hostname, options ?? {}, (error: NodeJS.ErrnoException | null, address?: unknown, family?: number) =>
+                    error
+                        ? reject(error)
+                        : resolve((options as Options | undefined)?.all ? address : { address, family })
+                )
+            )
+    });
     return { lookup: lookup as LookupFunction, breaker };
 }
 

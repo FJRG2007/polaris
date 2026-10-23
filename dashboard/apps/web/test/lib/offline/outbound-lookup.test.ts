@@ -5,6 +5,7 @@
  * answered at once, while outside ones fail fast once the first has failed.
  */
 
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { Breaker } from "@/lib/offline/breaker";
 import { createOutboundLookup, isLocalName, parseHosts, PROBE_NAME } from "@/lib/offline/outbound-lookup";
@@ -140,5 +141,17 @@ describe("createOutboundLookup", () => {
         advance(5_000);
         lookup("nope.example.org", {}, () => undefined);
         expect(resolver.pending).toHaveLength(1);
+    });
+
+    it("keeps the shape util.promisify(dns.lookup) answers", async () => {
+        const { lookup } = setup();
+        const asked = promisify(lookup as unknown as (h: string, o: object, c: () => void) => void) as unknown as (
+            h: string,
+            o?: object
+        ) => Promise<unknown>;
+        await expect(asked("localhost")).resolves.toEqual({ address: "127.0.0.1", family: 4 });
+        await expect(asked("localhost", { all: true, family: 4 })).resolves.toEqual([
+            { address: "127.0.0.1", family: 4 }
+        ]);
     });
 });
