@@ -63,7 +63,7 @@ export const officeDoc = defineScene({
 });
 
 /** Every document, then one opened to work on. */
-export const office = tourScene([officeStill, officeDoc], [
-    { hold: 1600 },
-    { view: 1, hold: 3400 }
-]);
+export const office = tourScene(
+    [officeStill, officeDoc],
+    [{ hold: 1600 }, { view: 1, hold: 3400 }]
+);

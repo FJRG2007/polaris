@@ -14,15 +14,87 @@ const owner = (who: { id: string; name: string }) => ({ id: who.id, name: who.na
 
 /** Invented companies on example domains. */
 const COMPANIES = [
-    { name: "Northwind Traders", domain: "northwind.example.com", who: TEAM.ana, staff: 240, revenue: 4_800_000, city: "Madrid", ideal: true },
-    { name: "Bluebird Logistics", domain: "bluebird.example.com", who: TEAM.sam, staff: 85, revenue: 1_250_000, city: "Lisbon", ideal: true },
-    { name: "Fernhill Studio", domain: "fernhill.example.org", who: VIEWER, staff: 12, revenue: 380_000, city: "Valencia", ideal: false },
-    { name: "Cobalt Energy", domain: "cobalt.example.net", who: TEAM.lena, staff: 1_100, revenue: 22_000_000, city: "Berlin", ideal: true },
-    { name: "Harbor & Pine", domain: "harborpine.example.com", who: TEAM.priya, staff: 46, revenue: 920_000, city: "Porto", ideal: false },
-    { name: "Lumen Health", domain: "lumen.example.org", who: TEAM.kenji, staff: 310, revenue: 6_400_000, city: "Lyon", ideal: true },
-    { name: "Quarry Labs", domain: "quarry.example.com", who: TEAM.ana, staff: 28, revenue: 540_000, city: "Seville", ideal: false },
-    { name: "Atlas Freight", domain: "atlas.example.net", who: TEAM.sam, staff: 520, revenue: 9_700_000, city: "Milan", ideal: true },
-    { name: "Willow Bakery", domain: "willow.example.com", who: VIEWER, staff: 9, revenue: 160_000, city: "Bilbao", ideal: false }
+    {
+        name: "Northwind Traders",
+        domain: "northwind.example.com",
+        who: TEAM.ana,
+        staff: 240,
+        revenue: 4_800_000,
+        city: "Madrid",
+        ideal: true
+    },
+    {
+        name: "Bluebird Logistics",
+        domain: "bluebird.example.com",
+        who: TEAM.sam,
+        staff: 85,
+        revenue: 1_250_000,
+        city: "Lisbon",
+        ideal: true
+    },
+    {
+        name: "Fernhill Studio",
+        domain: "fernhill.example.org",
+        who: VIEWER,
+        staff: 12,
+        revenue: 380_000,
+        city: "Valencia",
+        ideal: false
+    },
+    {
+        name: "Cobalt Energy",
+        domain: "cobalt.example.net",
+        who: TEAM.lena,
+        staff: 1_100,
+        revenue: 22_000_000,
+        city: "Berlin",
+        ideal: true
+    },
+    {
+        name: "Harbor & Pine",
+        domain: "harborpine.example.com",
+        who: TEAM.priya,
+        staff: 46,
+        revenue: 920_000,
+        city: "Porto",
+        ideal: false
+    },
+    {
+        name: "Lumen Health",
+        domain: "lumen.example.org",
+        who: TEAM.kenji,
+        staff: 310,
+        revenue: 6_400_000,
+        city: "Lyon",
+        ideal: true
+    },
+    {
+        name: "Quarry Labs",
+        domain: "quarry.example.com",
+        who: TEAM.ana,
+        staff: 28,
+        revenue: 540_000,
+        city: "Seville",
+        ideal: false
+    },
+    {
+        name: "Atlas Freight",
+        domain: "atlas.example.net",
+        who: TEAM.sam,
+        staff: 520,
+        revenue: 9_700_000,
+        city: "Milan",
+        ideal: true
+    },
+    {
+        name: "Willow Bakery",
+        domain: "willow.example.com",
+        who: VIEWER,
+        staff: 9,
+        revenue: 160_000,
+        city: "Bilbao",
+        ideal: false
+    }
 ];
 
 export const crm = defineScene({
@@ -54,7 +126,9 @@ export const crm = defineScene({
             config: {
                 ...config,
                 columns: config.columns.map((column) =>
-                    column.key === "annualRevenue" ? { ...column, aggregate: "sum" as const } : column
+                    column.key === "annualRevenue"
+                        ? { ...column, aggregate: "sum" as const }
+                        : column
                 )
             }
         };

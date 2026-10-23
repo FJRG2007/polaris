@@ -74,9 +74,12 @@ const watchStill = defineScene({
 });
 
 /** The overview as it redraws: every line moves on as new readings come in. */
-export const watch = tourScene([watchStill], [
-    { hold: 1100 },
-    { fresh: true, hold: 1100 },
-    { fresh: true, hold: 1100 },
-    { fresh: true, hold: 1600 }
-]);
+export const watch = tourScene(
+    [watchStill],
+    [
+        { hold: 1100 },
+        { fresh: true, hold: 1100 },
+        { fresh: true, hold: 1100 },
+        { fresh: true, hold: 1600 }
+    ]
+);

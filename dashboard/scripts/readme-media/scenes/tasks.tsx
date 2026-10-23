@@ -89,7 +89,7 @@ async function panelFromTop() {
 }
 
 /** The board, then a task opened beside it. */
-export const tasks = tourScene([tasksStill, taskPanel], [
-    { hold: 1600 },
-    { view: 1, run: () => panelFromTop(), hold: 3400 }
-]);
+export const tasks = tourScene(
+    [tasksStill, taskPanel],
+    [{ hold: 1600 }, { view: 1, run: () => panelFromTop(), hold: 3400 }]
+);

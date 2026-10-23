@@ -36,8 +36,7 @@ const placesStill = defineScene({
 });
 
 /** The place, then the porch light switched on and the front door opened. */
-export const placesOverview = tourScene([placesStill], [
-    { hold: 1800 },
-    { fresh: true, hold: 1600 },
-    { fresh: true, hold: 2800 }
-]);
+export const placesOverview = tourScene(
+    [placesStill],
+    [{ hold: 1800 }, { fresh: true, hold: 1600 }, { fresh: true, hold: 2800 }]
+);

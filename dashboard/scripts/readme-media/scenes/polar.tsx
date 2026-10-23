@@ -73,7 +73,13 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
     const lang = ctx.locale === "es-ES" ? "es" : "en";
     return (
         <div
-            style={{ flex: "1 1 0", minWidth: 0, overflow: "hidden", background: "#fff", color: INK }}
+            style={{
+                flex: "1 1 0",
+                minWidth: 0,
+                overflow: "hidden",
+                background: "#fff",
+                color: INK
+            }}
         >
             <div
                 style={{
@@ -86,9 +92,17 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
             >
                 <b style={{ fontSize: 18, color: BRAND }}>{SHOP.store}</b>
                 <div
-                    style={{ flex: 1, height: 30, borderRadius: 6, border: `1px solid ${LINE}`, background: "#f5f7f9" }}
+                    style={{
+                        flex: 1,
+                        height: 30,
+                        borderRadius: 6,
+                        border: `1px solid ${LINE}`,
+                        background: "#f5f7f9"
+                    }}
                 />
-                <span style={{ fontSize: 13, color: MUTED }}>{ctx.say("Basket (0)", "Cesta (0)")}</span>
+                <span style={{ fontSize: 13, color: MUTED }}>
+                    {ctx.say("Basket (0)", "Cesta (0)")}
+                </span>
             </div>
             <div style={{ display: "flex", gap: 28, padding: 28 }}>
                 <div
@@ -101,10 +115,28 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
                         background: "linear-gradient(135deg, #ccfbf1, #e0f2fe)"
                     }}
                 >
-                    <div style={{ width: "42%", height: "62%", borderRadius: 40, background: BRAND, boxShadow: "0 18px 40px rgba(15,118,110,.35)" }} />
+                    <div
+                        style={{
+                            width: "42%",
+                            height: "62%",
+                            borderRadius: 40,
+                            background: BRAND,
+                            boxShadow: "0 18px 40px rgba(15,118,110,.35)"
+                        }}
+                    />
                 </div>
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-                    <h1 style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.2 }}>{SHOP.product[lang]}</h1>
+                <div
+                    style={{
+                        flex: 1,
+                        minWidth: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10
+                    }}
+                >
+                    <h1 style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.2 }}>
+                        {SHOP.product[lang]}
+                    </h1>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                         <span style={{ display: "flex", color: STARS }}>
                             {[0, 1, 2, 3, 4].map((n) => (
@@ -112,7 +144,8 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
                             ))}
                         </span>
                         <span style={{ color: MUTED }}>
-                            {lang === "es" ? "4,4" : SHOP.rating} · {ctx.say("1,286 reviews", "1286 opiniones")}
+                            {lang === "es" ? "4,4" : SHOP.rating} ·{" "}
+                            {ctx.say("1,286 reviews", "1286 opiniones")}
                         </span>
                     </div>
                     <p style={{ fontSize: 28, fontWeight: 700 }}>{SHOP.price}</p>
@@ -122,14 +155,35 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
                         ))}
                     </ul>
                     <span
-                        style={{ width: "fit-content", borderRadius: 999, background: BRAND, color: "#fff", padding: "8px 22px", fontSize: 13, fontWeight: 600 }}
+                        style={{
+                            width: "fit-content",
+                            borderRadius: 999,
+                            background: BRAND,
+                            color: "#fff",
+                            padding: "8px 22px",
+                            fontSize: 13,
+                            fontWeight: 600
+                        }}
                     >
                         {ctx.say("Add to basket", "Añadir a la cesta")}
                     </span>
-                    <h2 style={{ marginTop: 10, fontSize: 15, fontWeight: 600 }}>{ctx.say("Reviews", "Opiniones")}</h2>
+                    <h2 style={{ marginTop: 10, fontSize: 15, fontWeight: 600 }}>
+                        {ctx.say("Reviews", "Opiniones")}
+                    </h2>
                     {SHOP.quotes[lang].map(([text, stars]) => (
-                        <div key={text} style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: 10, fontSize: 13 }}>
-                            <span style={{ color: STARS }}>{"★".repeat(stars)}{"☆".repeat(5 - stars)}</span>
+                        <div
+                            key={text}
+                            style={{
+                                border: `1px solid ${LINE}`,
+                                borderRadius: 8,
+                                padding: 10,
+                                fontSize: 13
+                            }}
+                        >
+                            <span style={{ color: STARS }}>
+                                {"★".repeat(stars)}
+                                {"☆".repeat(5 - stars)}
+                            </span>
                             <p style={{ color: MUTED }}>{text}</p>
                         </div>
                     ))}
@@ -143,11 +197,21 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
 function Browser({ ctx, stage }: { ctx: SceneContext; stage: PolarStage }) {
     const dark = ctx.theme === "dark";
     return (
-        <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: dark ? "#2b2d31" : "#e3e5e8" }}>
+        <div
+            style={{
+                display: "flex",
+                flexDirection: "column",
+                height: "100dvh",
+                background: dark ? "#2b2d31" : "#e3e5e8"
+            }}
+        >
             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px" }}>
                 <span style={{ display: "flex", gap: 6 }}>
                     {["#f87171", "#fbbf24", "#4ade80"].map((color) => (
-                        <i key={color} style={{ width: 11, height: 11, borderRadius: 99, background: color }} />
+                        <i
+                            key={color}
+                            style={{ width: 11, height: 11, borderRadius: 99, background: color }}
+                        />
                     ))}
                 </span>
                 <div
@@ -184,7 +248,10 @@ function SidePanel({ ctx }: { ctx: SceneContext }) {
     const lang = ctx.locale === "es-ES" ? "es" : "en";
     return (
         <div className="flex h-dvh bg-card">
-            <PolarChat fullPage site={{ url: SHOP.url, title: `${SHOP.product[lang]} - ${SHOP.store}` }} />
+            <PolarChat
+                fullPage
+                site={{ url: SHOP.url, title: `${SHOP.product[lang]} - ${SHOP.store}` }}
+            />
         </div>
     );
 }

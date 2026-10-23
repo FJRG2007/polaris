@@ -106,7 +106,12 @@ function StoreCard({
             preview={
                 // The name below is the link a keyboard reaches; the picture is
                 // the same destination for a pointer.
-                <Link href={page} tabIndex={-1} aria-hidden className="block border-b border-border">
+                <Link
+                    href={page}
+                    tabIndex={-1}
+                    aria-hidden
+                    className="block border-b border-border"
+                >
                     <store.StorePreview
                         name={app.name}
                         summary={app.summary}
@@ -229,18 +234,18 @@ export function MarketplaceGrid({
             </div>
 
             <BuiltInAppsSection
-                    apps={builtInShown.map((app) => ({
-                        id: app.id,
-                        label: app.name,
-                        href: pageOf(app.id),
-                        replaces: app.replaces.map((item) => ({
-                            name: item.name,
-                            src: `${base()}/logos/${item.logo}.svg`
-                        }))
-                    }))}
-                    words={builtInWords}
-                    link={Link}
-                />
+                apps={builtInShown.map((app) => ({
+                    id: app.id,
+                    label: app.name,
+                    href: pageOf(app.id),
+                    replaces: app.replaces.map((item) => ({
+                        name: item.name,
+                        src: `${base()}/logos/${item.logo}.svg`
+                    }))
+                }))}
+                words={builtInWords}
+                link={Link}
+            />
 
             {featured.length > 0 ? (
                 <section className="flex min-w-0 flex-col gap-3" aria-label={words.featured}>

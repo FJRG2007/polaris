@@ -91,8 +91,18 @@ export const SHOP = {
     rating: 4.4,
     reviews: 1286,
     points: {
-        en: ["28 L main compartment", "Padded sleeve for laptops up to 15.6\"", "Rain cover included", "1.1 kg"],
-        es: ["Compartimento principal de 28 L", "Funda acolchada para portátiles de hasta 15,6\"", "Funda para lluvia incluida", "1,1 kg"]
+        en: [
+            "28 L main compartment",
+            'Padded sleeve for laptops up to 15.6"',
+            "Rain cover included",
+            "1.1 kg"
+        ],
+        es: [
+            "Compartimento principal de 28 L",
+            'Funda acolchada para portátiles de hasta 15,6"',
+            "Funda para lluvia incluida",
+            "1,1 kg"
+        ]
     },
     quotes: {
         en: [
@@ -166,7 +176,12 @@ export function polarThread(ctx: SceneContext, stage: PolarStage = "answered", s
                           id: id("polar-message", shop ? 4 : 2),
                           role: "assistant",
                           parentId: question,
-                          parts: [{ type: "text", text: stage === "answering" ? partOf(answer) : answer }]
+                          parts: [
+                              {
+                                  type: "text",
+                                  text: stage === "answering" ? partOf(answer) : answer
+                              }
+                          ]
                       }
                   ])
         ]

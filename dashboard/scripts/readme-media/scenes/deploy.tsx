@@ -100,8 +100,11 @@ export const deployLogs = defineScene({
 });
 
 /** Every project, one opened on its canvas, then its web service's live log. */
-export const deployProject = tourScene([deployProjectStill, deploy, deployLogs], [
-    { view: 1, hold: 1700 },
-    { view: 0, hold: 2000 },
-    { view: 2, run: (ctx) => once(() => deployLogs.prepare?.(ctx)), hold: 3400, advance: 1600 }
-]);
+export const deployProject = tourScene(
+    [deployProjectStill, deploy, deployLogs],
+    [
+        { view: 1, hold: 1700 },
+        { view: 0, hold: 2000 },
+        { view: 2, run: (ctx) => once(() => deployLogs.prepare?.(ctx)), hold: 3400, advance: 1600 }
+    ]
+);

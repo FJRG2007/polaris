@@ -27,8 +27,13 @@ function Tools() {
                             }
                         >
                             <div className="flex items-center gap-2">
-                                <group.icon className="size-5 shrink-0 text-foreground-subtle" aria-hidden />
-                                <span className="font-medium">{word(`groups.${group.id}.name`)}</span>
+                                <group.icon
+                                    className="size-5 shrink-0 text-foreground-subtle"
+                                    aria-hidden
+                                />
+                                <span className="font-medium">
+                                    {word(`groups.${group.id}.name`)}
+                                </span>
                                 {group.soon ? (
                                     <span className="ml-auto rounded border border-border px-1.5 py-0.5 text-xs text-foreground-subtle">
                                         {t("page.coming")}

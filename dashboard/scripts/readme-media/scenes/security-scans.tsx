@@ -13,7 +13,13 @@ export const securityScans = defineScene({
     path: "/apps/servers/security",
     actions: (ctx) => {
         const at = (minutes: number) => new Date(Date.parse(ago(ctx.now, minutes)));
-        const scan = (n: number, kind: string, label: string, minutes: number, summary: Record<string, unknown>) => ({
+        const scan = (
+            n: number,
+            kind: string,
+            label: string,
+            minutes: number,
+            summary: Record<string, unknown>
+        ) => ({
             id: id("security-scan", n),
             kind,
             label,
@@ -30,8 +36,22 @@ export const securityScans = defineScene({
             serversAction: () => ({
                 ok: true,
                 data: [
-                    { id: HOST, name: ctx.say("This machine", "Esta máquina"), local: true, everyHours: 24, updates: "security", distro: "Ubuntu 24.04" },
-                    { id: id("server", 2), name: "edge-01", local: false, everyHours: 24, updates: "all", distro: "Debian 12" }
+                    {
+                        id: HOST,
+                        name: ctx.say("This machine", "Esta máquina"),
+                        local: true,
+                        everyHours: 24,
+                        updates: "security",
+                        distro: "Ubuntu 24.04"
+                    },
+                    {
+                        id: id("server", 2),
+                        name: "edge-01",
+                        local: false,
+                        everyHours: 24,
+                        updates: "all",
+                        distro: "Debian 12"
+                    }
                 ]
             }),
             overviewAction: () => ({
@@ -48,8 +68,16 @@ export const securityScans = defineScene({
                     scans: [
                         scan(1, "malware", "shop / uploads", 95, { found: 0 }),
                         scan(2, "malware", "wiki / data", 98, { found: 1 }),
-                        scan(3, "files", "shop / uploads", 160, { mode: "check", added: 4, removed: 0, changed: 1 }),
-                        scan(4, "audit", ctx.say("This machine", "Esta máquina"), 1440, { score: 82, warnings: 3 })
+                        scan(3, "files", "shop / uploads", 160, {
+                            mode: "check",
+                            added: 4,
+                            removed: 0,
+                            changed: 1
+                        }),
+                        scan(4, "audit", ctx.say("This machine", "Esta máquina"), 1440, {
+                            score: 82,
+                            warnings: 3
+                        })
                     ],
                     quarantine: [
                         {

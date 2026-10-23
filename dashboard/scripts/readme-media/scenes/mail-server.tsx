@@ -24,9 +24,27 @@ export const mailServer = defineScene({
     actions: (ctx) => ({
         listServersAction: () => ({
             servers: [
-                { hostname: "mail.example.com", domain: "example.com", status: "ready", place: "", days: 92 },
-                { hostname: "mx.example.org", domain: "example.org", status: "ready", place: "edge-01", days: 31 },
-                { hostname: "mail.example.net", domain: "example.net", status: "starting", place: "edge-02", days: 0 }
+                {
+                    hostname: "mail.example.com",
+                    domain: "example.com",
+                    status: "ready",
+                    place: "",
+                    days: 92
+                },
+                {
+                    hostname: "mx.example.org",
+                    domain: "example.org",
+                    status: "ready",
+                    place: "edge-01",
+                    days: 31
+                },
+                {
+                    hostname: "mail.example.net",
+                    domain: "example.net",
+                    status: "starting",
+                    place: "edge-02",
+                    days: 0
+                }
             ].map((server, n) => ({
                 id: id("mail-server", n + 1),
                 hostname: server.hostname,

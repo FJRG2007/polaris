@@ -12,9 +12,21 @@ export const statusPages = defineScene({
         listPagesAction: () => ({
             ok: true,
             pages: [
-                { slug: "shop", title: ctx.say("Shop status", "Estado de la tienda"), published: true, components: 6, openIncidents: 1 },
+                {
+                    slug: "shop",
+                    title: ctx.say("Shop status", "Estado de la tienda"),
+                    published: true,
+                    components: 6,
+                    openIncidents: 1
+                },
                 { slug: "api", title: "API", published: true, components: 4, openIncidents: 0 },
-                { slug: "internal", title: ctx.say("Internal tools", "Herramientas internas"), published: false, components: 3, openIncidents: 0 }
+                {
+                    slug: "internal",
+                    title: ctx.say("Internal tools", "Herramientas internas"),
+                    published: false,
+                    components: 3,
+                    openIncidents: 0
+                }
             ].map((page, n) => ({ id: id("status-page", n + 1), ...page }))
         })
     }),

@@ -23,12 +23,7 @@ import { appNeeds } from "@/lib/apps/app-needs";
 import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
 import type { AppManifest } from "@/lib/apps/catalog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
-import {
-    InstallWizard,
-    by,
-    statusLabel,
-    useOneClickInstall
-} from "../marketplace-view";
+import { InstallWizard, by, statusLabel, useOneClickInstall } from "../marketplace-view";
 import { ScreenshotGallery } from "./screenshot-gallery";
 import { AppPreview, PrimaryActionButton, StatusBadge } from "../store-card";
 import {

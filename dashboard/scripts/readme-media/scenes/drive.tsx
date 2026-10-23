@@ -61,7 +61,4 @@ export const driveLinks = defineScene({
 });
 
 /** The files, then the links handed out from them. */
-export const drive = tourScene([driveStill, driveLinks], [
-    { hold: 1800 },
-    { view: 1, hold: 3000 }
-]);
+export const drive = tourScene([driveStill, driveLinks], [{ hold: 1800 }, { view: 1, hold: 3000 }]);

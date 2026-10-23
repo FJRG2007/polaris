@@ -257,7 +257,8 @@ export function ShotCarousel({
                         </button>
                         {shot.caption ? (
                             <figcaption className="min-w-0 text-xs text-muted-foreground">
-                                <b className="font-medium text-foreground">{shot.name}</b> - {shot.caption}
+                                <b className="font-medium text-foreground">{shot.name}</b> -{" "}
+                                {shot.caption}
                             </figcaption>
                         ) : null}
                     </figure>

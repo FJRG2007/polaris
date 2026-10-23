@@ -46,7 +46,13 @@ describe("filterSiteApps", () => {
     ];
     const filter = (extra: Partial<Parameters<typeof site.filterSiteApps>[1]>) =>
         site
-            .filterSiteApps(apps, { query: "", category: "", sort: "featured", locale: "en", ...extra })
+            .filterSiteApps(apps, {
+                query: "",
+                category: "",
+                sort: "featured",
+                locale: "en",
+                ...extra
+            })
             .map((entry) => entry.id);
 
     it("keeps the dashboard's order, with anything not out yet last", () => {
@@ -65,7 +71,10 @@ describe("filterSiteApps", () => {
     });
 
     it("splits the shelves Polaris's first and leaves an empty one out", () => {
-        expect(site.siteShelves(apps).map((group) => group.shelf)).toEqual(["polaris", "community"]);
+        expect(site.siteShelves(apps).map((group) => group.shelf)).toEqual([
+            "polaris",
+            "community"
+        ]);
         expect(site.siteShelves([apps[3]!]).map((group) => group.shelf)).toEqual(["community"]);
     });
 });

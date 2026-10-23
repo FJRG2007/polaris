@@ -67,7 +67,10 @@ function translator(messages: Record<string, unknown>) {
     const find = (key: string): unknown =>
         key
             .split(".")
-            .reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], messages);
+            .reduce<unknown>(
+                (node, part) => (node as Record<string, unknown> | undefined)?.[part],
+                messages
+            );
     const t = (key: string, values: Readonly<Record<string, string | number>> = {}) => {
         const found = find(key);
         return typeof found === "string" ? site.fill(found, values) : key;
@@ -96,7 +99,8 @@ function storeList(webLocale: string, showcase: site.ShowcaseSection[]): site.Si
     const words = translator(messages(webLocale, "catalog"));
     const deploy = translator(messages(webLocale, "deploy"));
     const nav = translator(messages(webLocale, "nav"));
-    const navLabel = (label: string) => (nav.has(`labels.${label}`) ? nav(`labels.${label}`) : label);
+    const navLabel = (label: string) =>
+        nav.has(`labels.${label}`) ? nav(`labels.${label}`) : label;
     const localize = (app: AppManifest): AppManifest => {
         if (!app.deployTemplate) return localizeApp(words as never, app, navLabel);
         const key = `view.template.catalog.${app.deployTemplate}.description`;

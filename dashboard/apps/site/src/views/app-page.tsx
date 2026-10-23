@@ -124,8 +124,15 @@ export function AppPageView({
             </section>
 
             {shots.length > 0 ? (
-                <section className="flex min-w-0 flex-col gap-3" aria-label={builtInWords.screenshots}>
-                    <ShotCarousel title={builtInWords.screenshots} shots={shots} words={words(locale).viewer} />
+                <section
+                    className="flex min-w-0 flex-col gap-3"
+                    aria-label={builtInWords.screenshots}
+                >
+                    <ShotCarousel
+                        title={builtInWords.screenshots}
+                        shots={shots}
+                        words={words(locale).viewer}
+                    />
                 </section>
             ) : null}
 
@@ -145,10 +152,15 @@ export function AppPageView({
                                     className="size-10 shrink-0 object-contain"
                                 />
                                 <div className="flex min-w-0 flex-col gap-0.5">
-                                    <span className="truncate text-sm font-medium" title={game.name}>
+                                    <span
+                                        className="truncate text-sm font-medium"
+                                        title={game.name}
+                                    >
                                         {game.name}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{game.summary}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {game.summary}
+                                    </span>
                                 </div>
                             </li>
                         ))}
@@ -213,7 +225,10 @@ export function AppPageView({
                                             className="inline-flex min-w-0 items-center gap-1 break-all underline underline-offset-2"
                                         >
                                             {fact.value}
-                                            <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+                                            <ExternalLink
+                                                className="size-3 shrink-0"
+                                                aria-hidden="true"
+                                            />
                                         </a>
                                     ) : fact.code ? (
                                         <code className="break-all text-xs">{fact.value}</code>

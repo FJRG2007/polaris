@@ -85,7 +85,12 @@ export interface SiteApp {
     /** What it replaces, with the logo the site ships for each, as its dashboard page lists it. */
     readonly replaces: readonly { readonly name: string; readonly logo: string }[];
     /** The games it runs, for Game servers. */
-    readonly games: readonly { readonly id: string; readonly name: string; readonly summary: string; readonly logo: string }[];
+    readonly games: readonly {
+        readonly id: string;
+        readonly name: string;
+        readonly summary: string;
+        readonly logo: string;
+    }[];
 }
 
 /** The categories present, in the order they first appear (the dashboard's `storeCategories`). */
@@ -110,7 +115,9 @@ export function filterSiteApps(
     apps: readonly SiteApp[],
     filter: { query: string; category: string; sort: StoreSort; locale: SiteLocale }
 ): SiteApp[] {
-    const inCategory = filter.category ? apps.filter((app) => app.category === filter.category) : [...apps];
+    const inCategory = filter.category
+        ? apps.filter((app) => app.category === filter.category)
+        : [...apps];
     const term = filter.query.trim();
     const matched = term ? searchItems(inCategory, term, APP_FIELDS) : inCategory;
     const order = new Map(apps.map((app, index) => [app.id, index]));

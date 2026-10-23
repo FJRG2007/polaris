@@ -83,15 +83,16 @@ async function openOnPhone(ctx: Parameters<NonNullable<typeof vaultStill.prepare
     if (window.matchMedia("(min-width: 1024px)").matches) return;
     const name = OPEN_ITEM_NAME(ctx);
     await once(() => {
-        const title = [...document.querySelectorAll("h2")].find((heading) => heading.textContent === name);
+        const title = [...document.querySelectorAll("h2")].find(
+            (heading) => heading.textContent === name
+        );
         if (!title) throw new Error("the login did not open");
         (title.closest("[class*='rounded']") ?? title).scrollIntoView({ block: "start" });
     });
 }
 
 /** The vault, a login opened with its one-time code, then what was sent out of it. */
-export const vault = tourScene([{ ...vaultStill, prepare: undefined }, vaultSends], [
-    { hold: 1500 },
-    { run: (ctx) => openOnPhone(ctx), hold: 3000 },
-    { view: 1, hold: 2600 }
-]);
+export const vault = tourScene(
+    [{ ...vaultStill, prepare: undefined }, vaultSends],
+    [{ hold: 1500 }, { run: (ctx) => openOnPhone(ctx), hold: 3000 }, { view: 1, hold: 2600 }]
+);

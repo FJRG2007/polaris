@@ -40,7 +40,7 @@ const automationsStill = defineScene({
 });
 
 /** The list, then the alert that failed run again and passed. */
-export const automations = tourScene([automationsStill], [
-    { hold: 2000 },
-    { fresh: true, hold: 3000 }
-]);
+export const automations = tourScene(
+    [automationsStill],
+    [{ hold: 2000 }, { fresh: true, hold: 3000 }]
+);

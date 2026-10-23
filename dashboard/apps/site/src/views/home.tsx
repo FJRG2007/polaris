@@ -42,7 +42,16 @@ function SectionHead({ id, title, intro }: { id: string; title: string; intro: s
  * dashboard's own line for it, and leads to its marketplace page.
  */
 const MAIN_FEATURES = ["apps", "drive", "chat", "tasks", "mail", "game-servers"];
-const MORE_FEATURES = ["polar", "office", "vault", "notes", "automations", "watch", "calendar", "home"];
+const MORE_FEATURES = [
+    "polar",
+    "office",
+    "vault",
+    "notes",
+    "automations",
+    "watch",
+    "calendar",
+    "home"
+];
 
 function tourFeatures(locale: SiteLocale): { main: Feature[]; more: Feature[] } {
     const { apps, builtIn } = siteData().locales[locale];

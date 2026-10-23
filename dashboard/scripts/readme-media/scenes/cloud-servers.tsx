@@ -49,14 +49,70 @@ export const cloudServers = defineScene({
             overviewAction: () => ({
                 ok: true,
                 accounts: [
-                    { id: DO, provider: "digitalocean", name: ctx.say("Production", "Producción"), lastError: null, organization: null },
-                    { id: HZ, provider: "hetzner", name: ctx.say("Backups", "Copias"), lastError: null, organization: null }
+                    {
+                        id: DO,
+                        provider: "digitalocean",
+                        name: ctx.say("Production", "Producción"),
+                        lastError: null,
+                        organization: null
+                    },
+                    {
+                        id: HZ,
+                        provider: "hetzner",
+                        name: ctx.say("Backups", "Copias"),
+                        lastError: null,
+                        organization: null
+                    }
                 ],
                 servers: [
-                    server(1, DO, "digitalocean", "web-01", "fra1", "s-2vcpu-4gb", "running", "203.0.113.24", 24, 120),
-                    server(2, DO, "digitalocean", "worker-01", "ams3", "s-1vcpu-2gb", "running", "203.0.113.57", 12, 64),
-                    server(3, HZ, "hetzner", "backup-01", "fsn1", "cx22", "running", "198.51.100.12", 4.59, 210),
-                    server(4, HZ, "hetzner", "build-01", "nbg1", "cpx31", "off", "198.51.100.40", 15.59, 18)
+                    server(
+                        1,
+                        DO,
+                        "digitalocean",
+                        "web-01",
+                        "fra1",
+                        "s-2vcpu-4gb",
+                        "running",
+                        "203.0.113.24",
+                        24,
+                        120
+                    ),
+                    server(
+                        2,
+                        DO,
+                        "digitalocean",
+                        "worker-01",
+                        "ams3",
+                        "s-1vcpu-2gb",
+                        "running",
+                        "203.0.113.57",
+                        12,
+                        64
+                    ),
+                    server(
+                        3,
+                        HZ,
+                        "hetzner",
+                        "backup-01",
+                        "fsn1",
+                        "cx22",
+                        "running",
+                        "198.51.100.12",
+                        4.59,
+                        210
+                    ),
+                    server(
+                        4,
+                        HZ,
+                        "hetzner",
+                        "build-01",
+                        "nbg1",
+                        "cpx31",
+                        "off",
+                        "198.51.100.40",
+                        15.59,
+                        18
+                    )
                 ],
                 monthTotals: {
                     [DO]: { totals: { USD: 20.88 }, unpriced: 0 },

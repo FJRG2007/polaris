@@ -80,7 +80,7 @@ export const calendarTime = defineScene({
 });
 
 /** The week, then the time where everybody is. */
-export const calendar = tourScene([calendarStill, calendarTime], [
-    { hold: 2000 },
-    { view: 1, hold: 3000 }
-]);
+export const calendar = tourScene(
+    [calendarStill, calendarTime],
+    [{ hold: 2000 }, { view: 1, hold: 3000 }]
+);

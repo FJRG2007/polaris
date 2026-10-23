@@ -26,7 +26,9 @@ const CLIENTS = [
 ];
 
 const wave = (base: number, swing: number, phase: number) =>
-    Array.from({ length: BUCKETS }, (_, n) => Math.round(base + swing * Math.sin((n + phase) / 4) + ((n * 7) % 5) * 3));
+    Array.from({ length: BUCKETS }, (_, n) =>
+        Math.round(base + swing * Math.sin((n + phase) / 4) + ((n * 7) % 5) * 3)
+    );
 
 function insights(ctx: SceneContext) {
     const allowed = wave(140, 60, 0);
@@ -91,8 +93,14 @@ function insights(ctx: SceneContext) {
                     { name: "metrics.example.net", count: 214 },
                     { name: "pixel.example.org", count: 97 }
                 ],
-                topClients: CLIENTS.map((client, n) => ({ name: client.address, count: 1400 - n * 310 })),
-                topBlockedClients: CLIENTS.slice(0, 2).map((client, n) => ({ name: client.address, count: 420 - n * 150 })),
+                topClients: CLIENTS.map((client, n) => ({
+                    name: client.address,
+                    count: 1400 - n * 310
+                })),
+                topBlockedClients: CLIENTS.slice(0, 2).map((client, n) => ({
+                    name: client.address,
+                    count: 420 - n * 150
+                })),
                 clients: CLIENTS
             },
             log: { rows, page: 0, hasMore: true },
@@ -150,7 +158,14 @@ export const networkFilter = defineScene({
     path: "/apps/network-filter",
     api: (ctx) => ({
         "GET /api/dns-blocker/status": () =>
-            wire({ status: { state: "blocking", address: ADDRESS, settings: dns.DEFAULT_DNS_SETTINGS, stale: false } }),
+            wire({
+                status: {
+                    state: "blocking",
+                    address: ADDRESS,
+                    settings: dns.DEFAULT_DNS_SETTINGS,
+                    stale: false
+                }
+            }),
         "GET /api/dns-blocker/insights": () => wire(insights(ctx)),
         "GET /api/dns-blocker/tail": () => wire({ rows: [] }),
         "GET /api/dns-blocker/lists": () =>

@@ -110,7 +110,4 @@ export const mailThread = defineScene({
 });
 
 /** The inbox, then a conversation opened from it. */
-export const mail = tourScene([mailStill, mailThread], [
-    { hold: 1600 },
-    { view: 1, hold: 3400 }
-]);
+export const mail = tourScene([mailStill, mailThread], [{ hold: 1600 }, { view: 1, hold: 3400 }]);
