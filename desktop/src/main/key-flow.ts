@@ -12,7 +12,7 @@ import { openLocalWindow } from "./windows";
 import type { BrowserWindow } from "electron";
 import type { Outcome } from "@/shared/bridge";
 import { apiKeySchema } from "@/shared/api-key";
-import { ApiFailure, callJson, meSchema } from "./polaris-api";
+import { ApiFailure, callJson, learnServer, meSchema } from "./polaris-api";
 import { canKeepApiKey, forgetApiKey, keepApiKey, readApiKey } from "./api-key-store";
 
 const REFUSED = "Polaris refused that key - it may have been revoked or have expired.";
@@ -90,6 +90,7 @@ export async function submitApiKey(raw: unknown): Promise<Outcome> {
     }
     if (asking !== current) return { ok: false, error: "This form was replaced. Close this window." };
     remembered = { server: current.server, key: parsed.data };
+    void learnServer(current.server).catch(() => undefined);
     keepApiKey(current.server, parsed.data);
     settle(parsed.data);
     current.window.close();

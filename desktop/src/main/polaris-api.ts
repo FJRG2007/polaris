@@ -10,6 +10,7 @@
  * what the Deploy API accepts, and it can be revoked on its own.
  */
 
+import { createFailover, learnInstance, type Failover } from "../../../dashboard/packages/core/src/instance-fallback";
 import { z } from "zod";
 import { net } from "electron";
 import type { Readable } from "node:stream";
@@ -27,6 +28,25 @@ export class ApiFailure extends Error {
 }
 
 export const KEY_REFUSED = "The API key was refused - it may have been revoked or have expired. Paste a new one.";
+
+/**
+ * The same Polaris on its local addresses, learned over the server's own address
+ * once its key is accepted (`learnServer`). Kept for the life of the app: a
+ * request goes to a local address only after it proved, by signature, that it is
+ * this Polaris - see `@polaris/core/instance-fallback`.
+ */
+const failovers = new Map<string, Failover>();
+
+/** Learn the server's identity and local addresses. Best-effort; an older Polaris has none. */
+export async function learnServer(server: string): Promise<void> {
+    const instance = await learnInstance(server, (url, init) => net.fetch(url, init));
+    if (instance) failovers.set(server, createFailover({ primary: server, instance, fetch: (url, init) => net.fetch(url, init) }));
+}
+
+/** "Using your local network address" while on one, otherwise null. */
+export function addressWords(server: string): string | null {
+    return failovers.get(server)?.status().words ?? null;
+}
 
 export interface Caller {
     readonly server: string;
@@ -57,8 +77,12 @@ export async function call(caller: Caller, path: string, init: RequestInit = {})
     const headers = new Headers(init.headers);
     headers.set("authorization", `Bearer ${caller.key}`);
     let response: Response;
+    const options: RequestInit = { ...init, headers, credentials: "omit", cache: "no-store" };
+    const failover = failovers.get(caller.server);
     try {
-        response = await net.fetch(`${caller.server}${path}`, { ...init, headers, credentials: "omit", cache: "no-store" });
+        response = failover
+            ? await failover.request(path, options)
+            : await net.fetch(`${caller.server}${path}`, options);
     } catch (caught) {
         if ((caught as Error).name === "AbortError") throw caught;
         throw unreachable(caught, caller);
