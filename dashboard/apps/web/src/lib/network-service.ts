@@ -199,7 +199,7 @@ const HISTORY_SIZE = 10;
  */
 export async function probePublicIp(first = 0): Promise<string | null> {
     for (let step = 0; step < ECHO_SERVICES.length; step += 1) {
-        const url = ECHO_SERVICES[(first + step) % ECHO_SERVICES.length];
+        const url = ECHO_SERVICES[(first + step) % ECHO_SERVICES.length] ?? ECHO_SERVICES[0];
         try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 4000);
