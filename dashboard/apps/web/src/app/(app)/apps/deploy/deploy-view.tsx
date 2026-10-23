@@ -151,6 +151,8 @@ export interface ProjectSummary {
             serverName: string;
             containerRef: string;
             autoDeploy: boolean;
+            /** A push deploys only once every GitHub check on it has passed. */
+            waitForCi: boolean;
             deployBranch: string | null;
             commitFilter: string | null;
             /** Globs a push must touch to redeploy this one, for a shared repository. */

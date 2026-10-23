@@ -248,7 +248,10 @@
         "machineLoadFailed": "Could not read where this service builds",
         "machineSaveFailed": "Could not change where this service builds",
         "loadFailed": "Could not read this service's source",
-        "machineUnknown": "Choose a machine from the list"
+        "machineUnknown": "Choose a machine from the list",
+        "disconnectFailed": "Could not disconnect the repository",
+        "changeFailed": "Could not change the repository",
+        "repositoryInvalid": "Pick a repository and a valid branch name"
     },
     "scaling": {
         "loadFailed": "Could not read how this service is scaled",

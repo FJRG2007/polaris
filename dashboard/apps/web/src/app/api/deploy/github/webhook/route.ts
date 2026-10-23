@@ -4,6 +4,9 @@
  *
  *   - `push` fans out to every application tracking that repository whose branch
  *     and commit-message filters pass (auto-deploy, Vercel-style).
+ *   - `check_suite`, `check_run` and `workflow_run` finishing settle the pushes a
+ *     service is holding until CI passes ("Wait for CI"), beside the Agents app
+ *     that also reads the first and last of them.
  *   - `workflow_job` tells the runner pools which repository has work waiting, so
  *     a pool serving many repositories puts its next runner where it is needed.
  *
@@ -17,9 +20,14 @@
 import { z } from "zod";
 import { recordWorkflowJob } from "@/lib/runners/runner-demand";
 import { handleAgentWebhook } from "@/lib/agents/agent-webhook";
+import { finishedCheckOf, onChecksFinished } from "@/lib/deploy/ci-wait";
 import { branchFromRef, triggerAutoDeploysForPush } from "@/lib/deploy/push-deploys";
 import { closePullRequestPreview, ensurePullRequestPreview } from "@/lib/deploy/environments";
-import { getGithubWebhookSecret, githubAppHandle, verifyWebhookSignature } from "@/lib/github-service";
+import {
+    getGithubWebhookSecret,
+    githubAppHandle,
+    verifyWebhookSignature
+} from "@/lib/github-service";
 
 /** Events that concern the Agents app. Named rather than inferred so an event
  *  GitHub adds later is ignored until somebody decides what it means. */
@@ -64,6 +72,36 @@ interface WorkflowJobPayload {
     workflow_job?: { labels?: string[] };
 }
 
+/** How long a commit's check events are gathered before its checks are read. */
+const SETTLE_QUIET_MS = 3_000;
+/** The longest a steady stream of them may put that read off. */
+const SETTLE_MAX_DELAY_MS = 15_000;
+const settling = new Map<string, { timer: ReturnType<typeof setTimeout>; since: number }>();
+
+/**
+ * Settle any push held for CI on the commit a finished check ran on. Every job of
+ * a run reports on its own, so the events for one commit are gathered and its
+ * checks read once they go quiet, not once per job. Not awaited by the caller: a
+ * deploy it starts can outlast GitHub's ten seconds.
+ */
+function settleHeldPushes(event: string, payload: unknown): void {
+    const finished = finishedCheckOf(event, payload);
+    if (!finished) return;
+    const key = `${finished.repoFullName.toLowerCase()}@${finished.sha.toLowerCase()}`;
+    const prior = settling.get(key);
+    if (prior) clearTimeout(prior.timer);
+    const since = prior?.since ?? Date.now();
+    const delay = Math.max(0, Math.min(SETTLE_QUIET_MS, since + SETTLE_MAX_DELAY_MS - Date.now()));
+    const timer = setTimeout(() => {
+        settling.delete(key);
+        void onChecksFinished(finished.repoFullName, finished.sha).catch((error: unknown) => {
+            console.error("polaris: a push held for CI could not be settled:", error);
+        });
+    }, delay);
+    timer.unref?.();
+    settling.set(key, { timer, since });
+}
+
 /** The fields of a `pull_request` event a preview needs, validated rather than
  *  trusted: a signed payload is GitHub's, but its shape is still its business. */
 const pullRequestEvent = z.object({
@@ -77,7 +115,11 @@ const pullRequestEvent = z.object({
             sha: z.string().regex(/^[0-9a-f]{40}$/i),
             repo: z.object({ full_name: z.string() }).nullable().optional()
         }),
-        user: z.object({ login: z.string(), avatar_url: z.string().url() }).partial().nullable().optional()
+        user: z
+            .object({ login: z.string(), avatar_url: z.string().url() })
+            .partial()
+            .nullable()
+            .optional()
     })
 });
 
@@ -119,6 +161,18 @@ export async function POST(request: Request): Promise<Response> {
 
     if (event === "ping") return Response.json({ ok: true });
 
+    // Not one the Agents app reads, so it is answered here.
+    if (event === "check_run") {
+        let payload: unknown;
+        try {
+            payload = JSON.parse(raw);
+        } catch {
+            return new Response("bad payload", { status: 400 });
+        }
+        settleHeldPushes(event, payload);
+        return Response.json({ ok: true });
+    }
+
     // A job queued, started or finished somewhere a pool serves. Only self-hosted
     // jobs matter here, but a pool that carries none of the labels a job asked for
     // is filtered out by the recording itself rather than by guessing here.
@@ -155,6 +209,7 @@ export async function POST(request: Request): Promise<Response> {
         // Not awaited: cloning and queueing a whole environment can outlast the
         // ten seconds GitHub waits for an answer, and a delivery it gave up on is
         // one it retries.
+        if (event === "check_suite" || event === "workflow_run") settleHeldPushes(event, payload);
         if (event === "pull_request") {
             void handlePreviewEvent(payload).catch((error: unknown) => {
                 console.error("polaris: a preview environment could not be updated:", error);

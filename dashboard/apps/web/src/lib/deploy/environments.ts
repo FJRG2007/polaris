@@ -240,6 +240,7 @@ export async function cloneEnvironment(
                     memoryLimitMb: application.memoryLimitMb,
                     commitFilter: application.commitFilter,
                     watchPaths: application.watchPaths,
+                    waitForCi: application.waitForCi,
                     // The edge settings and whether the port is open come over too:
                     // a copy that answered on a port its original keeps closed, or
                     // without the original's rate limits, is not a copy.

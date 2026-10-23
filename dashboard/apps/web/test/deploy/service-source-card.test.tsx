@@ -13,10 +13,24 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { describeServiceSource } from "@/lib/deploy/service-source";
 
 vi.mock("@/app/(app)/apps/deploy/source-actions", () => ({
-    serviceSourceAction: vi.fn(async () => ({}))
+    serviceSourceAction: vi.fn(async () => ({
+        source: {
+            kind: "repository",
+            provider: "github",
+            name: "acme/web",
+            url: "https://github.com/acme/web",
+            branch: "main"
+        }
+    })),
+    changeSourceAction: vi.fn(async () => ({})),
+    disconnectSourceAction: vi.fn(async () => ({}))
+}));
+vi.mock("@/app/(app)/apps/deploy/actions", () => ({
+    githubReposAction: vi.fn(async () => ({ connected: true, login: null, repos: [] })),
+    searchGithubReposAction: vi.fn(async () => ({ repos: [] }))
 }));
 
-const { SourceRepositoryView, builderOf } =
+const { SourceRepositoryCard, SourceRepositoryView, builderOf } =
     await import("@/app/(app)/apps/deploy/service-source-cards");
 
 afterEach(cleanup);
@@ -210,3 +224,28 @@ describe("the builder a service is said to use", () => {
         ).toEqual({ kind: "image" });
     });
 });
+
+describe("the repository card's controls", () => {
+    const app = {
+        id: "app-1",
+        sourceType: "dockerfile",
+        deployBranch: "main",
+        rootDirectory: null,
+        autoDeploy: true
+    } as unknown as ProjectAppLike;
+
+    it("offers change and disconnect to somebody who may configure the service", async () => {
+        render(<SourceRepositoryCard app={app} canConfigure />, { wrapper: MessagesWrapper });
+        expect(await screen.findByRole("button", { name: "Change repository" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Disconnect" })).toBeTruthy();
+    });
+
+    it("offers neither to somebody who may only look", async () => {
+        render(<SourceRepositoryCard app={app} />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("acme/web")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Change repository" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Disconnect" })).toBeNull();
+    });
+});
+
+type ProjectAppLike = Parameters<typeof SourceRepositoryCard>[0]["app"];

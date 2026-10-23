@@ -248,7 +248,10 @@
         "machineLoadFailed": "No se pudo leer dónde se compila este servicio",
         "machineSaveFailed": "No se pudo cambiar dónde se compila este servicio",
         "loadFailed": "No se pudo leer el código de este servicio",
-        "machineUnknown": "Elige una máquina de la lista"
+        "machineUnknown": "Elige una máquina de la lista",
+        "disconnectFailed": "No se pudo desconectar el repositorio",
+        "changeFailed": "No se pudo cambiar el repositorio",
+        "repositoryInvalid": "Elige un repositorio y un nombre de rama válido"
     },
     "scaling": {
         "loadFailed": "No se pudo leer cómo escala este servicio",

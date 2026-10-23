@@ -28,6 +28,7 @@ import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
 import { RegistryPickCard } from "./registries/registry-pick-card";
 import { DeployBehaviourCards, useDeployBehaviour } from "./deploy-behaviour-section";
+import { ciAccessAction } from "./source-actions";
 import { BuilderCard, SourceRepositoryCard } from "./service-source-cards";
 import {
     SERVICE_SETTINGS_SEARCH,
@@ -796,7 +797,7 @@ export function SettingsTab({
     return (
         <SettingsLayout sections={shown} index={SERVICE_SETTINGS_SEARCH}>
             <SettingsSection {...head("source")}>
-                <SourceRepositoryCard app={app} canConfigure={configure} />
+                <SourceRepositoryCard app={app} canConfigure={configure} onChanged={onChanged} />
                 <SourceCards {...sourceProps} part="root" />
                 <SourceCards {...sourceProps} part="autoDeploy" />
                 {configure && (
@@ -965,6 +966,7 @@ function sourceFieldsOf(app: ProjectApp) {
         runtimeVersion: app.runtimeVersion ?? "",
         outputDirectory: app.outputDirectory ?? "",
         autoDeploy: app.autoDeploy,
+        waitForCi: app.waitForCi,
         branch: app.deployBranch ?? "",
         filter: app.commitFilter ?? "",
         watchPaths: app.watchPaths ?? "",
@@ -985,6 +987,7 @@ const BUILD_KEYS = [
 ] as const satisfies readonly (keyof SourceFields)[];
 const AUTO_DEPLOY_KEYS = [
     "autoDeploy",
+    "waitForCi",
     "branch",
     "filter",
     "watchPaths"
@@ -1044,6 +1047,7 @@ function useSourceCards(app: ProjectApp, onChanged: () => void) {
             const result = await deployActions.setAutoDeployAction({
                 applicationId: app.id,
                 autoDeploy: next.autoDeploy,
+                waitForCi: next.waitForCi,
                 deployBranch: next.branch.trim() || undefined,
                 commitFilter: next.filter.trim() || undefined,
                 watchPaths: next.watchPaths.trim() || undefined,
@@ -1085,6 +1089,92 @@ type SourceCardsState = ReturnType<typeof useSourceCards>;
 type SourcePart = "root" | "builder" | "commands" | "autoDeploy" | "releases";
 
 const PLAIN = { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } as const;
+
+type CiAccess = NonNullable<Awaited<ReturnType<typeof ciAccessAction>>["access"]>;
+
+/**
+ * "Wait for CI", under the push settings: the switch, and - when GitHub is not
+ * set up to let it work - what is missing and the page on GitHub that fixes it.
+ */
+function WaitForCiRow({
+    applicationId,
+    checked,
+    disabled,
+    onChange
+}: {
+    applicationId: string;
+    checked: boolean;
+    disabled: boolean;
+    onChange: (next: boolean) => void;
+}) {
+    const t = useTranslations("deployService");
+    const [access, setAccess] = useState<CiAccess | null>(null);
+
+    useEffect(() => {
+        let active = true;
+        void ciAccessAction(applicationId)
+            .then((result) => {
+                if (active && result.access) setAccess(result.access);
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, [applicationId]);
+
+    const gap = access?.gap ?? null;
+    const gapText =
+        gap === "app"
+            ? t("settings.ciGapApp")
+            : gap === "install"
+              ? t("settings.ciGapInstall")
+              : gap === "events"
+                ? t("settings.ciGapEvents")
+                : gap === "admins"
+                  ? t("settings.ciGapAdmins")
+                  : null;
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm font-medium">{t("settings.waitForCi")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("settings.waitForCiHint")}
+                    </span>
+                </div>
+                <Switch
+                    checked={checked}
+                    onChange={onChange}
+                    disabled={disabled}
+                    aria-label={t("settings.waitForCi")}
+                />
+            </div>
+            {gapText && (checked || gap !== "events") ? (
+                <p
+                    className={cn(
+                        "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-2.5 py-2 text-xs",
+                        gap === "events"
+                            ? "bg-surface text-muted-foreground"
+                            : "bg-warning-soft text-warning-ink"
+                    )}
+                >
+                    <span className="min-w-0">{gapText}</span>
+                    {access?.url ? (
+                        <a
+                            href={access.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1 font-medium text-primary hover:underline"
+                        >
+                            {t("settings.ciGapLink")}
+                            <ArrowUpRight className="size-3 shrink-0" aria-hidden />
+                        </a>
+                    ) : null}
+                </p>
+            ) : null}
+        </div>
+    );
+}
 
 function SourceCards({
     state,
@@ -1311,6 +1401,12 @@ function SourceCards({
                             {t("settings.watchPathsShort")}
                         </span>
                     </label>
+                    <WaitForCiRow
+                        applicationId={app.id}
+                        checked={draft.waitForCi}
+                        disabled={!canConfigure}
+                        onChange={(next) => form.patch({ waitForCi: next })}
+                    />
                 </SettingsCard>
             )}
 

@@ -2906,6 +2906,7 @@ export async function duplicateApplication(
             memoryLimitMb: app.memoryLimitMb,
             deployBranch: app.deployBranch,
             commitFilter: app.commitFilter,
+            waitForCi: app.waitForCi,
             keepReleases: app.keepReleases,
             // A copy is reached the way the original is, and guarded the same way.
             publishPort: app.publishPort,
@@ -4829,6 +4830,8 @@ export async function updateAutoDeploy(
         commitFilter?: string | null;
         watchPaths?: string | null;
         keepReleases?: boolean;
+        /** Left out keeps what is stored, for a caller that does not show it. */
+        waitForCi?: boolean;
     }
 ): Promise<void> {
     const app = await prisma.application.findFirst({
@@ -4844,7 +4847,8 @@ export async function updateAutoDeploy(
             // Stored as typed (one glob per line); parsed where it is matched, so the
             // field reads back exactly as it was written.
             watchPaths: settings.watchPaths?.trim() || null,
-            ...(settings.keepReleases !== undefined ? { keepReleases: settings.keepReleases } : {})
+            ...(settings.keepReleases !== undefined ? { keepReleases: settings.keepReleases } : {}),
+            ...(settings.waitForCi !== undefined ? { waitForCi: settings.waitForCi } : {})
         }
     });
     // Giving up the history leaves the older versions running with nothing pointing

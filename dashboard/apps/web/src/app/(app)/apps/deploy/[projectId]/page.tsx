@@ -146,6 +146,7 @@ export default async function DeployProjectPage({
                 serverName: app.target.name,
                 containerRef: serving.get(app.id)?.name ?? "",
                 autoDeploy: app.autoDeploy,
+                waitForCi: app.waitForCi,
                 deployBranch: app.deployBranch,
                 commitFilter: app.commitFilter,
                 watchPaths: app.watchPaths,

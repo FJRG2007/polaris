@@ -200,15 +200,22 @@ async function fetchInstallations(appId: string, pem: string): Promise<Installat
 async function fetchAppPermissions(
     appId: string,
     pem: string
-): Promise<Record<string, string> | null> {
+): Promise<{ permissions: Record<string, string>; events: string[] | null } | null> {
     try {
         const res = await fetch(`${API}/app`, {
             headers: apiHeaders(appJwt(appId, pem)),
             cache: "no-store"
         });
         if (!res.ok) return null;
-        const body = (await res.json()) as { permissions?: Record<string, string> };
-        return body.permissions ?? null;
+        const body = (await res.json()) as {
+            permissions?: Record<string, string>;
+            events?: unknown;
+        };
+        if (!body.permissions) return null;
+        const events = Array.isArray(body.events)
+            ? body.events.filter((event): event is string => typeof event === "string")
+            : null;
+        return { permissions: body.permissions, events };
     } catch {
         // Unknown, which every reader below treats as "assume the App asks for
         // everything" - the state things were in before this existed, and the one
@@ -602,7 +609,7 @@ export async function refreshInstallations(): Promise<void> {
     // Read alongside, on the same schedule and from the same credentials: an App
     // widened by hand on GitHub has to stop being reported as un-widened here
     // without anybody pressing anything, exactly as an acceptance does.
-    const appPermissions = await fetchAppPermissions(secrets.appId, secrets.pem);
+    const app = await fetchAppPermissions(secrets.appId, secrets.pem);
     const state = await getIntegrationState(PROVIDER);
     await upsertIntegration(PROVIDER, {
         config: {
@@ -610,7 +617,10 @@ export async function refreshInstallations(): Promise<void> {
             installations,
             // Left alone rather than written as null when GitHub could not be
             // asked: a blink must not read as an App that requests nothing.
-            ...(appPermissions ? { appPermissions } : {})
+            ...(app ? { appPermissions: app.permissions } : {}),
+            // The events it subscribes to, so a screen that relies on one can say
+            // when it is off - Deploy's "Wait for CI" listens for check_suite.
+            ...(app?.events ? { appEvents: app.events } : {})
         }
     });
 }
@@ -846,6 +856,47 @@ export async function githubAppVisibilityUrl(): Promise<string | null> {
     const state = await getIntegrationState(PROVIDER);
     const slug = typeof state?.config.appSlug === "string" ? state.config.appSlug : "";
     return slug ? `https://github.com/settings/apps/${slug}/advanced` : null;
+}
+
+/**
+ * Whether the App can read the checks on `owner`'s repositories, which is what
+ * Deploy's "Wait for CI" reads, and whether GitHub tells it when they finish.
+ *
+ * Only what was recorded: an unknown answers "ok", because an unknown must not
+ * put a step in front of somebody. Null for an instance without an App (a
+ * personal token reads checks with the repository scope it already has).
+ */
+export async function githubChecksAccess(owner: string): Promise<{
+    /** "app": the App does not ask for Checks; "install": the installation on
+     *  `owner` has not accepted it; "events": both are fine, but the App does not
+     *  subscribe to check suites, so results arrive by polling. */
+    gap: "app" | "install" | "events" | null;
+    url: string | null;
+} | null> {
+    const state = await getIntegrationState(PROVIDER);
+    if (state?.config.method !== "app") return null;
+    const asked =
+        state.config.appPermissions && typeof state.config.appPermissions === "object"
+            ? (state.config.appPermissions as Record<string, string>)
+            : null;
+    if (asked && Object.keys(asked).length > 0 && !asked.checks) {
+        return { gap: "app", url: appPermissionsUrl(state.config) };
+    }
+    const installs = Array.isArray(state.config.installations)
+        ? (state.config.installations as Installation[])
+        : [];
+    const install = installs.find((row) => row.login.toLowerCase() === owner.toLowerCase());
+    const granted = install?.permissions ?? {};
+    if (install && Object.keys(granted).length > 0 && !granted.checks) {
+        return { gap: "install", url: installationSettingsUrl(install, appPageUrl(state.config)) };
+    }
+    const events = Array.isArray(state.config.appEvents)
+        ? (state.config.appEvents as unknown[])
+        : null;
+    if (events && !events.includes("check_suite")) {
+        return { gap: "events", url: appPermissionsUrl(state.config) };
+    }
+    return { gap: null, url: null };
 }
 
 /** Where the App's own requested permissions are edited. Built from the slug,

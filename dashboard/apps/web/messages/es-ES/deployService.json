@@ -128,7 +128,13 @@
         "setupBlocked": "{who} no lo desplegó porque {companion} no arrancó: {output}",
         "firstDeployFailed": "{who} no pudo iniciar su primer despliegue: {output}",
         "secretsWithheld": "{who} no copió estos secretos a la vista previa: {names}",
-        "changed": "{who} lo cambió"
+        "changed": "{who} lo cambió",
+        "ciWaiting": "Esperando a que pasen los checks de GitHub en {sha} antes de desplegarlo",
+        "ciFailed": "No se desplegó {sha}: falló el check {check}",
+        "ciUnreadable": "No se desplegó {sha}: GitHub no mostró sus checks a Polaris. Tus administradores pueden permitirlo.",
+        "ciTimeout": "Se dejó de esperar a los checks de {sha} tras dos horas. No se desplegó.",
+        "sourceDisconnected": "{who} desconectó {name}",
+        "sourceChanged": "{who} conectó {name}"
     },
     "notes": {
         "placeholder": "Deja una nota sobre este servicio"
@@ -330,7 +336,14 @@
         "disableDomainNamed": "Desactivar {hostname}",
         "enableDomainNamed": "Activar {hostname}",
         "removeDomainNamed": "Quitar {hostname}",
-        "rootDirectoryShort": "La carpeta del servicio, si el repositorio contiene varios."
+        "rootDirectoryShort": "La carpeta del servicio, si el repositorio contiene varios.",
+        "waitForCi": "Esperar a CI",
+        "waitForCiHint": "Despliega un push solo cuando pasen todos sus checks de GitHub. Un commit sin checks se despliega al minuto.",
+        "ciGapApp": "La GitHub App no pide el permiso Checks, así que nunca se desplegaría nada. En GitHub, abre Permissions & events de la App, pon Checks en Read-only y guarda.",
+        "ciGapInstall": "La instalación de la GitHub App en este repositorio aún no ha aceptado el permiso Checks. Ábrela en GitHub y acepta los nuevos permisos.",
+        "ciGapEvents": "La GitHub App no envía eventos de check suite, así que los checks se leen una vez por minuto. Para enterarte al momento, marca Check suite en Subscribe to events en los ajustes de la App.",
+        "ciGapAdmins": "GitHub aún no deja a Polaris leer los checks de este repositorio, así que nada se desplegaría. Tus administradores pueden permitirlo.",
+        "ciGapLink": "Abrir en GitHub"
     },
     "exposureHint": {
         "zoneBase": "Un nombre directamente en {host}, con un certificado de Let's Encrypt. Este no está cubierto por un comodín, así que necesita su propio registro DNS - Polaris lo crea si el dominio está en tu cuenta de Cloudflare conectada y, si no, te dice qué registro añadir. Para un nombre en otro dominio, elige Dominio personalizado.",
@@ -851,7 +864,18 @@
         "imageShort": "Ejecuta esta imagen tal cual. Aquí no se construye nada.",
         "none": "Origen",
         "noneShort": "Aún no hay repositorio, carpeta ni imagen conectados.",
-        "loadFailed": "No se pudo leer el origen. Inténtalo en un momento."
+        "loadFailed": "No se pudo leer el origen. Inténtalo en un momento.",
+        "change": "Cambiar repositorio",
+        "connect": "Conectar repositorio",
+        "changeTitle": "Cambiar repositorio",
+        "connectTitle": "Conectar un repositorio",
+        "changeText": "El próximo despliegue se construye desde el repositorio y la rama que elijas. Lo que se ejecuta ahora sigue hasta entonces.",
+        "changePick": "Elegir otro",
+        "changeSave": "Conectar",
+        "cancel": "Cancelar",
+        "disconnect": "Desconectar",
+        "disconnectTitle": "¿Desconectar {name}?",
+        "disconnectText": "Los pushes dejan de desplegar este servicio. El despliegue actual sigue en marcha, y el próximo necesitará un repositorio o una subida."
     },
     "builder": {
         "title": "Compilador",

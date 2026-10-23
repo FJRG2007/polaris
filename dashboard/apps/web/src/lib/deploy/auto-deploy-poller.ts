@@ -16,7 +16,8 @@ import { githubTokenForOwner } from "../github-access";
 import { reconcilePullRequestPreviews } from "./environments";
 import { getChangedFiles, getLatestCommit } from "../github-service";
 import { parseWatchPaths, shouldDeployForPaths } from "@polaris/deploy";
-import { commitPassesFilter, deployPushedCommit } from "./push-deploys";
+import { commitPassesFilter } from "./push-deploys";
+import { deployOrHold, pollCiWaits } from "./ci-wait";
 
 const INTERVAL_MS = Number(process.env.POLARIS_AUTODEPLOY_POLL_MS) || 60_000;
 let started = false;
@@ -25,7 +26,10 @@ let started = false;
 export async function pollAutoDeploys(): Promise<void> {
     const apps = await prisma.application.findMany({
         where: { autoDeploy: true, sourceType: { in: ["dockerfile", "nixpacks"] } },
-        include: { environment: { include: { project: true } } }
+        include: {
+            environment: { include: { project: true } },
+            ciWait: { select: { commitSha: true } }
+        }
     });
     const commitCache = new Map<string, Awaited<ReturnType<typeof getLatestCommit>>>();
 
@@ -54,11 +58,16 @@ export async function pollAutoDeploys(): Promise<void> {
             commitCache.set(key, latest);
         }
         if (!latest || latest.sha === app.lastDeployedSha) continue;
+        // Already held for CI: the wait settles it, not another look from here.
+        if (app.waitForCi && app.ciWait?.commitSha === latest.sha) continue;
 
         // First sighting: baseline to the current head without deploying, so only a
         // genuinely new commit triggers a deploy (never a redeploy just for enabling).
         if (app.lastDeployedSha == null) {
-            await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: latest.sha } });
+            await prisma.application.update({
+                where: { id: app.id },
+                data: { lastDeployedSha: latest.sha }
+            });
             continue;
         }
         if (!commitPassesFilter(latest.message, app.commitFilter)) continue;
@@ -69,7 +78,13 @@ export async function pollAutoDeploys(): Promise<void> {
         const watch = parseWatchPaths(app.watchPaths);
         if (watch.length > 0) {
             const token = await githubTokenForOwner(ownerId, parsed.owner);
-            const changed = await getChangedFiles(parsed.owner, parsed.repo, app.lastDeployedSha, latest.sha, token);
+            const changed = await getChangedFiles(
+                parsed.owner,
+                parsed.repo,
+                app.lastDeployedSha,
+                latest.sha,
+                token
+            );
             if (!shouldDeployForPaths(changed, watch)) {
                 console.info(
                     `polaris: skipping auto-deploy of ${app.slug}; nothing it watches changed since ${app.lastDeployedSha.slice(0, 7)}`
@@ -79,11 +94,13 @@ export async function pollAutoDeploys(): Promise<void> {
         }
 
         try {
-            await deployPushedCommit(app, ownerId, {
+            await deployOrHold(app, ownerId, {
                 commitMessage: latest.message,
                 commitSha: latest.sha,
                 authorName: latest.authorName ?? undefined,
-                authorAvatarUrl: latest.authorAvatarUrl ?? undefined
+                authorAvatarUrl: latest.authorAvatarUrl ?? undefined,
+                repoFullName: `${parsed.owner}/${parsed.repo}`,
+                branch
             });
         } catch {
             // The commit was handed back, so the next tick retries it.
@@ -99,6 +116,10 @@ export function startAutoDeployPoller(): void {
     const tick = (): void =>
         void pollAutoDeploys()
             .catch((error) => console.error("polaris: auto-deploy poll failed:", error))
+            // Pushes held for CI whose check events never arrived - every LAN
+            // install, and any delivery GitHub dropped.
+            .then(() => pollCiWaits())
+            .catch((error) => console.error("polaris: wait-for-CI poll failed:", error))
             // Previews ride the same tick: an install GitHub cannot reach has no
             // other way to hear that a pull request opened or closed.
             .then(() => reconcilePullRequestPreviews())
