@@ -45,8 +45,15 @@ export function signPolarUnlock(shareId: string, passwordHash: string | null): s
     return signUnlock(POLAR_LINK_SCOPE, shareId, { passwordHash }, loadEnv().POLARIS_AUTH_SECRET);
 }
 
-/** Resolve a token and decide whether it opens anything. Counts nothing. */
-export async function gatePolarShare(token: string): Promise<PolarShareGate> {
+/**
+ * Resolve a token and decide whether it opens anything. Counts nothing.
+ * `withinCap: false` skips the view cap, for a request (a file) that belongs to
+ * a page whose own open already took a view.
+ */
+export async function gatePolarShare(
+    token: string,
+    { withinCap = true }: { readonly withinCap?: boolean } = {}
+): Promise<PolarShareGate> {
     if (!TOKEN_SHAPE.test(token)) return { ok: false, reason: "not_found" };
     const share = await prisma.polarThreadShare.findUnique({
         where: { tokenHash: hashToken(token) },
@@ -60,7 +67,7 @@ export async function gatePolarShare(token: string): Promise<PolarShareGate> {
             limits: {
                 revokedAt: null,
                 expiresAt: share.expiresAt,
-                maxUses: share.maxViews,
+                maxUses: withinCap ? share.maxViews : null,
                 useCount: share.views
             },
             rules: share

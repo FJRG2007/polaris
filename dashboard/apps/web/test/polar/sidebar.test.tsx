@@ -108,7 +108,17 @@ beforeEach(() => {
             if (url.endsWith("/share") && method === "GET") return Response.json({ link: null });
             if (url.endsWith("/share") && method === "POST")
                 return Response.json({
-                    link: { url: "https://polaris.example/c/token", sharedAt: NOW }
+                    link: {
+                        url: "https://polaris.example/c/token",
+                        sharedAt: NOW,
+                        views: 0,
+                        hasPassword: false,
+                        expiresAt: null,
+                        maxViews: null,
+                        allowedCidrs: [],
+                        allowedCountries: [],
+                        allowedContinents: []
+                    }
                 });
             if (method !== "GET" && refuse) return Response.json({}, { status: 500 });
             return Response.json({ ok: true });

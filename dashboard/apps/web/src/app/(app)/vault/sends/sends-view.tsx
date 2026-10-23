@@ -43,6 +43,7 @@ import {
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
+    linkExpiry,
     linkAddressRules,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
@@ -124,7 +125,7 @@ export function SendsView() {
         const lifetime = Number(days);
         const deletionDate = new Date(Date.now() + lifetime * 24 * 60 * 60 * 1000);
         // The expiry is a day; it ends when that day does, in the reader's time.
-        const expirationDate = advanced.expiresAt ? new Date(`${advanced.expiresAt}T23:59:59`) : null;
+        const expirationDate = linkExpiry(advanced.expiresAt);
         if (!name || !text) {
             setError(t("sends.needsBoth"));
             return;

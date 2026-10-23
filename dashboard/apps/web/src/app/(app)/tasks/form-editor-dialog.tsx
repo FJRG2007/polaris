@@ -18,7 +18,8 @@ import type { FormView } from "@/lib/tasks/form-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     LinkAdvancedFields,
-    linkAddressRules,
+    linkLimits,
+    linkExpiryDay,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import {
@@ -57,7 +58,7 @@ function draftOf(form: FormView): Draft {
         fields: form.fields,
         advanced: {
             password: "",
-            expiresAt: form.expiresAt ? form.expiresAt.slice(0, 10) : "",
+            expiresAt: linkExpiryDay(form.expiresAt),
             maxUses: form.maxSubmissions === null ? "" : String(form.maxSubmissions),
             allowedCidrs: form.allowedCidrs,
             allowedCountries: form.allowedCountries,
@@ -71,6 +72,37 @@ function questionId(fields: readonly core.FormField[]): string {
     let n = fields.length + 1;
     while (fields.some((field) => field.id === `q${n}`)) n += 1;
     return `q${n}`;
+}
+
+/** A dropdown's choices typed as one comma-separated line. The text is kept as
+ *  typed, so a trailing comma survives until the next choice follows it. */
+function ChoicesInput({
+    options,
+    label,
+    onChange
+}: {
+    options: readonly string[];
+    label: string;
+    onChange: (options: string[]) => void;
+}) {
+    const [text, setText] = useState(() => options.join(", "));
+    return (
+        <Input
+            value={text}
+            aria-label={label}
+            placeholder={label}
+            onChange={(event) => {
+                setText(event.target.value);
+                onChange(
+                    event.target.value
+                        .split(",")
+                        .map((option) => option.trim())
+                        .filter(Boolean)
+                        .slice(0, 30)
+                );
+            }}
+        />
+    );
 }
 
 export function FormEditorDialog({
@@ -122,12 +154,7 @@ export function FormEditorDialog({
                     confirmation: draft.confirmation,
                     requireLogin: draft.requireLogin,
                     enabled: draft.enabled,
-                    limits: {
-                        ...(draft.advanced.password ? { password: draft.advanced.password } : {}),
-                        maxViews: draft.advanced.maxUses ? Number(draft.advanced.maxUses) : null,
-                        expiresAt: draft.advanced.expiresAt || null,
-                        ...linkAddressRules(draft.advanced)
-                    }
+                    limits: linkLimits(draft.advanced)
                 }),
             setError
         );
@@ -139,7 +166,7 @@ export function FormEditorDialog({
 
     return (
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-            <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto">
+            <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle className="truncate">{t("forms.editor.title", { name: form.name })}</DialogTitle>
                     <DialogDescription>{t("forms.editor.hint")}</DialogDescription>
@@ -204,19 +231,10 @@ export function FormEditorDialog({
                                     </button>
                                 </div>
                                 {field.type === "dropdown" && (
-                                    <Input
-                                        value={field.options.join(", ")}
-                                        aria-label={t("forms.editor.choices")}
-                                        placeholder={t("forms.editor.choices")}
-                                        onChange={(event) =>
-                                            setField(index, {
-                                                options: event.target.value
-                                                    .split(",")
-                                                    .map((option) => option.trim())
-                                                    .filter(Boolean)
-                                                    .slice(0, 30)
-                                            })
-                                        }
+                                    <ChoicesInput
+                                        options={field.options}
+                                        label={t("forms.editor.choices")}
+                                        onChange={(options) => setField(index, { options })}
                                     />
                                 )}
                                 <label className="flex items-center gap-2 text-xs">
@@ -277,6 +295,7 @@ export function FormEditorDialog({
                         value={draft.advanced}
                         onChange={(advanced) => set("advanced", advanced)}
                         passwordSet={form.hasPassword}
+                        clearablePassword
                         usesLabel={t("forms.editor.maxSubmissions")}
                         idPrefix={`form-${form.id}`}
                     />

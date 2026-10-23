@@ -22,6 +22,8 @@ export type LinkAdvancedPart = "password" | "expiry" | "uses";
 
 export interface LinkAdvancedValue {
     password: string;
+    /** Take off the password the link already has. */
+    clearPassword?: boolean;
     /** A `yyyy-mm-dd` day, or empty for no expiry. */
     expiresAt: string;
     /** A positive whole number as typed, or empty for no cap. */
@@ -53,6 +55,37 @@ export function linkAddressRules(value: LinkAdvancedValue): {
     };
 }
 
+/** The end of a `yyyy-mm-dd` day in the reader's time, or null for none. */
+export function linkExpiry(day: string): Date | null {
+    return day ? new Date(`${day}T23:59:59.999`) : null;
+}
+
+/** A stored expiry as the `yyyy-mm-dd` day it ends, in the reader's time. */
+export function linkExpiryDay(iso: string | null): string {
+    if (!iso) return "";
+    const date = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** The password part of a value, as `linkLimitsSchema` takes it. */
+export function linkPasswordLimits(
+    value: LinkAdvancedValue
+): { password: string } | { clearPassword: true } | Record<string, never> {
+    if (value.password) return { password: value.password };
+    return value.clearPassword ? { clearPassword: true } : {};
+}
+
+/** A value as `linkLimitsSchema` takes it. */
+export function linkLimits(value: LinkAdvancedValue) {
+    return {
+        ...linkPasswordLimits(value),
+        maxViews: value.maxUses ? Number(value.maxUses) : null,
+        expiresAt: linkExpiry(value.expiresAt)?.toISOString() ?? null,
+        ...linkAddressRules(value)
+    };
+}
+
 /** How many limits a value sets, for the section's summary. */
 export function linkAdvancedCount(value: LinkAdvancedValue): number {
     return [
@@ -70,6 +103,7 @@ export function LinkAdvancedFields({
     omit = [],
     usesLabel,
     passwordSet = false,
+    clearablePassword = false,
     idPrefix = "link"
 }: {
     value: LinkAdvancedValue;
@@ -79,6 +113,8 @@ export function LinkAdvancedFields({
     usesLabel?: string;
     /** The link already has a password; typing one replaces it. */
     passwordSet?: boolean;
+    /** Offer to take the existing password off (`clearPassword` on the value). */
+    clearablePassword?: boolean;
     idPrefix?: string;
 }) {
     const t = useTranslations("components");
@@ -98,31 +134,52 @@ export function LinkAdvancedFields({
                 {shows("password") || shows("expiry") || shows("uses") ? (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {shows("password") ? (
-                            <label className="flex min-w-0 flex-col gap-1" htmlFor={`${idPrefix}-password`}>
-                                <span className="text-xs text-muted-foreground">
-                                    <Lock className="mr-1 inline size-3" aria-hidden />
-                                    {passwordSet
-                                        ? t("linkAdvanced.replacePassword")
-                                        : t("linkAdvanced.password")}
-                                </span>
-                                {/* enigma:allow-no-breach-check enigma:allow-identity-password -
-                                    a link's own passphrase, not a credential: it authenticates
-                                    nobody and guesses at it are limited per link per address. */}
-                                <Input
-                                    id={`${idPrefix}-password`}
-                                    type="password"
-                                    value={value.password}
-                                    placeholder={
-                                        passwordSet
-                                            ? t("linkAdvanced.passwordSet")
-                                            : t("linkAdvanced.passwordNone")
-                                    }
-                                    autoComplete="new-password"
-                                    onChange={(event) =>
-                                        onChange({ ...value, password: event.target.value })
-                                    }
-                                />
-                            </label>
+                            <div className="flex min-w-0 flex-col gap-1">
+                                <label className="flex min-w-0 flex-col gap-1" htmlFor={`${idPrefix}-password`}>
+                                    <span className="text-xs text-muted-foreground">
+                                        <Lock className="mr-1 inline size-3" aria-hidden />
+                                        {passwordSet
+                                            ? t("linkAdvanced.replacePassword")
+                                            : t("linkAdvanced.password")}
+                                    </span>
+                                    {/* enigma:allow-no-breach-check enigma:allow-identity-password -
+                                        a link's own passphrase, not a credential: it authenticates
+                                        nobody and guesses at it are limited per link per address. */}
+                                    <Input
+                                        id={`${idPrefix}-password`}
+                                        type="password"
+                                        value={value.password}
+                                        disabled={value.clearPassword === true}
+                                        placeholder={
+                                            passwordSet
+                                                ? t("linkAdvanced.passwordSet")
+                                                : t("linkAdvanced.passwordNone")
+                                        }
+                                        autoComplete="new-password"
+                                        onChange={(event) =>
+                                            onChange({ ...value, password: event.target.value })
+                                        }
+                                    />
+                                </label>
+                                {passwordSet && clearablePassword ? (
+                                    <label className="flex items-center gap-2 text-xs">
+                                        <input
+                                            type="checkbox"
+                                            className="size-4"
+                                            checked={value.clearPassword === true}
+                                            onChange={(event) => {
+                                                const { clearPassword: _, ...rest } = value;
+                                                onChange(
+                                                    event.target.checked
+                                                        ? { ...rest, password: "", clearPassword: true }
+                                                        : rest
+                                                );
+                                            }}
+                                        />
+                                        {t("linkAdvanced.removePassword")}
+                                    </label>
+                                ) : null}
+                            </div>
                         ) : null}
                         {shows("expiry") ? (
                             <label className="flex min-w-0 flex-col gap-1" htmlFor={`${idPrefix}-expires`}>

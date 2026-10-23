@@ -1549,6 +1549,7 @@
         "set": "{count, plural, one {# límite} other {# límites}}",
         "password": "Contraseña",
         "replacePassword": "Nueva clave",
+        "removePassword": "Quitar contraseña",
         "passwordSet": "Se queda si no escribes otra",
         "passwordNone": "Sin contraseña",
         "expires": "Caduca",

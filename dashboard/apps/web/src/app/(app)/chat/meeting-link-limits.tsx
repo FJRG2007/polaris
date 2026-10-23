@@ -19,6 +19,7 @@ import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
     linkAddressRules,
+    linkPasswordLimits,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 
@@ -66,7 +67,7 @@ export function MeetingLinkLimits({ meetingId }: { meetingId: string }) {
         const result = await runAction(
             () =>
                 setGuestLinkLimitsAction(meetingId, {
-                    ...(value.password ? { password: value.password } : {}),
+                    ...linkPasswordLimits(value),
                     ...linkAddressRules(value)
                 }),
             setError
@@ -91,6 +92,7 @@ export function MeetingLinkLimits({ meetingId }: { meetingId: string }) {
                 }}
                 omit={["expiry", "uses"]}
                 passwordSet={saved?.hasPassword ?? false}
+                clearablePassword
                 idPrefix={`meeting-${meetingId}`}
             />
             {error && (

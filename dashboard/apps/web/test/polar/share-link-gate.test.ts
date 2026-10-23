@@ -62,6 +62,13 @@ describe("a shared Polar chat's link", () => {
         expect(await gate.gatePolarShare(TOKEN)).toEqual({ ok: false, reason: "exhausted" });
     });
 
+    it("still serves a file on the page that took the last view", async () => {
+        findUnique.mockResolvedValueOnce(row({ maxViews: 1, views: 1 }));
+        expect(await gate.gatePolarShare(TOKEN, { withinCap: false })).toEqual({ ok: true, shareId: SHARE });
+        findUnique.mockResolvedValueOnce(row({ maxViews: 1, views: 1, expiresAt: new Date(Date.now() - 1000) }));
+        expect(await gate.gatePolarShare(TOKEN, { withinCap: false })).toEqual({ ok: false, reason: "expired" });
+    });
+
     it("refuses an address outside its list", async () => {
         ip = "203.0.113.9";
         findUnique.mockResolvedValueOnce(row({ allowedCidrs: '["198.51.100.0/24"]' }));

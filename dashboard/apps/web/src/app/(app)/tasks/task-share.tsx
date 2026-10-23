@@ -21,7 +21,8 @@ import { useEffect, useState } from "react";
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
-    linkAddressRules,
+    linkLimits,
+    linkExpiryDay,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { runAction } from "@/lib/run-action";
@@ -207,12 +208,7 @@ export function ShareDialog({
                     taskId,
                     enabled: true,
                     showComments: share.showComments,
-                    limits: {
-                        ...(advanced.password ? { password: advanced.password } : {}),
-                        maxViews: advanced.maxUses ? Number(advanced.maxUses) : null,
-                        expiresAt: advanced.expiresAt || null,
-                        ...linkAddressRules(advanced)
-                    }
+                    limits: linkLimits(advanced)
                 }),
             setError
         );
@@ -445,6 +441,7 @@ export function ShareDialog({
                                         value={advanced}
                                         onChange={setAdvanced}
                                         passwordSet={share?.hasPassword ?? false}
+                                        clearablePassword
                                         idPrefix="task-share"
                                     />
                                     <div className="flex justify-end">
@@ -472,7 +469,7 @@ function advancedOf(share: TaskShareView | null): LinkAdvancedValue {
     if (!share) return EMPTY_LINK_ADVANCED;
     return {
         password: "",
-        expiresAt: share.expiresAt ? share.expiresAt.slice(0, 10) : "",
+        expiresAt: linkExpiryDay(share.expiresAt),
         maxUses: share.maxViews === null ? "" : String(share.maxViews),
         allowedCidrs: share.allowedCidrs,
         allowedCountries: share.allowedCountries,

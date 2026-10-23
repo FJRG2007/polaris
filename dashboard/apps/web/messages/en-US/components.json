@@ -1549,6 +1549,7 @@
         "set": "{count, plural, one {# limit} other {# limits}}",
         "password": "Password",
         "replacePassword": "New password",
+        "removePassword": "Remove password",
         "passwordSet": "Kept unless you type one",
         "passwordNone": "No password",
         "expires": "Expires",

@@ -17,7 +17,8 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
-    linkAddressRules,
+    linkLimits,
+    linkExpiryDay,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { Link2, MessageSquareShare, Share2, Trash2, X } from "lucide-react";
@@ -174,12 +175,7 @@ export function PolarShareDialog({
             method: "PATCH",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
-                limits: {
-                    ...(advanced.password ? { password: advanced.password } : {}),
-                    maxViews: advanced.maxUses ? Number(advanced.maxUses) : null,
-                    expiresAt: advanced.expiresAt || null,
-                    ...linkAddressRules(advanced)
-                }
+                limits: linkLimits(advanced)
             })
         }).catch(() => null);
         setWorking(false);
@@ -293,6 +289,7 @@ export function PolarShareDialog({
                                     value={advanced}
                                     onChange={setAdvanced}
                                     passwordSet={link.hasPassword}
+                                    clearablePassword
                                     idPrefix="polar-share"
                                 />
                                 {limitsChanged ? (
@@ -627,7 +624,7 @@ function advancedOf(link: PolarShareLink | null): LinkAdvancedValue {
     if (!link) return EMPTY_LINK_ADVANCED;
     return {
         password: "",
-        expiresAt: link.expiresAt ? link.expiresAt.slice(0, 10) : "",
+        expiresAt: linkExpiryDay(link.expiresAt),
         maxUses: link.maxViews === null ? "" : String(link.maxViews),
         allowedCidrs: link.allowedCidrs,
         allowedCountries: link.allowedCountries,

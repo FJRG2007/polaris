@@ -15,7 +15,7 @@
  * Server-only.
  */
 
-import { readAddressRules } from "@/lib/link-guards";
+import { readAddressRules, storedAddressRules } from "@/lib/link-guards";
 import { linkLimitColumns } from "@/lib/link-limits";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
@@ -204,7 +204,8 @@ export async function sharePolarThread(
  * Stops serving the link. With `everyone`, or when nobody was sent the chat,
  * the share is deleted outright; otherwise the people keep it and the link's
  * token is replaced, so the old address stays a 404 even if the link is made
- * again. Idempotent; false only when the chat is not theirs.
+ * again, and its views and limits start over with it. Idempotent; false only
+ * when the chat is not theirs.
  */
 export async function revokePolarShare(
     userId: string,
@@ -222,7 +223,15 @@ export async function revokePolarShare(
     }
     await prisma.polarThreadShare.updateMany({
         where: { threadId },
-        data: { linkEnabled: false, ...freshToken() }
+        data: {
+            linkEnabled: false,
+            ...freshToken(),
+            views: 0,
+            passwordHash: null,
+            expiresAt: null,
+            maxViews: null,
+            ...storedAddressRules({})
+        }
     });
     return true;
 }
