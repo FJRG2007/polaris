@@ -82,6 +82,8 @@ export interface SiteApp {
     readonly facts: readonly AppFact[];
     /** Every capture of it, as its page shows them; none for an app nobody has captured. */
     readonly shots: readonly ShowcaseItem[];
+    /** What it replaces, with the logo the site ships for each, as its dashboard page lists it. */
+    readonly replaces: readonly { readonly name: string; readonly logo: string }[];
     /** The games it runs, for Game servers. */
     readonly games: readonly { readonly id: string; readonly name: string; readonly summary: string; readonly logo: string }[];
 }

@@ -182,6 +182,9 @@ function storeList(webLocale: string, showcase: site.ShowcaseSection[]): site.Si
             needs: appNeeds(t as never, app),
             facts,
             shots,
+            replaces: appReplaces(app.id)
+                .filter((item) => logos.has(`${item.logo}.svg`))
+                .map((item) => ({ name: item.name, logo: item.logo })),
             games:
                 app.id === GAME_SERVERS_APP_ID
                     ? GAMES.map((game) => ({

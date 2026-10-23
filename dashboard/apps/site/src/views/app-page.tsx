@@ -16,7 +16,7 @@ import { AppLogo, Badge, Button } from "@polaris/ui";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { ReplacedLogos } from "@polaris/ui/built-in-apps";
 import { asset, href, siteData, words } from "@/lib/site";
-import { ShotGallery, type Shot } from "@/components/shot-gallery";
+import { ShotCarousel, type Shot } from "@/components/shot-gallery";
 import { ConsentNote, StoreAppMark } from "@/views/marketplace-grid";
 import {
     fill,
@@ -78,7 +78,7 @@ export function AppPageView({
     const builtIn = "builtIn" in app ? app.builtIn : null;
     const name = store?.name ?? builtIn!.name;
     const shots = (store?.shots ?? builtIn!.shots).map(shot);
-    const replaces = store ? [] : builtIn!.replaces;
+    const replaces = store ? store.replaces : builtIn!.replaces;
     const needs = store?.needs ?? [builtInWords.needsNothing];
     return (
         <div className="flex min-w-0 flex-col gap-6">
@@ -123,8 +123,7 @@ export function AppPageView({
 
             {shots.length > 0 ? (
                 <section className="flex min-w-0 flex-col gap-3" aria-label={builtInWords.screenshots}>
-                    <h2 className="text-sm font-medium">{builtInWords.screenshots}</h2>
-                    <ShotGallery shots={shots} words={words(locale).viewer} />
+                    <ShotCarousel title={builtInWords.screenshots} shots={shots} words={words(locale).viewer} />
                 </section>
             ) : null}
 

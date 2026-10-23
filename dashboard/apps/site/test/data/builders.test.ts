@@ -32,6 +32,7 @@ const app = (id: string, extra: Partial<site.SiteApp> = {}): site.SiteApp => ({
     needs: [],
     facts: [],
     shots: [],
+    replaces: [],
     games: [],
     ...extra
 });
