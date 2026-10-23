@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as polls from "./dns-blocker-polls";
+import { keepInsights, lastInsights, readInsights } from "./dns-blocker-cache";
 import { serviceName } from "./fields";
 import { useUnmountSignal } from "@/lib/poll-fetch";
 import {
@@ -60,7 +61,6 @@ import {
     queryFilterSchema
 } from "@/lib/dns-blocker/query-log";
 import {
-    dnsListsAction,
     refreshDnsListsAction,
     pauseDnsBlockingAction,
     resumeDnsBlockingAction,
@@ -76,7 +76,7 @@ const LIVE_EVERY_MS = 3000;
 export const ALLOWED_COLOR = "hsl(var(--primary))";
 export const BLOCKED_COLOR = "hsl(var(--danger))";
 
-const EMPTY_FILTER: QueryFilter = {
+export const EMPTY_FILTER: QueryFilter = {
     search: "",
     outcome: "all",
     client: "",
@@ -187,7 +187,7 @@ export function DnsInsightsCard({
     const [refreshingLists, startRefreshingLists] = useTransition();
 
     const loadMetrics = useCallback(async () => {
-        const result = await dnsListsAction();
+        const result = await polls.dnsLists();
         setMetrics(result.error !== undefined ? null : result.metrics);
     }, []);
 
@@ -207,7 +207,10 @@ export function DnsInsightsCard({
     const load = useCallback(async (next: QueryFilter, fresh = false) => {
         const request = ++latest.current;
         setLoading(true);
-        const result = await polls.dnsInsights(next, fresh, signal());
+        // The last numbers this browser saw for it, until the read answers.
+        const held = lastInsights(next);
+        if (held) setData((current) => current ?? held);
+        const result = await readInsights(next, fresh, signal());
         if (request !== latest.current) return;
         setLoading(false);
         if (result.error !== undefined) {
@@ -216,6 +219,7 @@ export function DnsInsightsCard({
         }
         setError(null);
         setData(result.insights);
+        keepInsights(next, result.insights);
     }, []);
 
     useEffect(() => {
