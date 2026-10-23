@@ -385,7 +385,12 @@
                 selected: settings.source === "polaris"
             })
         ]);
-        source.addEventListener("change", () => save({ ...settings, source: source.value }, true));
+        // The app never sends a screen its own change back, so it is drawn here:
+        // the fields of the other source take the place of these.
+        source.addEventListener("change", () => {
+            save({ ...settings, source: source.value }, true);
+            render();
+        });
         return row(words.source, source, null, true);
     }
 
@@ -404,9 +409,11 @@
         }
         const field = (entry.options ?? []).find((option) => option.name === "timer");
         const picked = settings.polarisTimer || "new";
-        const timer = fieldControl(field ?? { type: "choice", choices: [] }, picked, (value) =>
-            save({ ...settings, polarisTimer: value ?? "new" }, true)
-        );
+        // A new timer asks for its name and length; one of the account's does not.
+        const timer = fieldControl(field ?? { type: "choice", choices: [] }, picked, (value) => {
+            save({ ...settings, polarisTimer: value ?? "new" }, true);
+            render();
+        });
         box.append(
             row(field?.label ?? words.timer, timer, null, true),
             el("div", { class: "buttons" }, [
