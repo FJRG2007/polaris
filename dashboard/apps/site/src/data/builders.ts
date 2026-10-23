@@ -365,7 +365,7 @@ export interface BuiltInSiteApp {
     readonly description: string;
     /** The products it replaces; `logo` names a tile in `public/logos`. */
     readonly replaces: readonly { readonly name: string; readonly logo: string }[];
-    /** Its README captures; none for an app nobody has captured yet. */
+    /** Every capture of it, the README's first; none for an app nobody has captured yet. */
     readonly shots: readonly ShowcaseItem[];
 }
 
