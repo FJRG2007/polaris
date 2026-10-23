@@ -226,10 +226,10 @@ página con todas sus funciones. Las versiones para móvil están en
       <a href="docs/features/automations.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/automations-light-es-desktop.webp">
-        <img src="docs/assets/media/automations-dark-es-desktop.webp" alt="Automatismos: cuando algo ocurre, se hace otra cosa">
+        <img src="docs/assets/media/automations-dark-es-desktop.webp" alt="Automatizaciones: cuando algo ocurre, se hace otra cosa">
       </picture>
       </a>
-      <br><sub><a href="docs/features/automations.es.md"><b>Automatismos</b></a>: cuando algo ocurre, se hace otra cosa</sub>
+      <br><sub><a href="docs/features/automations.es.md"><b>Automatizaciones</b></a>: cuando algo ocurre, se hace otra cosa</sub>
     </td>
     <td width="50%" valign="top">
       <a href="docs/features/watch.es.md">
