@@ -51,6 +51,8 @@ vi.mock("@/app/(app)/watch/connectivity/actions", () => ({
     setMergeGapAction: async () => ({ seconds: 60 })
 }));
 
+vi.mock("@/components/access/share-dialog", () => ({ ShareDialog: () => null }));
+
 const { ConnectivityView } = await import("@/app/(app)/watch/connectivity/connectivity-view");
 
 const NOW = Date.now();
@@ -102,7 +104,7 @@ beforeEach(() => {
 
 describe("the first paint", () => {
     it("draws the chrome with nothing loaded, and skeletons only where the figures go", () => {
-        const html = renderToStaticMarkup(withMessages(<ConnectivityView />));
+        const html = renderToStaticMarkup(withMessages(<ConnectivityView admin />));
         for (const words of [
             "Connectivity",
             "Right now",
@@ -124,7 +126,7 @@ describe("the first paint", () => {
 describe("with the record in", () => {
     it("shows the state, the uptime and the outages the filters keep", () => {
         report = sample();
-        const html = renderToStaticMarkup(withMessages(<ConnectivityView />));
+        const html = renderToStaticMarkup(withMessages(<ConnectivityView admin />));
         expect(html).toContain("Online");
         // Floored, never rounded up: 99.305...% is 99.30%.
         expect(html).toContain("99.30%");
@@ -139,7 +141,7 @@ describe("with the record in", () => {
 
     it("draws in Spanish", () => {
         report = sample();
-        const html = renderToStaticMarkup(withMessages(<ConnectivityView />, "es-ES"));
+        const html = renderToStaticMarkup(withMessages(<ConnectivityView admin />, "es-ES"));
         expect(html).toContain("Disponibilidad");
         expect(html).toContain("En línea");
         expect(html).toContain("Caída por día");
@@ -155,7 +157,7 @@ describe("with the record in", () => {
             firstBack: null
         };
         report = { ...base, open, outages: [open], lastPass: { at: iso(NOW - 10_000), up: false } };
-        const html = renderToStaticMarkup(withMessages(<ConnectivityView />));
+        const html = renderToStaticMarkup(withMessages(<ConnectivityView admin />));
         expect(html).toContain("Offline");
         expect(html).toMatch(/Down for 1 h/);
         expect(html).toContain("Noticed at polaris.example.com: Timed out");
