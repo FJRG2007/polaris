@@ -26,7 +26,9 @@ import type { BookingPageView } from "../../lib/scheduling-wire";
 import { cacheKey, unwrap, useCachedRead } from "../cached-read";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { bookingPageInputSchema } from "../../lib/scheduling-schemas";
-import { ArrowLeft, CopyPlus, ExternalLink, Trash2 } from "lucide-react";
+import { ArrowLeft, CopyPlus, ExternalLink, Share2, Trash2 } from "lucide-react";
+
+const { ShareDialog } = hostUi.accessShareDialog;
 import {
     bookingUrl,
     forgetBookingPages,
@@ -44,6 +46,7 @@ import {
     type BookingSeed
 } from "./model";
 import {
+    Badge,
     Button,
     Checkbox,
     CopyButton,
@@ -141,6 +144,7 @@ export function BookingPageEditor({
     const [saving, setSaving] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
+    const [sharing, setSharing] = useState(false);
 
     // The form starts from the stored page, or - for a new one - from the
     // first calendar a booking can go into.
@@ -260,6 +264,8 @@ export function BookingPageEditor({
         (calendar) => calendar.kind !== "resource" && calendar.id !== draft?.calendarId
     );
     const slug = baseline?.slug ?? "";
+    // A page somebody else owns and shares with this reader as a co-host.
+    const shared = pageId ? page.data?.shared : undefined;
 
     return (
         <div className="flex flex-col gap-4">
@@ -290,24 +296,39 @@ export function BookingPageEditor({
                         >
                             <ExternalLink />
                         </a>
-                        <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            onClick={() => void duplicate()}
-                            aria-label={t("bookingPage.duplicate")}
-                            title={t("bookingPage.duplicate")}
-                        >
-                            <CopyPlus />
-                        </Button>
-                        <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            onClick={() => void remove()}
-                            aria-label={t("bookingPage.delete")}
-                            title={t("bookingPage.delete")}
-                        >
-                            <Trash2 />
-                        </Button>
+                        {shared ? (
+                            <Badge variant="neutral">{t("bookingPage.sharedWithYou")}</Badge>
+                        ) : (
+                            <>
+                                <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    onClick={() => setSharing(true)}
+                                    aria-label={t("bookingPage.share")}
+                                    title={t("bookingPage.share")}
+                                >
+                                    <Share2 />
+                                </Button>
+                                <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    onClick={() => void duplicate()}
+                                    aria-label={t("bookingPage.duplicate")}
+                                    title={t("bookingPage.duplicate")}
+                                >
+                                    <CopyPlus />
+                                </Button>
+                                <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    onClick={() => void remove()}
+                                    aria-label={t("bookingPage.delete")}
+                                    title={t("bookingPage.delete")}
+                                >
+                                    <Trash2 />
+                                </Button>
+                            </>
+                        )}
                     </span>
                 ) : null}
             </div>
@@ -344,9 +365,17 @@ export function BookingPageEditor({
                     className="flex flex-col gap-4"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        void save();
+                        if (shared !== "view") void save();
                     }}
                 >
+                    {shared ? (
+                        <StatusNote tone="neutral">
+                            {shared === "view"
+                                ? t("bookingPage.sharedView")
+                                : t("bookingPage.sharedEdit")}
+                        </StatusNote>
+                    ) : null}
+                    <fieldset disabled={shared === "view"} className="contents">
                     <Section title={t("bookingPage.sectionAbout")}>
                         <FieldRow
                             label={`${t("bookingPage.title")} *`}
@@ -437,6 +466,7 @@ export function BookingPageEditor({
                         </label>
                     </Section>
 
+                    {shared ? null : (
                     <Section title={t("bookingPage.sectionCalendars")}>
                         <FieldRow
                             label={`${t("bookingPage.calendar")} *`}
@@ -508,6 +538,7 @@ export function BookingPageEditor({
                             )}
                         </div>
                     </Section>
+                    )}
 
                     <Section title={t("bookingPage.sectionTiming")}>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -660,7 +691,9 @@ export function BookingPageEditor({
                             />
                         </label>
                     </Section>
+                    </fieldset>
 
+                    {shared === "view" ? null : (
                     <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 py-3">
                         {attempted && !valid ? (
                             <span className="mr-auto text-xs text-danger">
@@ -694,10 +727,22 @@ export function BookingPageEditor({
                                   : t("bookingPage.create")}
                         </Button>
                     </div>
+                    )}
                 </form>
             )}
 
-            {pageId ? <BookingsList pageId={pageId} /> : null}
+            {pageId ? <BookingsList pageId={pageId} shared={shared} /> : null}
+            {sharing && pageId && baseline ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(next) => {
+                        if (!next) setSharing(false);
+                    }}
+                    subject="calendar.booking"
+                    subjectId={pageId}
+                    name={baseline.title}
+                />
+            ) : null}
         </div>
     );
 }

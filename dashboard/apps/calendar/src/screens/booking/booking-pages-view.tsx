@@ -21,7 +21,7 @@ import {
     useLinkBase
 } from "./reads";
 import { CalendarClock, Copy, CopyPlus, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
-import { Button, CopyButton, EmptyState, Skeleton, Switch, buttonVariants, cn } from "@polaris/ui";
+import { Badge, Button, CopyButton, EmptyState, Skeleton, Switch, buttonVariants, cn } from "@polaris/ui";
 import {
     deleteBookingPageAction,
     duplicateBookingPageAction,
@@ -172,9 +172,14 @@ export function BookingPagesView() {
                                 </span>
                             </div>
                             <div className="flex items-center gap-1">
+                                {page.shared ? (
+                                    <Badge variant="neutral">
+                                        {t("bookingPage.sharedWithYou")}
+                                    </Badge>
+                                ) : null}
                                 <Switch
                                     checked={page.enabled}
-                                    disabled={off && !page.enabled}
+                                    disabled={page.shared === "view" || (off && !page.enabled)}
                                     onChange={(value) => void toggle(page, value)}
                                     aria-label={t("bookingPage.enabledFor", { title: page.title })}
                                 />
@@ -206,16 +211,18 @@ export function BookingPagesView() {
                                 >
                                     <ExternalLink />
                                 </a>
-                                <Button
-                                    size="icon-sm"
-                                    variant="ghost"
-                                    disabled={busy === page.id}
-                                    onClick={() => void duplicate(page)}
-                                    aria-label={t("bookingPage.duplicate")}
-                                    title={t("bookingPage.duplicate")}
-                                >
-                                    <CopyPlus />
-                                </Button>
+                                {page.shared ? null : (
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        disabled={busy === page.id}
+                                        onClick={() => void duplicate(page)}
+                                        aria-label={t("bookingPage.duplicate")}
+                                        title={t("bookingPage.duplicate")}
+                                    >
+                                        <CopyPlus />
+                                    </Button>
+                                )}
                                 <Link
                                     href={`/calendar/booking/${page.id}`}
                                     aria-label={t("bookingPage.edit")}
@@ -226,15 +233,17 @@ export function BookingPagesView() {
                                 >
                                     <Pencil />
                                 </Link>
-                                <Button
-                                    size="icon-sm"
-                                    variant="ghost"
-                                    onClick={() => void remove(page)}
-                                    aria-label={t("bookingPage.delete")}
-                                    title={t("bookingPage.delete")}
-                                >
-                                    <Trash2 />
-                                </Button>
+                                {page.shared ? null : (
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        onClick={() => void remove(page)}
+                                        aria-label={t("bookingPage.delete")}
+                                        title={t("bookingPage.delete")}
+                                    >
+                                        <Trash2 />
+                                    </Button>
+                                )}
                             </div>
                         </li>
                     ))}

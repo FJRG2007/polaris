@@ -191,19 +191,45 @@ async function upcomingCounts(pageIds: readonly string[], now: Date): Promise<Ma
     return new Map(rows.map((row) => [row.pageId, row._count._all]));
 }
 
+/** The pages other people share with this reader as a co-host, by level. */
+async function coHosted(userId: string): Promise<Map<string, "view" | "edit">> {
+    const held = await host.accessGrants.grantedSubjects(userId, "calendar.booking");
+    const levels = new Map<string, "view" | "edit">();
+    for (const [id, capability] of held) {
+        if (capability === "edit" || capability === "view") levels.set(id, capability);
+    }
+    return levels;
+}
+
 export async function listBookingPages(
     user: SessionUser,
     now = new Date()
 ): Promise<BookingPageView[]> {
-    const rows = await prisma.calendarBookingPage.findMany({
-        where: { ownerId: user.id },
-        orderBy: { createdAt: "asc" }
-    });
+    const [rows, shared] = await Promise.all([
+        prisma.calendarBookingPage.findMany({
+            where: { ownerId: user.id },
+            orderBy: { createdAt: "asc" }
+        }),
+        coHosted(user.id)
+    ]);
+    const others =
+        shared.size === 0
+            ? []
+            : await prisma.calendarBookingPage.findMany({
+                  where: { id: { in: [...shared.keys()] }, ownerId: { not: user.id } },
+                  orderBy: { createdAt: "asc" }
+              });
     const counts = await upcomingCounts(
-        rows.map((row) => row.id),
+        [...rows, ...others].map((row) => row.id),
         now
     );
-    return rows.map((row) => pageView(row, counts.get(row.id) ?? 0));
+    return [
+        ...rows.map((row) => pageView(row, counts.get(row.id) ?? 0)),
+        ...others.map((row) => ({
+            ...pageView(row, counts.get(row.id) ?? 0),
+            shared: shared.get(row.id)!
+        }))
+    ];
 }
 
 async function ownPage(user: SessionUser, id: string): Promise<PageRow> {
@@ -212,13 +238,32 @@ async function ownPage(user: SessionUser, id: string): Promise<PageRow> {
     return row;
 }
 
+/**
+ * A page this person owns, or co-hosts at `need` or above. `shared` is the
+ * co-host's level, null for the owner. A page shared at "view" is refused
+ * where "edit" is asked for, in the same words as a page that is not there.
+ */
+async function reachablePage(
+    user: SessionUser,
+    id: string,
+    need: "view" | "edit"
+): Promise<{ row: PageRow; shared: "view" | "edit" | null }> {
+    const row = await prisma.calendarBookingPage.findUnique({ where: { id } });
+    if (row && row.ownerId === user.id) return { row, shared: null };
+    const level = row ? (await coHosted(user.id)).get(row.id) : undefined;
+    if (!row || !level || (need === "edit" && level !== "edit"))
+        throw new CalendarRefusal((await calendarT())("bookingPage.notFound"));
+    return { row, shared: level };
+}
+
 export async function bookingPage(
     user: SessionUser,
     id: string,
     now = new Date()
 ): Promise<BookingPageView> {
-    const row = await ownPage(user, id);
-    return pageView(row, (await upcomingCounts([row.id], now)).get(row.id) ?? 0);
+    const { row, shared } = await reachablePage(user, id, "view");
+    const view = pageView(row, (await upcomingCounts([row.id], now)).get(row.id) ?? 0);
+    return shared ? { ...view, shared } : view;
 }
 
 /** A readable address for a new page: its title in lowercase ASCII and a short
@@ -314,16 +359,22 @@ export async function updateBookingPage(
     id: string,
     input: BookingPageInput
 ): Promise<BookingPageView> {
-    const row = await ownPage(user, id);
+    const { row, shared } = await reachablePage(user, id, "edit");
     if (input.enabled) await requireBookingAllowed();
-    await checkCalendars(user, input);
+    // A co-host changes how the page books, never whose calendars it books
+    // into: those stay the owner's, as the owner last chose them.
+    const settled = shared
+        ? { ...input, calendarId: row.calendarId, conflictIds: readIds(row.conflictIds) }
+        : input;
+    if (!shared) await checkCalendars(user, input);
     const slug = input.slug ?? row.slug;
     if (slug !== row.slug) await slugFree(slug, row.id);
     const updated = await prisma.calendarBookingPage.update({
         where: { id: row.id },
-        data: { slug, ...columns(input) }
+        data: { slug, ...columns(settled) }
     });
-    return pageView(updated, (await upcomingCounts([row.id], new Date())).get(row.id) ?? 0);
+    const view = pageView(updated, (await upcomingCounts([row.id], new Date())).get(row.id) ?? 0);
+    return shared ? { ...view, shared } : view;
 }
 
 /** A copy of a page, switched off until its owner has looked at it. */
@@ -357,10 +408,12 @@ export async function duplicateBookingPage(
 export async function deleteBookingPage(user: SessionUser, id: string): Promise<void> {
     const row = await ownPage(user, id);
     await prisma.calendarBookingPage.delete({ where: { id: row.id } });
+    // Nobody co-hosts a page that no longer exists.
+    await host.accessGrants.dropGrantsFor("calendar.booking", row.id);
 }
 
 export async function listBookings(user: SessionUser, pageId: string): Promise<BookingView[]> {
-    const page = await ownPage(user, pageId);
+    const { row: page } = await reachablePage(user, pageId, "view");
     const questions = readQuestions(page.questions);
     const rows = await prisma.calendarBooking.findMany({
         where: { pageId: page.id },
@@ -1042,13 +1095,20 @@ export async function rescheduleBooking(
     return { start: start.toISOString(), end: end.toISOString() };
 }
 
-/** The owner cancels a booking from their list. */
+/** The owner, or a co-host who may change the page, cancels a booking from
+ *  its list. */
 export async function cancelBookingAsOwner(user: SessionUser, bookingId: string): Promise<void> {
-    const booking = await prisma.calendarBooking.findFirst({
-        where: { id: bookingId, page: { ownerId: user.id } },
+    const found = await prisma.calendarBooking.findFirst({
+        where: { id: bookingId },
         include: { page: true }
     });
     const t = await calendarT();
+    const booking =
+        found &&
+        (found.page.ownerId === user.id ||
+            (await coHosted(user.id)).get(found.page.id) === "edit")
+            ? found
+            : null;
     if (!booking) throw new CalendarRefusal(t("booking.notFound"));
     if (booking.status === "cancelled") return;
     if (booking.status === "pending") {

@@ -82,7 +82,8 @@ export const GRANT_SUBJECTS = [
     "watch.connectivity",
     "watch.alarm",
     "status.page",
-    "calendar.calendar"
+    "calendar.calendar",
+    "calendar.booking"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -182,7 +183,11 @@ export const GRANT_CAPABILITIES = {
     // A calendar, handed to an organization's role: seeing every detail, or
     // also changing its events. People and teams keep their own table
     // (CalendarShare, with its four levels); a grant here is only ever a role.
-    "calendar.calendar": ["view", "edit"]
+    "calendar.calendar": ["view", "edit"],
+    // A booking page, handed to a co-host: seeing it and every booking made
+    // through it, or also changing how it books and cancelling bookings. The
+    // calendars it books into, duplicating and deleting stay with its owner.
+    "calendar.booking": ["view", "edit"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -225,7 +230,8 @@ export const GRANT_ACTIONS = {
     "watch.connectivity": [],
     "watch.alarm": [],
     "status.page": [],
-    "calendar.calendar": []
+    "calendar.calendar": [],
+    "calendar.booking": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**
