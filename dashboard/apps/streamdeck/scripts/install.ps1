@@ -95,11 +95,24 @@ function Invoke-PolarisStreamDeckInstall {
         Start-Sleep -Seconds 2
     }
 
+    function Test-AppShown {
+        # Whether its window was on screen, as opposed to sitting in the tray:
+        # a window in the tray has no main window handle.
+        param($Process)
+        return $Process -and $Process.MainWindowHandle -ne [IntPtr]::Zero
+    }
+
     function Start-App {
-        param($Path)
+        # Back the way it was found: with its window if it had one open, to the
+        # tray if that is where it was.
+        param($Path, [bool]$Shown = $false)
         if ($Path -and (Test-Path $Path)) {
-            # `--runinbk` is how the app starts itself at sign-in: to the tray.
-            Start-Process -FilePath $Path -ArgumentList "--runinbk"
+            if ($Shown) {
+                Start-Process -FilePath $Path
+            } else {
+                # `--runinbk` is how the app starts itself at sign-in: to the tray.
+                Start-Process -FilePath $Path -ArgumentList "--runinbk"
+            }
         }
     }
 
@@ -107,11 +120,12 @@ function Invoke-PolarisStreamDeckInstall {
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
         $running = Get-App
         $exe = if ($running) { $running.Path } else { $null }
+        $shown = Test-AppShown $running
         if ($running -and (Test-Path $dir)) { Stop-App $running }
         foreach ($path in @($dir, $updater, $logFile)) {
             if (Test-Path $path) { Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue }
         }
-        if ($running) { Start-App $exe }
+        if ($running) { Start-App $exe $shown }
         Write-Log "removed the updates task and the plugin"
         return
     }
@@ -208,8 +222,9 @@ function Invoke-PolarisStreamDeckInstall {
 
             $running = Get-App
             $exe = if ($running) { $running.Path } else { $null }
+            $shown = Test-AppShown $running
             if ($running) {
-                Write-Log "closing the Stream Deck app to put the new version in; it starts again by itself"
+                Write-Log "closing the Stream Deck app to put the new version in; it opens again as it was"
                 Stop-App $running
             }
             $swapped = $false
@@ -225,7 +240,7 @@ function Invoke-PolarisStreamDeckInstall {
             } catch {
                 Write-Log "could not put $version in place: $($_.Exception.Message)"
             } finally {
-                if ($running) { Start-App $exe }
+                if ($running) { Start-App $exe $shown }
             }
 
             if ($swapped) {

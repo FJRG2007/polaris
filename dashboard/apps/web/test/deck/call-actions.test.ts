@@ -231,3 +231,20 @@ describe("switchOn", () => {
         }
     });
 });
+
+describe("the call keys' names", () => {
+    it("are in both catalogs, so a picker never shows a key without one", async () => {
+        const catalogs = await Promise.all(
+            ["en-US", "es-ES"].map(
+                async (locale) =>
+                    (await import(`../../messages/${locale}/api.json`)).default as {
+                        deck: { actions: Record<string, string> };
+                    }
+            )
+        );
+        for (const entry of callDeckActions()) {
+            for (const catalog of catalogs)
+                expect(catalog.deck.actions[entry.id.replace(".", "_")]).toBeTruthy();
+        }
+    });
+});

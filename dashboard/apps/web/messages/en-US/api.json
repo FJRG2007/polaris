@@ -282,6 +282,7 @@
             "call_deafen": "Deafen yourself",
             "call_camera": "Camera on or off",
             "call_record": "Record the call",
+            "call_share": "Share your screen",
             "call_hangup": "Hang up",
             "call_sound": "Play a sound"
         },
