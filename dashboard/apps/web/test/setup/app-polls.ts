@@ -263,6 +263,16 @@ vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
         () => import("@/app/(app)/apps/agents/sessions/actions"),
         "sessionScreenAction",
         1
+    ),
+    sessionChoices: forward(
+        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        "sessionChoicesAction",
+        0
+    ),
+    sessionChanges: forward(
+        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        "sessionChangesAction",
+        1
     )
 }));
 
@@ -702,4 +712,8 @@ vi.mock("@/app/(app)/apps/telemetry/telemetry-polls", () => ({
         "openIssueAction",
         2
     )
+}));
+
+vi.mock("@/app/(app)/apps/agents/repos/repos-polls", () => ({
+    repoAdvice: forward(() => import("@/app/(app)/apps/agents/actions"), "adviseRepoAction", 1)
 }));

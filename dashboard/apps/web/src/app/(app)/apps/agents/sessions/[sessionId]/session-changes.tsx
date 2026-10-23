@@ -45,11 +45,11 @@ import {
 } from "@polaris/ui";
 import {
     openSessionPullRequestAction,
-    sessionChangesAction,
     sessionFileDiffAction,
     sessionShipAction,
     type SessionShipView
 } from "../actions";
+import * as polls from "../sessions-polls";
 
 /** How often the list is read again while the agent is still working. */
 const REFRESH_MS = 15_000;
@@ -96,7 +96,7 @@ export function SessionChanges({ session }: { session: SessionView }) {
     const load = useCallback(async () => {
         const read = ++reads.current;
         const result = await runAction(
-            () => sessionChangesAction({ sessionId: session.id, offset: 0 }),
+            () => polls.sessionChanges({ sessionId: session.id, offset: 0 }),
             setProblem
         );
         // A slower answer to an older read must not paint over a newer one.
@@ -120,7 +120,7 @@ export function SessionChanges({ session }: { session: SessionView }) {
         const files = [...answer.listing.files];
         // The pages somebody already opened stay open.
         while (next && files.length < shown.current) {
-            const page = await sessionChangesAction({ sessionId: session.id, offset: next }).catch(
+            const page = await polls.sessionChanges({ sessionId: session.id, offset: next }).catch(
                 () => null
             );
             if (read !== reads.current) return;
@@ -149,7 +149,7 @@ export function SessionChanges({ session }: { session: SessionView }) {
         const read = reads.current;
         setMore(true);
         const result = await runAction(
-            () => sessionChangesAction({ sessionId: session.id, offset: listing.next }),
+            () => polls.sessionChanges({ sessionId: session.id, offset: listing.next }),
             setProblem
         );
         setMore(false);

@@ -156,7 +156,10 @@ const actions = vi.hoisted(() => {
         "runnerPrincipalsAction",
         "previewScopeAction",
         "telemetryOverviewAction",
-        "openIssueAction"
+        "openIssueAction",
+        "sessionChoicesAction",
+        "sessionChangesAction",
+        "adviseRepoAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -216,7 +219,9 @@ vi.mock("@/app/(app)/apps/servers/actions", () => ({
     sharedHostAction: actions.sharedHostAction
 }));
 vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
-    sessionScreenAction: actions.sessionScreenAction
+    sessionScreenAction: actions.sessionScreenAction,
+    sessionChoicesAction: actions.sessionChoicesAction,
+    sessionChangesAction: actions.sessionChangesAction
 }));
 vi.mock("@/app/(app)/apps/network-filter/actions", () => ({
     dnsInsightsAction: actions.dnsInsightsAction,
@@ -445,6 +450,9 @@ vi.mock("@/app/(app)/apps/telemetry/actions", () => ({
     telemetryOverviewAction: actions.telemetryOverviewAction,
     openIssueAction: actions.openIssueAction
 }));
+vi.mock("@/app/(app)/apps/agents/actions", () => ({
+    adviseRepoAction: actions.adviseRepoAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -614,7 +622,10 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/runners/principals": () => import("@/app/api/runners/principals/route"),
     "/api/runners/scope-preview": () => import("@/app/api/runners/scope-preview/route"),
     "/api/telemetry/overview": () => import("@/app/api/telemetry/overview/route"),
-    "/api/telemetry/issue": () => import("@/app/api/telemetry/issue/route")
+    "/api/telemetry/issue": () => import("@/app/api/telemetry/issue/route"),
+    "/api/agents/sessions/choices": () => import("@/app/api/agents/sessions/choices/route"),
+    "/api/agents/sessions/changes": () => import("@/app/api/agents/sessions/changes/route"),
+    "/api/agents/repo-advice": () => import("@/app/api/agents/repo-advice/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2389,6 +2400,42 @@ const CASES: Case[] = [
             ).telemetryIssue("projectId-1", "issueId-1"),
         action: "openIssueAction",
         args: ["projectId-1", "issueId-1"]
+    },
+    {
+        name: "the agents, repositories and machines a new session can use",
+        path: "/api/agents/sessions/choices",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/agents/sessions/sessions-polls")>(
+                    "@/app/(app)/apps/agents/sessions/sessions-polls"
+                )
+            ).sessionChoices(),
+        action: "sessionChoicesAction",
+        args: []
+    },
+    {
+        name: "a page of what a session changed in its checkout",
+        path: "/api/agents/sessions/changes",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/agents/sessions/sessions-polls")>(
+                    "@/app/(app)/apps/agents/sessions/sessions-polls"
+                )
+            ).sessionChanges({ kind: "sample" }),
+        action: "sessionChangesAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "how a repository is best run, and what may run it",
+        path: "/api/agents/repo-advice",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/agents/repos/repos-polls")>(
+                    "@/app/(app)/apps/agents/repos/repos-polls"
+                )
+            ).repoAdvice({ kind: "sample" }),
+        action: "adviseRepoAction",
+        args: [{ kind: "sample" }]
     }
 ];
 

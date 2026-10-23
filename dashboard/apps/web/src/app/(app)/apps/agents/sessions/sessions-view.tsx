@@ -26,7 +26,7 @@ import {
     SignInNotice
 } from "@/components/agents/agent-select";
 import { Bot, CircleDot, Loader2, Play, Server, Square } from "lucide-react";
-import { sessionChoicesAction, startSessionAction, stopSessionAction } from "./actions";
+import { startSessionAction, stopSessionAction } from "./actions";
 import type { GithubInstallGap } from "@/lib/github-app-reach";
 import { GithubAppGapNotice } from "@/components/github-app-gap";
 import {
@@ -47,6 +47,7 @@ import {
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { agentText, agentWord, sessionStateWord } from "@/lib/agents/words";
+import * as polls from "./sessions-polls";
 
 /** How often a live session is re-read. A session reports through its hooks, so
  *  this is only how quickly the list notices - fast enough that "needs you" is
@@ -229,7 +230,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     const router = useRouter();
 
     useEffect(() => {
-        void sessionChoicesAction().then((loaded) => {
+        void polls.sessionChoices().then((loaded) => {
             setChoices(loaded);
             // A workspace when there is nothing connected, which is now a real
             // answer rather than a dead end: an agent on a machine of your own
