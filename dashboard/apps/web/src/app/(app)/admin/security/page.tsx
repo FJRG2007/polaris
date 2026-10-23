@@ -34,10 +34,7 @@ export default async function AdminSecurityPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("security.title")}
-                description={t("security.description")}
-            />
+            <PageHeader title={t("security.title")} description={t("security.description")} />
             <div className="flex flex-col gap-4">
                 <SecurityAdmin policy={policy} mailReady={mail.channelId !== null} />
                 <div className="max-w-2xl">

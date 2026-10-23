@@ -57,7 +57,9 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
                     />
                     {error ? <p className="text-danger text-sm">{error}</p> : null}
                     {stale ? (
-                        <p className="text-warning-ink text-sm">{t("billing.stale", { reason: stale })}</p>
+                        <p className="text-warning-ink text-sm">
+                            {t("billing.stale", { reason: stale })}
+                        </p>
                     ) : null}
                     <parts.StatementTotals view={data} />
                     <OwnersTable view={data} />
@@ -90,11 +92,21 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
                 <table className="w-full min-w-[32rem] text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="w-full max-w-0 px-3 py-2 font-medium">{t("billing.owners.owner")}</th>
-                            <th className="px-3 py-2 font-medium text-right">{t("billing.owners.projects")}</th>
-                            <th className="px-3 py-2 font-medium text-right">{t("billing.owners.cpu")}</th>
-                            <th className="px-3 py-2 font-medium text-right">{t("billing.owners.cost")}</th>
-                            <th className="px-3 py-2 font-medium text-right">{t("billing.owners.budget")}</th>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">
+                                {t("billing.owners.owner")}
+                            </th>
+                            <th className="px-3 py-2 font-medium text-right">
+                                {t("billing.owners.projects")}
+                            </th>
+                            <th className="px-3 py-2 font-medium text-right">
+                                {t("billing.owners.cpu")}
+                            </th>
+                            <th className="px-3 py-2 font-medium text-right">
+                                {t("billing.owners.cost")}
+                            </th>
+                            <th className="px-3 py-2 font-medium text-right">
+                                {t("billing.owners.budget")}
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -126,7 +138,9 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
                                               {entry.projects}
                                           </td>
                                           <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
-                                              {t("billing.owners.cpuHours", { hours: parts.quantity(entry.usage.cpuHours) })}
+                                              {t("billing.owners.cpuHours", {
+                                                  hours: parts.quantity(entry.usage.cpuHours)
+                                              })}
                                           </td>
                                           <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
                                               {entry.cost ? format.currency(entry.cost.total) : "-"}
@@ -167,7 +181,9 @@ function OwnerName({ owner }: { owner: core.BillingOwner }) {
                 {owner.name}
             </span>
             <span className="text-muted-foreground shrink-0 text-xs">
-                {owner.kind === "org" ? t("billing.owners.organization") : t("billing.owners.personal")}
+                {owner.kind === "org"
+                    ? t("billing.owners.organization")
+                    : t("billing.owners.personal")}
             </span>
         </>
     );

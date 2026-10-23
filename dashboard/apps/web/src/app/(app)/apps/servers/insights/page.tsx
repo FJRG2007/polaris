@@ -41,10 +41,7 @@ export default async function ServerInsightsPage({
             <PageHeader title={t("insights.heading")} description={t("insights.description")} />
             <div className="flex flex-col gap-4">
                 {pages > 1 ? (
-                    <nav
-                        className="flex items-center gap-2"
-                        aria-label={t("insights.pages.label")}
-                    >
+                    <nav className="flex items-center gap-2" aria-label={t("insights.pages.label")}>
                         <span className="min-w-0 text-xs text-muted-foreground">
                             {t("insights.pages.range", {
                                 from: first + 1,
@@ -52,7 +49,11 @@ export default async function ServerInsightsPage({
                                 total: rows.length
                             })}
                         </span>
-                        <PageLink page={page - 1} pages={pages} label={t("insights.pages.previous")}>
+                        <PageLink
+                            page={page - 1}
+                            pages={pages}
+                            label={t("insights.pages.previous")}
+                        >
                             <ChevronLeft className="size-4" aria-hidden />
                         </PageLink>
                         <PageLink page={page + 1} pages={pages} label={t("insights.pages.next")}>

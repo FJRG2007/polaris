@@ -27,8 +27,7 @@ const badgeVariants = cva(
 );
 
 export interface BadgeProps
-    extends HTMLAttributes<HTMLSpanElement>,
-        VariantProps<typeof badgeVariants> {}
+    extends HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
 
 export function Badge({ className, variant, ...props }: BadgeProps) {
     return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
@@ -53,7 +52,10 @@ export function statusChipClass(tone: "success" | "warning" | "danger" | "neutra
 export function TagList({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     return (
         <div
-            className={cn("flex flex-wrap items-center gap-1 sm:w-max sm:max-w-[min(20rem,40vw)]", className)}
+            className={cn(
+                "flex flex-wrap items-center gap-1 sm:w-max sm:max-w-[min(20rem,40vw)]",
+                className
+            )}
             {...props}
         />
     );

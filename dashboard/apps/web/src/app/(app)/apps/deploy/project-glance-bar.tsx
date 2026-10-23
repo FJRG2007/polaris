@@ -270,7 +270,10 @@ export function ProjectGlanceBar({
                         title={attention
                             .map((entry) => `${entry.service}: ${entry.reasons.join(", ")}`)
                             .join("\n")}
-                        className={cn(statusChipClass("danger"), "min-w-0 max-w-full shrink hover:bg-danger-soft")}
+                        className={cn(
+                            statusChipClass("danger"),
+                            "min-w-0 max-w-full shrink hover:bg-danger-soft"
+                        )}
                     >
                         <CircleAlert className="size-3 shrink-0" />
                         <span className="truncate">

@@ -227,7 +227,11 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                                 onSelect={setSelection}
                                 onChange={() => undefined}
                                 onOpen={(id) =>
-                                    setSelection({ nodes: new Set([id]), notes: new Set(), edge: null })
+                                    setSelection({
+                                        nodes: new Set([id]),
+                                        notes: new Set(),
+                                        edge: null
+                                    })
                                 }
                                 onPalette={() => undefined}
                                 onAddNote={() => undefined}
@@ -246,7 +250,9 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                     <section className="min-w-0 space-y-2" aria-label={t("runView.steps")}>
                         <h2 className="text-sm font-semibold">{t("runView.steps")}</h2>
                         {!run.canSeeData ? (
-                            <p className="text-xs text-muted-foreground">{t("runView.hiddenData")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("runView.hiddenData")}
+                            </p>
                         ) : null}
                         <ol className="space-y-2">
                             {steps.map((step) => (

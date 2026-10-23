@@ -113,9 +113,16 @@ describe("layout guards", () => {
     it("catches what it is for", () => {
         const cell = `<tr><td className="px-3"><div className="flex flex-wrap gap-1"><Badge>a</Badge><Badge>b</Badge></div></td></tr>`;
         expect(badgeRowsWithoutTagList("x.tsx", cell)).toHaveLength(1);
-        expect(badgeRowsWithoutTagList("x.tsx", cell.replace(/div className="[^"]*"/, "TagList").replace("</div>", "</TagList>"))).toEqual([]);
+        expect(
+            badgeRowsWithoutTagList(
+                "x.tsx",
+                cell.replace(/div className="[^"]*"/, "TagList").replace("</div>", "</TagList>")
+            )
+        ).toEqual([]);
         const page = `export default function P() { return (<><PageHeader title="t" /><A /><B /></>); }`;
         expect(unspacedPageSections("x.tsx", page)).toHaveLength(1);
-        expect(unspacedPageSections("x.tsx", page.replace("<A /><B />", "<div><A /><B /></div>"))).toEqual([]);
+        expect(
+            unspacedPageSections("x.tsx", page.replace("<A /><B />", "<div><A /><B /></div>"))
+        ).toEqual([]);
     });
 });

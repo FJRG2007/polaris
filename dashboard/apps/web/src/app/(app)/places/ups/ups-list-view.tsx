@@ -120,7 +120,9 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                         </ul>
                         {offerError ? (
                             <p role="alert" className="text-sm text-danger-ink">
-                                {t(`ups.errors.${offerError === "notFound" ? "notFound" : "failed"}`)}
+                                {t(
+                                    `ups.errors.${offerError === "notFound" ? "notFound" : "failed"}`
+                                )}
                             </p>
                         ) : null}
                     </section>
@@ -137,8 +139,12 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                         <table className="w-full min-w-[36rem] text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-2 pr-3 font-medium">{t("ups.columns.name")}</th>
-                                    <th className="py-2 pr-3 font-medium">{t("ups.columns.status")}</th>
+                                    <th className="py-2 pr-3 font-medium">
+                                        {t("ups.columns.name")}
+                                    </th>
+                                    <th className="py-2 pr-3 font-medium">
+                                        {t("ups.columns.status")}
+                                    </th>
                                     <th className="py-2 pr-3 text-right font-medium">
                                         {t("ups.columns.charge")}
                                     </th>
@@ -148,7 +154,9 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                                     <th className="py-2 pr-3 text-right font-medium">
                                         {t("ups.columns.load")}
                                     </th>
-                                    <th className="py-2 font-medium">{t("ups.columns.connection")}</th>
+                                    <th className="py-2 font-medium">
+                                        {t("ups.columns.connection")}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -194,12 +202,16 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                                                   <td className="py-2.5 pr-3 text-right tabular-nums">
                                                       {charge === null
                                                           ? "-"
-                                                          : t("ups.units.percent", { value: charge })}
+                                                          : t("ups.units.percent", {
+                                                                value: charge
+                                                            })}
                                                   </td>
                                                   <td className="py-2.5 pr-3 text-right tabular-nums">
                                                       {minutes === null
                                                           ? "-"
-                                                          : t("ups.units.minutes", { count: minutes })}
+                                                          : t("ups.units.minutes", {
+                                                                count: minutes
+                                                            })}
                                                   </td>
                                                   <td className="py-2.5 pr-3 text-right tabular-nums">
                                                       {load === null

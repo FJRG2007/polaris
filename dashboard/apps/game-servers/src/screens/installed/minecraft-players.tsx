@@ -1903,14 +1903,12 @@ function moreEntries({
             text: t("playersTab.menu.gameMode"),
             icon: <Gamepad2 className="size-4" />,
             disabled: !live || !player.online,
-            entries: GAME_MODES.map(
-                (one): RowMenuEntry => ({
-                    kind: "item",
-                    text: t(`playersTab.modes.${one}`),
-                    checked: mode === one,
-                    onSelect: () => void onGamemode([player.name], one)
-                })
-            )
+            entries: GAME_MODES.map((one): RowMenuEntry => ({
+                kind: "item",
+                text: t(`playersTab.modes.${one}`),
+                checked: mode === one,
+                onSelect: () => void onGamemode([player.name], one)
+            }))
         },
         { kind: "separator" },
         {
@@ -2006,14 +2004,12 @@ function bulkEntries({
             text: t("playersTab.menu.gameMode"),
             icon: <Gamepad2 className="size-4" />,
             disabled: !live || online.length === 0,
-            entries: GAME_MODES.map(
-                (one): RowMenuEntry => ({
-                    kind: "item",
-                    text: t(`playersTab.modes.${one}`),
-                    checked: common === one,
-                    onSelect: () => void onGamemode(online, one)
-                })
-            )
+            entries: GAME_MODES.map((one): RowMenuEntry => ({
+                kind: "item",
+                text: t(`playersTab.modes.${one}`),
+                checked: common === one,
+                onSelect: () => void onGamemode(online, one)
+            }))
         }
     ];
     if (!bedrock) {
