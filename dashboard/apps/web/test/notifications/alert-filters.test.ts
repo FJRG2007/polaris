@@ -162,8 +162,16 @@ describe("quiet hours", () => {
 
     it("holds the webhook back and still writes the bell", async () => {
         quiet = { enabled: true, start: "00:00", end: "23:59", criticalBypass: true };
-        await notify({ userId: "u1", event: "deploy.failed", title: "Failed" });
-        await settle();
+        // Midday, inside the window: run in the last minute of a day, the real
+        // clock sat past 23:59 and the webhook went out.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-01-15T12:00:00Z"));
+        try {
+            await notify({ userId: "u1", event: "deploy.failed", title: "Failed" });
+            await settle();
+        } finally {
+            vi.useRealTimers();
+        }
         expect(created).toHaveBeenCalledTimes(1);
         expect(sent).not.toHaveBeenCalled();
         expect(deliveries).toContainEqual({
