@@ -35,7 +35,18 @@ const PLAY: { shop: boolean; stage: PolarStage; hold: number }[] = [
     { shop: true, stage: "answered", hold: 3400 }
 ];
 
-/** The step on screen; the still and the phone picture show the finished dashboard chat. */
+/**
+ * The side panel is a page of its own, the way the extension opens it: this
+ * scene again in a frame 420 px wide, told which stage to draw. At that width
+ * the chat lays itself out as it does in the real panel - its chat list put
+ * away behind a button - which a 420 px box inside a wide page would not do.
+ */
+const PANEL = new URLSearchParams(window.location.search).get("panel") as PolarStage | null;
+
+/** The phone plays only the dashboard: the side panel is a desktop browser's. */
+const SHOWN = () => (window.innerWidth < 768 ? PLAY.filter((one) => !one.shop) : PLAY);
+
+/** The step on screen; the still shows the finished dashboard chat. */
 let current = 2;
 const listeners = new Set<(step: number) => void>();
 
@@ -156,20 +167,41 @@ function Browser({ ctx, stage }: { ctx: SceneContext; stage: PolarStage }) {
             <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
                 <ShopPage ctx={ctx} />
                 {/* The extension's side panel, at the width a browser opens it. */}
-                <aside className="flex overflow-hidden border-l border-border bg-card" style={{ width: 420, flex: "none" }}>
-                    <PolarChat
-                        key={`shop-${stage}`}
-                        fullPage
-                        site={{ url: SHOP.url, title: `${SHOP.product[lang]} - ${SHOP.store}` }}
-                    />
-                </aside>
+                <iframe
+                    key={stage}
+                    id="polar-side-panel"
+                    title="Polar"
+                    src={`${window.location.pathname}${window.location.search}&panel=${stage}`}
+                    className="border-l border-border bg-card"
+                    style={{ width: 420, flex: "none", height: "100%" }}
+                />
             </div>
         </div>
     );
 }
 
+/** What the extension's side panel draws: the chat, with the page in front of the reader as its site. */
+function SidePanel({ ctx }: { ctx: SceneContext }) {
+    const lang = ctx.locale === "es-ES" ? "es" : "en";
+    return (
+        <div className="flex h-dvh bg-card">
+            <PolarChat fullPage site={{ url: SHOP.url, title: `${SHOP.product[lang]} - ${SHOP.store}` }} />
+        </div>
+    );
+}
+
+/** Resolves once the side panel's page has drawn its answer. */
+async function panelDrawn(): Promise<void> {
+    for (;;) {
+        const frame = document.getElementById("polar-side-panel") as HTMLIFrameElement | null;
+        const inner = frame?.contentWindow as (Window & { __scene?: { ready: boolean } }) | null;
+        if (inner?.__scene?.ready && inner.document.querySelector("textarea")) return;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+}
+
 function PolarInUse({ ctx }: { ctx: SceneContext }) {
-    const step = PLAY[useStep()]!;
+    const step = SHOWN()[useStep()]!;
     if (step.shop) return <Browser ctx={ctx} stage={step.stage} />;
     return (
         <Chrome>
@@ -192,7 +224,7 @@ export const polar = defineScene({
         }),
         "GET /api/polar/threads": () => ({ threads: polarThreads(ctx), pinned: [], projects: [] }),
         "GET /api/polar/threads/:id": () => {
-            const step = PLAY[current]!;
+            const step = PANEL ? { stage: PANEL, shop: true } : SHOWN()[current]!;
             return { thread: polarThread(ctx, step.stage, step.shop) };
         },
         "GET /api/polar/feedback": () => ({ marks: {} }),
@@ -207,15 +239,18 @@ export const polar = defineScene({
     render: (ctx) => {
         // The chat that was open before, which is the one the page reopens.
         window.localStorage.setItem(THREAD_KEY, OPEN_THREAD_ID);
-        return <PolarInUse ctx={ctx} />;
+        return PANEL ? <SidePanel ctx={ctx} /> : <PolarInUse ctx={ctx} />;
     },
     animation: {
-        frames: PLAY.length,
-        step: (index) => {
+        get frames() {
+            return SHOWN().length;
+        },
+        step: async (index) => {
             current = index;
             for (const listener of listeners) listener(index);
+            if (SHOWN()[index]!.shop) await panelDrawn();
         },
-        hold: (index) => PLAY[index]!.hold,
+        hold: (index) => SHOWN()[index]!.hold,
         advance: () => 900
     }
 });

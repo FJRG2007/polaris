@@ -1,8 +1,9 @@
 /** Deploy: every project at a glance, and one project's services on its canvas. */
 
+import { tourScene } from "../runtime/tour";
 import { Chrome } from "../runtime/chrome";
 import { defineScene, type SceneContext } from "../runtime/scene";
-import { label, press } from "../runtime/interact";
+import { label, once, press } from "../runtime/interact";
 import { VIEWER } from "../fixtures/people";
 import { toWire } from "@/lib/app-bundles/wire";
 import { ProjectsGrid } from "@/app/(app)/apps/deploy/projects-grid";
@@ -61,11 +62,16 @@ function Project({ ctx, open }: { ctx: SceneContext; open: string | null }) {
     );
 }
 
-export const deployProject = defineScene({
+const deployProjectStill = defineScene({
     id: "deploy-project",
     path: `/apps/deploy/${PROJECT_ID}`,
     params: { projectId: PROJECT_ID },
     actions: () => ({ deployFreshnessAction: () => null, imageUpdateAction: () => null }),
+    // The same two answers, read by the service panel's poll once it has been open a while.
+    api: () => ({
+        "GET /api/deploy/freshness": () => ({ value: null }),
+        "GET /api/deploy/image-update": () => ({ value: null })
+    }),
     render: (ctx) => <Project ctx={ctx} open={null} />
 });
 
@@ -92,3 +98,10 @@ export const deployLogs = defineScene({
     render: (ctx) => <Project ctx={ctx} open={WEB_ID} />,
     prepare: (ctx) => press(label(ctx.locale, "deployService.deployments.viewLogs"))
 });
+
+/** Every project, one opened on its canvas, then its web service's live log. */
+export const deployProject = tourScene([deployProjectStill, deploy, deployLogs], [
+    { view: 1, hold: 1700 },
+    { view: 0, hold: 2000 },
+    { view: 2, run: (ctx) => once(() => deployLogs.prepare?.(ctx)), hold: 3400, advance: 1600 }
+]);

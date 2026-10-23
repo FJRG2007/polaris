@@ -1,5 +1,6 @@
 /** Vault: the password manager, open on a login with its one-time code. */
 
+import { tourScene } from "../runtime/tour";
 import { Chrome } from "../runtime/chrome";
 import { VIEWER } from "../fixtures/people";
 import { defineScene } from "../runtime/scene";
@@ -14,7 +15,7 @@ import {
     vaultState
 } from "../fixtures/vault";
 
-export const vault = defineScene({
+const vaultStill = defineScene({
     id: "vault",
     path: "/vault",
     actions: (ctx) => ({
@@ -71,3 +72,10 @@ export const vaultSends = defineScene({
         );
     }
 });
+
+/** The vault, a login opened with its one-time code, then what was sent out of it. */
+export const vault = tourScene([{ ...vaultStill, prepare: undefined }, vaultSends], [
+    { hold: 1500 },
+    { run: (ctx) => vaultStill.prepare?.(ctx), hold: 3000 },
+    { view: 1, hold: 2600 }
+]);

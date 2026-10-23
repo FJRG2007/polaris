@@ -1,5 +1,6 @@
 /** Automations: what runs on its own, with how each one last went. */
 
+import { tourScene } from "../runtime/tour";
 import { PageHeader } from "@polaris/ui";
 import { ORG } from "../fixtures/people";
 import { Chrome } from "../runtime/chrome";
@@ -8,7 +9,7 @@ import { defineScene } from "../runtime/scene";
 import { AutomationsList } from "@/app/(app)/automations/automations-list";
 import { automationFolders, automationRows } from "../fixtures/automations";
 
-export const automations = defineScene({
+const automationsStill = defineScene({
     id: "automations",
     path: "/automations",
     actions: (ctx) => ({
@@ -37,3 +38,9 @@ export const automations = defineScene({
         </Chrome>
     )
 });
+
+/** The list, then the alert that failed run again and passed. */
+export const automations = tourScene([automationsStill], [
+    { hold: 2000 },
+    { fresh: true, hold: 3000 }
+]);

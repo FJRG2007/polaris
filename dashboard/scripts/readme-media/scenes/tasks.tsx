@@ -1,5 +1,6 @@
 /** Tasks: a list's board mid-sprint, the screen a team lives in. */
 
+import { tourScene } from "../runtime/tour";
 import { Chrome } from "../runtime/chrome";
 import { defineScene } from "../runtime/scene";
 import { PlainNames } from "@/components/person-name";
@@ -55,7 +56,7 @@ export function TaskBoard({
     );
 }
 
-export const tasks = defineScene({
+const tasksStill = defineScene({
     id: "tasks",
     path: `/tasks/l/${TASK_LIST_ID}`,
     params: { listId: TASK_LIST_ID },
@@ -69,3 +70,9 @@ export const taskPanel = defineScene({
     actions: (ctx) => ({ getTaskDetailAction: () => ({ detail: taskDetail(ctx) }) }),
     render: (ctx) => <TaskBoard ctx={ctx} openTask={taskRows(ctx)[0]!.id} />
 });
+
+/** The board, then a task opened beside it. */
+export const tasks = tourScene([tasksStill, taskPanel], [
+    { hold: 1600 },
+    { view: 1, hold: 3400 }
+]);

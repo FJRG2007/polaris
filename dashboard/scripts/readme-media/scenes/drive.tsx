@@ -1,5 +1,6 @@
 /** Drive: their own space beside the storage they connected, in one explorer. */
 
+import { tourScene } from "../runtime/tour";
 import { PageHeader } from "@polaris/ui";
 import { Chrome } from "../runtime/chrome";
 import { label } from "../runtime/interact";
@@ -8,7 +9,7 @@ import { DriveExplorer } from "@/app/(app)/drive/drive-explorer";
 import { SharedView } from "@/app/(app)/drive/shared-links/shared-links-view";
 import { DRIVE_ID, connections, folderSizes, rootEntries, shareLinks } from "../fixtures/drive";
 
-export const drive = defineScene({
+const driveStill = defineScene({
     id: "drive",
     path: "/drive",
     actions: () => ({
@@ -58,3 +59,9 @@ export const driveLinks = defineScene({
         </Chrome>
     )
 });
+
+/** The files, then the links handed out from them. */
+export const drive = tourScene([driveStill, driveLinks], [
+    { hold: 1800 },
+    { view: 1, hold: 3000 }
+]);

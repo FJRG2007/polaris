@@ -5,6 +5,7 @@
  * camera's picture is a drawing in `media/`, named by the camera's fixture id.
  */
 
+import { beat } from "../runtime/tour";
 import { TEAM, ago, id } from "./people";
 import type { SceneContext } from "../runtime/scene";
 import type { CameraView } from "../../../apps/places/src/lib/cameras";
@@ -111,7 +112,7 @@ export function devices(ctx: SceneContext): DeviceView[] {
             kind: "lock",
             name: ctx.say("Front door", "Puerta principal"),
             zone: entrance,
-            state: "locked",
+            state: beat() >= 2 ? "unlocked" : "locked",
             doorState: "closed",
             batteryPercent: 82
         }),
@@ -119,7 +120,7 @@ export function devices(ctx: SceneContext): DeviceView[] {
             kind: "light",
             name: ctx.say("Porch light", "Luz del porche"),
             zone: entrance,
-            state: "off"
+            state: beat() >= 1 ? "on" : "off"
         }),
         device(3, ctx, {
             kind: "lock",

@@ -9,6 +9,7 @@
  * stepped frame by frame under that frozen clock (Playwright's clock API) and
  * the frames are joined into an animated WebP with sharp, the same way projects
  * that record their UI for a README script interactions instead of filming them.
+ * The phone frame plays the same loop as the desktop one.
  *
  * A scene is refused, and the run fails, when the page logged an error, threw,
  * or asked for an action or an API route the scene did not answer: a picture of
@@ -323,7 +324,7 @@ async function run() {
             for (const what of new Set(missing)) problems.push(`not answered: ${what}`);
             if (problems.length > 0) return;
             const frames = await page.evaluate(() => window.__scene.frames);
-            if (frames <= 1 || viewport === "mobile") {
+            if (frames <= 1) {
                 if (check) return;
                 const image = await picture(page, scene, viewport);
                 writeFileSync(join(output, file), await image.webp({ quality: 82 }).toBuffer());
