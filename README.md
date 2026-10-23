@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Polaris</h1>
-  <h3>Your home lab, one control plane.</h3>
+  <h3>Run your team and your servers from one place you own.</h3>
   <img alt="License" src="https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge"/>
   <img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white"/>
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white"/>
@@ -22,10 +22,8 @@
   <hr />
 </div>
 
-Polaris is a self-hosted platform to run your servers and your team from one
-place: deploy apps and databases to your own machines, manage files across every
-NAS and cloud drive, host game servers, and work together with chat, calls,
-tasks, calendar, mail and documents.
+Deploys, files, chat, calls, mail, tasks and game servers on your own machines.
+Install it with one line, then do everything else from the browser.
 
 It replaces the separate tools a home lab or a small team ends up running -
 deployments, file sharing, a password manager, uptime checks, analytics, chat, a
@@ -34,8 +32,7 @@ task links the deploy it is about, and a file in Drive attaches to a message
 without being uploaded again.
 
 It runs in Docker and manages the host it is installed on plus any machine you
-add over SSH. After the install, updates and settings are handled from the web
-interface.
+add over SSH.
 
 ## A look inside
 

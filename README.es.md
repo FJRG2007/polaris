@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Polaris</h1>
-  <h3>Tu home lab, un solo panel de control.</h3>
+  <h3>Tu equipo y tus servidores, desde un sitio que es tuyo.</h3>
   <a href="README.md">English</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="#instalar">Instalar</a>
@@ -11,19 +11,15 @@
   <hr />
 </div>
 
-Polaris es una plataforma autoalojada para gestionar tus servidores y tu equipo
-desde un solo sitio: despliega apps y bases de datos en tus propias máquinas,
-gestiona archivos en todos tus NAS y nubes, aloja servidores de juegos y trabaja
-en equipo con chat, llamadas, tareas, calendario, correo y documentos.
+Despliegues, archivos, chat, llamadas, correo, tareas y servidores de juegos en
+tus propias máquinas. Se instala con una línea y todo lo demás se hace desde el
+navegador.
 
 Sustituye las herramientas sueltas que acaba teniendo un home lab o un equipo
 pequeño - despliegues, compartir archivos, gestor de contraseñas, monitorización,
 analítica, chat, gestor de tareas - por una sola instalación y unas mismas
 cuentas. Las apps comparten datos: una tarea enlaza el despliegue del que trata y
 un archivo de Drive se adjunta a un mensaje sin volver a subirlo.
-
-Después de instalarlo, las actualizaciones y los ajustes se hacen desde la
-interfaz web.
 
 La guía completa (qué incluye cada app, requisitos, uso y desarrollo) está en el
 [README en inglés](README.md).
