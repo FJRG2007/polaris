@@ -12,10 +12,12 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
+import { runScheduledJob } from "@/lib/cron/scheduler";
 import { repairCallAddress } from "@/lib/chat/call-address-watch";
 import { acmeEmailSchema } from "@/lib/tls/acme-contact";
 import { acmeContactStatus, restartEdge, saveAcmeEmail, type AcmeContactStatus } from "@/lib/tls/acme-edge";
 import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
+import { addressFollowView, type AddressFollowView } from "@/lib/domain-address-sync";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import { getPortBlocks, getPortPolicy, setPortBlock, setPortPolicy } from "@/lib/apps/port-block-store";
 import {
@@ -334,4 +336,14 @@ export async function restartEdgeAction(): Promise<{ restarting: boolean }> {
     await recordAudit({ actorId: user.id, action: "domains.restartEdge", targetType: "setting", targetId: "edge.acmeEmail" });
     restartEdgeAfterAnswer();
     return { restarting: true };
+}
+
+/**
+ * Check the public address now instead of on the next pass. Through the scheduler,
+ * so a pass already running is not doubled; the card reads what it found.
+ */
+export async function checkPublicAddressAction(): Promise<AddressFollowView> {
+    await requireAdmin();
+    await runScheduledJob("public-ip-follow");
+    return addressFollowView();
 }

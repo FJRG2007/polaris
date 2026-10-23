@@ -602,6 +602,27 @@
             "emptyDescription": "Connect a Cloudflare token that can edit DNS, and its zones appear here.",
             "openIntegrations": "Open Integrations"
         },
+        "follow": {
+            "title": "Public address",
+            "description": "Polaris keeps its own records on this server's public address, and repoints them when it changes.",
+            "check": "Check now",
+            "checking": "Checking",
+            "current": "Answers on",
+            "published": "Records point at",
+            "checked": "Checked",
+            "updated": "Last repointed",
+            "updatedCount": "{count, plural, one {# record} other {# records}}",
+            "never": "Not checked yet. The first check runs a few minutes after Polaris starts.",
+            "ok": "The records point at this server.",
+            "propagating": "The records were repointed. Public resolvers may show the old address until their cached answer expires.",
+            "problem": {
+                "noToken": "There is no Cloudflare token to update the records with. Connect one under <link>Integrations</link>.",
+                "api": "Cloudflare could not be read: {detail}",
+                "conflict": "These names point at an address Polaris did not write, so they were left alone: {detail}",
+                "failed": "Some records could not be updated: {detail}",
+                "unreached": "Public resolvers still answer another address after the record's TTL. Check the records below."
+            }
+        },
         "acme": {
             "title": "Certificate contact",
             "description": "The address Let's Encrypt is given when it issues this server's public certificates. Optional: they are issued without one.",

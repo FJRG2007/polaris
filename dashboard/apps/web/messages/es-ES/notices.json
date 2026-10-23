@@ -239,7 +239,7 @@
         "movedBody": "La dirección pública de este servidor cambió de {from} a {to}. Sus registros DNS ya apuntan ahí, así que no hubo que cambiar nada.",
         "noToken": "Este servidor responde ahora en {current}, pero Polaris no tiene token de Cloudflare para actualizar {domain}. Conecta uno en Integraciones y pulsa Comprobar en Admin -> Dominios.",
         "unreachedTitle": "{domain} sigue con la dirección antigua",
-        "unreachedBody": "Polaris apuntó los registros a {current}, pero los resolvedores públicos siguen respondiendo {seen} pasado el TTL. Abre Admin -> Dominios para ver qué nombre tiene otro registro."
+        "unreachedBody": "Polaris apuntó los registros a {current}, pero los resolvedores públicos siguen respondiendo {seen} pasado el TTL. Admin -> Dominios muestra lo que tienen ahora los registros."
     },
     "preview": {
         "noSecretsTitle": "La vista previa de {pull} no tiene secretos",

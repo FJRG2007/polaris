@@ -602,6 +602,27 @@
             "emptyDescription": "Conecta un token de Cloudflare que pueda editar DNS y sus zonas aparecerán aquí.",
             "openIntegrations": "Abrir Integraciones"
         },
+        "follow": {
+            "title": "Dirección pública",
+            "description": "Polaris mantiene sus registros en la dirección pública de este servidor y los redirige cuando cambia.",
+            "check": "Comprobar",
+            "checking": "Comprobando",
+            "current": "Responde en",
+            "published": "Registros en",
+            "checked": "Comprobado",
+            "updated": "Último cambio",
+            "updatedCount": "{count, plural, one {# registro} other {# registros}}",
+            "never": "Aún sin comprobar. La primera comprobación se hace unos minutos después de arrancar Polaris.",
+            "ok": "Los registros apuntan a este servidor.",
+            "propagating": "Se redirigieron los registros. Los resolvedores públicos pueden mostrar la dirección antigua hasta que caduque su respuesta en caché.",
+            "problem": {
+                "noToken": "No hay token de Cloudflare para actualizar los registros. Conecta uno en <link>Integraciones</link>.",
+                "api": "No se pudo leer Cloudflare: {detail}",
+                "conflict": "Estos nombres apuntan a una dirección que Polaris no escribió, así que no se tocaron: {detail}",
+                "failed": "Algunos registros no se pudieron actualizar: {detail}",
+                "unreached": "Los resolvedores públicos siguen respondiendo otra dirección pasado el TTL. Revisa los registros de abajo."
+            }
+        },
         "acme": {
             "title": "Correo de certificados",
             "description": "La dirección que se da a Let's Encrypt al emitir los certificados públicos de este servidor. Es opcional: se emiten igual sin ella.",

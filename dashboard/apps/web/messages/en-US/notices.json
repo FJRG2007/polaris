@@ -239,7 +239,7 @@
         "movedBody": "This server's public address changed from {from} to {to}. Its DNS records already point at it, so nothing had to change.",
         "noToken": "This server now answers on {current}, but Polaris has no Cloudflare token to update {domain}. Connect one under Integrations, then press Check now on Admin -> Domains.",
         "unreachedTitle": "{domain} still shows the old address",
-        "unreachedBody": "Polaris pointed the records at {current}, but public resolvers still answer {seen} after the record's TTL. Open Admin -> Domains to see which name still holds another record."
+        "unreachedBody": "Polaris pointed the records at {current}, but public resolvers still answer {seen} after the record's TTL. Admin -> Domains shows what the records hold now."
     },
     "preview": {
         "noSecretsTitle": "The preview of {pull} has no secrets",

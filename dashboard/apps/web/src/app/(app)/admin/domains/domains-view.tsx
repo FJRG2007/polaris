@@ -26,6 +26,7 @@ import { CallPortsCard } from "./call-ports-card";
 import { GamePortsCard } from "./game-ports-card";
 import { DomainSetupWizard } from "./setup-wizard";
 import { DnsRecordsCard } from "./dns-records-card";
+import { AddressFollowCard } from "./address-follow-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
 import { CertificateContactCard } from "./certificate-contact-card";
@@ -177,6 +178,8 @@ export function DomainsView() {
             {/* Beside the other certificate, and read on its own: it asks the host
                 daemon about the edge, which the overview above does not wait on. */}
             <CertificateContactCard />
+
+            <AddressFollowCard />
 
             <DnsRecordsCard />
 

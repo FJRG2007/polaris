@@ -50,6 +50,11 @@ import {
 
 /** The address Polaris last pointed its records at. Written only by this module. */
 export const PUBLISHED_KEY = "network.dnsPublishedIp";
+/** Addresses Polaris wrote into a record since the last run that published, so a
+ *  record repointed by a run that partly failed is still recognised as ours. */
+export const WRITTEN_KEY = "network.dnsWrittenIps";
+/** How many of those are kept: a run that never completes cannot grow the list. */
+const WRITTEN_MAX = 8;
 /** The address the last confirmed run saw, so a change is announced once. */
 const LAST_SEEN_KEY = "network.dnsFollowLastIp";
 /** The problem the current failure streak was announced for, so it is told once. */
@@ -112,11 +117,12 @@ export function formerAddresses(
     published: string | null,
     history: readonly string[],
     dashboardRecords: readonly CfDnsRecord[],
-    current: string
+    current: string,
+    written: readonly string[] = []
 ): Set<string> {
     const candidates = published
-        ? [published]
-        : [...history, ...dashboardRecords.filter((record) => !record.proxied).map((record) => record.content)];
+        ? [published, ...written]
+        : [...written, ...history, ...dashboardRecords.filter((record) => !record.proxied).map((record) => record.content)];
     return new Set(candidates.filter((ip) => ip !== current && isPublicIpv4(ip)));
 }
 
@@ -177,6 +183,16 @@ function message(caught: unknown): string {
     return caught instanceof Error ? caught.message : "Cloudflare refused the request";
 }
 
+async function readWritten(): Promise<string[]> {
+    try {
+        const raw = await getSetting(WRITTEN_KEY);
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed.filter((ip): ip is string => typeof ip === "string") : [];
+    } catch {
+        return [];
+    }
+}
+
 async function readStatus(): Promise<FollowStatus | null> {
     try {
         const raw = await getSetting(STATUS_KEY);
@@ -191,6 +207,17 @@ export async function followStatus(): Promise<FollowStatus | null> {
     const [status, published] = await Promise.all([readStatus(), getSetting(PUBLISHED_KEY)]);
     if (!status) return published ? { ...EMPTY_STATUS, publishedIp: published } : null;
     return { ...status, publishedIp: published };
+}
+
+/** The Domains card's answer: whether there is a domain to follow at all, and the status. */
+export interface AddressFollowView {
+    readonly configured: boolean;
+    readonly status: FollowStatus | null;
+}
+
+export async function addressFollowView(): Promise<AddressFollowView> {
+    const [config, status] = await Promise.all([getDomainZones().catch(() => null), followStatus()]);
+    return { configured: Boolean(config?.baseDomain), status };
 }
 
 const EMPTY_STATUS: FollowStatus = {
@@ -232,10 +259,11 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
     const current = first;
     await rememberPublicIp(current);
 
-    const [published, lastSeen, history] = await Promise.all([
+    const [published, lastSeen, history, written] = await Promise.all([
         getSetting(PUBLISHED_KEY),
         getSetting(LAST_SEEN_KEY),
-        publicIpHistory()
+        publicIpHistory(),
+        readWritten()
     ]);
     const from = lastSeen && lastSeen !== current ? lastSeen : null;
     if (from) await announceChange(from, current);
@@ -272,7 +300,8 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
         published,
         history,
         owned.find((entry) => entry.name === dashboardHost)?.records ?? [],
-        current
+        current,
+        written
     );
     const plan = planRepoint(owned, current, former);
 
@@ -295,15 +324,19 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
     }
 
     // Everything owned now points here: that is what was published.
-    if (failed.length === 0 && (repointed.length > 0 || plan.settled.length > 0) && published !== current) {
-        await setSetting(PUBLISHED_KEY, current);
+    if (failed.length === 0 && (repointed.length > 0 || plan.settled.length > 0)) {
+        if (published !== current) await setSetting(PUBLISHED_KEY, current);
+        if (written.length > 0) await setSetting(WRITTEN_KEY, null);
+    } else if (repointed.length > 0 && !written.includes(current)) {
+        await setSetting(WRITTEN_KEY, JSON.stringify([current, ...written].slice(0, WRITTEN_MAX)));
     }
 
     const reachBy =
         repointed.length > 0
             ? new Date(now.getTime() + ttl * 1000 + REACH_GRACE_MS).toISOString()
             : (previous?.reachBy ?? null);
-    const reach = reachBy ? await checkReach(config.baseDomain, dashboardHost ?? owned[0]?.name, current, reachBy, now) : null;
+    const probed = owned.find((entry) => entry.name === dashboardHost) ?? owned[0];
+    const reach = reachBy ? await checkReach(config.baseDomain, probed, current, reachBy, now) : null;
 
     const problem: FollowProblem | null =
         failed.length > 0 ? "failed" : plan.conflicts.length > 0 ? "conflict" : reach === "unreached" ? "unreached" : null;
@@ -336,16 +369,18 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
  * Whether the outside world sees the dashboard's hostname at the current address,
  * asked of public resolvers rather than this box's own (which may sit behind a
  * filter that caches). "pending" until the record's TTL plus a grace has passed;
- * after that one notice, and the wait ends.
+ * after that one notice, and the wait ends. A proxied name answers with
+ * Cloudflare's addresses, never this one, so there is nothing to compare.
  */
 async function checkReach(
     domain: string,
-    host: string | undefined,
+    probed: OwnedName | undefined,
     current: string,
     reachBy: string,
     now: Date
 ): Promise<"reached" | "pending" | "unreached"> {
-    if (!host) return "reached";
+    if (!probed || probed.records.some((record) => record.proxied)) return "reached";
+    const host = probed.name;
     const probe = host.startsWith("*.") ? `polaris-check.${host.slice(2)}` : host;
     const seen = await publicA(probe);
     if (seen.length > 0 && seen.every((address) => address === current)) return "reached";

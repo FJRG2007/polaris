@@ -263,4 +263,40 @@ describe("a run", () => {
             vi.useRealTimers();
         }
     });
+
+    it("does not judge a proxied dashboard name by the address resolvers answer", async () => {
+        records.set("polaris.example.com", [record("a", OLD, { proxied: true })]);
+        settings.set(PUBLISHED_KEY, OLD);
+        publicA.mockResolvedValue(["104.16.0.1"]);
+        vi.useFakeTimers({ now: new Date("2026-10-23T10:00:00Z"), toFake: ["Date"] });
+        try {
+            await syncZoneAddress();
+            vi.setSystemTime(new Date("2026-10-23T10:30:00Z"));
+            await syncZoneAddress();
+            expect(notify.mock.calls.some((call) => call[0].type === "domain.address-unreached")).toBe(false);
+            expect(publicA).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("still owns the records a partly failed run repointed when the address moves again", async () => {
+        const NEXT = "52.10.0.3";
+        settings.set(PUBLISHED_KEY, OLD);
+        repoint.mockImplementation(async (...args: Parameters<typeof editRecord>) => {
+            if (args[2] === "e") throw new Error("Rate limited");
+            await editRecord(...args);
+        });
+        await syncZoneAddress();
+        expect(settings.get(PUBLISHED_KEY)).toBe(OLD);
+
+        repoint.mockImplementation(editRecord);
+        probe.mockResolvedValue(NEXT);
+        const result = await syncZoneAddress();
+        expect(result.conflicts).toEqual([]);
+        expect(result.failed).toEqual([]);
+        expect(result.repointed).toHaveLength(5);
+        expect(settings.get(PUBLISHED_KEY)).toBe(NEXT);
+        expect(settings.has("network.dnsWrittenIps")).toBe(false);
+    });
 });
