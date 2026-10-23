@@ -27,7 +27,7 @@ import {
 } from "../schemas.js";
 
 /** How long `--follow` waits between reads of a running service's log. */
-const FOLLOW_MS = 2000;
+export const FOLLOW_MS = 2000;
 
 /** The default number of log lines. */
 const DEFAULT_TAIL = 200;
@@ -241,7 +241,7 @@ export async function deployments(
 }
 
 /** The last timestamp in a chunk of log, or the one there was. */
-function lastStamp(log: string, previous: string | null): string | null {
+export function lastStamp(log: string, previous: string | null): string | null {
     let found = previous;
     for (const entry of log.split("\n")) {
         const stamp = STAMP.exec(entry)?.[1];

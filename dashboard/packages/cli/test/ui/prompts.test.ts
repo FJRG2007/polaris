@@ -39,6 +39,23 @@ describe("when the prompts are used", () => {
     });
 });
 
+describe("plr on its own", () => {
+    it("opens the terminal UI when a person is at the terminal", async () => {
+        const { ui } = fakeUi();
+        const { context, stdout } = await testContext({ env, ui });
+        // Under the test runner there is no real terminal for it to take over.
+        await expect(run([], context, clean)).rejects.toThrow(/plr tui needs a terminal/);
+        expect(stdout()).toBe("");
+    });
+
+    it("prints the help in CI, even at a terminal", async () => {
+        const { ui } = fakeUi();
+        const { context, stdout } = await testContext({ env: { ...env, CI: "true" }, ui });
+        await run([], context, clean);
+        expect(stdout()).toMatch(/^plr - the Polaris command line/);
+    });
+});
+
 describe("choosing what a command acts on", () => {
     it("picks the service from the list when none is named", async () => {
         const { fetch, seen } = server();

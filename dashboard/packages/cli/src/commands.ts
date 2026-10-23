@@ -192,6 +192,20 @@ export const GROUPS: readonly Group[] = [
         ]
     },
     {
+        noun: "tui",
+        title: "Terminal UI (also plr on its own, at a terminal)",
+        defaultVerb: "open",
+        commands: [
+            {
+                verb: "open",
+                usage: "[--profile NAME]",
+                summary:
+                    "Browse projects, services, deployments, logs and variables; deploy and restart",
+                run: async (context, flags) => (await import("./tui/run.js")).tui(context, flags)
+            }
+        ]
+    },
+    {
         noun: "cli",
         title: "This CLI",
         commands: [

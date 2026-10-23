@@ -54,6 +54,11 @@ Dashboard
   plr dashboard open [home|deploy|keys|downloads]
                          Open the dashboard in your browser
 
+Terminal UI (also plr on its own, at a terminal)
+  plr tui open [--profile NAME]
+                         Browse projects, services, deployments, logs and
+                         variables; deploy and restart
+
 This CLI
   plr cli update [--url URL]
                          Get the newest CLI, or the one a Polaris serves

@@ -16,6 +16,7 @@ import { CliError, usage } from "./errors.js";
 import type { Probe } from "./guard.js";
 import type { Context } from "./context.js";
 import { mark, timed, timingReport } from "./timing.js";
+import { inCi } from "./ui.js";
 import { helpText, resolve, type Resolved } from "./commands.js";
 
 /** The whole help, grouped by noun. */
@@ -30,8 +31,16 @@ function localAnswer(parsed: Parsed, resolved: Resolved): string | null {
     return null;
 }
 
+/** `plr` with nothing after it, with a person at the terminal, opens the
+ *  terminal UI; anywhere else it prints the help, as it always has. */
+function opensTui(argv: readonly string[], interactive: boolean, env: NodeJS.ProcessEnv): boolean {
+    return argv.length === 0 && interactive && !inCi(env);
+}
+
 /** Run one command line. Separate from `main` so a test can drive it. */
 export async function run(argv: readonly string[], context: Context, probe?: Probe): Promise<void> {
+    if (opensTui(argv, context.io.interactive && Boolean(context.ui), context.host.env))
+        return run(["tui"], context, probe);
     const parsed = parse(argv);
     const resolved = resolve(parsed.positionals, context.host.env);
     const answer = localAnswer(parsed, resolved);
@@ -62,7 +71,9 @@ export async function main(): Promise<void> {
     const argv = process.argv.slice(2);
     // The help and --version need none of the rest of the CLI loaded. A line
     // that does not parse is left to `run`, which says what is wrong with it.
+    const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
     try {
+        if (opensTui(argv, tty, process.env)) throw new Error("not a local answer");
         const parsed = parse(argv);
         const answer = localAnswer(parsed, resolve(parsed.positionals, process.env));
         if (answer !== null) {
