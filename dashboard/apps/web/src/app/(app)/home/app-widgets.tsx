@@ -71,6 +71,10 @@ export function useAppWidgets(initial: readonly AppWidgetPreference[]) {
     const toast = useToast();
     const [cards, setCards] = useState<AppWidgetPreference[]>([...initial]);
     const accepted = useRef<AppWidgetPreference[]>([...initial]);
+    // What the server has stored. The cards are read from the stored layout, so
+    // a card is read once its save is in, not when it is drawn: read sooner and
+    // a new card comes back empty and stays that way until the next pass.
+    const [stored, setStored] = useState<readonly AppWidgetPreference[]>(accepted.current);
 
     const save = useCallback(
         (next: AppWidgetPreference[]) => {
@@ -79,6 +83,7 @@ export function useAppWidgets(initial: readonly AppWidgetPreference[]) {
                 (answer) => {
                     if (!answer.error) {
                         accepted.current = next;
+                        setStored(next);
                         return;
                     }
                     setCards(accepted.current);
@@ -95,6 +100,7 @@ export function useAppWidgets(initial: readonly AppWidgetPreference[]) {
 
     return {
         cards,
+        stored,
         add: (kind: AppWidgetKind, targets: string[]) => {
             if (cards.length >= MAX_APP_WIDGETS) return;
             save([
@@ -145,8 +151,12 @@ export function AppWidgetGridItems({
     const shown = state.cards.filter((card) =>
         kinds.some((kind) => kind.app === card.app && kind.kind === card.kind)
     );
-    // Read again whenever what the cards watch changes, not on every render.
-    const watching = shown.map((card) => `${card.id}=${card.targets.join(",")}`).join("|");
+    // Read again whenever what the stored cards watch changes, not on every
+    // render and not before the server has the change.
+    const watching = state.stored
+        .filter((card) => kinds.some((kind) => kind.app === card.app && kind.kind === card.kind))
+        .map((card) => `${card.id}=${card.targets.join(",")}`)
+        .join("|");
 
     const signal = useUnmountSignal();
     const read = useCallback(async () => {
