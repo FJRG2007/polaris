@@ -73,7 +73,11 @@ export function EdgePanel({ hostId }: { hostId: string }) {
 
     // A guard without its own copy of the address list is one a repair fixes, so the
     // button says "set up" rather than "again" until it has one.
-    const ready = state?.traefik === true && state.pushable && (!state.guard || state.offline);
+    const ready =
+        state?.traefik === true &&
+        state.pushable &&
+        state.uploads &&
+        (!state.guard || state.offline);
 
     return (
         <section className="flex flex-col gap-2">
@@ -101,6 +105,13 @@ export function EdgePanel({ hostId }: { hostId: string }) {
                     />
                     <Line good={state.guard} yes={t("edge.guardYes")} no={t("edge.guardNo")} />
                     <Line good={state.pushable} yes={t("edge.pushYes")} no={t("edge.pushNo")} />
+                    {state.traefik && (
+                        <Line
+                            good={state.uploads}
+                            yes={t("edge.uploadsYes")}
+                            no={t("edge.uploadsNo")}
+                        />
+                    )}
                     {state.guard && (
                         <Line
                             good={state.offline}

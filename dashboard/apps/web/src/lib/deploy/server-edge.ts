@@ -150,6 +150,10 @@ export interface ServerEdgeState {
      *  disk - bans, Tor exits, revoked sessions - so they hold while Polaris is off.
      *  A guard started by an older Polaris has no such volume. */
     readonly offline: boolean;
+    /** Whether that Traefik gives a request longer than its 60-second default to
+     *  arrive. One started by an older Polaris cuts any upload that takes longer
+     *  than a minute to send. */
+    readonly uploads: boolean;
     /** Whether Polaris is setting this server up right now. */
     readonly settingUp: boolean;
     /** Why the server could not be asked, where it could not. Its own words. */
@@ -161,6 +165,7 @@ const UNREACHABLE: ServerEdgeState = {
     guard: false,
     pushable: false,
     offline: false,
+    uploads: false,
     settingUp: false,
     error: null
 };
@@ -177,7 +182,8 @@ const PROBE = [
     "printf 'traefik=%s\\n' \"$(docker inspect -f '{{.State.Running}}' polaris-traefik 2>/dev/null || echo none)\"",
     "printf 'guard=%s\\n' \"$(docker inspect -f '{{.State.Running}}' polaris-edge-guard 2>/dev/null || echo none)\"",
     "if docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'providers.file.directory'; then printf 'pushable=true\\n'; else printf 'pushable=false\\n'; fi",
-    "if docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' polaris-edge-guard 2>/dev/null | grep -q '/edge-intel'; then printf 'offline=true\\n'; else printf 'offline=false\\n'; fi"
+    "if docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' polaris-edge-guard 2>/dev/null | grep -q '/edge-intel'; then printf 'offline=true\\n'; else printf 'offline=false\\n'; fi",
+    "if docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'respondingTimeouts.readTimeout'; then printf 'uploads=true\\n'; else printf 'uploads=false\\n'; fi"
 ].join("\n");
 
 /** What the probe said, out of its own output. Anything unrecognised is false,
@@ -191,7 +197,8 @@ export function readEdgeProbe(output: string): Omit<ServerEdgeState, "error" | "
         traefik: said("traefik") === "true",
         guard: said("guard") === "true",
         pushable: said("pushable") === "true",
-        offline: said("offline") === "true"
+        offline: said("offline") === "true",
+        uploads: said("uploads") === "true"
     };
 }
 

@@ -333,6 +333,8 @@
         "pushNo": "It only reads what a deployed container tells it, so a new domain or an edited firewall rule waits for that service to be built again, and a deploy replaces the running version with a short gap.",
         "offlineYes": "Bans and signed-out sessions are kept on this server, so they still apply while Polaris is off.",
         "offlineNo": "Bans and signed-out sessions from Polaris do not reach this server yet. Set it up again to fix that.",
+        "uploadsYes": "It waits for a large upload on a slow line to finish.",
+        "uploadsNo": "It cuts any upload that takes longer than a minute to send. Set it up again to fix that.",
         "settingUp": "Setting it up",
         "again": "Set it up again",
         "setUp": "Set this server up",
