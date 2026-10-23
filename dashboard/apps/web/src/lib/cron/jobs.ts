@@ -70,7 +70,7 @@ import { sweepReleaseImages } from "@/lib/deploy/release-retention";
 import { watchDisks } from "@/lib/deploy/disk-watch";
 import { runCutoverPass } from "@/lib/deploy/dns-cutover-service";
 import { reapplyAfterClockChange } from "@/lib/dns-blocker/service";
-import { rollUpHistory } from "@/lib/dns-blocker/insights";
+import { followQueryLog, rollUpHistory } from "@/lib/dns-blocker/insights";
 import { runReputationPass } from "@/lib/dns-blocker/reputation-service";
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 
@@ -206,6 +206,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // once would each read the same files (the row itself is written once).
         leaseMs: 2 * HOUR,
         run: () => rollUpHistory()
+    },
+    {
+        key: "dns-blocker-log",
+        // Every five minutes, and first shortly after boot: keeps this
+        // process's read of the last 24 hours of lookups caught up, so the
+        // Network filter opens on it instead of copying both days' files. A
+        // pass reads what was written since the last one, a few commands'
+        // worth; with no DNS server it reads one row.
+        everyMs: 5 * MINUTE,
+        // Unleased: what it reads is held by each process for its own screens.
+        leaseMs: null,
+        run: () => followQueryLog()
     },
     {
         key: "dns-blocker-reputation",
