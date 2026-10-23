@@ -178,7 +178,10 @@ export function pipeAndClose(
             settled = true;
             if (grace) clearTimeout(grace);
             source.unpipe(out);
-            const writable = out as NodeJS.WritableStream & { destroy?: () => void; closed?: boolean };
+            const writable = out as NodeJS.WritableStream & {
+                destroy?: () => void;
+                closed?: boolean;
+            };
             if (typeof writable.destroy !== "function" || writable.closed) return reject(error);
             const release = () => reject(error);
             out.once("close", release);
