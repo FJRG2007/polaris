@@ -12,12 +12,13 @@ import { FOLDER_PROFILES, folderTarget } from "../src/folder";
 // @ts-expect-error - a build script in plain JavaScript, without types.
 import { DECKS, profileFiles, stableUuid, zip } from "../scripts/profiles.mjs";
 
+type KeySpec = { settings: Record<string, unknown> } | null;
 type Deck = {
     profile: string;
     deviceType: number;
     model: string;
-    keys: unknown[][];
-    dials?: unknown[];
+    keys: KeySpec[][];
+    dials?: KeySpec[];
 };
 type Placed = { UUID: string; Settings: Record<string, unknown>; Plugin: { Version: string } };
 type Page = { Controllers: { Type: string; Actions: Record<string, Placed> | null }[] };
