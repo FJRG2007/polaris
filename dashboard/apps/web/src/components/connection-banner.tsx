@@ -28,7 +28,7 @@
 
 import { Button, cn } from "@polaris/ui";
 import { Wifi, WifiOff, CloudOff, RefreshCw, Globe } from "lucide-react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNetworkState } from "@enigmax/primitives/react/network";
 import { checkForNewBuild } from "@/lib/new-build";
@@ -131,14 +131,10 @@ export function ConnectionBanner() {
     }
 
     return (
-        <div
-            role="status"
-            aria-live="polite"
-            className="pointer-events-none fixed inset-x-0 top-0 z-[100] flex justify-center px-4 pt-2"
-        >
+        <BannerStrip>
             <p
                 className={cn(
-                    "pointer-events-auto flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-sm shadow-popover",
+                    "flex min-w-0 max-w-full items-center justify-center gap-2 border-b px-4 py-1 text-sm",
                     good
                         ? "border-success-edge bg-success-soft text-success-ink"
                         : state === "offline"
@@ -163,6 +159,41 @@ export function ConnectionBanner() {
                     </Button>
                 ) : null}
             </p>
+        </BannerStrip>
+    );
+}
+
+/** The CSS variable the app shell subtracts from the viewport while the strip
+ *  is up, so the shell stays exactly one screen tall with the strip above it. */
+export const BANNER_HEIGHT_VAR = "--connection-banner-height";
+
+/**
+ * The strip itself, in the page's flow rather than floating over it.
+ *
+ * Floating, it sat on top of whatever was at the top of the screen - the search
+ * box and the header's own text - for as long as it was up, and the offline one
+ * stays up for as long as the line is down. In the flow it pushes the page down
+ * instead, and says its height to the shell so the shell shrinks by the same
+ * amount and nothing is pushed off the bottom either.
+ */
+function BannerStrip({ children }: { children: ReactNode }) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const node = ref.current;
+        const root = document.documentElement;
+        if (!node) return;
+        const say = () => root.style.setProperty(BANNER_HEIGHT_VAR, `${node.offsetHeight}px`);
+        say();
+        const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(say);
+        observer?.observe(node);
+        return () => {
+            observer?.disconnect();
+            root.style.removeProperty(BANNER_HEIGHT_VAR);
+        };
+    }, []);
+    return (
+        <div ref={ref} role="status" aria-live="polite" className="relative z-[100] print:hidden">
+            {children}
         </div>
     );
 }

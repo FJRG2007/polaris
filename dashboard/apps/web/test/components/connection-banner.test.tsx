@@ -24,7 +24,9 @@ vi.mock("@/lib/host-internet", () => ({
     subscribeHostOffline: () => () => {}
 }));
 
-const { ConnectionBanner, SlowConnectionNotice } = await import("@/components/connection-banner");
+const { BANNER_HEIGHT_VAR, ConnectionBanner, SlowConnectionNotice } = await import(
+    "@/components/connection-banner"
+);
 const { noteStreamTrouble, probeNow, resetReachability } = await import("@/lib/reachability");
 const { clearUpdateInProgress, markUpdateInProgress } = await import("@/lib/update-in-progress");
 
@@ -72,6 +74,16 @@ describe("the connection banner", () => {
     it("says nothing on a page that opened online", () => {
         const { container } = render(<ConnectionBanner />, { wrapper: MessagesWrapper });
         expect(container.textContent).toBe("");
+    });
+
+    it("sits in the page instead of over it, and gives its height back when it goes", () => {
+        state = { online: false, recovered: false, slow: false };
+        const { unmount } = render(<ConnectionBanner />, { wrapper: MessagesWrapper });
+        // Floating, it covered the search box and the header's text.
+        expect(screen.getByRole("status").className).not.toContain("fixed");
+        expect(document.documentElement.style.getPropertyValue(BANNER_HEIGHT_VAR)).not.toBe("");
+        unmount();
+        expect(document.documentElement.style.getPropertyValue(BANNER_HEIGHT_VAR)).toBe("");
     });
 
     it("says so the moment the device is offline", () => {

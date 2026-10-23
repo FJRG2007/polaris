@@ -43,7 +43,7 @@ export function AppShell({
         // document scrolled under a sticky header, the window's scrollbar ran
         // the full height of the screen - up beside the header, as if the bar
         // itself were part of what scrolls.
-        <div className="relative flex h-dvh flex-col overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
+        <div className="relative flex h-[calc(100dvh-var(--connection-banner-height,0px))] flex-col overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
             <header className="z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                     {navButton}
