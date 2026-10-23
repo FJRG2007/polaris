@@ -1,19 +1,19 @@
 /**
- * The service panel is drawn the way every other side panel is - on the
- * dialog's own surface, with the application's own fields, borders and tabs -
- * and keeps two things of its own (globals.css, "The service panel's surface
+ * The deploy side panels (service, database, volume) are drawn as a page - on
+ * the page ground, with the application's own cards, fields, borders and tabs -
+ * and keep one thing of their own (globals.css, "The deploy side panels' ground
  * and switches"). These are the pairs that decide whether that works, measured
  * with the WCAG 2.x contrast formula in every theme against the global tokens.
  *
- *   - Nothing about a field is overridden: its fill, its edge and its hover are
- *     the application's, so a field here looks like a field anywhere else.
- *   - A card is the dialog's surface with its hairline, never a darker tone that
- *     reads as a hole in it, and the panel's body is not the page ground.
+ *   - Nothing about a field or a card is overridden, so either looks here the
+ *     way it does on any other page.
+ *   - Every panel, header included, sits on the page ground, not on the
+ *     dialog's raised surface.
+ *   - A field keeps a fill of its own on a card and on the page ground.
  *   - An unchecked switch is a track with no other boundary, so it holds the
- *     3:1 of WCAG 1.4.11 against the surface and the page, and is never weaker
+ *     3:1 of WCAG 1.4.11 against a card and the page, and is never weaker
  *     than the switch everywhere else.
- *   - A field still differs from the surface by its fill, and the focus ring
- *     and the text in a field stay readable.
+ *   - The focus ring and the text in a field stay readable.
  */
 
 import { readFileSync } from "node:fs";
@@ -24,10 +24,13 @@ const TOKENS = readFileSync(
     "utf8"
 );
 const GLOBALS = readFileSync(new URL("../../src/app/globals.css", import.meta.url), "utf8");
-const SERVICE_DETAIL = readFileSync(
-    new URL("../../src/app/(app)/apps/deploy/service-detail.tsx", import.meta.url),
-    "utf8"
-);
+const PANELS = ["service-detail.tsx", "database-panel.tsx", "volume-detail.tsx"].map((file) => ({
+    file,
+    source: readFileSync(
+        new URL(`../../src/app/(app)/apps/deploy/${file}`, import.meta.url),
+        "utf8"
+    )
+}));
 
 type Hsl = [number, number, number];
 
@@ -78,22 +81,23 @@ const THEMES: Record<string, { base: Record<string, Hsl>; panel: Record<string, 
 
 describe("service panel", () => {
     for (const [theme, { base, panel }] of Object.entries(THEMES)) {
-        // Inside the panel a card is the dialog's own surface.
         const tone = (name: string): Hsl => {
-            const key = name === "card" ? "elevated" : name;
-            const value = panel[key] ?? base[key];
-            if (!value) throw new Error(`${theme} has no --${key}`);
+            const value = panel[name] ?? base[name];
+            if (!value) throw new Error(`${theme} has no --${name}`);
             return value;
         };
 
-        it(`${theme}: overrides nothing about a field or a border`, () => {
-            for (const name of ["field", "field-edge", "border", "border-strong"]) {
+        it(`${theme}: overrides nothing about a field, a card or a border`, () => {
+            for (const name of ["field", "field-edge", "border", "border-strong", "card", "card-hover"]) {
                 expect(panel[name]).toBeUndefined();
             }
         });
 
-        it(`${theme}: a field is told from the surface by its fill`, () => {
-            expect(contrast(tone("field"), tone("card"))).toBeGreaterThanOrEqual(1.05);
+        // The same inset field as on every other page: a tone of its own on a
+        // card and on the ground, with the field's border as its edge.
+        it(`${theme}: a field is told from a card and the page by its fill`, () => {
+            expect(contrast(tone("field"), tone("card"))).toBeGreaterThanOrEqual(1.02);
+            expect(contrast(tone("field"), tone("background"))).toBeGreaterThanOrEqual(1.02);
         });
 
         it(`${theme}: an unchecked switch holds 3:1 on the surface and the page`, () => {
@@ -112,14 +116,17 @@ describe("service panel", () => {
         });
     }
 
-    it("draws a card as the dialog's surface, not as a darker tone under it", () => {
-        const rules = GLOBALS.slice(GLOBALS.indexOf("[data-service-panel] {"));
-        expect(rules.slice(0, rules.indexOf("}"))).toContain("--card: var(--elevated);");
-    });
+    for (const { file, source } of PANELS) {
+        it(`${file}: the whole panel sits on the page ground and gets the switch tuning`, () => {
+            const panel = source.slice(source.indexOf("<DialogContent"));
+            const tag = panel.slice(0, panel.indexOf(">\n"));
+            expect(tag).toContain('data-service-panel=""');
+            expect(tag).toMatch(/"[^"]*\bbg-background\b[^"]*"/);
+            expect(tag).not.toMatch(/\bbg-(elevated|surface)\b/);
+        });
+    }
 
-    it("keeps its body on the dialog's surface rather than the page ground", () => {
-        const body = SERVICE_DETAIL.slice(SERVICE_DETAIL.indexOf("flex-1 overflow-y-auto"));
-        expect(body.slice(0, body.indexOf('"'))).not.toContain("bg-background");
+    it("never overrides a field's own fill", () => {
         expect(GLOBALS).not.toContain("[data-service-panel] :is(input, textarea, button).bg-field");
     });
 

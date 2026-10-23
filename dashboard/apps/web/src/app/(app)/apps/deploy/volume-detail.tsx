@@ -203,8 +203,9 @@ export function VolumeDetailDialog({
     return (
         <Dialog open={volumeId !== null} onOpenChange={onOpenChange}>
             <DialogContent
+                data-service-panel=""
                 className={cn(
-                    "left-auto right-0 top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
+                    "left-auto right-0 top-0 flex bg-background h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
                     full
                         ? "w-full max-w-none"
                         : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
