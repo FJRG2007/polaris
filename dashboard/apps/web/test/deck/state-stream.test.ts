@@ -10,15 +10,17 @@ vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/chat/access", () => ({ reachableChannelIds: async () => new Set<string>() }));
 vi.mock("@/lib/chat/live", () => ({ subscribeChatChanges: () => () => undefined }));
 let reads = 0;
+/** Set, every read answers the same state: nothing moved. */
+let still = false;
 vi.mock("@/lib/deck/deck-service", () => ({
     readDeckStates: async () => {
         reads += 1;
-        const state = { tone: "ok", value: String(reads) };
+        const state = { tone: "ok", value: still ? "same" : String(reads) };
         return { readings: [{ key: "k1", state }], chat: false };
     }
 }));
 
-const { chatChangeConcerns, deckChangeConcerns, deckStateStream, stateFrame } =
+const { chatChangeConcerns, deckChangeConcerns, deckStateStream, stateFrame, DECK_STREAM } =
     await import("@/lib/deck/state-stream");
 const { deckChanged } = await import("@/lib/deck/live");
 const { apiKeyKindOf } = await import("../../../../packages/auth/src/api-keys");
@@ -109,5 +111,41 @@ describe("the deck bus", () => {
         expect(reads).toBe(2);
         expect(frames[1]).toContain('"value":"2"');
         abort.abort();
+    });
+
+    it("sends a pressed key again after a moment, even when nothing moved", async () => {
+        reads = 0;
+        still = true;
+        (DECK_STREAM as { pressedMs: number }).pressedMs = 200;
+        const abort = new AbortController();
+        const reader = deckStateStream(
+            { userId: "u1", locale: "en-US" } as never,
+            watched,
+            (() => "") as never,
+            abort.signal
+        ).getReader();
+        const decoder = new TextDecoder();
+        const next = async () => {
+            for (;;) {
+                const { value } = await reader.read();
+                const text = decoder.decode(value);
+                if (text.startsWith("event: state")) return text;
+            }
+        };
+        expect(await next()).toContain('"value":"same"');
+        // A plain wake reads again but sends nothing: the key did not move.
+        void deckChanged("u1", ["calendar.timer"]);
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+        expect(reads).toBe(2);
+        // A press: the guess it drew is replaced by the truth, unchanged or not,
+        // and not straight away - the tab has not done it yet.
+        void deckChanged("u1", ["calendar.timer"], true);
+        expect(reads).toBe(2);
+        const started = Date.now();
+        expect(await next()).toContain('"value":"same"');
+        expect(Date.now() - started).toBeGreaterThanOrEqual(150);
+        expect(reads).toBe(3);
+        abort.abort();
+        still = false;
     });
 });

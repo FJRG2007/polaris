@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { deckChanged } from "./live";
 import { callTool } from "./tool-call";
 import { isDeckScope } from "./scopes";
 import { scopesAvailableTo } from "@polaris/auth";
@@ -234,9 +235,8 @@ export async function runDeckAction(
     input: DeckRunInput,
     words: DeckWords
 ): Promise<DeckRunResult> {
-    const action = (await everyAction(words, caller, input.action.startsWith(TOOL_PREFIX))).find(
-        (candidate) => candidate.id === input.action
-    );
+    const actions = await everyAction(words, caller, input.action.startsWith(TOOL_PREFIX));
+    const action = actions.find((candidate) => candidate.id === input.action);
     if (!action) return { ok: false, message: words("deck.errors.unknownAction") };
     if (!allowed(action.scope, caller))
         return {
@@ -252,7 +252,17 @@ export async function runDeckAction(
         const options = core.options.safeParse(input.options);
         if (!options.success) return { ok: false, message: words("deck.errors.badOptions") };
         if (!core.run) return { ok: false, message: words("deck.errors.notRunnable") };
-        return core.run(options.data, caller);
+        const result = await core.run(options.data, caller);
+        // A press drew its guess on this key and the ones it moves; their
+        // truth is sent again a moment later even when it did not change, so
+        // a guess the tab on the call did not carry out does not stay drawn.
+        if (result.ok)
+            void deckChanged(
+                caller.userId,
+                actions.filter((other) => other.core?.area === core.area).map((other) => other.id),
+                true
+            );
+        return result;
     }
 
     if (action.tool) {
