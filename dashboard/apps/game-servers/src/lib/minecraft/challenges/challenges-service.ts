@@ -1932,7 +1932,8 @@ async function owe(
                     player: name,
                     reward: chunk,
                     event: language === "es" ? "Retos" : "Challenges",
-                    createdAt: now
+                    createdAt: now,
+                    trophy: null
                 }))
             ],
             now

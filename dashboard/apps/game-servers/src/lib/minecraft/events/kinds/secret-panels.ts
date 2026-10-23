@@ -66,8 +66,6 @@ const HERE = "pe_key_here";
 const SEEN = "pe_key_seen";
 /** The tag every player an arena took in carries (`arena.IN_ARENA`). */
 const IN_ARENA = "pe_arena";
-/** The seekers' team (`hide-and-seek.TEAMS`). */
-const SEEKERS = "pe_hs_seek";
 
 export type KeyKind = "btn" | "up" | "gaze" | "crouch" | "lever";
 export const KEY_KINDS: readonly KeyKind[] = ["btn", "up", "gaze", "crouch", "lever"];

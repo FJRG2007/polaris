@@ -2434,7 +2434,7 @@ function acidForecast(loop: StageLoop, acid: acidRain.Acid): acidRain.Spell[] {
     const { goAt } = state(loop);
     return goAt === null
         ? []
-        : acidRain.forecast(loop.run.endsAt - goAt, loop.run.id, acid.huts.length);
+        : acidRain.forecast(loop.run.endsAt - goAt, acid.huts.length);
 }
 
 /**
@@ -2493,7 +2493,7 @@ async function acidTick(
             );
         }
         lines.push(
-            ...acidRain.armLines(acid, spells[0] ?? acidRain.forecast(1, loop.run.id, 0)[0]!),
+            ...acidRain.armLines(acid, spells[0] ?? acidRain.forecast(1, 0)[0]!),
             ...acidRain.sidebarLines(commands.text(acidMessages.sidebarTitle(language)))
         );
         loop.acidSpell = 0;

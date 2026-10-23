@@ -937,7 +937,9 @@ export async function startEvent(input: {
         boss: null,
         villager: null,
         bingo: null,
-        fish: null
+        fish: null,
+        ring: null,
+        killsByPack: false
     } satisfies stored.EventRun;
 
     const written = await updateEventState(input.installedAppId, (state) => {
@@ -2966,7 +2968,7 @@ async function hideTreasure(
         if (!origin) throw new PlaceNotFound();
         loop.run = { ...loop.run, origin };
     }
-    await settlePendingChest(installedAppId, loop, server, options);
+    await settlePendingChest(installedAppId, loop, server);
     // No more places to be had: the hunt goes on with the chests already down.
     const enough = async () => {
         if (loop.run.chests.length === 0) throw new PlaceNotFound();
@@ -3073,8 +3075,7 @@ async function hideTreasure(
 async function settlePendingChest(
     installedAppId: string,
     loop: Loop,
-    server: ServerContainer,
-    options: catalog.EventOptions<"treasure-hunt">
+    server: ServerContainer
 ): Promise<void> {
     const place = loop.run.place;
     const last = loop.run.chests.at(-1);
@@ -3522,7 +3523,7 @@ async function rareCatchTick(
 function roundIn(
     run: stored.EventRun,
     language: catalog.Language
-): { kind: messages.RoundKind; asked: string; accepted: string[]; truth: boolean | null } {
+): { kind: written.RoundKind; asked: string; accepted: string[]; truth: boolean | null } {
     const options = run.preset.options as catalog.EventOptions<"trivia">;
     const questions = [
         ...options.questions,
@@ -3588,7 +3589,7 @@ function roundOf(
     run: stored.EventRun,
     language: speech.Speech
 ): {
-    kind: messages.RoundKind;
+    kind: written.RoundKind;
     asked: string;
     answer: string;
     accepted: string[];
@@ -4802,7 +4803,8 @@ async function finish(
                         player: name,
                         reward: left,
                         event: preset.name,
-                        createdAt: Date.now()
+                        createdAt: Date.now(),
+                        trophy: null
                     });
             }
             // The boss's trophy, besides whatever the podium paid: to the most

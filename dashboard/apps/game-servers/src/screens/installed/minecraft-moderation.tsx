@@ -66,6 +66,7 @@ export function MinecraftModeration({
                 installedAppId={installedAppId}
                 canManage={canManage}
                 running={running}
+                playersOnline={playersOnline}
             />
         </div>
     );
@@ -74,11 +75,14 @@ export function MinecraftModeration({
 function ModAnnouncementsCard({
     installedAppId,
     canManage,
-    running
+    running,
+    playersOnline
 }: {
     installedAppId: string;
     canManage: boolean;
     running: boolean;
+    /** Who a restart now would disconnect. */
+    playersOnline: number;
 }) {
     const t = useGameText("minecraft");
     const stateKey = `mod-announcements:${installedAppId}`;

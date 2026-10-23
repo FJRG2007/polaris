@@ -88,7 +88,7 @@ describe("moving Symbiote onto the pack link", () => {
     });
 
     it("never writes when the row only reads", async () => {
-        const state = await service.symbioteState("app-1", "owner-1", SERVER);
+        const state = await service.symbioteState("app-1", "owner-1");
         expect(state.installed).toBe(true);
         expect(fake.writes).toEqual([]);
     });

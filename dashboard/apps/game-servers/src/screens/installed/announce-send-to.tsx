@@ -15,7 +15,6 @@ import type { MinecraftEdition } from "../../lib/minecraft/service";
 import {
     EVERYBODY,
     GAME_MODES,
-    GAME_MODE_LABEL,
     MOST_PICKED,
     NON_OPERATORS,
     OPERATORS,

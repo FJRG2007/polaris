@@ -23,7 +23,7 @@ const SITE = { x: 100, z: -200 };
 const Y = 120;
 /** A six-minute run's weather, and its first spell. */
 const SIX = 6 * 60_000;
-const first = (huts = 4) => acid.forecast(SIX, "run-1", huts)[0]!;
+const first = (huts = 4) => acid.forecast(SIX, huts)[0]!;
 
 /** Every block the boxes put down, by `x,y,z`; a block put twice throws. */
 function blocksOf(boxes: readonly stage.Box[]): Map<string, string> {
@@ -308,7 +308,7 @@ describe("an acid rain's pack, on every release it is loaded on", () => {
 
 describe("an acid rain's weather", () => {
     it("opens with a drizzle, then surges, calms and drizzles, and ends in a downpour", () => {
-        const spells = acid.forecast(SIX, "w", 4);
+        const spells = acid.forecast(SIX, 4);
         expect(spells[0]).toMatchObject({ sky: "drizzle", from: 0, to: acid.OPENING_MS });
         expect(spells.at(-1)).toMatchObject({ sky: "downpour", to: SIX });
         // A minute, or a little more where a stretch too short to play joins it.
@@ -331,13 +331,13 @@ describe("an acid rain's weather", () => {
         expect(surges[1]!.collapse).toBe(0);
     });
 
-    it("keeps every rule for every length and seed", () => {
+    it("keeps every rule for every length", () => {
         const problems: string[] = [];
         for (let minutes = 1; minutes <= 30; minutes += 1)
-            for (let seed = 0; seed < 40; seed += 1) {
+            {
                 const total = minutes * 60_000;
-                const spells = acid.forecast(total, `s-${seed}`, 3);
-                const fail = (what: string) => problems.push(`${minutes} ${seed}: ${what}`);
+                const spells = acid.forecast(total, 3);
+                const fail = (what: string) => problems.push(`${minutes}: ${what}`);
                 if (spells[0]?.from !== 0) fail("does not start at Go");
                 if (spells.at(-1)?.to !== total || spells.at(-1)?.sky !== "downpour")
                     fail("does not end in a downpour");
@@ -360,12 +360,12 @@ describe("an acid rain's weather", () => {
     });
 
     it("is the same weather for the same run, whatever looks at it", () => {
-        expect(acid.forecast(SIX, "a", 4)).toEqual(acid.forecast(SIX, "a", 4));
-        expect(acid.forecast(0, "a", 4)).toEqual([]);
+        expect(acid.forecast(SIX, 4)).toEqual(acid.forecast(SIX, 4));
+        expect(acid.forecast(0, 4)).toEqual([]);
     });
 
     it("finds the spell for any moment, the last one past the end", () => {
-        const spells = acid.forecast(SIX, "w", 4);
+        const spells = acid.forecast(SIX, 4);
         expect(acid.spellAt(spells, 0)).toBe(0);
         expect(acid.spellAt(spells, acid.OPENING_MS)).toBe(1);
         expect(acid.spellAt(spells, SIX + 10_000)).toBe(spells.length - 1);
@@ -387,7 +387,7 @@ describe("an acid rain's weather", () => {
         expect(acid.rainOf({ sky: "calm" })).toBe(0);
         expect(acid.rainOf({ sky: "downpour" })).toBeGreaterThan(acid.rainOf({ sky: "surge" }));
         // What the pack is told: the calm switches the rain and its bites off.
-        const calm = acid.forecast(SIX, "w", 4).find((one) => one.sky === "calm")!;
+        const calm = acid.forecast(SIX, 4).find((one) => one.sky === "calm")!;
         expect(acid.skyLines(built, calm)).toContain("scoreboard players set #dose polaris_acid 0");
         expect(acid.skyLines(built, calm)).toContain("scoreboard players set #rain polaris_acid 0");
         expect(acid.FUNCTIONS.beat!.join("\n")).toContain(
@@ -399,7 +399,7 @@ describe("an acid rain's weather", () => {
         expect(acid.FUNCTIONS.gust).toBeUndefined();
         expect(Object.values(acid.FUNCTIONS).flat().join("\n")).not.toContain("#wind");
         const built = acid.arena({ size: "small", acidity: "mild" }, "w", SITE, Y);
-        for (const spell of acid.forecast(SIX, "w", 4))
+        for (const spell of acid.forecast(SIX, 4))
             expect(acid.skyLines(built, spell).join("\n")).not.toContain("#wind");
     });
 });

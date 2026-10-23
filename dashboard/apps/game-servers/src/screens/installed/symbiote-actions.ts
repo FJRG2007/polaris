@@ -34,7 +34,7 @@ export async function symbioteStateAction(
         if (!applicationId)
             return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         return {
-            state: await service.symbioteState(applicationId, access.ownerId, parsed.data)
+            state: await service.symbioteState(applicationId, access.ownerId)
         };
     } catch (caught) {
         return {

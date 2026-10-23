@@ -314,7 +314,7 @@ function drawn(options: EventOptions<"parkour">, seed: string, specials: boolean
             const next = direction > 0 ? x + size + widest : x - widest - step.size;
             return fits(next, step.size);
         };
-        const mayBeSpecial =
+        const mayBeSpecial: boolean =
             specials &&
             after === null &&
             role === "jump" &&

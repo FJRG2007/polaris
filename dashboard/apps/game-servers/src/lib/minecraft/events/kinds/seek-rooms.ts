@@ -1548,7 +1548,7 @@ export function dress(c: Canvas, season: Decoration, template: Template): void {
     ] as const;
     corners.forEach(([u, v], index) => {
         const facing: Side = v === 0 ? "south" : "north";
-        const free = (from: number, to: number, a = u, b = v) => {
+        const free = (from: number, to: number, a: number = u, b: number = v) => {
             for (let level = from; level <= to; level += 1) if (!c.free(a, level, b)) return false;
             return true;
         };

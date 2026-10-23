@@ -514,7 +514,7 @@ export function GameConsole({
                 setAsking({ entry, mode: "run" });
             } else if (press.kind === "fill") runKept(entry, { values: {}, target: null }, false);
             else if (press.kind === "batch") setBatch(entry.command);
-            else if (press.kind === "refuse") refuseKept(entry, schemaText(press.problem), false);
+            else if (press.kind === "refuse") refuseKept(entry, schemaText(press.problem) ?? press.problem, false);
             else if (press.kind === "queue") void runQueue(press.steps);
             else if (press.kind === "load") load(entry.command);
             else submit(entry.command);
