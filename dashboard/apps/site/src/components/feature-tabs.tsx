@@ -22,21 +22,31 @@ export interface Feature {
     readonly alt: string;
     readonly dark: string;
     readonly light: string | null;
+    /** The phone captures, played under 640 px like the site's other pictures. */
+    readonly darkMobile: string | null;
+    readonly lightMobile: string | null;
     /** The feature's page in the marketplace. */
     readonly href: string;
 }
 
-/** Whether the reader asked for less motion. */
-function useReducedMotion(): boolean {
-    const [reduced, setReduced] = useState(false);
+/** Whether a media query matches, kept current as the window changes. */
+function useMedia(media: string): boolean {
+    const [matches, setMatches] = useState(false);
     useEffect(() => {
-        const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-        const update = () => setReduced(query.matches);
+        const query = window.matchMedia(media);
+        const update = () => setMatches(query.matches);
         update();
         query.addEventListener("change", update);
         return () => query.removeEventListener("change", update);
-    }, []);
-    return reduced;
+    }, [media]);
+    return matches;
+}
+
+/** The capture that matches the theme and the width, picked as `ShotPicture` picks. */
+function captureFor(feature: Feature, light: boolean, phone: boolean): string {
+    if (phone && light && feature.lightMobile) return feature.lightMobile;
+    if (light && feature.light) return feature.light;
+    return phone && feature.darkMobile ? feature.darkMobile : feature.dark;
 }
 
 /**
@@ -45,15 +55,9 @@ function useReducedMotion(): boolean {
  */
 function Capture({ feature, still }: { feature: Feature; still: boolean }) {
     const canvas = useRef<HTMLCanvasElement>(null);
-    const [light, setLight] = useState(false);
-    useEffect(() => {
-        const query = window.matchMedia("(prefers-color-scheme: light)");
-        const update = () => setLight(query.matches);
-        update();
-        query.addEventListener("change", update);
-        return () => query.removeEventListener("change", update);
-    }, []);
-    const src = light && feature.light ? feature.light : feature.dark;
+    const light = useMedia("(prefers-color-scheme: light)");
+    const phone = useMedia("(max-width: 640px)");
+    const src = captureFor(feature, light, phone);
     useEffect(() => {
         if (!still) return;
         const image = new Image();
@@ -85,7 +89,7 @@ export function FeatureTabs({
 }) {
     const [picked, setPicked] = useState(main[0]?.id ?? "");
     const [expanded, setExpanded] = useState(false);
-    const still = useReducedMotion();
+    const still = useMedia("(prefers-reduced-motion: reduce)");
     const tabs = useRef<Record<string, HTMLButtonElement | null>>({});
     // A tab More reveals exists only after the render it causes, so it takes
     // focus from an effect rather than from the press.

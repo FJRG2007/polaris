@@ -60,6 +60,8 @@ function tourFeatures(locale: SiteLocale): { main: Feature[]; more: Feature[] } 
                 alt: lead.alt,
                 dark: asset(`media/${lead.dark}`),
                 light: lead.light ? asset(`media/${lead.light}`) : null,
+                darkMobile: lead.darkMobile ? asset(`media/${lead.darkMobile}`) : null,
+                lightMobile: lead.lightMobile ? asset(`media/${lead.lightMobile}`) : null,
                 href: href(locale, `marketplace/${id}/`)
             }
         ];

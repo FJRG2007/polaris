@@ -93,8 +93,6 @@ import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 
 type Words = NamespaceTranslator<"marketplace">;
 
-/** Each capability's badge, as `capabilities.<key>`. */
-
 /** An install's state, said as `statuses.<status>`; one a newer service adds shows as it came. */
 const STATUSES = new Set(["installing", "running", "stopped", "failed"]);
 
