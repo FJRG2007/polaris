@@ -5,7 +5,12 @@
  * request - or, for DNS, one that must never put Polaris in front of it at all.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The address sync announces a move as an automation event; the engine behind it
+// loads the session, which needs a configured environment this test has no use for.
+vi.mock("@/lib/automations/outbox", () => ({ emitAutomationEvent: async () => null }));
+
 import { dnsAddressFor } from "@/lib/domain-dns";
 import { readEdgeProbe } from "@/lib/deploy/server-edge";
 import { planRepoint } from "@/lib/domain-address-sync";
