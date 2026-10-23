@@ -312,17 +312,17 @@
         "failed": "No se pudo completar. Inténtalo de nuevo en un momento."
     },
     "automations": {
-        "loadFailed": "No se pudieron leer los automatismos",
-        "saveFailed": "No se pudo guardar el automatismo",
-        "removeFailed": "No se pudo quitar el automatismo",
-        "runFailed": "No se pudo iniciar el automatismo",
+        "loadFailed": "Error al leer las automatizaciones",
+        "saveFailed": "No se pudo guardar la automatización",
+        "removeFailed": "No se pudo quitar la automatización",
+        "runFailed": "No se pudo iniciar la automatización",
         "runsFailed": "No se pudieron leer las ejecuciones",
         "rotateFailed": "No se pudo cambiar la dirección del webhook",
-        "checkDetails": "Revisa los datos de el automatismo",
-        "notFound": "Ese automatismo no está en este proyecto.",
+        "checkDetails": "Revisa los datos de la automatización",
+        "notFound": "Esa automatización no está en este proyecto.",
         "foreignService": "Uno de los servicios que nombra no está en este proyecto o en un entorno donde puedas desplegar.",
-        "limit": "Un proyecto puede tener como mucho {limit} automatismos.",
-        "reach": "No puedes hacer todo lo que hace este automatismo: necesita poder desplegar cada servicio que nombra y abrir una consola para un comando."
+        "limit": "Un proyecto puede tener como mucho {limit} automatizaciones.",
+        "reach": "No puedes hacer todo lo que hace esta automatización: necesita poder desplegar cada servicio que nombra y abrir una consola para un comando."
     },
     "fileAccess": {
         "loadFailed": "No se pudieron leer las cuentas SFTP",

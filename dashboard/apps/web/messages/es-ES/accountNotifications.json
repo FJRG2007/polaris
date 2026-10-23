@@ -474,8 +474,8 @@
             "description": "Un grupo de almacenamiento perdió su protección o está casi lleno, un disco falla o se calienta, o una copia falló o no se hizo."
         },
         "automationsMessage": {
-            "label": "Mensaje de un automatismo",
-            "description": "Un paso Avisar de uno de tus automatismos te envió un mensaje."
+            "label": "Mensaje de una automatización",
+            "description": "Un paso Avisar de una de tus automatizaciones te envió un mensaje."
         },
         "webhookDisabled": {
             "label": "Se desactivó un webhook",

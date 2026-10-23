@@ -2564,7 +2564,7 @@
             "inbox": "Bandeja",
             "management": "Gestión",
             "crm": "CRM",
-            "automations": "Automatismos",
+            "automations": "Automatizaciones",
             "statusPages": "Estado público"
         },
         "permissions": {
@@ -2661,8 +2661,8 @@
                 "use": "Llevar empresas, personas y tratos"
             },
             "automations": {
-                "use": "Crear automatismos que actúan por ti",
-                "secrets": "Guardar secretos para automatismos"
+                "use": "Crear automatizaciones que actúan por ti",
+                "secrets": "Guardar secretos para automatizaciones"
             }
         }
     },
