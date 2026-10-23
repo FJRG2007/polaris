@@ -10,7 +10,11 @@
  * somebody was told to forget never starts working again.
  */
 
-import { GeoPicker } from "@/components/geo-picker";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { shareSnippetAction } from "./snippet-actions";
@@ -64,8 +68,7 @@ export function ShareSnippetDialog({
     const t = useTranslations("drive");
     const [visibility, setVisibility] = useState("link");
     const [burn, setBurn] = useState(false);
-    const [countries, setCountries] = useState<string[]>([]);
-    const [continents, setContinents] = useState<string[]>([]);
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [url, setUrl] = useState<string | null>(null);
@@ -77,8 +80,7 @@ export function ShareSnippetDialog({
         if (!snippet) return;
         setVisibility(snippet.visibility === "private" ? "link" : snippet.visibility);
         setBurn(snippet.burnAfterRead);
-        setCountries([]);
-        setContinents([]);
+        setAdvanced(EMPTY_LINK_ADVANCED);
         setError(null);
         setUrl(null);
         setCopied(false);
@@ -88,9 +90,10 @@ export function ShareSnippetDialog({
         event.preventDefault();
         if (!snippet) return;
         const form = new FormData(event.currentTarget);
-        const password = String(form.get("password") ?? "").trim();
-        const maxViews = String(form.get("maxViews") ?? "").trim();
-        const expiresAt = String(form.get("expiresAt") ?? "").trim();
+        const password = advanced.password.trim();
+        // Burn after reading is one view by definition, so a cap beside it is moot.
+        const maxViews = burn ? "" : advanced.maxUses.trim();
+        const expiresAt = advanced.expiresAt;
         const invited = entries(String(form.get("inviteUsers") ?? ""));
 
         if (visibility === "invite" && invited.length === 0) {
@@ -107,9 +110,9 @@ export function ShareSnippetDialog({
             expiresAt: expiresAt || null,
             burnAfterRead: burn,
             inviteUsers: invited,
-            allowedCidrs: entries(String(form.get("allowedCidrs") ?? "")),
-            allowedCountries: countries,
-            allowedContinents: continents
+            allowedCidrs: advanced.allowedCidrs,
+            allowedCountries: advanced.allowedCountries,
+            allowedContinents: advanced.allowedContinents
         });
         setPending(false);
         if (result.error) {
@@ -195,31 +198,6 @@ export function ShareSnippetDialog({
                             </p>
                         ) : (
                             <>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    {t("snippetShare.passwordOptional")}
-                                    <Input
-                                        name="password"
-                                        type="password"
-                                        placeholder={t("snippetShare.noPassword")}
-                                        autoComplete="off"
-                                    />
-                                </label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <label className="flex flex-col gap-1 text-sm">
-                                        {t("snippetShare.maxViews")}
-                                        <Input
-                                            name="maxViews"
-                                            type="number"
-                                            min="1"
-                                            placeholder={t("snippetShare.unlimited")}
-                                            disabled={burn}
-                                        />
-                                    </label>
-                                    <label className="flex flex-col gap-1 text-sm">
-                                        {t("snippetShare.expires")}
-                                        <Input name="expiresAt" type="date" />
-                                    </label>
-                                </div>
                                 <label className="flex items-center gap-2 text-sm">
                                     <input
                                         type="checkbox"
@@ -229,26 +207,13 @@ export function ShareSnippetDialog({
                                     />
                                     {t("snippetShare.deleteTheTextOnceIt")}
                                 </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    {t("snippetShare.restrictToIpsRangesOptional")}
-                                    <Input
-                                        name="allowedCidrs"
-                                        placeholder={t("snippetShare.eG2030113")}
-                                        autoComplete="off"
-                                    />
-                                    <span className="text-xs text-muted-foreground">
-                                        {t("snippetShare.commaOrSpaceSeparatedEmpty")}
-                                    </span>
-                                </label>
-                                <div className="flex flex-col gap-1 text-sm">
-                                    {t("snippetShare.restrictByLocationOptional")}
-                                    <GeoPicker
-                                        countries={countries}
-                                        continents={continents}
-                                        onCountries={setCountries}
-                                        onContinents={setContinents}
-                                    />
-                                </div>
+                                <LinkAdvancedFields
+                                    value={advanced}
+                                    onChange={setAdvanced}
+                                    omit={burn ? ["uses"] : []}
+                                    usesLabel={t("snippetShare.maxViews")}
+                                    idPrefix="snippet-share"
+                                />
                             </>
                         )}
 

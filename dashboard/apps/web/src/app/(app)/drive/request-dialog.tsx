@@ -14,7 +14,11 @@
 import { tokenList } from "@/lib/token-field";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, Copy, Inbox } from "lucide-react";
-import { GeoPicker } from "@/components/geo-picker";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { AccountInput } from "@/components/account-input";
 import { ExpirySelect } from "@/components/expiry-select";
 import { createFileRequestAction } from "./request-actions";
@@ -156,8 +160,7 @@ export function RequestDialog({
     const [url, setUrl] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [pickConnection, setPickConnection] = useState("");
-    const [geoCountries, setGeoCountries] = useState<string[]>([]);
-    const [geoContinents, setGeoContinents] = useState<string[]>([]);
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
     const [expiry, setExpiry] = useState("");
 
     // Picker mode: opened from the Drop points page with no fixed folder, so the
@@ -177,8 +180,12 @@ export function RequestDialog({
         setUrl(null);
         setCopied(false);
         setPickConnection(connections?.[0]?.id ?? "");
-        setGeoCountries(initial?.geoCountries ?? []);
-        setGeoContinents(initial?.geoContinents ?? []);
+        setAdvanced({
+            ...EMPTY_LINK_ADVANCED,
+            allowedCidrs: tokenList(initial?.allowedCidrs ?? "", /^$/),
+            allowedCountries: initial?.geoCountries ?? [],
+            allowedContinents: initial?.geoContinents ?? []
+        });
         setExpiry("");
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [target]);
@@ -206,7 +213,6 @@ export function RequestDialog({
             ])
         );
 
-        const allowedCidrs = tokenList(String(form.get("allowedCidrs") ?? ""), /^$/);
         const allowedUsers = tokenList(String(form.get("allowedUsers") ?? ""), /^@+/);
         const maxFiles = form.get("maxFiles");
         const maxMb = Number(form.get("maxMb") ?? 0);
@@ -232,16 +238,16 @@ export function RequestDialog({
             destinationConnectionId,
             destinationPath,
             requireLogin: form.get("requireLogin") === "on",
-            password: String(form.get("password") ?? "").trim() || undefined,
+            password: advanced.password.trim() || undefined,
             maxSizeBytes: maxMb > 0 ? Math.floor(maxMb * 1024 * 1024) : 1024 * 1024 * 1024,
             minSizeBytes: minMb > 0 ? Math.floor(minMb * 1024 * 1024) : undefined,
             maxFiles: maxFiles ? Number(maxFiles) : undefined,
             allowedExtensions,
             deniedExtensions,
             allowedMimeTypes: [],
-            allowedCidrs,
-            allowedCountries: geoCountries,
-            allowedContinents: geoContinents,
+            allowedCidrs: advanced.allowedCidrs,
+            allowedCountries: advanced.allowedCountries,
+            allowedContinents: advanced.allowedContinents,
             allowedUsers,
             startsAt: startsRaw ? new Date(startsRaw).toISOString() : undefined,
             allowUploaderDelete: form.get("allowUploaderDelete") === "on",
@@ -438,15 +444,6 @@ export function RequestDialog({
                         </Section>
 
                         <Section title={t("create.security")}>
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("create.pin")}
-                                <Input
-                                    name="password"
-                                    type="password"
-                                    placeholder={t("form.noPin")}
-                                    autoComplete="off"
-                                />
-                            </label>
                             <label className="flex items-center gap-2 text-sm">
                                 <input
                                     type="checkbox"
@@ -504,24 +501,12 @@ export function RequestDialog({
                                     {t("form.usersHint")}
                                 </span>
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("form.cidrs")}
-                                <Input
-                                    name="allowedCidrs"
-                                    defaultValue={initial?.allowedCidrs}
-                                    placeholder={t("form.cidrsPlaceholder")}
-                                    autoComplete="off"
-                                />
-                            </label>
-                            <div className="flex flex-col gap-1 text-sm">
-                                {t("form.location")}
-                                <GeoPicker
-                                    countries={geoCountries}
-                                    continents={geoContinents}
-                                    onCountries={setGeoCountries}
-                                    onContinents={setGeoContinents}
-                                />
-                            </div>
+                            <LinkAdvancedFields
+                                value={advanced}
+                                onChange={setAdvanced}
+                                omit={["expiry", "uses"]}
+                                idPrefix="drop-point"
+                            />
                         </Section>
 
                         {error ? <p className="text-sm text-danger">{error}</p> : null}

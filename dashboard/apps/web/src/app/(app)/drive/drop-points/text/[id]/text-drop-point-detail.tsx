@@ -12,7 +12,11 @@ import Link from "next/link";
 import { formatBytes } from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { GeoPicker } from "@/components/geo-picker";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { useConfirm } from "@/components/confirm-dialog";
 import { AccountInput } from "@/components/account-input";
 import { useFormChanged } from "@/lib/use-form-changed";
@@ -76,8 +80,13 @@ export function TextDropPointDetail({
     const router = useRouter();
     const t = useTranslations("drivePoints");
     const format = useDisplayFormat();
-    const [countries, setCountries] = useState(request.allowedCountries);
-    const [continents, setContinents] = useState(request.allowedContinents);
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>({
+        ...EMPTY_LINK_ADVANCED,
+        expiresAt: asDateValue(request.expiresAt),
+        allowedCidrs: request.allowedCidrs,
+        allowedCountries: request.allowedCountries,
+        allowedContinents: request.allowedContinents
+    });
     const [requireLogin, setRequireLogin] = useState(request.requireLogin);
     const [allowSealed, setAllowSealed] = useState(request.allowSealed);
     const [pending, setPending] = useState(false);
@@ -91,12 +100,16 @@ export function TextDropPointDetail({
     // The switches and the location picker are React state, not form fields, so
     // the form snapshot cannot see them: without this, turning one off and saving
     // would be refused as "nothing changed".
+    const expiryChanged = advanced.expiresAt !== asDateValue(request.expiresAt);
     const dirty =
         changed ||
         requireLogin !== request.requireLogin ||
         allowSealed !== request.allowSealed ||
-        countries.join() !== request.allowedCountries.join() ||
-        continents.join() !== request.allowedContinents.join();
+        advanced.password !== "" ||
+        expiryChanged ||
+        advanced.allowedCidrs.join() !== request.allowedCidrs.join() ||
+        advanced.allowedCountries.join() !== request.allowedCountries.join() ||
+        advanced.allowedContinents.join() !== request.allowedContinents.join();
 
     async function onCopyLink() {
         const result = await revealTextRequestLinkAction(request.id);
@@ -117,9 +130,8 @@ export function TextDropPointDetail({
     async function onSave(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        const password = String(form.get("password") ?? "");
+        const password = advanced.password;
         const maxSubmissions = String(form.get("maxSubmissions") ?? "").trim();
-        const expiresAt = String(form.get("expiresAt") ?? "").trim();
 
         setPending(true);
         setError(null);
@@ -136,10 +148,11 @@ export function TextDropPointDetail({
             maxLength: Number(form.get("maxLength")),
             maxSubmissions: maxSubmissions ? Number(maxSubmissions) : null,
             allowedUsers: entries(String(form.get("allowedUsers") ?? "")),
-            allowedCidrs: entries(String(form.get("allowedCidrs") ?? "")),
-            allowedCountries: countries,
-            allowedContinents: continents,
-            expiresAt: expiresAt || null
+            allowedCidrs: advanced.allowedCidrs,
+            allowedCountries: advanced.allowedCountries,
+            allowedContinents: advanced.allowedContinents,
+            // An untouched expiry keeps its exact time; the field shows only the day.
+            ...(expiryChanged ? { expiresAt: advanced.expiresAt || null } : {})
         });
         setPending(false);
         if (result.error) {
@@ -147,6 +160,7 @@ export function TextDropPointDetail({
             return;
         }
         setSaved(true);
+        setAdvanced((current) => ({ ...current, password: "" }));
         commit();
         router.refresh();
     }
@@ -271,27 +285,6 @@ export function TextDropPointDetail({
                                 />
                             </label>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <label className="flex flex-col gap-1 text-sm">
-                                {request.hasPassword
-                                    ? t("text.changePassword")
-                                    : t("text.password")}
-                                <Input
-                                    name="password"
-                                    type="password"
-                                    placeholder={request.hasPassword ? t("text.unchanged") : t("text.noPassword")}
-                                    autoComplete="off"
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("text.closes")}
-                                <Input
-                                    name="expiresAt"
-                                    type="date"
-                                    defaultValue={asDateValue(request.expiresAt)}
-                                />
-                            </label>
-                        </div>
                         {request.hasPassword ? (
                             <label className="flex items-center gap-2 text-sm">
                                 <input type="checkbox" name="clearPassword" className="size-4" />
@@ -329,24 +322,13 @@ export function TextDropPointDetail({
                                 <span className="block text-xs text-muted-foreground">{t("text.sealedHint")}</span>
                             </span>
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
-                            {t("form.cidrs")}
-                            <Input
-                                name="allowedCidrs"
-                                defaultValue={request.allowedCidrs.join(", ")}
-                                placeholder={t("form.cidrsPlaceholder")}
-                                autoComplete="off"
-                            />
-                        </label>
-                        <div className="flex flex-col gap-1 text-sm">
-                            {t("form.location")}
-                            <GeoPicker
-                                countries={countries}
-                                continents={continents}
-                                onCountries={setCountries}
-                                onContinents={setContinents}
-                            />
-                        </div>
+                        <LinkAdvancedFields
+                            value={advanced}
+                            onChange={setAdvanced}
+                            omit={["uses"]}
+                            passwordSet={request.hasPassword}
+                            idPrefix="text-drop-point-edit"
+                        />
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="mt-1 flex items-center justify-end gap-2">
                             {saved ? (

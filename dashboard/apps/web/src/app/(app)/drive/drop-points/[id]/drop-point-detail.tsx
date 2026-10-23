@@ -14,7 +14,11 @@ import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { tokenList } from "@/lib/token-field";
 import { useNow } from "@/components/presence";
-import { GeoPicker } from "@/components/geo-picker";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { useConfirm } from "@/components/confirm-dialog";
 import { AccountInput } from "@/components/account-input";
@@ -733,18 +737,28 @@ function EditDropPointDialog({
     const t = useTranslations("drivePoints");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [geoCountries, setGeoCountries] = useState<string[]>(config.allowedCountries);
-    const [geoContinents, setGeoContinents] = useState<string[]>(config.allowedContinents);
+    const initialExpiry = config.expiresAt ? config.expiresAt.slice(0, 10) : "";
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>({
+        ...EMPTY_LINK_ADVANCED,
+        expiresAt: initialExpiry,
+        allowedCidrs: config.allowedCidrs,
+        allowedCountries: config.allowedCountries,
+        allowedContinents: config.allowedContinents
+    });
     const { formProps, changed: fieldsChanged } = useFormChanged();
 
-    // The locations live outside the form, so they are compared separately;
+    // The Advanced section lives outside the form, so it is compared separately;
     // together they decide whether there is anything to save at all.
     const sameList = (a: string[], b: string[]) =>
         a.length === b.length && [...a].sort().join() === [...b].sort().join();
+    const expiryChanged = advanced.expiresAt !== initialExpiry;
     const changed =
         fieldsChanged ||
-        !sameList(geoCountries, config.allowedCountries) ||
-        !sameList(geoContinents, config.allowedContinents);
+        advanced.password !== "" ||
+        expiryChanged ||
+        !sameList(advanced.allowedCidrs, config.allowedCidrs) ||
+        !sameList(advanced.allowedCountries, config.allowedCountries) ||
+        !sameList(advanced.allowedContinents, config.allowedContinents);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -755,16 +769,12 @@ function EditDropPointDialog({
         const allowedExtensions = tokenList(String(form.get("extensions") ?? ""), /^\./);
         const deniedExtensions = tokenList(String(form.get("deniedExtensions") ?? ""), /^\./);
         const allowedUsers = tokenList(String(form.get("allowedUsers") ?? ""), /^@+/);
-        const allowedCidrs = String(form.get("allowedCidrs") ?? "")
-            .split(/[\s,]+/)
-            .map((value) => value.trim())
-            .filter(Boolean);
         const maxMb = Number(form.get("maxMb") ?? 0);
         const minMb = Number(form.get("minMb") ?? 0);
         const deleteWindowMin = Number(form.get("deleteWindowMin") ?? 0);
         const maxFiles = form.get("maxFiles");
         const removePin = form.get("removePin") === "on";
-        const pin = String(form.get("password") ?? "");
+        const pin = advanced.password;
         const startsRaw = String(form.get("startsAt") ?? "").trim();
 
         const result = await updateFileRequestAction(config.id, {
@@ -777,16 +787,17 @@ function EditDropPointDialog({
             maxFiles: maxFiles ? Number(maxFiles) : null,
             allowedExtensions,
             deniedExtensions,
-            allowedCidrs,
-            allowedCountries: geoCountries,
-            allowedContinents: geoContinents,
+            allowedCidrs: advanced.allowedCidrs,
+            allowedCountries: advanced.allowedCountries,
+            allowedContinents: advanced.allowedContinents,
             allowedUsers,
             startsAt: startsRaw ? new Date(startsRaw).toISOString() : null,
             allowUploaderDelete: form.get("allowUploaderDelete") === "on",
             allowOverwrite: form.get("allowOverwrite") === "on",
             uploaderDeleteWindowSeconds:
                 deleteWindowMin > 0 ? Math.floor(deleteWindowMin * 60) : null,
-            expiresAt: String(form.get("expiresAt") ?? "") || null
+            // An untouched expiry keeps its exact time; the field shows only the day.
+            expiresAt: expiryChanged ? advanced.expiresAt || null : undefined
         });
         setPending(false);
         if (result.error) {
@@ -898,42 +909,14 @@ function EditDropPointDialog({
                                 defaultValue={toLocalInput(config.startsAt)}
                             />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
-                            {t("detail.fields.expires")}
-                            <Input
-                                name="expiresAt"
-                                type="date"
-                                defaultValue={config.expiresAt ? config.expiresAt.slice(0, 10) : ""}
-                            />
-                        </label>
                     </div>
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("form.cidrs")}
-                        <Input
-                            name="allowedCidrs"
-                            defaultValue={config.allowedCidrs.join(", ")}
-                            placeholder={t("form.cidrsPlaceholder")}
-                            autoComplete="off"
-                        />
-                    </label>
-                    <div className="flex flex-col gap-1 text-sm">
-                        {t("form.location")}
-                        <GeoPicker
-                            countries={geoCountries}
-                            continents={geoContinents}
-                            onCountries={setGeoCountries}
-                            onContinents={setGeoContinents}
-                        />
-                    </div>
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("form.pin")}
-                        <Input
-                            name="password"
-                            type="password"
-                            placeholder={config.hasPassword ? t("form.pinKeep") : t("form.noPin")}
-                            autoComplete="off"
-                        />
-                    </label>
+                    <LinkAdvancedFields
+                        value={advanced}
+                        onChange={setAdvanced}
+                        omit={["uses"]}
+                        passwordSet={config.hasPassword}
+                        idPrefix="drop-point-edit"
+                    />
                     {config.hasPassword ? (
                         <label className="flex items-center gap-2 text-sm">
                             <input type="checkbox" name="removePin" className="size-4" />
