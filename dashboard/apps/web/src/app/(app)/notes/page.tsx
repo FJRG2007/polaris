@@ -57,7 +57,7 @@ export default async function NotesPage({
                 </div>
                 <NewNoteButton />
             </div>
-            <NotesView shelves={withNotes} note={note} />
+            <NotesView shelves={withNotes} note={note?.view ?? null} shared={note?.shared ?? null} />
         </div>
     );
 }
@@ -65,10 +65,14 @@ export default async function NotesPage({
 /** The note in the address, if this reader may open it. A refusal reads as no
  *  note rather than as an error: a stale link is a link, not a fault. */
 async function openable(actor: access.NoteActor, noteId: string) {
+    let shared: "view" | "edit" | null = null;
     try {
         await access.requireNote(actor, noteId, "guest");
     } catch {
-        return null;
+        // Not on a shelf this reader reaches: shared with them on its own, or nothing.
+        shared = await access.sharedNote(actor, noteId);
+        if (!shared) return null;
     }
-    return getNote(noteId);
+    const view = await getNote(noteId);
+    return view ? { view, shared } : null;
 }

@@ -19,12 +19,13 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { NoteMoveDialog } from "./note-move-dialog";
 import { NoteShareDialog } from "./note-share-dialog";
+import { ShareDialog } from "@/components/access/share-dialog";
 import { NoteTree, type ShelfData } from "./note-tree";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
+import { Badge, Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
 import { Archive, ChevronRight, Download, Move, Pin, PinOff, Plus, Share2, Trash2 } from "lucide-react";
 import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./notebook-dialogs";
 
@@ -32,7 +33,16 @@ import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./no
  *  write on every keystroke, short enough that closing the tab is safe. */
 const SAVE_AFTER = 800;
 
-export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; note: NoteView | null }) {
+export function NotesView({
+    shelves,
+    note,
+    shared = null
+}: {
+    shelves: readonly ShelfData[];
+    note: NoteView | null;
+    /** Opened through a share of this one note rather than its shelf. */
+    shared?: "view" | "edit" | null;
+}) {
     const t = useTranslations("notes");
     const router = useRouter();
     const [title, setTitle] = useState(note?.title ?? "");
@@ -42,6 +52,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [moving, setMoving] = useState<string | null>(null);
     const [sharing, setSharing] = useState<string | null>(null);
+    const [sharingPeople, setSharingPeople] = useState<string | null>(null);
     const [newNotebook, setNewNotebook] = useState(false);
     const [people, setPeople] = useState<string | null>(null);
     const [importing, setImporting] = useState<{
@@ -153,9 +164,11 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                                 aria-label={t("view.titleLabel")}
                                 placeholder={t("tree.untitled")}
                                 onChange={(event) => setTitle(event.target.value)}
+                                readOnly={shared === "view"}
                                 bare
                                 className="h-auto flex-1 text-2xl font-semibold"
                             />
+                            {!shared && (
                             <button
                                 type="button"
                                 aria-label={note.pinned ? t("view.unpinNote") : t("view.pinNote")}
@@ -169,6 +182,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             >
                                 {note.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
                             </button>
+                            )}
+                            {!shared && (
                             <button
                                 type="button"
                                 aria-label={t("view.moveNote")}
@@ -178,15 +193,23 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             >
                                 <Move className="size-4" />
                             </button>
+                            )}
+                            {shared ? (
+                                <Badge variant="neutral" className="mt-1.5 shrink-0">
+                                    {t("view.sharedWithYou")}
+                                </Badge>
+                            ) : null}
+                            {!shared && (
                             <button
                                 type="button"
                                 aria-label={t("view.shareNote")}
                                 title={t("view.share")}
-                                onClick={() => setSharing(note.id)}
+                                onClick={() => setSharingPeople(note.id)}
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Share2 className="size-4" />
                             </button>
+                            )}
                             <button
                                 type="button"
                                 aria-label={t("view.exportNote")}
@@ -201,6 +224,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             >
                                 <Download className="size-4" />
                             </button>
+                            {!shared && (
                             <button
                                 type="button"
                                 aria-label={t("view.archiveNote")}
@@ -219,6 +243,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             >
                                 <Archive className="size-4" />
                             </button>
+                            )}
+                            {!shared && (
                             <button
                                 type="button"
                                 aria-label={t("view.deleteNote")}
@@ -228,6 +254,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             >
                                 <Trash2 className="size-4" />
                             </button>
+                            )}
                         </div>
 
                         <p className="text-xs text-muted-foreground" aria-live="polite">
@@ -250,6 +277,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             key={note.id}
                             value={body}
                             onChange={setBody}
+                            disabled={shared === "view"}
                             placeholder={t("view.editorPlaceholder")}
                             className="min-h-[24rem] flex-1"
                         />
@@ -297,6 +325,29 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                         if (!result.error) router.refresh();
                         return result;
                     }}
+                />
+            )}
+            {sharingPeople && (
+                <ShareDialog
+                    open
+                    onOpenChange={(next) => {
+                        if (!next) setSharingPeople(null);
+                    }}
+                    subject="note.note"
+                    subjectId={sharingPeople}
+                    name={titleOf(shelves, sharingPeople) ?? note?.title ?? ""}
+                    extra={
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                                setSharing(sharingPeople);
+                                setSharingPeople(null);
+                            }}
+                        >
+                            {t("view.publicLink")}
+                        </Button>
+                    }
                 />
             )}
             {sharing && (

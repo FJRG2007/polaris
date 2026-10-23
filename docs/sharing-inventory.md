@@ -60,7 +60,7 @@ reason).
 | Polar | Thread | - | `PolarShareRecipient` | Polar share link | dialog fronting it | fine | - |
 | Polar | Project | - | owner | none | people | add | todo |
 | Notes | Space | `note.space` | `NoteSpaceMember` + AccessGrant | `NoteShare` | - | fine | - |
-| Notes | Single note | - | none | `NoteShare` | people | add | todo |
+| Notes | Single note | `note.note` | shelf members + AccessGrant per note | `NoteShare` | people (open it, or also change its title and text; moving, pinning, archiving, deleting and sharing stay on its shelf; the reader needs the Notes app itself and opens it from the bell link, as it is not listed in their tree) | add | done |
 | Tasks | Space | `task.space` | `TaskSpaceMember` + AccessGrant | `TaskShare` | - | fine | - |
 | Tasks | Folder / list | `task.folder` | `TaskFolderMember` + AccessGrant | `TaskShare` | - | fine | - |
 | Tasks | Single task | - | assignees | `TaskShare` | people | add | todo |

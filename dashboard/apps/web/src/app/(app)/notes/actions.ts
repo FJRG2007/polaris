@@ -17,6 +17,7 @@ import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { revalidatePath } from "next/cache";
 import * as access from "@/lib/notes/access";
+import { dropGrantsFor } from "@/lib/access/grants";
 import { requirePermission } from "@/lib/session";
 import * as notes from "@/lib/notes/note-service";
 import * as shelves from "@/lib/notes/shelf-service";
@@ -94,7 +95,11 @@ export async function updateNoteAction(input: unknown): Promise<{ error?: string
         };
 
     try {
-        await access.requireNote(caller, parsed.data.noteId, "member");
+        await access.requireNote(caller, parsed.data.noteId, "member").catch(async (refused: unknown) => {
+            // A note shared to edit on its own: its title and text, nothing else.
+            const textOnly = Object.keys(parsed.data).every((key) => ["noteId", "title", "body"].includes(key));
+            if (!textOnly || (await access.sharedNote(caller, parsed.data.noteId)) !== "edit") throw refused;
+        });
         if (!(await notes.updateNote(parsed.data)))
             return { error: (await getTranslations("notes"))("errors.noteGone") };
         refresh();
@@ -136,6 +141,7 @@ export async function deleteNoteAction(noteId: string): Promise<{ error?: string
         await access.requireNote(caller, noteId, "member");
         if (!(await notes.deleteNote(noteId)))
             return { error: (await getTranslations("notes"))("errors.noteGone") };
+        await dropGrantsFor("note.note", noteId);
         refresh();
         return {};
     } catch (caught) {

@@ -24,7 +24,7 @@ import { GrantError } from "@/lib/access/grants";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { mayEditShelf as mayEditAutomationShelf } from "@/lib/automations/runner";
 import { memberOrgIds, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
-import { requireSpace as requireNoteSpace } from "@/lib/notes/access";
+import { requireNote as requireNoteOnShelf, requireSpace as requireNoteSpace } from "@/lib/notes/access";
 import { requireShareable as requireOfficeShareable } from "@/lib/office/documents";
 import { requireSpace as requireChatSpace, requireChannel } from "@/lib/chat/access";
 import { requireSpace as requireTaskSpace, requireFolder } from "@/lib/tasks/access";
@@ -61,6 +61,10 @@ export async function requireMayShare(
             return;
         case "note.space":
             await requireNoteSpace(actor, subjectId, "admin");
+            return;
+        case "note.note":
+            // Whoever runs the shelf it sits on: its owner on a personal one.
+            await requireNoteOnShelf(actor, subjectId, "admin");
             return;
         case "office.document":
             // Editing is not enough to hand it on, exactly as opening a door is
@@ -508,6 +512,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         }
         case "crm.dashboard":
             return "/crm/dashboards";
+        case "note.note":
+            return `/notes?note=${encodeURIComponent(subjectId)}`;
         case "backup.plan":
             return "/apps/backups";
         case "telemetry.project":

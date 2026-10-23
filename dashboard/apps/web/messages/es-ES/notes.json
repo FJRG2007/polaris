@@ -75,6 +75,8 @@
         "bringIn": "Importar"
     },
     "view": {
+        "sharedWithYou": "Compartido contigo",
+        "publicLink": "Enlace público",
         "emptyTitle": "Elige una nota o escribe una nueva.",
         "emptyDescription": "Tus notas son solo tuyas. Una libreta se comparte con las personas que están en ella.",
         "breadcrumb": "Dónde está esta nota",
