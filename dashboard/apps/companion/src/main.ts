@@ -505,7 +505,7 @@ export default class PolarisInstance extends InstanceBase<Schema> {
                         entry.label,
                         this.#states.get(feedback.id),
                         feedback.options[mapping.TEXT_OPTION] !== false,
-                        entry.id
+                        this.#connection.current.phase === "online" ? entry.id : ""
                     );
                 },
                 unsubscribe: (feedback) => this.#unwatchFeedback(feedback.id)

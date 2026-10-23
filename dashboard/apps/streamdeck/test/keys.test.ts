@@ -235,4 +235,10 @@ describe("call keys", () => {
             'fill="#78350f"'
         );
     });
+
+    it("turns a call tile green while the camera or a shared screen is live, as Companion does", () => {
+        expect(renderKey({ icon: "video", tone: "ok", look: "call", on: true })).toContain(
+            'fill="#15803D"'
+        );
+    });
 });

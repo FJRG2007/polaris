@@ -68,14 +68,16 @@ export function clip(text: string, max: number): string {
 /** Polaris violet, the colour of its mark. */
 const CALL_TILE = "#7632EC";
 
-/** A call tile's fill for a state: violet at rest, amber while nobody can hear
- *  you, red while the call is recorded. Hanging up is bright red during a call
+/** A call tile's fill for a state: violet at rest, green while the camera or a
+ *  shared screen is live, amber while nobody can hear you, red while the call is
+ *  recorded. Hanging up is bright red during a call
  *  and a dim red with a pink glyph when there is no call to leave. */
 function tileColors(look: KeyLook, tone: KeyTone): { fill: string; glyph: string } {
     if (look === "hangup")
         return tone === "bad"
             ? { fill: "#D83A3A", glyph: "#FFFFFF" }
             : { fill: "#4A2328", glyph: "#F87171" };
+    if (tone === "ok") return { fill: "#15803D", glyph: "#FFFFFF" };
     if (tone === "warn") return { fill: BACKGROUND.warn, glyph: "#FFFFFF" };
     if (tone === "bad") return { fill: "#B91C1C", glyph: "#FFFFFF" };
     return { fill: CALL_TILE, glyph: "#FFFFFF" };

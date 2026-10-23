@@ -369,6 +369,12 @@ describe("your call and your places on Companion buttons", () => {
         expect(mapping.stateStyle("Hang up", { tone: "idle" }, false, "call.hangup").bgcolor).toBe(
             mapping.COLORS.hangup
         );
+        expect(
+            mapping.stateStyle("Camera", { tone: "ok", on: true }, false, "call.camera").bgcolor
+        ).toBe(mapping.COLORS.ok);
+        expect(mapping.stateStyle("Hang up", undefined, false, "").bgcolor).toBe(
+            mapping.COLORS.idle
+        );
     });
 });
 
