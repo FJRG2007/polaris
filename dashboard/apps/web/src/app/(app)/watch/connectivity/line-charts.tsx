@@ -152,7 +152,7 @@ function IpHistory({ changes }: { changes: NonNullable<LineReport["ipChanges"]> 
             {changes.length === 0 ? (
                 <p className="text-xs text-muted-foreground">{t("connectivity.line.ips.empty")}</p>
             ) : (
-                <ul className="flex max-h-56 flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
+                <ul className="flex max-h-56 flex-col divide-y divide-border overflow-y-auto overscroll-contain rounded-md border border-border">
                     {changes.map((change) => {
                         const label = change.previous
                             ? t("connectivity.line.ips.changed", {
