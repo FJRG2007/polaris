@@ -1536,5 +1536,8 @@
         "meeting": "In a meeting",
         "busyCall": "Do not disturb - in a call",
         "busyMeeting": "Do not disturb - in a meeting"
+    },
+    "deviceAddress": {
+        "via": "via"
     }
 }

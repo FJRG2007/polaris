@@ -15,6 +15,7 @@
 import { Badge, Button, cn } from "@polaris/ui";
 import { LogOut, Terminal } from "lucide-react";
 import { SystemMark } from "@/components/client-marks";
+import { DeviceAddress } from "@/components/device-address";
 import { PinButton } from "@/components/sessions-table";
 import type { CliSessionView } from "@/lib/cli/sessions";
 import { RelativeTime } from "@/components/relative-time";
@@ -141,11 +142,9 @@ export function CliSessionRows({
                                     </span>
                                 </td>
                                 <td className="hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
-                                    {address ?? (
-                                        <span className="text-muted-foreground">
-                                            {t("sessionsTable.notRecorded")}
-                                        </span>
-                                    )}
+                                    <DeviceAddress
+                                        address={{ ip: address ?? null, publicIp: null }}
+                                    />
                                 </td>
                                 <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
                                     {t("sessionsTable.notRecorded")}

@@ -41,13 +41,21 @@ import { PanelRightOpen, ShieldOff, ShieldQuestion, Smartphone } from "lucide-re
 
 /** Where a pass was granted, as one line, for the layouts too narrow to hold the
  *  columns. */
-function origin(device: TrustedDeviceRow, t: NamespaceTranslator<"accountSecurity">): string {
-    return [addressLine(device), device.host].filter(Boolean).join(" - ") || t("passkeys.notRecorded");
+function origin(
+    device: TrustedDeviceRow,
+    t: NamespaceTranslator<"accountSecurity">,
+    via: string
+): string {
+    return (
+        [addressLine(device, via), device.host].filter(Boolean).join(" - ") ||
+        t("passkeys.notRecorded")
+    );
 }
 
 export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] }) {
     const router = useRouter();
     const t = useTranslations("accountSecurity");
+    const tc = useTranslations("components");
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -165,7 +173,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                             ) : null}
                                                         </p>
                                                         <p className="truncate text-xs text-muted-foreground lg:hidden">
-                                                            {origin(device, t)}
+                                                            {origin(device, t, tc("deviceAddress.via"))}
                                                         </p>
                                                     </div>
                                                 </div>

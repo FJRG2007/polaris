@@ -318,6 +318,32 @@ describe("the one-line origin", () => {
             "Unknown location"
         );
     });
+
+    it("joins the two addresses in the reader's word", () => {
+        expect(
+            sessionOrigin(session({ publicIp: "198.51.100.88" }), "Ubicación desconocida", "vía")
+        ).toBe("10.0.1.131 vía 198.51.100.88 - ES - polaris.local");
+    });
+});
+
+describe("the address and domain columns", () => {
+    // A browser's row drew them grey while an extension's and the command line's
+    // drew them like every other column: one rule now, for every kind of row.
+    it("draw a recorded address and domain like the other columns", () => {
+        const markup = render([session()]);
+        expect(markup).toContain('<span class="block truncate">polaris.local</span>');
+        expect(markup).not.toMatch(
+            /text-muted-foreground[^"]*"><span class="font-mono">10\.0\.1\.131/
+        );
+    });
+
+    it("mute only what was not recorded", () => {
+        const markup = render([session({ ip: null, host: null })]);
+        expect(markup).toContain(
+            '<span class="block truncate text-muted-foreground">Not recorded</span>'
+        );
+        expect(markup).toContain('<span class="text-muted-foreground">Not recorded</span>');
+    });
 });
 
 describe("a browser extension's connection", () => {
