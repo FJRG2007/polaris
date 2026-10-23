@@ -6,19 +6,24 @@
  * first and fills itself from here, and polls it while open so the state at the
  * top stays live.
  *
- * Administrators only, like the "cannot reach the internet" alert it records.
- * Node runtime for Prisma.
+ * Administrators, like the "cannot reach the internet" alert it records, and
+ * anybody one of them shared it with - who is sent it without the parts that
+ * name this network. Node runtime for Prisma.
  */
 
 import { NextResponse } from "next/server";
-import { apiAdmin } from "@/lib/api-session";
+import { apiUser } from "@/lib/api-session";
 import { connectivityReport } from "@/lib/connectivity/outage-tracker";
+import { connectivityReach, sharedConnectivityReport } from "@/lib/connectivity/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const refused = await apiAdmin();
-    if (refused instanceof Response) return refused;
-    return NextResponse.json(await connectivityReport());
+    const caller = await apiUser();
+    if (caller instanceof Response) return caller;
+    const reach = await connectivityReach(caller);
+    if (!reach) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const report = await connectivityReport();
+    return NextResponse.json(reach === "admin" ? report : sharedConnectivityReport(report));
 }

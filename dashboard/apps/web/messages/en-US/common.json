@@ -42,7 +42,25 @@
         "unreadable": "That could not be read",
         "notWritten": "That share could not be written",
         "nobodyFound": "Nobody could be looked up",
-        "notTakenBack": "That share could not be taken back"
+        "notTakenBack": "That share could not be taken back",
+        "notice": "{name} shared {what} with you",
+        "somebody": "Somebody",
+        "subjects": {
+            "chat.space": "a space in Chat",
+            "chat.channel": "a conversation",
+            "task.space": "a space in Tasks",
+            "task.folder": "a list in Tasks",
+            "note.space": "a space in Notes",
+            "office.document": "a document",
+            "place.device": "a device",
+            "place.camera": "a camera",
+            "place.ups": "a UPS",
+            "place.nas": "a NAS",
+            "place.server": "a server",
+            "place.domain": "a website",
+            "place.room": "a room",
+            "watch.connectivity": "the connectivity record"
+        }
     },
     "mentions": {
         "unreadable": "That search could not be read",

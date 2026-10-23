@@ -340,5 +340,26 @@
             "hours": "{n} h",
             "minutes": "{n} min"
         }
+    },
+    "guestConnectivity": {
+        "title": "Connectivity",
+        "kind": {
+            "line": "Internet line",
+            "dns": "DNS",
+            "address": "Public address"
+        },
+        "periods": {
+            "24h": "Last 24 hours",
+            "7d": "Last 7 days",
+            "30d": "Last 30 days",
+            "90d": "Last 90 days"
+        },
+        "uptime": "{period}: {share} online",
+        "recent": "Recent outages",
+        "none": "No outages recorded.",
+        "started": "From {when}",
+        "lasted": "Lasted {span}",
+        "ongoing": "Still down",
+        "seeOnly": "This link only shows the connection's record."
     }
 }

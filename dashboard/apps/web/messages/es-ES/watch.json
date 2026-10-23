@@ -224,6 +224,8 @@
         "description": "Cada vez que Polaris perdió la conexión o no se podía llegar a él desde fuera, y cuánto duró.",
         "checkNow": "Comprobar",
         "checking": "Comprobando",
+        "share": "Dar acceso",
+        "sharedWithYou": "Compartido contigo",
         "kinds": {
             "line": "Línea",
             "dns": "DNS",

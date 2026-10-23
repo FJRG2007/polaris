@@ -13,7 +13,7 @@
  * administrator's) without knowing anything about sessions.
  */
 
-import type { Permission } from "@polaris/core";
+import type { GrantSubject, Permission } from "@polaris/core";
 import { APP_SECTIONS, POLARIS_APPS, type AppEntry } from "@/lib/apps";
 
 /** Where somebody with no app at all belongs. */
@@ -54,6 +54,12 @@ export interface AppAccessInput {
      * grant written for one person is not part of it.
      */
     alsoReaches?: (appId: string) => Promise<boolean>;
+    /**
+     * Whether this person holds a live grant over any one thing of a subject,
+     * for the rail screens a grant opens (`AppSection.reachedBy`). Absent - a
+     * role preview - means none: a grant is written to people, not to roles.
+     */
+    reachesSubject?: (subject: GrantSubject) => Promise<boolean>;
     /**
      * Whether an app is closed to this person by a policy of its own rather
      * than a permission - Polar's audience, chosen by the administrator.
@@ -153,16 +159,22 @@ export async function reachableAppNav(
  * browser. Only the permissions some section names are asked about, which is a
  * handful rather than the whole list.
  */
-export async function heldSectionPermissions({ can }: AppAccessInput): Promise<string[]> {
-    const named = [
-        ...new Set(
-            Object.values(APP_SECTIONS)
-                .flat()
-                .flatMap((section) => (section.needs ? [section.needs] : []))
-        )
+export async function heldSectionPermissions({
+    can,
+    reachesSubject
+}: AppAccessInput): Promise<string[]> {
+    const sections = Object.values(APP_SECTIONS).flat();
+    const named = [...new Set(sections.flatMap((section) => (section.needs ? [section.needs] : [])))];
+    const subjects = [
+        ...new Set(sections.flatMap((section) => (section.reachedBy ? [section.reachedBy] : [])))
     ];
-    const verdicts = await Promise.all(named.map(async (one) => [one, await can(one)] as const));
-    return verdicts.filter(([, allowed]) => allowed).map(([one]) => one);
+    const [verdicts, reached] = await Promise.all([
+        Promise.all(named.map(async (one) => [one, await can(one)] as const)),
+        reachesSubject
+            ? Promise.all(subjects.map(async (one) => [one, await reachesSubject(one)] as const))
+            : []
+    ]);
+    return [...verdicts, ...reached].filter(([, allowed]) => allowed).map(([one]) => one);
 }
 
 /**

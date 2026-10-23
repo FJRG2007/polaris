@@ -110,6 +110,13 @@ export async function requireMayShare(
                 throw new GrantError("You cannot share that");
             return;
         }
+        case "watch.connectivity":
+            // The record the internet alert writes, which only administrators
+            // receive and read; one of them decides who else may.
+            if (subjectId !== core.WATCH_CONNECTIVITY_ID || !user.isAdmin) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
     }
 }
 
@@ -306,7 +313,8 @@ export function shareIsBounded(subject: core.GrantSubject): boolean {
         subject === "place.nas" ||
         subject === "place.server" ||
         subject === "place.domain" ||
-        subject === "place.room"
+        subject === "place.room" ||
+        subject === "watch.connectivity"
     );
 }
 
@@ -325,3 +333,21 @@ export const CAPABILITY_LABELS: Record<string, { label: string; hint: string }> 
     // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
     control: { label: "Can operate", hint: "Open, close and switch it, as well as see it." }
 };
+
+/**
+ * Where the person something was shared with finds it, for the bell. Only the
+ * subjects whose screen does not need more than the id; null leaves the notice
+ * without a link rather than guessing one.
+ */
+export function subjectHref(subject: core.GrantSubject, subjectId: string): string | null {
+    switch (subject) {
+        case "watch.connectivity":
+            return "/watch/connectivity";
+        case "office.document":
+            return "/office/shared";
+        case "place.ups":
+            return `/places/ups/${encodeURIComponent(subjectId)}`;
+        default:
+            return subject.startsWith("place.") ? "/places" : null;
+    }
+}

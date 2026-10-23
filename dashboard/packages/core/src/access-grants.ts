@@ -78,7 +78,8 @@ export const GRANT_SUBJECTS = [
     "place.nas",
     "place.server",
     "place.domain",
-    "place.room"
+    "place.room",
+    "watch.connectivity"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -148,7 +149,11 @@ export const GRANT_CAPABILITIES = {
     // (https://saltosystems.com/en/solutions/hospitality/,
     // https://docs.getkisi.com/docs/groups). Devices put in the room later are
     // covered; ones taken out are not.
-    "place.room": ["view", "control"]
+    "place.room": ["view", "control"],
+    // This deployment's connectivity record: its state, its outages and their
+    // history. Reading is all there is - checking now and the merge window stay
+    // with the administrators the internet alert goes to.
+    "watch.connectivity": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -187,7 +192,8 @@ export const GRANT_ACTIONS = {
     "place.nas": ["watch", "fan", "backup"],
     "place.server": ["watch"],
     "place.domain": ["watch"],
-    "place.room": ["watch", "open", "close", "operate"]
+    "place.room": ["watch", "open", "close", "operate"],
+    "watch.connectivity": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**
@@ -568,9 +574,10 @@ export const grantLinkSchema = withGrantRules(grantBounds.extend(addressRuleFiel
 export type GrantLinkInput = z.infer<typeof grantLinkSchema>;
 
 /**
- * What may be handed out as a link: everything in Places. A door and a UPS may
- * be driven through one; a camera is only watched (no PTZ, no recordings); the
- * rest only seen - see `LINK_WATCH_ONLY_SUBJECTS`.
+ * What may be handed out as a link: everything in Places, and the
+ * connectivity record in Watch. A door and a UPS may be driven through one; a
+ * camera is only watched (no PTZ, no recordings); the rest only seen - see
+ * `LINK_WATCH_ONLY_SUBJECTS`.
  */
 export const GRANT_LINK_SUBJECTS = [
     "place.device",
@@ -579,7 +586,8 @@ export const GRANT_LINK_SUBJECTS = [
     "place.nas",
     "place.server",
     "place.domain",
-    "place.room"
+    "place.room",
+    "watch.connectivity"
 ] as const satisfies readonly GrantSubject[];
 
 export type GrantLinkSubject = (typeof GRANT_LINK_SUBJECTS)[number];
@@ -597,8 +605,16 @@ export function isGrantLinkSubject(value: unknown): value is GrantLinkSubject {
 export const LINK_WATCH_ONLY_SUBJECTS = [
     "place.nas",
     "place.server",
-    "place.domain"
+    "place.domain",
+    "watch.connectivity"
 ] as const satisfies readonly GrantLinkSubject[];
+
+/**
+ * The one connectivity record a deployment keeps, as a grant's subject id.
+ * There is nothing to choose between, so the id is a constant rather than a
+ * row: a grant over it reads the whole record.
+ */
+export const WATCH_CONNECTIVITY_ID = "deployment";
 
 /** The capabilities a link to this subject may carry, weakest first. */
 export function linkCapabilities(subject: GrantLinkSubject): readonly string[] {

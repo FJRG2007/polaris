@@ -42,7 +42,25 @@
         "unreadable": "No se ha podido leer",
         "notWritten": "No se pudo guardar esa compartición",
         "nobodyFound": "No se ha podido buscar a nadie",
-        "notTakenBack": "No se ha podido retirar esa compartición"
+        "notTakenBack": "No se ha podido retirar esa compartición",
+        "notice": "{name} ha compartido {what} contigo",
+        "somebody": "Alguien",
+        "subjects": {
+            "chat.space": "un espacio de chat",
+            "chat.channel": "una conversación",
+            "task.space": "un espacio de tareas",
+            "task.folder": "una lista de tareas",
+            "note.space": "un espacio de notas",
+            "office.document": "un documento",
+            "place.device": "un aparato",
+            "place.camera": "una cámara",
+            "place.ups": "un SAI",
+            "place.nas": "un NAS",
+            "place.server": "un servidor",
+            "place.domain": "una web",
+            "place.room": "una sala",
+            "watch.connectivity": "el registro de conexión"
+        }
     },
     "mentions": {
         "unreadable": "No se ha podido leer esa búsqueda",

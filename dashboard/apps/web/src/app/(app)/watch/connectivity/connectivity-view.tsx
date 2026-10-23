@@ -14,7 +14,9 @@
  * now", which runs the watcher's own pass early.
  */
 
-import { RefreshCw } from "lucide-react";
+import * as core from "@polaris/core";
+import { RefreshCw, Share2 } from "lucide-react";
+import { ShareDialog } from "@/components/access/share-dialog";
 import { OutageTable } from "./outage-table";
 import { MergeGapForm } from "./merge-gap-form";
 import { LineCharts } from "./line-charts";
@@ -63,8 +65,9 @@ function uptimeText(
     return `${format.number(floored, { minimumFractionDigits: floored === 100 ? 0 : 2, maximumFractionDigits: 2 })}%`;
 }
 
-export function ConnectivityView() {
+export function ConnectivityView({ admin }: { admin: boolean }) {
     const t = useTranslations("watch");
+    const [sharing, setSharing] = useState(false);
     const format = useDisplayFormat();
     const span = useMemo(() => spanWith(t), [t]);
     const { data, loading, error, refresh, replace } = useLiveResource<ConnectivityReport>({
@@ -129,24 +132,50 @@ export function ConnectivityView() {
                 title={t("connectivity.title")}
                 description={t("connectivity.description")}
                 actions={
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={checkNow}
-                        aria-disabled={checking}
-                        title={t("connectivity.checkNow")}
-                        aria-label={t("connectivity.checkNow")}
-                    >
-                        <RefreshCw
-                            className={checking ? "animate-spin" : undefined}
-                            aria-hidden="true"
-                        />
-                        <span className="hidden sm:inline">
-                            {checking ? t("connectivity.checking") : t("connectivity.checkNow")}
-                        </span>
-                    </Button>
+                    admin ? (
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSharing(true)}
+                                title={t("connectivity.share")}
+                                aria-label={t("connectivity.share")}
+                            >
+                                <Share2 aria-hidden="true" />
+                                <span className="hidden sm:inline">{t("connectivity.share")}</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={checkNow}
+                                aria-disabled={checking}
+                                title={t("connectivity.checkNow")}
+                                aria-label={t("connectivity.checkNow")}
+                            >
+                                <RefreshCw
+                                    className={checking ? "animate-spin" : undefined}
+                                    aria-hidden="true"
+                                />
+                                <span className="hidden sm:inline">
+                                    {checking ? t("connectivity.checking") : t("connectivity.checkNow")}
+                                </span>
+                            </Button>
+                        </div>
+                    ) : (
+                        <Badge variant="neutral">{t("connectivity.sharedWithYou")}</Badge>
+                    )
                 }
             />
+            {admin ? (
+                <ShareDialog
+                    open={sharing}
+                    onOpenChange={setSharing}
+                    subject="watch.connectivity"
+                    subjectId={core.WATCH_CONNECTIVITY_ID}
+                    name={t("connectivity.title")}
+                    bounded
+                />
+            ) : null}
             <div className="flex flex-col gap-4">
                 {checkError ? <p className="text-sm text-danger">{checkError}</p> : null}
 
@@ -233,12 +262,14 @@ export function ConnectivityView() {
                             <OlderMonths report={data} span={span} />
                         ) : null}
 
-                        <MergeGapForm
-                            seconds={data?.mergeGapSeconds ?? null}
-                            onSaved={(seconds) => {
-                                if (data) replace({ ...data, mergeGapSeconds: seconds });
-                            }}
-                        />
+                        {admin ? (
+                            <MergeGapForm
+                                seconds={data?.mergeGapSeconds ?? null}
+                                onSaved={(seconds) => {
+                                    if (data) replace({ ...data, mergeGapSeconds: seconds });
+                                }}
+                            />
+                        ) : null}
                     </div>
                 )}
             </div>

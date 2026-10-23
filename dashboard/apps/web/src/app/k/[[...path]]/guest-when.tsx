@@ -21,7 +21,7 @@ export function GuestWhen({
     message
 }: {
     at: string;
-    message: "guestStatus.checked" | "guestLink.until";
+    message: "guestStatus.checked" | "guestLink.until" | "guestConnectivity.started";
 }) {
     const words = useTranslations("publicPages");
     const locale = useLocale();

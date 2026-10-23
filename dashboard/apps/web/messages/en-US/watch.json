@@ -224,6 +224,8 @@
         "description": "Every time Polaris lost its connection or could not be reached from outside, and for how long.",
         "checkNow": "Check now",
         "checking": "Checking",
+        "share": "Share access",
+        "sharedWithYou": "Shared with you",
         "kinds": {
             "line": "Internet line",
             "dns": "DNS",

@@ -36,7 +36,7 @@ reason).
 
 | App | Object | Subject | People today | Link today | Missing | Decision | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Watch | Connectivity (outages, history) | - | none (administrators only) | none | people + link | add | in progress |
+| Watch | Connectivity (outages, history) | `watch.connectivity` | none (administrators only) | none | people + link | add | done |
 | Watch | Alarms | - | none (administrators only) | none | people (view) | add | todo |
 | Watch | Servers, services, containers (metrics, uptime) | `place.server`, `place.domain` | AccessGrant via Places device | AccessGrant link `/k` | shared-with marker in Watch | add | todo |
 | Watch | Webhooks | - | none | none | - | no: carries delivery secrets | - |

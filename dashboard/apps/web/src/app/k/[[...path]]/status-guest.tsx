@@ -10,7 +10,7 @@ import { GuestWhen } from "./guest-when";
 import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
 /** Seconds as the largest two units that say anything: "3 d 4 h", "12 min". */
-function span(seconds: number, words: (key: "days" | "hours" | "minutes", n: number) => string) {
+export function span(seconds: number, words: (key: "days" | "hours" | "minutes", n: number) => string) {
     const days = Math.floor(seconds / 86_400);
     const hours = Math.floor((seconds % 86_400) / 3_600);
     const minutes = Math.floor((seconds % 3_600) / 60);

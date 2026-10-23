@@ -25,10 +25,13 @@ import {
     owningOrgIds,
     requireMayShare,
     shareCandidates,
+    subjectHref,
     subjectPlaceLocated,
     type GrantCandidate
 } from "@/lib/access/sharing-service";
 import { sharingBaseUrl } from "@/lib/domain-service";
+import { translatorFor } from "@/lib/i18n/translate";
+import { createNotification } from "@/lib/notification-service";
 import {
     GrantError,
     listSubjectGrants,
@@ -67,6 +70,37 @@ function subjectOf(value: unknown): core.GrantSubject {
  * for the person it was lent to. Chat and Tasks resolve access on the way into
  * every screen and already redraw themselves on the caller's own next move.
  */
+/**
+ * Tell the person something was handed to, in the bell and in their own
+ * language. A team or a role is not told one by one: who is in it is a query and
+ * a chance to tell the wrong people. Best-effort, like every notice.
+ */
+async function tellGrantee(
+    sharer: { id: string; name?: string | null },
+    subject: core.GrantSubject,
+    subjectId: string,
+    userId: string
+): Promise<void> {
+    if (userId === sharer.id) return;
+    let words = translatorFor(core.DEFAULT_LOCALE, "common");
+    try {
+        const { getUserLocale } = await import("@/lib/i18n/locale-service");
+        words = translatorFor(await getUserLocale(userId), "common");
+    } catch {
+        // The default language, then.
+    }
+    await createNotification({
+        userId,
+        type: "access.shared",
+        title: words("share.notice", {
+            name: sharer.name || words("share.somebody"),
+            what: words(`share.subjects.${subject}`)
+        }),
+        href: subjectHref(subject, subjectId),
+        level: "info"
+    });
+}
+
 function settled(subject: core.GrantSubject): void {
     if (subject.startsWith("place.")) revalidatePath("/places");
 }
@@ -136,6 +170,9 @@ export async function shareAction(
             }
         });
         settled(kind);
+        if (parsed.data.principalType === "user") {
+            await tellGrantee(user, kind, String(subjectId), parsed.data.principalId);
+        }
         // Lending somebody a thing can hand them a whole app: a door opens
         // Places for a visitor who holds none of its permissions, a game server
         // opens Game servers. Their switcher is drawn on the server, so without
