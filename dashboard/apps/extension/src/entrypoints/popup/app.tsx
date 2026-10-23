@@ -6,8 +6,7 @@ import { EVERY_SITE } from "@/lib/injection";
 import { readIntendedLogin } from "@/lib/save";
 import { isNewer, type UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
-import { alternatesOf, localPermissions, type ReachStatus } from "@/lib/local-address";
-import { learnInstance, type InstanceRecord } from "@polaris/core/instance-fallback";
+import { localPermissions, type ReachStatus } from "@/lib/local-address";
 import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { Picker } from "./picker";
@@ -363,7 +362,9 @@ function LocalAddress({
         setDenied(false);
         let granted = false;
         try {
-            granted = await browser.permissions.request({ origins: localPermissions(reach.missing) });
+            granted = await browser.permissions.request({
+                origins: localPermissions(reach.missing)
+            });
         } catch {
             granted = false;
         }
@@ -411,26 +412,6 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
     // it spent the one prompt a gesture is good for on a host that cannot exist.
     const usable = looksLikeAddress(typed);
 
-    // Who is at the address, read while it is typed, so the click that connects
-    // can ask for its local addresses in the same prompt: the click is the only
-    // moment a permission may be asked, and a fetch inside it would come too late
-    // for some browsers. Public, no credential, and only ever this address.
-    const [learned, setLearned] = useState<{ origin: string; record: InstanceRecord } | null>(null);
-    useEffect(() => {
-        const origin = usable ? readOrigin(typed) : null;
-        if (!origin) return;
-        let live = true;
-        const timer = setTimeout(() => {
-            void learnInstance(origin).then((record) => {
-                if (live && record) setLearned({ origin, record });
-            });
-        }, 500);
-        return () => {
-            live = false;
-            clearTimeout(timer);
-        };
-    }, [typed, usable]);
-
     const connect = async (): Promise<void> => {
         const origin = readOrigin(typed);
         if (!origin) {
@@ -445,15 +426,12 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
         // the worker this used to be sent to has none. It failed with "This
         // function must be called during a user gesture", which reached the
         // screen as "Something went wrong." on a perfectly good address.
-        // Its local addresses go in the same prompt, so the extension keeps working
-        // on the day the internet is down at home. Already granted on Chromium,
-        // where every page is; Firefox asks.
-        const local = learned?.origin === origin ? alternatesOf(learned.record, origin) : [];
+        // Only the address typed: Firefox grants a prompt all or nothing, so asking
+        // for the local addresses here too would let a "no" to them block the
+        // server itself. They are asked for on their own button once connected.
         let granted = false;
         try {
-            granted = await browser.permissions.request({
-                origins: [`${origin}/*`, ...localPermissions(local)]
-            });
+            granted = await browser.permissions.request({ origins: [`${origin}/*`] });
         } catch {
             granted = false;
         }
