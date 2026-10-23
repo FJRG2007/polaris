@@ -721,7 +721,8 @@ export function PolarChat({
     onClose,
     fullPage = false,
     site,
-    chatScope = null
+    chatScope = null,
+    onConversation
 }: {
     onClose?: () => void;
     fullPage?: boolean;
@@ -734,6 +735,12 @@ export function PolarChat({
      * the Polaris address the chat itself sits on is then nobody's business.
      */
     site?: SiteContext | null;
+    /** The conversation on screen as text, each time an answer settles: the
+     *  extension's panel keeps a copy for when Polaris does not answer. */
+    onConversation?: (conversation: {
+        id: string;
+        lines: { role: string; text: string }[];
+    }) => void;
 }) {
     const t = useTranslations("polar");
     const pathname = usePathname();
@@ -972,6 +979,16 @@ export function PolarChat({
         resume: true
     });
     const busy = chat.status === "submitted" || chat.status === "streaming";
+    const conversationRef = useRef(onConversation);
+    conversationRef.current = onConversation;
+    useEffect(() => {
+        if (busy || !conversationRef.current) return;
+        const lines = chat.messages.map((message) => ({
+            role: message.role,
+            text: textOf(message)
+        }));
+        conversationRef.current({ id: threadId, lines });
+    }, [busy, threadId, chat.messages]);
     const runMarks = polarRuns.usePolarRuns(showHistory, busy);
     /** The stop button: leaving a chat never stops its answer, this does. */
     const stopAnswer = () =>

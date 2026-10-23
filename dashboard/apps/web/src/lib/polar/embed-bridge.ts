@@ -138,3 +138,79 @@ export function opensOutside(href: string, here: string): boolean {
     const current = new URL(here);
     return !(url.origin === current.origin && url.pathname === current.pathname);
 }
+
+/**
+ * The copy of a conversation the panel keeps for when this Polaris does not
+ * answer: the extension draws it, read-only, in place of the frame. Bounded
+ * here and again in the panel (`apps/extension/src/lib/polar-offline.ts`, held
+ * to these by a test): the last messages of the one conversation on screen,
+ * as plain text, and the account they belong to so another account signing in
+ * on the same browser never reads them.
+ */
+export const SNAPSHOT_MESSAGES = 40;
+export const SNAPSHOT_TEXT = 8000;
+export const SNAPSHOT_TITLE = 120;
+
+const snapshotMessage = z.object({
+    source: z.literal(FROM_EMBED),
+    kind: z.literal("snapshot"),
+    account: z.string().min(1).max(64),
+    conversation: z.object({
+        id: z.string().min(1).max(64),
+        title: z.string().max(SNAPSHOT_TITLE),
+        at: z.number().int().nonnegative(),
+        messages: z
+            .array(
+                z.object({
+                    role: z.enum(["user", "assistant"]),
+                    text: z.string().max(SNAPSHOT_TEXT)
+                })
+            )
+            .max(SNAPSHOT_MESSAGES)
+    })
+});
+
+export type ConversationSnapshot = z.infer<typeof snapshotMessage>;
+
+export interface SnapshotLine {
+    readonly role: string;
+    readonly text: string;
+}
+
+/**
+ * The message the embed hands the panel for a conversation, cut to the caps:
+ * spoken lines only, empty ones dropped, the newest kept. Null when there is
+ * nothing worth keeping.
+ */
+export function snapshotOf(
+    account: string,
+    conversation: { id: string; at: number; lines: readonly SnapshotLine[] }
+): ConversationSnapshot | null {
+    const messages = conversation.lines
+        .filter((line) => (line.role === "user" || line.role === "assistant") && line.text.trim())
+        .slice(-SNAPSHOT_MESSAGES)
+        .map((line) => ({
+            role: line.role as "user" | "assistant",
+            text: line.text.trim().slice(0, SNAPSHOT_TEXT)
+        }));
+    if (!messages.length) return null;
+    const first = messages.find((line) => line.role === "user") ?? messages[0]!;
+    const parsed = snapshotMessage.safeParse({
+        source: FROM_EMBED,
+        kind: "snapshot",
+        account,
+        conversation: {
+            id: conversation.id,
+            title: first.text.replace(/\s+/g, " ").slice(0, SNAPSHOT_TITLE),
+            at: Math.max(0, Math.floor(conversation.at)),
+            messages
+        }
+    });
+    return parsed.success ? parsed.data : null;
+}
+
+/** A snapshot message as the panel must find it, or null for anything else. */
+export function snapshotFrom(data: unknown): ConversationSnapshot | null {
+    const message = snapshotMessage.safeParse(data);
+    return message.success ? message.data : null;
+}

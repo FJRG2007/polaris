@@ -39,7 +39,7 @@ export default async function PolarEmbedPage({
             ) : (
                 <ToastProvider>
                     <PolarProvider allowed>
-                        <PolarEmbed parent={parent} chat={chat} />
+                        <PolarEmbed parent={parent} chat={chat} account={user.id} />
                     </PolarProvider>
                 </ToastProvider>
             )}
