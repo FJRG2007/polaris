@@ -1,21 +1,23 @@
 {
-    "title": "Automatizaciones",
+    "title": "Automatismos",
     "description": "Cuando pase algo, haz algo. Actúa como quien lo publicó.",
-    "newAutomation": "Nueva automatización",
+    "newAutomation": "Nuevo automatismo",
     "list": {
-        "emptyTitle": "Sin automatizaciones",
+        "emptyTitle": "Aún no hay automatismos",
         "emptyDescription": "Empieza con un disparador y añade lo que debe hacer.",
-        "emptyReadOnly": "Nada aún. Un admin de la organización puede crear una.",
-        "emptyFromApp": "Aún no hay ninguna. Empieza con una plantilla.",
-        "loadFailed": "No se pudieron cargar las automatizaciones.",
+        "emptyReadOnly": "Nada aún. Un admin de la organización puede crear uno.",
+        "emptyFromApp": "Aún no hay ninguno. Empieza con una plantilla.",
+        "loadFailed": "No se pudieron cargar los automatismos.",
         "retry": "Reintentar",
         "draft": "Borrador",
         "never": "Sin ejecutar",
         "lastRun": "Última vez {when}",
         "switchLabel": "Ejecutar {name} al dispararse",
-        "notPublished": "Publícala antes de activarla",
+        "notPublished": "Publícalo antes de activarlo",
         "runs": "Historial",
-        "runOff": "Actívala primero"
+        "runOff": "Actívalo primero",
+        "share": "Dar acceso",
+        "sharedWithYou": "Compartida contigo"
     },
     "modes": {
         "single": "De uno en uno",
@@ -43,7 +45,7 @@
         "timedOut": "Caducado"
     },
     "create": {
-        "title": "Nueva automatización",
+        "title": "Nuevo automatismo",
         "name": "Nombre",
         "namePlaceholder": "Puerta abierta",
         "descriptionLabel": "Descripción",
@@ -53,18 +55,18 @@
         "cancel": "Cancelar"
     },
     "editor": {
-        "back": "Automatizaciones",
+        "back": "Automatismos",
         "save": "Guardar",
         "saved": "Guardado",
         "publish": "Publicar",
-        "published": "Publicada y activa",
+        "published": "Publicado y activo",
         "runNow": "Ejecutar",
         "runStarted": "Iniciada",
-        "noManual": "Añade un disparador A mano para ejecutarla aquí",
+        "noManual": "Añade un disparador A mano para ejecutarlo aquí",
         "delete": "Eliminar",
-        "deleted": "Automatización borrada",
-        "readOnly": "Puedes verla, pero solo un admin de la organización puede cambiarla.",
-        "notStructured": "Esta automatización no se puede mostrar como lista.",
+        "deleted": "Automatismo eliminado",
+        "readOnly": "Puedes verlo, pero solo un admin de la organización puede cambiarlo.",
+        "notStructured": "Este automatismo no se puede mostrar como lista.",
         "unsaved": "Cambios sin guardar",
         "when": "Cuando",
         "whenHint": "Cualquiera de estos lo inicia.",
@@ -228,8 +230,8 @@
     },
     "runs": {
         "title": "Ejecuciones",
-        "description": "Lo que hicieron tus automatizaciones, lo último primero.",
-        "automation": "Automatización",
+        "description": "Lo que hicieron tus automatismos, lo último primero.",
+        "automation": "Automatismo",
         "status": "Estado",
         "started": "Inicio",
         "duration": "Duró",
@@ -250,13 +252,13 @@
         "input": "Enviado",
         "output": "Recibido",
         "beforeMove": "Antes del traslado",
-        "beforeMoveHint": "Ejecuciones de donde vivía antes esta automatización. Solo lectura."
+        "beforeMoveHint": "Ejecuciones de donde vivía antes este automatismo. Solo lectura."
     },
     "runErrors": {
         "alreadyRunning": "Ya en curso",
         "queueFull": "La cola estaba llena",
         "rateLimited": "Demasiadas en 10 minutos",
-        "loop": "Se paró un bucle entre automatizaciones",
+        "loop": "Se paró un bucle entre automatismos",
         "timeout": "Un paso tardó demasiado",
         "interrupted": "Polaris se reinició en un paso",
         "appMissing": "Necesita una app no instalada",
@@ -305,7 +307,7 @@
     },
     "secrets": {
         "title": "Secretos",
-        "description": "URLs de webhook, tokens y claves que envían tus automatizaciones. No se vuelven a mostrar.",
+        "description": "URLs de webhook, tokens y claves que envían tus automatismos. No se vuelven a mostrar.",
         "new": "Nuevo secreto",
         "name": "Nombre",
         "namePlaceholder": "Webhook de Slack",
@@ -335,11 +337,11 @@
         "neverUsed": "Sin usar"
     },
     "errors": {
-        "notFound": "Esa automatización ya no está.",
+        "notFound": "Ese automatismo ya no está.",
         "forbidden": "No puedes cambiar esto.",
         "limit": "Este espacio llegó a su límite.",
         "invalid": "Algo no es válido. Revisa los pasos.",
-        "notPublished": "Publícala antes.",
+        "notPublished": "Publícalo antes.",
         "noManualTrigger": "Añade antes un disparador A mano.",
         "secretMissing": "Un paso usa un secreto de otro espacio.",
         "webhookUnavailable": "Un paso de chat usa un webhook que no puedes usar. Elígelo de nuevo.",
@@ -364,7 +366,7 @@
         "scopeTooDeep": "Los Intentar y bucles anidan {max} niveles como mucho. Saca un paso."
     },
     "canvas": {
-        "board": "Lienzo de la automatización",
+        "board": "Lienzo del automatismo",
         "help": "Arrastra el fondo para moverlo y usa la rueda para el zoom. Arrastra de un puerto a un nodo para unirlos. Tab va a un nodo, Intro lo abre, flechas lo mueven, Supr lo quita, F2 lo renombra, D lo apaga, P lo fija, clic derecho para más. N añade un nodo, Mayús+S una nota, Ctrl+C y Ctrl+V copian y pegan, Ctrl+Z deshace, 1 encuadra, Mayús+Alt+T ordena.",
         "helpReadOnly": "Arrastra el fondo para moverlo, la rueda o dos dedos para el zoom. Tab va a un nodo e Intro lo muestra.",
         "view": "Vista",
@@ -545,8 +547,8 @@
         "input": "Entrada",
         "output": "Salida",
         "noData": "Sin datos",
-        "hiddenData": "Solo quien puede editar esta automatización ve los datos.",
-        "openAutomation": "Ver automatización",
+        "hiddenData": "Solo quien puede editar este automatismo ve los datos.",
+        "openAutomation": "Abrir automatismo",
         "test": "Prueba",
         "version": "Versión {number}",
         "testVersion": "Prueba",

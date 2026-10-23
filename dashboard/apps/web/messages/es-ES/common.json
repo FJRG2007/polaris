@@ -65,7 +65,8 @@
             "calendar.calendar": "un calendario",
             "calendar.booking": "una página de reservas",
             "crm.record": "un registro del CRM",
-            "crm.dashboard": "un panel del CRM"
+            "crm.dashboard": "un panel del CRM",
+            "automation.automation": "una automatización"
         }
     },
     "mentions": {

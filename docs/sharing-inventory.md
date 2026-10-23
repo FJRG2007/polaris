@@ -45,7 +45,7 @@ reason).
 | Calendar | Booking page | `calendar.booking` | owner + AccessGrant co-hosts | public booking page | co-hosts (see it and its bookings, or also change how it books and cancel bookings; its calendars, duplicate and delete stay with the owner) | add | done |
 | CRM | Company, person, opportunity | `crm.record` | org roles (`CrmRoleRule`) + AccessGrant per record | none | per-record people share (its fields, read; timeline, related records and changes stay on the shelf) | add | done |
 | CRM | Dashboard | `crm.dashboard` | org shelf + AccessGrant per dashboard | none | people (view its charts, counted as a reader of only the kinds they count; a public link is not built) | add | done |
-| Automations | Automation, folder | - | org shelf | none | people (view, edit) | add | todo |
+| Automations | Automation | `automation.automation` | org shelf + AccessGrant per automation | none | people (view its steps, versions and runs; editing is not shared, as an automation runs as whoever published it; a folder is not shared) | add | done |
 | Analytics | Site | - | org shelf | none | people + public link | add | todo |
 | Telemetry | Project | - | org shelf | none | people (view) | add | todo |
 | Deploy | Project | - | `ProjectMember` | none | dialog fronting ProjectMember | add | todo |

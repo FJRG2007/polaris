@@ -21,6 +21,7 @@ import * as core from "@polaris/core";
 import { sessionCan } from "@/lib/session";
 import type { SessionUser } from "@/lib/session";
 import { GrantError } from "@/lib/access/grants";
+import { mayEditShelf as mayEditAutomationShelf } from "@/lib/automations/runner";
 import { memberOrgIds, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
 import { requireSpace as requireNoteSpace } from "@/lib/notes/access";
 import { requireShareable as requireOfficeShareable } from "@/lib/office/documents";
@@ -172,6 +173,20 @@ export async function requireMayShare(
                     throw new GrantError("You cannot share that");
                 }
             } else if (row.userId !== user.id) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
+        }
+        case "automation.automation": {
+            // Whoever may change automations on its shelf decides who else
+            // may look at one.
+            const row = /^[0-9a-f-]{36}$/i.test(subjectId)
+                ? await prisma.automation.findUnique({
+                      where: { id: subjectId },
+                      select: { orgId: true, userId: true }
+                  })
+                : null;
+            if (!row || !(await mayEditAutomationShelf(user, row))) {
                 throw new GrantError("You cannot share that");
             }
             return;
@@ -459,6 +474,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         }
         case "crm.dashboard":
             return "/crm/dashboards";
+        case "automation.automation":
+            return `/automations/${subjectId}`;
         case "office.document":
             return "/office/shared";
         case "place.ups":

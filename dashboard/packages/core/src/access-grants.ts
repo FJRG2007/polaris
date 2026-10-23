@@ -85,7 +85,8 @@ export const GRANT_SUBJECTS = [
     "calendar.calendar",
     "calendar.booking",
     "crm.record",
-    "crm.dashboard"
+    "crm.dashboard",
+    "automation.automation"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -196,7 +197,10 @@ export const GRANT_CAPABILITIES = {
     "crm.record": ["view"],
     // One CRM dashboard: its charts, counted over its shelf as somebody who
     // may read only the kinds of record they count. Changing it stays on the shelf.
-    "crm.dashboard": ["view"]
+    "crm.dashboard": ["view"],
+    // One automation: its steps, its versions and its runs. Changing, publishing,
+    // switching and running it stay on its shelf, as it runs as whoever published it.
+    "automation.automation": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -242,7 +246,8 @@ export const GRANT_ACTIONS = {
     "calendar.calendar": [],
     "calendar.booking": [],
     "crm.record": [],
-    "crm.dashboard": []
+    "crm.dashboard": [],
+    "automation.automation": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

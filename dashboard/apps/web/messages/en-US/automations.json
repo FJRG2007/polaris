@@ -3,6 +3,8 @@
     "description": "When something happens, do something. Runs as whoever published it.",
     "newAutomation": "New automation",
     "list": {
+        "share": "Share access",
+        "sharedWithYou": "Shared with you",
         "emptyTitle": "No automations yet",
         "emptyDescription": "Start one with a trigger, then add what it should do.",
         "emptyReadOnly": "Nothing here yet. An organization admin can add one.",
