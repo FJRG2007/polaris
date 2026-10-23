@@ -1,0 +1,87 @@
+# Sharing inventory
+
+Every object a person owns in Polaris that somebody else could reasonably want to
+see or use, and how it is handed over: to **people** (a user, a team or a role)
+and as **a link** (somebody with no account). A new screen that holds such an
+object is checked against this table before it ships.
+
+The rule: one Share entry point, the same dialog everywhere
+(`apps/web/src/components/access/share-dialog.tsx`), backed by `AccessGrant`
+(`GRANT_SUBJECTS` / `GRANT_CAPABILITIES` in `packages/core/src/access-grants.ts`)
+unless the app already has a member system of its own, in which case the dialog
+fronts that one instead of copying its data. Links go through `checkLink()`
+(`apps/web/src/lib/link-guards.ts`) and render read-only on
+`components/public-shell.tsx`.
+
+`test/access/sharing-inventory.test.ts` reads the **Subject** column: every
+subject named there must exist in `GRANT_SUBJECTS`, and every entry of
+`GRANT_SUBJECTS` must be named here. A row with no subject yet shows `-`.
+
+How the table was built (re-run these when adding a screen):
+
+- app sections: `ls apps/web/src/app/(app) apps/web/src/app/(app)/apps`
+- app bundles: `ls apps` (calendar, cloud-servers, companion, crm, extension,
+  game-servers, places, security-scans, site, status-pages, streamdeck)
+- owned models: every Prisma model with `userId` / `ownerId` / `orgId`
+- sharing systems: `AccessGrant`, `ResourceGrant`, `DriveAcl`, `Share`,
+  `CalendarShare`, `ProjectMember`, `VaultCollectionAccess`,
+  `PolarShareRecipient`, `NoteSpaceMember`, `TaskSpaceMember`,
+  `TaskFolderMember`, `ChatSpaceMember`, `GamePlayerAccess`, `StatusPage`,
+  `TaskShare`, `NoteShare`, `OfficeLink`, `Snippet`, `VaultSend`
+- link guards: `grep -rl "checkLink\|link-guards" apps/web/src`
+
+Decision: **fine** (already shared both ways, or as far as it makes sense),
+**add** (something is missing and will be built), **no** (not shareable, with the
+reason).
+
+| App | Object | Subject | People today | Link today | Missing | Decision | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Watch | Connectivity (outages, history) | - | none (administrators only) | none | people + link | add | in progress |
+| Watch | Alarms | - | none (administrators only) | none | people (view) | add | todo |
+| Watch | Servers, services, containers (metrics, uptime) | `place.server`, `place.domain` | AccessGrant via Places device | AccessGrant link `/k` | shared-with marker in Watch | add | todo |
+| Watch | Webhooks | - | none | none | - | no: carries delivery secrets | - |
+| Status pages | Status page (editors) | - | owner only | public page itself | editors | add | todo |
+| Calendar | Calendar | - | `CalendarShare` (user, team) | none | dialog fronting CalendarShare, roles, link (read-only feed) | add | todo |
+| Calendar | Booking page | - | owner | public booking page | co-hosts | add | todo |
+| CRM | Company, person, opportunity | - | org roles (`CrmRoleRule`) | none | per-record people share | add | todo |
+| CRM | Dashboard | - | org shelf | none | people + link | add | todo |
+| Automations | Automation, folder | - | org shelf | none | people (view, edit) | add | todo |
+| Analytics | Site | - | org shelf | none | people + public link | add | todo |
+| Telemetry | Project | - | org shelf | none | people (view) | add | todo |
+| Deploy | Project | - | `ProjectMember` | none | dialog fronting ProjectMember | add | todo |
+| Deploy | Service | - | through its project | none | - | no: reached through its project | - |
+| Databases | Database | - | through its Deploy project | none | - | no: credentials, reached through its project | - |
+| Backups | Plan | - | owner | none | people (view) | add | todo |
+| Backups | Recovery point | - | owner | none | - | no: a restore writes over live data; view through the plan | - |
+| Game servers | Server (players) | - | `GamePlayerAccess` | invite link | operators via the dialog | add | todo |
+| Network filter | Stats, rules | - | administrators | none | people (view) | add | todo |
+| Firewall | Rules, views | - | administrators | none | - | no: edge security, administrators only | - |
+| Agents | Session | - | owner | none | people (view) | add | todo |
+| Polar | Thread | - | `PolarShareRecipient` | Polar share link | dialog fronting it | fine | - |
+| Polar | Project | - | owner | none | people | add | todo |
+| Notes | Space | `note.space` | `NoteSpaceMember` + AccessGrant | `NoteShare` | - | fine | - |
+| Notes | Single note | - | none | `NoteShare` | people | add | todo |
+| Tasks | Space | `task.space` | `TaskSpaceMember` + AccessGrant | `TaskShare` | - | fine | - |
+| Tasks | Folder / list | `task.folder` | `TaskFolderMember` + AccessGrant | `TaskShare` | - | fine | - |
+| Tasks | Single task | - | assignees | `TaskShare` | people | add | todo |
+| Tasks | Intake form | - | space members | `TaskForm` link | - | fine | - |
+| Chat | Space | `chat.space` | `ChatSpaceMember` + AccessGrant | space invite | - | fine | - |
+| Chat | Channel | `chat.channel` | `ChatChannelMember` + AccessGrant | - | - | fine | - |
+| Chat | Meeting | - | invitees | meeting guest link | - | fine | - |
+| Office | Document | `office.document` | AccessGrant | `OfficeLink` | - | fine | - |
+| Drive | File, folder | - | `DriveAcl` | `Share` | - | fine | - |
+| Drive | Snippet | - | `SnippetInvite` | `Snippet` link | - | fine | - |
+| Drive | File request, text request | - | owner | request link | - | fine | - |
+| Vault | Collection | - | `VaultCollectionAccess` | `VaultSend` (one item) | - | fine | - |
+| Places | Device | `place.device` | AccessGrant | AccessGrant link `/k` | - | fine | - |
+| Places | Camera | `place.camera` | AccessGrant | AccessGrant link `/k` | - | fine | - |
+| Places | UPS | `place.ups` | AccessGrant | AccessGrant link `/k` | - | fine | - |
+| Places | NAS | `place.nas` | AccessGrant | AccessGrant link `/k` | - | fine | - |
+| Places | Server | `place.server` | AccessGrant | AccessGrant link `/k` | - | fine | - |
+| Places | Domain | `place.domain` | AccessGrant | AccessGrant link `/k` | - | fine | - |
+| Places | Room | `place.room` | AccessGrant | AccessGrant link `/k` | - | fine | - |
+| Places | Whole place | - | instance permission | none | people | add | todo |
+| Mail | Mailbox | - | owner | none | delegate (read, send) | add | todo |
+| Clock | Timer, alarm, stopwatch | - | owner | none | - | no: personal and short-lived | - |
+| Containers, Servers, Tunnels, Runners | Infrastructure | - | instance permissions | none | - | no: host control stays with permissions | - |
+| Mail server, Code, Marketplace, Installed apps | Instance tools | - | instance permissions | none | - | no: instance administration | - |
