@@ -6,6 +6,7 @@ import { cn } from "../lib/cn";
 import { FLOATING_MOTION } from "../lib/motion";
 import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
+import * as fit from "../lib/submenu-fit";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
@@ -18,7 +19,6 @@ export const MENU_GUTTER = 16;
 export const DropdownMenu = RadixMenu.Root;
 export const DropdownMenuTrigger = RadixMenu.Trigger;
 export const DropdownMenuGroup = RadixMenu.Group;
-export const DropdownMenuSub = RadixMenu.Sub;
 export const DropdownMenuSeparatorRoot = RadixMenu.Separator;
 
 export const DropdownMenuContent = forwardRef<
@@ -89,6 +89,28 @@ export const DropdownMenuItem = forwardRef<
 ));
 DropdownMenuItem.displayName = "DropdownMenuItem";
 
+/**
+ * A submenu. Opens beside its menu, or over it in a window too narrow for
+ * either side - see `submenu-fit`.
+ */
+export function DropdownMenuSub({
+    onOpenChange,
+    ...props
+}: ComponentPropsWithoutRef<typeof RadixMenu.Sub>) {
+    const { state, measure } = fit.useSubmenuFitRoot(MENU_GUTTER);
+    return (
+        <fit.SubmenuFitProvider value={state}>
+            <RadixMenu.Sub
+                {...props}
+                onOpenChange={(next) => {
+                    measure(next);
+                    onOpenChange?.(next);
+                }}
+            />
+        </fit.SubmenuFitProvider>
+    );
+}
+
 /** A submenu's trigger. Same shape and same nudge as the right-click menu's:
  *  they are the same submenus reached two ways. */
 export const DropdownMenuSubTrigger = forwardRef<
@@ -96,9 +118,10 @@ export const DropdownMenuSubTrigger = forwardRef<
     ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger> & { variant?: "default" | "danger" }
 >(({ className, children, variant = "default", onPointerMove, onPointerLeave, ...props }, ref) => {
     const settled = useSettledHover();
+    const measured = fit.useSubmenuTriggerRef(ref);
     return (
         <RadixMenu.SubTrigger
-            ref={ref}
+            ref={measured}
             className={cn(
                 "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none [&_svg:not([class*=size-])]:size-4 [&_svg]:shrink-0 transition-colors duration-fast focus:bg-option-hover data-[state=open]:bg-option-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
                 // A submenu whose options all do the same heavy thing is that
@@ -126,12 +149,19 @@ export const DropdownMenuSubTrigger = forwardRef<
 });
 DropdownMenuSubTrigger.displayName = "DropdownMenuSubTrigger";
 
+/** Radix's submenu content, laid over its menu when it cannot fit beside it. */
+const FittedSubContent = forwardRef<
+    ElementRef<typeof RadixMenu.SubContent>,
+    ComponentPropsWithoutRef<typeof RadixMenu.SubContent>
+>((props, ref) => <RadixMenu.SubContent ref={ref} {...fit.useSubmenuOffsets()} {...props} />);
+FittedSubContent.displayName = "FittedSubContent";
+
 export const DropdownMenuSubContent = forwardRef<
     ElementRef<typeof RadixMenu.SubContent>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubContent>
 >(({ className, collisionPadding = MENU_GUTTER, ...props }, ref) => (
     <RadixMenu.Portal>
-        <RadixMenu.SubContent
+        <FittedSubContent
             ref={ref}
             collisionPadding={collisionPadding}
             className={cn(

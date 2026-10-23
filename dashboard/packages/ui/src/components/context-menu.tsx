@@ -10,6 +10,7 @@ import { cn } from "../lib/cn";
 import { FLOATING_MOTION } from "../lib/motion";
 import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
+import * as fit from "../lib/submenu-fit";
 import { useKeyNames } from "../lib/key-names";
 import { applePlatform, formatShortcut } from "../lib/shortcut";
 import { ignoreOpeningPress } from "../lib/menu-press";
@@ -56,18 +57,23 @@ export function ContextMenuSub({
     // that is hidden instead of unmounted has no other way of telling that it
     // is back on screen - see `menu-surface`.
     const surface = useMemo(() => ({ open, kept }), [open, kept]);
+    // Over its menu in a window too narrow for either side - see `submenu-fit`.
+    const { state, measure } = fit.useSubmenuFitRoot(MENU_GUTTER, 11);
     return (
         <MenuSurfaceProvider value={surface}>
-            <RadixMenu.Sub
-                {...props}
-                onOpenChange={(next) => {
-                    setOpen(next);
-                    // Kept only once it has actually been opened, so a menu
-                    // nobody steps into still costs nothing to put on screen.
-                    if (next) setKept(true);
-                    onOpenChange?.(next);
-                }}
-            />
+            <fit.SubmenuFitProvider value={state}>
+                <RadixMenu.Sub
+                    {...props}
+                    onOpenChange={(next) => {
+                        measure(next);
+                        setOpen(next);
+                        // Kept only once it has actually been opened, so a menu
+                        // nobody steps into still costs nothing to put on screen.
+                        if (next) setKept(true);
+                        onOpenChange?.(next);
+                    }}
+                />
+            </fit.SubmenuFitProvider>
         </MenuSurfaceProvider>
     );
 }
@@ -230,10 +236,11 @@ export const ContextMenuSubTrigger = forwardRef<
     ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger> & { variant?: "default" | "danger" }
 >(({ className, children, variant = "default", onPointerMove, onPointerLeave, ...props }, ref) => {
     const settled = useSettledHover();
+    const measured = fit.useSubmenuTriggerRef(ref);
 
     return (
         <RadixMenu.SubTrigger
-            ref={ref}
+            ref={measured}
             className={cn(
                 "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none [&_svg:not([class*=size-])]:size-4 [&_svg]:shrink-0 transition-colors duration-fast focus:bg-option-hover data-[state=open]:bg-option-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
                 // A submenu whose options all do the same heavy thing is that
@@ -311,10 +318,12 @@ export const ContextMenuSubContent = forwardRef<
     // than faded while closed, since there is nothing to animate out of a
     // submenu that is only being stepped past.
     const { kept } = useMenuSurface();
+    const offsets = fit.useSubmenuOffsets();
     return (
         <RadixMenu.Portal forceMount={kept || undefined}>
             <RadixMenu.SubContent
                 ref={ref}
+                {...offsets}
                 forceMount={kept || undefined}
                 collisionPadding={collisionPadding}
                 className={cn(

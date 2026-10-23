@@ -11,7 +11,7 @@
  * refuses to be framed.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { buttonVariants, cn } from "@polaris/ui";
 import * as bridge from "@/lib/polar/embed-bridge";
 import type { SiteContext } from "@/lib/polar/shared";
@@ -21,10 +21,13 @@ import { PolarAvatar } from "@/components/polar/motion/polar-avatar";
 
 export function PolarEmbed({
     parent,
-    chat = null
+    chat = null,
+    account
 }: {
     parent: string | null;
     chat?: string | null;
+    /** Who is signed in, so the panel's offline copy is never another's. */
+    account: string;
 }) {
     const [site, setSite] = useState<SiteContext | null>(null);
     const { ask } = usePolar();
@@ -66,9 +69,25 @@ export function PolarEmbed({
         };
     }, [parent]);
 
+    // The conversation on screen, handed to the panel to keep for when this
+    // Polaris does not answer - only to the extension that framed it.
+    const keep = useCallback(
+        (conversation: { id: string; lines: bridge.SnapshotLine[] }) => {
+            if (!parent || window.parent === window) return;
+            const snapshot = bridge.snapshotOf(account, { ...conversation, at: Date.now() });
+            if (snapshot) window.parent.postMessage(snapshot, parent);
+        },
+        [parent, account]
+    );
+
     return (
         <div className="flex h-dvh min-h-0 overflow-hidden bg-card">
-            <PolarChat fullPage site={parent ? site : undefined} chatScope={chat} />
+            <PolarChat
+                fullPage
+                site={parent ? site : undefined}
+                chatScope={chat}
+                onConversation={keep}
+            />
         </div>
     );
 }

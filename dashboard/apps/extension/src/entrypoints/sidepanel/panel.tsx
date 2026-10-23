@@ -14,6 +14,8 @@ import { storage } from "#imports";
 import { useWords } from "../popup/words";
 import { originsOf } from "../popup/polar-row";
 import * as polar from "@/lib/polar-panel";
+import * as offline from "@/lib/polar-offline";
+import { DraftOffer, OfflineView } from "./offline";
 import { askBackground } from "@/lib/messages";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -97,6 +99,42 @@ function holdPort(
 
 const WEB_PAGES = ["https://*/*", "http://*/*"];
 
+/** How often an open chat checks that Polaris still answers, ms. */
+const HEALTH_MS = 30_000;
+
+interface Connection {
+    readonly origin: string | null;
+    /** The account connected on it, which is whose copy and draft are shown. */
+    readonly account: string | null;
+}
+
+/** The Polaris this browser is connected to, and as whom. */
+async function polarisConnection(): Promise<Connection> {
+    const reply = await askBackground({ kind: "status" });
+    if (!reply.ok || !("status" in reply)) return { origin: null, account: null };
+    return {
+        origin: reply.status.server,
+        account: reply.status.linkedAccount?.id ?? null
+    };
+}
+
+async function isUp(origin: string): Promise<boolean> {
+    try {
+        const answer = await fetch(new URL("/api/health", origin), {
+            credentials: "omit",
+            cache: "no-store"
+        });
+        return answer.status < 500;
+    } catch {
+        return false;
+    }
+}
+
+async function findPolaris(): Promise<Connection & { up: boolean }> {
+    const found = await polarisConnection();
+    return { ...found, up: found.origin ? await isUp(found.origin) : false };
+}
+
 type Reach = "asking" | "none" | "offline" | "ready";
 
 interface Front {
@@ -139,15 +177,24 @@ async function readTab(tabId: number): Promise<polar.SharedPage | null> {
 export function Panel(): React.JSX.Element {
     const t = useWords();
     const [server, setServer] = useState<string | null>(null);
+    const [account, setAccount] = useState<string | null>(null);
     const [reach, setReach] = useState<Reach>("asking");
     const [front, setFront] = useState<Front>(NO_FRONT);
     const [allowed, setAllowed] = useState<string[]>([]);
     const [dismissed, setDismissed] = useState<string | null>(null);
     const [chatScope, setChatScope] = useState<polar.ChatScope | null>(null);
     const [run, setRun] = useState<string | null>(null);
+    /** The last copy of the chats, the draft typed while down, and since when. */
+    const [kept, setKept] = useState<offline.Kept | null>(null);
+    const [draft, setDraft] = useState("");
+    const [downSince, setDownSince] = useState<number | null>(null);
     const frame = useRef<HTMLIFrameElement>(null);
     /** A question from a right-click, held until the chat in the frame is ready. */
     const waiting = useRef<polar.PolarAsk | null>(null);
+    /** The draft handed to the chat, cleared from storage once it is posted. */
+    const offered = useRef<polar.PolarAsk | null>(null);
+    /** Copies written one after another, so two close together keep both. */
+    const saving = useRef<Promise<void>>(Promise.resolve());
     /** The frame whose chat has said it is listening. */
     const listening = useRef<Window | null>(null);
     const portRef = useRef<PanelPort | null>(null);
@@ -171,7 +218,10 @@ export function Panel(): React.JSX.Element {
         if (!target || !server || !ask || target !== listening.current) return;
         target.postMessage(polar.askMessage(ask), new URL(server).origin);
         waiting.current = null;
-    }, [server]);
+        if (ask !== offered.current) return;
+        offered.current = null;
+        if (account) void storage.removeItem(offline.draftKey(server, account));
+    }, [server, account]);
 
     useEffect(
         () =>
@@ -188,29 +238,64 @@ export function Panel(): React.JSX.Element {
         [deliver]
     );
 
-    const connect = useCallback(async (fromKept = true) => {
+    const connect = useCallback(async () => {
         setReach("asking");
-        const kept = fromKept ? await LAST_SERVER.getValue().catch(() => null) : null;
+        const kept = await LAST_SERVER.getValue().catch(() => null);
         if (kept) {
             setServer(kept);
             setReach("ready");
         }
-        const reply = await askBackground({ kind: "status" });
-        const origin = reply.ok && "status" in reply ? reply.status.server : null;
+        const { origin, account } = await polarisConnection();
         setServer(origin);
+        setAccount(account);
         void LAST_SERVER.setValue(origin).catch(() => undefined);
         if (!origin) return setReach("none");
-        if (fromKept) setReach("ready");
-        try {
-            const answer = await fetch(new URL("/api/health", origin), {
-                credentials: "omit",
-                cache: "no-store"
-            });
-            setReach(answer.status < 500 ? "ready" : "offline");
-        } catch {
-            setReach("offline");
-        }
+        // The chat loads now; the health check only says whether it is down.
+        setReach("ready");
+        const up = await isUp(origin);
+        setReach(up ? "ready" : "offline");
+        setDownSince((before) => (up ? null : (before ?? Date.now())));
     }, []);
+
+    // The copy of this Polaris and the draft of its account, read once known.
+    useEffect(() => {
+        if (!server) return;
+        void storage
+            .getItem<unknown>(offline.keptKey(server))
+            .then((value) => setKept(offline.readKept(value)));
+        if (!account) return setDraft("");
+        void storage
+            .getItem<string>(offline.draftKey(server, account))
+            .then((value) => setDraft(typeof value === "string" ? value : ""));
+    }, [server, account]);
+
+    const writeDraft = useCallback(
+        (text: string) => {
+            setDraft(text);
+            if (!server || !account) return;
+            const key = offline.draftKey(server, account);
+            void (text.trim() ? storage.setItem(key, text) : storage.removeItem(key));
+        },
+        [server, account]
+    );
+
+    // A chat already open whose Polaris stops answering turns to the copy.
+    useEffect(() => {
+        if (reach !== "ready" || !server) return;
+        let stopped = false;
+        const timer = setInterval(() => {
+            if (document.hidden) return;
+            void isUp(server).then((up) => {
+                if (up || stopped) return;
+                setReach("offline");
+                setDownSince((before) => before ?? Date.now());
+            });
+        }, HEALTH_MS);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+        };
+    }, [reach, server]);
 
     useEffect(() => {
         void connect();
@@ -296,6 +381,22 @@ export function Panel(): React.JSX.Element {
     useEffect(() => {
         if (!server) return;
         const onMessage = (event: MessageEvent): void => {
+            const snapshot = offline.snapshotFrom(event, frame.current?.contentWindow, server);
+            if (snapshot) {
+                const key = offline.keptKey(server);
+                saving.current = saving.current
+                    .then(async () => {
+                        const next = offline.remember(
+                            offline.readKept(await storage.getItem<unknown>(key)),
+                            snapshot.account,
+                            snapshot.conversation
+                        );
+                        await storage.setItem(key, next);
+                        setKept(next);
+                    })
+                    .catch(() => undefined);
+                return;
+            }
             if (!polar.isRefresh(event, frame.current?.contentWindow, server)) return;
             listening.current = frame.current?.contentWindow ?? null;
             void send();
@@ -338,13 +439,26 @@ export function Panel(): React.JSX.Element {
         );
     }
     if (reach === "offline") {
+        // The copy is the last account's to use Polar here: only that one sees it.
         return (
-            <div className="side-app">
-                <div className="side-empty">
-                    <p>{t("polar.offline")}</p>
-                    <button onClick={() => void connect(false)}>{t("polar.retry")}</button>
-                </div>
-            </div>
+            <OfflineView
+                kept={offline.keptFor(kept, account)}
+                since={downSince ?? Date.now()}
+                draft={draft}
+                onDraft={writeDraft}
+                probe={async () => {
+                    const found = await findPolaris();
+                    if (found.up && found.origin) {
+                        setServer(found.origin);
+                        setAccount(found.account);
+                    }
+                    return found.up;
+                }}
+                onBack={() => {
+                    setDownSince(null);
+                    setReach("ready");
+                }}
+            />
         );
     }
 
@@ -378,6 +492,19 @@ export function Panel(): React.JSX.Element {
                         {t("polar.stop")}
                     </button>
                 </div>
+            ) : null}
+            {draft.trim() ? (
+                <DraftOffer
+                    onUse={() => {
+                        // Into the composer, for the person to read and send.
+                        const ask = { draft: draft.trim() };
+                        waiting.current = ask;
+                        offered.current = ask;
+                        setDraft("");
+                        deliver();
+                    }}
+                    onDiscard={() => writeDraft("")}
+                />
             ) : null}
             <iframe
                 // A conversation per tab is a frame per tab: a new tab in front

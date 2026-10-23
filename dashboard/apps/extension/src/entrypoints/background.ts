@@ -14,6 +14,7 @@ import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
 import { chromiumBrowser } from "@/lib/browser-name";
 import * as polar from "@/lib/polar-panel";
+import * as polarOffline from "@/lib/polar-offline";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
@@ -1018,9 +1019,17 @@ async function forgetLink(): Promise<void> {
         LINK_FACES.setValue({ self: null, orgs: {} }),
         LINK_SHELF.setValue(null),
         // No account, so the browser's own language until another connects.
-        ACCOUNT_LOCALE.setValue(null)
+        ACCOUNT_LOCALE.setValue(null),
+        forgetPolarCopies()
     ]);
     await retitleMenus();
+}
+
+/** Polar's offline copies of the chats and its drafts, which are the account's. */
+async function forgetPolarCopies(): Promise<void> {
+    const held = await browser.storage.local.get(null);
+    const keys = Object.keys(held).filter(polarOffline.isOfflineKey);
+    if (keys.length) await browser.storage.local.remove(keys);
 }
 
 /** Throw away everything this browser holds for the connection in front.
