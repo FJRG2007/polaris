@@ -143,7 +143,9 @@ const actions = vi.hoisted(() => {
         "containerDriveLinkAction",
         "engineOptionsAction",
         "listManagedAction",
-        "listTunnelServersAction"
+        "listTunnelServersAction",
+        "getWafAddressActivityAction",
+        "getWafRuleAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -409,6 +411,10 @@ vi.mock("@/app/(app)/apps/databases/actions", () => ({
     listManagedAction: actions.listManagedAction,
     listTunnelServersAction: actions.listTunnelServersAction
 }));
+vi.mock("@/app/(app)/apps/firewall/actions", () => ({
+    getWafAddressActivityAction: actions.getWafAddressActivityAction,
+    getWafRuleAction: actions.getWafRuleAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -562,7 +568,9 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/containers/drive-link": () => import("@/app/api/containers/drive-link/route"),
     "/api/databases/engines": () => import("@/app/api/databases/engines/route"),
     "/api/databases/managed": () => import("@/app/api/databases/managed/route"),
-    "/api/databases/tunnel-servers": () => import("@/app/api/databases/tunnel-servers/route")
+    "/api/databases/tunnel-servers": () => import("@/app/api/databases/tunnel-servers/route"),
+    "/api/firewall/address-activity": () => import("@/app/api/firewall/address-activity/route"),
+    "/api/firewall/rule": () => import("@/app/api/firewall/rule/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2181,6 +2189,30 @@ const CASES: Case[] = [
             ).tunnelServers(),
         action: "listTunnelServersAction",
         args: []
+    },
+    {
+        name: "what one address did over a window",
+        path: "/api/firewall/address-activity",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/firewall/firewall-polls")>(
+                    "@/app/(app)/apps/firewall/firewall-polls"
+                )
+            ).addressActivity("ip-1", 24),
+        action: "getWafAddressActivityAction",
+        args: ["ip-1", 24]
+    },
+    {
+        name: "a scope's firewall rule and what it inherits",
+        path: "/api/firewall/rule",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/firewall/firewall-polls")>(
+                    "@/app/(app)/apps/firewall/firewall-polls"
+                )
+            ).wafRule({ scopeType: "project", scopeId: "scopeId-1" }),
+        action: "getWafRuleAction",
+        args: [{ scopeType: "project", scopeId: "scopeId-1" }]
     }
 ];
 

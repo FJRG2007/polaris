@@ -635,3 +635,12 @@ vi.mock("@/app/(app)/apps/databases/databases-polls", () => ({
         0
     )
 }));
+
+vi.mock("@/app/(app)/apps/firewall/firewall-polls", () => ({
+    addressActivity: forward(
+        () => import("@/app/(app)/apps/firewall/actions"),
+        "getWafAddressActivityAction",
+        2
+    ),
+    wafRule: forward(() => import("@/app/(app)/apps/firewall/actions"), "getWafRuleAction", 1)
+}));
