@@ -80,7 +80,7 @@ export const deployLogs = defineScene({
     id: "deploy-logs",
     path: `/apps/deploy/${PROJECT_ID}?service=${WEB_ID}`,
     params: { projectId: PROJECT_ID },
-    actions: (ctx) => ({
+    actions: () => ({
         serviceFollowStateAction: () => ({ following: true }),
         serviceHistoryAction: () => [],
         deployFreshnessAction: () => null,

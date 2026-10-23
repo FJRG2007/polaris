@@ -49,8 +49,7 @@ export function settingsOverview(ctx: SceneContext): SettingsOverview {
             { url: "http://polaris.local", host: "polaris.local", kind: "local", health: up }
         ],
         // Documentation ranges (RFC 5737), which route nowhere.
-        publicIp: "203.0.113.24",
-        serverIp: "192.0.2.10"
+        network: { publicIp: "203.0.113.24", serverIp: "192.0.2.10" }
     };
 }
 
@@ -81,7 +80,7 @@ function member(
         id: person.id,
         name: person.name,
         email: person.email,
-        username: person.email.split("@")[0],
+        username: person.email.split("@")[0]!,
         company: null,
         isAdmin: false,
         banned: false,

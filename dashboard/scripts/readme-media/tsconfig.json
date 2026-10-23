@@ -1,0 +1,31 @@
+{
+  // Type-checks the scenes and their runtime against the dashboard's own
+  // sources: `npx tsc -p scripts/readme-media --noEmit` from dashboard/.
+  "extends": "../../apps/web/tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "plugins": [],
+    "paths": {
+      "@/*": [
+        "../../apps/web/src/*"
+      ],
+      "@readme-media/*": [
+        "./runtime/*"
+      ]
+    }
+  },
+  "include": [
+    "assets.d.ts",
+    "../../apps/web/src/*.d.ts",
+    // The apps are typed against what the dashboard hands them, declared here.
+    "../../apps/web/src/lib/app-host/server.ts",
+    "../../apps/web/src/components/app-host/client.tsx",
+    "../../apps/web/src/components/route-skeleton.tsx",
+    "scenes",
+    "runtime",
+    "fixtures"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

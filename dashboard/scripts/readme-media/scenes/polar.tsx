@@ -141,7 +141,6 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
 
 /** A browser window: its address bar, the shop, and the extension's side panel. */
 function Browser({ ctx, stage }: { ctx: SceneContext; stage: PolarStage }) {
-    const lang = ctx.locale === "es-ES" ? "es" : "en";
     const dark = ctx.theme === "dark";
     return (
         <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: dark ? "#2b2d31" : "#e3e5e8" }}>

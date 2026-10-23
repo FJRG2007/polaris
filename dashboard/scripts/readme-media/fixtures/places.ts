@@ -66,7 +66,11 @@ function camera(n: number, name: string, zone: string): CameraView {
         enabled: true,
         ptz: n === 2,
         lastSeenAt: null,
-        offlineSince: null
+        offlineSince: null,
+        roomId: "",
+        privacy: false,
+        privacyNative: false,
+        privacyPreset: ""
     };
 }
 
@@ -230,7 +234,7 @@ export function placeOverview(ctx: SceneContext): PlaceOverview {
         events: [
             {
                 id: id("place-event", 1),
-                cameraName: watched[0].name,
+                cameraName: watched[0]!.name,
                 at: ago(ctx.now, 6),
                 kind: "package",
                 person: null,
@@ -238,7 +242,7 @@ export function placeOverview(ctx: SceneContext): PlaceOverview {
             },
             {
                 id: id("place-event", 2),
-                cameraName: watched[1].name,
+                cameraName: watched[1]!.name,
                 at: ago(ctx.now, 38),
                 kind: "vehicle",
                 person: null,
@@ -246,7 +250,7 @@ export function placeOverview(ctx: SceneContext): PlaceOverview {
             },
             {
                 id: id("place-event", 3),
-                cameraName: watched[0].name,
+                cameraName: watched[0]!.name,
                 at: ago(ctx.now, 52),
                 kind: "person",
                 person: TEAM.ana.name,
@@ -254,7 +258,7 @@ export function placeOverview(ctx: SceneContext): PlaceOverview {
             },
             {
                 id: id("place-event", 4),
-                cameraName: watched[2].name,
+                cameraName: watched[2]!.name,
                 at: ago(ctx.now, 140),
                 kind: "animal",
                 person: null,

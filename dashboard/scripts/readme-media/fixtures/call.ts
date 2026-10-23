@@ -317,6 +317,7 @@ export function callState(ctx: SceneContext, shape: CallShape = standupShape(ctx
         backgroundProblem: null,
         look: { light: "off", style: "none", frame: "off" },
         setLook: nothing,
+        rejoin: nothing,
         toggleMic: nothing,
         toggleCamera: nothing,
         toggleShare: nothing,
