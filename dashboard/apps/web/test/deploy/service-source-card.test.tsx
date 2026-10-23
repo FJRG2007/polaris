@@ -14,7 +14,13 @@ import { describeServiceSource } from "@/lib/deploy/service-source";
 
 vi.mock("@/app/(app)/apps/deploy/source-actions", () => ({
     serviceSourceAction: vi.fn(async () => ({
-        source: { kind: "repository", provider: "github", name: "acme/web", url: "https://github.com/acme/web", branch: "main" }
+        source: {
+            kind: "repository",
+            provider: "github",
+            name: "acme/web",
+            url: "https://github.com/acme/web",
+            branch: "main"
+        }
     })),
     changeSourceAction: vi.fn(async () => ({})),
     disconnectSourceAction: vi.fn(async () => ({}))

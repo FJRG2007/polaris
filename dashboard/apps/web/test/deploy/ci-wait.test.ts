@@ -60,15 +60,25 @@ vi.mock("@polaris/db", () => ({
                 const row = state.waits.find((wait) => matches(wait, where));
                 return row ? withApp(row) : null;
             }),
-            upsert: vi.fn(async ({ where, create }: { where: { applicationId: string }; create: Wait }) => {
-                const found = state.waits.find((wait) => wait.applicationId === where.applicationId);
-                if (found) return found;
-                const row = { ...create, id: `wait-${state.waits.length + 1}` };
-                state.waits.push(row);
-                return row;
-            }),
+            upsert: vi.fn(
+                async ({ where, create }: { where: { applicationId: string }; create: Wait }) => {
+                    const found = state.waits.find(
+                        (wait) => wait.applicationId === where.applicationId
+                    );
+                    if (found) return found;
+                    const row = { ...create, id: `wait-${state.waits.length + 1}` };
+                    state.waits.push(row);
+                    return row;
+                }
+            ),
             updateMany: vi.fn(
-                async ({ where, data }: { where: Record<string, unknown>; data: Partial<Wait> }) => {
+                async ({
+                    where,
+                    data
+                }: {
+                    where: Record<string, unknown>;
+                    data: Partial<Wait>;
+                }) => {
                     const rows = state.waits.filter((wait) => matches(wait, where));
                     for (const row of rows) Object.assign(row, data);
                     return { count: rows.length };
@@ -87,12 +97,14 @@ vi.mock("@/lib/activity/activity", () => ({
     })
 }));
 vi.mock("@/lib/deploy/pushed-commit", () => ({
-    deployPushedCommit: vi.fn(async (app: { id: string }, _owner: string, commit: { commitSha: string }) => {
-        if (state.app.lastDeployedSha === commit.commitSha) return false;
-        state.app.lastDeployedSha = commit.commitSha;
-        state.deploys.push(commit.commitSha);
-        return true;
-    })
+    deployPushedCommit: vi.fn(
+        async (app: { id: string }, _owner: string, commit: { commitSha: string }) => {
+            if (state.app.lastDeployedSha === commit.commitSha) return false;
+            state.app.lastDeployedSha = commit.commitSha;
+            state.deploys.push(commit.commitSha);
+            return true;
+        }
+    )
 }));
 vi.mock("@/lib/github-access", () => ({ githubTokenForOwner: vi.fn(async () => "token") }));
 vi.mock("@/lib/github-service", () => ({ githubAppHandle: vi.fn(async () => "polaris-here") }));
@@ -100,14 +112,20 @@ vi.mock("@/lib/github-service", () => ({ githubAppHandle: vi.fn(async () => "pol
 globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
     if (String(url).includes("/status?")) {
         return state.commitStatuses.status === 200
-            ? new Response(JSON.stringify({ state: "pending", statuses: state.commitStatuses.statuses }), {
-                  status: 200
-              })
+            ? new Response(
+                  JSON.stringify({ state: "pending", statuses: state.commitStatuses.statuses }),
+                  {
+                      status: 200
+                  }
+              )
             : new Response("{}", { status: state.commitStatuses.status });
     }
     return state.checks.status === 200
         ? new Response(
-              JSON.stringify({ total_count: state.checks.runs.length, check_runs: state.checks.runs }),
+              JSON.stringify({
+                  total_count: state.checks.runs.length,
+                  check_runs: state.checks.runs
+              }),
               { status: 200 }
           )
         : new Response("{}", { status: state.checks.status });
@@ -159,37 +177,60 @@ describe("judging the checks on a commit", () => {
         ciWait.judgeChecks({ status, runs, ownSlug: "polaris-here", ageMs });
 
     it("is green when every check passed, skipped ones included", () => {
-        expect(judge(200, [run("test", "completed", "success"), run("lint", "completed", "skipped")])).toEqual({
+        expect(
+            judge(200, [run("test", "completed", "success"), run("lint", "completed", "skipped")])
+        ).toEqual({
             state: "green"
         });
     });
     it("names the check that failed", () => {
-        expect(judge(200, [run("test", "completed", "failure"), run("lint", "in_progress", null)])).toEqual({
+        expect(
+            judge(200, [run("test", "completed", "failure"), run("lint", "in_progress", null)])
+        ).toEqual({
             state: "failed",
             check: "test"
         });
     });
     it("waits while any check is still running", () => {
-        expect(judge(200, [run("test", "completed", "success"), run("e2e", "queued", null)]).state).toBe("pending");
+        expect(
+            judge(200, [run("test", "completed", "success"), run("e2e", "queued", null)]).state
+        ).toBe("pending");
     });
     it("leaves Polaris's own row on the commit out", () => {
-        expect(judge(200, [run("my-service", "in_progress", null, "polaris-here")]).state).toBe("green");
+        expect(judge(200, [run("my-service", "in_progress", null, "polaris-here")]).state).toBe(
+            "green"
+        );
     });
     it("takes a commit with no checks as green only after the grace minute", () => {
         expect(judge(200, [], 5_000).state).toBe("pending");
         expect(judge(200, [], ciWait.NO_CHECKS_GRACE_MS).state).toBe("green");
     });
     it("reads commit statuses as checks too", () => {
-        const judgeStatuses = (statuses: ReturnType<typeof status>[], runs: ReturnType<typeof run>[] = []) =>
-            ciWait.judgeChecks({ status: 200, runs, statuses, ownSlug: "polaris-here", ageMs: 120_000 });
+        const judgeStatuses = (
+            statuses: ReturnType<typeof status>[],
+            runs: ReturnType<typeof run>[] = []
+        ) =>
+            ciWait.judgeChecks({
+                status: 200,
+                runs,
+                statuses,
+                ownSlug: "polaris-here",
+                ageMs: 120_000
+            });
         expect(judgeStatuses([status("ci/jenkins", "pending")]).state).toBe("pending");
-        expect(judgeStatuses([status("ci/jenkins", "failure")])).toEqual({ state: "failed", check: "ci/jenkins" });
+        expect(judgeStatuses([status("ci/jenkins", "failure")])).toEqual({
+            state: "failed",
+            check: "ci/jenkins"
+        });
         expect(judgeStatuses([status("ci/jenkins", "error")]).state).toBe("failed");
-        expect(judgeStatuses([status("ci/jenkins", "pending")], [run("test", "completed", "success")]).state).toBe(
-            "pending"
-        );
+        expect(
+            judgeStatuses([status("ci/jenkins", "pending")], [run("test", "completed", "success")])
+                .state
+        ).toBe("pending");
         expect(judgeStatuses([status("ci/jenkins", "success")]).state).toBe("green");
-        expect(judgeStatuses([status("deploy", "pending", "polaris-here[bot]")]).state).toBe("green");
+        expect(judgeStatuses([status("deploy", "pending", "polaris-here[bot]")]).state).toBe(
+            "green"
+        );
     });
     it("tells a refusal from a blink", () => {
         expect(judge(403, []).state).toBe("unreadable");
@@ -294,7 +335,9 @@ describe("a push held for CI", () => {
         state.commitStatuses.statuses = [status("ci/jenkins", "failure")];
         await ciWait.onChecksFinished("owner/repo", SHA_A);
         expect(state.deploys).toEqual([]);
-        expect(state.lines.find((line) => line.action === "ci-failed")).toMatchObject({ toValue: "ci/jenkins" });
+        expect(state.lines.find((line) => line.action === "ci-failed")).toMatchObject({
+            toValue: "ci/jenkins"
+        });
         state.commitStatuses.statuses = [status("ci/jenkins", "success")];
         await ciWait.onChecksFinished("owner/repo", SHA_A);
         expect(state.deploys).toEqual([SHA_A]);
@@ -336,21 +379,41 @@ describe("a finished check from the webhook", () => {
     const repository = { full_name: "Owner/Repo" };
     it("is read from each of GitHub's three shapes", () => {
         expect(
-            ciWait.finishedCheckOf("check_suite", { action: "completed", repository, check_suite: { head_sha: SHA_A } })
+            ciWait.finishedCheckOf("check_suite", {
+                action: "completed",
+                repository,
+                check_suite: { head_sha: SHA_A }
+            })
         ).toEqual({ repoFullName: "Owner/Repo", sha: SHA_A });
         expect(
-            ciWait.finishedCheckOf("workflow_run", { action: "completed", repository, workflow_run: { head_sha: SHA_A } })
+            ciWait.finishedCheckOf("workflow_run", {
+                action: "completed",
+                repository,
+                workflow_run: { head_sha: SHA_A }
+            })
         ).toEqual({ repoFullName: "Owner/Repo", sha: SHA_A });
         expect(
-            ciWait.finishedCheckOf("check_run", { action: "completed", repository, check_run: { head_sha: SHA_A } })
+            ciWait.finishedCheckOf("check_run", {
+                action: "completed",
+                repository,
+                check_run: { head_sha: SHA_A }
+            })
         ).toEqual({ repoFullName: "Owner/Repo", sha: SHA_A });
     });
     it("ignores one that has not finished, or is malformed", () => {
         expect(
-            ciWait.finishedCheckOf("check_suite", { action: "requested", repository, check_suite: { head_sha: SHA_A } })
+            ciWait.finishedCheckOf("check_suite", {
+                action: "requested",
+                repository,
+                check_suite: { head_sha: SHA_A }
+            })
         ).toBeNull();
         expect(
-            ciWait.finishedCheckOf("check_suite", { action: "completed", repository, check_suite: { head_sha: "nope" } })
+            ciWait.finishedCheckOf("check_suite", {
+                action: "completed",
+                repository,
+                check_suite: { head_sha: "nope" }
+            })
         ).toBeNull();
         expect(ciWait.finishedCheckOf("push", { action: "completed", repository })).toBeNull();
         expect(ciWait.finishedCheckOf("check_suite", null)).toBeNull();

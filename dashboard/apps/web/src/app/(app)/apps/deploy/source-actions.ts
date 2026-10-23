@@ -214,7 +214,12 @@ export async function ciAccessAction(applicationId: unknown): Promise<{
         if (!repo) return { access: { gap: null, url: null } };
         const found = (await githubChecksAccess(repo.owner)) ?? { gap: null, url: null };
         if (user.isAdmin) return { access: found };
-        return { access: { gap: found.gap === "app" || found.gap === "install" ? "admins" : null, url: null } };
+        return {
+            access: {
+                gap: found.gap === "app" || found.gap === "install" ? "admins" : null,
+                url: null
+            }
+        };
     } catch (caught) {
         return failure(caught, "source.loadFailed");
     }

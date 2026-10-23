@@ -34,8 +34,26 @@ export const SERVICE_SETTINGS_INDEX = {
     repository: {
         section: "source",
         keywords: {
-            en: ["repository", "repo", "github", "git", "branch", "source", "connected", "disconnect", "change repository"],
-            es: ["repositorio", "rama", "origen", "conectado", "codigo", "desconectar", "cambiar repositorio"]
+            en: [
+                "repository",
+                "repo",
+                "github",
+                "git",
+                "branch",
+                "source",
+                "connected",
+                "disconnect",
+                "change repository"
+            ],
+            es: [
+                "repositorio",
+                "rama",
+                "origen",
+                "conectado",
+                "codigo",
+                "desconectar",
+                "cambiar repositorio"
+            ]
         }
     },
     rootDirectory: {
@@ -48,8 +66,26 @@ export const SERVICE_SETTINGS_INDEX = {
     autoDeploy: {
         section: "source",
         keywords: {
-            en: ["auto deploy", "push", "branch", "commit filter", "watch paths", "trigger", "wait for ci", "checks", "github actions"],
-            es: ["despliegue automatico", "rama", "filtro de commits", "rutas vigiladas", "esperar a ci", "checks", "github actions"]
+            en: [
+                "auto deploy",
+                "push",
+                "branch",
+                "commit filter",
+                "watch paths",
+                "trigger",
+                "wait for ci",
+                "checks",
+                "github actions"
+            ],
+            es: [
+                "despliegue automatico",
+                "rama",
+                "filtro de commits",
+                "rutas vigiladas",
+                "esperar a ci",
+                "checks",
+                "github actions"
+            ]
         }
     },
     uploadedSource: {

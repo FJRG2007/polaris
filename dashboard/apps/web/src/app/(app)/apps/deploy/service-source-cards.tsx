@@ -19,7 +19,16 @@ import type { ServiceSourceView } from "@/lib/deploy/service-source";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { CardError, CardSkeleton, SettingsCard } from "./settings-kit";
 import { changeSourceAction, disconnectSourceAction, serviceSourceAction } from "./source-actions";
-import { ArrowUpRight, Box, FolderUp, GitBranch, Hammer, Loader2, Pencil, Unplug } from "lucide-react";
+import {
+    ArrowUpRight,
+    Box,
+    FolderUp,
+    GitBranch,
+    Hammer,
+    Loader2,
+    Pencil,
+    Unplug
+} from "lucide-react";
 import {
     Badge,
     Button,

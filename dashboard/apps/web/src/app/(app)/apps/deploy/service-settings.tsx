@@ -1138,7 +1138,9 @@ function WaitForCiRow({
             <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="text-sm font-medium">{t("settings.waitForCi")}</span>
-                    <span className="text-xs text-muted-foreground">{t("settings.waitForCiHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("settings.waitForCiHint")}
+                    </span>
                 </div>
                 <Switch
                     checked={checked}
@@ -1151,7 +1153,9 @@ function WaitForCiRow({
                 <p
                     className={cn(
                         "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-2.5 py-2 text-xs",
-                        gap === "events" ? "bg-surface text-muted-foreground" : "bg-warning-soft text-warning-ink"
+                        gap === "events"
+                            ? "bg-surface text-muted-foreground"
+                            : "bg-warning-soft text-warning-ink"
                     )}
                 >
                     <span className="min-w-0">{gapText}</span>

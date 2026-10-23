@@ -207,7 +207,10 @@ async function fetchAppPermissions(
             cache: "no-store"
         });
         if (!res.ok) return null;
-        const body = (await res.json()) as { permissions?: Record<string, string>; events?: unknown };
+        const body = (await res.json()) as {
+            permissions?: Record<string, string>;
+            events?: unknown;
+        };
         if (!body.permissions) return null;
         const events = Array.isArray(body.events)
             ? body.events.filter((event): event is string => typeof event === "string")
@@ -887,7 +890,9 @@ export async function githubChecksAccess(owner: string): Promise<{
     if (install && Object.keys(granted).length > 0 && !granted.checks) {
         return { gap: "install", url: installationSettingsUrl(install, appPageUrl(state.config)) };
     }
-    const events = Array.isArray(state.config.appEvents) ? (state.config.appEvents as unknown[]) : null;
+    const events = Array.isArray(state.config.appEvents)
+        ? (state.config.appEvents as unknown[])
+        : null;
     if (events && !events.includes("check_suite")) {
         return { gap: "events", url: appPermissionsUrl(state.config) };
     }

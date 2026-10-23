@@ -27,7 +27,9 @@ export const repointSourceSchema = z.object({
         .trim()
         .max(255)
         // A git ref name: no spaces, control characters, ".." or a leading "-".
-        .refine((value) => value === "" || /^(?!-)(?!.*\.\.)[^\s~^:?*[\\\x00-\x1f\x7f]+$/.test(value))
+        .refine(
+            (value) => value === "" || /^(?!-)(?!.*\.\.)[^\s~^:?*[\\\x00-\x1f\x7f]+$/.test(value)
+        )
 });
 
 export type RepointSource = z.infer<typeof repointSourceSchema>;

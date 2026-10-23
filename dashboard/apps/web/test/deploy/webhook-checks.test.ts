@@ -76,7 +76,13 @@ describe("a finished check suite", () => {
     });
 
     it("settles nothing for one that has only been requested", async () => {
-        await POST(delivery("check_suite", { action: "requested", repository, check_suite: { head_sha: SHA } }));
+        await POST(
+            delivery("check_suite", {
+                action: "requested",
+                repository,
+                check_suite: { head_sha: SHA }
+            })
+        );
         expect(mocks.handleAgentWebhook).toHaveBeenCalledTimes(1);
         await vi.runAllTimersAsync();
         expect(mocks.onChecksFinished).not.toHaveBeenCalled();
@@ -85,7 +91,9 @@ describe("a finished check suite", () => {
 
 describe("a finished check run", () => {
     it("settles held pushes, and the Agents app is not asked", async () => {
-        await POST(delivery("check_run", { action: "completed", repository, check_run: { head_sha: SHA } }));
+        await POST(
+            delivery("check_run", { action: "completed", repository, check_run: { head_sha: SHA } })
+        );
         await vi.runAllTimersAsync();
         expect(mocks.onChecksFinished).toHaveBeenCalledWith("acme/web", SHA);
         expect(mocks.handleAgentWebhook).not.toHaveBeenCalled();
@@ -97,7 +105,13 @@ describe("a finished check run", () => {
             await POST(delivery("check_run", payload));
             await vi.advanceTimersByTimeAsync(500);
         }
-        await POST(delivery("check_suite", { action: "completed", repository, check_suite: { head_sha: SHA } }));
+        await POST(
+            delivery("check_suite", {
+                action: "completed",
+                repository,
+                check_suite: { head_sha: SHA }
+            })
+        );
         expect(mocks.onChecksFinished).not.toHaveBeenCalled();
         await vi.runAllTimersAsync();
         expect(mocks.onChecksFinished).toHaveBeenCalledTimes(1);

@@ -114,7 +114,9 @@ export function judgeChecks(input: {
         (run) => run.status === "completed" && !PASSING.has(run.conclusion ?? "")
     );
     if (failed) return { state: "failed", check: failed.name };
-    const failedStatus = statuses.find((status) => status.state === "failure" || status.state === "error");
+    const failedStatus = statuses.find(
+        (status) => status.state === "failure" || status.state === "error"
+    );
     if (failedStatus) return { state: "failed", check: failedStatus.context };
     if (runs.some((run) => run.status !== "completed")) return { state: "pending" };
     if (statuses.some((status) => status.state !== "success")) return { state: "pending" };
@@ -166,7 +168,11 @@ async function readCheckRuns(
         const url = `${commitUrl(owner, repo, sha)}/check-runs?filter=latest&per_page=100&page=${page}`;
         let res: Response;
         try {
-            res = await fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(10_000) });
+            res = await fetch(url, {
+                headers,
+                cache: "no-store",
+                signal: AbortSignal.timeout(10_000)
+            });
         } catch {
             return { status: 0, runs: [] };
         }
@@ -326,7 +332,11 @@ async function note(row: WaitRow, action: string, toValue: string | null): Promi
 }
 
 /** Move a row on only from the state it was read in, so two settlers never both act. */
-async function move(row: WaitRow, from: readonly string[], data: Record<string, unknown>): Promise<boolean> {
+async function move(
+    row: WaitRow,
+    from: readonly string[],
+    data: Record<string, unknown>
+): Promise<boolean> {
     const moved = await prisma.deployCiWait.updateMany({
         where: { id: row.id, commitSha: row.commitSha, status: { in: [...from] } },
         data
@@ -336,7 +346,8 @@ async function move(row: WaitRow, from: readonly string[], data: Record<string, 
 
 /** Deploy the held commit, at most once. */
 async function release(row: WaitRow): Promise<boolean> {
-    if (!(await move(row, [row.status], { status: "deploying", checkedAt: new Date() }))) return false;
+    if (!(await move(row, [row.status], { status: "deploying", checkedAt: new Date() })))
+        return false;
     const app = row.application;
     try {
         const started = await deployPushedCommit(app, app.environment.project.ownerId, {
@@ -360,7 +371,10 @@ async function release(row: WaitRow): Promise<boolean> {
  * a check on this commit finished, which is allowed to revive a hold that timed
  * out. Answers whether a deploy started.
  */
-export async function settleCiWait(id: string, options: { fromEvent?: boolean } = {}): Promise<boolean> {
+export async function settleCiWait(
+    id: string,
+    options: { fromEvent?: boolean } = {}
+): Promise<boolean> {
     const row = await loadWait(id);
     if (!row) return false;
     const settleable = options.fromEvent ? [...SETTLEABLE, "expired"] : SETTLEABLE;
@@ -382,7 +396,11 @@ export async function settleCiWait(id: string, options: { fromEvent?: boolean } 
     const token = await githubTokenForOwner(ownerId, owner);
     const read = await readCommitChecks(owner, repo, row.commitSha, token);
     const ageMs = Date.now() - row.createdAt.getTime();
-    const verdict = judgeChecks({ ...read, ownSlug: await githubAppHandle().catch(() => null), ageMs });
+    const verdict = judgeChecks({
+        ...read,
+        ownSlug: await githubAppHandle().catch(() => null),
+        ageMs
+    });
 
     if (verdict.state === "green") return release(row);
     const expired = !options.fromEvent && ageMs >= CI_WAIT_TIMEOUT_MS;
@@ -399,8 +417,14 @@ export async function settleCiWait(id: string, options: { fromEvent?: boolean } 
             await move(row, [row.status], { checkedAt: new Date() });
             return false;
         }
-        if (await move(row, [row.status], { status: "failed", failedCheck, checkedAt: new Date() })) {
-            await note(row, verdict.state === "failed" ? "ci-failed" : "ci-unreadable", verdict.state === "failed" ? verdict.check : null);
+        if (
+            await move(row, [row.status], { status: "failed", failedCheck, checkedAt: new Date() })
+        ) {
+            await note(
+                row,
+                verdict.state === "failed" ? "ci-failed" : "ci-unreadable",
+                verdict.state === "failed" ? verdict.check : null
+            );
         }
         return false;
     }

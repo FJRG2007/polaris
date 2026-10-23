@@ -35,9 +35,8 @@ vi.mock("@/lib/deploy/ci-wait", () => ({
     })
 }));
 
-const { disconnectSource, repointSource, repointSourceSchema } = await import(
-    "@/lib/deploy/source-connection"
-);
+const { disconnectSource, repointSource, repointSourceSchema } =
+    await import("@/lib/deploy/source-connection");
 
 beforeEach(() => {
     state.app = {
@@ -75,7 +74,10 @@ describe("disconnecting a repository", () => {
             dockerfilePath: "Dockerfile"
         });
         expect(state.dropped).toEqual(["app-1"]);
-        expect(state.lines[0]).toMatchObject({ action: "source-disconnected", fromValue: "acme/web" });
+        expect(state.lines[0]).toMatchObject({
+            action: "source-disconnected",
+            fromValue: "acme/web"
+        });
     });
 
     it("writes nothing for a service with no repository", async () => {
@@ -87,7 +89,10 @@ describe("disconnecting a repository", () => {
 
 describe("changing the repository", () => {
     it("re-points the source and the branch pushes are heard on", async () => {
-        await repointSource("app-1", "owner-1", "user-1", { repoFullName: "acme/api", branch: "release" });
+        await repointSource("app-1", "owner-1", "user-1", {
+            repoFullName: "acme/api",
+            branch: "release"
+        });
         const data = state.updates[0] ?? {};
         expect(JSON.parse(String(data.sourceConfig))).toMatchObject({
             repoUrl: "https://github.com/acme/api",
@@ -115,11 +120,23 @@ describe("changing the repository", () => {
     });
 
     it("accepts only a repository name and a git branch name", () => {
-        expect(repointSourceSchema.safeParse({ repoFullName: "acme/api", branch: "feat/x" }).success).toBe(true);
-        expect(repointSourceSchema.safeParse({ repoFullName: "acme/api", branch: "" }).success).toBe(true);
-        expect(repointSourceSchema.safeParse({ repoFullName: "acme", branch: "" }).success).toBe(false);
-        expect(repointSourceSchema.safeParse({ repoFullName: "acme/api", branch: "a b" }).success).toBe(false);
-        expect(repointSourceSchema.safeParse({ repoFullName: "acme/api", branch: "a..b" }).success).toBe(false);
-        expect(repointSourceSchema.safeParse({ repoFullName: "../x/y", branch: "" }).success).toBe(false);
+        expect(
+            repointSourceSchema.safeParse({ repoFullName: "acme/api", branch: "feat/x" }).success
+        ).toBe(true);
+        expect(
+            repointSourceSchema.safeParse({ repoFullName: "acme/api", branch: "" }).success
+        ).toBe(true);
+        expect(repointSourceSchema.safeParse({ repoFullName: "acme", branch: "" }).success).toBe(
+            false
+        );
+        expect(
+            repointSourceSchema.safeParse({ repoFullName: "acme/api", branch: "a b" }).success
+        ).toBe(false);
+        expect(
+            repointSourceSchema.safeParse({ repoFullName: "acme/api", branch: "a..b" }).success
+        ).toBe(false);
+        expect(repointSourceSchema.safeParse({ repoFullName: "../x/y", branch: "" }).success).toBe(
+            false
+        );
     });
 });

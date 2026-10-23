@@ -23,7 +23,11 @@ import { handleAgentWebhook } from "@/lib/agents/agent-webhook";
 import { finishedCheckOf, onChecksFinished } from "@/lib/deploy/ci-wait";
 import { branchFromRef, triggerAutoDeploysForPush } from "@/lib/deploy/push-deploys";
 import { closePullRequestPreview, ensurePullRequestPreview } from "@/lib/deploy/environments";
-import { getGithubWebhookSecret, githubAppHandle, verifyWebhookSignature } from "@/lib/github-service";
+import {
+    getGithubWebhookSecret,
+    githubAppHandle,
+    verifyWebhookSignature
+} from "@/lib/github-service";
 
 /** Events that concern the Agents app. Named rather than inferred so an event
  *  GitHub adds later is ignored until somebody decides what it means. */
@@ -111,7 +115,11 @@ const pullRequestEvent = z.object({
             sha: z.string().regex(/^[0-9a-f]{40}$/i),
             repo: z.object({ full_name: z.string() }).nullable().optional()
         }),
-        user: z.object({ login: z.string(), avatar_url: z.string().url() }).partial().nullable().optional()
+        user: z
+            .object({ login: z.string(), avatar_url: z.string().url() })
+            .partial()
+            .nullable()
+            .optional()
     })
 });
 
