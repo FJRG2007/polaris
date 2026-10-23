@@ -113,7 +113,9 @@ describe("the settings screen", () => {
                 })
             });
         tell(false);
-        expect(dom.window.document.body.textContent).not.toContain("Using your local network address");
+        expect(dom.window.document.body.textContent).not.toContain(
+            "Using your local network address"
+        );
         tell(true);
         expect(dom.window.document.body.textContent).toContain("Using your local network address");
     });

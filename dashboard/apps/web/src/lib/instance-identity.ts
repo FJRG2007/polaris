@@ -25,7 +25,13 @@ import { appBaseUrl } from "@/lib/domain-service";
 import { dashboardHosts } from "@/lib/domain-edge";
 import { challengeMessage } from "@polaris/core/instance-fallback";
 import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/storage";
-import { createPrivateKey, generateKeyPairSync, randomBytes, sign, type KeyObject } from "node:crypto";
+import {
+    createPrivateKey,
+    generateKeyPairSync,
+    randomBytes,
+    sign,
+    type KeyObject
+} from "node:crypto";
 
 /** Readable from any origin, never with a cookie. */
 export const OPEN_HEADERS = {
@@ -90,7 +96,11 @@ function open(stored: StoredIdentity): InstanceIdentity {
         },
         loadEnv().POLARIS_MASTER_KEY
     );
-    const privateKey = createPrivateKey({ key: Buffer.from(pkcs8, "base64"), format: "der", type: "pkcs8" });
+    const privateKey = createPrivateKey({
+        key: Buffer.from(pkcs8, "base64"),
+        format: "der",
+        type: "pkcs8"
+    });
     return { id: stored.id, publicKey: stored.publicKey, privateKey };
 }
 
@@ -103,13 +113,20 @@ function mint(): { stored: StoredIdentity; identity: InstanceIdentity } {
     const stored: StoredIdentity = {
         id,
         publicKey,
-        sealed: { c: blob.ciphertext.toString("base64"), n: blob.nonce.toString("base64"), k: blob.keyId }
+        sealed: {
+            c: blob.ciphertext.toString("base64"),
+            n: blob.nonce.toString("base64"),
+            k: blob.keyId
+        }
     };
     return { stored, identity: { id, publicKey, privateKey: pair.privateKey } };
 }
 
 async function load(): Promise<InstanceIdentity | null> {
-    const existing = await prisma.setting.findUnique({ where: { key: IDENTITY_KEY }, select: { value: true } });
+    const existing = await prisma.setting.findUnique({
+        where: { key: IDENTITY_KEY },
+        select: { value: true }
+    });
     if (existing) {
         const stored = readStored(existing.value);
         // A row that cannot be read is never replaced: clients have pinned the key
@@ -122,7 +139,9 @@ async function load(): Promise<InstanceIdentity | null> {
             return open(stored);
         } catch (caught) {
             if (caught instanceof CredentialDecryptError) {
-                console.error("polaris: the instance identity key cannot be opened with this master key");
+                console.error(
+                    "polaris: the instance identity key cannot be opened with this master key"
+                );
                 return null;
             }
             throw caught;
@@ -130,11 +149,16 @@ async function load(): Promise<InstanceIdentity | null> {
     }
     const { stored, identity } = mint();
     try {
-        await prisma.setting.create({ data: { key: IDENTITY_KEY, value: JSON.stringify(stored), scope: "global" } });
+        await prisma.setting.create({
+            data: { key: IDENTITY_KEY, value: JSON.stringify(stored), scope: "global" }
+        });
         return identity;
     } catch {
         // Another peer of the rollover made it first; theirs is the one to keep.
-        const raced = await prisma.setting.findUnique({ where: { key: IDENTITY_KEY }, select: { value: true } });
+        const raced = await prisma.setting.findUnique({
+            where: { key: IDENTITY_KEY },
+            select: { value: true }
+        });
         const theirs = raced ? readStored(raced.value) : null;
         return theirs ? open(theirs) : null;
     }
@@ -178,7 +202,8 @@ export async function instanceAddresses(): Promise<string[]> {
         dashboardHosts().catch(() => [] as string[]),
         getHostLanIp().catch(() => null)
     ]);
-    const mdns = process.env.POLARIS_MDNS_HOSTNAME || process.env.POLARIS_LOCAL_HOSTNAME || "polaris";
+    const mdns =
+        process.env.POLARIS_MDNS_HOSTNAME || process.env.POLARIS_LOCAL_HOSTNAME || "polaris";
     const candidates = [
         ...(app ? [app] : []),
         ...hosts,
@@ -191,7 +216,11 @@ export async function instanceAddresses(): Promise<string[]> {
 }
 
 /** Sign a client's nonce for the origin it asked on. */
-export function signChallenge(identity: InstanceIdentity, requestOrigin: string, nonce: string): string {
+export function signChallenge(
+    identity: InstanceIdentity,
+    requestOrigin: string,
+    nonce: string
+): string {
     const message = Buffer.from(challengeMessage(identity.id, requestOrigin, nonce));
     return sign(null, message, identity.privateKey).toString("base64url");
 }

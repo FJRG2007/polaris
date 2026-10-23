@@ -235,12 +235,19 @@ describe("a signed-in connection", () => {
     const kept = { address: ADDRESS, token: "plr_x" };
 
     it("learns the local addresses of a key kept from before, once, and keeps them", async () => {
-        const instance = { id: "plr_fixture_instance", publicKey: "A".repeat(43), addresses: [ADDRESS] };
+        const instance = {
+            id: "plr_fixture_instance",
+            publicKey: "A".repeat(43),
+            addresses: [ADDRESS]
+        };
         const fetcher = vi.fn(async (url: string | URL | Request) =>
             String(url).endsWith("/api/instance") ? json(instance) : json({ actions: CATALOGUE })
         );
         const { host, saved } = recorder();
-        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        const connection = new Connection(
+            new PolarisClient("0.1.0", fetcher as typeof fetch),
+            host
+        );
         await connection.start(ADDRESS, kept);
         await vi.waitFor(() => expect(saved).toHaveLength(1));
         expect(saved[0]).toMatchObject({ ...kept, instance });

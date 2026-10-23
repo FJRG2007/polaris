@@ -31,7 +31,8 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: MASTER_KEY }) }));
 vi.mock("@/lib/request-context", () => ({ clientIp: async () => "192.168.1.50" }));
 vi.mock("@/lib/rate-limit-service", () => ({
-    rateLimit: async () => (limited ? { ok: false, retryAfterMs: 30_000 } : { ok: true, retryAfterMs: 0 })
+    rateLimit: async () =>
+        limited ? { ok: false, retryAfterMs: 30_000 } : { ok: true, retryAfterMs: 0 }
 }));
 vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => "192.168.1.20" }));
 vi.mock("@/lib/domain-edge", () => ({ dashboardHosts: async () => ["polaris.example.com"] }));
@@ -85,7 +86,11 @@ describe("GET /api/instance", () => {
     it("answers the id, the key and the https addresses, readable from any origin", async () => {
         const response = await instanceRoute.GET();
         expect(response.headers.get("access-control-allow-origin")).toBe("*");
-        const body = (await response.json()) as { id: string; publicKey: string; addresses: string[] };
+        const body = (await response.json()) as {
+            id: string;
+            publicKey: string;
+            addresses: string[];
+        };
         expect(body.addresses).toEqual([
             "https://polaris.example.com",
             "https://polaris.local",
@@ -108,42 +113,65 @@ describe("POST /api/instance/challenge", () => {
             addresses: string[];
         };
         const nonce = freshNonce();
-        const answer = (await (await challengeRoute.POST(challenge("polaris.local", { nonce }))).json()) as {
+        const answer = (await (
+            await challengeRoute.POST(challenge("polaris.local", { nonce }))
+        ).json()) as {
             id: string;
             signature: string;
         };
         expect(answer.id).toBe(record.id);
-        expect(await verifyChallenge(record, "https://polaris.local", nonce, answer.signature)).toBe(true);
+        expect(
+            await verifyChallenge(record, "https://polaris.local", nonce, answer.signature)
+        ).toBe(true);
         // The same signature does not vouch for another address.
-        expect(await verifyChallenge(record, "https://192.168.1.20", nonce, answer.signature)).toBe(false);
+        expect(await verifyChallenge(record, "https://192.168.1.20", nonce, answer.signature)).toBe(
+            false
+        );
     });
 
     it("refuses a missing or malformed nonce", async () => {
         expect((await challengeRoute.POST(challenge("polaris.local", {}))).status).toBe(400);
-        expect((await challengeRoute.POST(challenge("polaris.local", { nonce: "short" }))).status).toBe(400);
-        expect((await challengeRoute.POST(challenge("polaris.local", { nonce: freshNonce(), extra: 1 }))).status).toBe(
-            400
-        );
+        expect(
+            (await challengeRoute.POST(challenge("polaris.local", { nonce: "short" }))).status
+        ).toBe(400);
+        expect(
+            (
+                await challengeRoute.POST(
+                    challenge("polaris.local", { nonce: freshNonce(), extra: 1 })
+                )
+            ).status
+        ).toBe(400);
     });
 
     it("is rate-limited", async () => {
         limited = true;
-        expect((await challengeRoute.POST(challenge("polaris.local", { nonce: freshNonce() }))).status).toBe(429);
+        expect(
+            (await challengeRoute.POST(challenge("polaris.local", { nonce: freshNonce() }))).status
+        ).toBe(429);
     });
 
     it("is what the shared client verifier accepts end to end", async () => {
         const record = (await (await instanceRoute.GET()).json()) as never;
         const fetchImpl = async (url: string, init: RequestInit = {}): Promise<Response> => {
             const parsed = new URL(url);
-            if (parsed.origin === "https://polaris.example.com") throw new TypeError("fetch failed");
+            if (parsed.origin === "https://polaris.example.com")
+                throw new TypeError("fetch failed");
             if (parsed.pathname === "/api/instance/challenge") {
                 return challengeRoute.POST(
-                    new Request(url, { method: "POST", headers: { host: parsed.host }, body: init.body as string })
+                    new Request(url, {
+                        method: "POST",
+                        headers: { host: parsed.host },
+                        body: init.body as string
+                    })
                 );
             }
             return Response.json({ ok: true });
         };
-        const failover = createFailover({ primary: "https://polaris.example.com", instance: record, fetch: fetchImpl });
+        const failover = createFailover({
+            primary: "https://polaris.example.com",
+            instance: record,
+            fetch: fetchImpl
+        });
         expect((await failover.request("/api/v1/me")).status).toBe(200);
         expect(failover.status().origin).toBe("https://polaris.local");
     });

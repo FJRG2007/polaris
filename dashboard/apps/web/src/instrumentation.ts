@@ -191,7 +191,9 @@ export async function register(): Promise<void> {
     // public one stops answering. Made here when an install has none, so nothing
     // has to be configured for it.
     const { ensureInstanceIdentity } = await import("./lib/instance-identity");
-    void ensureInstanceIdentity().catch((error) => console.error("polaris: instance identity setup failed:", error));
+    void ensureInstanceIdentity().catch((error) =>
+        console.error("polaris: instance identity setup failed:", error)
+    );
 
     // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS

@@ -24,19 +24,37 @@ export function OPTIONS(): Response {
 }
 
 export async function GET(): Promise<Response> {
-    const limited = await rateLimit(`instance:${(await clientIp()) ?? "unknown"}`, LIMIT, WINDOW_MS);
+    const limited = await rateLimit(
+        `instance:${(await clientIp()) ?? "unknown"}`,
+        LIMIT,
+        WINDOW_MS
+    );
     if (!limited.ok) {
         return NextResponse.json(
             { error: "Too many requests. Try again in a minute." },
-            { status: 429, headers: { ...OPEN_HEADERS, "retry-after": String(Math.ceil(limited.retryAfterMs / 1000)) } }
+            {
+                status: 429,
+                headers: {
+                    ...OPEN_HEADERS,
+                    "retry-after": String(Math.ceil(limited.retryAfterMs / 1000))
+                }
+            }
         );
     }
     const identity = await ensureInstanceIdentity();
     if (!identity) {
-        return NextResponse.json({ error: "This Polaris has no identity yet." }, { status: 503, headers: OPEN_HEADERS });
+        return NextResponse.json(
+            { error: "This Polaris has no identity yet." },
+            { status: 503, headers: OPEN_HEADERS }
+        );
     }
     return NextResponse.json(
-        { version: 1, id: identity.id, publicKey: identity.publicKey, addresses: await instanceAddresses() },
+        {
+            version: 1,
+            id: identity.id,
+            publicKey: identity.publicKey,
+            addresses: await instanceAddresses()
+        },
         { headers: OPEN_HEADERS }
     );
 }

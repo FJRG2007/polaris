@@ -16,7 +16,10 @@ const ID = "inst_0123456789abcdef";
 
 function keyPair(): { publicKey: string; privateKey: KeyObject } {
     const pair = generateKeyPairSync("ed25519");
-    return { publicKey: String(pair.publicKey.export({ format: "jwk" }).x), privateKey: pair.privateKey };
+    return {
+        publicKey: String(pair.publicKey.export({ format: "jwk" }).x),
+        privateKey: pair.privateKey
+    };
 }
 
 const real = keyPair();
