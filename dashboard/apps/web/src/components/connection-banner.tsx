@@ -113,7 +113,16 @@ export function ConnectionBanner() {
     if (state === null) return null;
 
     const good = state === "back" || state === "polarisBack";
-    const Icon = state === "offline" ? WifiOff : state === "unreachable" ? CloudOff : state === "updating" ? RefreshCw : state === "noInternet" ? Globe : Wifi;
+    const Icon =
+        state === "offline"
+            ? WifiOff
+            : state === "unreachable"
+              ? CloudOff
+              : state === "updating"
+                ? RefreshCw
+                : state === "noInternet"
+                  ? Globe
+                  : Wifi;
 
     async function retry() {
         setRetrying(true);
@@ -137,7 +146,10 @@ export function ConnectionBanner() {
                           : "border-warning-edge bg-warning-soft text-warning-ink"
                 )}
             >
-                <Icon className={cn("size-4 shrink-0", state === "updating" && "animate-spin")} aria-hidden />
+                <Icon
+                    className={cn("size-4 shrink-0", state === "updating" && "animate-spin")}
+                    aria-hidden
+                />
                 <span className="min-w-0">{t(`network.${state}`)}</span>
                 {state === "unreachable" ? (
                     <Button

@@ -44,7 +44,8 @@ async function ask(): Promise<void> {
         }
     }
     asking = false;
-    if (listeners.size > 0) timer = setTimeout(() => void ask(), offline ? OFFLINE_EVERY_MS : EVERY_MS);
+    if (listeners.size > 0)
+        timer = setTimeout(() => void ask(), offline ? OFFLINE_EVERY_MS : EVERY_MS);
 }
 
 export function subscribeHostOffline(listener: () => void): () => void {

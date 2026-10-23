@@ -149,7 +149,9 @@ export async function mailCredential(account: MailCredentialSource): Promise<Mai
     const credential = await readCredential(account.connectionId);
     const refreshToken = credential?.refreshToken;
     if (!refreshToken) {
-        throw new MailAuthError("The account that authorized this mailbox needs authorizing again.");
+        throw new MailAuthError(
+            "The account that authorized this mailbox needs authorizing again."
+        );
     }
 
     const provider = oauthProviderFor(account.service);
@@ -166,12 +168,16 @@ export async function mailCredential(account: MailCredentialSource): Promise<Mai
         // A grant the provider refused is the same answer to the person holding
         // the mailbox: authorize it again. The provider's own words are kept off
         // the screen deliberately - they name endpoints and scopes.
-        if (caught instanceof GoogleAuthExpiredError || caught instanceof MicrosoftAuthExpiredError) {
+        if (
+            caught instanceof GoogleAuthExpiredError ||
+            caught instanceof MicrosoftAuthExpiredError
+        ) {
             reachable.succeed();
             throw new MailAuthError("This mailbox needs authorizing again.");
         }
         // One line when it stops answering; the retries after it back off quietly.
-        if (!reachable.isOpen) console.warn(`polaris: ${provider} did not answer a mail token request:`, caught);
+        if (!reachable.isOpen)
+            console.warn(`polaris: ${provider} did not answer a mail token request:`, caught);
         reachable.fail();
         throw unreachable(provider);
     }

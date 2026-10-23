@@ -23,5 +23,8 @@ export const dynamic = "force-dynamic";
  *  few seconds, so this answers with whichever one took the request - which is
  *  what lets a tab learn about the update at all. */
 export function GET(): Response {
-    return NextResponse.json({ build: buildStamp(), internet: !internetOffline() }, { headers: { "cache-control": "no-store" } });
+    return NextResponse.json(
+        { build: buildStamp(), internet: !internetOffline() },
+        { headers: { "cache-control": "no-store" } }
+    );
 }

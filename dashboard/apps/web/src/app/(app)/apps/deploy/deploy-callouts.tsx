@@ -46,7 +46,8 @@ function useFreshness(applicationId: string, sha: string | null): DeployFreshnes
             return;
         }
         let active = true;
-        void polls.deployFreshness(applicationId)
+        void polls
+            .deployFreshness(applicationId)
             .catch(() => null)
             .then((result) => {
                 freshnessCache.set(key, { at: Date.now(), value: result });
@@ -72,7 +73,8 @@ function useImageUpdate(
             return;
         }
         let active = true;
-        void polls.imageUpdate(applicationId)
+        void polls
+            .imageUpdate(applicationId)
             .catch(() => null)
             .then((result) => {
                 if (active) setValue(result);

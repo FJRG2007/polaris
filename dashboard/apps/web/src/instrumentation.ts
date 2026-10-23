@@ -9,7 +9,8 @@ export async function register(): Promise<void> {
     if (process.env.NEXT_RUNTIME !== "nodejs") return;
     // Before anything looks a name up: with the internet gone, outside lookups
     // fail fast instead of filling the thread pool that local ones need too.
-    const { installOutboundLookup, watchOutboundFetch } = await import("./lib/offline/outbound-lookup");
+    const { installOutboundLookup, watchOutboundFetch } =
+        await import("./lib/offline/outbound-lookup");
     installOutboundLookup();
     watchOutboundFetch();
     // First, before anything can answer a request: an installed app's server

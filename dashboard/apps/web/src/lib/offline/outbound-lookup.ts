@@ -38,10 +38,24 @@ import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
 
 type Address = { address: string; family: number };
-type Options = { family?: number | string; all?: boolean; hints?: number; order?: string; verbatim?: boolean };
-type Callback = (error: NodeJS.ErrnoException | null, address?: string | Address[], family?: number) => void;
+type Options = {
+    family?: number | string;
+    all?: boolean;
+    hints?: number;
+    order?: string;
+    verbatim?: boolean;
+};
+type Callback = (
+    error: NodeJS.ErrnoException | null,
+    address?: string | Address[],
+    family?: number
+) => void;
 export type LookupFunction = (hostname: string, options: unknown, callback?: unknown) => void;
-type Resolve = (hostname: string, options: Options & { all: true }, callback: (error: NodeJS.ErrnoException | null, addresses: Address[]) => void) => void;
+type Resolve = (
+    hostname: string,
+    options: Options & { all: true },
+    callback: (error: NodeJS.ErrnoException | null, addresses: Address[]) => void
+) => void;
 
 export const POSITIVE_TTL_MS = 30_000;
 export const NEGATIVE_TTL_MS = 5_000;
@@ -87,7 +101,9 @@ function readHosts(): Map<string, Address[]> {
 }
 
 function lookupError(hostname: string, code: string): NodeJS.ErrnoException {
-    const error: NodeJS.ErrnoException & { hostname?: string } = new Error(`getaddrinfo ${code} ${hostname}`);
+    const error: NodeJS.ErrnoException & { hostname?: string } = new Error(
+        `getaddrinfo ${code} ${hostname}`
+    );
     error.code = code;
     error.errno = undefined;
     error.syscall = "getaddrinfo";
@@ -131,7 +147,10 @@ export function createOutboundLookup(input: {
 
     function remember(key: string, addresses: Address[] | null): void {
         if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value!);
-        cache.set(key, { addresses, until: now() + (addresses ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS) });
+        cache.set(key, {
+            addresses,
+            until: now() + (addresses ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS)
+        });
     }
 
     let confirming = false;
@@ -143,7 +162,8 @@ export function createOutboundLookup(input: {
             confirming = false;
             if (!error) return breaker.succeed();
             const missing = error.code === "ENOTFOUND" || error.code === "ENODATA";
-            if (missing || OFFLINE_CODES.has(error.code ?? "")) breaker.fail(Number.POSITIVE_INFINITY);
+            if (missing || OFFLINE_CODES.has(error.code ?? ""))
+                breaker.fail(Number.POSITIVE_INFINITY);
             else breaker.fail();
         });
     }
@@ -159,16 +179,22 @@ export function createOutboundLookup(input: {
         const name = String(hostname ?? "").toLowerCase();
 
         if (name === "localhost" || name.endsWith(".localhost")) {
-            return reply(callback, options, [
-                { address: "127.0.0.1", family: 4 },
-                { address: "::1", family: 6 }
-            ], hostname);
+            return reply(
+                callback,
+                options,
+                [
+                    { address: "127.0.0.1", family: 4 },
+                    { address: "::1", family: 6 }
+                ],
+                hostname
+            );
         }
         const listed = hosts.get(name);
         if (listed) return reply(callback, options, listed, hostname);
-        if (isLocalName(name)) return input.resolve(hostname, { ...options, all: true }, (error, addresses) =>
-            error ? callback(error) : reply(callback, options, addresses, hostname)
-        );
+        if (isLocalName(name))
+            return input.resolve(hostname, { ...options, all: true }, (error, addresses) =>
+                error ? callback(error) : reply(callback, options, addresses, hostname)
+            );
 
         const admission = breaker.admit();
         if (admission === "refuse") {
@@ -216,10 +242,17 @@ export function createOutboundLookup(input: {
     Object.defineProperty(lookup, promisify.custom, {
         value: (hostname: string, options?: unknown) =>
             new Promise((resolve, reject) =>
-                lookup(hostname, options ?? {}, (error: NodeJS.ErrnoException | null, address?: unknown, family?: number) =>
-                    error
-                        ? reject(error)
-                        : resolve((options as Options | undefined)?.all ? address : { address, family })
+                lookup(
+                    hostname,
+                    options ?? {},
+                    (error: NodeJS.ErrnoException | null, address?: unknown, family?: number) =>
+                        error
+                            ? reject(error)
+                            : resolve(
+                                  (options as Options | undefined)?.all
+                                      ? address
+                                      : { address, family }
+                              )
                 )
             )
     });
@@ -252,7 +285,11 @@ export function installOutboundLookup(): void {
                     : "polaris: internet connection is back"
             )
     });
-    const made = createOutboundLookup({ resolve: original as unknown as Resolve, hosts: readHosts(), breaker });
+    const made = createOutboundLookup({
+        resolve: original as unknown as Resolve,
+        hosts: readHosts(),
+        breaker
+    });
     const timer = setInterval(() => {
         if (breaker.isOpen) made.lookup(PROBE_NAME, { all: true }, () => undefined);
     }, PROBE_EVERY_MS);
@@ -295,7 +332,12 @@ export function noteOutboundFailure(hostname: string, error: unknown): void {
         if (typeof code === "string") codes.add(code);
         cause = (cause as { cause?: unknown }).cause;
     }
-    if (codes.has("UND_ERR_CONNECT_TIMEOUT") || codes.has("ETIMEDOUT") || codes.has("ENETUNREACH") || codes.has("EHOSTUNREACH")) {
+    if (
+        codes.has("UND_ERR_CONNECT_TIMEOUT") ||
+        codes.has("ETIMEDOUT") ||
+        codes.has("ENETUNREACH") ||
+        codes.has("EHOSTUNREACH")
+    ) {
         installed.breaker.fail(1);
     }
 }
@@ -312,7 +354,8 @@ const WATCHED_FETCH = Symbol.for("polaris.offline.fetch");
 function hostOf(input: unknown): string {
     try {
         if (typeof input === "string" || input instanceof URL) return new URL(input).hostname;
-        if (input && typeof (input as Request).url === "string") return new URL((input as Request).url).hostname;
+        if (input && typeof (input as Request).url === "string")
+            return new URL((input as Request).url).hostname;
     } catch {
         // A relative or malformed address is the caller's own error to report.
     }
@@ -329,7 +372,10 @@ export function watchOutboundFetch(): void {
     if (holder[WATCHED_FETCH]) return;
     holder[WATCHED_FETCH] = true;
     const original = globalThis.fetch;
-    const watched = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const watched = (async (
+        input: Parameters<typeof fetch>[0],
+        init?: Parameters<typeof fetch>[1]
+    ) => {
         try {
             const response = await original(input, init);
             noteOutboundSuccess(hostOf(input));

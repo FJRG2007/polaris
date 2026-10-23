@@ -51,10 +51,18 @@ export const projectGlance = (projectId: string, signal?: AbortSignal) =>
     );
 
 export const deployFreshness = (applicationId: string, signal?: AbortSignal) =>
-    readPoll<Answer<typeof glance.deployFreshnessAction>>("/api/deploy/freshness", { applicationId }, signal);
+    readPoll<Answer<typeof glance.deployFreshnessAction>>(
+        "/api/deploy/freshness",
+        { applicationId },
+        signal
+    );
 
 export const imageUpdate = (applicationId: string, signal?: AbortSignal) =>
-    readPoll<Answer<typeof glance.imageUpdateAction>>("/api/deploy/image-update", { applicationId }, signal);
+    readPoll<Answer<typeof glance.imageUpdateAction>>(
+        "/api/deploy/image-update",
+        { applicationId },
+        signal
+    );
 
 export const deployments = (applicationId: string, signal?: AbortSignal) =>
     readPoll<Answer<typeof actions.listDeploymentsAction>>(

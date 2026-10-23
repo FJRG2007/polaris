@@ -8,10 +8,18 @@
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { Breaker } from "@/lib/offline/breaker";
-import { createOutboundLookup, isLocalName, parseHosts, PROBE_NAME } from "@/lib/offline/outbound-lookup";
+import {
+    createOutboundLookup,
+    isLocalName,
+    parseHosts,
+    PROBE_NAME
+} from "@/lib/offline/outbound-lookup";
 
 type Address = { address: string; family: number };
-type Pending = { hostname: string; done: (error: NodeJS.ErrnoException | null, addresses: Address[]) => void };
+type Pending = {
+    hostname: string;
+    done: (error: NodeJS.ErrnoException | null, addresses: Address[]) => void;
+};
 
 function offlineResolver() {
     const pending: Pending[] = [];
@@ -29,11 +37,19 @@ function offlineResolver() {
     return { pending, resolve, failAll, answerAll };
 }
 
-function ask(lookup: (h: string, o: unknown, c?: unknown) => void, hostname: string, options: unknown = {}) {
-    return new Promise<{ error: NodeJS.ErrnoException | null; address?: unknown; family?: number }>((done) =>
-        lookup(hostname, options, (error: NodeJS.ErrnoException | null, address?: unknown, family?: number) =>
-            done({ error, address, family })
-        )
+function ask(
+    lookup: (h: string, o: unknown, c?: unknown) => void,
+    hostname: string,
+    options: unknown = {}
+) {
+    return new Promise<{ error: NodeJS.ErrnoException | null; address?: unknown; family?: number }>(
+        (done) =>
+            lookup(
+                hostname,
+                options,
+                (error: NodeJS.ErrnoException | null, address?: unknown, family?: number) =>
+                    done({ error, address, family })
+            )
     );
 }
 
@@ -42,15 +58,26 @@ function setup() {
     const resolver = offlineResolver();
     const breaker = new Breaker({ now: () => now, firstRetryMs: 15_000, threshold: 3 });
     const hosts = parseHosts("127.0.0.1 localhost\n172.17.0.1 host.docker.internal # gateway\n");
-    const made = createOutboundLookup({ resolve: resolver.resolve, hosts, breaker, now: () => now });
+    const made = createOutboundLookup({
+        resolve: resolver.resolve,
+        hosts,
+        breaker,
+        now: () => now
+    });
     return { ...made, resolver, advance: (ms: number) => (now += ms) };
 }
 
 describe("isLocalName", () => {
-    it.each(["localhost", "polaris-hostd", "postgres", "10.0.0.2", "::1", "polaris.local", "nas.lan", "x.home.arpa"])(
-        "treats %s as local",
-        (name) => expect(isLocalName(name)).toBe(true)
-    );
+    it.each([
+        "localhost",
+        "polaris-hostd",
+        "postgres",
+        "10.0.0.2",
+        "::1",
+        "polaris.local",
+        "nas.lan",
+        "x.home.arpa"
+    ])("treats %s as local", (name) => expect(isLocalName(name)).toBe(true));
     it.each(["api.github.com", "oauth2.googleapis.com"])("treats %s as outside", (name) =>
         expect(isLocalName(name)).toBe(false)
     );
@@ -186,10 +213,9 @@ describe("createOutboundLookup", () => {
 
     it("keeps the shape util.promisify(dns.lookup) answers", async () => {
         const { lookup } = setup();
-        const asked = promisify(lookup as unknown as (h: string, o: object, c: () => void) => void) as unknown as (
-            h: string,
-            o?: object
-        ) => Promise<unknown>;
+        const asked = promisify(
+            lookup as unknown as (h: string, o: object, c: () => void) => void
+        ) as unknown as (h: string, o?: object) => Promise<unknown>;
         await expect(asked("localhost")).resolves.toEqual({ address: "127.0.0.1", family: 4 });
         await expect(asked("localhost", { all: true, family: 4 })).resolves.toEqual([
             { address: "127.0.0.1", family: 4 }
