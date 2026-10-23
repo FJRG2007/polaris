@@ -20,6 +20,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import * as activity from "@/lib/activity/activity";
 import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
+import { dropGrantsFor } from "@/lib/access/grants";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
@@ -1439,9 +1440,9 @@ export async function deleteTask(taskId: string): Promise<void> {
  *  may write, so this is one statement rather than a loop of them; tracked time,
  *  checklists and the subtasks themselves follow through the schema's cascades.
  *
- *  The history, the discussion and the followers do not: all three live in a
- *  table shared by every app and none has a foreign key to cascade along, so
- *  they are dropped here - for the subtasks as well as for what was asked for,
+ *  The history, the discussion, the followers and the grants do not: all four
+ *  live in a table shared by every app and none has a foreign key to cascade
+ *  along, so they are dropped here - for the subtasks as well as for what was asked for,
  *  since those are going too. */
 export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
     if (taskIds.length === 0) return 0;
@@ -1451,6 +1452,7 @@ export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
         await activity.forget("task", going, tx);
         await comments.forget("task", going, tx);
         await follow.forget("task", going, tx);
+        await dropGrantsFor("task.task", going, tx);
         return count;
     });
 }

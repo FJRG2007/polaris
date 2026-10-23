@@ -133,6 +133,19 @@ describe("a mailbox lent to read", () => {
         });
     });
 
+    it("resumes after the last row shown, keeping messages sent the same second", async () => {
+        state.lent.set(BOX, "view");
+        const sentAt = new Date(Date.UTC(2026, 9, 20));
+        await delegate.delegatedInbox("reader", BOX, { sentAt, id: MSG });
+        expect(state.messageWhere.at(-1)).toEqual({
+            accountId: BOX,
+            folderId: "inbox-1",
+            deleted: false,
+            draft: false,
+            OR: [{ sentAt: { lt: sentAt } }, { sentAt, id: { lt: MSG } }]
+        });
+    });
+
     it("reads one message of that mailbox as text, and nothing from another", async () => {
         state.lent.set(BOX, "view");
         const message = await delegate.delegatedMessage("reader", BOX, MSG);
@@ -141,7 +154,13 @@ describe("a mailbox lent to read", () => {
             to: ["boss@example.test"],
             bodyText: "<b>not html</b>"
         });
-        expect(state.messageWhere.at(-1)).toEqual({ id: MSG, accountId: BOX, draft: false });
+        expect(state.messageWhere.at(-1)).toEqual({
+            id: MSG,
+            accountId: BOX,
+            folderId: "inbox-1",
+            deleted: false,
+            draft: false
+        });
         await expect(delegate.delegatedMessage("reader", BOX, "other")).rejects.toThrow();
     });
 

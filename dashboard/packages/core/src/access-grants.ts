@@ -123,10 +123,15 @@ export type GrantPrincipal = (typeof GRANT_PRINCIPALS)[number];
  * Who a grant on a subject may be to, where that is not everybody. A subject
  * whose app already keeps people and teams in a table of its own takes only
  * what that table cannot hold, so the same person is never handed one thing
- * twice in two places.
+ * twice in two places. A subject no screen lists for its reader, opened only
+ * from the notice its grantee is sent, goes to a person alone: a team or a role
+ * is not told one by one, so its members would hold something they cannot find.
  */
 export const GRANT_SUBJECT_PRINCIPALS: Partial<Record<GrantSubject, readonly GrantPrincipal[]>> = {
-    "calendar.calendar": ["role"]
+    "calendar.calendar": ["role"],
+    "note.note": ["user"],
+    "task.task": ["user"],
+    "agents.session": ["user"]
 };
 
 /** The principals a grant on this subject may be to. */

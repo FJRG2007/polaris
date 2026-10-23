@@ -80,3 +80,11 @@ describe("the calendar subject", () => {
         expect(core.isGrantLinkSubject("calendar.calendar")).toBe(false);
     });
 });
+
+describe("a subject only its notice leads to", () => {
+    it("is handed to a person, the one principal that notice reaches", () => {
+        for (const subject of ["note.note", "task.task", "agents.session"] as const) {
+            expect(core.subjectPrincipals(subject)).toEqual(["user"]);
+        }
+    });
+});

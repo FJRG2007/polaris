@@ -59,12 +59,6 @@ export interface RecordOpening {
 }
 
 /**
- * A record from another shelf that was shared with this reader: its fields and
- * nothing around it - no timeline, no related records, no shelf people - read
- * as a reader who may see that one kind and change nothing. Null without a live
- * grant, or once the record is gone or in the trash.
- */
-/**
  * Somebody reading one shared thing on another shelf: that shelf, the kinds of
  * record named and only to read them, no role narrowing them further.
  */
@@ -92,6 +86,12 @@ export function readerOn(
     };
 }
 
+/**
+ * A record from another shelf that was shared with this reader: its fields and
+ * nothing around it - no timeline, no related records, no shelf people - read
+ * as a reader who may see that one kind and change nothing. Null without a live
+ * grant, or once the record is gone or in the trash.
+ */
 export async function openSharedRecord(
     user: SessionUser,
     object: CrmObject,

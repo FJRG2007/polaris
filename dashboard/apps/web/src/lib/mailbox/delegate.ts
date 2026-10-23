@@ -90,28 +90,47 @@ function everyone(value: unknown): string[] {
     );
 }
 
-/**
- * One page of the delegated mailbox's inbox, newest first, from before
- * `before` when given. Drafts and deleted messages are left out.
- */
-export async function delegatedInbox(
-    userId: string,
-    accountId: string,
-    before?: Date
-): Promise<{ mailbox: DelegatedMailbox; rows: DelegatedRow[]; more: boolean }> {
-    const mailbox = await delegatedMailbox(userId, accountId);
+/** Where a page of the delegated inbox resumes: after the last row shown. */
+export interface DelegatedCursor {
+    readonly sentAt: Date;
+    readonly id: string;
+}
+
+/** The delegated mailbox's inbox, which is all of it a delegate reads. */
+async function inboxOf(accountId: string): Promise<string | null> {
     const inbox = await prisma.mailFolder.findFirst({
         where: { accountId, role: "inbox" },
         select: { id: true }
     });
-    if (!inbox) return { mailbox, rows: [], more: false };
+    return inbox?.id ?? null;
+}
+
+/**
+ * One page of the delegated mailbox's inbox, newest first, after `after` when
+ * given. Drafts and deleted messages are left out.
+ */
+export async function delegatedInbox(
+    userId: string,
+    accountId: string,
+    after?: DelegatedCursor
+): Promise<{ mailbox: DelegatedMailbox; rows: DelegatedRow[]; more: boolean }> {
+    const mailbox = await delegatedMailbox(userId, accountId);
+    const inboxId = await inboxOf(accountId);
+    if (!inboxId) return { mailbox, rows: [], more: false };
     const found = await prisma.mailMessage.findMany({
         where: {
             accountId,
-            folderId: inbox.id,
+            folderId: inboxId,
             deleted: false,
             draft: false,
-            ...(before ? { sentAt: { lt: before } } : {})
+            ...(after
+                ? {
+                      OR: [
+                          { sentAt: { lt: after.sentAt } },
+                          { sentAt: after.sentAt, id: { lt: after.id } }
+                      ]
+                  }
+                : {})
         },
         select: {
             id: true,
@@ -135,15 +154,17 @@ export async function delegatedInbox(
     return { mailbox, rows, more: found.length > DELEGATE_PAGE };
 }
 
-/** One message of a delegated mailbox, read as plain text. */
+/** One message of a delegated mailbox's inbox, read as plain text. */
 export async function delegatedMessage(
     userId: string,
     accountId: string,
     messageId: string
 ): Promise<DelegatedMessage> {
     await delegatedMailbox(userId, accountId);
+    const inboxId = await inboxOf(accountId);
+    if (!inboxId) throw new MailAccessError();
     const row = await prisma.mailMessage.findFirst({
-        where: { id: messageId, accountId, draft: false },
+        where: { id: messageId, accountId, folderId: inboxId, deleted: false, draft: false },
         select: {
             id: true,
             subject: true,

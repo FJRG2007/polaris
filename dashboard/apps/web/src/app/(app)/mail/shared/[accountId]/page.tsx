@@ -23,11 +23,19 @@ export const dynamic = "force-dynamic";
 function readQuery(query: Record<string, string | string[] | undefined>) {
     const one = (value: string | string[] | undefined) =>
         typeof value === "string" ? value.trim() : "";
+    const uuid = (value: string) => (/^[0-9a-f-]{36}$/i.test(value) ? value : null);
     const before = new Date(one(query.before));
+    const afterId = uuid(one(query.after));
     return {
-        messageId: /^[0-9a-f-]{36}$/i.test(one(query.m)) ? one(query.m) : null,
-        before: Number.isNaN(before.getTime()) ? undefined : before
+        messageId: uuid(one(query.m)),
+        after:
+            Number.isNaN(before.getTime()) || !afterId ? undefined : { sentAt: before, id: afterId }
     };
+}
+
+/** The query that resumes the list after one row. */
+function resume(row: { sentAt: Date; id: string }): string {
+    return `before=${encodeURIComponent(row.sentAt.toISOString())}&after=${row.id}`;
 }
 
 export default async function SharedMailboxPage({
@@ -39,12 +47,12 @@ export default async function SharedMailboxPage({
 }) {
     const user = await requirePermission("mail.use");
     const { accountId } = await params;
-    const { messageId, before } = readQuery(await searchParams);
+    const { messageId, after } = readQuery(await searchParams);
     const t = await getTranslations("mail");
 
     const read = async () => {
         try {
-            const inbox = await delegatedInbox(user.id, accountId, before);
+            const inbox = await delegatedInbox(user.id, accountId, after);
             const open = messageId
                 ? await delegatedMessage(user.id, accountId, messageId).catch((caught) => {
                       if (caught instanceof MailAccessError) return null;
@@ -61,7 +69,7 @@ export default async function SharedMailboxPage({
     if (!found) notFound();
     const { mailbox, rows, more, open } = found;
     const base = `/mail/shared/${mailbox.id}`;
-    const keep = before ? `&before=${encodeURIComponent(before.toISOString())}` : "";
+    const keep = after ? `&${resume(after)}` : "";
     const older = rows.at(-1);
 
     return (
@@ -127,7 +135,7 @@ export default async function SharedMailboxPage({
                     )}
                     {more && older ? (
                         <Link
-                            href={`${base}?before=${encodeURIComponent(older.sentAt.toISOString())}`}
+                            href={`${base}?${resume(older)}`}
                             className="mt-3 inline-block text-sm text-muted-foreground hover:text-foreground"
                         >
                             {t("delegate.older")}

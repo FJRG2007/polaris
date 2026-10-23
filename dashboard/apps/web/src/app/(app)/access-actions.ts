@@ -64,13 +64,6 @@ function subjectOf(value: unknown): core.GrantSubject {
 }
 
 /**
- * Redraw the screens a share changes, where the server draws them.
- *
- * Only Places: its lists are rendered per request and a lent door has to appear
- * for the person it was lent to. Chat and Tasks resolve access on the way into
- * every screen and already redraw themselves on the caller's own next move.
- */
-/**
  * Tell the person something was handed to, in the bell and in their own
  * language. A team or a role is not told one by one: who is in it is a query and
  * a chance to tell the wrong people. Best-effort, like every notice.
@@ -101,6 +94,13 @@ async function tellGrantee(
     });
 }
 
+/**
+ * Redraw the screens a share changes, where the server draws them.
+ *
+ * Only Places: its lists are rendered per request and a lent door has to appear
+ * for the person it was lent to. Chat and Tasks resolve access on the way into
+ * every screen and already redraw themselves on the caller's own next move.
+ */
 function settled(subject: core.GrantSubject): void {
     if (subject.startsWith("place.")) revalidatePath("/places");
 }

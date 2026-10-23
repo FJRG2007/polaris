@@ -18,7 +18,7 @@
  * would be spent before the visitor arrived.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { createHash, randomBytes } from "node:crypto";
 import { teamIdsFor } from "@/lib/orgs/org-service";
@@ -913,8 +913,16 @@ export async function dropGrantsOfGoneDomains(): Promise<void> {
 
 /** Everything one subject hands out, gone - what deleting the subject itself
  *  has to do, since nothing here is a foreign key. */
-export async function dropGrantsFor(subject: core.GrantSubject, subjectId: string): Promise<void> {
-    await prisma.accessGrant.deleteMany({ where: { subjectType: subject, subjectId } });
+export async function dropGrantsFor(
+    subject: core.GrantSubject,
+    subjectId: string | readonly string[],
+    client: Prisma.TransactionClient = prisma
+): Promise<void> {
+    const ids = typeof subjectId === "string" ? [subjectId] : [...subjectId];
+    if (ids.length === 0) return;
+    await client.accessGrant.deleteMany({
+        where: { subjectType: subject, subjectId: { in: ids } }
+    });
 }
 
 // ---------------------------------------------------------------------------
