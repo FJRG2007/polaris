@@ -25,8 +25,6 @@ import { countryFlag, countryName, type VisitDimension, type VisitRange, type Vi
 import { Activity, Check, Copy, Globe, MonitorSmartphone, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn, Input, ScrollRow, Select, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
 import {
-    getAnalyticsOverviewAction,
-    listAnalyticsSitesAction,
     rotateTrackerKeyAction,
     setAnalyticsSettingsAction,
     setTrackerEnabledAction,
@@ -34,6 +32,7 @@ import {
 } from "./actions";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./analytics-polls";
 
 /** Thousands separators without a locale: the browser's separator disagrees with the
  *  server on the first render, and it is not the reader's chosen format either. */
@@ -81,7 +80,7 @@ export function AnalyticsView({
     // reach, and it only fills the picker in the header.
     useEffect(() => {
         let cancelled = false;
-        void listAnalyticsSitesAction()
+        void polls.analyticsSites()
             .then((result) => {
                 if (!cancelled) setServices(result.sites);
             })
@@ -107,7 +106,7 @@ export function AnalyticsView({
         // something Polaris measures", which is a sentence about a URL nobody typed.
         if (scopeNeedsTarget(scope) && !siteId) return;
         startLoad(async () => {
-            const result = await getAnalyticsOverviewAction({ scopeType: scope, scopeId: siteId, range });
+            const result = await polls.analyticsOverview({ scopeType: scope, scopeId: siteId, range });
             if ("error" in result) {
                 setFailure(result.error);
                 setData(null);

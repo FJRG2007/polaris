@@ -588,3 +588,16 @@ vi.mock("@/app/(app)/tasks/tasks-polls", () => ({
         0
     )
 }));
+
+vi.mock("@/app/(app)/apps/analytics/analytics-polls", () => ({
+    analyticsSites: forward(
+        () => import("@/app/(app)/apps/analytics/actions"),
+        "listAnalyticsSitesAction",
+        0
+    ),
+    analyticsOverview: forward(
+        () => import("@/app/(app)/apps/analytics/actions"),
+        "getAnalyticsOverviewAction",
+        1
+    )
+}));

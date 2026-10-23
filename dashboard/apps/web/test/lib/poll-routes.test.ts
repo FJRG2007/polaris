@@ -135,7 +135,9 @@ const actions = vi.hoisted(() => {
         "getTaskDetailAction",
         "getTaskShareAction",
         "createContextAction",
-        "trackerTargetsAction"
+        "trackerTargetsAction",
+        "listAnalyticsSitesAction",
+        "getAnalyticsOverviewAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -383,6 +385,10 @@ vi.mock("@/app/(app)/tasks/actions", () => ({
 vi.mock("@/app/(app)/tasks/trackers/actions", () => ({
     trackerTargetsAction: actions.trackerTargetsAction
 }));
+vi.mock("@/app/(app)/apps/analytics/actions", () => ({
+    listAnalyticsSitesAction: actions.listAnalyticsSitesAction,
+    getAnalyticsOverviewAction: actions.getAnalyticsOverviewAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -528,7 +534,9 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/tasks/detail": () => import("@/app/api/tasks/detail/route"),
     "/api/tasks/share": () => import("@/app/api/tasks/share/route"),
     "/api/tasks/create-context": () => import("@/app/api/tasks/create-context/route"),
-    "/api/tasks/trackers/targets": () => import("@/app/api/tasks/trackers/targets/route")
+    "/api/tasks/trackers/targets": () => import("@/app/api/tasks/trackers/targets/route"),
+    "/api/analytics/sites": () => import("@/app/api/analytics/sites/route"),
+    "/api/analytics/overview": () => import("@/app/api/analytics/overview/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2047,6 +2055,34 @@ const CASES: Case[] = [
             ).trackerTargets(),
         action: "trackerTargetsAction",
         args: []
+    },
+    {
+        name: "the services Analytics can measure",
+        path: "/api/analytics/sites",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/analytics/analytics-polls")>(
+                    "@/app/(app)/apps/analytics/analytics-polls"
+                )
+            ).analyticsSites(),
+        action: "listAnalyticsSitesAction",
+        args: []
+    },
+    {
+        name: "what a scope's visitors did over a range",
+        path: "/api/analytics/overview",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/analytics/analytics-polls")>(
+                    "@/app/(app)/apps/analytics/analytics-polls"
+                )
+            ).analyticsOverview({
+                scopeType: "scopeType-1",
+                scopeId: "scopeId-1",
+                range: "range-1"
+            }),
+        action: "getAnalyticsOverviewAction",
+        args: [{ scopeType: "scopeType-1", scopeId: "scopeId-1", range: "range-1" }]
     }
 ];
 
