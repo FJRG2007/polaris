@@ -114,7 +114,7 @@ describe("the line's card", () => {
     it("draws in Spanish", () => {
         report = fixture();
         const html = renderToStaticMarkup(withMessages(<LineCharts admin />, "es-ES"));
-        expect(html).toContain("Calidad de la línea");
+        expect(html).toContain("Tu conexión");
         expect(html).toContain("Historial de IP");
     });
 });

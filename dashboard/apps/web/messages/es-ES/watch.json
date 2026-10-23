@@ -347,18 +347,18 @@
             "unobserved": "Sin vigilar"
         },
         "line": {
-            "title": "Calidad de la línea",
+            "title": "Tu conexión",
             "description": "Medido cada minuto: lo rápido que responde internet, cuánto se pierde y cuánto tiempo funcionó.",
             "range": "Rango",
             "latency": "Latencia",
             "loss": "Pérdida",
-            "uptime": "Disponible",
+            "uptime": "Activo",
             "ms": "{value} ms",
             "error": "No se pudieron cargar las medidas de la línea. Se volverá a intentar en breve.",
             "empty": "Aún no hay medidas en este rango. Las primeras aparecen un minuto después de arrancar Polaris.",
             "now": {
                 "up": "En línea",
-                "down": "Sin conexión",
+                "down": "Sin red",
                 "dns": "El DNS no responde"
             },
             "ips": {
@@ -368,7 +368,7 @@
                 "first": "Vista primero: {current}"
             },
             "automate": "Recibe un aviso, llama a un webhook o lanza una acción de Places cuando cambie la línea:",
-            "automations": "Automatizaciones"
+            "automations": "Reglas"
         }
     }
 }
