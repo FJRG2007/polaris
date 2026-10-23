@@ -108,12 +108,20 @@ function byName<T extends SavedRecord>(records: readonly T[]): Map<string, T[]> 
 /**
  * Point every name at the backup. A name with no address record is not ours to
  * create and is skipped; one already holding exactly the backup record is done.
+ * Moving from one backup to another, `saved` holds the originals, which decide
+ * whether a name is proxied - not the backup record it holds now.
  */
-export function planFlip(live: readonly LiveRecord[], target: BackupTarget): FlipPlan {
+export function planFlip(
+    live: readonly LiveRecord[],
+    target: BackupTarget,
+    saved: readonly SavedRecord[] = []
+): FlipPlan {
     const originals: SavedRecord[] = [];
     const ops: RecordOp[] = [];
+    const before = byName(saved);
     for (const [name, records] of byName(live)) {
-        const wanted = backupRecord(target, name, records.some((record) => record.proxied));
+        const own = before.get(name) ?? records;
+        const wanted = backupRecord(target, name, own.some((record) => record.proxied));
         const [first, ...rest] = records;
         if (!first || (rest.length === 0 && same(first, wanted))) continue;
         originals.push(...records.map(plain));

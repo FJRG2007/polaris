@@ -63,6 +63,7 @@ import {
     BACKUP_PATHS,
     decide,
     readState,
+    type Flip,
     type FlipState,
     type Verdict
 } from "./decision";
@@ -141,7 +142,15 @@ const relaySchema = z.object({
 });
 
 /** Why a path cannot be used right now, as a key the screen words. */
-const PATH_PROBLEMS = ["no-token", "no-domain", "no-daemon", "no-server", "no-address", "failed"] as const;
+const PATH_PROBLEMS = [
+    "no-token",
+    "no-domain",
+    "no-daemon",
+    "no-server",
+    "no-address",
+    "ports-busy",
+    "failed"
+] as const;
 export type PathProblem = (typeof PATH_PROBLEMS)[number] | null;
 
 const probeSchema = z.object({
@@ -201,7 +210,7 @@ export async function backupView(): Promise<BackupView> {
         loadCloudflareToken().catch(() => null),
         prisma.deployTarget
             .findMany({
-                where: { status: "active", kind: { not: "local" } },
+                where: { status: "active", kind: { not: "local" }, owner: { isAdmin: true } },
                 select: { id: true, name: true },
                 orderBy: { name: "asc" },
                 take: 100
@@ -225,9 +234,11 @@ export async function saveConfig(next: BackupConfig): Promise<void> {
     const previous = await readConfig();
     await setSetting(BACKUP_CONFIG_KEY, JSON.stringify(configSchema.parse(next)));
     forgetBackupAccess();
-    if (previous.path === "relay" && (next.path !== "relay" || next.relayTargetId !== previous.relayTargetId))
+    // A path still serving is retired by the pass, once the records have left it.
+    const serving = parse(recordsSchema, await getSetting(BACKUP_RECORDS_KEY))?.target.kind ?? null;
+    if (previous.path === "relay" && next.path !== "relay" && serving !== "relay")
         await retireRelay().catch(() => undefined);
-    if (previous.path === "tunnel" && next.path !== "tunnel")
+    if (previous.path === "tunnel" && next.path !== "tunnel" && serving !== "tunnel")
         await retireTunnel().catch(() => undefined);
 }
 
@@ -272,8 +283,10 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     let conflicts: string[] = [];
     let moved: string | null = null;
     try {
-        if (uplink) await arm(zones.baseDomain, target !== null && decision.state.serving === "direct");
         if (decision.move === "to-backup" && target) await toBackup(zones.baseDomain, target);
+        // A path changed while on backup: the records follow it before the old one goes.
+        else if (decision.state.serving === "backup" && target && saved && !sameTarget(saved.target, target))
+            await toBackup(zones.baseDomain, target);
         if (decision.move === "to-direct" || (decision.state.serving === "direct" && saved))
             conflicts = await toDirect();
         moved = decision.move;
@@ -288,6 +301,15 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             BACKUP_STATE_KEY,
             JSON.stringify({ ...decision.state, serving: previous.serving, since: previous.since, lastFlip: previous.lastFlip })
         );
+    }
+    if (uplink) {
+        try {
+            await arm(zones.baseDomain, target !== null);
+            await retireUnused(config);
+        } catch (caught) {
+            problem = problem ?? "failed";
+            detail = detail ?? message(caught);
+        }
     }
     await setSetting(
         PROBE_KEY,
@@ -335,24 +357,47 @@ async function apply(token: string, zoneId: string, ops: readonly RecordOp[]): P
     }
 }
 
+/** `armed` is null once records were written back and have to be looked at again. */
+const ttlSchema = z.object({ armed: z.boolean().nullable(), ttl: z.record(z.string(), z.number()) });
+
 /** Short TTLs on DNS-only records while a flip may come; their own back after. */
 async function arm(baseDomain: string, armed: boolean): Promise<void> {
-    const stored = parse(z.object({ armed: z.boolean(), ttl: z.record(z.string(), z.number()) }), await getSetting(TTL_KEY));
+    const stored = parse(ttlSchema, await getSetting(TTL_KEY));
     if ((stored?.armed ?? false) === armed) return;
     const { token, zoneId, live } = await liveRecords(baseDomain);
     const plan = planTtl(live, armed, stored?.ttl ?? {});
-    await setSetting(TTL_KEY, JSON.stringify({ armed, ttl: plan.remembered }));
+    // Every TTL about to be shortened is remembered first, and the state only
+    // changes once the writes landed, so a pass cut short is planned again.
+    await setSetting(
+        TTL_KEY,
+        JSON.stringify({ armed: stored?.armed ?? null, ttl: { ...stored?.ttl, ...plan.remembered } })
+    );
     await apply(token, zoneId, plan.ops);
+    await setSetting(TTL_KEY, JSON.stringify({ armed, ttl: plan.remembered }));
+}
+
+async function forgetArmed(): Promise<void> {
+    const stored = parse(ttlSchema, await getSetting(TTL_KEY));
+    if (stored && stored.armed !== null) await setSetting(TTL_KEY, JSON.stringify({ ...stored, armed: null }));
+}
+
+function sameTarget(a: BackupTarget, b: BackupTarget): boolean {
+    return a.kind === "tunnel"
+        ? b.kind === "tunnel" && a.tunnelId === b.tunnelId
+        : b.kind === "relay" && a.address === b.address;
 }
 
 async function toBackup(baseDomain: string, target: BackupTarget): Promise<void> {
     const { token, zoneId, live } = await liveRecords(baseDomain);
-    const plan = planFlip(live, target);
     // The originals are saved before the first write and never replaced while a
     // flip is under way, so a repeated pass cannot remember the backup as original.
     const saved = parse(recordsSchema, await getSetting(BACKUP_RECORDS_KEY));
+    const plan = planFlip(live, target, saved?.originals);
     if (!saved)
         await setSetting(BACKUP_RECORDS_KEY, JSON.stringify({ zoneId, target, originals: plan.originals }));
+    // Moving between paths keeps the originals and only changes what is restored over.
+    else if (!sameTarget(saved.target, target))
+        await setSetting(BACKUP_RECORDS_KEY, JSON.stringify({ ...saved, target }));
     forgetBackupAccess();
     await apply(token, zoneId, plan.ops);
 }
@@ -373,7 +418,20 @@ async function toDirect(): Promise<string[]> {
     const plan = planRestore(live, saved.originals, saved.target);
     await apply(token, saved.zoneId, plan.ops);
     await setSetting(BACKUP_RECORDS_KEY, null);
+    // The originals came back with whatever TTL they had when saved.
+    await forgetArmed();
     return plan.conflicts;
+}
+
+/** Take down a path that is no longer chosen, once no record points at it. */
+async function retireUnused(config: BackupConfig): Promise<void> {
+    const [serving, tunnel, relay] = await Promise.all([
+        getSetting(BACKUP_RECORDS_KEY).then((raw) => parse(recordsSchema, raw)?.target.kind ?? null),
+        getSetting(TUNNEL_KEY),
+        getSetting(RELAY_KEY)
+    ]);
+    if (tunnel && config.path !== "tunnel" && serving !== "tunnel") await retireTunnel();
+    if (relay && config.path !== "relay" && serving !== "relay") await retireRelay();
 }
 
 /** The named tunnel, created once, its connector kept running with no DNS on it. */
@@ -434,9 +492,9 @@ async function retireTunnel(): Promise<void> {
 }
 
 /** A target row as `getPorts` takes it, with the address the house dials. */
-async function relayTarget(id: string) {
+async function relayTarget(id: string, anyOwner = false) {
     const row = await prisma.deployTarget.findFirst({
-        where: { id, status: "active", kind: { not: "local" } },
+        where: { id, status: "active", kind: { not: "local" }, ...(anyOwner ? {} : { owner: { isAdmin: true } }) },
         select: {
             id: true,
             kind: true,
@@ -458,6 +516,8 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
     const address = target.host?.address ?? null;
     if (!address) throw new PathRefusal("no-address");
     let stored = parse(relaySchema, await getSetting(RELAY_KEY));
+    // Another server was picked: its relay end comes down, the house end is replaced below.
+    if (stored && stored.targetId !== target.id) await retireRelayEnd(stored.targetId).catch(() => undefined);
     if (!stored || stored.targetId !== target.id || stored.address !== address) {
         const relay = generateKeyPair();
         const home = generateKeyPair();
@@ -493,7 +553,12 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
         relayProject("relay"),
         () => relaySpec("relay", relayConfig, ports.tcp),
         changed
-    );
+    ).catch((caught: unknown) => {
+        // The server already publishes one of the ports for something of its own.
+        throw /port is already allocated|address already in use|bind for/i.test(message(caught))
+            ? new PathRefusal("ports-busy")
+            : caught;
+    });
     await keepUp(new HostdPorts(), relayProject("home"), () => relaySpec("home", homeConfig, ports.tcp), changed);
     if (changed) await setSetting(RELAY_KEY, JSON.stringify({ ...stored, tcp: ports.tcp }));
     return { kind: "relay", address };
@@ -507,18 +572,20 @@ async function retireRelay(): Promise<void> {
     } finally {
         await home.dispose();
     }
-    if (stored) {
-        const target = await relayTarget(stored.targetId).catch(() => null);
-        if (target) {
-            const ports = await getPorts(target, target.ownerId);
-            try {
-                await ports.composeDown(relayProject("relay"));
-            } finally {
-                await ports.dispose();
-            }
-        }
-    }
+    if (stored) await retireRelayEnd(stored.targetId);
     await setSetting(RELAY_KEY, null);
+}
+
+async function retireRelayEnd(targetId: string): Promise<void> {
+    // Taking our own relay down, wherever it was left.
+    const target = await relayTarget(targetId, true).catch(() => null);
+    if (!target) return;
+    const ports = await getPorts(target, target.ownerId);
+    try {
+        await ports.composeDown(relayProject("relay"));
+    } finally {
+        await ports.dispose();
+    }
 }
 
 /**
@@ -624,11 +691,15 @@ async function measure(
  */
 async function outsideMachine(relayTargetId: string | null, homeAddress: string) {
     const preferred = relayTargetId
-        ? await prisma.deployTarget.findFirst({ where: { id: relayTargetId }, select: { hostId: true } })
+        ? await prisma.deployTarget.findFirst({
+              where: { id: relayTargetId, owner: { isAdmin: true } },
+              select: { hostId: true }
+          })
         : null;
     const hosts = await prisma.host.findMany({
         where: {
             status: "active",
+            owner: { isAdmin: true },
             OR: [
                 { environment: { in: ["vps", "cloud"] } },
                 ...(preferred?.hostId ? [{ id: preferred.hostId }] : [])
@@ -696,10 +767,18 @@ async function announce(state: FlipState, domain: string): Promise<void> {
                 type: on ? "domain.backup-on" : "domain.backup-off",
                 level: on ? "warning" : "success",
                 title: on ? t("backupAccess.onTitle", { domain }) : t("backupAccess.offTitle", { domain }),
-                body: on ? t("backupAccess.onBody") : t("backupAccess.offBody")
+                body: t(noticeBody(state.lastFlip?.reason ?? null, on))
             })
             .catch(() => undefined);
     }
+}
+
+/** Why the domain moved, as the bell words it: each reason says something different. */
+function noticeBody(reason: Flip["reason"] | null, on: boolean) {
+    if (reason === "always") return "backupAccess.onAlwaysBody";
+    if (reason === "manual") return on ? "backupAccess.onManualBody" : "backupAccess.offManualBody";
+    if (reason === "unconfigured") return "backupAccess.offUnconfiguredBody";
+    return on ? "backupAccess.onBody" : "backupAccess.offBody";
 }
 
 function message(caught: unknown): string {

@@ -676,7 +676,7 @@
             "state": {
                 "direct": "Directa",
                 "backup": "En respaldo desde",
-                "noUplink": "Sin salida: nada sale de casa, así que ninguna ruta puede ayudar aún. Un punto de acceso móvil lo cubrirá más adelante."
+                "noUplink": "Sin salida: nada sale de casa, así que ninguna ruta puede ayudar aún."
             },
             "reasons": {
                 "outage": "la ruta directa dejó de responder",
@@ -699,6 +699,7 @@
                 "no-daemon": "Esta edición no puede ejecutar el conector. La edición completa sí.",
                 "no-server": "El servidor relé ya no existe. Elige otro.",
                 "no-address": "El servidor relé no tiene dirección pública.",
+                "ports-busy": "Algo en el servidor relé ya usa uno de los puertos que tiene que llevar. Elige otro servidor o libéralos allí.",
                 "failed": "La última pasada falló: {detail}"
             },
             "tcpCarried": "El relé lleva TCP {ports}.",

@@ -482,6 +482,10 @@
         "onTitle": "{domain} is on backup access",
         "onBody": "The direct path stopped answering, so visitors now reach Polaris through the backup path. It switches back by itself.",
         "offTitle": "{domain} is direct again",
-        "offBody": "The direct path answers again and the original DNS records are back."
+        "offBody": "The direct path answers again and the original DNS records are back.",
+        "onAlwaysBody": "Backup access is set to always on, so visitors now reach Polaris through the backup path.",
+        "onManualBody": "Switched to the backup path by hand. It stays there until it is switched back.",
+        "offManualBody": "Switched back to the direct path by hand, and the original DNS records are back.",
+        "offUnconfiguredBody": "The backup path was turned off, so the original DNS records are back."
     }
 }

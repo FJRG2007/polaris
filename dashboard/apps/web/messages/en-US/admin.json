@@ -676,7 +676,7 @@
             "state": {
                 "direct": "Direct",
                 "backup": "On backup since",
-                "noUplink": "No uplink: nothing gets out of the house, so no path can help yet. A phone hotspot will cover this later."
+                "noUplink": "No uplink: nothing gets out of the house, so no path can help yet."
             },
             "reasons": {
                 "outage": "the direct path stopped answering",
@@ -699,6 +699,7 @@
                 "no-daemon": "This edition cannot run the connector. The full edition can.",
                 "no-server": "The relay server is gone. Pick another one.",
                 "no-address": "The relay server has no public address.",
+                "ports-busy": "Something on the relay server already uses one of the ports it has to carry. Pick another server or free them there.",
                 "failed": "The last pass failed: {detail}"
             },
             "tcpCarried": "The relay carries TCP {ports}.",

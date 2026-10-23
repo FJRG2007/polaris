@@ -482,6 +482,10 @@
         "onTitle": "{domain} está en acceso de respaldo",
         "onBody": "La ruta directa dejó de responder, así que las visitas llegan a Polaris por la ruta de respaldo. Vuelve sola.",
         "offTitle": "{domain} vuelve a ser directo",
-        "offBody": "La ruta directa responde de nuevo y los registros DNS originales están de vuelta."
+        "offBody": "La ruta directa responde de nuevo y los registros DNS originales están de vuelta.",
+        "onAlwaysBody": "El acceso de respaldo está siempre activo, así que las visitas llegan a Polaris por la ruta de respaldo.",
+        "onManualBody": "Se cambió a mano a la ruta de respaldo. Sigue ahí hasta que se vuelva a cambiar.",
+        "offManualBody": "Se volvió a mano a la ruta directa y los registros DNS originales están de vuelta.",
+        "offUnconfiguredBody": "Se apagó la ruta de respaldo, así que los registros DNS originales están de vuelta."
     }
 }

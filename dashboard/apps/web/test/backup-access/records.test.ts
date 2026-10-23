@@ -36,6 +36,16 @@ const strip = (records: SavedRecord[]) =>
         .sort((a, b) => `${a.name}${a.content}`.localeCompare(`${b.name}${b.content}`));
 
 describe("backup access record plans", () => {
+    it("moves from the tunnel to the relay keeping each name's own proxy flag, and restores cleanly", () => {
+        const onTunnel = apply(ORIGINALS, planFlip(ORIGINALS, TUNNEL).ops);
+        const onRelay = apply(onTunnel, planFlip(onTunnel, RELAY, strip(ORIGINALS)).ops);
+        const wildcard = onRelay.find((record) => record.name === "*.example.com");
+        expect(wildcard).toMatchObject({ type: "A", content: RELAY.address, proxied: false });
+        const restore = planRestore(onRelay, strip(ORIGINALS), RELAY);
+        expect(restore.conflicts).toEqual([]);
+        expect(strip(apply(onRelay, restore.ops))).toEqual(strip(ORIGINALS));
+    });
+
     it("points every name at the tunnel as one proxied CNAME", () => {
         const plan = planFlip(ORIGINALS, TUNNEL);
         const after = apply(ORIGINALS, plan.ops);
