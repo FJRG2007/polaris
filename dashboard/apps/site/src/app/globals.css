@@ -10,3 +10,65 @@ body {
     background: hsl(var(--background));
     color: hsl(var(--foreground));
 }
+
+/* Code highlighted at build time carries both themes as variables; the page
+   draws dark unless the system asks for light, the same as the tokens. */
+.code-block .shiki,
+.code-block .shiki span {
+    color: var(--shiki-dark);
+    background-color: transparent !important;
+}
+@media (prefers-color-scheme: light) {
+    .code-block .shiki,
+    .code-block .shiki span {
+        color: var(--shiki-light);
+    }
+}
+
+/* The feature guides, rendered from the repository's Markdown. */
+@layer components {
+    .doc-prose {
+        @apply flex min-w-0 flex-col gap-4 text-[15px] leading-relaxed text-foreground;
+    }
+    .doc-prose h2 {
+        @apply mt-6 scroll-mt-20 text-xl font-semibold tracking-tight;
+    }
+    .doc-prose h3 {
+        @apply mt-4 scroll-mt-20 text-base font-semibold;
+    }
+    .doc-prose p,
+    .doc-prose li {
+        @apply text-muted-foreground;
+    }
+    .doc-prose strong {
+        @apply font-semibold text-foreground;
+    }
+    .doc-prose a {
+        @apply text-foreground underline underline-offset-2;
+    }
+    .doc-prose ul {
+        @apply flex list-disc flex-col gap-1 pl-5;
+    }
+    .doc-prose ol {
+        @apply flex list-decimal flex-col gap-1 pl-5;
+    }
+    .doc-prose img {
+        @apply h-auto w-full rounded-lg border border-border;
+    }
+    .doc-prose :not(pre) > code {
+        @apply break-words rounded bg-surface px-1 py-0.5 text-[13px];
+    }
+    .doc-prose .code-block {
+        @apply overflow-x-auto rounded-lg border border-border bg-card p-3 text-[13px];
+    }
+    .doc-prose table {
+        @apply block w-full overflow-x-auto text-sm;
+    }
+    .doc-prose th,
+    .doc-prose td {
+        @apply border-b border-border px-2 py-1.5 text-left align-top;
+    }
+    .doc-prose blockquote {
+        @apply border-l-2 border-border pl-3 text-muted-foreground;
+    }
+}

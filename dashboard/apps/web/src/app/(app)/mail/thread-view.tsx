@@ -25,7 +25,7 @@ import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
 import { spamReasonText } from "./spam-reason";
 import { mailRefusalText } from "@/lib/mailbox/refusal-text";
-import * as flying from "@/components/image-flight";
+import * as flying from "@polaris/ui/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AddressChip } from "./address-chip";
 import { forwardSeed, replySeed } from "./answering";

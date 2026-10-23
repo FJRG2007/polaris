@@ -28,7 +28,7 @@ import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
 import { EntryThumbnail } from "./entry-thumbnail";
 import { usePolarContext } from "@/components/polar/polar-panel";
-import * as flying from "@/components/image-flight";
+import * as flying from "@polaris/ui/image-flight";
 import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";

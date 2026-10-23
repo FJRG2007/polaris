@@ -18,7 +18,7 @@
 
 import { viewerKind } from "./viewer/kind";
 import { useRef, useState } from "react";
-import * as flying from "@/components/image-flight";
+import * as flying from "@polaris/ui/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
 import { DocView } from "./viewer/doc-view";

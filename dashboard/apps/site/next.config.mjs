@@ -20,5 +20,7 @@ export default {
     images: { unoptimized: true },
     transpilePackages: ["@polaris/ui"],
     env: { NEXT_PUBLIC_BASE_PATH: basePath },
-    eslint: { ignoreDuringBuilds: true }
+    eslint: { ignoreDuringBuilds: true },
+    // A 404 drawn in the site's own frame, with its icon and title.
+    experimental: { globalNotFound: true }
 };

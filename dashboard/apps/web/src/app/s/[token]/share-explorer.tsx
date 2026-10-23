@@ -14,7 +14,7 @@
  */
 
 import { saveFile, sendFile } from "@/components/transfers/move-file";
-import * as flying from "@/components/image-flight";
+import * as flying from "@polaris/ui/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { TransfersView } from "@/components/transfers/transfers-view";

@@ -18,20 +18,12 @@
 
 import { copyText, downloadFile } from "@/app/(app)/chat/links";
 import { Copy, Download, ExternalLink, Flag, Forward, Link2 } from "lucide-react";
+import type { ViewedImage } from "@polaris/ui/image-viewer";
 import type { DropdownMenuItem, DropdownMenuSeparator } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-export interface ActionableImage {
-    readonly url: string;
-    readonly name: string;
-    /** The message it is on, for forwarding and reporting. Absent for a picture
-     *  that is not in a conversation - a profile photo, which there is nowhere
-     *  to forward and nothing to report. */
-    readonly messageId?: string;
-    /** Whether whoever sent it lets it be passed on. The menu offers the action
-     *  or does not; it never offers one that would be refused. */
-    readonly forwardable?: boolean;
-}
+/** A picture, as the viewer and its menu see it. */
+export type ActionableImage = ViewedImage;
 
 /**
  * The picture's own address, made absolute.
@@ -157,7 +149,9 @@ function ImageItems({
                 <Item
                     onSelect={() =>
                         void copyImage(image.url).then((outcome) =>
-                            announce(outcome === "copied" ? t("images.copied") : t("images.copyRefused"))
+                            announce(
+                                outcome === "copied" ? t("images.copied") : t("images.copyRefused")
+                            )
                         )
                     }
                 >

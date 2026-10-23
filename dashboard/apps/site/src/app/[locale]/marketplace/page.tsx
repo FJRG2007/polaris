@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isLocale, words } from "@/lib/site";
+import { isLocale, words, pageMetadata } from "@/lib/site";
 import { siteData } from "@/lib/site";
 import { MarketplaceGrid } from "@/views/marketplace-grid";
 
@@ -8,7 +8,13 @@ type Props = { params: Promise<{ locale: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { locale } = await params;
-    return isLocale(locale) ? { title: `${words(locale).market.title} - Polaris` } : {};
+    return isLocale(locale)
+        ? pageMetadata(locale, {
+              title: words(locale).market.title,
+              description: words(locale).meta.marketplace,
+              page: "marketplace/"
+          })
+        : {};
 }
 
 export default async function Page({ params }: Props) {

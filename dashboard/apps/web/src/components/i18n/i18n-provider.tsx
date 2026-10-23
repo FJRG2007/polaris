@@ -19,7 +19,8 @@ import { useRouter } from "next/navigation";
 import type { Namespace, NamespaceTranslator } from "@/lib/i18n/types";
 import { readLocaleCookie, writeLocaleCookie } from "@/lib/i18n/cookie";
 import { UiStringsProvider, type UiStrings } from "@polaris/ui";
-import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { I18nContext } from "@polaris/ui/i18n";
+import { Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { setActionFailureText } from "@/lib/run-action";
 import { useRouterSettled } from "@/components/use-router-settled";
 import {
@@ -29,13 +30,6 @@ import {
     type Locale,
     type Namespaces
 } from "@polaris/core";
-
-interface I18nState {
-    readonly locale: Locale;
-    readonly messages: Namespaces;
-}
-
-const I18nContext = createContext<I18nState | null>(null);
 
 /** The locale and the first namespaces, for everything below. Pure, so a test
  *  can render a translated component inside one without a router. */

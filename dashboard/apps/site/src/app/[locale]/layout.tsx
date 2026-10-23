@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SITE_LOCALES } from "@/data/builders";
-import { isLocale, words } from "@/lib/site";
+import { isLocale, pageMetadata, SITE_VIEWPORT } from "@/lib/site";
+
+export const viewport = SITE_VIEWPORT;
 import { SiteShell } from "@/components/site-shell";
 
 export const dynamicParams = false;
@@ -19,10 +21,7 @@ export async function generateMetadata({
     params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
     const { locale } = await params;
-    return {
-        title: "Polaris",
-        description: isLocale(locale) ? words(locale).meta.description : undefined
-    };
+    return isLocale(locale) ? pageMetadata(locale, {}) : {};
 }
 
 export default async function LocaleLayout({

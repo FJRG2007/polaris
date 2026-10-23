@@ -7,7 +7,9 @@ import { join } from "node:path";
 import en from "@/messages/en.json";
 import es from "@/messages/es.json";
 import { readFileSync } from "node:fs";
+import type { Metadata, Viewport } from "next";
 import type { SiteData, SiteLocale } from "@/data/builders";
+import type { SearchRecord } from "@/components/docs-search";
 
 export type Words = typeof en;
 
@@ -40,4 +42,91 @@ export function href(locale: SiteLocale, page = ""): string {
 /** Whether a locale segment is one the site is built in. */
 export function isLocale(value: string): value is SiteLocale {
     return value === "en" || value === "es";
+}
+
+/** Where the site is published, for the absolute addresses a shared link needs. */
+const SITE_ORIGIN = process.env.SITE_ORIGIN ?? "https://fjrg2007.github.io";
+
+/** The browser's colour around the page: the dashboard's dark background. */
+export const SITE_VIEWPORT: Viewport = { themeColor: "#0b0c0e" };
+
+/**
+ * A page's title, description, icons and link preview in one locale, so a
+ * link pasted into a chat shows Polaris's mark, the page's own title and a
+ * real screenshot of the product.
+ */
+export function pageMetadata(
+    locale: SiteLocale,
+    { title, description, page = "" }: { title?: string; description?: string; page?: string }
+): Metadata {
+    const t = words(locale).meta;
+    const full = title ? `${title} - Polaris` : "Polaris";
+    const summary = description ?? t.description;
+    const lead = siteData().locales[locale].showcase[0]?.items[0];
+    const image = lead ? { url: asset(`media/${lead.dark}`), alt: t.ogAlt } : undefined;
+    const url = asset(href(locale, page));
+    return {
+        metadataBase: new URL(SITE_ORIGIN),
+        title: full,
+        description: summary,
+        alternates: {
+            canonical: url,
+            languages: { en: asset(href("en", page)), es: asset(href("es", page)) }
+        },
+        icons: {
+            icon: [
+                { url: asset("favicon.ico"), sizes: "any" },
+                { url: asset("icon.svg"), type: "image/svg+xml" }
+            ],
+            apple: asset("apple-touch-icon.png")
+        },
+        manifest: asset("manifest.webmanifest"),
+        openGraph: {
+            type: "website",
+            siteName: "Polaris",
+            title: full,
+            description: summary,
+            url,
+            locale: locale === "es" ? "es_ES" : "en_US",
+            images: image ? [image] : undefined
+        },
+        twitter: {
+            card: "summary_large_image",
+            title: full,
+            description: summary,
+            images: image ? [image] : undefined
+        }
+    };
+}
+
+/** What the docs search looks through: every guide's sections and every API operation. */
+export function searchRecords(locale: SiteLocale): SearchRecord[] {
+    const { docs, api } = siteData();
+    const records: SearchRecord[] = [];
+    for (const page of docs[locale]) {
+        const at = asset(href(locale, `docs/${page.slug}/`));
+        records.push({
+            title: page.title,
+            section: page.summary,
+            href: at,
+            text: page.text[""] ?? ""
+        });
+        for (const heading of page.headings)
+            records.push({
+                title: heading.text,
+                section: page.title,
+                href: `${at}#${heading.id}`,
+                text: page.text[heading.id] ?? ""
+            });
+    }
+    const reference = asset(href(locale, "docs/api/"));
+    for (const group of api.groups)
+        for (const op of group.operations)
+            records.push({
+                title: op.summary || op.path,
+                section: `${op.method} ${op.path}`,
+                href: `${reference}#${op.id}`,
+                text: `${group.tag} ${op.description}`
+            });
+    return records;
 }

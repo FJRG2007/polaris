@@ -94,7 +94,15 @@ describe("the assistants card", () => {
 
 describe("the page", () => {
     it("draws every card, the wide one first", async () => {
-        const source = await readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8");
+        const source =
+            await // The page and the shared layout it renders, which the public site draws too.
+            Promise.all([
+                readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8"),
+                readFile(
+                    `${SRC}../../../packages/ui/src/downloads/account/downloads-page.tsx`,
+                    "utf8"
+                )
+            ]).then((parts) => parts.join(" "));
         for (const card of [
             'id="app"',
             "<ExtensionCard",
@@ -110,7 +118,15 @@ describe("the page", () => {
     });
 
     it("offers no download for a phone, only the plain fact that it is planned", async () => {
-        const source = await readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8");
+        const source =
+            await // The page and the shared layout it renders, which the public site draws too.
+            Promise.all([
+                readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8"),
+                readFile(
+                    `${SRC}../../../packages/ui/src/downloads/account/downloads-page.tsx`,
+                    "utf8"
+                )
+            ]).then((parts) => parts.join(" "));
         const mobile = source.slice(source.indexOf('id="mobile"'));
         expect(mobile).toContain('t("downloads.mobile.planned")');
         expect(mobile).not.toContain("href=");

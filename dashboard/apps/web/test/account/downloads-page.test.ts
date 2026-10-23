@@ -23,13 +23,20 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
-const page = readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8");
-const extensionCard = readFile(`${SRC}app/(app)/account/downloads/extension-card.tsx`, "utf8");
+const page = // The page and the shared layout it renders, which the public site draws too.
+    Promise.all([
+        readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8"),
+        readFile(`${SRC}../../../packages/ui/src/downloads/account/downloads-page.tsx`, "utf8")
+    ]).then((parts) => parts.join(" "));
+const extensionCard = readFile(
+    `${SRC}../../../packages/ui/src/downloads/account/extension-card.tsx`,
+    "utf8"
+);
 // The offer is drawn by `app-download-offers` and awaited by `app-download`, and
 // its sentences live in the English catalog, so all three are what it says.
 const files = Promise.all([
     readFile(`${SRC}components/app-download.tsx`, "utf8"),
-    readFile(`${SRC}components/app-download-offers.tsx`, "utf8"),
+    readFile(`${SRC}../../../packages/ui/src/downloads/account/app-download-offers.tsx`, "utf8"),
     readFile(`${SRC}../messages/en-US/components.json`, "utf8")
 ]).then((parts) => parts.join(" "));
 
