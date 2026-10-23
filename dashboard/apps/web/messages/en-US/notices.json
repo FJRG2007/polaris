@@ -234,7 +234,12 @@
         "setBody": "This server's public address is {to}, so {count} DNS {count, plural, one {record was} other {records were}} repointed.",
         "staleTitle": "{domain} does not point at this server",
         "notUpdated": "This server now answers on {current}, but the records could not be updated: {detail}",
-        "conflict": "This server now answers on {current}, but {names} points at {contents}. Polaris does not repoint a record it did not write - change it yourself if it should name this server."
+        "conflict": "This server now answers on {current}, but {names} points at {contents}. Polaris does not repoint a record it did not write - change it yourself if it should name this server.",
+        "movedTitle": "Public address is now {to}",
+        "movedBody": "This server's public address changed from {from} to {to}. Its DNS records already point at it, so nothing had to change.",
+        "noToken": "This server now answers on {current}, but Polaris has no Cloudflare token to update {domain}. Connect one under Integrations, then press Check now on Admin -> Domains.",
+        "unreachedTitle": "{domain} still shows the old address",
+        "unreachedBody": "Polaris pointed the records at {current}, but public resolvers still answer {seen} after the record's TTL. Open Admin -> Domains to see which name still holds another record."
     },
     "preview": {
         "noSecretsTitle": "The preview of {pull} has no secrets",

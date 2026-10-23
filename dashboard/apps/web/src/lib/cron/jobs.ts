@@ -743,6 +743,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: probeAllDomains
     },
     {
+        key: "public-ip-follow",
+        // Two minutes, and first at boot: while the ISP's new address is not in
+        // the zone, the dashboard and every deployed app are unreachable, so the
+        // window this leaves is the outage. A quiet pass is two echo requests and
+        // one Cloudflare read per owned name.
+        everyMs: 2 * MINUTE,
+        // Leased: two web containers during an update would both repoint the same
+        // records and both announce it.
+        leaseMs: 5 * MINUTE,
+        run: async () => (await import("@/lib/domain-address-sync")).syncZoneAddress()
+    },
+    {
         key: "domain-security",
         // Hourly, a few domains a run: each domain is re-audited once a day,
         // and no single run spends long on lookups however many domains there are.

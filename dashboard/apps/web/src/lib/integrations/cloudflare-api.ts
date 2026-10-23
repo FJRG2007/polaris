@@ -241,6 +241,20 @@ export async function findDnsRecords(
         }));
 }
 
+/**
+ * Point an existing record at a new address, changing nothing else about it: its
+ * proxy flag, TTL and comment stay as the operator left them. A PATCH of the one
+ * field rather than a PUT of the record, which would reset whatever it did not name.
+ */
+export async function repointRecord(
+    token: string,
+    zoneId: string,
+    recordId: string,
+    content: string
+): Promise<void> {
+    await cf(token, "PATCH", `/zones/${zoneId}/dns_records/${recordId}`, { content });
+}
+
 /** Delete every record of a type/name except one, so a name that round-robined between
  *  several addresses ends up pointing only where the caller asked. */
 export async function pruneDnsRecords(

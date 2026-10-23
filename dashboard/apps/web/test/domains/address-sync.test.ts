@@ -1,106 +1,266 @@
 /**
- * Which stale DNS records a background sync is allowed to repoint.
+ * The public-address follower: the guided setup's "Point them at this server",
+ * run every two minutes against the operator's real zone.
  *
- * This runs unattended, every ten minutes, against the operator's real zone, and
- * the failure it exists to prevent is a domain that dies silently when the ISP
+ * The failure it exists to prevent is a domain that dies silently when the ISP
  * rotates the address. The failure it must not cause is worse: repointing a
- * record somebody put there on purpose - an apex serving the website they already
- * had - and taking a live site down to fix a domain that was not broken.
- *
- * So the rule is narrow on purpose. A record naming the address this server used
- * to answer on is one Polaris wrote and the ISP invalidated. Anything else is
- * somebody's, and gets reported rather than taken over.
+ * record somebody put there on purpose. So a record is edited only when it is one
+ * of the names the setup asked for AND it holds an address this server had.
  */
 
-import { describe, expect, it } from "vitest";
-import { classifyStale } from "@/lib/domain-address-sync";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const OLD = "198.51.100.88";
-const NEW = "198.51.100.18";
+const OLD = "52.10.0.1";
+const NEW = "52.10.0.2";
+const ELSEWHERE = "52.20.0.9";
 
-const zone = [
-    { name: "polaris.example.com", addresses: [OLD] },
-    { name: "*.polaris.example.com", addresses: [OLD] },
-    { name: "*.mc.example.com", addresses: [OLD] }
-];
+const settings = new Map<string, string>();
+const probe = vi.fn<(first?: number) => Promise<string | null>>();
+const history = vi.fn<() => Promise<string[]>>(async () => []);
+const token = vi.fn<() => Promise<string | null>>(async () => "cf-token");
+const records = new Map<string, { id: string; content: string; ttl: number; proxied: boolean }[]>();
+async function editRecord(_t: string, _z: string, id: string, content: string): Promise<void> {
+    for (const list of records.values()) for (const record of list) if (record.id === id) record.content = content;
+}
+const repoint = vi.fn(editRecord);
+const remove = vi.fn(async () => undefined);
+const find = vi.fn(async (_t: string, _z: string, _type: string, name: string) =>
+    (records.get(name) ?? []).map((record) => ({ ...record }))
+);
+const notify = vi.fn(async (_input: { type: string; body?: string }) => undefined);
+const emit = vi.fn(async () => "event-1");
+const publicA = vi.fn<(name: string) => Promise<string[]>>(async () => [NEW]);
 
-describe("what the sync corrects", () => {
-    it("repoints every name that still answers with the address we have left", () => {
-        const { ours, theirs } = classifyStale(zone, NEW, OLD);
-        expect(ours.map((entry) => entry.name)).toEqual([
-            "polaris.example.com",
-            "*.polaris.example.com",
-            "*.mc.example.com"
-        ]);
-        expect(theirs).toEqual([]);
+vi.mock("@polaris/db", () => ({
+    prisma: { user: { findMany: async () => [{ id: "admin-1" }] } }
+}));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async (key: string) => settings.get(key) ?? null,
+    setSetting: async (key: string, value: string | null) => {
+        if (value === null) settings.delete(key);
+        else settings.set(key, value);
+    }
+}));
+vi.mock("@/lib/network-service", () => ({
+    probePublicIp: (first?: number) => probe(first),
+    publicIpHistory: () => history(),
+    rememberPublicIp: async () => undefined
+}));
+vi.mock("@/lib/domain-zones", () => ({
+    getDomainZones: async () => ({ baseDomain: "example.com", zones: [] }),
+    polarisZoneHost: async () => "polaris.example.com"
+}));
+vi.mock("@/lib/domain-dns", () => ({
+    ownedZoneNames: async () => [
+        "polaris.example.com",
+        "*.polaris.example.com",
+        "plr.example.com",
+        "*.plr.example.com",
+        "*.mc.example.com"
+    ]
+}));
+vi.mock("@/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: () => token() }));
+vi.mock("@/lib/integrations/cloudflare-api", () => ({
+    findDnsRecords: find,
+    repointRecord: repoint,
+    deleteDnsRecord: remove,
+    resolveZoneForHostname: async () => ({ id: "zone-1", name: "example.com" })
+}));
+vi.mock("@/lib/notification-service", () => ({ createNotification: notify }));
+vi.mock("@/lib/automations/outbox", () => ({ emitAutomationEvent: emit }));
+vi.mock("@/lib/notifications/notice-words", () => ({
+    wordsFor: async () => (key: string) => key
+}));
+vi.mock("@/lib/dns/authoritative", () => ({ publicA: (name: string) => publicA(name) }));
+vi.mock("@/lib/backup-access", () => ({ backupAccessActive: async () => false }));
+
+const { formerAddresses, planRepoint, syncZoneAddress, PUBLISHED_KEY } = await import(
+    "@/lib/domain-address-sync"
+);
+
+function record(id: string, content: string, extra: { ttl?: number; proxied?: boolean } = {}) {
+    return { id, content, ttl: extra.ttl ?? 300, proxied: extra.proxied ?? false };
+}
+
+/** The zone as it stood after the outage: every owned name on the old address. */
+function staleZone(): void {
+    records.clear();
+    records.set("polaris.example.com", [record("a", OLD)]);
+    records.set("*.polaris.example.com", [record("b", OLD)]);
+    records.set("plr.example.com", [record("c", OLD, { proxied: true, ttl: 1 })]);
+    records.set("*.plr.example.com", [record("d", OLD)]);
+    records.set("*.mc.example.com", [record("e", OLD)]);
+    records.set("example.com", [record("apex", ELSEWHERE)]);
+}
+
+beforeEach(() => {
+    settings.clear();
+    vi.clearAllMocks();
+    repoint.mockImplementation(editRecord);
+    probe.mockResolvedValue(NEW);
+    history.mockResolvedValue([]);
+    token.mockResolvedValue("cf-token");
+    publicA.mockResolvedValue([NEW]);
+    staleZone();
+});
+
+describe("which records are ours", () => {
+    it("is only the published address once there is one", () => {
+        expect([...formerAddresses(OLD, [ELSEWHERE], [], NEW)]).toEqual([OLD]);
     });
 
-    it("does nothing at all once they agree", () => {
-        const settled = zone.map((entry) => ({ ...entry, addresses: [NEW] }));
-        const { ours, theirs } = classifyStale(settled, NEW, OLD);
-        expect(ours).toEqual([]);
-        expect(theirs).toEqual([]);
+    it("falls back to former detections and the dashboard's own record before anything was published", () => {
+        const former = formerAddresses(null, ["52.30.0.1"], [record("a", OLD)], NEW);
+        expect([...former].sort()).toEqual(["52.30.0.1", OLD].sort());
     });
 
-    it("counts a name that answers with the new address among others as settled", () => {
-        // Cloudflare is mid-propagation, or a second record is on its way out. The
-        // name reaches this server, which is what the sync is for.
-        const { ours } = classifyStale(
-            [{ name: "a.example.com", addresses: [OLD, NEW] }],
-            NEW,
-            OLD
-        );
-        expect(ours).toEqual([]);
+    it("does not learn an address from a proxied dashboard record", () => {
+        expect([...formerAddresses(null, [], [record("a", "104.16.0.1", { proxied: true })], NEW)]).toEqual([]);
+    });
+
+    it("never counts the current or a private address", () => {
+        expect([...formerAddresses(null, [NEW, "10.0.0.5"], [], NEW)]).toEqual([]);
     });
 });
 
-describe("what the sync refuses to touch", () => {
-    it("leaves a record that was never this server", () => {
-        // The apex, serving the website they already had. Repointing it to fix a
-        // subdomain would be an outage caused by the thing preventing outages.
-        const apex = [{ name: "example.com", addresses: ["203.0.113.10"] }];
-        const { ours, theirs } = classifyStale(apex, NEW, OLD);
-        expect(ours).toEqual([]);
-        expect(theirs.map((entry) => entry.name)).toEqual(["example.com"]);
-    });
-
-    it("takes over nothing when it has no former address to recognise ours by", () => {
-        // A process that has just started cannot tell its own old address from a
-        // stranger's, so it reports and lets somebody look.
-        const { ours, theirs } = classifyStale(zone, NEW, null);
-        expect(ours).toEqual([]);
-        expect(theirs).toHaveLength(3);
-    });
-
-    it("does not treat a name that resolves to nothing as stale", () => {
-        // Absent, not wrong. Creating it is the guided setup's job, done in front
-        // of somebody, not a correction made behind their back.
-        const { ours, theirs } = classifyStale(
-            [{ name: "new.example.com", addresses: [] }],
+describe("the plan", () => {
+    it("edits a stale record of ours in place and leaves a foreign one", () => {
+        const plan = planRepoint(
+            [
+                { name: "a.example.com", records: [record("1", OLD)] },
+                { name: "example.com", records: [record("2", ELSEWHERE)] }
+            ],
             NEW,
-            OLD
+            new Set([OLD])
         );
-        expect(ours).toEqual([]);
-        expect(theirs).toEqual([]);
+        expect(plan.repoint.map((entry) => entry.record.id)).toEqual(["1"]);
+        expect(plan.conflicts).toEqual([{ name: "example.com", content: ELSEWHERE }]);
     });
 
-    it("stays still when the address did not actually move", () => {
-        // Detection returned what we already knew, so a record disagreeing with it
-        // disagrees for some other reason - and guessing is how a working zone gets
-        // rewritten.
-        const { ours, theirs } = classifyStale(
-            [{ name: "a.example.com", addresses: ["198.51.100.4"] }],
-            OLD,
-            OLD
+    it("never adds a second record: a stale duplicate beside the current one goes", () => {
+        const plan = planRepoint(
+            [{ name: "a.example.com", records: [record("1", NEW), record("2", OLD)] }],
+            NEW,
+            new Set([OLD])
         );
-        expect(ours).toEqual([]);
-        expect(theirs.map((entry) => entry.name)).toEqual(["a.example.com"]);
+        expect(plan.repoint).toEqual([]);
+        expect(plan.drop.map((entry) => entry.record.id)).toEqual(["2"]);
     });
 
-    it("sorts a mixed zone into the half it may fix and the half it may not", () => {
-        const mixed = [...zone, { name: "example.com", addresses: ["203.0.113.10"] }];
-        const { ours, theirs } = classifyStale(mixed, NEW, OLD);
-        expect(ours).toHaveLength(3);
-        expect(theirs.map((entry) => entry.name)).toEqual(["example.com"]);
+    it("treats a name with no record as absent, not stale", () => {
+        const plan = planRepoint([{ name: "a.example.com", records: [] }], NEW, new Set([OLD]));
+        expect(plan).toEqual({ repoint: [], drop: [], conflicts: [], settled: [] });
+    });
+});
+
+describe("a run", () => {
+    it("repoints every owned name on the first run, learning the old address from the dashboard's record", async () => {
+        const result = await syncZoneAddress();
+        expect(result.repointed).toHaveLength(5);
+        expect(repoint).toHaveBeenCalledTimes(5);
+        expect(repoint.mock.calls.every((call) => call[3] === NEW)).toBe(true);
+        // The apex is somebody's website: not even read, since it is not an owned name.
+        expect(find.mock.calls.some((call) => call[3] === "example.com")).toBe(false);
+        expect(settings.get(PUBLISHED_KEY)).toBe(NEW);
+    });
+
+    it("keeps the proxy flag and TTL: only the address is sent", async () => {
+        await syncZoneAddress();
+        const call = repoint.mock.calls.find((entry) => entry[2] === "c");
+        expect(call?.slice(2)).toEqual(["c", NEW]);
+        expect(records.get("plr.example.com")?.[0]).toEqual(record("c", NEW, { proxied: true, ttl: 1 }));
+    });
+
+    it("leaves a record pointing at another host", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        records.set("*.mc.example.com", [record("e", ELSEWHERE)]);
+        const result = await syncZoneAddress();
+        expect(result.repointed).not.toContain("*.mc.example.com");
+        expect(result.conflicts).toEqual([{ name: "*.mc.example.com", content: ELSEWHERE }]);
+        expect(repoint.mock.calls.some((call) => call[2] === "e")).toBe(false);
+    });
+
+    it("does nothing when the two reads disagree", async () => {
+        probe.mockImplementation(async (first) => (first === 0 ? NEW : OLD));
+        const result = await syncZoneAddress();
+        expect(result.skipped).not.toBeNull();
+        expect(find).not.toHaveBeenCalled();
+        expect(repoint).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when a read fails", async () => {
+        probe.mockImplementation(async (first) => (first === 0 ? NEW : null));
+        await syncZoneAddress();
+        expect(repoint).not.toHaveBeenCalled();
+    });
+
+    it("is idempotent: a second run writes nothing and says nothing", async () => {
+        await syncZoneAddress();
+        repoint.mockClear();
+        notify.mockClear();
+        const second = await syncZoneAddress();
+        expect(second.repointed).toEqual([]);
+        expect(repoint).not.toHaveBeenCalled();
+        expect(remove).not.toHaveBeenCalled();
+        expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("announces a change once, with the event automations listen for", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        settings.set("network.dnsFollowLastIp", OLD);
+        await syncZoneAddress();
+        expect(notify).toHaveBeenCalledTimes(1);
+        expect(notify.mock.calls[0][0].type).toBe("domain.address-changed");
+        expect(emit).toHaveBeenCalledWith(
+            "core.event",
+            expect.objectContaining({
+                payload: { name: "network.public-ip-changed", payload: { from: OLD, to: NEW } }
+            })
+        );
+    });
+
+    it("says the address moved even when there was nothing to repoint", async () => {
+        settings.set("network.dnsFollowLastIp", OLD);
+        for (const list of records.values()) for (const entry of list) if (entry.content === OLD) entry.content = NEW;
+        await syncZoneAddress();
+        expect(notify.mock.calls.map((call) => call[0].type)).toEqual(["domain.address-moved"]);
+    });
+
+    it("notifies a failure once per streak, not once per run", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        repoint.mockRejectedValue(new Error("Authentication error"));
+        await syncZoneAddress();
+        await syncZoneAddress();
+        await syncZoneAddress();
+        const failures = notify.mock.calls.filter((call) => call[0].type === "domain.address-stale");
+        expect(failures).toHaveLength(1);
+        expect(settings.get(PUBLISHED_KEY)).toBe(OLD);
+    });
+
+    it("tells the operator plainly when there is no token to update with", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        token.mockResolvedValue(null);
+        await syncZoneAddress();
+        await syncZoneAddress();
+        const failures = notify.mock.calls.filter((call) => call[0].type === "domain.address-stale");
+        expect(failures).toHaveLength(1);
+        expect(failures[0][0].body).toBe("domainAddress.noToken");
+    });
+
+    it("checks the outside world after the TTL and says so once if it still sees the old address", async () => {
+        publicA.mockResolvedValue([OLD]);
+        vi.useFakeTimers({ now: new Date("2026-10-23T10:00:00Z"), toFake: ["Date"] });
+        try {
+            await syncZoneAddress();
+            expect(notify.mock.calls.some((call) => call[0].type === "domain.address-unreached")).toBe(false);
+            vi.setSystemTime(new Date("2026-10-23T10:10:00Z"));
+            await syncZoneAddress();
+            vi.setSystemTime(new Date("2026-10-23T10:12:00Z"));
+            await syncZoneAddress();
+            const unreached = notify.mock.calls.filter((call) => call[0].type === "domain.address-unreached");
+            expect(unreached).toHaveLength(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

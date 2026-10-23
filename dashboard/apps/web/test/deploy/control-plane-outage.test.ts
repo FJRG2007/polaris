@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { dnsAddressFor } from "@/lib/domain-dns";
 import { readEdgeProbe } from "@/lib/deploy/server-edge";
-import { classifyStale } from "@/lib/domain-address-sync";
+import { planRepoint } from "@/lib/domain-address-sync";
 import { intelFingerprint } from "@/lib/waf-intel-service";
 import { remoteIntelScript } from "@/lib/deploy/router-remote";
 import { needsHandedCertificate } from "@/lib/tls/managed-cert-plan";
@@ -46,13 +46,13 @@ describe("where a domain's record points", () => {
     it("is never repointed home by the address sync, before or after an outage", () => {
         // The zone sync only corrects records that named this machine's previous
         // address; a record naming another server is somebody's deliberate record.
-        const { ours, theirs } = classifyStale(
-            [{ name: "example.com", addresses: [EC2] }],
-            HOME,
-            "198.51.100.1"
+        const plan = planRepoint(
+            [{ name: "example.com", records: [{ id: "r1", content: EC2, ttl: 300, proxied: false }] }],
+            "54.0.0.20",
+            new Set(["54.0.0.30"])
         );
-        expect(ours).toEqual([]);
-        expect(theirs.map((entry) => entry.name)).toEqual(["example.com"]);
+        expect(plan.repoint).toEqual([]);
+        expect(plan.conflicts.map((entry) => entry.name)).toEqual(["example.com"]);
     });
 });
 

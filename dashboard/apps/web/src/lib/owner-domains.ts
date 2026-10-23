@@ -32,6 +32,7 @@ import { isIpv4 } from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { grantedResourceIds } from "@polaris/auth";
 import { detectPublicIp } from "./network-service";
+import { authoritativeA, propagationLeft } from "./dns/authoritative";
 import { resolve4, resolveTxt } from "node:dns/promises";
 import { getSetting, setSetting } from "./setting-store";
 import { isBaseDomain, normalizeBaseDomain, randomLabel } from "@polaris/deploy";
@@ -385,9 +386,10 @@ export async function checkOwnerDomain(owner: DomainOwner, id: string): Promise<
     const row = await prisma.ownerDomain.findFirst({ where: { id, ...ownerWhere(owner) } });
     if (!row) throw new OwnerDomainError("That domain is not one of yours");
 
+    const wildcardProbe = `${randomLabel(8)}.${row.domain}`;
     const [txt, wildcardAddresses, expectedIp] = await Promise.all([
         txtOrEmpty(`${OWNER_DOMAIN_TXT_LABEL}.${row.domain}`),
-        addressesOrEmpty(`${randomLabel(8)}.${row.domain}`),
+        addressesOrEmpty(wildcardProbe),
         detectPublicIp()
     ]);
 
@@ -395,7 +397,15 @@ export async function checkOwnerDomain(owner: DomainOwner, id: string): Promise<
     // Without a known public IP the record can only be confirmed to exist, not
     // compared - which is still the useful half of the answer, and better than
     // refusing a domain because this box cannot work out its own address.
-    const pointsHere = wildcardAddresses.length > 0 && (!expectedIp || wildcardAddresses.includes(expectedIp));
+    const resolvedHere = wildcardAddresses.length > 0 && (!expectedIp || wildcardAddresses.includes(expectedIp));
+    // This box's resolver may still hold the old answer after a change. The verdict
+    // is the zone's own nameservers': when they already answer here, the record is
+    // right and only a cached copy lags behind.
+    const left =
+        !resolvedHere && expectedIp && wildcardAddresses.length > 0
+            ? propagationLeft([await authoritativeA(wildcardProbe)], expectedIp)
+            : null;
+    const pointsHere = resolvedHere || left !== null;
 
     const detail = !owns
         ? `No ${OWNER_DOMAIN_TXT_LABEL}.${row.domain} TXT record with that value yet. Records can take a few minutes to appear.`
@@ -403,7 +413,9 @@ export async function checkOwnerDomain(owner: DomainOwner, id: string): Promise<
           ? `No DNS answer for *.${row.domain} yet. Add the wildcard record, then check again.`
           : !pointsHere
             ? `*.${row.domain} resolves to ${wildcardAddresses.join(", ")}, but this server is at ${expectedIp}.`
-            : "Verified. Services here can take hostnames under this domain.";
+            : left !== null
+              ? `Verified. The domain's nameservers already answer ${expectedIp}; cached copies of the old address expire within ${left} seconds.`
+              : "Verified. Services here can take hostnames under this domain.";
 
     const updated = await prisma.ownerDomain.update({
         where: { id: row.id },

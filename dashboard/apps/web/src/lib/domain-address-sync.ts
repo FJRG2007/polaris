@@ -5,59 +5,167 @@
  * reconnect, on a lease expiry, on nothing at all - and the moment it does, every
  * A record Polaris wrote names an address that now belongs to somebody else. The
  * domain does not degrade: it refuses connections, instantly and completely,
- * while the server sits there healthy, the router forwards correctly, and nothing
- * anywhere says what happened. The operator is left looking at a router that is
- * fine and a dashboard that reports a domain "not answering".
+ * while the server sits there healthy and nothing anywhere says what happened.
  *
- * That was the shape of it: the records are written once, by the guided setup,
- * and nothing ever revisits them. A DuckDNS subdomain configured here has been
- * re-synced every ten minutes for exactly this reason; the operator's own zone,
- * on a provider Polaris holds an API token for, had no equivalent. This is that
- * equivalent.
+ * This is the guided setup's "Point them at this server" run on a schedule, under
+ * rules that make it safe to run unattended:
  *
- * Two rules make it safe to run unattended:
+ * Nothing is written on a guess. The address has to be read twice, from two
+ * different echo services, and the two have to agree. A failed or disagreeing
+ * lookup does nothing at all.
  *
- * Nothing is written on a guess. The address has to be detected - not read from a
- * cache, not inferred - and a detection that fails means the sync does nothing at
- * all. A server that has briefly lost its internet connection must never conclude
- * from that silence that its address has changed.
+ * A record is only repointed when it was ours. The names are exactly the ones the
+ * setup asked for (`ownedZoneNames`), read from Cloudflare itself rather than from
+ * a resolver that may hold a cached answer, and a record is edited only when it
+ * holds the address Polaris last published - or, before anything was published,
+ * an address this box answered on before. Anything else is somebody's deliberate
+ * record and is reported, never taken over. The record is edited in place, so its
+ * proxy flag and TTL are the operator's, and no second record is ever added.
  *
- * A record is only repointed when it was ours. One that points at the address we
- * last knew this server by has gone stale and is corrected; one that points
- * anywhere else is somebody's deliberate record - an apex serving their existing
- * website, most often - and it is reported rather than taken over. That
- * distinction is the whole difference between a sync and an outage of its own.
+ * The earlier version recognised "ours" by the remembered detected address, read
+ * just before detecting. Seventeen other places refresh that value, and once any
+ * of them had, the old records looked like a stranger's and stayed stale for good.
+ * The published address is written only here, so nothing else can move it.
  */
 
 import { prisma } from "@polaris/db";
-import { getDomainZones } from "@/lib/domain-zones";
+import { isPublicIpv4 } from "@polaris/core";
+import { backupAccessActive } from "@/lib/backup-access";
+import { publicA } from "@/lib/dns/authoritative";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { createNotification } from "@/lib/notification-service";
-import { checkZoneDns, provisionZoneDns } from "@/lib/domain-dns";
-import { detectPublicIp, networkPublicIp } from "@/lib/network-service";
-import { readerWords } from "@/lib/i18n/reader-words";
+import { emitAutomationEvent } from "@/lib/automations/outbox";
 import { wordsFor } from "@/lib/notifications/notice-words";
+import { getDomainZones, polarisZoneHost } from "@/lib/domain-zones";
+import { ownedZoneNames } from "@/lib/domain-dns";
+import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
+import { probePublicIp, publicIpHistory, rememberPublicIp } from "@/lib/network-service";
+import {
+    deleteDnsRecord,
+    findDnsRecords,
+    repointRecord,
+    resolveZoneForHostname,
+    type CfDnsRecord
+} from "@/lib/integrations/cloudflare-api";
 
-/** How often the address is re-checked. The same cadence the DuckDNS sync runs
- *  at, and for the same reason: it is one outbound request, and the window it
- *  leaves is how long a rotated address keeps the domain down. */
-const EVERY_MS = 10 * 60 * 1000;
+/** The address Polaris last pointed its records at. Written only by this module. */
+export const PUBLISHED_KEY = "network.dnsPublishedIp";
+/** The address the last confirmed run saw, so a change is announced once. */
+const LAST_SEEN_KEY = "network.dnsFollowLastIp";
+/** The problem the current failure streak was announced for, so it is told once. */
+const FAILING_KEY = "network.dnsFollowFailing";
+/** What the last run found, for Admin -> Domains. */
+export const STATUS_KEY = "network.dnsFollowStatus";
 
-/** Long enough after start that the first tick does not compete with everything
- *  else a boot is doing, short enough that an address rotated while the box was
- *  off is corrected before anybody notices. */
-const FIRST_TICK_MS = 45_000;
+/** The event automations see when the address changes. */
+export const PUBLIC_IP_CHANGED_EVENT = "network.public-ip-changed";
+
+/** How long past the record's TTL the outside answer may still be old before it is told. */
+const REACH_GRACE_MS = 2 * 60 * 1000;
+/** What Cloudflare's "automatic" TTL (1) means in seconds. */
+const AUTO_TTL_S = 300;
+
+export type FollowProblem = "no-token" | "api" | "conflict" | "failed" | "unreached";
+
+/** What the last run found, as Admin -> Domains shows it. */
+export interface FollowStatus {
+    readonly checkedAt: string;
+    /** The address this server answers on, when two reads agreed. */
+    readonly ip: string | null;
+    readonly publishedIp: string | null;
+    readonly updatedAt: string | null;
+    readonly updatedCount: number;
+    readonly problem: FollowProblem | null;
+    /** Why, in words, when there is a problem. */
+    readonly detail: string | null;
+    /** While waiting for the outside world to see a change: when it should have. */
+    readonly reachBy: string | null;
+}
+
+/** A name the follower owns and the A records it holds today. */
+export interface OwnedName {
+    readonly name: string;
+    readonly records: readonly CfDnsRecord[];
+}
+
+export interface RepointPlan {
+    /** Records to edit in place to the current address. */
+    readonly repoint: readonly { readonly name: string; readonly record: CfDnsRecord }[];
+    /** Our stale records on a name that already has a record for the current
+     *  address: removed, so the name stops round-robining onto the old one. */
+    readonly drop: readonly { readonly name: string; readonly record: CfDnsRecord }[];
+    /** Records naming an address that was never ours. Left alone and reported. */
+    readonly conflicts: readonly { readonly name: string; readonly content: string }[];
+    /** Names already pointing only here. */
+    readonly settled: readonly string[];
+}
+
+/**
+ * Which addresses count as this server's former ones. The published address when
+ * there is one - and then only it. Before anything was published (an install that
+ * predates this, or the first run), the addresses detection has seen before, and
+ * the address the dashboard's own hostname points at: the dashboard was reached
+ * on that name, so whatever it named was this box, unless Cloudflare's proxy sits
+ * in front of it.
+ */
+export function formerAddresses(
+    published: string | null,
+    history: readonly string[],
+    dashboardRecords: readonly CfDnsRecord[],
+    current: string
+): Set<string> {
+    const candidates = published
+        ? [published]
+        : [...history, ...dashboardRecords.filter((record) => !record.proxied).map((record) => record.content)];
+    return new Set(candidates.filter((ip) => ip !== current && isPublicIpv4(ip)));
+}
+
+/**
+ * Split what the owned names hold into what may be corrected and what must not
+ * be touched. Pure, because the whole safety of running unattended is here.
+ *
+ * A name with no record is absent, not stale: creating it is the guided setup's
+ * job. A name holding several records keeps the ones that are not ours.
+ */
+export function planRepoint(
+    names: readonly OwnedName[],
+    current: string,
+    former: ReadonlySet<string>
+): RepointPlan {
+    const repoint: { name: string; record: CfDnsRecord }[] = [];
+    const drop: { name: string; record: CfDnsRecord }[] = [];
+    const conflicts: { name: string; content: string }[] = [];
+    const settled: string[] = [];
+    for (const { name, records } of names) {
+        if (records.length === 0) continue;
+        const stale = records.filter((record) => record.content !== current);
+        if (stale.length === 0) {
+            settled.push(name);
+            continue;
+        }
+        let pointsHere = records.length > stale.length;
+        for (const record of stale) {
+            if (!former.has(record.content)) {
+                conflicts.push({ name, content: record.content });
+                continue;
+            }
+            // Edit one in place; any further stale one of ours would become a second
+            // record with the same address, so it goes instead.
+            if (pointsHere) drop.push({ name, record });
+            else {
+                repoint.push({ name, record });
+                pointsHere = true;
+            }
+        }
+    }
+    return { repoint, drop, conflicts, settled };
+}
 
 export interface ZoneAddressSync {
-    /** The address the records named before, when it was one of ours. */
     readonly from: string | null;
-    /** The address this server answers on now. */
     readonly to: string | null;
-    /** Names repointed at it. */
     readonly repointed: readonly string[];
-    /** Names left alone because they point somewhere that was never this server,
-     *  with what they point at. */
     readonly conflicts: readonly { readonly name: string; readonly content: string }[];
-    /** Names that could not be written, with why. */
     readonly failed: readonly { readonly name: string; readonly detail: string }[];
     /** Why nothing was done, when nothing was. Null when the sync ran. */
     readonly skipped: string | null;
@@ -65,114 +173,194 @@ export interface ZoneAddressSync {
 
 const NOTHING: ZoneAddressSync = { from: null, to: null, repointed: [], conflicts: [], failed: [], skipped: null };
 
-/** One name in the layout and what it resolves to today. */
-export interface NamedRecord {
-    readonly name: string;
-    readonly addresses: readonly string[];
+function message(caught: unknown): string {
+    return caught instanceof Error ? caught.message : "Cloudflare refused the request";
 }
 
-/**
- * Split what no longer names this server into what this sync may correct and what
- * it must not touch.
- *
- * The whole safety of running unattended is here, so it is separate and pure. A
- * record that names the address this server used to answer on is one Polaris
- * wrote and the ISP invalidated - correcting it is the entire point. A record
- * naming anything else was put there by somebody, for something, and the obvious
- * example is the operator's apex serving the website they already had: repointing
- * that would take a live site down to fix a domain that was not broken.
- *
- * A name resolving to nothing is not stale, it is absent - creating it is the
- * guided setup's job, not a correction to make behind somebody's back.
- *
- * With no previous address known, nothing qualifies as ours. That is deliberate:
- * a fresh process cannot tell its own former address from a stranger's, and the
- * safe direction is to report rather than to take over.
- */
-export function classifyStale(
-    named: readonly NamedRecord[],
-    current: string,
-    previous: string | null
-): { readonly ours: NamedRecord[]; readonly theirs: NamedRecord[] } {
-    const stale = named.filter((entry) => entry.addresses.length > 0 && !entry.addresses.includes(current));
-    const ours = stale.filter(
-        (entry) => previous !== null && previous !== current && entry.addresses.every((address) => address === previous)
-    );
-    return { ours, theirs: stale.filter((entry) => !ours.includes(entry)) };
+async function readStatus(): Promise<FollowStatus | null> {
+    try {
+        const raw = await getSetting(STATUS_KEY);
+        return raw ? (JSON.parse(raw) as FollowStatus) : null;
+    } catch {
+        return null;
+    }
 }
 
+/** What Admin -> Domains shows: the last run's outcome and the published address. */
+export async function followStatus(): Promise<FollowStatus | null> {
+    const [status, published] = await Promise.all([readStatus(), getSetting(PUBLISHED_KEY)]);
+    if (!status) return published ? { ...EMPTY_STATUS, publishedIp: published } : null;
+    return { ...status, publishedIp: published };
+}
+
+const EMPTY_STATUS: FollowStatus = {
+    checkedAt: "",
+    ip: null,
+    publishedIp: null,
+    updatedAt: null,
+    updatedCount: 0,
+    problem: null,
+    detail: null,
+    reachBy: null
+};
+
 /**
- * Check what this server's public address is now, and repoint the zone's records
- * at it when they have fallen behind.
- *
- * Idempotent and quiet: on the overwhelming majority of runs the address has not
- * moved, the records already agree, and this costs one HTTP request and a
- * handful of DNS lookups.
+ * Read the address, and repoint the owned records that still name a former one.
+ * Idempotent and quiet: on almost every run the address has not moved, and this
+ * costs two echo requests and one Cloudflare read per owned name.
  */
 export async function syncZoneAddress(): Promise<ZoneAddressSync> {
+    if (await backupAccessActive()) return { ...NOTHING, skipped: "Backup access owns the records" };
     const config = await getDomainZones().catch(() => null);
     if (!config?.baseDomain) return { ...NOTHING, skipped: "No domain is configured" };
 
-    // Read before detecting: detection overwrites the remembered value, and the
-    // one it overwrites is how a stale record is recognised as ours.
-    const previous = await networkPublicIp().catch(() => null);
-    const current = await detectPublicIp(true).catch(() => null);
-    if (!current) return { ...NOTHING, skipped: "This server's public address could not be detected" };
-
-    const report = await checkZoneDns().catch(() => null);
-    if (!report) return { ...NOTHING, skipped: "The zone's records could not be read" };
-
-    // Everything the layout names, zones and each game's wildcard alike: a game
-    // wildcard left behind is every server of that game unreachable.
-    const named = [
-        ...report.zones.flatMap((zone) => [
-            { name: zone.host, addresses: zone.addresses },
-            { name: zone.wildcard, addresses: zone.addresses }
-        ]),
-        ...report.gameZones.map((zone) => ({ name: zone.wildcard, addresses: zone.addresses }))
-    ];
-    // Ours and out of date, or somebody else's. Only the first kind is corrected.
-    const { ours, theirs } = classifyStale(named, current, previous);
-    if (ours.length === 0 && theirs.length === 0) return { ...NOTHING, from: previous, to: current };
-    if (ours.length === 0) {
-        await warn(
-            config.baseDomain,
-            current,
-            theirs.map((entry) => ({ name: entry.name, content: entry.addresses.join(", ") }))
+    const previous = await readStatus();
+    const now = new Date();
+    const save = (status: Partial<FollowStatus>): Promise<void> =>
+        setSetting(
+            STATUS_KEY,
+            JSON.stringify({ ...EMPTY_STATUS, ...previous, ...status, checkedAt: now.toISOString() })
         );
-        return {
-            ...NOTHING,
-            from: previous,
-            to: current,
-            conflicts: theirs.map((entry) => ({ name: entry.name, content: entry.addresses.join(", ") })),
-            skipped: "The records point somewhere this server has never answered on"
-        };
+
+    // Two reads from different services, and only an agreement counts. One that
+    // fails or disagrees is a flaky lookup, never a reason to rewrite DNS.
+    const [first, second] = await Promise.all([probePublicIp(0), probePublicIp(2)]);
+    if (!first || first !== second) {
+        await save({});
+        return { ...NOTHING, skipped: "The public address could not be confirmed" };
+    }
+    const current = first;
+    await rememberPublicIp(current);
+
+    const [published, lastSeen, history] = await Promise.all([
+        getSetting(PUBLISHED_KEY),
+        getSetting(LAST_SEEN_KEY),
+        publicIpHistory()
+    ]);
+    const from = lastSeen && lastSeen !== current ? lastSeen : null;
+    if (from) await announceChange(from, current);
+    if (lastSeen !== current) await setSetting(LAST_SEEN_KEY, current);
+
+    const token = await loadCloudflareToken().catch(() => null);
+    if (!token) {
+        // Only worth saying when the records may now be wrong: on an install that
+        // never connected Cloudflare and whose address has not moved, it is noise.
+        if (from || (published && published !== current)) {
+            await fail(config.baseDomain, current, "no-token", null);
+        }
+        await save({ ip: current, problem: "no-token", detail: null });
+        return { ...NOTHING, from, to: current, skipped: "No Cloudflare token is connected" };
     }
 
-    const written = await provisionZoneDns({ overwrite: true }).catch(async (caught: unknown) => {
-        return {
-            error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.domains.recordsFailed")
-        };
+    let owned: OwnedName[];
+    let zoneId: string;
+    try {
+        zoneId = (await resolveZoneForHostname(token, config.baseDomain)).id;
+        owned = [];
+        // Sequential: Cloudflare rate-limits per account (see provisionZoneDns).
+        for (const name of await ownedZoneNames(config)) {
+            owned.push({ name, records: await findDnsRecords(token, zoneId, "A", name) });
+        }
+    } catch (caught) {
+        await fail(config.baseDomain, current, "api", message(caught));
+        await save({ ip: current, problem: "api", detail: message(caught) });
+        return { ...NOTHING, from, to: current, skipped: message(caught) };
+    }
+
+    const dashboardHost = await polarisZoneHost().catch(() => null);
+    const former = formerAddresses(
+        published,
+        history,
+        owned.find((entry) => entry.name === dashboardHost)?.records ?? [],
+        current
+    );
+    const plan = planRepoint(owned, current, former);
+
+    const repointed: string[] = [];
+    const failed: { name: string; detail: string }[] = [];
+    let ttl = 0;
+    for (const { name, record } of plan.repoint) {
+        try {
+            await repointRecord(token, zoneId, record.id, current);
+            repointed.push(name);
+            ttl = Math.max(ttl, record.ttl === undefined || record.ttl <= 1 ? AUTO_TTL_S : record.ttl);
+        } catch (caught) {
+            failed.push({ name, detail: message(caught) });
+        }
+    }
+    for (const { name, record } of plan.drop) {
+        await deleteDnsRecord(token, zoneId, record.id).catch((caught: unknown) => {
+            failed.push({ name, detail: message(caught) });
+        });
+    }
+
+    // Everything owned now points here: that is what was published.
+    if (failed.length === 0 && (repointed.length > 0 || plan.settled.length > 0) && published !== current) {
+        await setSetting(PUBLISHED_KEY, current);
+    }
+
+    const reachBy =
+        repointed.length > 0
+            ? new Date(now.getTime() + ttl * 1000 + REACH_GRACE_MS).toISOString()
+            : (previous?.reachBy ?? null);
+    const reach = reachBy ? await checkReach(config.baseDomain, dashboardHost ?? owned[0]?.name, current, reachBy, now) : null;
+
+    const problem: FollowProblem | null =
+        failed.length > 0 ? "failed" : plan.conflicts.length > 0 ? "conflict" : reach === "unreached" ? "unreached" : null;
+    const detail =
+        failed.length > 0
+            ? failed.map((entry) => `${entry.name}: ${entry.detail}`).join("; ")
+            : plan.conflicts.length > 0
+              ? plan.conflicts.map((entry) => `${entry.name} -> ${entry.content}`).join(", ")
+              : null;
+    if (problem === "failed") await fail(config.baseDomain, current, "failed", detail);
+    else if (problem === "conflict") await fail(config.baseDomain, current, "conflict", null, plan.conflicts);
+    else if (problem === null) await setSetting(FAILING_KEY, null);
+    // One notice per change: what was repointed, or that it moved with nothing to do.
+    // A problem has its own notice above, which names the new address.
+    if (repointed.length > 0) {
+        await announceUpdated(config.baseDomain, from ?? [...former][0] ?? null, current, repointed.length);
+    } else if (from && problem === null) await announceMoved(from, current);
+
+    await save({
+        ip: current,
+        problem,
+        detail,
+        reachBy: reach === "pending" ? reachBy : null,
+        ...(repointed.length > 0 ? { updatedAt: now.toISOString(), updatedCount: repointed.length } : {})
     });
-    if ("error" in written) {
-        await warn(config.baseDomain, current, [], written.error);
-        return { ...NOTHING, from: previous, to: current, skipped: written.error };
-    }
-
-    const repointed = [...written.created, ...written.replaced];
-    if (repointed.length > 0) await announce(config.baseDomain, previous, current, repointed.length);
-    return {
-        from: previous,
-        to: current,
-        repointed,
-        conflicts: written.conflicts,
-        failed: written.failed,
-        skipped: null
-    };
+    return { from, to: current, repointed, conflicts: plan.conflicts, failed, skipped: null };
 }
 
-/** Told to whoever administers this Polaris. The address is instance-wide and
- *  belongs to nobody in particular, so it goes to the people who could act on it. */
+/**
+ * Whether the outside world sees the dashboard's hostname at the current address,
+ * asked of public resolvers rather than this box's own (which may sit behind a
+ * filter that caches). "pending" until the record's TTL plus a grace has passed;
+ * after that one notice, and the wait ends.
+ */
+async function checkReach(
+    domain: string,
+    host: string | undefined,
+    current: string,
+    reachBy: string,
+    now: Date
+): Promise<"reached" | "pending" | "unreached"> {
+    if (!host) return "reached";
+    const probe = host.startsWith("*.") ? `polaris-check.${host.slice(2)}` : host;
+    const seen = await publicA(probe);
+    if (seen.length > 0 && seen.every((address) => address === current)) return "reached";
+    if (now.getTime() < new Date(reachBy).getTime()) return "pending";
+    await notifyAdmins(async (t) => ({
+        type: "domain.address-unreached",
+        title: t("domainAddress.unreachedTitle", { domain }),
+        body: t("domainAddress.unreachedBody", { current, seen: seen.join(", ") || "-" }),
+        level: "warning",
+        actionRequired: true
+    }));
+    return "unreached";
+}
+
+/** Told to whoever administers this Polaris: the address is instance-wide. */
 async function administrators(): Promise<string[]> {
     const rows = await prisma.user
         .findMany({ where: { isAdmin: true }, select: { id: true } })
@@ -180,59 +368,73 @@ async function administrators(): Promise<string[]> {
     return rows.map((row) => row.id);
 }
 
-/** What was put right, so a domain that went down and came back is a thing that
- *  happened rather than a mystery somebody half-noticed. */
-async function announce(domain: string, from: string | null, to: string, records: number): Promise<void> {
-    for (const userId of await administrators()) {
-        const t = await wordsFor(userId, "notices");
-        await createNotification({
-            userId,
-            type: "domain.address-changed",
-            title: t("domainAddress.pointsTitle", { domain, to }),
-            body: from
-                ? t("domainAddress.changedBody", { from, to, count: records })
-                : t("domainAddress.setBody", { to, count: records }),
-            href: "/admin/domains",
-            level: "info"
-        });
-    }
-}
+type Notice = Pick<Parameters<typeof createNotification>[0], "type" | "title" | "body" | "level" | "actionRequired">;
 
-/** And what could not be, which is the case that needs somebody. */
-async function warn(
-    domain: string,
-    current: string,
-    conflicts: readonly { name: string; content: string }[],
-    detail?: string
+async function notifyAdmins(
+    build: (t: Awaited<ReturnType<typeof wordsFor<"notices">>>) => Promise<Notice> | Notice
 ): Promise<void> {
     for (const userId of await administrators()) {
         const t = await wordsFor(userId, "notices");
-        await createNotification({
+        await createNotification({ userId, href: "/admin/domains", ...(await build(t)) });
+    }
+}
+
+/** The address moved: handed to automations, whatever happens to the records. */
+async function announceChange(from: string, to: string): Promise<void> {
+    for (const userId of await administrators()) {
+        await emitAutomationEvent("core.event", {
             userId,
-            type: "domain.address-stale",
-            title: t("domainAddress.staleTitle", { domain }),
-            body: detail
-                ? t("domainAddress.notUpdated", { current, detail })
-                : t("domainAddress.conflict", {
-                      current,
-                      names: conflicts.map((entry) => entry.name).join(", "),
-                      contents: conflicts.map((entry) => entry.content).join(", ")
-                  }),
-            href: "/admin/domains",
-            level: "warning",
-            actionRequired: true
+            subjectKey: PUBLIC_IP_CHANGED_EVENT,
+            payload: { name: PUBLIC_IP_CHANGED_EVENT, payload: { from, to } },
+            dedupeKey: `${PUBLIC_IP_CHANGED_EVENT}:${userId}:${from}:${to}:${Math.floor(Date.now() / 60_000)}`
         });
     }
 }
 
-let started = false;
+/** The address moved and there was nothing to repoint and nothing wrong: still said. */
+async function announceMoved(from: string, to: string): Promise<void> {
+    await notifyAdmins((t) => ({
+        type: "domain.address-moved",
+        title: t("domainAddress.movedTitle", { to }),
+        body: t("domainAddress.movedBody", { from, to }),
+        level: "info"
+    }));
+}
 
-/** Run the sync for as long as this process lives. Idempotent, and a no-op until
- *  a domain is configured. */
-export function startZoneAddressSync(): void {
-    if (started) return;
-    started = true;
-    const tick = (): void => void syncZoneAddress().catch(() => undefined);
-    setInterval(tick, EVERY_MS).unref?.();
-    setTimeout(tick, FIRST_TICK_MS).unref?.();
+async function announceUpdated(domain: string, from: string | null, to: string, count: number): Promise<void> {
+    await notifyAdmins((t) => ({
+        type: "domain.address-changed",
+        title: t("domainAddress.pointsTitle", { domain, to }),
+        body: from ? t("domainAddress.changedBody", { from, to, count }) : t("domainAddress.setBody", { to, count }),
+        level: "info"
+    }));
+}
+
+/** A problem, told once per streak: the same problem on the next run is silent. */
+async function fail(
+    domain: string,
+    current: string,
+    problem: FollowProblem,
+    detail: string | null,
+    conflicts: readonly { name: string; content: string }[] = []
+): Promise<void> {
+    const signature = `${problem}:${current}`;
+    if ((await getSetting(FAILING_KEY)) === signature) return;
+    await setSetting(FAILING_KEY, signature);
+    await notifyAdmins((t) => ({
+        type: "domain.address-stale",
+        title: t("domainAddress.staleTitle", { domain }),
+        body:
+            problem === "no-token"
+                ? t("domainAddress.noToken", { current, domain })
+                : problem === "conflict"
+                  ? t("domainAddress.conflict", {
+                        current,
+                        names: conflicts.map((entry) => entry.name).join(", "),
+                        contents: [...new Set(conflicts.map((entry) => entry.content))].join(", ")
+                    })
+                  : t("domainAddress.notUpdated", { current, detail: detail ?? "-" }),
+        level: "warning",
+        actionRequired: true
+    }));
 }
