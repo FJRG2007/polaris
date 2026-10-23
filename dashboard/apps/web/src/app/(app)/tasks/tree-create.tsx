@@ -26,6 +26,7 @@ import { TaskCreateDialog } from "./task-create-dialog";
 import type { CreateContext } from "@/lib/tasks/space-service";
 import { CheckSquare, FileText, FolderPlus, ListPlus, Loader2, Target, Timer } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import * as polls from "./tasks-polls";
 
 /** Where a create menu was opened. */
 export interface CreateAt {
@@ -319,7 +320,7 @@ export function TreeCreate({
         }
         setLoading(true);
         void (async () => {
-            const result = await runAction(() => actions.createContextAction(at.spaceId, at.folderId), onError);
+            const result = await runAction(() => polls.createContext(at.spaceId, at.folderId), onError);
             setLoading(false);
             if (!result?.context) {
                 onClose();

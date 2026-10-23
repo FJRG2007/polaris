@@ -55,6 +55,7 @@ import {
     keepFocusOnClose,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./tasks-polls";
 
 /**
  * How a write treats the screen.
@@ -188,7 +189,7 @@ export function TaskPanel({
 
     const load = useCallback((id: string) => {
         startLoading(async () => {
-            const result = await runAction(() => actions.getTaskDetailAction(id), setError);
+            const result = await runAction(() => polls.taskDetail(id), setError);
             if (wanted.current !== id) return;
             if (result?.detail) {
                 saved.current = result.detail.task;

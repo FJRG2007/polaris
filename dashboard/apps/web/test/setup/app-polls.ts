@@ -572,3 +572,19 @@ vi.mock("@/app/(app)/account/account-polls", () => ({
         1
     )
 }));
+
+vi.mock("@/app/(app)/tasks/tasks-polls", () => ({
+    handoffChoices: forward(
+        () => import("@/app/(app)/tasks/actions"),
+        "agentHandoffChoicesAction",
+        0
+    ),
+    taskDetail: forward(() => import("@/app/(app)/tasks/actions"), "getTaskDetailAction", 1),
+    taskShare: forward(() => import("@/app/(app)/tasks/actions"), "getTaskShareAction", 1),
+    createContext: forward(() => import("@/app/(app)/tasks/actions"), "createContextAction", 2),
+    trackerTargets: forward(
+        () => import("@/app/(app)/tasks/trackers/actions"),
+        "trackerTargetsAction",
+        0
+    )
+}));

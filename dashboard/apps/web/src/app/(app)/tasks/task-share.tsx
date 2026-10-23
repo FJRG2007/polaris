@@ -40,6 +40,7 @@ import {
     Textarea,
     cn
 } from "@polaris/ui";
+import * as polls from "./tasks-polls";
 
 /** A link in a box with the copy control, the same shape in both blocks. */
 function LinkRow({ url, label }: { url: string; label: string }) {
@@ -118,7 +119,7 @@ export function ShareDialog({
         setError("");
         setOutcome(null);
         void (async () => {
-            const result = await runAction(() => actions.getTaskShareAction(taskId), setError);
+            const result = await runAction(() => polls.taskShare(taskId), setError);
             if (result?.error) setError(result.error);
             setPrivateUrl(result?.privateUrl ?? "");
             setShare(result?.share ?? null);

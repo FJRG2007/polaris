@@ -23,8 +23,7 @@ import {
     deleteTrackerAction,
     saveTrackerAction,
     setTrackerEnabledAction,
-    syncTrackerAction,
-    trackerTargetsAction
+    syncTrackerAction
 } from "./actions";
 import {
     Badge,
@@ -43,6 +42,7 @@ import {
     Select,
     Switch
 } from "@polaris/ui";
+import * as polls from "../tasks-polls";
 
 interface Space {
     id: string;
@@ -239,7 +239,7 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
     const [busy, startTransition] = useTransition();
 
     useEffect(() => {
-        void trackerTargetsAction().then((targets) => {
+        void polls.trackerTargets().then((targets) => {
             setSpaces(targets.spaces);
             setSpaceId((current) => current || (targets.spaces[0]?.id ?? ""));
         });

@@ -20,7 +20,7 @@ import { Bot, Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
-import { agentHandoffChoicesAction, handTaskToAgentAction } from "./actions";
+import { handTaskToAgentAction } from "./actions";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 import {
     accountOf,
@@ -39,6 +39,7 @@ import {
     Select,
     Textarea
 } from "@polaris/ui";
+import * as polls from "./tasks-polls";
 
 interface Props {
     taskId: string;
@@ -102,7 +103,7 @@ function HandOffDialog({
     const router = useRouter();
 
     useEffect(() => {
-        void agentHandoffChoicesAction().then((choices) => {
+        void polls.handoffChoices().then((choices) => {
             setRepos(choices.repos);
             setAgents(choices.agents);
             setRepoId((current) => current || (choices.repos[0]?.id ?? ""));

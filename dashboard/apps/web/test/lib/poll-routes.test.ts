@@ -130,7 +130,12 @@ const actions = vi.hoisted(() => {
         "serverFollowStateAction",
         "githubKeysAction",
         "leftoverAutoRemoveAction",
-        "sharedHostAction"
+        "sharedHostAction",
+        "agentHandoffChoicesAction",
+        "getTaskDetailAction",
+        "getTaskShareAction",
+        "createContextAction",
+        "trackerTargetsAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -369,6 +374,15 @@ vi.mock("@/app/(app)/account/sessions/actions", () => ({
 vi.mock("@/app/(app)/apps/servers/ssh-key-actions", () => ({
     githubKeysAction: actions.githubKeysAction
 }));
+vi.mock("@/app/(app)/tasks/actions", () => ({
+    agentHandoffChoicesAction: actions.agentHandoffChoicesAction,
+    getTaskDetailAction: actions.getTaskDetailAction,
+    getTaskShareAction: actions.getTaskShareAction,
+    createContextAction: actions.createContextAction
+}));
+vi.mock("@/app/(app)/tasks/trackers/actions", () => ({
+    trackerTargetsAction: actions.trackerTargetsAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -509,7 +523,12 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/servers/github-keys": () => import("@/app/api/servers/github-keys/route"),
     "/api/servers/leftover-auto-remove": () =>
         import("@/app/api/servers/leftover-auto-remove/route"),
-    "/api/servers/shared-host": () => import("@/app/api/servers/shared-host/route")
+    "/api/servers/shared-host": () => import("@/app/api/servers/shared-host/route"),
+    "/api/tasks/agent-handoff": () => import("@/app/api/tasks/agent-handoff/route"),
+    "/api/tasks/detail": () => import("@/app/api/tasks/detail/route"),
+    "/api/tasks/share": () => import("@/app/api/tasks/share/route"),
+    "/api/tasks/create-context": () => import("@/app/api/tasks/create-context/route"),
+    "/api/tasks/trackers/targets": () => import("@/app/api/tasks/trackers/targets/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -1968,6 +1987,66 @@ const CASES: Case[] = [
             ).sharedHost("hostId-1"),
         action: "sharedHostAction",
         args: ["hostId-1"]
+    },
+    {
+        name: "the repositories and agents a task can be handed to",
+        path: "/api/tasks/agent-handoff",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/tasks/tasks-polls")>(
+                    "@/app/(app)/tasks/tasks-polls"
+                )
+            ).handoffChoices(),
+        action: "agentHandoffChoicesAction",
+        args: []
+    },
+    {
+        name: "one task's detail for its panel",
+        path: "/api/tasks/detail",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/tasks/tasks-polls")>(
+                    "@/app/(app)/tasks/tasks-polls"
+                )
+            ).taskDetail("taskId-1"),
+        action: "getTaskDetailAction",
+        args: ["taskId-1"]
+    },
+    {
+        name: "a task's share link and its settings",
+        path: "/api/tasks/share",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/tasks/tasks-polls")>(
+                    "@/app/(app)/tasks/tasks-polls"
+                )
+            ).taskShare("taskId-1"),
+        action: "getTaskShareAction",
+        args: ["taskId-1"]
+    },
+    {
+        name: "a space's vocabulary for a new task",
+        path: "/api/tasks/create-context",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/tasks/tasks-polls")>(
+                    "@/app/(app)/tasks/tasks-polls"
+                )
+            ).createContext("spaceId-1", "folderId-1"),
+        action: "createContextAction",
+        args: ["spaceId-1", "folderId-1"]
+    },
+    {
+        name: "the spaces and lists a tracker can file into",
+        path: "/api/tasks/trackers/targets",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/tasks/tasks-polls")>(
+                    "@/app/(app)/tasks/tasks-polls"
+                )
+            ).trackerTargets(),
+        action: "trackerTargetsAction",
+        args: []
     }
 ];
 
