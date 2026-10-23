@@ -120,7 +120,9 @@ describe("a camera quiet longer than the grace window", () => {
             })
         ];
 
-        const { container } = render(<CamerasView canManage canControl openId={null} header={null} />);
+        const { container } = render(
+            <CamerasView canManage canControl openId={null} header={null} />
+        );
         await painted();
 
         expect(screen.getByText(/Not answering since/)).toBeDefined();

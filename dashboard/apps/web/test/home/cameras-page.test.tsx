@@ -188,7 +188,9 @@ describe("a visitor lent a camera", () => {
         await painted();
 
         expect(document.querySelector("table")).not.toBeNull();
-        expect(screen.queryByRole("button", { name: /Change Front door|Remove Front door/ })).toBeNull();
+        expect(
+            screen.queryByRole("button", { name: /Change Front door|Remove Front door/ })
+        ).toBeNull();
     });
 });
 

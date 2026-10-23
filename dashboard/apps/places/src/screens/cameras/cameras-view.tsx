@@ -449,37 +449,39 @@ export function CamerasView({
             <div className="flex flex-wrap items-center gap-2">
                 {loaded.length > 0 && narrowing ? (
                     <>
-                    <div className="relative min-w-0 flex-1 sm:max-w-xs">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
-                        <Input
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder={t("cameras.search")}
-                            aria-label={t("cameras.search")}
-                            className="pl-8"
-                        />
-                    </div>
-                    {areas.length > 1 ? (
-                        <Select
-                            value={zone ?? ALL_AREAS}
-                            onValueChange={(value) => setZone(value === ALL_AREAS ? null : value)}
-                            aria-label={t("cameras.area")}
-                            className="w-48"
-                            options={[
-                                {
-                                    value: ALL_AREAS,
-                                    label: t("cameras.everyArea", { count: loaded.length })
-                                },
-                                ...areas.map((area) => ({
-                                    value: area.zone,
-                                    label: t("cameras.areaCount", {
-                                        area: area.zone || t("cameras.noArea"),
-                                        count: area.count
-                                    })
-                                }))
-                            ]}
-                        />
-                    ) : null}
+                        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
+                            <Input
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                placeholder={t("cameras.search")}
+                                aria-label={t("cameras.search")}
+                                className="pl-8"
+                            />
+                        </div>
+                        {areas.length > 1 ? (
+                            <Select
+                                value={zone ?? ALL_AREAS}
+                                onValueChange={(value) =>
+                                    setZone(value === ALL_AREAS ? null : value)
+                                }
+                                aria-label={t("cameras.area")}
+                                className="w-48"
+                                options={[
+                                    {
+                                        value: ALL_AREAS,
+                                        label: t("cameras.everyArea", { count: loaded.length })
+                                    },
+                                    ...areas.map((area) => ({
+                                        value: area.zone,
+                                        label: t("cameras.areaCount", {
+                                            area: area.zone || t("cameras.noArea"),
+                                            count: area.count
+                                        })
+                                    }))
+                                ]}
+                            />
+                        ) : null}
                     </>
                 ) : null}
                 <SegmentedControl
@@ -677,55 +679,75 @@ export function CamerasView({
                                                         ) : null}
                                                         {canManage ? (
                                                             <>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            aria-label={t("cameras.changeName", {
-                                                                name: camera.name
-                                                            })}
-                                                            title={t("cameras.change")}
-                                                            onClick={() => setEditing(camera)}
-                                                        >
-                                                            <Pencil className="size-4 shrink-0" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            aria-label={t("cameras.drawAreasOn", {
-                                                                name: camera.name
-                                                            })}
-                                                            title={t("cameras.areas")}
-                                                            onClick={() => setDrawing(camera)}
-                                                        >
-                                                            <Shapes className="size-4 shrink-0" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            aria-label={t("cameras.shareName", {
-                                                                name: camera.name
-                                                            })}
-                                                            title={t("cameras.share")}
-                                                            onClick={() => setSharing(camera)}
-                                                        >
-                                                            <Share2 className="size-4 shrink-0" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            aria-label={t("cameras.removeName", {
-                                                                name: camera.name
-                                                            })}
-                                                            title={t("cameras.remove")}
-                                                            onClick={() => setRemoving(camera)}
-                                                        >
-                                                            <Trash2 className="size-4 shrink-0" />
-                                                        </Button>
-                                                        <CameraMenu
-                                                            camera={camera}
-                                                            manage={manage}
-                                                            full={false}
-                                                        />
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label={t(
+                                                                        "cameras.changeName",
+                                                                        {
+                                                                            name: camera.name
+                                                                        }
+                                                                    )}
+                                                                    title={t("cameras.change")}
+                                                                    onClick={() =>
+                                                                        setEditing(camera)
+                                                                    }
+                                                                >
+                                                                    <Pencil className="size-4 shrink-0" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label={t(
+                                                                        "cameras.drawAreasOn",
+                                                                        {
+                                                                            name: camera.name
+                                                                        }
+                                                                    )}
+                                                                    title={t("cameras.areas")}
+                                                                    onClick={() =>
+                                                                        setDrawing(camera)
+                                                                    }
+                                                                >
+                                                                    <Shapes className="size-4 shrink-0" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label={t(
+                                                                        "cameras.shareName",
+                                                                        {
+                                                                            name: camera.name
+                                                                        }
+                                                                    )}
+                                                                    title={t("cameras.share")}
+                                                                    onClick={() =>
+                                                                        setSharing(camera)
+                                                                    }
+                                                                >
+                                                                    <Share2 className="size-4 shrink-0" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label={t(
+                                                                        "cameras.removeName",
+                                                                        {
+                                                                            name: camera.name
+                                                                        }
+                                                                    )}
+                                                                    title={t("cameras.remove")}
+                                                                    onClick={() =>
+                                                                        setRemoving(camera)
+                                                                    }
+                                                                >
+                                                                    <Trash2 className="size-4 shrink-0" />
+                                                                </Button>
+                                                                <CameraMenu
+                                                                    camera={camera}
+                                                                    manage={manage}
+                                                                    full={false}
+                                                                />
                                                             </>
                                                         ) : null}
                                                     </div>
