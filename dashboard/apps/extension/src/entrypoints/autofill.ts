@@ -213,8 +213,9 @@ async function start(): Promise<void> {
     let pending: Change = "none";
     let walkedAt = 0;
     const again = (needs: Change = "rescan"): void => {
-        if (needs === "none") return;
-        if (needs === "rescan") pending = "rescan";
+        const stale = Date.now() - walkedAt > FULL_LOOK_MS;
+        if (needs === "none" && !stale) return;
+        if (needs !== "reread") pending = "rescan";
         else if (pending === "none") pending = "reread";
         if (settling !== null) return;
         settling = window.setTimeout(() => {

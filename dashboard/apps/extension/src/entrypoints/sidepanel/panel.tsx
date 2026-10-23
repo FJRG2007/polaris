@@ -188,9 +188,9 @@ export function Panel(): React.JSX.Element {
         [deliver]
     );
 
-    const connect = useCallback(async () => {
+    const connect = useCallback(async (fromKept = true) => {
         setReach("asking");
-        const kept = await LAST_SERVER.getValue().catch(() => null);
+        const kept = fromKept ? await LAST_SERVER.getValue().catch(() => null) : null;
         if (kept) {
             setServer(kept);
             setReach("ready");
@@ -200,7 +200,7 @@ export function Panel(): React.JSX.Element {
         setServer(origin);
         void LAST_SERVER.setValue(origin).catch(() => undefined);
         if (!origin) return setReach("none");
-        setReach("ready");
+        if (fromKept) setReach("ready");
         try {
             const answer = await fetch(new URL("/api/health", origin), {
                 credentials: "omit",
@@ -217,6 +217,12 @@ export function Panel(): React.JSX.Element {
         void ALLOWED_SITES.getValue().then(setAllowed);
         return ALLOWED_SITES.watch((next) => setAllowed(next ?? []));
     }, [connect]);
+
+    const lastRead = useRef<{
+        tabId: number;
+        at: number;
+        page: Promise<polar.SharedPage | null>;
+    } | null>(null);
 
     // Which page is in front, followed as the person moves around.
     const look = useCallback(async () => {
@@ -249,7 +255,9 @@ export function Panel(): React.JSX.Element {
         void look();
         const onActivated = (): void => void look();
         const onUpdated = (_id: number, change: { status?: string; url?: string }): void => {
-            if (change.status === "complete" || change.url) void look();
+            if (change.status !== "complete" && !change.url) return;
+            lastRead.current = null;
+            void look();
         };
         browser.tabs.onActivated.addListener(onActivated);
         browser.tabs.onUpdated.addListener(onUpdated);
@@ -262,11 +270,6 @@ export function Panel(): React.JSX.Element {
     }, [look]);
 
     const shared = front.site !== null && allowed.includes(front.site);
-    const lastRead = useRef<{
-        tabId: number;
-        at: number;
-        page: Promise<polar.SharedPage | null>;
-    } | null>(null);
     const readFront = useCallback((tabId: number): Promise<polar.SharedPage | null> => {
         const held = lastRead.current;
         if (held && held.tabId === tabId && Date.now() - held.at < PAGE_READ_MS) return held.page;
@@ -339,7 +342,7 @@ export function Panel(): React.JSX.Element {
             <div className="side-app">
                 <div className="side-empty">
                     <p>{t("polar.offline")}</p>
-                    <button onClick={() => void connect()}>{t("polar.retry")}</button>
+                    <button onClick={() => void connect(false)}>{t("polar.retry")}</button>
                 </div>
             </div>
         );
