@@ -120,6 +120,27 @@ export class Connection {
         this.host.phase(phase);
     }
 
+    /** "Using your local network address" while on one, otherwise null. */
+    addressWords(): string | null {
+        return this.credentials ? this.client.addressWords(this.credentials) : null;
+    }
+
+    #learnTried = false;
+
+    /**
+     * Credentials kept from before Polaris described itself have no local
+     * addresses. Learned once, over the usual address that just answered, and
+     * saved with them so the module can carry on over the local network.
+     */
+    async #learnInstance(credentials: Credentials): Promise<void> {
+        if (credentials.instance || this.#learnTried) return;
+        this.#learnTried = true;
+        const instance = await this.client.learn(credentials.address).catch(() => null);
+        if (!instance || this.credentials !== credentials) return;
+        this.credentials = { ...credentials, instance };
+        this.host.save(this.credentials);
+    }
+
     async refreshCatalogue(force: boolean): Promise<void> {
         const credentials = this.credentials;
         if (!credentials) return;
@@ -133,6 +154,7 @@ export class Connection {
             this.latest = listing.latest;
             this.host.catalogue(this.catalogue);
             this.#set({ phase: "online" });
+            void this.#learnInstance(credentials);
         } catch (caught) {
             this.#failed(caught);
         }
