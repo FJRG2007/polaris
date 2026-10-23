@@ -36,6 +36,11 @@ describe("siteApps", () => {
         expect(apps[2]!.comingSoon).toBe(true);
     });
 
+    it("keeps a Polaris app's logo file, and none for any other app", () => {
+        const apps = site.siteApps([app("home", { logo: "home" }), app("ark")], "en");
+        expect(apps.map((entry) => entry.logo)).toEqual([null, "home"]);
+    });
+
     it("takes a locale's words and falls back to the catalogue's own", () => {
         const [entry] = site.siteApps([app("a", { distributor: "Docker Hub" })], "es", {
             card: {

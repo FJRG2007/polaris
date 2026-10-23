@@ -433,7 +433,6 @@ export function AppLogo({
     const uid = `al${appId.replace(/[^a-zA-Z0-9]/g, "")}${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
     const logo = hasAppLogo(appId) ? LOGOS[appId]! : null;
     if (!logo) return <>{fallback}</>;
-    const [light, mid, deep] = logo.palette;
     const ids = { base: `${uid}b`, face: `${uid}f`, mask: `${uid}m` };
 
     return (
@@ -449,6 +448,23 @@ export function AppLogo({
             // in it to 16px) never shrinks a logo drawn at another size.
             style={{ width: size, height: size, flexShrink: 0 }}
         >
+            {drawLogo(logo, ids)}
+        </svg>
+    );
+}
+
+/** The ids one drawing of a logo names its gradients and mask by. */
+interface LogoIds {
+    readonly base: string;
+    readonly face: string;
+    readonly mask: string;
+}
+
+/** A logo's gradients and glyph, the contents of an `<svg viewBox="0 0 32 32">`. */
+function drawLogo(logo: LogoDefinition, ids: LogoIds): ReactNode {
+    const [light, mid, deep] = logo.palette;
+    return (
+        <>
             <defs>
                 <linearGradient
                     id={ids.base}
@@ -475,6 +491,27 @@ export function AppLogo({
                 </linearGradient>
             </defs>
             {logo.draw({ base: `url(#${ids.base})`, face: `url(#${ids.face})`, mask: ids.mask })}
+        </>
+    );
+}
+
+/**
+ * The logo as a standalone SVG element for a file of its own
+ * (`assets/app-logos/<id>.svg`, written by `scripts/app-logo-files.mjs`): no
+ * page attributes, and ids named after the app so they are the same on every
+ * run and never collide with another logo's on one page. Null for an app
+ * without a logo.
+ */
+export function AppLogoFile({ appId }: { appId: string }) {
+    if (!hasAppLogo(appId)) return null;
+    const prefix = `${appId}-`;
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+            {drawLogo(LOGOS[appId]!, {
+                base: `${prefix}base`,
+                face: `${prefix}face`,
+                mask: `${prefix}mask`
+            })}
         </svg>
     );
 }
