@@ -22,8 +22,12 @@ export interface PageSummary {
     readonly openIncidents: number;
 }
 
-export async function listPages(): Promise<PageSummary[]> {
+/** Every page, or only these ones - the pages shared with somebody who does
+ *  not run status pages. */
+export async function listPages(only?: readonly string[]): Promise<PageSummary[]> {
+    if (only && only.length === 0) return [];
     const pages = await prisma.statusPage.findMany({
+        where: only ? { id: { in: [...only] } } : undefined,
         orderBy: { createdAt: "asc" },
         take: 200,
         select: {
@@ -222,6 +226,8 @@ export async function savePage(
 
 export async function deletePage(id: string): Promise<void> {
     await prisma.statusPage.deleteMany({ where: { id } });
+    // Nobody keeps a page that no longer exists.
+    await host.accessGrants.dropGrantsFor("status.page", id);
     await trySyncStatusEdge();
 }
 

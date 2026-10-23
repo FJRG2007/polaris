@@ -8,6 +8,7 @@
     },
     "errors": {
         "generic": "That did not work. Try again in a moment.",
+        "notAllowed": "This status page is not shared with you.",
         "checkInput": "Some fields are not valid. Check them and try again.",
         "pageGone": "This status page no longer exists.",
         "incidentGone": "This incident no longer exists.",
@@ -30,9 +31,11 @@
         "emptyTitle": "No status pages yet",
         "emptyBody": "Create a page, add the services it reports on, and publish it when it is ready.",
         "components": "{count} components",
-        "openIncidents": "{count} open"
+        "openIncidents": "{count} open",
+        "sharedWithYou": "Shared with you"
     },
     "page": {
+        "share": "Share access",
         "headline": {
             "operational": "All systems operational",
             "degraded": "Some systems are degraded",

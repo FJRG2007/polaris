@@ -80,7 +80,8 @@ export const GRANT_SUBJECTS = [
     "place.domain",
     "place.room",
     "watch.connectivity",
-    "watch.alarm"
+    "watch.alarm",
+    "status.page"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -157,7 +158,11 @@ export const GRANT_CAPABILITIES = {
     "watch.connectivity": ["view"],
     // One alarm: its rule, its state and whether it is firing. Changing,
     // pausing and deleting it stay with whoever made it.
-    "watch.alarm": ["view"]
+    "watch.alarm": ["view"],
+    // One status page: its components, checks, incidents and maintenance, and
+    // its title and address. Deleting it and its custom domain stay with the
+    // people who run status pages.
+    "status.page": ["edit"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -198,7 +203,8 @@ export const GRANT_ACTIONS = {
     "place.domain": ["watch"],
     "place.room": ["watch", "open", "close", "operate"],
     "watch.connectivity": [],
-    "watch.alarm": []
+    "watch.alarm": [],
+    "status.page": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

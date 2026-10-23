@@ -11,7 +11,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ExternalLink, Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Eye, Pencil, Plus, Share2, Trash2 } from "lucide-react";
+import { hostUi } from "@polaris/app-host/client";
 import {
     Button,
     ConfirmDeleteDialog,
@@ -50,8 +51,31 @@ const PUBLIC_BASE = "/status";
 
 const NEW_PAGE = { id: null, title: "", slug: "", description: "", published: false };
 
-export function StatusPagesScreen({ pageId }: { pageId: string | null }) {
-    return pageId ? <PageEditor pageId={pageId} /> : <PagesList />;
+const { ShareDialog } = hostUi.accessShareDialog;
+
+/**
+ * `manager` is whoever holds `status.manage`; anybody else here was given
+ * single pages to edit, and is offered nothing that makes, deletes or shares a
+ * page or touches its domain.
+ */
+export function StatusPagesScreen({
+    pageId,
+    manager
+}: {
+    pageId: string | null;
+    manager: boolean;
+}) {
+    return pageId ? <PageEditor pageId={pageId} manager={manager} /> : <PagesList manager={manager} />;
+}
+
+/** The marker on a page somebody shared with this reader. */
+function SharedBadge() {
+    const t = useStatusT();
+    return (
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            {t("list.sharedWithYou")}
+        </span>
+    );
 }
 
 function publicUrl(slug: string): string {
@@ -59,7 +83,7 @@ function publicUrl(slug: string): string {
     return `${window.location.origin}${PUBLIC_BASE}/${slug}`;
 }
 
-function PagesList() {
+function PagesList({ manager }: { manager: boolean }) {
     const t = useStatusT();
     const [pages, setPages] = useState<PageSummary[] | null>(() => readCache("pages"));
     const [failed, setFailed] = useState<string | null>(null);
@@ -82,9 +106,11 @@ function PagesList() {
                 title={t("list.title")}
                 description={t("list.description")}
                 actions={
-                    <Button onClick={() => setCreating(true)}>
-                        <Plus aria-hidden /> {t("list.new")}
-                    </Button>
+                    manager ? (
+                        <Button onClick={() => setCreating(true)}>
+                            <Plus aria-hidden /> {t("list.new")}
+                        </Button>
+                    ) : undefined
                 }
             />
             {failed && !pages ? (
@@ -107,7 +133,11 @@ function PagesList() {
                 <EmptyState
                     title={t("list.emptyTitle")}
                     description={t("list.emptyBody")}
-                    action={<Button onClick={() => setCreating(true)}>{t("list.new")}</Button>}
+                    action={
+                        manager ? (
+                            <Button onClick={() => setCreating(true)}>{t("list.new")}</Button>
+                        ) : undefined
+                    }
                 />
             ) : (
                 <ul className="divide-y divide-border rounded-lg border border-border bg-card">
@@ -122,6 +152,7 @@ function PagesList() {
                                     {t("list.components", { count: page.components.toString() })}
                                 </p>
                             </Link>
+                            {manager ? null : <SharedBadge />}
                             {page.openIncidents > 0 ? (
                                 <span className="shrink-0 rounded-full bg-danger/15 px-2 py-0.5 text-xs text-danger">
                                     {t("list.openIncidents", {
@@ -162,13 +193,14 @@ type Pending =
     | { kind: "incident"; id: string; name: string }
     | { kind: "maintenance"; id: string; name: string };
 
-function PageEditor({ pageId }: { pageId: string }) {
+function PageEditor({ pageId, manager }: { pageId: string; manager: boolean }) {
     const t = useStatusT();
     const locale = useStatusLocale();
     const toast = useToast();
     const [page, setPage] = useState<PageDetail | null>(() => readCache(`page:${pageId}`));
     const [failed, setFailed] = useState<string | null>(null);
     const [editing, setEditing] = useState(false);
+    const [sharing, setSharing] = useState(false);
     const [component, setComponent] = useState<{
         id: string | null;
         name: string;
@@ -282,6 +314,7 @@ function PageEditor({ pageId }: { pageId: string }) {
                 actions={
                     page ? (
                         <div className="flex flex-wrap items-center gap-2">
+                            {manager ? null : <SharedBadge />}
                             <CopyButton value={publicUrl(page.slug)} />
                             {page.published ? (
                                 <Button variant="outline" asChild>
@@ -311,6 +344,17 @@ function PageEditor({ pageId }: { pageId: string }) {
                             >
                                 <Pencil aria-hidden />
                             </Button>
+                            {manager ? (
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    aria-label={t("page.share")}
+                                    title={t("page.share")}
+                                    onClick={() => setSharing(true)}
+                                >
+                                    <Share2 aria-hidden />
+                                </Button>
+                            ) : null}
                         </div>
                     ) : null
                 }
@@ -625,24 +669,35 @@ function PageEditor({ pageId }: { pageId: string }) {
                 )}
             </section>
 
-            <DomainSection
-                pageId={page.id}
-                domain={page.customDomain}
-                published={page.published}
-                onChanged={load}
-            />
+            {manager ? (
+                <>
+                    <DomainSection
+                        pageId={page.id}
+                        domain={page.customDomain}
+                        published={page.published}
+                        onChanged={load}
+                    />
 
-            <section className="mt-10 rounded-lg border border-danger/40 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("page.deleteTitle")}</p>
-                        <p className="text-xs text-muted-foreground">{t("page.deleteBody")}</p>
-                    </div>
-                    <Button variant="danger" onClick={() => setDeleting({ kind: "page" })}>
-                        {t("page.delete")}
-                    </Button>
-                </div>
-            </section>
+                    <section className="mt-10 rounded-lg border border-danger/40 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">{t("page.deleteTitle")}</p>
+                                <p className="text-xs text-muted-foreground">{t("page.deleteBody")}</p>
+                            </div>
+                            <Button variant="danger" onClick={() => setDeleting({ kind: "page" })}>
+                                {t("page.delete")}
+                            </Button>
+                        </div>
+                    </section>
+                    <ShareDialog
+                        open={sharing}
+                        onOpenChange={setSharing}
+                        subject="status.page"
+                        subjectId={page.id}
+                        name={page.title}
+                    />
+                </>
+            ) : null}
 
             <PageDialog
                 open={editing}

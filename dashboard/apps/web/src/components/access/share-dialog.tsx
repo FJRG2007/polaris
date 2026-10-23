@@ -68,7 +68,7 @@ import {
 } from "@polaris/ui";
 
 /** The capabilities this dialog has words for, as `share.capabilities.<id>`. */
-const CAPABILITIES = new Set(["guest", "member", "admin", "view", "control"]);
+const CAPABILITIES = new Set(["guest", "member", "admin", "view", "control", "edit"]);
 
 /** What a standing looks like beside a row. Only `live` is quiet: the other four
  *  are the reason somebody is looking. */

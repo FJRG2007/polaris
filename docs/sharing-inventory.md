@@ -40,7 +40,7 @@ reason).
 | Watch | Alarms | `watch.alarm` | owner only | none | people (view; reader needs Watch itself) | add | done |
 | Watch | Servers, services, containers (metrics, uptime) | `place.server`, `place.domain` | AccessGrant via Places device | AccessGrant link `/k` | shared-with marker in Watch (servers; a lent domain is read in Places, Watch lists no domains) | add | done |
 | Watch | Webhooks | - | none | none | - | no: carries delivery secrets | - |
-| Status pages | Status page (editors) | - | owner only | public page itself | editors | add | todo |
+| Status pages | Status page (editors) | `status.page` | `status.manage` holders (every page) | public page itself | editors (edit one page; create, delete, domain stay with `status.manage`) | add | done |
 | Calendar | Calendar | - | `CalendarShare` (user, team) | none | dialog fronting CalendarShare, roles, link (read-only feed) | add | todo |
 | Calendar | Booking page | - | owner | public booking page | co-hosts | add | todo |
 | CRM | Company, person, opportunity | - | org roles (`CrmRoleRule`) | none | per-record people share | add | todo |

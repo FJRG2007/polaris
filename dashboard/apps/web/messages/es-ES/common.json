@@ -60,7 +60,8 @@
             "place.domain": "una web",
             "place.room": "una sala",
             "watch.connectivity": "el registro de conexión",
-            "watch.alarm": "una alarma"
+            "watch.alarm": "una alarma",
+            "status.page": "una página de estado"
         }
     },
     "mentions": {

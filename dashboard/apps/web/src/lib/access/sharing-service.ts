@@ -119,6 +119,18 @@ export async function requireMayShare(
             if (!alarm) throw new GrantError("You cannot share that");
             return;
         }
+        case "status.page": {
+            // Whoever runs status pages decides who else keeps one up to date.
+            if (!(await sessionCan(user, "status.manage"))) {
+                throw new GrantError("You cannot share that");
+            }
+            const page = await prisma.statusPage.findUnique({
+                where: { id: subjectId },
+                select: { id: true }
+            });
+            if (!page) throw new GrantError("You cannot share that");
+            return;
+        }
         case "watch.connectivity":
             // The record the internet alert writes, which only administrators
             // receive and read; one of them decides who else may.
@@ -340,7 +352,9 @@ export const CAPABILITY_LABELS: Record<string, { label: string; hint: string }> 
     // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
     view: { label: "Can see", hint: "Watch it and see its state. Nothing else." },
     // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
-    control: { label: "Can operate", hint: "Open, close and switch it, as well as see it." }
+    control: { label: "Can operate", hint: "Open, close and switch it, as well as see it." },
+    // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
+    edit: { label: "Can change", hint: "Change it and keep it up to date. Not delete it." }
 };
 
 /**
@@ -354,6 +368,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return "/watch/connectivity";
         case "watch.alarm":
             return "/watch/alarms";
+        case "status.page":
+            return `/status-pages/${subjectId}`;
         case "office.document":
             return "/office/shared";
         case "place.ups":

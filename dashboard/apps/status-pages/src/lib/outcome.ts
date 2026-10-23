@@ -31,8 +31,17 @@ export async function requireStatusManager() {
 export async function outcome<T extends object>(
     work: (userId: string) => Promise<T>
 ): Promise<Outcome<T>> {
+    return settle(requireStatusManager, work);
+}
+
+/** Runs an action's work as whoever `gate` lets through, and turns what either
+ *  throws into an answer. */
+export async function settle<T extends object>(
+    gate: () => Promise<{ id: string }>,
+    work: (userId: string) => Promise<T>
+): Promise<Outcome<T>> {
     try {
-        const user = await requireStatusManager();
+        const user = await gate();
         return { ok: true, ...(await work(user.id)) };
     } catch (caught) {
         if (caught instanceof StatusRefusal) {

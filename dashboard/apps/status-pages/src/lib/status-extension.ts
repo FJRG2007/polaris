@@ -18,6 +18,10 @@ const MINUTE = 60 * SECOND;
 export const statusExtension: AppExtension = {
     id: "status-pages",
 
+    // Somebody given a single page to edit reaches the app without
+    // `status.manage`, and sees that page and nothing else.
+    reaches: async (userId) => (await import("./page-access")).reachesAnyPage(userId),
+
     jobs: () => [
         {
             key: "status-checks",
