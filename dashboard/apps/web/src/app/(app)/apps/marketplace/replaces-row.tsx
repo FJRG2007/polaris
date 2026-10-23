@@ -7,8 +7,9 @@
  */
 
 import { cn } from "@polaris/ui";
+import { ReplacedLogos } from "@polaris/ui/built-in-apps";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { appReplaces, replacedLogoSrc } from "@/lib/apps/replaces";
+import { replacedLogos } from "@/lib/apps/replaces";
 
 export function ReplacesRow({
     appId,
@@ -21,41 +22,9 @@ export function ReplacesRow({
     className?: string;
 }) {
     const t = useTranslations("marketplace");
-    const items = appReplaces(appId);
+    const items = replacedLogos(appId);
     if (items.length === 0) return null;
-    const size = compact ? 20 : 28;
-    const list = (
-        <ul
-            aria-label={t("detail.replaces")}
-            className={cn(
-                "flex min-w-0 flex-wrap items-center",
-                compact ? "gap-1" : "gap-x-4 gap-y-2"
-            )}
-        >
-            {items.map((item) => (
-                <li
-                    key={item.name}
-                    data-replaces={item.logo}
-                    title={item.name}
-                    className="flex min-w-0 items-center gap-1.5"
-                >
-                    <img
-                        src={replacedLogoSrc(item)}
-                        alt={item.name}
-                        width={size}
-                        height={size}
-                        className="shrink-0"
-                        style={{ width: size, height: size }}
-                    />
-                    {compact ? null : (
-                        <span aria-hidden="true" className="text-muted-foreground truncate text-sm">
-                            {item.name}
-                        </span>
-                    )}
-                </li>
-            ))}
-        </ul>
-    );
+    const list = <ReplacedLogos items={items} label={t("detail.replaces")} compact={compact} />;
     if (compact) return <div className={cn("min-w-0", className)}>{list}</div>;
     return (
         <section className={cn("flex min-w-0 flex-col gap-2", className)}>

@@ -27,7 +27,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
-import { ReplacesRow } from "./replaces-row";
+import { replacedLogos } from "@/lib/apps/replaces";
+import { BuiltInAppsSection } from "@polaris/ui/built-in-apps";
 import { useLocalizeStoreApp } from "./use-store-words";
 import { TemplateDeployDialog } from "./template-deploy-dialog";
 import { UninstallDialog } from "./uninstall-dialog";
@@ -71,7 +72,6 @@ import {
 } from "./store-card";
 import * as store from "@polaris/ui/store-card";
 import {
-    AppLogo,
     Badge,
     Button,
     Dialog,
@@ -480,50 +480,32 @@ function BuiltInSection({ query }: { query: string }) {
     const needle = query.trim().toLowerCase();
     const apps = builtInApps()
         .map((app) => ({ ...app, label: navLabel(app.label) }))
-        .filter((app) => !needle || app.label.toLowerCase().includes(needle));
-    if (apps.length === 0) return null;
+        .filter((app) => !needle || app.label.toLowerCase().includes(needle))
+        .map((app) => {
+            const Icon = app.icon;
+            return {
+                id: app.id,
+                label: app.label,
+                href: app.href,
+                replaces: replacedLogos(app.id),
+                // The plain icon only for an app that has no logo of its own.
+                fallback: (
+                    <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md border">
+                        <Icon className="size-4" aria-hidden="true" />
+                    </div>
+                )
+            };
+        });
     return (
-        <section className="flex min-w-0 flex-col gap-3" aria-label={t("polaris.builtIn")}>
-            <h2 className="text-sm font-medium text-muted-foreground">{t("polaris.builtIn")}</h2>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {apps.map((app) => {
-                    const Icon = app.icon;
-                    return (
-                        <div
-                            key={app.id}
-                            data-built-in={app.id}
-                            className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
-                        >
-                            {/* The app's own logo, the tile the launcher shows;
-                                the plain icon only for an app that has none. */}
-                            <AppLogo
-                                appId={app.id}
-                                size={36}
-                                className="shrink-0"
-                                fallback={
-                                    <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md border">
-                                        <Icon className="size-4" aria-hidden="true" />
-                                    </div>
-                                }
-                            />
-                            <div className="min-w-0 flex-1">
-                                <Link
-                                    href={app.href}
-                                    className="block truncate text-sm font-medium hover:underline"
-                                    title={app.label}
-                                >
-                                    {app.label}
-                                </Link>
-                                <ReplacesRow appId={app.id} compact className="mt-1.5" />
-                            </div>
-                            <Button asChild size="sm" variant="secondary">
-                                <Link href={app.href}>{t("card.open")}</Link>
-                            </Button>
-                        </div>
-                    );
-                })}
-            </div>
-        </section>
+        <BuiltInAppsSection
+            apps={apps}
+            words={{
+                title: t("polaris.builtIn"),
+                open: t("card.open"),
+                replaces: t("detail.replaces")
+            }}
+            link={Link}
+        />
     );
 }
 
