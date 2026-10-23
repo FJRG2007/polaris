@@ -703,6 +703,7 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
         "kind",
         "since",
         "durationSeconds",
+        "duration",
         "previous",
         "current",
         "publicIp"

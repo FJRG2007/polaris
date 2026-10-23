@@ -880,7 +880,7 @@
             "name": "Tell me when the internet comes back",
             "action": "Tell me when it comes back",
             "noticeTitle": "The internet is back",
-            "noticeBody": "It was down for {seconds} seconds."
+            "noticeBody": "It was down for {duration}."
         }
     }
 }

@@ -880,7 +880,7 @@
             "name": "Avísame cuando vuelva internet",
             "action": "Avísame cuando vuelva",
             "noticeTitle": "Internet ha vuelto",
-            "noticeBody": "Estuvo caído {seconds} segundos."
+            "noticeBody": "Estuvo caído {duration}."
         }
     }
 }

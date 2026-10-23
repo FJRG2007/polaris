@@ -148,7 +148,7 @@ export async function createAutomationAction(
                 ? {
                       title: t(`templates.${parsed.data.template}.noticeTitle`),
                       body: t(`templates.${parsed.data.template}.noticeBody`, {
-                          seconds: "{{trigger.durationSeconds}}"
+                          duration: "{{trigger.duration}}"
                       })
                   }
                 : undefined

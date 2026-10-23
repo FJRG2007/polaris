@@ -102,8 +102,8 @@ async function probeOutside(publicIp: string | null): Promise<boolean | null> {
     return answers.some((list) => list.includes(publicIp));
 }
 
-/** Measure one sample. Exported for the "Check now" action. */
-export async function measureLine(now = Date.now()): Promise<rules.LineProbe> {
+/** Measure one sample. */
+async function measureLine(now = Date.now()): Promise<rules.LineProbe> {
     const [targets, dns] = await Promise.all([probeTargets(), probeDns()]);
     let publicIp: string | null = null;
     let outside: boolean | null = null;

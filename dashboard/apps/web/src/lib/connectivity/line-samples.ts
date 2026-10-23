@@ -395,7 +395,7 @@ export interface LineReport {
     readonly ipChanges?: readonly PublicIpChangeView[];
 }
 
-/** The report as anybody it was shared with is sent it: no addresses. */
+/** The report with its addresses taken out, for a view that must not name this network. */
 export function sharedLineReport(report: LineReport): LineReport {
     const { ipChanges: _ipChanges, ...rest } = report;
     return { ...rest, now: rest.now ? { ...rest.now, publicIp: null } : null };

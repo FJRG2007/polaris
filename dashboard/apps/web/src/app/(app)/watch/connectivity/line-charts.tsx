@@ -155,27 +155,30 @@ function IpHistory({ changes }: { changes: NonNullable<LineReport["ipChanges"]> 
                 <p className="text-xs text-muted-foreground">{t("connectivity.line.ips.empty")}</p>
             ) : (
                 <ul className="flex max-h-56 flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
-                    {changes.map((change) => (
-                        <li
-                            key={`${change.at}-${change.current}`}
-                            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3 py-2 text-sm"
-                        >
-                            <span className="min-w-0 truncate font-mono" title={change.current}>
-                                {change.previous
-                                    ? t("connectivity.line.ips.changed", {
-                                          previous: change.previous,
-                                          current: change.current
-                                      })
-                                    : t("connectivity.line.ips.first", { current: change.current })}
-                            </span>
-                            <time
-                                className="shrink-0 text-xs text-muted-foreground"
-                                dateTime={change.at}
+                    {changes.map((change) => {
+                        const label = change.previous
+                            ? t("connectivity.line.ips.changed", {
+                                  previous: change.previous,
+                                  current: change.current
+                              })
+                            : t("connectivity.line.ips.first", { current: change.current });
+                        return (
+                            <li
+                                key={`${change.at}-${change.current}`}
+                                className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3 py-2 text-sm"
                             >
-                                {format.dateTime(Date.parse(change.at))}
-                            </time>
-                        </li>
-                    ))}
+                                <span className="min-w-0 truncate font-mono" title={label}>
+                                    {label}
+                                </span>
+                                <time
+                                    className="shrink-0 text-xs text-muted-foreground"
+                                    dateTime={change.at}
+                                >
+                                    {format.dateTime(Date.parse(change.at))}
+                                </time>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
         </section>

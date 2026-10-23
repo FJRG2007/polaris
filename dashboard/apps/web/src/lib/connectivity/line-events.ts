@@ -36,6 +36,19 @@ export const CONNECTIVITY_NOTICES = {
 
 type Words = (t: NamespaceTranslator<"notices">) => { title: string; body: string };
 
+function spanOf(seconds: number, t: NamespaceTranslator<"notices">): string {
+    return formatSpan(seconds * 1000, (form, values) => t(`span.${form}`, values));
+}
+
+/** The event as an automation sees it: "up" also says how long, in words. */
+export function automationPayload(event: ConnectivityEvent): Record<string, unknown> {
+    if (event.event !== "up") return event;
+    return {
+        ...event,
+        duration: spanOf(event.durationSeconds, translatorFor(DEFAULT_LOCALE, "notices"))
+    };
+}
+
 function wordsOf(event: ConnectivityEvent): Words {
     switch (event.event) {
         case "down":
@@ -46,11 +59,7 @@ function wordsOf(event: ConnectivityEvent): Words {
         case "up":
             return (t) => ({
                 title: t("connectivity.backTitle"),
-                body: t("connectivity.backBody", {
-                    duration: formatSpan(event.durationSeconds * 1000, (form, values) =>
-                        t(`span.${form}`, values)
-                    )
-                })
+                body: t("connectivity.backBody", { duration: spanOf(event.durationSeconds, t) })
             });
         case "ipChanged":
             return (t) => ({
@@ -98,7 +107,7 @@ export async function announceConnectivity(event: ConnectivityEvent): Promise<vo
         ),
         emitAutomationEvent(CONNECTIVITY_EVENT_TYPE, {
             subjectKey: event.event,
-            payload: event,
+            payload: automationPayload(event),
             dedupeKey: `connectivity:${eventKey(event)}`
         })
     ]);

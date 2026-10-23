@@ -278,7 +278,6 @@ const changeTool: McpTool<z.infer<typeof changeInput>> = {
     }
 };
 
-/** The account's alarms, for `polaris_search`. */
 // ---------------------------------------------------------------------------
 // Connectivity
 // ---------------------------------------------------------------------------
@@ -357,6 +356,7 @@ const connectivityTool: McpTool<z.infer<typeof connectivityInput>> = {
     }
 };
 
+/** The account's alarms, for `polaris_search`. */
 export const WATCH_SEARCH = defineMcpSearch({
     id: "watch.alarms",
     app: "watch",

@@ -2,8 +2,8 @@
  * The line's charts for Watch > Connectivity: latency, loss and uptime over a
  * range (`?range=24h|7d|30d|90d`), and the public address's history.
  *
- * Administrators, like the record it sits beside. A shared view is sent
- * `sharedLineReport`, without the addresses. Node runtime for Prisma.
+ * Administrators only, like the record it sits beside, so the report goes out
+ * whole, addresses included. Node runtime for Prisma.
  */
 
 import { NextResponse } from "next/server";

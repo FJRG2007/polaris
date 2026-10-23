@@ -87,6 +87,7 @@ describe("the line's card", () => {
         for (const text of ["Latency", "Packet loss", "Uptime", "Online", "Public IP history"])
             expect(html).toContain(text);
         expect(html).toContain("198.51.100.7 -&gt; 203.0.113.5");
+        expect(html).toContain('title="198.51.100.7 -&gt; 203.0.113.5"');
         expect(html).toContain("First seen: 198.51.100.7");
         expect(html).toContain("Tell me when it comes back");
     });
