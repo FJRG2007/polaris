@@ -13,6 +13,7 @@ import type { Flags } from "../args.js";
 import { meSchema } from "../schemas.js";
 import { configFile } from "../config.js";
 import { CLI_VERSION } from "../version.js";
+import { fancy } from "../ui.js";
 import { line, printJson } from "../output.js";
 import { DEFAULT_REPO, isNewerVersion, newestRelease } from "../releases.js";
 import { bundlePath, readMarker, type InstallMarker } from "./install.js";
@@ -85,20 +86,29 @@ export async function status(context: Context, flags: Flags): Promise<void> {
 
     if (flags.json) return printJson(context.io, report);
 
-    line(context.io, `CLI:      ${report.cli.version} (${report.cli.path})`);
-    line(context.io, `Config:   ${report.config}`);
+    const lines = [
+        `CLI:      ${report.cli.version} (${report.cli.path})`,
+        `Config:   ${report.config}`
+    ];
     if (report.url)
-        line(
-            context.io,
+        lines.push(
             `Polaris:  ${report.url}${report.profile ? ` (profile ${report.profile})` : " (POLARIS_TOKEN)"}`
         );
     if (report.signedIn) {
         const who = report.signedIn.name
             ? `${report.signedIn.name} <${report.signedIn.email}>`
             : report.signedIn.email;
-        line(context.io, `Signed in as ${who}`);
-        line(context.io, `Allowed to: ${report.signedIn.scopes.join(", ") || "nothing"}`);
+        lines.push(`Signed in as ${who}`);
+        lines.push(`Allowed to: ${report.signedIn.scopes.join(", ") || "nothing"}`);
     }
+    const ui = await fancy(context, flags);
+    if (ui) {
+        ui.note(lines.join("\n"), "plr status");
+        if (report.cli.updateAvailable) ui.warn("A newer CLI is out. Run plr cli update.");
+        if (report.problem) ui.error(report.problem);
+        return;
+    }
+    for (const each of lines) line(context.io, each);
     if (report.cli.updateAvailable) line(context.io, "A newer CLI is out. Run plr cli update.");
     if (report.problem) line(context.io, report.problem);
 }

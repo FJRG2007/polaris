@@ -32,8 +32,18 @@ POLARIS_URL="${POLARIS_URL:-__POLARIS_URL__}"
 # installer can tell them apart from anything else called polaris.
 MARKER="polaris-developer-cli"
 
-log() { printf 'polaris-cli: %s\n' "$1"; }
-err() { printf 'polaris-cli: %s\n' "$1" >&2; }
+# Printed in the same frame as the CLI's own prompts (src/ui.ts), in ASCII so
+# an old console draws it too: a bar down the left, a mark per step, and the
+# one thing to do next in a box of its own.
+log() { printf '|  %s\n' "$1"; }
+step() { printf '|\n*  %s\n' "$1"; }
+ok() { printf '|  [ok] %s\n' "$1"; }
+err() { printf '!  polaris-cli: %s\n' "$1" >&2; }
+next_box() {
+    rule=""
+    while [ "${#rule}" -lt $((${#1} + 4)) ]; do rule="$rule-"; done
+    printf '|\n+%s+\n|  %s  |\n+%s+\n' "$rule" "$1" "$rule"
+}
 
 # What a Polaris server install leaves on a machine, or nothing. Mirrors
 # packages/cli/src/guard.ts, plus a look at Docker for the running stack.
@@ -110,6 +120,7 @@ shell_rc() {
 }
 
 main() {
+    printf '+  Polaris CLI\n'
     case "$POLARIS_URL" in
         http://* | https://*) ;;
         *) POLARIS_URL="" ;;
@@ -157,7 +168,7 @@ main() {
 
     tmp=$(mktemp "$data/polaris.mjs.XXXXXX")
     trap 'rm -f "$tmp"' EXIT
-    log "downloading the CLI from $url"
+    step "downloading the CLI from $url"
     if ! curl -fsSL -H "User-Agent: polaris-cli-installer" -o "$tmp" "$url"; then
         err "could not download it from $url. Check that this computer can open github.com, then try again."
         exit 1
@@ -170,6 +181,7 @@ main() {
         err "the download did not match its checksum; nothing was installed. Try again."
         exit 1
     fi
+    ok "checksum matches the release"
 
     chmod 755 "$tmp"
     mv "$tmp" "$data/polaris.mjs"
@@ -199,8 +211,8 @@ main() {
         log "added $bin to PATH in $rc; open a new terminal to use plr."
     fi
 
-    log "installed plr (also polaris)."
-    log "next: plr login --url ${POLARIS_URL:-https://your-polaris}"
+    ok "installed plr (also polaris)."
+    next_box "next: plr login --url ${POLARIS_URL:-https://your-polaris}"
 }
 
 main "$@"

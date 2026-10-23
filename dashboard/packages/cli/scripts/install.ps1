@@ -37,8 +37,23 @@ function Install-PolarisCli {
     # installer can tell them apart from anything else called polaris.
     $marker = "polaris-developer-cli"
 
-    function Write-Log { param($Message) Write-Host "polaris-cli: $Message" }
-    function Write-Problem { param($Message) Write-Host "polaris-cli: $Message" -ForegroundColor Red }
+    # The same frame as the CLI's own prompts (src/ui.ts), in ASCII so an old
+    # console draws it too: a bar down the left, a mark per step, and the one
+    # thing to do next in a box of its own.
+    function Write-Log { param($Message) Write-Host "|  $Message" }
+    function Write-Step { param($Message) Write-Host "|"; Write-Host "*  $Message" }
+    function Write-Done { param($Message) Write-Host "|  [ok] $Message" -ForegroundColor Green }
+    function Write-Problem { param($Message) Write-Host "!  polaris-cli: $Message" -ForegroundColor Red }
+    function Write-NextBox {
+        param($Message)
+        $rule = "+" + ("-" * ($Message.Length + 4)) + "+"
+        Write-Host "|"
+        Write-Host $rule
+        Write-Host "|  $Message  |" -ForegroundColor Cyan
+        Write-Host $rule
+    }
+
+    Write-Host "+  Polaris CLI"
 
     $node = Get-Command node -ErrorAction SilentlyContinue
     if (-not $node) {
@@ -111,7 +126,7 @@ function Install-PolarisCli {
     }
 
     $tmp = Join-Path $dir ("polaris.mjs." + [Guid]::NewGuid().ToString("N"))
-    Write-Log "downloading the CLI from $($asset.browser_download_url)"
+    Write-Step "downloading the CLI from $($asset.browser_download_url)"
     try {
         Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile $tmp -Headers @{ "User-Agent" = "polaris-cli-installer" }
     }
@@ -130,6 +145,7 @@ function Install-PolarisCli {
         Write-Problem "the download did not match its checksum; nothing was installed. Try again."
         return
     }
+    Write-Done "checksum matches the release"
     Move-Item -Force -Path $tmp -Destination (Join-Path $dir "polaris.mjs")
 
     $installed = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -165,8 +181,8 @@ function Install-PolarisCli {
     finally { if ($key) { $key.Close() } }
     if (($env:Path -split ";") -notcontains $dir) { $env:Path = "$env:Path;$dir" }
 
-    Write-Log "installed plr (also polaris)."
-    Write-Log "next: plr login --url $(if ($url) { $url } else { 'https://your-polaris' })"
+    Write-Done "installed plr (also polaris)."
+    Write-NextBox "next: plr login --url $(if ($url) { $url } else { 'https://your-polaris' })"
 }
 
 Install-PolarisCli

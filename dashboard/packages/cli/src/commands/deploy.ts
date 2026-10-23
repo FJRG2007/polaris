@@ -13,6 +13,7 @@ import { call, refusalMessage, requireCompatible, send } from "../api.js";
 import type { Flags } from "../args.js";
 import { CliError, usage } from "../errors.js";
 import { line, printJson, table } from "../output.js";
+import { fancy, spinning, type Ui } from "../ui.js";
 import { requireSession, type Context, type Session } from "../context.js";
 import {
     buildLogSchema,
@@ -26,7 +27,7 @@ import {
 } from "../schemas.js";
 
 /** How long `--follow` waits between reads of a running service's log. */
-const FOLLOW_MS = 2000;
+export const FOLLOW_MS = 2000;
 
 /** The default number of log lines. */
 const DEFAULT_TAIL = 200;
@@ -34,13 +35,79 @@ const DEFAULT_TAIL = 200;
 /** A Docker log line starts with its RFC 3339 timestamp; it is what `since` takes. */
 const STAMP = /^(\d{4}-\d{2}-\d{2}T\S+)\s/;
 
-/** The service a reference names, asked of the server. */
+/**
+ * Choose a service from every one this sign-in reaches: the project, then the
+ * environment, then the service, each asked only when there is more than one.
+ * The reference it returns is the one the command line takes, so what was
+ * picked can be typed next time.
+ */
+export async function pickService(context: Context, session: Session, ui: Ui): Promise<string> {
+    const { projects: found } = await spinning(
+        ui,
+        {
+            start: "Reading your projects",
+            done: () => "Projects read",
+            failed: "Could not read them"
+        },
+        () =>
+            call(session.connection, "GET", "/api/v1/deploy/projects", projectsSchema, {
+                fetch: context.fetch
+            })
+    );
+    const reachable = found.filter((project) =>
+        project.environments.some((environment) => environment.services.length > 0)
+    );
+    if (reachable.length === 0)
+        throw new CliError(
+            "No services you can reach yet. Create one under Deploy in the dashboard (plr dashboard open deploy)."
+        );
+    const project =
+        reachable.length === 1
+            ? reachable[0]!
+            : await ui.select(
+                  "Which project?",
+                  reachable.map((each) => ({ value: each, label: each.name, hint: each.slug }))
+              );
+    const environments = project.environments.filter((each) => each.services.length > 0);
+    const environment =
+        environments.length === 1
+            ? environments[0]!
+            : await ui.select(
+                  "Which environment?",
+                  environments.map((each) => ({
+                      value: each,
+                      label: each.name,
+                      hint: each.isDefault ? "default" : each.slug
+                  }))
+              );
+    const service =
+        environment.services.length === 1
+            ? environment.services[0]!
+            : await ui.select(
+                  "Which service?",
+                  environment.services.map((each) => ({
+                      value: each,
+                      label: each.name,
+                      hint: each.status
+                  }))
+              );
+    const ref = `${project.slug}/${environment.slug}/${service.slug}`;
+    ui.info(`Service: ${ref}`);
+    return ref;
+}
+
+/** The service a reference names, asked of the server. With nothing named and
+ *  a person at the terminal, they choose it from a list. */
 export async function resolveService(
     context: Context,
     session: Session,
-    ref: string | undefined
+    ref: string | undefined,
+    ui: Ui | null = null
 ): Promise<ServiceDetail> {
-    const named = ref ?? context.host.env.POLARIS_SERVICE;
+    const named =
+        ref ??
+        context.host.env.POLARIS_SERVICE ??
+        (ui ? await pickService(context, session, ui) : undefined);
     if (!named)
         throw usage(
             "Name a service: project/service, project/environment/service or its id (or set POLARIS_SERVICE)."
@@ -97,13 +164,32 @@ export async function service(
     ref: string | undefined
 ): Promise<void> {
     const session = await requireSession(context, flags);
-    const found = await resolveService(context, session, ref);
+    const ui = await fancy(context, flags);
+    const found = await resolveService(context, session, ref, ui);
     if (flags.json) return printJson(context.io, found);
     const source =
         found.source.image ??
         (found.source.repository
             ? `${found.source.repository}${found.source.branch ? `#${found.source.branch}` : ""}`
             : found.source.kind);
+    if (ui) {
+        const domains = found.domains.map(
+            (domain) =>
+                `Domain:      ${domain.hostname} -> :${domain.targetPort} (${domain.enabled ? domain.health : "disabled"})`
+        );
+        ui.note(
+            [
+                `Status:      ${found.status}`,
+                `Source:      ${source}`,
+                `Auto-deploy: ${found.autoDeploy ? "on" : "off"}`,
+                `Deployment:  ${found.currentDeploymentId ?? "none yet"}`,
+                ...(domains.length ? domains : ["Domains:     none"]),
+                `Id:          ${found.id}`
+            ].join("\n"),
+            refOf(found)
+        );
+        return;
+    }
     line(context.io, `${refOf(found)}  (${found.id})`);
     line(context.io, `Status:      ${found.status}`);
     line(context.io, `Source:      ${source}`);
@@ -124,7 +210,7 @@ export async function deployments(
     ref: string | undefined
 ): Promise<void> {
     const session = await requireSession(context, flags);
-    const found = await resolveService(context, session, ref);
+    const found = await resolveService(context, session, ref, await fancy(context, flags));
     const { deployments: list } = await call(
         session.connection,
         "GET",
@@ -155,7 +241,7 @@ export async function deployments(
 }
 
 /** The last timestamp in a chunk of log, or the one there was. */
-function lastStamp(log: string, previous: string | null): string | null {
+export function lastStamp(log: string, previous: string | null): string | null {
     let found = previous;
     for (const entry of log.split("\n")) {
         const stamp = STAMP.exec(entry)?.[1];
@@ -166,7 +252,7 @@ function lastStamp(log: string, previous: string | null): string | null {
 
 export async function logs(context: Context, flags: Flags, ref: string | undefined): Promise<void> {
     const session = await requireSession(context, flags);
-    const found = await resolveService(context, session, ref);
+    const found = await resolveService(context, session, ref, await fancy(context, flags));
     const path = `/api/v1/deploy/services/${found.id}/logs`;
     const tail = flags.tail ?? DEFAULT_TAIL;
     const first = await call(session.connection, "GET", `${path}?tail=${tail}`, runtimeLogSchema, {
@@ -253,18 +339,50 @@ export async function deploy(
     ref: string | undefined
 ): Promise<void> {
     const session = await requireSession(context, flags);
+    const ui = await fancy(context, flags);
+    if (ui) {
+        ui.intro("plr service deploy");
+        const found = await resolveService(context, session, ref, ui);
+        // Asked only when the service was chosen from the list: one named on
+        // the command line or by POLARIS_SERVICE is already the decision.
+        const picked = !ref && !context.host.env.POLARIS_SERVICE;
+        if (picked && !(await ui.confirm(`Deploy ${refOf(found)} again?`, true))) {
+            ui.outro("Nothing was deployed.");
+            return;
+        }
+        const { deploymentId } = await spinning(
+            ui,
+            {
+                start: `Starting a deployment of ${refOf(found)}`,
+                done: (started) => `Deployment ${started.deploymentId} started`,
+                failed: "Polaris did not start it"
+            },
+            () => startDeploy(context, session, found)
+        );
+        if (flags.follow) {
+            ui.info("Build log:");
+            return followBuild(context, session, deploymentId);
+        }
+        ui.outro(`Watch it with plr deployment logs ${deploymentId} --follow`);
+        return;
+    }
     const found = await resolveService(context, session, ref);
-    const { deploymentId } = await call(
+    const { deploymentId } = await startDeploy(context, session, found);
+    if (flags.json) return printJson(context.io, { deploymentId });
+    line(context.io, `Deploying ${refOf(found)}: deployment ${deploymentId}.`);
+    if (flags.follow) return followBuild(context, session, deploymentId);
+    line(context.io, `Watch it with plr deployment logs ${deploymentId} --follow`);
+}
+
+/** Ask Polaris for a new deployment of a service. */
+export function startDeploy(context: Context, session: Session, found: { id: string }) {
+    return call(
         session.connection,
         "POST",
         `/api/v1/deploy/services/${found.id}/deploy`,
         deployStartedSchema,
         { fetch: context.fetch }
     );
-    if (flags.json) return printJson(context.io, { deploymentId });
-    line(context.io, `Deploying ${refOf(found)}: deployment ${deploymentId}.`);
-    if (flags.follow) return followBuild(context, session, deploymentId);
-    line(context.io, `Watch it with plr deployment logs ${deploymentId} --follow`);
 }
 
 export async function restart(
@@ -273,16 +391,39 @@ export async function restart(
     ref: string | undefined
 ): Promise<void> {
     const session = await requireSession(context, flags);
+    const ui = await fancy(context, flags);
+    if (ui) {
+        ui.intro("plr service restart");
+        const found = await resolveService(context, session, ref, ui);
+        if (!(await ui.confirm(`Restart ${refOf(found)}? It is briefly unavailable.`))) {
+            ui.outro("Nothing was restarted.");
+            return;
+        }
+        await spinning(
+            ui,
+            {
+                start: `Restarting ${refOf(found)}`,
+                done: () => `Restarted ${refOf(found)}`,
+                failed: "Polaris did not restart it"
+            },
+            () => restartService(context, session, found)
+        );
+        ui.outro("Done.");
+        return;
+    }
     const found = await resolveService(context, session, ref);
-    await call(
+    await restartService(context, session, found);
+    if (flags.json) return printJson(context.io, { restarted: true, service: found.id });
+    line(context.io, `Restarted ${refOf(found)}.`);
+}
+
+/** Ask Polaris to restart a service. */
+export function restartService(context: Context, session: Session, found: { id: string }) {
+    return call(
         session.connection,
         "POST",
         `/api/v1/deploy/services/${found.id}/restart`,
         restartedSchema,
-        {
-            fetch: context.fetch
-        }
+        { fetch: context.fetch }
     );
-    if (flags.json) return printJson(context.io, { restarted: true, service: found.id });
-    line(context.io, `Restarted ${refOf(found)}.`);
 }
