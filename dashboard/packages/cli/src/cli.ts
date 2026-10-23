@@ -107,5 +107,9 @@ export async function main(): Promise<void> {
     } finally {
         // PLR_DEBUG=1: where the time went, after the command's own output.
         context.io.err(timingReport());
+        // A prompt leaves the terminal's input open, which would keep the
+        // process waiting for a key after the command has finished.
+        process.stdin.pause();
+        (process.stdin as { unref?: () => void }).unref?.();
     }
 }
