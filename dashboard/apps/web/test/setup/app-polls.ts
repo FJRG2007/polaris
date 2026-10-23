@@ -303,6 +303,11 @@ vi.mock("@/app/(app)/home/home-polls", () => ({
         () => import("@/app/(app)/home/app-widget-actions"),
         "readAppWidgetsAction",
         0
+    ),
+    appWidgetTargets: forward(
+        () => import("@/app/(app)/home/app-widget-actions"),
+        "appWidgetTargetsAction",
+        2
     )
 }));
 
@@ -723,4 +728,12 @@ vi.mock("@/app/(app)/apps/telemetry/telemetry-polls", () => ({
 
 vi.mock("@/app/(app)/apps/agents/repos/repos-polls", () => ({
     repoAdvice: forward(() => import("@/app/(app)/apps/agents/actions"), "adviseRepoAction", 1)
+}));
+
+vi.mock("@/app/(app)/mail/mail-polls", () => ({
+    drafts: forward(() => import("@/app/(app)/mail/actions"), "listDraftsAction", 0)
+}));
+
+vi.mock("@/app/(app)/vault/vault-polls", () => ({
+    itemUses: forward(() => import("@/app/(app)/vault/vault-actions"), "itemUsesAction", 1)
 }));

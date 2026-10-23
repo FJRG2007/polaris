@@ -30,8 +30,9 @@ import { useDisplayFormat } from "@/components/display-format";
 import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, EmptyState, cn, useToast } from "@polaris/ui";
-import { discardDraftAction, listDraftsAction, retrySendAction } from "../actions";
+import { discardDraftAction, retrySendAction } from "../actions";
 import { Pencil, RotateCcw, Send, Trash2, TriangleAlert } from "lucide-react";
+import * as polls from "../mail-polls";
 
 /** How long a burst of "sending" frames is waited out before the list is asked
  *  for again: a queue sending five messages says so five times. */
@@ -71,7 +72,8 @@ export function DraftsView({ drafts: initial }: { drafts: MailDraftView[] }) {
         if (settling.current) clearTimeout(settling.current);
         settling.current = setTimeout(() => {
             settling.current = null;
-            void listDraftsAction()
+            void polls
+                .drafts()
                 .then(setDrafts)
                 .catch(() => {
                     // The list stays as the server last said; the next frame

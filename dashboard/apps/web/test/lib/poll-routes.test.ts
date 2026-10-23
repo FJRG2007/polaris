@@ -162,7 +162,10 @@ const actions = vi.hoisted(() => {
         "adviseRepoAction",
         "hookAddressAction",
         "chatWebhooksAction",
-        "thresholdChoicesAction"
+        "thresholdChoicesAction",
+        "appWidgetTargetsAction",
+        "listDraftsAction",
+        "itemUsesAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -234,7 +237,8 @@ vi.mock("@/app/(app)/apps/tunnels/actions", () => ({
     tunnelStatusesAction: actions.tunnelStatusesAction
 }));
 vi.mock("@/app/(app)/home/app-widget-actions", () => ({
-    readAppWidgetsAction: actions.readAppWidgetsAction
+    readAppWidgetsAction: actions.readAppWidgetsAction,
+    appWidgetTargetsAction: actions.appWidgetTargetsAction
 }));
 vi.mock("@/app/(app)/admin/inbox/actions", () => ({
     listConversationsAction: actions.listConversationsAction,
@@ -459,6 +463,12 @@ vi.mock("@/app/(app)/apps/telemetry/actions", () => ({
 vi.mock("@/app/(app)/apps/agents/actions", () => ({
     adviseRepoAction: actions.adviseRepoAction
 }));
+vi.mock("@/app/(app)/mail/actions", () => ({
+    listDraftsAction: actions.listDraftsAction
+}));
+vi.mock("@/app/(app)/vault/vault-actions", () => ({
+    itemUsesAction: actions.itemUsesAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -635,7 +645,10 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/automations/hook-address": () => import("@/app/api/automations/hook-address/route"),
     "/api/automations/chat-webhooks": () => import("@/app/api/automations/chat-webhooks/route"),
     "/api/automations/threshold-choices": () =>
-        import("@/app/api/automations/threshold-choices/route")
+        import("@/app/api/automations/threshold-choices/route"),
+    "/api/home/app-widget-targets": () => import("@/app/api/home/app-widget-targets/route"),
+    "/api/mail/draft-list": () => import("@/app/api/mail/draft-list/route"),
+    "/api/vault/item-uses": () => import("@/app/api/vault/item-uses/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2482,6 +2495,42 @@ const CASES: Case[] = [
             ).thresholdChoices(),
         action: "thresholdChoicesAction",
         args: []
+    },
+    {
+        name: "what an app widget on the overview can show",
+        path: "/api/home/app-widget-targets",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/home/home-polls")>(
+                    "@/app/(app)/home/home-polls"
+                )
+            ).appWidgetTargets("app-1", "kind-1"),
+        action: "appWidgetTargetsAction",
+        args: ["app-1", "kind-1"]
+    },
+    {
+        name: "the drafts list",
+        path: "/api/mail/draft-list",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/mail/mail-polls")>(
+                    "@/app/(app)/mail/mail-polls"
+                )
+            ).drafts(),
+        action: "listDraftsAction",
+        args: []
+    },
+    {
+        name: "where and when an item was used",
+        path: "/api/vault/item-uses",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/vault/vault-polls")>(
+                    "@/app/(app)/vault/vault-polls"
+                )
+            ).itemUses("itemId-1"),
+        action: "itemUsesAction",
+        args: ["itemId-1"]
     }
 ];
 
