@@ -172,7 +172,9 @@ describe("polar runs", () => {
 
     it("reads a failure chunk and ignores anything else", () => {
         expect(
-            chunkFailure(sse({ type: "data-polar-failure", data: { code: "provider", kind: "down" } }))
+            chunkFailure(
+                sse({ type: "data-polar-failure", data: { code: "provider", kind: "down" } })
+            )
         ).toEqual({ code: "provider", kind: "down" });
         expect(chunkFailure(sse({ type: "text-delta", delta: "a" }))).toBeNull();
         expect(chunkFailure(sse({ type: "data-polar-failure", data: {} }))).toBeNull();

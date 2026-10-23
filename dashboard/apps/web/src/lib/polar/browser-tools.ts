@@ -87,7 +87,10 @@ const browserInput = z.object({
     text: z.string().max(BROWSER_TYPE_MOST).optional().describe("type: the text."),
     submit: z.boolean().optional().describe("type: press Enter after."),
     keys: z.string().max(60).optional().describe('key: like "Enter", "Escape", "PageDown".'),
-    direction: z.enum(["up", "down", "left", "right"]).optional().describe("scroll: down by default."),
+    direction: z
+        .enum(["up", "down", "left", "right"])
+        .optional()
+        .describe("scroll: down by default."),
     amount: z.number().min(0.1).max(10).optional().describe("scroll: screens, 1 by default."),
     value: z.string().max(200).optional().describe("select: the option's text or value."),
     selector: browserSelector.optional().describe("read: a CSS selector to read part of the page."),
@@ -247,7 +250,6 @@ function partsOf(messages: readonly ModelMessageLike[]): ContentPart[] {
     );
 }
 
-
 /** How the person answered the card for one call, if it had one. Pure. */
 export function cardAnswerFor(
     toolCallId: string,
@@ -300,7 +302,8 @@ export function sitesApprovedIn(messages: readonly ModelMessageLike[]): Set<stri
     for (const part of parts) {
         if (part.type !== "tool-call" || !part.toolCallId || !part.toolName) continue;
         const name = part.toolName;
-        if (name !== BROWSER_TOOL && !Object.values(BROWSER_TOOLS).includes(name as never)) continue;
+        if (name !== BROWSER_TOOL && !Object.values(BROWSER_TOOLS).includes(name as never))
+            continue;
         const site = siteOfInput(name, part.input);
         if (site) calls.set(part.toolCallId, site);
     }

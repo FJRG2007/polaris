@@ -229,7 +229,9 @@ describe("approval", () => {
     ];
 
     it("checks each action's fields against the command it sends", () => {
-        expect(commandOf({ action: "scroll", site: "x.com", direction: "down" }).success).toBe(true);
+        expect(commandOf({ action: "scroll", site: "x.com", direction: "down" }).success).toBe(
+            true
+        );
         // Acting on a page names the site it is for.
         expect(commandOf({ action: "click", ref: "e2" }).success).toBe(false);
         expect(commandOf({ action: "open" }).success).toBe(false);
@@ -306,9 +308,11 @@ describe("approval", () => {
 
     it("asks before opening an address the model made up, not one the person gave", () => {
         expect(
-            browserNeedsCard({ action: "open", url: "https://evil.test/?q=secret" }, [], [
-                "evil.test"
-            ])
+            browserNeedsCard(
+                { action: "open", url: "https://evil.test/?q=secret" },
+                [],
+                ["evil.test"]
+            )
         ).toBe(true);
         const given = [{ role: "user", content: "read https://github.com/acme/app" }];
         expect(

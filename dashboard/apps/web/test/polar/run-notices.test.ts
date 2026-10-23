@@ -35,9 +35,9 @@ describe("polar run notices", () => {
             "The model did not answer (OpenRouter, MiniMax M3.1 Flash (free)). Ask again or pick another model."
         );
         expect(body).not.toContain("Open the chat");
-        expect(failedBody(es, { code: "provider", kind: "rate", provider: "OpenRouter" }, null)).toContain(
-            "OpenRouter"
-        );
+        expect(
+            failedBody(es, { code: "provider", kind: "rate", provider: "OpenRouter" }, null)
+        ).toContain("OpenRouter");
     });
 
     it("falls back to the plain sentence when the answer carried no provider failure", () => {

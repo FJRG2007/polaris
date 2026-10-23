@@ -22,11 +22,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import {
-    browserSite,
-    type BrowserCommand,
-    type BrowserResult
-} from "@polaris/core/browser-agent";
+import { browserSite, type BrowserCommand, type BrowserResult } from "@polaris/core/browser-agent";
 
 /** How long a browser counts as there after its last poll. A poll is held for
  *  `POLL_HOLD_MS`, so this is a little over two of them. */

@@ -344,9 +344,7 @@ const SCROLL_KEYS: Record<string, { x: number; y: number }> = {
  *  or the page itself - X and most feeds scroll the page, chats scroll a box. */
 function scroller(doc: Document): Element {
     const view = doc.defaultView;
-    let element = view
-        ? doc.elementFromPoint?.(view.innerWidth / 2, view.innerHeight / 2)
-        : null;
+    let element = view ? doc.elementFromPoint?.(view.innerWidth / 2, view.innerHeight / 2) : null;
     while (element && element !== doc.documentElement) {
         const style = view?.getComputedStyle(element);
         const scrolls = /(auto|scroll)/.test(`${style?.overflowY ?? ""}${style?.overflowX ?? ""}`);
@@ -395,7 +393,10 @@ export function scrollPage(
  * neither.
  */
 export function pressKeys(doc: Document, keys: string): ActOutcome {
-    const parts = keys.split("+").map((part) => part.trim()).filter(Boolean);
+    const parts = keys
+        .split("+")
+        .map((part) => part.trim())
+        .filter(Boolean);
     const key = parts.at(-1) ?? "";
     const held = new Set(parts.slice(0, -1).map((part) => part.toLowerCase()));
     const target = (doc.activeElement as HTMLElement | null) ?? doc.body;
@@ -415,7 +416,9 @@ export function pressKeys(doc: Document, keys: string): ActOutcome {
     target.dispatchEvent(new KeyboardEvent("keyup", init));
     if (handled) return { ok: true };
     const scroll = SCROLL_KEYS[named.toLowerCase()];
-    const typing = target.matches?.("input, textarea, [contenteditable=''], [contenteditable='true']");
+    const typing = target.matches?.(
+        "input, textarea, [contenteditable=''], [contenteditable='true']"
+    );
     if (scroll && !typing) {
         const view = doc.defaultView;
         view?.scrollBy({
@@ -439,10 +442,13 @@ export function hoverRef(refs: RefTable, ref: string): ActOutcome {
     if (!element) return { ok: false, refusal: "unknown-ref" };
     (element as HTMLElement).scrollIntoView?.({ block: "center" });
     for (const type of ["pointerover", "pointerenter", "mouseover", "mouseenter", "mousemove"]) {
-        const Event = type.startsWith("pointer") && typeof PointerEvent !== "undefined"
-            ? PointerEvent
-            : MouseEvent;
-        element.dispatchEvent(new Event(type, { bubbles: type.endsWith("over") || type === "mousemove" }));
+        const Event =
+            type.startsWith("pointer") && typeof PointerEvent !== "undefined"
+                ? PointerEvent
+                : MouseEvent;
+        element.dispatchEvent(
+            new Event(type, { bubbles: type.endsWith("over") || type === "mousemove" })
+        );
     }
     return { ok: true };
 }
@@ -455,7 +461,8 @@ export function selectRef(refs: RefTable, ref: string, value: string): ActOutcom
     if (!Select || !(element instanceof Select)) return { ok: false, refusal: "failed" };
     const wanted = value.trim().toLowerCase();
     const option = [...element.options].find(
-        (entry) => entry.value.toLowerCase() === wanted || entry.text.trim().toLowerCase() === wanted
+        (entry) =>
+            entry.value.toLowerCase() === wanted || entry.text.trim().toLowerCase() === wanted
     );
     if (!option) return { ok: false, refusal: "failed" };
     element.value = option.value;

@@ -137,4 +137,3 @@ describe("the browser's site card", () => {
         expect(onReject).toHaveBeenCalledTimes(1);
     });
 });
-
