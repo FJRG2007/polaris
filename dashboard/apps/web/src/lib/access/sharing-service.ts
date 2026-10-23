@@ -209,6 +209,15 @@ export async function requireMayShare(
             if (!(await getSession(subjectId, user.id))) throw new GrantError("You cannot share that");
             return;
         }
+        case "polar.project": {
+            // Only its owner shows a project to somebody else.
+            const project = await prisma.polarProject.findUnique({
+                where: { id: subjectId },
+                select: { ownerId: true }
+            });
+            if (!project || project.ownerId !== user.id) throw new GrantError("You cannot share that");
+            return;
+        }
         case "backup.plan": {
             // Only its owner shows a plan to somebody else.
             const plan = await prisma.backupPlan.findUnique({
@@ -529,6 +538,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return `/notes?note=${encodeURIComponent(subjectId)}`;
         case "backup.plan":
             return "/apps/backups";
+        case "polar.project":
+            return "/polar";
         case "agents.session":
             return `/apps/agents/sessions/${subjectId}`;
         case "dns.filter":

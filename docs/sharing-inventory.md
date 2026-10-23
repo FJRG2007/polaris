@@ -58,7 +58,7 @@ reason).
 | Firewall | Rules, views | - | administrators | none | - | no: edge security, administrators only | - |
 | Agents | Session | `agents.session` | owner + AccessGrant per session | none | people (view what was said, what it reported and where it got to, from the bell link; typing to it, stopping it, its terminal, its screen and its changes stay with whoever steers it; the reader needs the Agents app's read permission) | add | done |
 | Polar | Thread | - | `PolarShareRecipient` | Polar share link | dialog fronting it | fine | - |
-| Polar | Project | - | owner | none | people | add | todo |
+| Polar | Project | `polar.project` | owner + AccessGrant per project | none | people (view: listed in their sidebar after their own projects, its name and instructions, with Make a copy of your own; its chats stay private - a chat is shared on its own - and nothing is filed into, changed or deleted by the reader) | add | done |
 | Notes | Space | `note.space` | `NoteSpaceMember` + AccessGrant | `NoteShare` | - | fine | - |
 | Notes | Single note | `note.note` | shelf members + AccessGrant per note | `NoteShare` | people (open it, or also change its title and text; moving, pinning, archiving, deleting and sharing stay on its shelf; the reader needs the Notes app itself and opens it from the bell link, as it is not listed in their tree) | add | done |
 | Tasks | Space | `task.space` | `TaskSpaceMember` + AccessGrant | `TaskShare` | - | fine | - |

@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { polarCaller } from "@/lib/polar/access";
+import { dropGrantsFor } from "@/lib/access/grants";
 import { deletePolarProject, updatePolarProject } from "@/lib/polar/projects";
 import { projectInstructionsSchema, projectNameSchema } from "@/lib/polar/shared";
 
@@ -45,7 +46,8 @@ export async function DELETE(_request: Request, { params }: Params): Promise<Res
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
-    return (await deletePolarProject(user.id, id.data))
-        ? NextResponse.json({ ok: true })
-        : NOT_FOUND();
+    if (!(await deletePolarProject(user.id, id.data))) return NOT_FOUND();
+    // Whoever it was shared with stops finding it.
+    await dropGrantsFor("polar.project", id.data);
+    return NextResponse.json({ ok: true });
 }

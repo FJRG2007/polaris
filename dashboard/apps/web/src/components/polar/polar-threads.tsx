@@ -38,7 +38,9 @@ import {
     SquarePen,
     Trash2,
     Code2,
-    ExternalLink
+    Copy,
+    ExternalLink,
+    Users
 } from "lucide-react";
 import {
     Button,
@@ -75,6 +77,13 @@ import {
 } from "@/components/polar/polar-sharing";
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
 import { StateDot, type PolarCodeHistory } from "@/components/polar/polar-code";
+import dynamic from "next/dynamic";
+
+/** Loaded when a project is shared, not with every sidebar. */
+const ShareDialog = dynamic(
+    () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
+    { ssr: false }
+);
 
 /** The Code sessions listed beside the chats, for somebody who can open Agents. */
 export interface PolarThreadsCode {
@@ -156,6 +165,7 @@ export function PolarThreads({
         moving: PolarThreadRow | null;
     } | null>(null);
     const [deletingProject, setDeletingProject] = useState<PolarProjectRow | null>(null);
+    const [sharingProject, setSharingProject] = useState<PolarProjectRow | null>(null);
     const [folded, setFolded] = useState(false);
     useEffect(() => setFolded(readFolded()), []);
     const HideIcon = hide.icon;
@@ -163,7 +173,8 @@ export function PolarThreads({
     const sections = polarShared.threadSections(rows ?? []);
 
     const actions: RowActions = {
-        projects: projects ?? [],
+        // A chat is filed only under a project of the person's own.
+        projects: (projects ?? []).filter((project) => !project.shared),
         onOpen: (row) => onOpen(row.id),
         onRename: (row, title) => void sidebar.rename(row.id, title),
         onPin: (row, pinned) => void sidebar.setPinned(row.id, pinned),
@@ -239,6 +250,13 @@ export function PolarThreads({
                                     onNew={() => onNew(project.id)}
                                     onEdit={() => setProjectForm({ project, moving: null })}
                                     onDelete={() => setDeletingProject(project)}
+                                    onShare={() => setSharingProject(project)}
+                                    onCopy={() =>
+                                        void sidebar.createProject({
+                                            name: project.name,
+                                            instructions: project.instructions
+                                        })
+                                    }
                                 >
                                     {(sections.projects.get(project.id) ?? []).length > 0 ? (
                                         <>
@@ -329,6 +347,17 @@ export function PolarThreads({
                         setManagingShares(false);
                         onOpen(id);
                     }}
+                />
+            ) : null}
+            {sharingProject ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) setSharingProject(null);
+                    }}
+                    subject="polar.project"
+                    subjectId={sharingProject.id}
+                    name={sharingProject.name}
                 />
             ) : null}
             {projectForm ? (
@@ -536,6 +565,8 @@ function ProjectItem({
     onNew,
     onEdit,
     onDelete,
+    onShare,
+    onCopy,
     children
 }: {
     project: PolarProjectRow;
@@ -544,6 +575,8 @@ function ProjectItem({
     onNew: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    onShare: () => void;
+    onCopy: () => void;
     children: ReactNode;
 }) {
     const t = useTranslations("polar");
@@ -561,6 +594,12 @@ function ProjectItem({
                 >
                     <Icon className="size-4 shrink-0 text-foreground-subtle" />
                     <span className="min-w-0 truncate">{project.name}</span>
+                    {project.shared ? (
+                        <Users
+                            className="size-3.5 shrink-0 text-foreground-subtle"
+                            aria-label={t("history.projectShared")}
+                        />
+                    ) : null}
                 </button>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -580,30 +619,48 @@ function ProjectItem({
                             chose.current = false;
                         }}
                     >
-                        <DropdownMenuItem onSelect={onNew}>
-                            <SquarePen />
-                            {t("history.projectNewChat", { name: project.name })}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onSelect={() => {
-                                chose.current = true;
-                                onEdit();
-                            }}
-                        >
-                            <Pencil />
-                            {t("history.editProject")}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            variant="danger"
-                            onSelect={() => {
-                                chose.current = true;
-                                onDelete();
-                            }}
-                        >
-                            <Trash2 />
-                            {t("history.projectDelete")}
-                        </DropdownMenuItem>
+                        {project.shared ? (
+                            <DropdownMenuItem onSelect={onCopy}>
+                                <Copy />
+                                {t("history.projectCopy")}
+                            </DropdownMenuItem>
+                        ) : (
+                            <>
+                                <DropdownMenuItem onSelect={onNew}>
+                                    <SquarePen />
+                                    {t("history.projectNewChat", { name: project.name })}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={() => {
+                                        chose.current = true;
+                                        onEdit();
+                                    }}
+                                >
+                                    <Pencil />
+                                    {t("history.editProject")}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={() => {
+                                        chose.current = true;
+                                        onShare();
+                                    }}
+                                >
+                                    <Share2 />
+                                    {t("history.projectShare")}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    variant="danger"
+                                    onSelect={() => {
+                                        chose.current = true;
+                                        onDelete();
+                                    }}
+                                >
+                                    <Trash2 />
+                                    {t("history.projectDelete")}
+                                </DropdownMenuItem>
+                            </>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
