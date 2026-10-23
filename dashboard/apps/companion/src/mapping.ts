@@ -336,6 +336,7 @@ export function catalogueVariables(
 export const FIXED_VARIABLES = [
     { id: "connection", name: "Connection to Polaris" },
     { id: "account", name: "Signed-in account" },
+    { id: "network_address", name: "Which address is in use: empty on the usual one" },
     { id: "sign_in_code", name: "Code to approve in Polaris" },
     { id: "sign_in_url", name: "Page to approve the code on" },
     { id: "update_version", name: "Newer module version, empty when this is the newest" },

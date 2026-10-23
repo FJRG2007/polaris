@@ -14,6 +14,7 @@
 
 import type { UpdateNotice } from "@/lib/update";
 import type { ServerRef } from "@/lib/servers";
+import type { ReachStatus } from "@/lib/local-address";
 import { ENGLISH, type Words } from "@/lib/words";
 
 /** The id of the identity made from the signed-in account, offered when the
@@ -152,6 +153,12 @@ export interface VaultStatus {
      * orphaning the one they were in the middle of approving.
      */
     readonly awaitingApproval: boolean;
+    /**
+     * Which address of the server the worker is on - the usual one, or a local
+     * address of the same Polaris while the usual one is down - and what keeps a
+     * local address out of use. Absent from a worker older than the popup.
+     */
+    readonly reach?: ReachStatus;
     /**
      * Every Polaris this browser knows, the one in front marked. Never empty
      * once an address has been given, and listed even for an install from

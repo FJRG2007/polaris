@@ -10,11 +10,14 @@
  * what the Deploy API accepts, and it can be revoked on its own.
  */
 
+import { createFailover, learnInstance, type Failover } from "../../../dashboard/packages/core/src/instance-fallback";
 import { z } from "zod";
-import { net } from "electron";
+import { join } from "node:path";
+import { app, net } from "electron";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { describeNetError, netErrorCode } from "./reachability";
+import { RELEARN_MS, readStoredInstance, writeStoredInstance } from "./instance-store";
 
 /** A refusal or failure, with a sentence for the push window. */
 export class ApiFailure extends Error {
@@ -27,6 +30,59 @@ export class ApiFailure extends Error {
 }
 
 export const KEY_REFUSED = "The API key was refused - it may have been revoked or have expired. Paste a new one.";
+
+/**
+ * The same Polaris on its local addresses, learned over the server's own address
+ * once its key is accepted (`learnServer`) and kept on disk (`instance-store`), so
+ * an app started while the internet is down still has them. A request goes to a
+ * local address only after it proved, by signature, that it is this Polaris - see
+ * `@polaris/core/instance-fallback`.
+ */
+const failovers = new Map<string, Failover>();
+
+function instancesFile(): string {
+    return join(app.getPath("userData"), "instances.json");
+}
+
+const netFetch = (url: string, init?: RequestInit): Promise<Response> => net.fetch(url, init);
+
+/** Learn the server's identity and local addresses over its own address. Best-effort; an older Polaris has none. */
+export async function learnServer(server: string): Promise<void> {
+    const instance = await learnInstance(server, netFetch);
+    if (!instance) return;
+    failovers.set(server, createFailover({ primary: server, instance, fetch: netFetch }));
+    try {
+        writeStoredInstance(instancesFile(), server, instance);
+    } catch {
+        // Kept in memory for this run; the next start learns it again.
+    }
+}
+
+const asked = new Set<string>();
+
+/** The failover for a server, read back from disk the first time it is asked for. */
+function failoverFor(server: string): Failover | undefined {
+    const held = failovers.get(server);
+    if (held) return held;
+    const stored = readStoredInstance(instancesFile(), server);
+    if (!stored) {
+        // A key kept from before the addresses were learned: ask once this run.
+        if (!asked.has(server)) {
+            asked.add(server);
+            void learnServer(server).catch(() => undefined);
+        }
+        return undefined;
+    }
+    const failover = createFailover({ primary: server, instance: stored.record, fetch: netFetch });
+    failovers.set(server, failover);
+    if (Date.now() - stored.learnedAt > RELEARN_MS) void learnServer(server).catch(() => undefined);
+    return failover;
+}
+
+/** "Using your local network address" while on one, otherwise null. */
+export function addressWords(server: string): string | null {
+    return failoverFor(server)?.status().words ?? null;
+}
 
 export interface Caller {
     readonly server: string;
@@ -57,8 +113,12 @@ export async function call(caller: Caller, path: string, init: RequestInit = {})
     const headers = new Headers(init.headers);
     headers.set("authorization", `Bearer ${caller.key}`);
     let response: Response;
+    const options: RequestInit = { ...init, headers, credentials: "omit", cache: "no-store" };
+    const failover = failoverFor(caller.server);
     try {
-        response = await net.fetch(`${caller.server}${path}`, { ...init, headers, credentials: "omit", cache: "no-store" });
+        response = failover
+            ? await failover.request(path, options)
+            : await net.fetch(`${caller.server}${path}`, options);
     } catch (caught) {
         if ((caught as Error).name === "AbortError") throw caught;
         throw unreachable(caught, caller);
@@ -80,7 +140,8 @@ export async function sendFile(
     headers: Readonly<Record<string, string>>,
     signal: AbortSignal
 ): Promise<unknown> {
-    const request = net.request({ method: "POST", url: `${caller.server}${path}`, credentials: "omit", cache: "no-store" });
+    const origin = (await failoverFor(caller.server)?.resolve()) ?? caller.server;
+    const request = net.request({ method: "POST", url: `${origin}${path}`, credentials: "omit", cache: "no-store" });
     request.chunkedEncoding = true;
     request.setHeader("authorization", `Bearer ${caller.key}`);
     for (const [name, value] of Object.entries(headers)) request.setHeader(name, value);

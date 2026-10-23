@@ -193,6 +193,14 @@ export async function register(): Promise<void> {
     const { startCloudProvisionWatch } = await import("./lib/data-cloud/service");
     void afterPredecessor().then(startCloudProvisionWatch);
 
+    // Who this Polaris is, for clients that fall back to its LAN address when the
+    // public one stops answering. Made here when an install has none, so nothing
+    // has to be configured for it.
+    const { ensureInstanceIdentity } = await import("./lib/instance-identity");
+    void ensureInstanceIdentity().catch((error) =>
+        console.error("polaris: instance identity setup failed:", error)
+    );
+
     // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS
     // once the operator installs the root. Best-effort: a failure keeps the

@@ -7,6 +7,7 @@
  * device - when there is no browser here or `--browserless` says not to try.
  */
 
+import { learnInstance } from "../../../core/src/instance-fallback.js";
 import { CLI_VERSION } from "../version.js";
 import { CliError, usage } from "../errors.js";
 import { line, printJson } from "../output.js";
@@ -225,7 +226,9 @@ export async function login(context: Context, flags: Flags): Promise<void> {
                 keyId: claim.keyId,
                 scopes: claim.scopes,
                 storage,
-                signedInAt: new Date().toISOString()
+                signedInAt: new Date().toISOString(),
+                instance: await learnInstance(url, context.fetch),
+                instanceLearnedAt: new Date().toISOString()
             }
         }
     };

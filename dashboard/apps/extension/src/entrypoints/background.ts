@@ -62,6 +62,7 @@ import {
     settleSavedServers,
     vaultBase
 } from "@/lib/server";
+import { learnOver, reachOrigin, reachStatus } from "@/lib/reach";
 
 /**
  * Everything that touches a key, a token or the network.
@@ -1052,7 +1053,7 @@ async function dropLink(): Promise<void> {
  */
 async function refreshLink(force = false): Promise<void> {
     const [origin, token, checkedAt] = await Promise.all([
-        currentOrigin(),
+        reachOrigin(),
         LINK_TOKEN.getValue(),
         LINK_CHECKED.getValue()
     ]);
@@ -1645,7 +1646,7 @@ const ACCOUNT_TIMEOUT_MS = 10_000;
 async function readAccount(): Promise<messages.ExtensionAccount | null> {
     const held = await ACCOUNT.getValue();
     if (held) return held;
-    const [key, origin] = await Promise.all([ACCOUNT_KEY.getValue(), currentOrigin()]);
+    const [key, origin] = await Promise.all([ACCOUNT_KEY.getValue(), reachOrigin()]);
     if (!key || !origin) return null;
     try {
         const reply = await fetch(`${origin}/api/v1/me`, {
@@ -2055,6 +2056,7 @@ async function status(): Promise<messages.VaultStatus> {
         // sign-in screen's to report, and reading it here would take the answer
         // away from the screen that says it out loud.
         awaitingApproval: waiting?.state === "pending",
+        reach: await reachStatus(),
         servers: servers.listServers(
             await savedServers(),
             server,
@@ -2130,7 +2132,7 @@ let looking: Promise<void> | null = null;
  * design, so this is the only way a second browser's change arrives.
  */
 async function sync(force: boolean): Promise<boolean> {
-    const origin = await currentOrigin();
+    const origin = await reachOrigin();
     if (!origin) return false;
     const base = vaultBase(origin);
     const access = await token(base);
@@ -2762,7 +2764,7 @@ async function save(item: {
     const intent = readIntendedLogin(item, await words());
     if (!intent.ok) return { ok: false, error: intent.error };
 
-    const origin = await currentOrigin();
+    const origin = await reachOrigin();
     if (!origin) return { ok: false, error: await say("errors.whichPolaris") };
     const base = vaultBase(origin);
     const access = await token(base);
@@ -2825,7 +2827,7 @@ async function changePassword(id: string, password: string): Promise<messages.Re
     const key = keyFor(item);
     if (!key) return { ok: false, error: await say("errors.noItemKey") };
 
-    const origin = await currentOrigin();
+    const origin = await reachOrigin();
     if (!origin) return { ok: false, error: await say("errors.whichPolaris") };
     const base = vaultBase(origin);
     const access = await token(base);
@@ -2988,7 +2990,7 @@ async function currentNotice(): Promise<update.UpdateNotice | null> {
  * extension is suddenly current.
  */
 async function checkForUpdate(): Promise<void> {
-    const origin = await currentOrigin();
+    const origin = await reachOrigin();
     if (!origin) return;
     try {
         const response = await fetch(`${origin}/api/polaris/extension`, {
@@ -3017,7 +3019,7 @@ async function checkForUpdate(): Promise<void> {
 /** Polar using this browser (`lib/polar-browser.ts`): asks for each site when it first needs it. */
 const polarBrowser = new PolarBrowser({
     api: browser as unknown as BrowserApi,
-    link: async () => ({ origin: await currentOrigin(), token: await LINK_TOKEN.getValue() }),
+    link: async () => ({ origin: await reachOrigin(), token: await LINK_TOKEN.getValue() }),
     say: (which) => say(which === "bar" ? "polar.browserBar" : "polar.stop")
 });
 
@@ -3081,6 +3083,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // somebody has been signed in on before brings that account back
                 // rather than a second, empty session beside it.
                 await inTurn(() => bringServer(origin));
+                // Who it is, asked now over the address that was just typed, so
+                // its local addresses are known before the day they are needed.
+                await learnOver(origin, true).catch(() => undefined);
                 return { ok: true, status: await status() };
             }
 
@@ -3155,7 +3160,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "unlink": {
-                const [origin, token] = await Promise.all([currentOrigin(), LINK_TOKEN.getValue()]);
+                const [origin, token] = await Promise.all([reachOrigin(), LINK_TOKEN.getValue()]);
                 // Told, then forgotten. What makes it real here is the forgetting,
                 // so a server that could not be reached does not keep this browser
                 // connected to something somebody has finished with.
@@ -3559,7 +3564,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // Asked of this deployment's own server, which is the only origin
                 // this extension may reach - and what leaves the browser is five
                 // characters of a hash. Unknown answers are unknown, never safe.
-                const origin = await currentOrigin();
+                const origin = await reachOrigin();
                 if (!origin) return { ok: true, count: null };
                 return { ok: true, count: await breachCount(origin, request.password) };
             }

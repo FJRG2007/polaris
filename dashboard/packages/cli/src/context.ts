@@ -16,7 +16,8 @@ import { canOpenBrowser, openBrowser } from "./browser.js";
 import { timed } from "./timing.js";
 import { clackUi, type Ui } from "./ui.js";
 import { configDir, currentHost, type Host } from "./paths.js";
-import { loadConfig, profileNameSchema, type Profile } from "./config.js";
+import { learnInstance, RELEARN_MS } from "../../core/src/instance-fallback.js";
+import { loadConfig, profileNameSchema, saveConfig, type Profile } from "./config.js";
 
 export interface Io {
     out(text: string): void;
@@ -143,5 +144,46 @@ export async function requireSession(context: Context, flags: Flags): Promise<Se
             `The sign-in for "${name}" is missing from the ${profile.storage === "keychain" ? "keychain" : "credentials file"}. Run plr login --profile ${name}.`
         );
     }
-    return { connection: { url: profile.url, token }, profileName: name, profile };
+    const current = await relearnInstance(context, name, profile);
+    return {
+        connection: { url: current.url, token, instance: current.instance ?? null },
+        profileName: name,
+        profile: current
+    };
+}
+
+/** How long asking the usual address who it is may hold up a command. */
+const RELEARN_TIMEOUT_MS = 5_000;
+
+/**
+ * Ask the profile's address who it is again once a day, so a local address that
+ * moved - or a profile signed in before Polaris described itself - catches up.
+ * Asked over `url` only; when it does not answer, what was learned before is kept
+ * and the next ask waits another day.
+ */
+async function relearnInstance(context: Context, name: string, profile: Profile): Promise<Profile> {
+    const learnedAt = Date.parse(profile.instanceLearnedAt ?? profile.signedInAt);
+    if (Date.now() - learnedAt < RELEARN_MS) return profile;
+    const instance = await learnInstance(profile.url, context.fetch, RELEARN_TIMEOUT_MS);
+    const next: Profile = {
+        ...profile,
+        instance: instance ?? profile.instance ?? null,
+        instanceLearnedAt: new Date().toISOString()
+    };
+    try {
+        const config = await loadConfig(context.configDir);
+        const saved = config.profiles[name];
+        if (!saved || saved.url !== profile.url) return next;
+        const { instance: learned, instanceLearnedAt } = next;
+        await saveConfig(context.configDir, {
+            ...config,
+            profiles: {
+                ...config.profiles,
+                [name]: { ...saved, instance: learned, instanceLearnedAt }
+            }
+        });
+    } catch {
+        // Not kept; asked again on the next command.
+    }
+    return next;
 }

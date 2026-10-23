@@ -144,6 +144,7 @@
                     })
                 })
             );
+            if (status.local) box.append(el("p", { class: "notice", text: words.local }));
             if (status.link === "offline")
                 box.append(el("p", { class: "notice", text: words.offline }));
             if (status.update) box.append(...updateNotice(status.update));

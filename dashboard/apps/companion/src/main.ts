@@ -99,6 +99,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
     async init(config: Config, _isFirstInit: boolean, secrets: Secrets): Promise<void> {
         this.config = config;
         this.#define([]);
+        this.#client.onAddress = () =>
+            this.setVariableValues({ network_address: this.#connection.addressWords() ?? "" });
         await this.#connection.start(config.address ?? "", readCredentials(secrets));
     }
 
@@ -160,6 +162,7 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         this.setVariableValues({
             connection: phase.phase,
             account: this.#connection.credentials?.account ?? "",
+            network_address: this.#connection.addressWords() ?? "",
             sign_in_code: phase.phase === "signing-in" ? phase.userCode : "",
             sign_in_url: phase.phase === "signing-in" ? phase.url : "",
             update_version: update?.version ?? "",

@@ -15,12 +15,51 @@ import { refusalSchema } from "./schemas.js";
 import { performance } from "node:perf_hooks";
 import { mark, timing } from "./timing.js";
 import { PROTOCOL_HEADER, compatibilityProblem } from "./compat.js";
+import {
+    createFailover,
+    readInstance,
+    refusedWords,
+    USING_LOCAL_WORDS,
+    type Failover
+} from "../../core/src/instance-fallback.js";
 
 export interface Connection {
     /** The Polaris address, without a trailing slash. */
     readonly url: string;
     /** Null for the requests that come before signing in. */
     readonly token: string | null;
+    /** The instance learned at login, which lets a request reach the same
+     *  Polaris on its local address when `url` does not answer. */
+    readonly instance?: unknown;
+}
+
+/** One failover per address and process: the CLI runs one command and exits. */
+const failovers = new Map<string, Failover>();
+let toldLocal = false;
+
+function failoverFor(connection: Connection, doFetch: Fetch, timeoutMs: number): Failover | null {
+    const instance = readInstance(connection.instance);
+    if (!instance) return null;
+    const key = [connection.url, instance.id, instance.publicKey, ...instance.addresses].join(" ");
+    let failover = failovers.get(key);
+    if (!failover) {
+        failover = createFailover({ primary: connection.url, instance, fetch: doFetch, timeoutMs });
+        failovers.set(key, failover);
+    }
+    return failover;
+}
+
+/** Why the local addresses did not help either, in words, when they did not. */
+function alternateWords(failover: Failover | null): string {
+    if (!failover) return "";
+    const { refused, untrusted } = failover.status();
+    const parts = refused.map(refusedWords);
+    if (untrusted.length > 0) {
+        parts.push(
+            "Your local network address uses Polaris's own certificate, which this computer does not trust yet."
+        );
+    }
+    return parts.length > 0 ? ` ${parts.join(" ")}` : "";
 }
 
 export type Fetch = typeof fetch;
@@ -128,21 +167,44 @@ export async function send(
     const startedAt = timing() ? performance.now() : 0;
     // Named without its query, which can carry a service's name.
     const label = `${method} ${path.split("?")[0]}`;
+    let failover: Failover | null = null;
     try {
-        const response = await doFetch(`${connection.url}${path}`, {
+        const timeoutMs = options.timeoutMs ?? 30_000;
+        failover = connection.token ? failoverFor(connection, doFetch, timeoutMs) : null;
+        const init: RequestInit = {
             method,
             headers: headers(connection, options.body !== undefined),
             body: options.body === undefined ? undefined : JSON.stringify(options.body),
             // Not followed: a redirect would carry the token to wherever it
             // points. The address it names is reported instead, to sign in with.
-            redirect: "manual",
-            signal: AbortSignal.timeout(options.timeoutMs ?? 30_000)
-        });
+            redirect: "manual"
+        };
+        const bodyTimeout = new AbortController();
+        const response = failover
+            ? await failover.request(path, { ...init, signal: bodyTimeout.signal })
+            : await doFetch(`${connection.url}${path}`, {
+                  ...init,
+                  signal: AbortSignal.timeout(timeoutMs)
+              });
+        if (failover) {
+            const deadline = AbortSignal.timeout(timeoutMs);
+            deadline.addEventListener("abort", () => bodyTimeout.abort(deadline.reason), {
+                once: true
+            });
+        }
+        const status = failover?.status();
+        if (status?.local && !toldLocal) {
+            toldLocal = true;
+            process.stderr.write(`${USING_LOCAL_WORDS} (${status.origin}).
+`);
+        }
         mark(`${label} ${response.status}`, startedAt);
         return response;
     } catch (caught) {
         mark(`${label} failed`, startedAt);
-        throw new CliError(`Could not reach ${connection.url}: ${unreachableReason(caught)}.`);
+        throw new CliError(
+            `Could not reach ${connection.url}: ${unreachableReason(caught)}.${alternateWords(failover)}`
+        );
     }
 }
 

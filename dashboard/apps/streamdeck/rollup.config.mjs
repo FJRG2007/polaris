@@ -19,7 +19,10 @@ export default {
         sourcemap: false
     },
     plugins: [
-        typescript({ include: ["src/**/*.ts"], noEmitOnError: true }),
+        typescript({
+            include: ["src/**/*.ts", "../../packages/core/src/instance-fallback.ts"],
+            noEmitOnError: true
+        }),
         nodeResolve({ browser: false, exportConditions: ["node"], preferBuiltins: true }),
         commonjs(),
         {

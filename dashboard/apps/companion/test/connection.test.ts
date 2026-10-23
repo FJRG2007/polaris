@@ -234,6 +234,27 @@ describe("signing in", () => {
 describe("a signed-in connection", () => {
     const kept = { address: ADDRESS, token: "plr_x" };
 
+    it("learns the local addresses of a key kept from before, once, and keeps them", async () => {
+        const instance = {
+            id: "plr_fixture_instance",
+            publicKey: "A".repeat(43),
+            addresses: [ADDRESS]
+        };
+        const fetcher = vi.fn(async (url: string | URL | Request) =>
+            String(url).endsWith("/api/instance") ? json(instance) : json({ actions: CATALOGUE })
+        );
+        const { host, saved } = recorder();
+        const connection = new Connection(
+            new PolarisClient("0.1.0", fetcher as typeof fetch),
+            host
+        );
+        await connection.start(ADDRESS, kept);
+        await vi.waitFor(() => expect(saved).toHaveLength(1));
+        expect(saved[0]).toMatchObject({ ...kept, instance });
+        expect(connection.addressWords()).toBeNull();
+        connection.stop();
+    });
+
     it("stops and asks to sign in again when the key is gone", async () => {
         const fetcher = vi.fn(async () => new Response(null, { status: 401 }));
         const { host } = recorder();
@@ -273,6 +294,8 @@ describe("a signed-in connection", () => {
         const fetcher = vi.fn(async (url: string | URL | Request) => {
             const path = String(url).slice(ADDRESS.length);
             if (path === "/api/deck/actions") return json({ actions: CATALOGUE });
+            // An older Polaris that does not describe itself: no local addresses.
+            if (path === "/api/instance") return new Response(null, { status: 404 });
             streams += 1;
             if (streams === 1) return new Response(null, { status: 502 });
             const frame = `event: state\ndata: ${JSON.stringify({

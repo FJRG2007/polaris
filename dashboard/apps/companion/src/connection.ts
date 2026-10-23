@@ -120,6 +120,23 @@ export class Connection {
         this.host.phase(phase);
     }
 
+    /** "Using your local network address" while on one, otherwise null. */
+    addressWords(): string | null {
+        return this.credentials ? this.client.addressWords(this.credentials) : null;
+    }
+
+    /**
+     * Keep what Polaris says about itself current with the credentials: ones kept
+     * from before Polaris described itself have no local addresses, and a local
+     * address can move. Asked over the usual address that just answered.
+     */
+    async #learnInstance(credentials: Credentials): Promise<void> {
+        const instance = await this.client.relearn(credentials);
+        if (!instance || this.credentials !== credentials) return;
+        this.credentials = { ...credentials, instance };
+        this.host.save(this.credentials);
+    }
+
     async refreshCatalogue(force: boolean): Promise<void> {
         const credentials = this.credentials;
         if (!credentials) return;
@@ -127,10 +144,13 @@ export class Connection {
         this.#catalogueAt = Date.now();
         try {
             const listing = await this.client.listing(credentials);
+            const words = this.client.addressWords(credentials);
+            if (words) this.host.log("info", `${words} (the usual address is not answering).`);
             this.catalogue = listing.actions;
             this.latest = listing.latest;
             this.host.catalogue(this.catalogue);
             this.#set({ phase: "online" });
+            void this.#learnInstance(credentials);
         } catch (caught) {
             this.#failed(caught);
         }
@@ -254,7 +274,10 @@ export class Connection {
                         address,
                         token: claimed.token,
                         keyId: claimed.keyId,
-                        account: accountName(claimed.account)
+                        account: accountName(claimed.account),
+                        ...(await this.client
+                            .learn(address)
+                            .then((instance) => (instance ? { instance } : {})))
                     };
                     this.host.save(this.credentials);
                     this.#failures = 0;

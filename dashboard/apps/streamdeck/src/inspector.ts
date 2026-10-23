@@ -34,6 +34,8 @@ export async function tellInspector(surface: Surface): Promise<void> {
         link: hub.link,
         address: hub.credentials?.address ?? null,
         account: hub.credentials?.account ?? null,
+        // On a local address of the same Polaris while the usual one is down.
+        local: hub.credentials ? hub.client.addressWords(hub.credentials) !== null : false,
         connecting: hub.connecting,
         update: withUpdateNow(
             updateFor(hub.latest, hub.client.version, hub.credentials?.address ?? null)
