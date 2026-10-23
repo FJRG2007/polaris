@@ -18,6 +18,7 @@
 import Link from "next/link";
 import { useGameText } from "../game-text";
 import { GameConsole } from "./game-console";
+import { MinecraftAccess } from "./minecraft-access";
 import { hytaleFilesAction } from "./hytale-actions";
 import { hostUi } from "@polaris/app-host/client";
 import { useCallback, useEffect, useState } from "react";
@@ -165,6 +166,11 @@ export function HytalePanel({
                 game="hytale"
                 hint={t("hytale.theServerSOwnCommands")}
             />
+
+            {/* Who else runs or watches this server: the same per-server access
+                every other game has - Watch is read only, Moderate and Manage
+                are the operators - bounded by what the viewer holds. */}
+            <MinecraftAccess installedAppId={installedAppId} />
         </div>
     );
 }
