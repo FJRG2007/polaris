@@ -13,8 +13,8 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Input, Select } from "@polaris/ui";
 import type { TargetGroup } from "@polaris/messaging";
-import { firstDiscordChannelAction, listChannelTargetsAction } from "./actions";
 import { type DiscordTarget, encodeDiscordPeer, parseDiscordPeer } from "./platform-meta";
+import * as polls from "../admin-polls";
 
 export function DiscordPeerFields({
     botChannelId,
@@ -52,7 +52,8 @@ export function DiscordPeerFields({
             return;
         }
         let active = true;
-        void firstDiscordChannelAction()
+        void polls
+            .firstDiscordChannel()
             .then((value) => active && setBot(value))
             .catch(() => undefined);
         return () => {
@@ -67,7 +68,8 @@ export function DiscordPeerFields({
             return;
         }
         let active = true;
-        void listChannelTargetsAction(bot)
+        void polls
+            .channelTargets(bot)
             .then((value) => active && setGroups(value))
             .catch(() => active && setGroups([]));
         return () => {

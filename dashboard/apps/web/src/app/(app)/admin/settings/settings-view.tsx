@@ -33,6 +33,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState, useTransition } from "react";
 import * as polls from "./settings-polls";
+import * as adminPolls from "../admin-polls";
 import {
     isRecentRun,
     isUpdateInFlight,
@@ -1151,7 +1152,8 @@ function OwnVulnerabilitiesLine({ available }: { available: boolean }) {
     const [found, setFound] = useState<Awaited<ReturnType<typeof ownVulnerabilitiesAction>>>(null);
     useEffect(() => {
         let live = true;
-        void ownVulnerabilitiesAction()
+        void adminPolls
+            .ownVulnerabilities()
             .then((result) => live && setFound(result))
             .catch(() => undefined);
         return () => {

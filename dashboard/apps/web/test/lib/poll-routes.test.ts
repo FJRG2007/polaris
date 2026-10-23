@@ -99,7 +99,16 @@ const actions = vi.hoisted(() => {
         "messageDeliveryAction",
         "linkPreviewAction",
         "profileAction",
-        "listMeetingsAction"
+        "listMeetingsAction",
+        "callServerSettingsAction",
+        "listDnsZonesAction",
+        "networkStatusAction",
+        "firstDiscordChannelAction",
+        "listChannelTargetsAction",
+        "listAgentsAction",
+        "listContactsAction",
+        "mailBodyHeldAction",
+        "ownVulnerabilitiesAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -169,7 +178,11 @@ vi.mock("@/app/(app)/admin/inbox/actions", () => ({
     listConversationsAction: actions.listConversationsAction,
     getMessagesAction: actions.getMessagesAction,
     listActivityAction: actions.listActivityAction,
-    channelStateAction: actions.channelStateAction
+    channelStateAction: actions.channelStateAction,
+    firstDiscordChannelAction: actions.firstDiscordChannelAction,
+    listChannelTargetsAction: actions.listChannelTargetsAction,
+    listAgentsAction: actions.listAgentsAction,
+    listContactsAction: actions.listContactsAction
 }));
 vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
     serverDetailAction: actions.serverDetailAction
@@ -179,13 +192,15 @@ vi.mock("@/app/(app)/automations/actions", () => ({
     noticeChannelsAction: actions.noticeChannelsAction
 }));
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
-    checkUpdatesAction: actions.checkUpdatesAction
+    checkUpdatesAction: actions.checkUpdatesAction,
+    ownVulnerabilitiesAction: actions.ownVulnerabilitiesAction
 }));
 vi.mock("@/app/(app)/account/domains/actions", () => ({
     readOwnerDomainAction: actions.readOwnerDomainAction
 }));
 vi.mock("@/app/(app)/account/domains/dns-actions", () => ({
-    dnsPropagationAction: actions.dnsPropagationAction
+    dnsPropagationAction: actions.dnsPropagationAction,
+    listDnsZonesAction: actions.listDnsZonesAction
 }));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({
     readCallAction: actions.readCallAction,
@@ -282,6 +297,15 @@ vi.mock("@/app/(app)/chat/actions", () => ({
     messageDeliveryAction: actions.messageDeliveryAction,
     linkPreviewAction: actions.linkPreviewAction,
     profileAction: actions.profileAction
+}));
+vi.mock("@/app/(app)/admin/chat/actions", () => ({
+    callServerSettingsAction: actions.callServerSettingsAction
+}));
+vi.mock("@/app/(app)/admin/domains/actions", () => ({
+    networkStatusAction: actions.networkStatusAction
+}));
+vi.mock("@/app/(app)/admin/retention/actions", () => ({
+    mailBodyHeldAction: actions.mailBodyHeldAction
 }));
 
 type Handler = (request: Request) => Promise<Response>;
@@ -391,7 +415,16 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/chat/delivery": () => import("@/app/api/chat/delivery/route"),
     "/api/chat/link-preview": () => import("@/app/api/chat/link-preview/route"),
     "/api/chat/profile": () => import("@/app/api/chat/profile/route"),
-    "/api/chat/meeting-list": () => import("@/app/api/chat/meeting-list/route")
+    "/api/chat/meeting-list": () => import("@/app/api/chat/meeting-list/route"),
+    "/api/admin/call-server": () => import("@/app/api/admin/call-server/route"),
+    "/api/domains/zones": () => import("@/app/api/domains/zones/route"),
+    "/api/admin/network-status": () => import("@/app/api/admin/network-status/route"),
+    "/api/admin/inbox/discord-channel": () => import("@/app/api/admin/inbox/discord-channel/route"),
+    "/api/admin/inbox/channel-targets": () => import("@/app/api/admin/inbox/channel-targets/route"),
+    "/api/admin/inbox/agents": () => import("@/app/api/admin/inbox/agents/route"),
+    "/api/admin/inbox/contacts": () => import("@/app/api/admin/inbox/contacts/route"),
+    "/api/admin/retention/mail-bodies": () => import("@/app/api/admin/retention/mail-bodies/route"),
+    "/api/admin/own-vulnerabilities": () => import("@/app/api/admin/own-vulnerabilities/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -1477,6 +1510,114 @@ const CASES: Case[] = [
                 )
             ).meetingList(),
         action: "listMeetingsAction",
+        args: []
+    },
+    {
+        name: "the call server's settings, asked again while it starts",
+        path: "/api/admin/call-server",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).callServerSettings(),
+        action: "callServerSettingsAction",
+        args: []
+    },
+    {
+        name: "the DNS zones the provider token reaches",
+        path: "/api/domains/zones",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).dnsZones(),
+        action: "listDnsZonesAction",
+        args: []
+    },
+    {
+        name: "how the deployment is reached",
+        path: "/api/admin/network-status",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).networkStatus(),
+        action: "networkStatusAction",
+        args: []
+    },
+    {
+        name: "the Discord bot channel to ask about servers",
+        path: "/api/admin/inbox/discord-channel",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).firstDiscordChannel(),
+        action: "firstDiscordChannelAction",
+        args: []
+    },
+    {
+        name: "a bot channel's servers and channels",
+        path: "/api/admin/inbox/channel-targets",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).channelTargets("channelId-1"),
+        action: "listChannelTargetsAction",
+        args: ["channelId-1"]
+    },
+    {
+        name: "the agents a thread can be assigned to",
+        path: "/api/admin/inbox/agents",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).inboxAgents(),
+        action: "listAgentsAction",
+        args: []
+    },
+    {
+        name: "the inbox contacts",
+        path: "/api/admin/inbox/contacts",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).inboxContacts(),
+        action: "listContactsAction",
+        args: []
+    },
+    {
+        name: "how many mail bodies are held",
+        path: "/api/admin/retention/mail-bodies",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).mailBodyHeld(),
+        action: "mailBodyHeldAction",
+        args: []
+    },
+    {
+        name: "what the last scans found in Polaris's own images",
+        path: "/api/admin/own-vulnerabilities",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
+                    "@/app/(app)/admin/admin-polls"
+                )
+            ).ownVulnerabilities(),
+        action: "ownVulnerabilitiesAction",
         args: []
     }
 ];

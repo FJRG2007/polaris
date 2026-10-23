@@ -19,11 +19,12 @@ import { runAction } from "@/lib/run-action";
 import { MAIL_BODY_KEEP_MAX } from "@polaris/core";
 import { useEffect, useState, useTransition } from "react";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
-import { mailBodyHeldAction, saveMailBodyKeepAction } from "./actions";
+import { saveMailBodyKeepAction } from "./actions";
 import { writeSnapshot } from "@/lib/snapshot-cache";
 import { useKeptSnapshot } from "@/components/use-live-resource";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "../admin-polls";
 
 /** Where the last count is kept, and how old it may be and still be shown. */
 const HELD_KEY = "retention:mail-held";
@@ -59,7 +60,7 @@ export function MailBodyForm({ kept }: { kept: number }) {
 
     useEffect(() => {
         void runAction(
-            () => mailBodyHeldAction(),
+            () => polls.mailBodyHeld(),
             () => setCountFailed(true)
         ).then((result) => {
             if (!result) return;

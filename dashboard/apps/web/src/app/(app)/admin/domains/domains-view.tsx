@@ -60,6 +60,7 @@ import {
     saveNetworkConfigAction,
     syncDuckDnsAction
 } from "./actions";
+import * as polls from "../admin-polls";
 
 /** How stale a kept read may be and still be worth painting while the fresh one is
  *  on its way. Past a few minutes an address that has gone down since misleads
@@ -801,7 +802,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
         // failed with, or the error stays under a panel that has just loaded fine.
         setError(null);
         setLoading(true);
-        void networkStatusAction()
+        void polls.networkStatus()
             .then((next) => {
                 const previous = loaded.current;
                 loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };

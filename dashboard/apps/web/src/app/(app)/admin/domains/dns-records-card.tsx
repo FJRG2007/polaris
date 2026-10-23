@@ -19,7 +19,7 @@ import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { Button, EmptyState, Select } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { listDnsZonesAction } from "@/app/(app)/account/domains/dns-actions";
+import * as polls from "../admin-polls";
 
 type Zone = { id: string; name: string };
 
@@ -49,7 +49,8 @@ export function DnsRecordsCard() {
         // the server too, where the tab's copy does not exist.
         const kept = readSnapshot<Zone[]>(ZONES_KEY, ZONES_MAX_AGE_MS);
         if (kept) adopt(kept.value);
-        void listDnsZonesAction()
+        void polls
+            .dnsZones()
             .catch(() => ({ error: t("domains.records.readFailed"), zones: undefined }))
             .then((result) => {
                 if (!live) return;

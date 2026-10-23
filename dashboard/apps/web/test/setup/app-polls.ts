@@ -431,3 +431,47 @@ vi.mock("@/app/(app)/chat/chat-reads", () => ({
     chatProfile: forward(() => import("@/app/(app)/chat/actions"), "profileAction", 2),
     meetingList: forward(() => import("@/app/(app)/chat/meeting-actions"), "listMeetingsAction", 0)
 }));
+
+vi.mock("@/app/(app)/admin/admin-polls", () => ({
+    callServerSettings: forward(
+        () => import("@/app/(app)/admin/chat/actions"),
+        "callServerSettingsAction",
+        0
+    ),
+    dnsZones: forward(
+        () => import("@/app/(app)/account/domains/dns-actions"),
+        "listDnsZonesAction",
+        0
+    ),
+    networkStatus: forward(
+        () => import("@/app/(app)/admin/domains/actions"),
+        "networkStatusAction",
+        0
+    ),
+    firstDiscordChannel: forward(
+        () => import("@/app/(app)/admin/inbox/actions"),
+        "firstDiscordChannelAction",
+        0
+    ),
+    channelTargets: forward(
+        () => import("@/app/(app)/admin/inbox/actions"),
+        "listChannelTargetsAction",
+        1
+    ),
+    inboxAgents: forward(() => import("@/app/(app)/admin/inbox/actions"), "listAgentsAction", 0),
+    inboxContacts: forward(
+        () => import("@/app/(app)/admin/inbox/actions"),
+        "listContactsAction",
+        0
+    ),
+    mailBodyHeld: forward(
+        () => import("@/app/(app)/admin/retention/actions"),
+        "mailBodyHeldAction",
+        0
+    ),
+    ownVulnerabilities: forward(
+        () => import("@/app/(app)/admin/settings/actions"),
+        "ownVulnerabilitiesAction",
+        0
+    )
+}));
