@@ -7,6 +7,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ENGLISH } from "../src/lib/words";
 import {
+    BLOCKED_HOSTS_KEY,
+    PAGE_FILLING_KEY,
+    readPageFilling,
+    readPageFillingValues,
+    savePageFilling,
+    unblockHost
+} from "../src/lib/page-filling";
+import {
+    PageFillingSheet,
     ShortcutSheet,
     keyCaps,
     matchesPolaris,
@@ -57,5 +66,56 @@ describe("the shortcuts list", () => {
         expect(matchesPolaris("Ctrl+J")).toBe(true);
         expect(matchesPolaris("⌘J")).toBe(true);
         expect(matchesPolaris("Alt+P")).toBe(false);
+    });
+});
+
+describe("filling inside web pages", () => {
+    const draw = (on: boolean, blocked: string[]): string =>
+        renderToStaticMarkup(
+            <PageFillingSheet
+                on={on}
+                blocked={blocked}
+                note={null}
+                onTurn={() => {}}
+                onUnblock={() => {}}
+                t={ENGLISH}
+            />
+        );
+
+    it("is on unless somebody turned it off, and keeps only real hosts", () => {
+        expect(readPageFillingValues(undefined, undefined)).toEqual({ on: true, blocked: [] });
+        expect(readPageFillingValues(false, ["a.example", "", 3])).toEqual({
+            on: false,
+            blocked: ["a.example"]
+        });
+    });
+
+    it("says what each choice does", () => {
+        expect(draw(true, [])).toContain("offered under the boxes");
+        expect(draw(false, [])).toContain("Nothing is drawn inside pages");
+    });
+
+    it("lists the sites it was switched off for, each with a way back", () => {
+        const markup = draw(true, ["shop.example", "bank.example"]);
+        expect(markup.match(/data-blocked=/g)).toHaveLength(2);
+        expect(markup).toContain("Turn Polaris back on for bank.example");
+        expect(draw(true, [])).toContain("No site is switched off.");
+    });
+
+    it("stores both under the names the worker reads", async () => {
+        const held: Record<string, unknown> = { "blocked.hosts": ["a.example", "b.example"] };
+        const api = {
+            storage: {
+                local: {
+                    get: async (key: string) => ({ [key]: held[key] }),
+                    set: async (items: Record<string, unknown>) => void Object.assign(held, items)
+                }
+            }
+        };
+        await savePageFilling(api, false);
+        expect(await unblockHost(api, "a.example")).toEqual(["b.example"]);
+        expect(await readPageFilling(api)).toEqual({ on: false, blocked: ["b.example"] });
+        expect(PAGE_FILLING_KEY).toBe("local:inline.enabled");
+        expect(BLOCKED_HOSTS_KEY).toBe("local:blocked.hosts");
     });
 });

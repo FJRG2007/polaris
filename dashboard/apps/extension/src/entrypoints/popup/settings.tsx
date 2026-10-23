@@ -11,6 +11,8 @@
 
 import { useWords } from "./words";
 import * as polar from "@/lib/polar-panel";
+import * as filling from "@/lib/page-filling";
+import { askBackground } from "@/lib/messages";
 import { useEffect, useState } from "react";
 import type { WordKey, Words } from "@/lib/words";
 import { chromiumBrowser } from "@/lib/browser-name";
@@ -240,6 +242,68 @@ function Choice<T extends string>({
     );
 }
 
+/**
+ * "Fill in from the vault" on web pages, and the sites it was switched off for.
+ *
+ * Drawn from what it is given so a test can draw it; `Settings` reads and writes
+ * the browser's storage and tells the worker, which registers or removes the
+ * inline script there and then.
+ */
+export function PageFillingSheet({
+    on,
+    blocked,
+    note,
+    onTurn,
+    onUnblock,
+    t
+}: {
+    on: boolean;
+    blocked: readonly string[];
+    note: string | null;
+    onTurn: (on: boolean) => void;
+    onUnblock: (host: string) => void;
+    t: Words;
+}): React.JSX.Element {
+    return (
+        <>
+            <Choice
+                label={t("settings.fillOnPages")}
+                value={on ? "on" : "off"}
+                options={[
+                    { value: "on", label: t("settings.on") },
+                    { value: "off", label: t("settings.off") }
+                ]}
+                hint={t(on ? "settings.fillOnHint" : "settings.fillOffHint")}
+                onChange={(value) => onTurn(value === "on")}
+            />
+            {note ? <p className="muted small">{note}</p> : null}
+            <div className="setting">
+                <span className="strong small">{t("settings.offSites")}</span>
+                {blocked.length === 0 ? (
+                    <p className="muted small">{t("settings.noOffSites")}</p>
+                ) : (
+                    <ul className="sheet-box">
+                        {blocked.map((host) => (
+                            <li key={host} className="sheet-row" data-blocked={host}>
+                                <span className="sheet-name" title={host}>
+                                    {host}
+                                </span>
+                                <button
+                                    className="ghost"
+                                    aria-label={t("settings.turnBackOnFor", { host })}
+                                    onClick={() => onUnblock(host)}
+                                >
+                                    {t("settings.turnBackOn")}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </>
+    );
+}
+
 const firefoxBrowser = (): boolean => polar.isFirefox(browser);
 
 export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX.Element {
@@ -249,7 +313,12 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
     const [refused, setRefused] = useState(false);
     const [panelScope, setPanelScope] = useState<polar.PanelScope>("all");
     const [chatScope, setChatScope] = useState<polar.ChatScope>("shared");
+    const [pages, setPages] = useState<filling.PageFilling | null>(null);
+    const [pagesNote, setPagesNote] = useState<string | null>(null);
     const firefox = firefoxBrowser();
+    // Manifest v2 has no `scripting`, so Firefox draws nothing inside pages to
+    // switch off.
+    const inlinePossible = Boolean(browser.scripting?.registerContentScripts);
 
     const read = (): void =>
         void commands()
@@ -266,6 +335,10 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
                 setChatScope(scopes.chat);
             })
             .catch(() => undefined);
+        void filling
+            .readPageFilling(browser)
+            .then(setPages)
+            .catch(() => setPages({ on: true, blocked: [] }));
         // Back from the browser's shortcuts screen is a focus: read the truth again.
         window.addEventListener("focus", read);
         return () => window.removeEventListener("focus", read);
@@ -306,6 +379,27 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
         void polar.saveScope(browser, "chat", value).catch(() => setChatScope(chatScope));
     };
 
+    const turnPages = (on: boolean): void => {
+        if (!pages || pages.on === on) return;
+        const before = pages;
+        setPages({ ...pages, on });
+        setPagesNote(null);
+        void filling
+            .savePageFilling(browser, on)
+            .then(() => askBackground({ kind: "startInline" }))
+            .then(() => setPagesNote(on ? null : t("popup.sites.reloadOpen")))
+            .catch(() => setPages(before));
+    };
+    const unblock = (host: string): void => {
+        if (!pages) return;
+        const before = pages;
+        setPages({ ...pages, blocked: pages.blocked.filter((entry) => entry !== host) });
+        void filling
+            .unblockHost(browser, host)
+            .then((left) => setPages((now) => (now ? { ...now, blocked: left } : now)))
+            .catch(() => setPages(before));
+    };
+
     const hintKey: WordKey = firefox ? "settings.shortcutsFirefox" : "settings.shortcutsChromium";
     return (
         <main className="settings">
@@ -326,6 +420,22 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
                 )}
                 {refused ? <p className="problem">{t("polar.shortcutRefused")}</p> : null}
             </SettingsSection>
+            {inlinePossible ? (
+                <SettingsSection id="settings-pages" title={t("settings.pages")}>
+                    {pages === null ? (
+                        <div className="sheet-box skeleton" aria-hidden="true" />
+                    ) : (
+                        <PageFillingSheet
+                            on={pages.on}
+                            blocked={pages.blocked}
+                            note={pagesNote}
+                            onTurn={turnPages}
+                            onUnblock={unblock}
+                            t={t}
+                        />
+                    )}
+                </SettingsSection>
+            ) : null}
             {canPolar ? (
                 <SettingsSection id="settings-polar" title={t("polar.title")}>
                     <Choice
