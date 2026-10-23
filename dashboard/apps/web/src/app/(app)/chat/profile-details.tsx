@@ -22,7 +22,6 @@
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AtSign, Lock } from "lucide-react";
-import { profileAction } from "./actions";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { Badge, cn, Skeleton } from "@polaris/ui";
@@ -32,6 +31,7 @@ import { MutualPanel } from "@/components/mutual-panel";
 import { usePresence } from "@/components/presence-store";
 import { ActivityCards } from "@/components/activity-card";
 import { ProfileBanner } from "@/components/profile-banner";
+import * as polls from "./chat-reads";
 
 /** Somebody, as far as the screen already knows them. */
 export interface ProfilePerson {
@@ -61,7 +61,8 @@ export function useChatProfile(
         let live = true;
         setLoading(true);
         setProfile(null);
-        void profileAction(channelId, userId)
+        void polls
+            .chatProfile(channelId, userId)
             .then((result) => {
                 if (live) setProfile(result.profile ?? null);
             })

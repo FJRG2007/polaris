@@ -17,10 +17,10 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { ArrowLeftRight } from "lucide-react";
-import { conversationsElsewhereAction } from "./actions";
 import { useEffect, useState } from "react";
 import type { ChatElsewhere } from "@/lib/chat/chat-service";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
+import * as polls from "./chat-reads";
 
 export function Elsewhere({
     /** Changes whenever the rail is rebuilt, which is when the counts here can
@@ -35,7 +35,7 @@ export function Elsewhere({
 
     useEffect(() => {
         let alive = true;
-        void runAction(conversationsElsewhereAction, () => undefined).then((result) => {
+        void runAction(() => polls.conversationsElsewhere(), () => undefined).then((result) => {
             if (alive && result?.chats) setChats(result.chats);
         });
         return () => {

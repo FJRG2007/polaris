@@ -19,7 +19,6 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { editHistoryAction } from "./actions";
 import { History, Loader2 } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -28,6 +27,7 @@ import { RichText } from "@/components/rich-text/rich-text";
 import type { CustomEmojiSet } from "@/components/rich-text/custom-emoji";
 import { useDisplayFormat } from "@/components/display-format";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
+import * as polls from "./chat-reads";
 
 export function EditHistoryDialog({
     message,
@@ -56,7 +56,7 @@ export function EditHistoryDialog({
             return;
         }
         let current = true;
-        void editHistoryAction(message.id).then((result) => {
+        void polls.editHistory(message.id).then((result) => {
             if (!current) return;
             if (result.error) setError(result.error);
             else setHistory(result.history ?? null);

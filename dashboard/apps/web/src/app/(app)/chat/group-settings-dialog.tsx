@@ -20,7 +20,7 @@ import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
-import { listMembersAction, setGroupOptionsAction, transferGroupAction } from "./actions";
+import { setGroupOptionsAction, transferGroupAction } from "./actions";
 import {
     Button,
     Dialog,
@@ -31,6 +31,7 @@ import {
     DialogTitle,
     Switch
 } from "@polaris/ui";
+import * as polls from "./chat-reads";
 
 interface GroupOptions {
     membersMayEdit?: boolean;
@@ -60,7 +61,7 @@ export function GroupSettingsDialog({
         if (!open) return;
         setHandingTo(null);
         setError("");
-        void listMembersAction(channel.id).then((result) => setMembers(result.members ?? []));
+        void polls.chatMembers(channel.id).then((result) => setMembers(result.members ?? []));
     }, [open, channel.id]);
 
     const others = members.filter((member) => member.userId !== channel.ownerId);

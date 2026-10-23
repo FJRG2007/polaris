@@ -192,6 +192,7 @@ import {
     Volume2,
     Webhook
 } from "lucide-react";
+import * as polls from "./chat-reads";
 
 /**
  * Whether every picture, video and link card in this conversation starts
@@ -1962,7 +1963,7 @@ function LinkArea({ message }: { message: ChatMessageView }) {
         // taken before Polaris knew to read the channel and the colour - and
         // blanking it first would make a refresh look like a failure.
         let live = true;
-        void actions.linkPreviewAction(message.id).then((result) => {
+        void polls.linkPreview(message.id).then((result) => {
             if (live && result.preview) setFound(result.preview);
         });
         return () => {

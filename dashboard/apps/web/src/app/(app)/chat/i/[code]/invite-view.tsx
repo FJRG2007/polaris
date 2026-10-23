@@ -20,7 +20,8 @@ import { runAction } from "@/lib/run-action";
 import type { ChatInviteOffer } from "@/lib/chat/invites";
 import { Button, EmptyState, Skeleton } from "@polaris/ui";
 import { Loader2, MessageSquare, TriangleAlert } from "lucide-react";
-import { acceptInviteAction, readInviteAction } from "@/app/(app)/chat/actions";
+import { acceptInviteAction } from "@/app/(app)/chat/actions";
+import * as polls from "../../chat-reads";
 
 export function InviteView({ code }: { code: string }) {
     const t = useTranslations("chat");
@@ -30,7 +31,7 @@ export function InviteView({ code }: { code: string }) {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        void readInviteAction(code).then((result) => {
+        void polls.readInvite(code).then((result) => {
             setOffer(result.offer ?? null);
             setError(result.error ?? "");
         });

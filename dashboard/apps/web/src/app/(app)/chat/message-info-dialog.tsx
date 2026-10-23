@@ -19,11 +19,11 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { messageDeliveryAction } from "./actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { Check, CheckCheck, Loader2, SendHorizontal } from "lucide-react";
 import type { ChatMessageView, MessageDelivery } from "@/lib/chat/messages";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
+import * as polls from "./chat-reads";
 
 export function MessageInfoDialog({
     message,
@@ -51,7 +51,7 @@ export function MessageInfoDialog({
         setAsked(false);
         if (!message) return;
         let current = true;
-        void messageDeliveryAction(message.id).then((result) => {
+        void polls.messageDelivery(message.id).then((result) => {
             if (!current) return;
             if (result.error) setError(result.error);
             else setDelivery(result.delivery ?? null);

@@ -82,7 +82,24 @@ const actions = vi.hoisted(() => {
         "setupInstalledAction",
         "stepUpOptionsAction",
         "shouldOfferOverviewAction",
-        "getUserProfileAction"
+        "getUserProfileAction",
+        "listMembersAction",
+        "spaceBansAction",
+        "listInvitesAction",
+        "listWebhooksAction",
+        "carriedMessageAction",
+        "chatRulesAction",
+        "callsUnavailableAction",
+        "editHistoryAction",
+        "conversationsElsewhereAction",
+        "tenorReadyAction",
+        "listSavedMediaAction",
+        "readInviteAction",
+        "inviteCandidatesAction",
+        "messageDeliveryAction",
+        "linkPreviewAction",
+        "profileAction",
+        "listMeetingsAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -170,7 +187,11 @@ vi.mock("@/app/(app)/account/domains/actions", () => ({
 vi.mock("@/app/(app)/account/domains/dns-actions", () => ({
     dnsPropagationAction: actions.dnsPropagationAction
 }));
-vi.mock("@/app/(app)/chat/meeting-actions", () => ({ readCallAction: actions.readCallAction }));
+vi.mock("@/app/(app)/chat/meeting-actions", () => ({
+    readCallAction: actions.readCallAction,
+    callsUnavailableAction: actions.callsUnavailableAction,
+    listMeetingsAction: actions.listMeetingsAction
+}));
 vi.mock("@/app/oauth/recover/actions", () => ({
     recoveryStatusAction: actions.recoveryStatusAction
 }));
@@ -244,6 +265,23 @@ vi.mock("@/app/(app)/tour-actions", () => ({
 }));
 vi.mock("@/app/(app)/drive/activity-actions", () => ({
     getUserProfileAction: actions.getUserProfileAction
+}));
+vi.mock("@/app/(app)/chat/actions", () => ({
+    listMembersAction: actions.listMembersAction,
+    spaceBansAction: actions.spaceBansAction,
+    listInvitesAction: actions.listInvitesAction,
+    listWebhooksAction: actions.listWebhooksAction,
+    carriedMessageAction: actions.carriedMessageAction,
+    chatRulesAction: actions.chatRulesAction,
+    editHistoryAction: actions.editHistoryAction,
+    conversationsElsewhereAction: actions.conversationsElsewhereAction,
+    tenorReadyAction: actions.tenorReadyAction,
+    listSavedMediaAction: actions.listSavedMediaAction,
+    readInviteAction: actions.readInviteAction,
+    inviteCandidatesAction: actions.inviteCandidatesAction,
+    messageDeliveryAction: actions.messageDeliveryAction,
+    linkPreviewAction: actions.linkPreviewAction,
+    profileAction: actions.profileAction
 }));
 
 type Handler = (request: Request) => Promise<Response>;
@@ -336,7 +374,24 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/setup/installed": () => import("@/app/api/setup/installed/route"),
     "/api/account/step-up/options": () => import("@/app/api/account/step-up/options/route"),
     "/api/tours/overview-offer": () => import("@/app/api/tours/overview-offer/route"),
-    "/api/users/profile": () => import("@/app/api/users/profile/route")
+    "/api/users/profile": () => import("@/app/api/users/profile/route"),
+    "/api/chat/members": () => import("@/app/api/chat/members/route"),
+    "/api/chat/bans": () => import("@/app/api/chat/bans/route"),
+    "/api/chat/invites": () => import("@/app/api/chat/invites/route"),
+    "/api/chat/webhook-list": () => import("@/app/api/chat/webhook-list/route"),
+    "/api/chat/carried": () => import("@/app/api/chat/carried/route"),
+    "/api/chat/rules": () => import("@/app/api/chat/rules/route"),
+    "/api/chat/calls-unavailable": () => import("@/app/api/chat/calls-unavailable/route"),
+    "/api/chat/edit-history": () => import("@/app/api/chat/edit-history/route"),
+    "/api/chat/elsewhere": () => import("@/app/api/chat/elsewhere/route"),
+    "/api/chat/tenor-ready": () => import("@/app/api/chat/tenor-ready/route"),
+    "/api/chat/saved-media": () => import("@/app/api/chat/saved-media/route"),
+    "/api/chat/invite": () => import("@/app/api/chat/invite/route"),
+    "/api/chat/invite-candidates": () => import("@/app/api/chat/invite-candidates/route"),
+    "/api/chat/delivery": () => import("@/app/api/chat/delivery/route"),
+    "/api/chat/link-preview": () => import("@/app/api/chat/link-preview/route"),
+    "/api/chat/profile": () => import("@/app/api/chat/profile/route"),
+    "/api/chat/meeting-list": () => import("@/app/api/chat/meeting-list/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -1219,6 +1274,210 @@ const CASES: Case[] = [
             ).userProfile("userId-1"),
         action: "getUserProfileAction",
         args: ["userId-1"]
+    },
+    {
+        name: "who is in a conversation",
+        path: "/api/chat/members",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).chatMembers("channelId-1"),
+        action: "listMembersAction",
+        args: ["channelId-1"]
+    },
+    {
+        name: "who is banned from a space",
+        path: "/api/chat/bans",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).spaceBans("spaceId-1"),
+        action: "spaceBansAction",
+        args: ["spaceId-1"]
+    },
+    {
+        name: "the invite links of a space",
+        path: "/api/chat/invites",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).chatInvites("spaceId-1", "channelId-1"),
+        action: "listInvitesAction",
+        args: ["spaceId-1", "channelId-1"]
+    },
+    {
+        name: "a channel's webhooks",
+        path: "/api/chat/webhook-list",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).chatWebhooks("channelId-1"),
+        action: "listWebhooksAction",
+        args: ["channelId-1"]
+    },
+    {
+        name: "a message quoted into another conversation",
+        path: "/api/chat/carried",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).carriedMessage("messageId-1"),
+        action: "carriedMessageAction",
+        args: ["messageId-1"]
+    },
+    {
+        name: "the instance's chat rules",
+        path: "/api/chat/rules",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).chatRules(),
+        action: "chatRulesAction",
+        args: []
+    },
+    {
+        name: "why calls are off, asked again on a timer",
+        path: "/api/chat/calls-unavailable",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).callsUnavailable(),
+        action: "callsUnavailableAction",
+        args: []
+    },
+    {
+        name: "a message's edit history",
+        path: "/api/chat/edit-history",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).editHistory("messageId-1"),
+        action: "editHistoryAction",
+        args: ["messageId-1"]
+    },
+    {
+        name: "the conversations waiting in another workspace",
+        path: "/api/chat/elsewhere",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).conversationsElsewhere(),
+        action: "conversationsElsewhereAction",
+        args: []
+    },
+    {
+        name: "whether the GIF and sticker tabs have anything behind them",
+        path: "/api/chat/tenor-ready",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).tenorReady(),
+        action: "tenorReadyAction",
+        args: []
+    },
+    {
+        name: "the GIFs and stickers the account kept",
+        path: "/api/chat/saved-media",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).savedMedia(),
+        action: "listSavedMediaAction",
+        args: []
+    },
+    {
+        name: "what an invite link offers",
+        path: "/api/chat/invite",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).readInvite("code-1"),
+        action: "readInviteAction",
+        args: ["code-1"]
+    },
+    {
+        name: "who the invite dialog lists",
+        path: "/api/chat/invite-candidates",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).inviteCandidates({ spaceId: "spaceId-1", query: "query-1" }),
+        action: "inviteCandidatesAction",
+        args: [{ spaceId: "spaceId-1", query: "query-1" }]
+    },
+    {
+        name: "who a message reached",
+        path: "/api/chat/delivery",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).messageDelivery("messageId-1"),
+        action: "messageDeliveryAction",
+        args: ["messageId-1"]
+    },
+    {
+        name: "what the link in a message is",
+        path: "/api/chat/link-preview",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).linkPreview("messageId-1"),
+        action: "linkPreviewAction",
+        args: ["messageId-1"]
+    },
+    {
+        name: "a person's profile as a conversation shows it",
+        path: "/api/chat/profile",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).chatProfile("channelId-1", "userId-1"),
+        action: "profileAction",
+        args: ["channelId-1", "userId-1"]
+    },
+    {
+        name: "the meetings the account can see, asked again on a timer",
+        path: "/api/chat/meeting-list",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).meetingList(),
+        action: "listMeetingsAction",
+        args: []
     }
 ];
 

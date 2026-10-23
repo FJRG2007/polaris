@@ -399,3 +399,35 @@ vi.mock("@/components/shared-polls", () => ({
         1
     )
 }));
+
+vi.mock("@/app/(app)/chat/chat-reads", () => ({
+    chatMembers: forward(() => import("@/app/(app)/chat/actions"), "listMembersAction", 1),
+    spaceBans: forward(() => import("@/app/(app)/chat/actions"), "spaceBansAction", 1),
+    chatInvites: forward(() => import("@/app/(app)/chat/actions"), "listInvitesAction", 2),
+    chatWebhooks: forward(() => import("@/app/(app)/chat/actions"), "listWebhooksAction", 1),
+    carriedMessage: forward(() => import("@/app/(app)/chat/actions"), "carriedMessageAction", 1),
+    chatRules: forward(() => import("@/app/(app)/chat/actions"), "chatRulesAction", 0),
+    callsUnavailable: forward(
+        () => import("@/app/(app)/chat/meeting-actions"),
+        "callsUnavailableAction",
+        0
+    ),
+    editHistory: forward(() => import("@/app/(app)/chat/actions"), "editHistoryAction", 1),
+    conversationsElsewhere: forward(
+        () => import("@/app/(app)/chat/actions"),
+        "conversationsElsewhereAction",
+        0
+    ),
+    tenorReady: forward(() => import("@/app/(app)/chat/actions"), "tenorReadyAction", 0),
+    savedMedia: forward(() => import("@/app/(app)/chat/actions"), "listSavedMediaAction", 0),
+    readInvite: forward(() => import("@/app/(app)/chat/actions"), "readInviteAction", 1),
+    inviteCandidates: forward(
+        () => import("@/app/(app)/chat/actions"),
+        "inviteCandidatesAction",
+        1
+    ),
+    messageDelivery: forward(() => import("@/app/(app)/chat/actions"), "messageDeliveryAction", 1),
+    linkPreview: forward(() => import("@/app/(app)/chat/actions"), "linkPreviewAction", 1),
+    chatProfile: forward(() => import("@/app/(app)/chat/actions"), "profileAction", 2),
+    meetingList: forward(() => import("@/app/(app)/chat/meeting-actions"), "listMeetingsAction", 0)
+}));

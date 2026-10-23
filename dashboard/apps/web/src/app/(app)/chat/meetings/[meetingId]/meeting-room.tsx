@@ -68,11 +68,11 @@ import {
 import {
     endMeetingAction,
     inviteToMeetingAction,
-    listMeetingsAction,
     removeFromMeetingAction,
     setMeetingOptionsAction,
     transferHostAction
 } from "@/app/(app)/chat/meeting-actions";
+import * as polls from "../../chat-reads";
 
 export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewerId: string }) {
     const t = useTranslations("chat");
@@ -100,7 +100,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
 
     const load = useCallback(async () => {
-        const result = await listMeetingsAction();
+        const result = await polls.meetingList();
         const found = result.meetings.find((meeting) => meeting.id === meetingId) ?? null;
         setAbout(found);
         // Not on the list and not in the room: it ended, or it was never this

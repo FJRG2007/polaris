@@ -98,6 +98,7 @@ import { AgeGate } from "./age-gate";
 import { placed } from "./ring-back";
 import { fetchLiveCall } from "./chat-polls";
 import { usePolarContext } from "@/components/polar/polar-panel";
+import * as polls from "./chat-reads";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -881,7 +882,7 @@ export function ChannelView({
         if (!quoting || quoted.current === quoting) return;
         quoted.current = quoting;
         router.replace(`/chat/c/${channelId}`, { scroll: false });
-        void runAction(() => actions.carriedMessageAction(quoting), setError).then((result) => {
+        void runAction(() => polls.carriedMessage(quoting), setError).then((result) => {
             if (result?.carried) setCarried(result.carried);
         });
     }, [channelId, quoting, router]);
