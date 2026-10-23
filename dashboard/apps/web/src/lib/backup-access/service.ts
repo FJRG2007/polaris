@@ -141,14 +141,8 @@ const relaySchema = z.object({
 });
 
 /** Why a path cannot be used right now, as a key the screen words. */
-export type PathProblem =
-    | "no-token"
-    | "no-domain"
-    | "no-daemon"
-    | "no-server"
-    | "no-address"
-    | "failed"
-    | null;
+const PATH_PROBLEMS = ["no-token", "no-domain", "no-daemon", "no-server", "no-address", "failed"] as const;
+export type PathProblem = (typeof PATH_PROBLEMS)[number] | null;
 
 const probeSchema = z.object({
     checkedAt: z.string(),
@@ -164,13 +158,13 @@ const probeSchema = z.object({
     /** The cloud server that checked from outside; null when only the inside check ran. */
     from: z.string().nullable().default(null),
     lastIp: z.string().nullable(),
-    problem: z.string().nullable(),
+    problem: z.enum(PATH_PROBLEMS).nullable().catch(null),
     detail: z.string().nullable(),
     conflicts: z.array(z.string()).default([])
 });
 type Probe = z.infer<typeof probeSchema>;
 
-function parse<T>(schema: z.ZodType<T>, raw: string | null): T | null {
+function parse<S extends z.ZodTypeAny>(schema: S, raw: string | null): z.output<S> | null {
     if (!raw) return null;
     try {
         const parsed = schema.safeParse(JSON.parse(raw));
