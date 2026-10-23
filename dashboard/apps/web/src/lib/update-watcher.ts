@@ -53,6 +53,7 @@ import {
     type NotificationLevel,
     type Permission
 } from "@polaris/core";
+import { internetOffline } from "@/lib/offline/outbound-lookup";
 
 /** Who is told about an update - the same people allowed to install one. */
 const UPDATE_PERMISSION: Permission = "system.manage";
@@ -391,6 +392,10 @@ export function startUpdateWatcher(): void {
     if (started) return;
     started = true;
     const tick = (): void => {
+        // The key sweep below is a database read and runs regardless; everything
+        // else asks the internet, and offline would only log the same miss again.
+        void sweepExpiringModelKeys().catch(() => undefined);
+        if (internetOffline()) return;
         void checkForUpdate().catch((error) =>
             console.error("polaris: update watcher tick failed:", error)
         );
@@ -404,11 +409,6 @@ export function startUpdateWatcher(): void {
         // with an empty catalogue - so a failure is logged at debug and retried
         // on the next tick rather than reported to anybody.
         void refreshModelCatalogIfStale().catch(() => undefined);
-        // And again: an indexed read that matches nothing on a deployment where
-        // nobody has given a key an end date. It has to run on a timer rather
-        // than when somebody opens a screen, because the whole point is telling
-        // them before the morning a run stops working.
-        void sweepExpiringModelKeys().catch(() => undefined);
     };
     setTimeout(tick, FIRST_PASS_MS).unref();
     setInterval(tick, INTERVAL_MS).unref();

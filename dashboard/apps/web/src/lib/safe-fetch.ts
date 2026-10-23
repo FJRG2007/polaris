@@ -42,6 +42,7 @@
 import * as core from "@polaris/core";
 import { lookup } from "node:dns/promises";
 import { Agent, fetch as guardedFetch } from "undici";
+import { internetOffline, isLocalName } from "@/lib/offline/outbound-lookup";
 import { createGate, createSharedFlight, deadline } from "@/lib/concurrency-gate";
 
 /** What undici's fetch answers with. Named off the function so this cannot drift
@@ -86,6 +87,10 @@ const sameName = createSharedFlight<VettedAddress[]>();
  * nobody.
  */
 export async function resolveName(hostname: string): Promise<VettedAddress[]> {
+    // Offline, an outside name would only hold a lookup slot for nothing.
+    if (internetOffline() && !isLocalName(hostname)) {
+        throw Object.assign(new Error(`getaddrinfo EAI_AGAIN ${hostname}`), { code: "EAI_AGAIN" });
+    }
     const wait = deadline(FETCH_TIMEOUT_MS, `${hostname} took too long to resolve`);
     try {
         return await sameName(
