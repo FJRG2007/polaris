@@ -119,7 +119,12 @@ const actions = vi.hoisted(() => {
         "waitingTransfersAction",
         "sentTransfersAction",
         "getShareLogsAction",
-        "getSnippetLogsAction"
+        "getSnippetLogsAction",
+        "keyUsageAction",
+        "loadFriendsAction",
+        "loadFriendRequestsAction",
+        "stepUpRemainingAction",
+        "trustedDeviceAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -284,7 +289,8 @@ vi.mock("@/app/(app)/setup-actions", () => ({
     setupInstalledAction: actions.setupInstalledAction
 }));
 vi.mock("@/app/(app)/account/step-up-actions", () => ({
-    stepUpOptionsAction: actions.stepUpOptionsAction
+    stepUpOptionsAction: actions.stepUpOptionsAction,
+    stepUpRemainingAction: actions.stepUpRemainingAction
 }));
 vi.mock("@/app/(app)/tour-actions", () => ({
     shouldOfferOverviewAction: actions.shouldOfferOverviewAction
@@ -338,6 +344,16 @@ vi.mock("@/app/(app)/drive/share-actions", () => ({
 }));
 vi.mock("@/app/(app)/drive/snippets/snippet-actions", () => ({
     getSnippetLogsAction: actions.getSnippetLogsAction
+}));
+vi.mock("@/app/(app)/account/api-keys/usage-actions", () => ({
+    keyUsageAction: actions.keyUsageAction
+}));
+vi.mock("@/app/(app)/account/privacy/actions", () => ({
+    loadFriendsAction: actions.loadFriendsAction,
+    loadFriendRequestsAction: actions.loadFriendRequestsAction
+}));
+vi.mock("@/app/(app)/account/sessions/actions", () => ({
+    trustedDeviceAction: actions.trustedDeviceAction
 }));
 
 type Handler = (request: Request) => Promise<Response>;
@@ -467,7 +483,12 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/drive/transfers/waiting": () => import("@/app/api/drive/transfers/waiting/route"),
     "/api/drive/transfers/sent": () => import("@/app/api/drive/transfers/sent/route"),
     "/api/drive/share-logs": () => import("@/app/api/drive/share-logs/route"),
-    "/api/drive/snippet-logs": () => import("@/app/api/drive/snippet-logs/route")
+    "/api/drive/snippet-logs": () => import("@/app/api/drive/snippet-logs/route"),
+    "/api/account/api-keys/usage": () => import("@/app/api/account/api-keys/usage/route"),
+    "/api/account/friends": () => import("@/app/api/account/friends/route"),
+    "/api/account/friends/requests": () => import("@/app/api/account/friends/requests/route"),
+    "/api/account/step-up/remaining": () => import("@/app/api/account/step-up/remaining/route"),
+    "/api/account/sessions/device": () => import("@/app/api/account/sessions/device/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -1794,6 +1815,66 @@ const CASES: Case[] = [
             ).snippetLogs("snippetId-1"),
         action: "getSnippetLogsAction",
         args: ["snippetId-1"]
+    },
+    {
+        name: "what an API key was used for over a range",
+        path: "/api/account/api-keys/usage",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/account/account-polls")>(
+                    "@/app/(app)/account/account-polls"
+                )
+            ).keyUsage({ keyId: "keyId-1", range: "range-1" }),
+        action: "keyUsageAction",
+        args: [{ keyId: "keyId-1", range: "range-1" }]
+    },
+    {
+        name: "a page of the account's friends",
+        path: "/api/account/friends",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/account/account-polls")>(
+                    "@/app/(app)/account/account-polls"
+                )
+            ).friendsPage({ kind: "sample" }),
+        action: "loadFriendsAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "the friend requests waiting",
+        path: "/api/account/friends/requests",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/account/account-polls")>(
+                    "@/app/(app)/account/account-polls"
+                )
+            ).friendRequests(),
+        action: "loadFriendRequestsAction",
+        args: []
+    },
+    {
+        name: "how long a step-up proof is still good",
+        path: "/api/account/step-up/remaining",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/account/account-polls")>(
+                    "@/app/(app)/account/account-polls"
+                )
+            ).stepUpRemaining("purpose-1"),
+        action: "stepUpRemainingAction",
+        args: ["purpose-1"]
+    },
+    {
+        name: "one trusted device's detail",
+        path: "/api/account/sessions/device",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/account/account-polls")>(
+                    "@/app/(app)/account/account-polls"
+                )
+            ).trustedDevice("deviceId-1"),
+        action: "trustedDeviceAction",
+        args: ["deviceId-1"]
     }
 ];
 

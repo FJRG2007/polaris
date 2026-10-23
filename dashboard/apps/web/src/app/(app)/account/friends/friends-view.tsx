@@ -32,14 +32,13 @@ import { Loader2, MessageSquarePlus, Search, UserMinus, UserPlus, X } from "luci
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import type { FriendCursor, FriendRequestView, FriendView } from "@/lib/friends-service";
 import {
-    loadFriendsAction,
     removeFriendAction,
     requestFriendAction,
-    loadFriendRequestsAction,
     requestFriendByUsernameAction,
     respondToRequestAction,
     searchPeopleAction
 } from "../privacy/actions";
+import * as polls from "../account-polls";
 
 /** Below this nothing is asked at all - the floor the server keeps, said here
  *  too so the request is never made. */
@@ -108,8 +107,8 @@ function FriendsCard({
      */
     const reload = async () => {
         const [page, pending] = await Promise.all([
-            loadFriendsAction(null),
-            loadFriendRequestsAction()
+            polls.friendsPage(null),
+            polls.friendRequests()
         ]);
         setPeople(page.items);
         setCursor(page.cursor);
@@ -150,7 +149,7 @@ function FriendsCard({
     const loadMore = async () => {
         if (loading || !cursor) return;
         setLoading(true);
-        const page = await loadFriendsAction(cursor);
+        const page = await polls.friendsPage(cursor);
         setPeople((current) => {
             // The pages are read in order, but a reload can land between two of
             // them - so anybody already on the list is not added twice.

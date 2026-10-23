@@ -14,11 +14,12 @@ import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat, useDisplayPreferences } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { keyUsageAction, type KeyUsage } from "@/app/(app)/account/api-keys/usage-actions";
+import type { KeyUsage } from "@/app/(app)/account/api-keys/usage-actions";
 import { ArrowLeft, BookOpen, Pencil, RotateCw } from "lucide-react";
 import { Badge, Button, SegmentedControl, Skeleton, cn } from "@polaris/ui";
 import type { Percentile } from "@/lib/api-usage/report";
 import { USAGE_RANGES, type UsageRange } from "@/lib/api-usage/ranges";
+import * as polls from "../../../account-polls";
 
 type Translate = NamespaceTranslator<"account">;
 
@@ -63,7 +64,8 @@ export function KeyUsageView({ apiKey }: { apiKey: UsageKey }) {
         const request = ++latest.current;
         const known = cached(apiKey.id, range);
         setLoad(known ? { state: "ready", usage: known } : { state: "loading" });
-        keyUsageAction({ keyId: apiKey.id, range })
+        polls
+            .keyUsage({ keyId: apiKey.id, range })
             .then((result) => {
                 if (request !== latest.current) return;
                 if (result.usage) {

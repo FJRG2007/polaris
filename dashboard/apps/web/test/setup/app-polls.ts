@@ -517,3 +517,31 @@ vi.mock("@/app/(app)/drive/drive-reads", () => ({
         1
     )
 }));
+
+vi.mock("@/app/(app)/account/account-polls", () => ({
+    keyUsage: forward(
+        () => import("@/app/(app)/account/api-keys/usage-actions"),
+        "keyUsageAction",
+        1
+    ),
+    friendsPage: forward(
+        () => import("@/app/(app)/account/privacy/actions"),
+        "loadFriendsAction",
+        1
+    ),
+    friendRequests: forward(
+        () => import("@/app/(app)/account/privacy/actions"),
+        "loadFriendRequestsAction",
+        0
+    ),
+    stepUpRemaining: forward(
+        () => import("@/app/(app)/account/step-up-actions"),
+        "stepUpRemainingAction",
+        1
+    ),
+    trustedDevice: forward(
+        () => import("@/app/(app)/account/sessions/actions"),
+        "trustedDeviceAction",
+        1
+    )
+}));
