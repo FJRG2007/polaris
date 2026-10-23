@@ -1451,6 +1451,7 @@
         "slowCall": "Tu conexión es lenta: el vídeo y la voz pueden cortarse.",
         "unreachable": "No se puede contactar con Polaris ahora. Reintentando.",
         "updating": "Polaris se está actualizando. Volverá en un momento.",
+        "noInternet": "Sin conexión a internet - Polaris sigue funcionando en tu red",
         "polarisBack": "Polaris ha vuelto",
         "retry": "Reintentar"
     },

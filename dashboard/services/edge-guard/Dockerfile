@@ -40,6 +40,9 @@ RUN npm run build -w @polaris/core && npm run build -w @polaris/edge-guard
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Name lookups share libuv's four-thread pool by default; a dead internet line
+# makes each outside one hang ~10 s, and four of them stall everything else.
+ENV UV_THREADPOOL_SIZE=16
 # The bundle is self-contained; nothing else from the workspace is needed.
 COPY --from=builder /build/services/edge-guard/dist/index.js ./index.js
 # The intel volume is mounted read-only here, but ownership is decided by whichever

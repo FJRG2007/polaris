@@ -18,6 +18,7 @@ import { getChangedFiles, getLatestCommit } from "../github-service";
 import { parseWatchPaths, shouldDeployForPaths } from "@polaris/deploy";
 import { commitPassesFilter } from "./push-deploys";
 import { deployOrHold, pollCiWaits } from "./ci-wait";
+import { internetOffline } from "@/lib/offline/outbound-lookup";
 
 const INTERVAL_MS = Number(process.env.POLARIS_AUTODEPLOY_POLL_MS) || 60_000;
 let started = false;
@@ -113,7 +114,10 @@ export async function pollAutoDeploys(): Promise<void> {
 export function startAutoDeployPoller(): void {
     if (started) return;
     started = true;
-    const tick = (): void =>
+    const tick = (): void => {
+        // Both halves ask GitHub. Offline, the breaker's own probe says when it is
+        // back, and the next tick after that catches up.
+        if (internetOffline()) return;
         void pollAutoDeploys()
             .catch((error) => console.error("polaris: auto-deploy poll failed:", error))
             // Pushes held for CI whose check events never arrived - every LAN
@@ -124,6 +128,7 @@ export function startAutoDeployPoller(): void {
             // other way to hear that a pull request opened or closed.
             .then(() => reconcilePullRequestPreviews())
             .catch((error) => console.error("polaris: preview reconcile failed:", error));
+    };
     setInterval(tick, INTERVAL_MS).unref?.();
     // First pass shortly after boot, once the server has settled.
     setTimeout(tick, 15_000).unref?.();

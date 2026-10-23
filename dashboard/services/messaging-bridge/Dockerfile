@@ -44,6 +44,9 @@ RUN npm run build -w @polaris/messaging && npm run build -w @polaris/messaging-b
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Name lookups share libuv's four-thread pool by default; a dead internet line
+# makes each outside one hang ~10 s, and four of them stall everything else.
+ENV UV_THREADPOOL_SIZE=16
 # Use the system Chromium for whatsapp-web.js; never let Puppeteer download its own.
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium

@@ -17,6 +17,9 @@
  *   app was already doing failed, and never while everything works.
  * - Updating: the same silence while this device has an update rolling over,
  *   which is expected and says so instead of sounding like a failure.
+ * - No internet: Polaris answers, but the server it runs on cannot reach the
+ *   internet (`lib/host-internet`). Everything on the local network keeps
+ *   working, so it is the quietest of these and gives way to any other.
  *
  * "Back" is said only after a real drop, and goes away by itself. When Polaris
  * comes back on a new build, the new-build card is what speaks - it has the
@@ -24,12 +27,13 @@
  */
 
 import { Button, cn } from "@polaris/ui";
-import { Wifi, WifiOff, CloudOff, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, CloudOff, RefreshCw, Globe } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNetworkState } from "@enigmax/primitives/react/network";
 import { checkForNewBuild } from "@/lib/new-build";
 import { updateInProgress } from "@/lib/update-in-progress";
+import { hostOffline, subscribeHostOffline } from "@/lib/host-internet";
 import {
     noteRequestFailure,
     probeNow,
@@ -50,6 +54,9 @@ export function ConnectionBanner() {
     const t = useTranslations("components");
     const { online, recovered } = useNetworkState();
     const reach = useSyncExternalStore(subscribeReachability, reachability, () => SERVER_SNAPSHOT);
+    // The server's own line, said only when nothing more urgent is: Polaris
+    // itself still answers, so this is a quiet note rather than an alarm.
+    const noInternet = useSyncExternalStore(subscribeHostOffline, hostOffline, () => false);
     const [back, setBack] = useState<Back>("none");
     const [retrying, setRetrying] = useState(false);
     const seenRecoveries = useRef(reach.recoveries);
@@ -97,14 +104,25 @@ export function ConnectionBanner() {
               ? "updating"
               : "unreachable"
           : back === "none"
-            ? null
+            ? noInternet
+                ? "noInternet"
+                : null
             : back === "polaris"
               ? "polarisBack"
               : "back";
     if (state === null) return null;
 
     const good = state === "back" || state === "polarisBack";
-    const Icon = state === "offline" ? WifiOff : state === "unreachable" ? CloudOff : state === "updating" ? RefreshCw : Wifi;
+    const Icon =
+        state === "offline"
+            ? WifiOff
+            : state === "unreachable"
+              ? CloudOff
+              : state === "updating"
+                ? RefreshCw
+                : state === "noInternet"
+                  ? Globe
+                  : Wifi;
 
     async function retry() {
         setRetrying(true);
@@ -128,7 +146,10 @@ export function ConnectionBanner() {
                           : "border-warning-edge bg-warning-soft text-warning-ink"
                 )}
             >
-                <Icon className={cn("size-4 shrink-0", state === "updating" && "animate-spin")} aria-hidden />
+                <Icon
+                    className={cn("size-4 shrink-0", state === "updating" && "animate-spin")}
+                    aria-hidden
+                />
                 <span className="min-w-0">{t(`network.${state}`)}</span>
                 {state === "unreachable" ? (
                     <Button

@@ -16,6 +16,13 @@ let state = { online: true, recovered: false, slow: false };
 vi.mock("@enigmax/primitives/react/network", () => ({ useNetworkState: () => state }));
 let newBuild = false;
 vi.mock("@/lib/new-build", () => ({ checkForNewBuild: async () => newBuild }));
+// The server's own internet line is asked on its own schedule
+// (test/lib/host-internet.test.ts); here it is only a value the banner reads.
+let hostIsOffline = false;
+vi.mock("@/lib/host-internet", () => ({
+    hostOffline: () => hostIsOffline,
+    subscribeHostOffline: () => () => {}
+}));
 
 const { ConnectionBanner, SlowConnectionNotice } = await import("@/components/connection-banner");
 const { noteStreamTrouble, probeNow, resetReachability } = await import("@/lib/reachability");
@@ -32,6 +39,7 @@ const fetchMock = vi.fn(async () =>
 beforeEach(() => {
     state = { online: true, recovered: false, slow: false };
     newBuild = false;
+    hostIsOffline = false;
     answering = true;
     fetchMock.mockClear();
     vi.stubGlobal("fetch", fetchMock);
@@ -96,6 +104,15 @@ describe("when Polaris itself does not answer", () => {
             vi.advanceTimersByTime(10 * 60 * 1000);
         });
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("says quietly when the server has no internet, and gives way to being offline", () => {
+        hostIsOffline = true;
+        const { rerender } = render(<ConnectionBanner />, { wrapper: MessagesWrapper });
+        expect(screen.getByRole("status").textContent).toContain("No internet connection");
+        state = { online: false, recovered: false, slow: false };
+        rerender(<ConnectionBanner />);
+        expect(screen.getByRole("status").textContent).toContain("You're offline");
     });
 
     it("says Polaris cannot be reached, apart from being offline", async () => {
@@ -177,7 +194,9 @@ describe("a slow line in a call", () => {
     });
 
     it("is not named when it is fine, or when there is none at all", () => {
-        const { container, rerender } = render(<SlowConnectionNotice />, { wrapper: MessagesWrapper });
+        const { container, rerender } = render(<SlowConnectionNotice />, {
+            wrapper: MessagesWrapper
+        });
         expect(container.textContent).toBe("");
         state = { online: false, recovered: false, slow: true };
         rerender(<SlowConnectionNotice />);

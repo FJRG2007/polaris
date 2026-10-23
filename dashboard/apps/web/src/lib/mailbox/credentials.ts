@@ -18,6 +18,7 @@
 import { loadEnv } from "@polaris/config";
 import { MAIL_OAUTH_SCOPES } from "@polaris/core";
 import { readCredential } from "@/lib/connections/store";
+import { Breaker } from "@/lib/offline/breaker";
 import { encryptSecret, decryptSecret, CredentialDecryptError } from "@polaris/storage";
 import {
     getGoogleOAuthClient,
@@ -148,40 +149,94 @@ export async function mailCredential(account: MailCredentialSource): Promise<Mai
     const credential = await readCredential(account.connectionId);
     const refreshToken = credential?.refreshToken;
     if (!refreshToken) {
-        throw new MailAuthError("The account that authorized this mailbox needs authorizing again.");
+        throw new MailAuthError(
+            "The account that authorized this mailbox needs authorizing again."
+        );
     }
 
     const provider = oauthProviderFor(account.service);
+    const reachable = tokenEndpoint(provider);
+    // Unanswered a moment ago: say so now, instead of every pass and every folder
+    // catch-up waiting out its own timeout and writing its own line about it.
+    if (reachable.admit() === "refuse") throw unreachable(provider);
     try {
-        if (provider === "google") {
-            const client = await getGoogleOAuthClient();
-            if (!client) throw new MailAuthError("Google is not connected on this Polaris any more.");
-            // Google mints one token per refresh token regardless of what was
-            // asked for; the scopes it carries are the ones the link was granted,
-            // which is what `grantsMailAccess` checked before this account existed.
-            void GOOGLE_MAIL_SCOPES;
-            return { kind: "oauth", user, accessToken: await googleAccessToken(client, refreshToken) };
-        }
-        const client = await getMicrosoftOAuthClient();
-        if (!client) throw new MailAuthError("Microsoft is not connected on this Polaris any more.");
-        return {
-            kind: "oauth",
-            user,
-            accessToken: await microsoftAccessToken(client, refreshToken, MICROSOFT_MAIL_SCOPES)
-        };
+        const credential = await requestToken(provider, user, refreshToken);
+        reachable.succeed();
+        return credential;
     } catch (caught) {
         if (caught instanceof MailAuthError) throw caught;
         // A grant the provider refused is the same answer to the person holding
         // the mailbox: authorize it again. The provider's own words are kept off
         // the screen deliberately - they name endpoints and scopes.
-        if (caught instanceof GoogleAuthExpiredError || caught instanceof MicrosoftAuthExpiredError) {
+        if (
+            caught instanceof GoogleAuthExpiredError ||
+            caught instanceof MicrosoftAuthExpiredError
+        ) {
+            reachable.succeed();
             throw new MailAuthError("This mailbox needs authorizing again.");
         }
-        console.warn(`polaris: ${provider} did not answer a mail token request:`, caught);
-        throw new Error(
-            `Polaris could not reach ${provider === "google" ? "Google" : "Microsoft"} to authorize this mailbox.`
-        );
+        // One line when it stops answering; the retries after it back off quietly.
+        if (!reachable.isOpen)
+            console.warn(`polaris: ${provider} did not answer a mail token request:`, caught);
+        reachable.fail();
+        throw unreachable(provider);
     }
+}
+
+/** Retried after 30 s, then twice as long after each miss, up to 15 min. */
+export const TOKEN_RETRY_FIRST_MS = 30_000;
+export const TOKEN_RETRY_MAX_MS = 15 * 60_000;
+
+const tokenEndpoints = new Map<"google" | "microsoft", Breaker>();
+
+/** Whether a provider's token endpoint answered lately, kept per provider. */
+function tokenEndpoint(provider: "google" | "microsoft"): Breaker {
+    let breaker = tokenEndpoints.get(provider);
+    if (!breaker) {
+        breaker = new Breaker({
+            firstRetryMs: TOKEN_RETRY_FIRST_MS,
+            maxRetryMs: TOKEN_RETRY_MAX_MS,
+            onChange: (open) => {
+                if (!open) console.warn(`polaris: ${provider} answers mail token requests again`);
+            }
+        });
+        tokenEndpoints.set(provider, breaker);
+    }
+    return breaker;
+}
+
+/** For tests: forget what the endpoints did. */
+export function resetTokenEndpoints(): void {
+    tokenEndpoints.clear();
+}
+
+function unreachable(provider: "google" | "microsoft"): Error {
+    return new Error(
+        `Polaris could not reach ${provider === "google" ? "Google" : "Microsoft"} to authorize this mailbox.`
+    );
+}
+
+async function requestToken(
+    provider: "google" | "microsoft",
+    user: string,
+    refreshToken: string
+): Promise<MailCredential> {
+    if (provider === "google") {
+        const client = await getGoogleOAuthClient();
+        if (!client) throw new MailAuthError("Google is not connected on this Polaris any more.");
+        // Google mints one token per refresh token regardless of what was
+        // asked for; the scopes it carries are the ones the link was granted,
+        // which is what `grantsMailAccess` checked before this account existed.
+        void GOOGLE_MAIL_SCOPES;
+        return { kind: "oauth", user, accessToken: await googleAccessToken(client, refreshToken) };
+    }
+    const client = await getMicrosoftOAuthClient();
+    if (!client) throw new MailAuthError("Microsoft is not connected on this Polaris any more.");
+    return {
+        kind: "oauth",
+        user,
+        accessToken: await microsoftAccessToken(client, refreshToken, MICROSOFT_MAIL_SCOPES)
+    };
 }
 
 /** Which service authorizes a given mail service. Only two do. */

@@ -12,7 +12,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 class GoogleAuthExpiredError extends Error {}
 class MicrosoftAuthExpiredError extends Error {}
 
-const mint = { google: async (): Promise<string> => "google-token", microsoft: async (): Promise<string> => "ms-token" };
+const mint = {
+    google: async (): Promise<string> => "google-token",
+    microsoft: async (): Promise<string> => "ms-token"
+};
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k" }) }));
 vi.mock("@polaris/storage", () => ({
@@ -20,7 +23,9 @@ vi.mock("@polaris/storage", () => ({
     decryptSecret: () => "",
     CredentialDecryptError: class extends Error {}
 }));
-vi.mock("@/lib/connections/store", () => ({ readCredential: async () => ({ refreshToken: "refresh" }) }));
+vi.mock("@/lib/connections/store", () => ({
+    readCredential: async () => ({ refreshToken: "refresh" })
+}));
 vi.mock("@/lib/google-calendar/service", () => ({
     getGoogleOAuthClient: async () => ({ clientId: "client", clientSecret: "secret" }),
     googleAccessToken: () => mint.google(),
@@ -34,7 +39,13 @@ vi.mock("@/lib/connections/microsoft", () => ({
     MICROSOFT_MAIL_SCOPES: []
 }));
 
-const { mailCredential, MailAuthError } = await import("@/lib/mailbox/credentials");
+const {
+    mailCredential,
+    MailAuthError,
+    resetTokenEndpoints,
+    TOKEN_RETRY_FIRST_MS,
+    TOKEN_RETRY_MAX_MS
+} = await import("@/lib/mailbox/credentials");
 
 function authorized(service: string) {
     return {
@@ -50,6 +61,8 @@ function authorized(service: string) {
 }
 
 beforeEach(() => {
+    vi.useRealTimers();
+    resetTokenEndpoints();
     mint.google = async () => "google-token";
     mint.microsoft = async () => "ms-token";
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -76,7 +89,9 @@ describe("minting a mailbox's token", () => {
         };
         const attempt = mailCredential(authorized("gmail"));
         await expect(attempt).rejects.not.toBeInstanceOf(MailAuthError);
-        await expect(attempt).rejects.toThrow("Polaris could not reach Google to authorize this mailbox.");
+        await expect(attempt).rejects.toThrow(
+            "Polaris could not reach Google to authorize this mailbox."
+        );
     });
 
     it("retries, rather than pausing the mailbox, when Microsoft has a bad minute", async () => {
@@ -85,13 +100,97 @@ describe("minting a mailbox's token", () => {
         };
         const attempt = mailCredential(authorized("outlook"));
         await expect(attempt).rejects.not.toBeInstanceOf(MailAuthError);
-        await expect(attempt).rejects.toThrow("Polaris could not reach Microsoft to authorize this mailbox.");
+        await expect(attempt).rejects.toThrow(
+            "Polaris could not reach Microsoft to authorize this mailbox."
+        );
     });
 
     it("hands back the token when it is minted", async () => {
         await expect(mailCredential(authorized("gmail"))).resolves.toMatchObject({
             kind: "oauth",
             accessToken: "google-token"
+        });
+    });
+});
+
+describe("a token endpoint that does not answer", () => {
+    it("is not asked again until the backoff passes, and backs off further each miss", async () => {
+        vi.useFakeTimers({ now: 0 });
+        const warn = vi.mocked(console.warn);
+        warn.mockClear();
+        let asked = 0;
+        mint.google = async () => {
+            asked++;
+            throw new TypeError("fetch failed");
+        };
+
+        await expect(mailCredential(authorized("gmail"))).rejects.toThrow("could not reach Google");
+        expect(asked).toBe(1);
+        // Every pass and catch-up in the window is answered at once, unasked.
+        for (let i = 0; i < 10; i++) {
+            await expect(mailCredential(authorized("gmail"))).rejects.toThrow(
+                "could not reach Google"
+            );
+        }
+        expect(asked).toBe(1);
+
+        vi.setSystemTime(TOKEN_RETRY_FIRST_MS);
+        await expect(mailCredential(authorized("gmail"))).rejects.toThrow("could not reach Google");
+        expect(asked).toBe(2);
+        vi.setSystemTime(TOKEN_RETRY_FIRST_MS * 2);
+        await expect(mailCredential(authorized("gmail"))).rejects.toThrow("could not reach Google");
+        expect(asked).toBe(2);
+        vi.setSystemTime(TOKEN_RETRY_FIRST_MS * 3);
+        await expect(mailCredential(authorized("gmail"))).rejects.toThrow("could not reach Google");
+        expect(asked).toBe(3);
+
+        // One line for going quiet, none per retry.
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it("never waits longer than the ceiling between tries", async () => {
+        vi.useFakeTimers({ now: 0 });
+        let asked = 0;
+        mint.google = async () => {
+            asked++;
+            throw new TypeError("fetch failed");
+        };
+        let now = 0;
+        for (let i = 0; i < 12; i++) {
+            await mailCredential(authorized("gmail")).catch(() => undefined);
+            now += TOKEN_RETRY_MAX_MS;
+            vi.setSystemTime(now);
+        }
+        expect(asked).toBe(12);
+    });
+
+    it("says once that it is back, and answers normally again", async () => {
+        vi.useFakeTimers({ now: 0 });
+        const warn = vi.mocked(console.warn);
+        warn.mockClear();
+        mint.google = async () => {
+            throw new TypeError("fetch failed");
+        };
+        await mailCredential(authorized("gmail")).catch(() => undefined);
+        mint.google = async () => "google-token";
+        vi.setSystemTime(TOKEN_RETRY_FIRST_MS);
+        await expect(mailCredential(authorized("gmail"))).resolves.toMatchObject({
+            accessToken: "google-token"
+        });
+        await expect(mailCredential(authorized("gmail"))).resolves.toMatchObject({
+            accessToken: "google-token"
+        });
+        expect(warn).toHaveBeenCalledTimes(2);
+        expect(String(warn.mock.calls[1]![0])).toContain("again");
+    });
+
+    it("keeps each provider apart", async () => {
+        mint.google = async () => {
+            throw new TypeError("fetch failed");
+        };
+        await mailCredential(authorized("gmail")).catch(() => undefined);
+        await expect(mailCredential(authorized("outlook"))).resolves.toMatchObject({
+            accessToken: "ms-token"
         });
     });
 });
