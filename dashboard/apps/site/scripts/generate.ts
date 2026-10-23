@@ -96,7 +96,7 @@ function localize(sections: site.ShowcaseSection[], locale: "en" | "es"): site.S
 
 /**
  * The apps every Polaris comes with, named and described in the dashboard's own
- * words, with what each replaces and the README captures that show it.
+ * words, with what each replaces and every capture that shows it.
  */
 function builtIn(webLocale: string, showcase: site.ShowcaseSection[]): site.BuiltInSiteApp[] {
     const nav = JSON.parse(read(join(web, "messages", webLocale, "nav.json")));
@@ -135,13 +135,19 @@ function captured(scene: string, webLocale: string): site.ShowcaseItem[] {
     const dark = `${scene}-dark-${language}-desktop.webp`;
     const light = `${scene}-light-${language}-desktop.webp`;
     if (!existsSync(join(media, dark))) return [];
-    const shown = new RegExp(`<img src="\\.\\./assets/media/${dark.replace(/\./g, "\\.")}"[^>]*alt="([^"]*)"`);
+    const shown = new RegExp(
+        `<img src="\\.\\./assets/media/${dark.replace(/\./g, "\\.")}"[^>]*alt="([^"]*)"`
+    );
     for (const page of featurePages[language]) {
         const at = shown.exec(page);
         if (!at) continue;
         const heading = /^## (.+)$/gm;
         let name = "";
-        for (let match = heading.exec(page); match && match.index < at.index; match = heading.exec(page))
+        for (
+            let match = heading.exec(page);
+            match && match.index < at.index;
+            match = heading.exec(page)
+        )
             name = match[1]!.trim();
         const alt = at[1] ?? "";
         return [
