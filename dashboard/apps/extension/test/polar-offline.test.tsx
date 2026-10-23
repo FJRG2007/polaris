@@ -113,6 +113,21 @@ describe("remember", () => {
             offline.readKept({ account: "u", conversations: [conversation("t1"), { id: 3 }] })
         ).toEqual({ account: "u", conversations: [conversation("t1")] });
     });
+
+    it("shows a copy only to the account it was kept for", () => {
+        const kept = offline.remember(null, "a", conversation("t1"));
+        expect(offline.keptFor(kept, "a")).toBe(kept);
+        expect(offline.keptFor(kept, "b")).toBeNull();
+        expect(offline.keptFor(kept, null)).toBeNull();
+    });
+
+    it("keeps a draft per account and knows its own keys", () => {
+        expect(offline.draftKey(SERVER, "a")).not.toBe(offline.draftKey(SERVER, "b"));
+        for (const key of [offline.keptKey(SERVER), offline.draftKey(SERVER, "a")]) {
+            expect(offline.isOfflineKey(key.replace(/^local:/, ""))).toBe(true);
+        }
+        expect(offline.isOfflineKey("polar.sites")).toBe(false);
+    });
 });
 
 describe("retryDelay and blocksOf", () => {

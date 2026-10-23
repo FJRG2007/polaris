@@ -23,11 +23,15 @@ export const SNAPSHOT_TITLE = 120;
 export const KEPT_CONVERSATIONS = 10;
 export const KEPT_BYTES = 512 * 1024;
 
-/** Where the copy and the draft live, one of each per Polaris. */
+/** Where the copy lives, one per Polaris, and the draft, one per account on it. */
 export const keptKey = (server: string): `local:${string}` =>
     `local:polar.kept.${new URL(server).origin}`;
-export const draftKey = (server: string): `local:${string}` =>
-    `local:polar.draft.${new URL(server).origin}`;
+export const draftKey = (server: string, account: string): `local:${string}` =>
+    `local:polar.draft.${new URL(server).origin}.${account}`;
+
+/** Whether a key in the browser's local storage is a copy or a draft. */
+export const isOfflineKey = (key: string): boolean =>
+    key.startsWith("polar.kept.") || key.startsWith("polar.draft.");
 
 export interface KeptMessage {
     readonly role: "user" | "assistant";
@@ -98,6 +102,11 @@ export function readKept(value: unknown): Kept | null {
         .filter((one): one is KeptConversation => one !== null)
         .slice(0, KEPT_CONVERSATIONS);
     return { account: value.account, conversations };
+}
+
+/** The copy only for the account it was kept for; nothing for another or none. */
+export function keptFor(kept: Kept | null, account: string | null): Kept | null {
+    return kept && account && kept.account === account ? kept : null;
 }
 
 const sizeOf = (kept: Kept): number => new TextEncoder().encode(JSON.stringify(kept)).length;

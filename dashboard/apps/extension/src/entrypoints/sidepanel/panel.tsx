@@ -99,10 +99,23 @@ function holdPort(
 
 const WEB_PAGES = ["https://*/*", "http://*/*"];
 
-/** The Polaris this browser is connected to, and whether it answers. */
-async function polarisOrigin(): Promise<string | null> {
+/** How often an open chat checks that Polaris still answers, ms. */
+const HEALTH_MS = 30_000;
+
+interface Connection {
+    readonly origin: string | null;
+    /** The account connected on it, which is whose copy and draft are shown. */
+    readonly account: string | null;
+}
+
+/** The Polaris this browser is connected to, and as whom. */
+async function polarisConnection(): Promise<Connection> {
     const reply = await askBackground({ kind: "status" });
-    return reply.ok && "status" in reply ? reply.status.server : null;
+    if (!reply.ok || !("status" in reply)) return { origin: null, account: null };
+    return {
+        origin: reply.status.server,
+        account: reply.status.linkedAccount?.id ?? null
+    };
 }
 
 async function isUp(origin: string): Promise<boolean> {
@@ -117,9 +130,9 @@ async function isUp(origin: string): Promise<boolean> {
     }
 }
 
-async function findPolaris(): Promise<{ origin: string | null; up: boolean }> {
-    const origin = await polarisOrigin();
-    return { origin, up: origin ? await isUp(origin) : false };
+async function findPolaris(): Promise<Connection & { up: boolean }> {
+    const found = await polarisConnection();
+    return { ...found, up: found.origin ? await isUp(found.origin) : false };
 }
 
 type Reach = "asking" | "none" | "offline" | "ready";
@@ -164,6 +177,7 @@ async function readTab(tabId: number): Promise<polar.SharedPage | null> {
 export function Panel(): React.JSX.Element {
     const t = useWords();
     const [server, setServer] = useState<string | null>(null);
+    const [account, setAccount] = useState<string | null>(null);
     const [reach, setReach] = useState<Reach>("asking");
     const [front, setFront] = useState<Front>(NO_FRONT);
     const [allowed, setAllowed] = useState<string[]>([]);
@@ -177,6 +191,10 @@ export function Panel(): React.JSX.Element {
     const frame = useRef<HTMLIFrameElement>(null);
     /** A question from a right-click, held until the chat in the frame is ready. */
     const waiting = useRef<polar.PolarAsk | null>(null);
+    /** The draft handed to the chat, cleared from storage once it is posted. */
+    const offered = useRef<polar.PolarAsk | null>(null);
+    /** Copies written one after another, so two close together keep both. */
+    const saving = useRef<Promise<void>>(Promise.resolve());
     /** The frame whose chat has said it is listening. */
     const listening = useRef<Window | null>(null);
     const portRef = useRef<PanelPort | null>(null);
@@ -200,7 +218,10 @@ export function Panel(): React.JSX.Element {
         if (!target || !server || !ask || target !== listening.current) return;
         target.postMessage(polar.askMessage(ask), new URL(server).origin);
         waiting.current = null;
-    }, [server]);
+        if (ask !== offered.current) return;
+        offered.current = null;
+        if (account) void storage.removeItem(offline.draftKey(server, account));
+    }, [server, account]);
 
     useEffect(
         () =>
@@ -224,8 +245,9 @@ export function Panel(): React.JSX.Element {
             setServer(kept);
             setReach("ready");
         }
-        const origin = await polarisOrigin();
+        const { origin, account } = await polarisConnection();
         setServer(origin);
+        setAccount(account);
         void LAST_SERVER.setValue(origin).catch(() => undefined);
         if (!origin) return setReach("none");
         // The chat loads now; the health check only says whether it is down.
@@ -235,26 +257,45 @@ export function Panel(): React.JSX.Element {
         setDownSince((before) => (up ? null : (before ?? Date.now())));
     }, []);
 
-    // The copy and the draft of this Polaris, read once it is known.
+    // The copy of this Polaris and the draft of its account, read once known.
     useEffect(() => {
         if (!server) return;
         void storage
             .getItem<unknown>(offline.keptKey(server))
             .then((value) => setKept(offline.readKept(value)));
+        if (!account) return setDraft("");
         void storage
-            .getItem<string>(offline.draftKey(server))
+            .getItem<string>(offline.draftKey(server, account))
             .then((value) => setDraft(typeof value === "string" ? value : ""));
-    }, [server]);
+    }, [server, account]);
 
     const writeDraft = useCallback(
         (text: string) => {
             setDraft(text);
-            if (!server) return;
-            const key = offline.draftKey(server);
+            if (!server || !account) return;
+            const key = offline.draftKey(server, account);
             void (text.trim() ? storage.setItem(key, text) : storage.removeItem(key));
         },
-        [server]
+        [server, account]
     );
+
+    // A chat already open whose Polaris stops answering turns to the copy.
+    useEffect(() => {
+        if (reach !== "ready" || !server) return;
+        let stopped = false;
+        const timer = setInterval(() => {
+            if (document.hidden) return;
+            void isUp(server).then((up) => {
+                if (up || stopped) return;
+                setReach("offline");
+                setDownSince((before) => before ?? Date.now());
+            });
+        }, HEALTH_MS);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+        };
+    }, [reach, server]);
 
     useEffect(() => {
         void connect();
@@ -343,15 +384,17 @@ export function Panel(): React.JSX.Element {
             const snapshot = offline.snapshotFrom(event, frame.current?.contentWindow, server);
             if (snapshot) {
                 const key = offline.keptKey(server);
-                void storage.getItem<unknown>(key).then(async (value) => {
-                    const next = offline.remember(
-                        offline.readKept(value),
-                        snapshot.account,
-                        snapshot.conversation
-                    );
-                    await storage.setItem(key, next);
-                    setKept(next);
-                });
+                saving.current = saving.current
+                    .then(async () => {
+                        const next = offline.remember(
+                            offline.readKept(await storage.getItem<unknown>(key)),
+                            snapshot.account,
+                            snapshot.conversation
+                        );
+                        await storage.setItem(key, next);
+                        setKept(next);
+                    })
+                    .catch(() => undefined);
                 return;
             }
             if (!polar.isRefresh(event, frame.current?.contentWindow, server)) return;
@@ -396,17 +439,20 @@ export function Panel(): React.JSX.Element {
         );
     }
     if (reach === "offline") {
-        // The copy is the last account's to use Polar here: a new one replaces it.
+        // The copy is the last account's to use Polar here: only that one sees it.
         return (
             <OfflineView
-                kept={kept}
+                kept={offline.keptFor(kept, account)}
                 since={downSince ?? Date.now()}
                 draft={draft}
                 onDraft={writeDraft}
                 probe={async () => {
-                    const { origin, up } = await findPolaris();
-                    if (up && origin) setServer(origin);
-                    return up;
+                    const found = await findPolaris();
+                    if (found.up && found.origin) {
+                        setServer(found.origin);
+                        setAccount(found.account);
+                    }
+                    return found.up;
                 }}
                 onBack={() => {
                     setDownSince(null);
@@ -451,9 +497,11 @@ export function Panel(): React.JSX.Element {
                 <DraftOffer
                     onUse={() => {
                         // Into the composer, for the person to read and send.
-                        waiting.current = { draft: draft.trim() };
+                        const ask = { draft: draft.trim() };
+                        waiting.current = ask;
+                        offered.current = ask;
+                        setDraft("");
                         deliver();
-                        writeDraft("");
                     }}
                     onDiscard={() => writeDraft("")}
                 />
