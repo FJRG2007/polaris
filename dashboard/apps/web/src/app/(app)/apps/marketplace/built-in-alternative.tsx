@@ -2,15 +2,15 @@
 
 /**
  * The line a Deploy template carries when one of Polaris's own apps already does
- * its job: Vaultwarden beside Vault, Uptime Kuma beside Watch.
+ * its job: Vaultwarden beside Vault, Umami beside Analytics.
  *
  * Deploying the template still works - somebody migrating an existing install
  * may want exactly that - so this is a note, not a replacement for the button.
  * What it says is read off `builtInAlternative`, so it can only name a built-in
  * that the replaces table already says does the job.
  *
- * The link is drawn only for a reader who may open that app (`openable`, worked
- * out on the server with the check the app's own pages make); anyone else is
+ * The link is drawn only for a reader who may open that screen (`openable`, worked
+ * out on the server with the check the screen itself makes); anyone else is
  * still told it exists rather than sent to a screen that turns them away.
  */
 
@@ -26,7 +26,7 @@ export function BuiltInAlternativeNote({
     openable
 }: {
     app: AppManifest;
-    /** Ids of the built-in apps this reader may open. */
+    /** Addresses of the built-in screens this reader may open. */
     openable: ReadonlySet<string>;
 }) {
     const t = useTranslations("marketplace");
@@ -39,7 +39,7 @@ export function BuiltInAlternativeNote({
             <Sparkles className="mt-px size-3.5 shrink-0 text-primary" aria-hidden="true" />
             <span className="min-w-0">
                 {t("card.builtIn", { app: name })}{" "}
-                {openable.has(builtIn.id) && (
+                {openable.has(builtIn.href) && (
                     <Link
                         href={builtIn.href}
                         className="font-medium text-foreground underline underline-offset-2"

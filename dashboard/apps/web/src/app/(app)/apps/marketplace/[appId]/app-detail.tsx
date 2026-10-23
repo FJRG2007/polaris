@@ -283,7 +283,8 @@ export function AppInstallPanel({
     /** deploy.manage, the permission the install action requires. */
     canInstall: boolean;
     installs: DetailInstall[];
-    /** The built-in apps this reader may open (`BuiltInAlternativeNote`). */
+    /** Addresses of the built-in screens this reader may open
+     *  (`BuiltInAlternativeNote`). */
     openableBuiltIns?: readonly string[];
 }) {
     const t = useTranslations("marketplace");

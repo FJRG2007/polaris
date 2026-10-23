@@ -139,8 +139,9 @@ export function MarketplaceView({
     /** Whether the reader may open the admin screen, for the way there from an
      *  empty user marketplace. */
     canBrowsePolaris?: boolean;
-    /** The built-in apps this reader may open, for the note on a template whose
-     *  job one of them already does (see `BuiltInAlternativeNote`). */
+    /** Addresses of the built-in screens this reader may open, for the note on
+     *  a template whose job one of them already does (see
+     *  `BuiltInAlternativeNote`). */
     openableBuiltIns?: readonly string[];
 }) {
     const t = useTranslations("marketplace");
@@ -628,22 +629,22 @@ function StoreCard({
                 <>
                     <BuiltInAlternativeNote app={app} openable={openable} />
                     {app.consent && (
-                    <p className="text-xs text-muted-foreground">
-                        {t.rich("card.consent", {
-                            label: app.consent.label,
-                            link: (chunks) => (
-                                <a
-                                    key="consent"
-                                    href={app.consent?.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="underline underline-offset-2 hover:text-foreground"
-                                >
-                                    {chunks}
-                                </a>
-                            )
-                        })}
-                    </p>
+                        <p className="text-xs text-muted-foreground">
+                            {t.rich("card.consent", {
+                                label: app.consent.label,
+                                link: (chunks) => (
+                                    <a
+                                        key="consent"
+                                        href={app.consent?.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="underline underline-offset-2 hover:text-foreground"
+                                    >
+                                        {chunks}
+                                    </a>
+                                )
+                            })}
+                        </p>
                     )}
                 </>
             }

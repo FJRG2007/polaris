@@ -11,7 +11,7 @@ import { AppInstallPanel } from "./[appId]/app-detail";
 import { uninstallAccess } from "@/lib/apps/install-access";
 import { gameForCatalogId } from "@/lib/apps/games-catalog";
 import { sessionCan, type SessionUser } from "@/lib/session";
-import { builtInApps, storeScope, type StoreScope } from "@/lib/apps/marketplace-store";
+import { builtInAlternatives, storeScope, type StoreScope } from "@/lib/apps/marketplace-store";
 import {
     installForReader,
     instanceWideInstallIds,
@@ -73,14 +73,15 @@ export async function AppInstallState({ appId, user }: { appId: string; user: Se
 }
 
 /**
- * The built-in apps this reader may open, for the note a template carries when
- * one of them already does its job. Asked with `sessionCan`, the same question
- * each app's pages answer, so the note only links where the link would work.
+ * The addresses of the built-in screens this reader may open, for the note a
+ * template carries when one of them already does its job. Asked with
+ * `sessionCan`, the same question each screen answers, so the note only links
+ * where the link would work.
  */
 export async function openableBuiltIns(user: SessionUser): Promise<string[]> {
-    const entries = builtInApps();
+    const screens = builtInAlternatives();
     const allowed = await Promise.all(
-        entries.map((entry) => (entry.permission ? sessionCan(user, entry.permission) : true))
+        screens.map((screen) => (screen.permission ? sessionCan(user, screen.permission) : true))
     );
-    return entries.filter((_, index) => allowed[index]).map((entry) => entry.id);
+    return screens.filter((_, index) => allowed[index]).map((screen) => screen.href);
 }

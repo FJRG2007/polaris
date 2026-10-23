@@ -54,17 +54,25 @@ describe("template logos", () => {
 describe("a template a built-in app already covers", () => {
     const covered = (id: string) => {
         const app = findStoreApp(`template-${id}`);
-        return app ? builtInAlternative(app)?.id : "missing template";
+        return app ? builtInAlternative(app)?.href : "missing template";
     };
 
     it("is matched to the built-in that lists its product", () => {
-        expect(covered("vaultwarden")).toBe("vault");
-        expect(covered("uptime-kuma")).toBe("watch");
-        expect(covered("n8n")).toBe("automations");
-        expect(covered("nextcloud")).toBe("drive");
-        expect(covered("umami")).toBe("apps");
-        expect(covered("mattermost")).toBe("chat");
-        expect(covered("vikunja")).toBe("tasks");
+        expect(covered("vaultwarden")).toBe("/vault");
+        expect(covered("uptime-kuma")).toBe("/watch");
+        expect(covered("n8n")).toBe("/automations");
+        expect(covered("nextcloud")).toBe("/drive");
+        expect(covered("mattermost")).toBe("/chat");
+        expect(covered("vikunja")).toBe("/tasks");
+    });
+
+    it("points to the section that does the job, with the permission it needs", () => {
+        const umami = findStoreApp("template-umami");
+        expect(umami && builtInAlternative(umami)).toEqual({
+            label: "Analytics",
+            href: "/apps/analytics",
+            permission: "deploy.manage"
+        });
     });
 
     it("is not claimed where no built-in does the job", () => {
@@ -77,7 +85,7 @@ describe("a template a built-in app already covers", () => {
             <MarketplaceView
                 installed={[]}
                 initialQuery="Vaultwarden"
-                openableBuiltIns={["vault"]}
+                openableBuiltIns={["/vault"]}
             />,
             { wrapper: MessagesWrapper }
         );
