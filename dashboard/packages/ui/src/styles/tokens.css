@@ -119,9 +119,11 @@
     --header-height: 3rem;
 
     /* What the shell's notices above a page take, published by the page-notices
-       strip while one is up (see PAGE_NOTICES). Screens that fill the window
-       subtract it. */
-    --notice-height: 0px;
+       strip while one is up (see PAGE_NOTICES), plus the connection strip above
+       the whole shell. Screens that fill the window subtract it. */
+    --page-notice-height: 0px;
+    --connection-banner-height: 0px;
+    --notice-height: calc(var(--page-notice-height) + var(--connection-banner-height));
 
     /* Elevation. A popover reads as lifted; a modal reads as detached. */
     --shadow-popover: 0 8px 24px -6px hsl(225 30% 2% / 0.55), 0 2px 6px -2px hsl(225 30% 2% / 0.45);

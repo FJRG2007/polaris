@@ -163,8 +163,9 @@ export const PAGE_BLEED =
  * so a page under it starts where it would have and a PAGE_BLEED screen's
  * negative margin stops at the notices instead of sliding under them.
  *
- * Whoever renders it publishes its height as `--notice-height` on the root, and
- * PAGE_FILL and PAGE_BLEED subtract it: a screen that fills the window is that
+ * Whoever renders it publishes its height as `--page-notice-height` on the
+ * root, `--notice-height` adds the connection strip's to it, and PAGE_FILL and
+ * PAGE_BLEED subtract that: a screen that fills the window is that
  * much shorter while a notice is up, rather than pushed off the bottom of a
  * content area that does not scroll. Empty, it is not drawn and takes no room.
  */

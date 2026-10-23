@@ -23,7 +23,18 @@ describe("the notices above a page", () => {
         const tokens = await source("../../../../packages/ui/src/styles/tokens.css");
         // Nothing published yet is no notice at all, not an unset variable that
         // throws the whole calc() away.
-        expect(tokens).toMatch(/--notice-height: 0px;/);
+        expect(tokens).toMatch(/--page-notice-height: 0px;/);
+        expect(tokens).toMatch(/--connection-banner-height: 0px;/);
+        expect(tokens).toMatch(
+            /--notice-height: calc\(var\(--page-notice-height\) \+ var\(--connection-banner-height\)\);/
+        );
+    });
+
+    it("include the connection strip above the shell", async () => {
+        const banner = await source("../../src/components/connection-banner.tsx");
+        expect(banner).toContain('BANNER_HEIGHT_VAR = "--connection-banner-height"');
+        const notices = await source("../../src/components/page-notices.tsx");
+        expect(notices).toContain('VARIABLE = "--page-notice-height"');
     });
 
     it("sit in main's top padding and give it back below", async () => {
