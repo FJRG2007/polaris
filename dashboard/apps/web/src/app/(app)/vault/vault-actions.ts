@@ -443,7 +443,10 @@ export async function itemUsesAction(itemId: string): Promise<ItemUseEntry[]> {
 }
 
 /** Replace the address rules of one of this account's Sends. */
-export async function setSendRulesAction(sendId: string, rules: unknown): Promise<{ error?: string }> {
+export async function setSendRulesAction(
+    sendId: string,
+    rules: unknown
+): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     const parsed = sendRulesSchema.safeParse(rules);
     if (!parsed.success) return { error: await vaultRefusal("errors.sendRules") };

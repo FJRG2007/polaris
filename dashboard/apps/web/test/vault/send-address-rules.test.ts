@@ -13,7 +13,13 @@ const update = vi.fn();
 const updateMany = vi.fn();
 vi.mock("@polaris/db", () => ({
     prisma: {
-        vaultSend: { findUnique, findFirst, update, updateMany, fields: { accessCount: "accessCount" } }
+        vaultSend: {
+            findUnique,
+            findFirst,
+            update,
+            updateMany,
+            fields: { accessCount: "accessCount" }
+        }
     }
 }));
 vi.mock("@/lib/vault/account", () => ({ bumpRevision: vi.fn(async () => undefined) }));
@@ -69,8 +75,13 @@ describe("a Send's address rules", () => {
     });
 
     it("refuse an address outside the list before the password is tried or a view is counted", async () => {
-        findUnique.mockResolvedValueOnce(row({ allowedCidrs: '["198.51.100.0/24"]', passwordHash: "h", maxAccessCount: 1 }));
-        expect(await sends.accessSend("access-id", "guess", "203.0.113.9")).toEqual({ ok: false, reason: "address" });
+        findUnique.mockResolvedValueOnce(
+            row({ allowedCidrs: '["198.51.100.0/24"]', passwordHash: "h", maxAccessCount: 1 })
+        );
+        expect(await sends.accessSend("access-id", "guess", "203.0.113.9")).toEqual({
+            ok: false,
+            reason: "address"
+        });
         expect(verifyLinkPassword).not.toHaveBeenCalled();
         expect(updateMany).not.toHaveBeenCalled();
         expect(update).not.toHaveBeenCalled();
@@ -85,7 +96,10 @@ describe("a Send's address rules", () => {
     it("refuse a visitor outside the countries", async () => {
         inRegion = false;
         findUnique.mockResolvedValueOnce(row({ allowedCountries: '["ES"]' }));
-        expect(await sends.accessSend("access-id", undefined, "203.0.113.9")).toEqual({ ok: false, reason: "address" });
+        expect(await sends.accessSend("access-id", undefined, "203.0.113.9")).toEqual({
+            ok: false,
+            reason: "address"
+        });
     });
 
     it("survive a Bitwarden client's PUT, which only writes protocol fields", async () => {
@@ -113,11 +127,26 @@ describe("a Send's address rules", () => {
 
     it("are set by the owner only, from the Sends screen", async () => {
         updateMany.mockResolvedValueOnce({ count: 0 });
-        expect(await sends.setSendRules(USER, SEND, { allowedCidrs: [], allowedCountries: ["ES"], allowedContinents: [] })).toBe(false);
+        expect(
+            await sends.setSendRules(USER, SEND, {
+                allowedCidrs: [],
+                allowedCountries: ["ES"],
+                allowedContinents: []
+            })
+        ).toBe(false);
         expect(updateMany.mock.calls[0][0].where).toEqual({ id: SEND, userId: USER });
 
         updateMany.mockResolvedValueOnce({ count: 1 });
-        expect(await sends.setSendRules(USER, SEND, { allowedCidrs: ["10.0.0.0/8"], allowedCountries: [], allowedContinents: [] })).toBe(true);
-        expect(updateMany.mock.calls[1][0].data).toMatchObject({ allowedCidrs: '["10.0.0.0/8"]', allowedCountries: "[]" });
+        expect(
+            await sends.setSendRules(USER, SEND, {
+                allowedCidrs: ["10.0.0.0/8"],
+                allowedCountries: [],
+                allowedContinents: []
+            })
+        ).toBe(true);
+        expect(updateMany.mock.calls[1][0].data).toMatchObject({
+            allowedCidrs: '["10.0.0.0/8"]',
+            allowedCountries: "[]"
+        });
     });
 });

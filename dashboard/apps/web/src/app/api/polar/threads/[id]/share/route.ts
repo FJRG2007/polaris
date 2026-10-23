@@ -14,7 +14,12 @@ import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { polarMessageIdSchema } from "@/lib/polar/answer-feedback";
 import * as core from "@polaris/core";
-import { polarShareLink, revokePolarShare, setPolarShareLimits, sharePolarThread } from "@/lib/polar/share";
+import {
+    polarShareLink,
+    revokePolarShare,
+    setPolarShareLimits,
+    sharePolarThread
+} from "@/lib/polar/share";
 
 export const dynamic = "force-dynamic";
 

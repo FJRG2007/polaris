@@ -196,7 +196,8 @@ export function ShareDialog({
     // stored one cannot be read back to compare.
     const limitsChanged =
         share !== null &&
-        (advanced.password !== "" || JSON.stringify(advanced) !== JSON.stringify(advancedOf(share)));
+        (advanced.password !== "" ||
+            JSON.stringify(advanced) !== JSON.stringify(advancedOf(share)));
 
     const saveLimits = async () => {
         if (!share) return;
@@ -450,7 +451,9 @@ export function ShareDialog({
                                             disabled={savingLimits || !limitsChanged}
                                             onClick={() => void saveLimits()}
                                         >
-                                            {savingLimits && <Loader2 className="size-4 animate-spin" />}
+                                            {savingLimits && (
+                                                <Loader2 className="size-4 animate-spin" />
+                                            )}
                                             {t("share.public.saveLimits")}
                                         </Button>
                                     </div>

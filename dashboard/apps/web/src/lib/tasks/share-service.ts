@@ -166,7 +166,8 @@ export interface PublicTaskView {
         readonly items: { readonly name: string; readonly done: boolean }[];
     }[];
     /** Present only when the sharer chose to include the discussion. */
-    readonly comments: { readonly author: string; readonly body: string; readonly createdAt: string }[] | null;
+    readonly comments:
+        { readonly author: string; readonly body: string; readonly createdAt: string }[] | null;
     readonly createdAt: string;
     readonly updatedAt: string;
 }
@@ -238,7 +239,10 @@ export async function getPublicTask(token: string): Promise<PublicTaskView | nul
     // Counted conditionally: two people opening the last permitted view at the
     // same moment must not both get it.
     const counted = await prisma.taskShare.updateMany({
-        where: { id: share.id, ...(share.maxViews === null ? {} : { views: { lt: share.maxViews } }) },
+        where: {
+            id: share.id,
+            ...(share.maxViews === null ? {} : { views: { lt: share.maxViews } })
+        },
         data: { views: { increment: 1 } }
     });
     if (counted.count === 0) return null;
@@ -286,13 +290,16 @@ export interface ShareDelivery {
     readonly failures: { readonly recipient: string; readonly reason: string }[];
 }
 
-function outsiderMessage(locale: Locale, input: {
-    sender: string;
-    reference: string;
-    name: string;
-    note: string;
-    url: string;
-}): { subject: string; text: string; html: string } {
+function outsiderMessage(
+    locale: Locale,
+    input: {
+        sender: string;
+        reference: string;
+        name: string;
+        note: string;
+        url: string;
+    }
+): { subject: string; text: string; html: string } {
     const escape = (value: string): string =>
         value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const readOnly = translate(locale, "tasks.shareMail.readOnly");
@@ -315,7 +322,14 @@ function outsiderMessage(locale: Locale, input: {
         `<p><a href="${escape(input.url)}">${escape(translate(locale, "tasks.shareMail.open"))}</a></p>`,
         `<p>${escape(readOnly)}</p>`
     ].join("");
-    return { subject: translate(locale, "tasks.shareMail.subject", { sender: input.sender, name: input.name }), text, html };
+    return {
+        subject: translate(locale, "tasks.shareMail.subject", {
+            sender: input.sender,
+            name: input.name
+        }),
+        text,
+        html
+    };
 }
 
 /**
@@ -368,9 +382,16 @@ export async function sendTaskByEmail(
         // The same authority the app itself uses, asked on their behalf: a link
         // to a space they cannot reach would only tell them it exists.
         try {
-            await access.requireTask({ id: member.id, isAdmin: member.isAdmin }, input.taskId, "guest");
+            await access.requireTask(
+                { id: member.id, isAdmin: member.isAdmin },
+                input.taskId,
+                "guest"
+            );
         } catch {
-            failures.push({ recipient: member.name, reason: translate(senderLocale, "tasks.shareMail.noAccess") });
+            failures.push({
+                recipient: member.name,
+                reason: translate(senderLocale, "tasks.shareMail.noAccess")
+            });
             continue;
         }
         await follow.follow("task", input.taskId, member.id, "explicit");
@@ -396,7 +417,10 @@ export async function sendTaskByEmail(
         });
         if (!share) {
             for (const address of outsiders) {
-                failures.push({ recipient: address, reason: translate(senderLocale, "tasks.shareMail.linkOff") });
+                failures.push({
+                    recipient: address,
+                    reason: translate(senderLocale, "tasks.shareMail.linkOff")
+                });
             }
         } else {
             const url = await publicUrl(share.token);

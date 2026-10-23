@@ -111,7 +111,12 @@ export interface VisitorRow {
 }
 
 function status(config: DropPointConfig): {
-    label: "detail.status.closed" | "detail.status.scheduled" | "detail.status.expired" | "detail.status.full" | "detail.status.open";
+    label:
+        | "detail.status.closed"
+        | "detail.status.scheduled"
+        | "detail.status.expired"
+        | "detail.status.full"
+        | "detail.status.open";
     variant: "success" | "neutral" | "warning";
 } {
     if (config.revokedAt) return { label: "detail.status.closed", variant: "neutral" };
@@ -273,8 +278,18 @@ export function DropPointDetail({
 
     const tabs = [
         { id: "overview" as const, label: t("detail.tabs.overview"), icon: Inbox, count: null },
-        { id: "files" as const, label: t("detail.tabs.files"), icon: FileText, count: files.length },
-        { id: "visitors" as const, label: t("detail.tabs.visitors"), icon: Users, count: visitors.length }
+        {
+            id: "files" as const,
+            label: t("detail.tabs.files"),
+            icon: FileText,
+            count: files.length
+        },
+        {
+            id: "visitors" as const,
+            label: t("detail.tabs.visitors"),
+            icon: Users,
+            count: visitors.length
+        }
     ];
 
     return (
@@ -428,31 +443,49 @@ function OverviewTab({ config }: { config: DropPointConfig }) {
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-                    <Field label={t("detail.fields.maxSize")}>{formatBytes(BigInt(config.maxSizeBytes))}</Field>
-                    <Field label={t("detail.fields.minSize")}>
-                        {config.minSizeBytes ? formatBytes(BigInt(config.minSizeBytes)) : t("detail.values.none")}
+                    <Field label={t("detail.fields.maxSize")}>
+                        {formatBytes(BigInt(config.maxSizeBytes))}
                     </Field>
-                    <Field label={t("detail.fields.maxFiles")}>{config.maxFiles ?? t("detail.values.noLimit")}</Field>
+                    <Field label={t("detail.fields.minSize")}>
+                        {config.minSizeBytes
+                            ? formatBytes(BigInt(config.minSizeBytes))
+                            : t("detail.values.none")}
+                    </Field>
+                    <Field label={t("detail.fields.maxFiles")}>
+                        {config.maxFiles ?? t("detail.values.noLimit")}
+                    </Field>
                     <Field label={t("detail.fields.collected")}>{config.submissionCount}</Field>
                     <Field label={t("detail.fields.starts")}>
-                        {config.startsAt ? format.dateTime(config.startsAt) : t("detail.values.immediately")}
+                        {config.startsAt
+                            ? format.dateTime(config.startsAt)
+                            : t("detail.values.immediately")}
                     </Field>
                     <Field label={t("detail.fields.expires")}>
-                        {config.expiresAt ? format.date(config.expiresAt) : t("detail.values.never")}
+                        {config.expiresAt
+                            ? format.date(config.expiresAt)
+                            : t("detail.values.never")}
                     </Field>
                     <Field label={t("detail.fields.signIn")}>
-                        {config.requireLogin ? t("detail.values.required") : t("detail.values.notRequired")}
+                        {config.requireLogin
+                            ? t("detail.values.required")
+                            : t("detail.values.notRequired")}
                     </Field>
-                    <Field label={t("detail.fields.pin")}>{config.hasPassword ? t("detail.values.set") : t("detail.values.none")}</Field>
+                    <Field label={t("detail.fields.pin")}>
+                        {config.hasPassword ? t("detail.values.set") : t("detail.values.none")}
+                    </Field>
                     <Field label={t("detail.fields.uploaderDelete")}>
                         {config.allowUploaderDelete
                             ? config.uploaderDeleteWindowSeconds
-                                ? t("detail.values.minutes", { count: Math.round(config.uploaderDeleteWindowSeconds / 60) })
+                                ? t("detail.values.minutes", {
+                                      count: Math.round(config.uploaderDeleteWindowSeconds / 60)
+                                  })
                                 : t("detail.values.anytime")
                             : t("detail.values.off")}
                     </Field>
                     <Field label={t("detail.fields.users")}>
-                        {config.allowedUsers.length > 0 ? config.allowedUsers.join(", ") : t("detail.values.anyone")}
+                        {config.allowedUsers.length > 0
+                            ? config.allowedUsers.join(", ")
+                            : t("detail.values.anyone")}
                     </Field>
                     <Field label={t("detail.fields.fileTypes")}>
                         {config.allowedExtensions.length > 0
@@ -465,7 +498,9 @@ function OverviewTab({ config }: { config: DropPointConfig }) {
                             : t("detail.values.none")}
                     </Field>
                     <Field label={t("detail.fields.ipAllowlist")}>
-                        {config.allowedCidrs.length > 0 ? config.allowedCidrs.join(", ") : t("detail.values.any")}
+                        {config.allowedCidrs.length > 0
+                            ? config.allowedCidrs.join(", ")
+                            : t("detail.values.any")}
                     </Field>
                     <Field label={t("detail.fields.locations")}>
                         {config.allowedContinents.length + config.allowedCountries.length > 0
@@ -512,9 +547,13 @@ function FilesTab({
                             <tr>
                                 <th className="px-4 py-2 font-medium">{t("detail.files.file")}</th>
                                 <th className="px-4 py-2 font-medium">{t("detail.files.size")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.files.uploadedBy")}</th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.files.uploadedBy")}
+                                </th>
                                 <th className="px-4 py-2 font-medium">{t("detail.files.when")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.files.status")}</th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.files.status")}
+                                </th>
                                 <th className="px-4 py-2" />
                             </tr>
                         </thead>
@@ -585,10 +624,18 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                         <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2 font-medium">{t("detail.visitors.ip")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.visitors.user")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.visitors.firstSeen")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.visitors.connected")}</th>
-                                <th className="px-4 py-2 font-medium">{t("detail.visitors.uploaded")}</th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.visitors.user")}
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.visitors.firstSeen")}
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.visitors.connected")}
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    {t("detail.visitors.uploaded")}
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -624,12 +671,16 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                                                             : "text-muted-foreground"
                                                     }
                                                 >
-                                                    {live ? t("detail.visitors.activeNow") : duration}
+                                                    {live
+                                                        ? t("detail.visitors.activeNow")
+                                                        : duration}
                                                 </span>
                                             </span>
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
-                                            {row.uploads > 0 ? t("detail.visitors.files", { count: row.uploads }) : t("detail.visitors.none")}
+                                            {row.uploads > 0
+                                                ? t("detail.visitors.files", { count: row.uploads })
+                                                : t("detail.visitors.none")}
                                         </td>
                                     </tr>
                                 );
@@ -813,7 +864,9 @@ function EditDropPointDialog({
                 <DialogHeader>
                     <DialogTitle>{t("edit.title")}</DialogTitle>
                     <DialogDescription className="truncate">
-                        {t("edit.description", { place: config.destinationPath || config.connectionName })}
+                        {t("edit.description", {
+                            place: config.destinationPath || config.connectionName
+                        })}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
@@ -961,7 +1014,9 @@ function EditDropPointDialog({
                                         min="1"
                                         defaultValue={
                                             config.uploaderDeleteWindowSeconds
-                                                ? Math.round(config.uploaderDeleteWindowSeconds / 60)
+                                                ? Math.round(
+                                                      config.uploaderDeleteWindowSeconds / 60
+                                                  )
                                                 : ""
                                         }
                                         placeholder={t("form.anytime")}
@@ -980,9 +1035,7 @@ function EditDropPointDialog({
                             placeholder={t("form.usersPlaceholder")}
                             aria-label={t("form.usersLabel")}
                         />
-                        <span className="text-xs text-muted-foreground">
-                            {t("form.usersHint")}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{t("form.usersHint")}</span>
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end">

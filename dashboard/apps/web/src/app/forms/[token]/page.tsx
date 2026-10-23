@@ -45,7 +45,9 @@ export default async function PublicFormPage({ params }: { params: Promise<{ tok
                 </Messages>
             ) : (
                 <div className="text-center">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("form.unavailableTitle")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("form.unavailableTitle")}
+                    </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         {gate.ok || gate.reason === "not_found"
                             ? t("form.unavailable")

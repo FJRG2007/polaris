@@ -62,7 +62,10 @@ describe("a meeting's guest link", () => {
     it("refuses an address outside its list", async () => {
         ip = "203.0.113.9";
         findUnique.mockResolvedValueOnce(row({ allowedCidrs: '["198.51.100.0/24"]' }));
-        expect(await gate.gateMeetingLink("token")).toEqual({ ok: false, reason: "ip_not_allowed" });
+        expect(await gate.gateMeetingLink("token")).toEqual({
+            ok: false,
+            reason: "ip_not_allowed"
+        });
         ip = "198.51.100.7";
         findUnique.mockResolvedValueOnce(row({ allowedCidrs: '["198.51.100.0/24"]' }));
         expect(await gate.gateMeetingLink("token")).toEqual({ ok: true, meetingId: MEETING });
@@ -71,7 +74,10 @@ describe("a meeting's guest link", () => {
     it("refuses a visitor outside its countries", async () => {
         inRegion = false;
         findUnique.mockResolvedValueOnce(row({ allowedCountries: '["ES"]' }));
-        expect(await gate.gateMeetingLink("token")).toEqual({ ok: false, reason: "country_not_allowed" });
+        expect(await gate.gateMeetingLink("token")).toEqual({
+            ok: false,
+            reason: "country_not_allowed"
+        });
         inRegion = true;
     });
 
@@ -85,22 +91,35 @@ describe("a meeting's guest link", () => {
     it("asks for the password until it is solved, in its own scope", async () => {
         cookie = undefined;
         findUnique.mockResolvedValueOnce(row({ linkPasswordHash: HASH }));
-        expect(await gate.gateMeetingLink("token")).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gateMeetingLink("token")).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
 
         cookie = gate.signMeetingUnlock(MEETING, HASH);
         findUnique.mockResolvedValueOnce(row({ linkPasswordHash: HASH }));
         expect(await gate.gateMeetingLink("token")).toEqual({ ok: true, meetingId: MEETING });
 
         const { signUnlock } = await import("@/lib/link-guards");
-        cookie = signUnlock("task", MEETING, { passwordHash: HASH }, "one-secret-for-every-signature-here");
+        cookie = signUnlock(
+            "task",
+            MEETING,
+            { passwordHash: HASH },
+            "one-secret-for-every-signature-here"
+        );
         findUnique.mockResolvedValueOnce(row({ linkPasswordHash: HASH }));
-        expect(await gate.gateMeetingLink("token")).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gateMeetingLink("token")).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
         cookie = undefined;
     });
 
     it("lets only the host set its limits, and keeps the password unless one is typed", async () => {
         findUnique.mockResolvedValueOnce({ ...row(), hostId: "somebody-else" });
-        await expect(gate.setMeetingLinkLimits(HOST, MEETING, gate.meetingLinkLimitsSchema.parse({}))).rejects.toThrow();
+        await expect(
+            gate.setMeetingLinkLimits(HOST, MEETING, gate.meetingLinkLimitsSchema.parse({}))
+        ).rejects.toThrow();
         expect(update).not.toHaveBeenCalled();
 
         findUnique.mockResolvedValueOnce({ ...row(), hostId: HOST });
@@ -115,11 +134,20 @@ describe("a meeting's guest link", () => {
             allowedCountries: '["ES"]',
             allowedContinents: "[]"
         });
-        expect(saved).toEqual({ hasPassword: true, allowedCidrs: [], allowedCountries: ["ES"], allowedContinents: [] });
+        expect(saved).toEqual({
+            hasPassword: true,
+            allowedCidrs: [],
+            allowedCountries: ["ES"],
+            allowedContinents: []
+        });
 
         findUnique.mockResolvedValueOnce({ ...row(), hostId: HOST });
         update.mockResolvedValueOnce(row({ linkPasswordHash: HASH }));
-        await gate.setMeetingLinkLimits(HOST, MEETING, gate.meetingLinkLimitsSchema.parse({ password: "open-sesame" }));
+        await gate.setMeetingLinkLimits(
+            HOST,
+            MEETING,
+            gate.meetingLinkLimitsSchema.parse({ password: "open-sesame" })
+        );
         expect(update.mock.calls[1][0].data.linkPasswordHash).toBe(HASH);
     });
 });

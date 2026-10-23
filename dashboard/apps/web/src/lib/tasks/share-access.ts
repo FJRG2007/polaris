@@ -67,7 +67,15 @@ export async function gateTaskShare(token: string): Promise<TaskShareGate> {
     if (share.passwordHash) {
         const solved = (await cookies()).get(taskUnlockCookie(share.id))?.value;
         const secret = loadEnv().POLARIS_AUTH_SECRET;
-        if (!verifyUnlock(TASK_LINK_SCOPE, share.id, solved, { passwordHash: share.passwordHash }, secret)) {
+        if (
+            !verifyUnlock(
+                TASK_LINK_SCOPE,
+                share.id,
+                solved,
+                { passwordHash: share.passwordHash },
+                secret
+            )
+        ) {
             return { ok: false, reason: "password_required" };
         }
     }
@@ -82,7 +90,10 @@ export async function taskShareForUnlock(
 ): Promise<{ readonly id: string; readonly passwordHash: string | null } | null> {
     const gate = await gateTaskShare(token);
     if (!gate.ok && gate.reason !== "password_required") return null;
-    return prisma.taskShare.findUnique({ where: { token }, select: { id: true, passwordHash: true } });
+    return prisma.taskShare.findUnique({
+        where: { token },
+        select: { id: true, passwordHash: true }
+    });
 }
 
 /** Whether a password opens this link. Wrong and unset both answer false. */

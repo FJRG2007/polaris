@@ -287,9 +287,7 @@ export function RequestDialog({
 
                 {url ? (
                     <div className="flex flex-col gap-3">
-                        <p className="text-sm text-muted-foreground">
-                            {t("create.shareOnce")}
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("create.shareOnce")}</p>
                         <div className="flex items-center gap-2">
                             <Input readOnly value={url} className="font-mono text-xs" />
                             <Button type="button" size="icon" variant="secondary" onClick={onCopy}>

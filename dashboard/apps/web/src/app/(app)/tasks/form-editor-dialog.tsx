@@ -123,7 +123,8 @@ export function FormEditorDialog({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
-    const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+    const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+        setDraft((d) => ({ ...d, [key]: value }));
     const setField = (index: number, patch: Partial<core.FormField>) =>
         set(
             "fields",
@@ -137,7 +138,8 @@ export function FormEditorDialog({
         draft.listId !== "" &&
         draft.fields.length > 0 &&
         draft.fields.every(
-            (field) => field.label.trim() !== "" && (field.type !== "dropdown" || field.options.length > 0)
+            (field) =>
+                field.label.trim() !== "" && (field.type !== "dropdown" || field.options.length > 0)
         );
 
     const save = async () => {
@@ -168,14 +170,19 @@ export function FormEditorDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle className="truncate">{t("forms.editor.title", { name: form.name })}</DialogTitle>
+                    <DialogTitle className="truncate">
+                        {t("forms.editor.title", { name: form.name })}
+                    </DialogTitle>
                     <DialogDescription>{t("forms.editor.hint")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex min-w-0 flex-col gap-1">
                         <span className="text-xs text-muted-foreground">{t("forms.name")} *</span>
-                        <Input value={draft.name} onChange={(event) => set("name", event.target.value)} />
+                        <Input
+                            value={draft.name}
+                            onChange={(event) => set("name", event.target.value)}
+                        />
                     </label>
                     <div className="flex min-w-0 flex-col gap-1">
                         <span className="text-xs text-muted-foreground">{t("forms.list")} *</span>
@@ -187,7 +194,9 @@ export function FormEditorDialog({
                         />
                     </div>
                     <label className="flex min-w-0 flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("forms.editor.intro")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("forms.editor.intro")}
+                        </span>
                         <Textarea
                             value={draft.intro}
                             maxLength={1000}
@@ -197,9 +206,14 @@ export function FormEditorDialog({
                     </label>
 
                     <fieldset className="flex min-w-0 flex-col gap-2">
-                        <legend className="mb-1 text-xs text-muted-foreground">{t("forms.editor.questions")} *</legend>
+                        <legend className="mb-1 text-xs text-muted-foreground">
+                            {t("forms.editor.questions")} *
+                        </legend>
                         {draft.fields.map((field, index) => (
-                            <div key={field.id} className="flex flex-col gap-2 rounded-md border border-border p-2">
+                            <div
+                                key={field.id}
+                                className="flex flex-col gap-2 rounded-md border border-border p-2"
+                            >
                                 <div className="flex min-w-0 items-center gap-2">
                                     <Input
                                         value={field.label}
@@ -207,11 +221,15 @@ export function FormEditorDialog({
                                         placeholder={t("forms.editor.question")}
                                         maxLength={200}
                                         className="min-w-0 flex-1"
-                                        onChange={(event) => setField(index, { label: event.target.value })}
+                                        onChange={(event) =>
+                                            setField(index, { label: event.target.value })
+                                        }
                                     />
                                     <Select
                                         value={field.type}
-                                        onValueChange={(type) => setField(index, { type: type as core.FormFieldType })}
+                                        onValueChange={(type) =>
+                                            setField(index, { type: type as core.FormFieldType })
+                                        }
                                         options={core.FORM_FIELD_TYPES.map((type) => ({
                                             value: type,
                                             label: optionLabel(t, "formField", type)
@@ -224,7 +242,12 @@ export function FormEditorDialog({
                                         aria-label={t("forms.editor.removeQuestion")}
                                         title={t("forms.editor.removeQuestion")}
                                         disabled={draft.fields.length === 1}
-                                        onClick={() => set("fields", draft.fields.filter((_, i) => i !== index))}
+                                        onClick={() =>
+                                            set(
+                                                "fields",
+                                                draft.fields.filter((_, i) => i !== index)
+                                            )
+                                        }
                                         className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger disabled:opacity-40"
                                     >
                                         <Trash2 className="size-3.5" />
@@ -272,7 +295,9 @@ export function FormEditorDialog({
                     </fieldset>
 
                     <label className="flex min-w-0 flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("forms.editor.confirmation")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("forms.editor.confirmation")}
+                        </span>
                         <Input
                             value={draft.confirmation}
                             maxLength={500}
@@ -280,7 +305,10 @@ export function FormEditorDialog({
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm">
-                        <Switch checked={draft.enabled} onChange={(enabled) => set("enabled", enabled)} />
+                        <Switch
+                            checked={draft.enabled}
+                            onChange={(enabled) => set("enabled", enabled)}
+                        />
                         {t("forms.editor.open")}
                     </label>
                     <label className="flex items-center gap-2 text-sm">

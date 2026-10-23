@@ -232,7 +232,8 @@ export async function submitForm(
     const clean: Record<string, string> = {};
     for (const field of fields) {
         const value = (answers[field.id] ?? "").toString().trim().slice(0, 5000);
-        if (field.required && !value) return { ok: false, error: t("forms.required", { field: field.label }) };
+        if (field.required && !value)
+            return { ok: false, error: t("forms.required", { field: field.label }) };
         if (value) clean[field.id] = value;
     }
 
@@ -286,7 +287,8 @@ export async function submitForm(
         }
         if (
             form.maxSubmissions !== null &&
-            (await tx.taskFormSubmission.count({ where: { formId: form.id } })) >= form.maxSubmissions
+            (await tx.taskFormSubmission.count({ where: { formId: form.id } })) >=
+                form.maxSubmissions
         ) {
             return null;
         }
@@ -331,7 +333,10 @@ export async function submitForm(
             .create({ data: { taskId: created.id, fieldId: value.fieldId, value: value.value } })
             .catch(() => undefined);
     }
-    await prisma.taskFormSubmission.update({ where: { id: slot.id }, data: { taskId: created.id } });
+    await prisma.taskFormSubmission.update({
+        where: { id: slot.id },
+        data: { taskId: created.id }
+    });
 
     // The space rides back so the caller can tell the team a request arrived
     // without looking the form up again.

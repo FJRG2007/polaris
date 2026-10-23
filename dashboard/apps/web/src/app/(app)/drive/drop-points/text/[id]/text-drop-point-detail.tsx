@@ -175,17 +175,25 @@ export function TextDropPointDetail({
                             {t("detail.back")}
                         </Link>
                     </Button>
-                    <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={request.title}>
+                    <h1
+                        className="truncate text-[1.0625rem] font-semibold tracking-tight"
+                        title={request.title}
+                    >
                         {request.title}
                     </h1>
                     <p className="text-sm text-muted-foreground">
                         {request.maxSubmissions !== null
-                            ? t("text.collectedOf", { count: request.submissionCount, max: request.maxSubmissions })
+                            ? t("text.collectedOf", {
+                                  count: request.submissionCount,
+                                  max: request.maxSubmissions
+                              })
                             : t("text.collectedCount", { count: request.submissionCount })}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {request.revokedAt ? <Badge variant="neutral">{t("detail.status.closed")}</Badge> : null}
+                    {request.revokedAt ? (
+                        <Badge variant="neutral">{t("detail.status.closed")}</Badge>
+                    ) : null}
                     <Button size="sm" variant="secondary" onClick={onCopyLink}>
                         {copied ? (
                             <Check className="size-4 text-success" />
@@ -234,8 +242,8 @@ export function TextDropPointDetail({
                                                 ) : null}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {row.from ?? t("detail.anonymous")} - {formatBytes(row.size)}{" "}
-                                                - {format.dateTime(row.at)}
+                                                {row.from ?? t("detail.anonymous")} -{" "}
+                                                {formatBytes(row.size)} - {format.dateTime(row.at)}
                                             </p>
                                         </div>
                                     </Link>
@@ -319,7 +327,9 @@ export function TextDropPointDetail({
                             />
                             <span>
                                 {t("text.sealedLabel")}
-                                <span className="block text-xs text-muted-foreground">{t("text.sealedHint")}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    {t("text.sealedHint")}
+                                </span>
                             </span>
                         </label>
                         <LinkAdvancedFields
@@ -332,7 +342,9 @@ export function TextDropPointDetail({
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="mt-1 flex items-center justify-end gap-2">
                             {saved ? (
-                                <span className="text-xs text-muted-foreground">{t("text.saved")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("text.saved")}
+                                </span>
                             ) : null}
                             <Button type="submit" disabled={pending || !dirty}>
                                 {pending ? (

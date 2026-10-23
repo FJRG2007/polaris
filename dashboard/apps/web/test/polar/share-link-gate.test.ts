@@ -64,9 +64,17 @@ describe("a shared Polar chat's link", () => {
 
     it("still serves a file on the page that took the last view", async () => {
         findUnique.mockResolvedValueOnce(row({ maxViews: 1, views: 1 }));
-        expect(await gate.gatePolarShare(TOKEN, { withinCap: false })).toEqual({ ok: true, shareId: SHARE });
-        findUnique.mockResolvedValueOnce(row({ maxViews: 1, views: 1, expiresAt: new Date(Date.now() - 1000) }));
-        expect(await gate.gatePolarShare(TOKEN, { withinCap: false })).toEqual({ ok: false, reason: "expired" });
+        expect(await gate.gatePolarShare(TOKEN, { withinCap: false })).toEqual({
+            ok: true,
+            shareId: SHARE
+        });
+        findUnique.mockResolvedValueOnce(
+            row({ maxViews: 1, views: 1, expiresAt: new Date(Date.now() - 1000) })
+        );
+        expect(await gate.gatePolarShare(TOKEN, { withinCap: false })).toEqual({
+            ok: false,
+            reason: "expired"
+        });
     });
 
     it("refuses an address outside its list", async () => {
@@ -81,14 +89,20 @@ describe("a shared Polar chat's link", () => {
     it("asks for the password until it is solved, and again once it changes", async () => {
         cookie = undefined;
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
-        expect(await gate.gatePolarShare(TOKEN)).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gatePolarShare(TOKEN)).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
 
         cookie = gate.signPolarUnlock(SHARE, HASH);
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
         expect(await gate.gatePolarShare(TOKEN)).toEqual({ ok: true, shareId: SHARE });
 
         findUnique.mockResolvedValueOnce(row({ passwordHash: "scrypt$salt-two$hash-two" }));
-        expect(await gate.gatePolarShare(TOKEN)).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gatePolarShare(TOKEN)).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
         cookie = undefined;
     });
 
@@ -100,9 +114,17 @@ describe("a shared Polar chat's link", () => {
 
     it("does not take a cookie solved for another kind of link", async () => {
         const { signUnlock } = await import("@/lib/link-guards");
-        cookie = signUnlock("task", SHARE, { passwordHash: HASH }, "one-secret-for-every-signature-here");
+        cookie = signUnlock(
+            "task",
+            SHARE,
+            { passwordHash: HASH },
+            "one-secret-for-every-signature-here"
+        );
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
-        expect(await gate.gatePolarShare(TOKEN)).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gatePolarShare(TOKEN)).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
         cookie = undefined;
     });
 });

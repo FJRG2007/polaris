@@ -104,7 +104,11 @@ describe("a pass against the link that issued it", () => {
             passwordHash: null
         });
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
+            await links.linkPassStanding(
+                DOC,
+                links.signLinkPass(DOC, LINK, "editor", null),
+                undefined
+            )
         ).toBe("editor");
     });
 
@@ -116,7 +120,11 @@ describe("a pass against the link that issued it", () => {
             passwordHash: null
         });
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
+            await links.linkPassStanding(
+                DOC,
+                links.signLinkPass(DOC, LINK, "editor", null),
+                undefined
+            )
         ).toBeNull();
     });
 
@@ -128,14 +136,22 @@ describe("a pass against the link that issued it", () => {
             passwordHash: null
         });
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
+            await links.linkPassStanding(
+                DOC,
+                links.signLinkPass(DOC, LINK, "editor", null),
+                undefined
+            )
         ).toBeNull();
     });
 
     it("is worth nothing when the link is gone or names another role", async () => {
         findFirst.mockResolvedValueOnce(null);
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
+            await links.linkPassStanding(
+                DOC,
+                links.signLinkPass(DOC, LINK, "editor", null),
+                undefined
+            )
         ).toBeNull();
         findFirst.mockResolvedValueOnce({
             role: "viewer",
@@ -144,7 +160,11 @@ describe("a pass against the link that issued it", () => {
             passwordHash: null
         });
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
+            await links.linkPassStanding(
+                DOC,
+                links.signLinkPass(DOC, LINK, "editor", null),
+                undefined
+            )
         ).toBeNull();
     });
 

@@ -380,7 +380,9 @@ export async function getGuestLinkLimitsAction(
     meetingId: string
 ): Promise<{ limits?: meetingLink.MeetingLinkLimitsView; error?: string }> {
     const user = await requirePermission("chat.use");
-    const result = await guard(() => meetingLink.getMeetingLinkLimits(user.id, String(meetingId ?? "")));
+    const result = await guard(() =>
+        meetingLink.getMeetingLinkLimits(user.id, String(meetingId ?? ""))
+    );
     return result.error ? { error: result.error } : { limits: result.value };
 }
 
@@ -390,7 +392,8 @@ export async function setGuestLinkLimitsAction(
 ): Promise<{ limits?: meetingLink.MeetingLinkLimitsView; error?: string }> {
     const user = await requirePermission("chat.use");
     const parsed = meetingLink.meetingLinkLimitsSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("chat"))("meetingLink.checkLimits") };
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("meetingLink.checkLimits") };
     const result = await guard(() =>
         meetingLink.setMeetingLinkLimits(user.id, String(meetingId ?? ""), parsed.data)
     );

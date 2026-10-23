@@ -174,7 +174,9 @@ export function ShareDialog({
                                                     onCopy(result.path, result.url ?? "")
                                                 }
                                                 title={t("share.copyLink", { name: result.name })}
-                                                aria-label={t("share.copyLink", { name: result.name })}
+                                                aria-label={t("share.copyLink", {
+                                                    name: result.name
+                                                })}
                                             >
                                                 {copied === result.path ? (
                                                     <Check className="size-4 text-success" />
@@ -214,9 +216,7 @@ export function ShareDialog({
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         {many ? (
-                            <p className="text-sm text-muted-foreground">
-                                {t("share.eachItem")}
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("share.eachItem")}</p>
                         ) : null}
                         <LinkAdvancedFields
                             value={advanced}
@@ -251,7 +251,9 @@ export function ShareDialog({
                                             name="allowUpload"
                                             className="size-4"
                                         />
-                                        {many ? t("share.allowUploadMany") : t("share.allowUploadOne")}
+                                        {many
+                                            ? t("share.allowUploadMany")
+                                            : t("share.allowUploadOne")}
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input

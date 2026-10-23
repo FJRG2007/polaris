@@ -82,7 +82,15 @@ export async function gatePolarShare(
     if (share.passwordHash) {
         const solved = (await cookies()).get(polarUnlockCookie(share.id))?.value;
         const secret = loadEnv().POLARIS_AUTH_SECRET;
-        if (!verifyUnlock(POLAR_LINK_SCOPE, share.id, solved, { passwordHash: share.passwordHash }, secret)) {
+        if (
+            !verifyUnlock(
+                POLAR_LINK_SCOPE,
+                share.id,
+                solved,
+                { passwordHash: share.passwordHash },
+                secret
+            )
+        ) {
             return { ok: false, reason: "password_required" };
         }
     }
@@ -101,7 +109,10 @@ export async function countPolarShareView(shareId: string): Promise<boolean> {
     });
     if (!share) return false;
     const counted = await prisma.polarThreadShare.updateMany({
-        where: { id: shareId, ...(share.maxViews === null ? {} : { views: { lt: share.maxViews } }) },
+        where: {
+            id: shareId,
+            ...(share.maxViews === null ? {} : { views: { lt: share.maxViews } })
+        },
         data: { views: { increment: 1 } }
     });
     return counted.count > 0;

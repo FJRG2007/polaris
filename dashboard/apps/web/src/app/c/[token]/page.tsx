@@ -45,12 +45,16 @@ export default async function SharedPolarChatPage({
         if (gate.reason === "password_required") {
             return <LinkPasswordForm token={token} unlock={unlockPolarShareAction} />;
         }
-        return <LinkUnavailable signedIn={signedIn} message={await linkDenialMessage(gate.reason)} />;
+        return (
+            <LinkUnavailable signedIn={signedIn} message={await linkDenialMessage(gate.reason)} />
+        );
     }
     const thread = await readSharedPolarThread(token);
     if (!thread) notFound();
     if (!(await countPolarShareView(gate.shareId))) {
-        return <LinkUnavailable signedIn={signedIn} message={await linkDenialMessage("exhausted")} />;
+        return (
+            <LinkUnavailable signedIn={signedIn} message={await linkDenialMessage("exhausted")} />
+        );
     }
     return (
         <Messages namespaces={["publicPages", "polar", "chat"]}>

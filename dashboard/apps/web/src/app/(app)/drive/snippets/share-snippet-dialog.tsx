@@ -175,7 +175,10 @@ export function ShareSnippetDialog({
                             <Select
                                 value={visibility}
                                 onValueChange={setVisibility}
-                                options={VISIBILITIES.map((one) => ({ value: one.value, label: t(one.label) }))}
+                                options={VISIBILITIES.map((one) => ({
+                                    value: one.value,
+                                    label: t(one.label)
+                                }))}
                                 aria-label={t("snippetShare.whoCanOpenIt")}
                             />
                         </label>
@@ -225,7 +228,9 @@ export function ShareSnippetDialog({
                                 ) : (
                                     <Link2 className="size-4" />
                                 )}
-                                {visibility === "private" ? t("snippetShare.makeItPrivate") : t("snippetShare.share")}
+                                {visibility === "private"
+                                    ? t("snippetShare.makeItPrivate")
+                                    : t("snippetShare.share")}
                             </Button>
                         </div>
                     </form>

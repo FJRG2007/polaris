@@ -119,9 +119,7 @@ export function NewTextDropPointButton() {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t("newText.askSomebodyForText")}</DialogTitle>
-                        <DialogDescription>
-                            {t("newText.theyGetAPageTo")}
-                        </DialogDescription>
+                        <DialogDescription>{t("newText.theyGetAPageTo")}</DialogDescription>
                     </DialogHeader>
 
                     {url ? (
@@ -159,10 +157,7 @@ export function NewTextDropPointButton() {
                         <form onSubmit={onSubmit} className="flex flex-col gap-3">
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("newText.title")}
-                                <Input
-                                    name="title"
-                                    placeholder={t("newText.namedForYouIfYou")}
-                                />
+                                <Input name="title" placeholder={t("newText.namedForYouIfYou")} />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("newText.whatToSend")}

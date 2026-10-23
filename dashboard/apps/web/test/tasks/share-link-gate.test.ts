@@ -72,22 +72,36 @@ describe("a task's public link", () => {
     it("asks for the password until it is solved, and again once it changes", async () => {
         cookie = undefined;
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
-        expect(await gate.gateTaskShare("token")).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gateTaskShare("token")).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
 
         cookie = gate.signTaskUnlock(SHARE, HASH);
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
         expect(await gate.gateTaskShare("token")).toEqual({ ok: true, shareId: SHARE });
 
         findUnique.mockResolvedValueOnce(row({ passwordHash: "scrypt$salt-two$hash-two" }));
-        expect(await gate.gateTaskShare("token")).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gateTaskShare("token")).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
         cookie = undefined;
     });
 
     it("does not take a cookie solved for another kind of link", async () => {
         const { signUnlock } = await import("@/lib/link-guards");
-        cookie = signUnlock("note", SHARE, { passwordHash: HASH }, "one-secret-for-every-signature-here");
+        cookie = signUnlock(
+            "note",
+            SHARE,
+            { passwordHash: HASH },
+            "one-secret-for-every-signature-here"
+        );
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
-        expect(await gate.gateTaskShare("token")).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gateTaskShare("token")).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
         cookie = undefined;
     });
 });

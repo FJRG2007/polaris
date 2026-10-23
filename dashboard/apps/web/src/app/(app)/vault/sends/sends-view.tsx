@@ -142,21 +142,24 @@ export function SendsView() {
             // derived from it.
             const urlKey = window.crypto.getRandomValues(new Uint8Array(16));
             const sendKey = await crypto.deriveSendKey(urlKey);
-            const result = await createSendAction({
-                type: 0,
-                name: await crypto.encrypt(name, sendKey),
-                notes: null,
-                // The link key, wrapped under the vault key, so this account's
-                // other devices can rebuild the link without being told it.
-                key: await crypto.encryptBytes(urlKey, key),
-                text: { text: await crypto.encrypt(text, sendKey), hidden: false },
-                password: password ? await crypto.sendPasswordHash(password, urlKey) : null,
-                maxAccessCount: advanced.maxUses ? Number(advanced.maxUses) : null,
-                expirationDate: expirationDate ? expirationDate.toISOString() : null,
-                deletionDate: deletionDate.toISOString(),
-                disabled: false,
-                hideEmail: true
-            }, linkAddressRules(advanced));
+            const result = await createSendAction(
+                {
+                    type: 0,
+                    name: await crypto.encrypt(name, sendKey),
+                    notes: null,
+                    // The link key, wrapped under the vault key, so this account's
+                    // other devices can rebuild the link without being told it.
+                    key: await crypto.encryptBytes(urlKey, key),
+                    text: { text: await crypto.encrypt(text, sendKey), hidden: false },
+                    password: password ? await crypto.sendPasswordHash(password, urlKey) : null,
+                    maxAccessCount: advanced.maxUses ? Number(advanced.maxUses) : null,
+                    expirationDate: expirationDate ? expirationDate.toISOString() : null,
+                    deletionDate: deletionDate.toISOString(),
+                    disabled: false,
+                    hideEmail: true
+                },
+                linkAddressRules(advanced)
+            );
             if (result.error || !result.url) {
                 setError(result.error ?? t("sends.notCreated"));
                 return;
@@ -329,7 +332,9 @@ export function SendsView() {
                                         size="sm"
                                         variant="ghost"
                                         title={t("sends.whereItOpens")}
-                                        aria-label={t("sends.whereItOpensNamed", { name: row.name })}
+                                        aria-label={t("sends.whereItOpensNamed", {
+                                            name: row.name
+                                        })}
                                         onClick={() => {
                                             setRulesDraft(row.rules);
                                             setRulesError(null);
@@ -353,7 +358,10 @@ export function SendsView() {
                     ))}
                 </div>
             )}
-            <Dialog open={limiting !== null} onOpenChange={(open) => (open ? undefined : setLimiting(null))}>
+            <Dialog
+                open={limiting !== null}
+                onOpenChange={(open) => (open ? undefined : setLimiting(null))}
+            >
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="truncate">

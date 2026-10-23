@@ -28,7 +28,11 @@ export interface SendAddressRules {
     readonly allowedContinents: string[];
 }
 
-const RULE_SELECT = { allowedCidrs: true, allowedCountries: true, allowedContinents: true } as const;
+const RULE_SELECT = {
+    allowedCidrs: true,
+    allowedCountries: true,
+    allowedContinents: true
+} as const;
 
 /** What lives inside a Send's encrypted document. */
 interface SendDocument {
@@ -237,7 +241,11 @@ export async function listSendRules(userId: string): Promise<Record<string, Send
 }
 
 /** Replace one Send's address rules. Owner-scoped; false when it is not theirs. */
-export async function setSendRules(userId: string, sendId: string, rules: SendAddressRules): Promise<boolean> {
+export async function setSendRules(
+    userId: string,
+    sendId: string,
+    rules: SendAddressRules
+): Promise<boolean> {
     const { count } = await prisma.vaultSend.updateMany({
         where: { id: sendId, userId },
         data: { ...storedAddressRules(rules), revisionDate: new Date() }
@@ -277,7 +285,10 @@ export async function attachSendFile(
 /** Why a Send cannot be served, or the Send. */
 export type SendAccess =
     | { ok: true; send: SendRow & { storedPath: string | null }; document: SendDocument }
-    | { ok: false; reason: "not_found" | "expired" | "exhausted" | "disabled" | "address" | "password" };
+    | {
+          ok: false;
+          reason: "not_found" | "expired" | "exhausted" | "disabled" | "address" | "password";
+      };
 
 /**
  * Open a Send from its public link.
@@ -287,7 +298,11 @@ export type SendAccess =
  * past its deletion date answers as if it were never there: it is about to be
  * swept, and telling a stranger that it existed says more than it should.
  */
-export async function accessSend(accessId: string, password?: string, ip?: string): Promise<SendAccess> {
+export async function accessSend(
+    accessId: string,
+    password?: string,
+    ip?: string
+): Promise<SendAccess> {
     const found = await prisma.vaultSend.findUnique({
         where: { accessId },
         select: { ...SEND_SELECT, ...RULE_SELECT, storedPath: true }

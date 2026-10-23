@@ -96,7 +96,9 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
         return (
             <Shell signedIn={signedIn} signInLabel={t("task.signIn")} back={`/t/${token}`}>
                 <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("task.unavailableTitle")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("task.unavailableTitle")}
+                    </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         {gate.ok || gate.reason === "not_found"
                             ? t("task.unavailable")

@@ -24,7 +24,9 @@ const anywhere = storedAddressRules({});
 
 describe("checkLink", () => {
     it("serves a link with no limits to anyone", async () => {
-        expect(await checkLink({ limits: open, rules: anywhere }, undefined, NOW)).toEqual({ ok: true });
+        expect(await checkLink({ limits: open, rules: anywhere }, undefined, NOW)).toEqual({
+            ok: true
+        });
     });
 
     it("refuses a revoked link", async () => {
@@ -89,7 +91,11 @@ describe("checkLink", () => {
 
 describe("stored address rules", () => {
     it("round-trip through the JSON columns every link table uses", () => {
-        const lists = { allowedCidrs: ["10.0.0.0/8"], allowedCountries: ["ES"], allowedContinents: ["EU"] };
+        const lists = {
+            allowedCidrs: ["10.0.0.0/8"],
+            allowedCountries: ["ES"],
+            allowedContinents: ["EU"]
+        };
         expect(readAddressRules(storedAddressRules(lists))).toEqual(lists);
     });
 

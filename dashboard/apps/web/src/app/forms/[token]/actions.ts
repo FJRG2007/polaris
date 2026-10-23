@@ -75,7 +75,10 @@ export async function submitFormAction(
  * nothing and one that no longer opens, so it cannot be used to find out which
  * tokens are real.
  */
-export async function unlockFormAction(token: string, password: string): Promise<{ error?: string }> {
+export async function unlockFormAction(
+    token: string,
+    password: string
+): Promise<{ error?: string }> {
     const t = await getTranslations("publicPages");
     const form = await gate.taskFormForUnlock(token);
     if (!form) return { error: t("denied.unavailable") };
@@ -90,12 +93,16 @@ export async function unlockFormAction(token: string, password: string): Promise
     }
 
     await resetRateLimit(limitKey);
-    (await cookies()).set(gate.formUnlockCookie(form.id), gate.signFormUnlock(form.id, form.passwordHash), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: loadEnv().POLARIS_SECURE_COOKIES,
-        path: "/",
-        maxAge: UNLOCK_TTL_SECONDS
-    });
+    (await cookies()).set(
+        gate.formUnlockCookie(form.id),
+        gate.signFormUnlock(form.id, form.passwordHash),
+        {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: loadEnv().POLARIS_SECURE_COOKIES,
+            path: "/",
+            maxAge: UNLOCK_TTL_SECONDS
+        }
+    );
     return {};
 }

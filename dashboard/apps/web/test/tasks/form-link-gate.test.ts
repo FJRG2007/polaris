@@ -77,7 +77,10 @@ describe("an intake form's public link", () => {
     it("refuses a visitor outside its countries", async () => {
         inRegion = false;
         findUnique.mockResolvedValueOnce(row({ allowedCountries: '["ES"]' }));
-        expect(await gate.gateTaskForm("token")).toEqual({ ok: false, reason: "country_not_allowed" });
+        expect(await gate.gateTaskForm("token")).toEqual({
+            ok: false,
+            reason: "country_not_allowed"
+        });
         inRegion = true;
     });
 
@@ -91,16 +94,27 @@ describe("an intake form's public link", () => {
     it("asks for the password until it is solved, in its own scope", async () => {
         cookie = undefined;
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
-        expect(await gate.gateTaskForm("token")).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gateTaskForm("token")).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
 
         cookie = gate.signFormUnlock(FORM, HASH);
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
         expect(await gate.gateTaskForm("token")).toEqual({ ok: true, formId: FORM });
 
         const { signUnlock } = await import("@/lib/link-guards");
-        cookie = signUnlock("task", FORM, { passwordHash: HASH }, "one-secret-for-every-signature-here");
+        cookie = signUnlock(
+            "task",
+            FORM,
+            { passwordHash: HASH },
+            "one-secret-for-every-signature-here"
+        );
         findUnique.mockResolvedValueOnce(row({ passwordHash: HASH }));
-        expect(await gate.gateTaskForm("token")).toEqual({ ok: false, reason: "password_required" });
+        expect(await gate.gateTaskForm("token")).toEqual({
+            ok: false,
+            reason: "password_required"
+        });
         cookie = undefined;
     });
 });

@@ -58,7 +58,8 @@ export function MeetingLinkLimits({ meetingId }: { meetingId: string }) {
 
     // A typed password is always a change: a stored one cannot be read back.
     const changed =
-        saved !== null && (value.password !== "" || JSON.stringify(value) !== JSON.stringify(valueOf(saved)));
+        saved !== null &&
+        (value.password !== "" || JSON.stringify(value) !== JSON.stringify(valueOf(saved)));
 
     const save = async () => {
         setSaving(true);
@@ -101,8 +102,15 @@ export function MeetingLinkLimits({ meetingId }: { meetingId: string }) {
                 </p>
             )}
             <div className="flex items-center justify-end gap-2">
-                {done && <span className="text-xs text-muted-foreground">{t("meetingLink.saved")}</span>}
-                <Button size="sm" variant="secondary" disabled={saving || !changed} onClick={() => void save()}>
+                {done && (
+                    <span className="text-xs text-muted-foreground">{t("meetingLink.saved")}</span>
+                )}
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={saving || !changed}
+                    onClick={() => void save()}
+                >
                     {saving && <Loader2 className="size-4 animate-spin" />}
                     {t("meetingLink.save")}
                 </Button>

@@ -70,7 +70,15 @@ export async function gateTaskForm(token: string): Promise<TaskFormGate> {
     if (form.passwordHash) {
         const solved = (await cookies()).get(formUnlockCookie(form.id))?.value;
         const secret = loadEnv().POLARIS_AUTH_SECRET;
-        if (!verifyUnlock(FORM_LINK_SCOPE, form.id, solved, { passwordHash: form.passwordHash }, secret)) {
+        if (
+            !verifyUnlock(
+                FORM_LINK_SCOPE,
+                form.id,
+                solved,
+                { passwordHash: form.passwordHash },
+                secret
+            )
+        ) {
             return { ok: false, reason: "password_required" };
         }
     }
@@ -85,7 +93,10 @@ export async function taskFormForUnlock(
 ): Promise<{ readonly id: string; readonly passwordHash: string | null } | null> {
     const gate = await gateTaskForm(token);
     if (!gate.ok && gate.reason !== "password_required") return null;
-    return prisma.taskForm.findUnique({ where: { token }, select: { id: true, passwordHash: true } });
+    return prisma.taskForm.findUnique({
+        where: { token },
+        select: { id: true, passwordHash: true }
+    });
 }
 
 /** Whether a password opens this form. Wrong and unset both answer false. */

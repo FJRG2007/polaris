@@ -33,7 +33,9 @@ const FORM = {
     id: "01a081bf-94a6-76c1-9907-ab70aa5f6471",
     spaceId: "space-1",
     listId: "list-1",
-    fields: JSON.stringify([{ id: "q1", label: "What", type: "text", required: true, options: [], mapsTo: "" }]),
+    fields: JSON.stringify([
+        { id: "q1", label: "What", type: "text", required: true, options: [], mapsTo: "" }
+    ]),
     defaultStatusId: null,
     confirmation: "",
     requireLogin: false,
@@ -56,7 +58,10 @@ describe("submitting a form with a cap", () => {
         expect(result.ok).toBe(true);
         expect(queryRaw).toHaveBeenCalledOnce();
         expect(create).toHaveBeenCalledOnce();
-        expect(update).toHaveBeenCalledWith({ where: { id: "slot-1" }, data: { taskId: "task-1" } });
+        expect(update).toHaveBeenCalledWith({
+            where: { id: "slot-1" },
+            data: { taskId: "task-1" }
+        });
     });
 
     it("refuses once the cap is reached, filing nothing", async () => {

@@ -31,7 +31,10 @@ const MEETING_LINK_SCOPE = "meeting";
 
 /** What a host may set on the guest link: the shared limits without the expiry
  *  and the cap, which the call already decides. */
-export const meetingLinkLimitsSchema = core.linkLimitsSchema.omit({ maxViews: true, expiresAt: true });
+export const meetingLinkLimitsSchema = core.linkLimitsSchema.omit({
+    maxViews: true,
+    expiresAt: true
+});
 
 export type MeetingLinkLimitsInput = z.infer<typeof meetingLinkLimitsSchema>;
 
@@ -51,7 +54,12 @@ export function meetingUnlockCookie(meetingId: string): string {
 }
 
 export function signMeetingUnlock(meetingId: string, passwordHash: string | null): string {
-    return signUnlock(MEETING_LINK_SCOPE, meetingId, { passwordHash }, loadEnv().POLARIS_AUTH_SECRET);
+    return signUnlock(
+        MEETING_LINK_SCOPE,
+        meetingId,
+        { passwordHash },
+        loadEnv().POLARIS_AUTH_SECRET
+    );
 }
 
 /** Resolve a guest token and decide whether it opens anything. An ended call
@@ -73,7 +81,10 @@ export async function gateMeetingLink(token: string): Promise<MeetingLinkGate> {
 
     const ip = await clientIp();
     const checked = await checkLink(
-        { limits: { revokedAt: null, expiresAt: null, maxUses: null, useCount: 0 }, rules: meeting },
+        {
+            limits: { revokedAt: null, expiresAt: null, maxUses: null, useCount: 0 },
+            rules: meeting
+        },
         ip
     );
     if (!checked.ok) return { ok: false, reason: checked.reason };
@@ -84,7 +95,15 @@ export async function gateMeetingLink(token: string): Promise<MeetingLinkGate> {
     if (meeting.linkPasswordHash) {
         const solved = (await cookies()).get(meetingUnlockCookie(meeting.id))?.value;
         const grant = { passwordHash: meeting.linkPasswordHash };
-        if (!verifyUnlock(MEETING_LINK_SCOPE, meeting.id, solved, grant, loadEnv().POLARIS_AUTH_SECRET)) {
+        if (
+            !verifyUnlock(
+                MEETING_LINK_SCOPE,
+                meeting.id,
+                solved,
+                grant,
+                loadEnv().POLARIS_AUTH_SECRET
+            )
+        ) {
             return { ok: false, reason: "password_required" };
         }
     }
@@ -142,7 +161,10 @@ function toView(meeting: {
     return { hasPassword: Boolean(meeting.linkPasswordHash), ...readAddressRules(meeting) };
 }
 
-export async function getMeetingLinkLimits(actorId: string, meetingId: string): Promise<MeetingLinkLimitsView> {
+export async function getMeetingLinkLimits(
+    actorId: string,
+    meetingId: string
+): Promise<MeetingLinkLimitsView> {
     return toView(await hostedMeeting(actorId, meetingId));
 }
 

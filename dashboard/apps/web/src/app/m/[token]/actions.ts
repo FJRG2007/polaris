@@ -19,7 +19,10 @@ import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 const UNLOCK_LIMIT = 8;
 const UNLOCK_WINDOW_MS = 10 * 60_000;
 
-export async function unlockMeetingLinkAction(token: string, password: string): Promise<{ error?: string }> {
+export async function unlockMeetingLinkAction(
+    token: string,
+    password: string
+): Promise<{ error?: string }> {
     const t = await getTranslations("publicPages");
     const meeting = await gate.meetingLinkForUnlock(String(token ?? ""));
     if (!meeting) return { error: t("denied.unavailable") };
@@ -34,12 +37,16 @@ export async function unlockMeetingLinkAction(token: string, password: string): 
     }
 
     await resetRateLimit(limitKey);
-    (await cookies()).set(gate.meetingUnlockCookie(meeting.id), gate.signMeetingUnlock(meeting.id, meeting.passwordHash), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: loadEnv().POLARIS_SECURE_COOKIES,
-        path: "/",
-        maxAge: UNLOCK_TTL_SECONDS
-    });
+    (await cookies()).set(
+        gate.meetingUnlockCookie(meeting.id),
+        gate.signMeetingUnlock(meeting.id, meeting.passwordHash),
+        {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: loadEnv().POLARIS_SECURE_COOKIES,
+            path: "/",
+            maxAge: UNLOCK_TTL_SECONDS
+        }
+    );
     return {};
 }

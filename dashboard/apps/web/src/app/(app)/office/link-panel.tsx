@@ -231,11 +231,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                         <Button size="sm" variant="secondary" onClick={() => setMaking(false)}>
                             {t("links.cancel")}
                         </Button>
-                        <Button
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => void make()}
-                        >
+                        <Button size="sm" disabled={busy} onClick={() => void make()}>
                             {busy ? (
                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                             ) : null}

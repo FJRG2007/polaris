@@ -135,7 +135,10 @@ export function LinkAdvancedFields({
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {shows("password") ? (
                             <div className="flex min-w-0 flex-col gap-1">
-                                <label className="flex min-w-0 flex-col gap-1" htmlFor={`${idPrefix}-password`}>
+                                <label
+                                    className="flex min-w-0 flex-col gap-1"
+                                    htmlFor={`${idPrefix}-password`}
+                                >
                                     <span className="text-xs text-muted-foreground">
                                         <Lock className="mr-1 inline size-3" aria-hidden />
                                         {passwordSet
@@ -171,7 +174,11 @@ export function LinkAdvancedFields({
                                                 const { clearPassword: _, ...rest } = value;
                                                 onChange(
                                                     event.target.checked
-                                                        ? { ...rest, password: "", clearPassword: true }
+                                                        ? {
+                                                              ...rest,
+                                                              password: "",
+                                                              clearPassword: true
+                                                          }
                                                         : rest
                                                 );
                                             }}
@@ -182,7 +189,10 @@ export function LinkAdvancedFields({
                             </div>
                         ) : null}
                         {shows("expiry") ? (
-                            <label className="flex min-w-0 flex-col gap-1" htmlFor={`${idPrefix}-expires`}>
+                            <label
+                                className="flex min-w-0 flex-col gap-1"
+                                htmlFor={`${idPrefix}-expires`}
+                            >
                                 <span className="text-xs text-muted-foreground">
                                     {t("linkAdvanced.expires")}
                                 </span>
@@ -197,7 +207,10 @@ export function LinkAdvancedFields({
                             </label>
                         ) : null}
                         {shows("uses") ? (
-                            <label className="flex min-w-0 flex-col gap-1" htmlFor={`${idPrefix}-uses`}>
+                            <label
+                                className="flex min-w-0 flex-col gap-1"
+                                htmlFor={`${idPrefix}-uses`}
+                            >
                                 <span className="text-xs text-muted-foreground">
                                     {usesLabel ?? t("linkAdvanced.uses")}
                                 </span>

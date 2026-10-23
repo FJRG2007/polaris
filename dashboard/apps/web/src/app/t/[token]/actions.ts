@@ -37,12 +37,16 @@ export async function unlockTaskShareAction(
     }
 
     await resetRateLimit(limitKey);
-    (await cookies()).set(gate.taskUnlockCookie(share.id), gate.signTaskUnlock(share.id, share.passwordHash), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: loadEnv().POLARIS_SECURE_COOKIES,
-        path: "/",
-        maxAge: UNLOCK_TTL_SECONDS
-    });
+    (await cookies()).set(
+        gate.taskUnlockCookie(share.id),
+        gate.signTaskUnlock(share.id, share.passwordHash),
+        {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: loadEnv().POLARIS_SECURE_COOKIES,
+            path: "/",
+            maxAge: UNLOCK_TTL_SECONDS
+        }
+    );
     return {};
 }

@@ -34,8 +34,7 @@ export interface LinkLimits {
 
 /** Why a link cannot be used right now, or `ok`. */
 export type LinkUsability =
-    | { ok: true }
-    | { ok: false; reason: "revoked" | "expired" | "exhausted" | "scheduled" };
+    { ok: true } | { ok: false; reason: "revoked" | "expired" | "exhausted" | "scheduled" };
 
 /** Where a link's rules refused the caller, in the order they are checked. */
 export type LinkDenial = "not_allowed" | "ip_not_allowed" | "country_not_allowed";
