@@ -433,6 +433,22 @@ export async function chatRelayReady(userId: string): Promise<boolean> {
     return false;
 }
 
+/**
+ * The accounts any installed app could show a Chat message to in a game right
+ * now, or null when one of them cannot say (an older version of it), and then
+ * the caller has to look wider. An app that fails to answer counts as unable.
+ */
+export async function chatRelayAccounts(): Promise<Set<string> | null> {
+    const accounts = new Set<string>();
+    for (const extension of await chatRelays()) {
+        if (!extension.chatRelayAccounts) return null;
+        const playing = await extension.chatRelayAccounts().catch(() => null);
+        if (!playing) return null;
+        for (const userId of playing) accounts.add(userId);
+    }
+    return accounts;
+}
+
 /** What hands one message to every app that can show it in a game, resolved
  *  once however many readers it goes to, or null when no installed app can. One
  *  app failing does not stop another, and none of them can fail the message. */

@@ -22,9 +22,8 @@ vi.mock("@/app/(app)/account/notifications/actions", () => ({
     setMessagesInGameAction: vi.fn()
 }));
 
-const { NotificationSettingsView } = await import(
-    "@/app/(app)/account/notifications/notification-settings-view"
-);
+const { NotificationSettingsView } =
+    await import("@/app/(app)/account/notifications/notification-settings-view");
 const { IN_GAME_NOT_READY } = await import("@/lib/chat/in-game-choice");
 
 function card(ready: boolean): string {
@@ -52,6 +51,30 @@ describe("the Messages in Minecraft card", () => {
         expect(group.match(/disabled=""/g)?.length).toBeGreaterThanOrEqual(3);
         expect(markup).toContain(IN_GAME_NOT_READY.slice(0, 40));
         expect(markup).toContain('href="/account/connections?return=%2Faccount%2Fnotifications"');
+    });
+
+    it("sits under the apps' own heading, which is absent with nothing an app adds", () => {
+        expect(card(true)).toBeTruthy();
+        const markup = (messagesInGame: "all" | null) =>
+            renderToStaticMarkup(
+                withMessages(
+                    <NotificationSettingsView
+                        rules={[]}
+                        destinations={[]}
+                        senders={[]}
+                        deliveries={[]}
+                        messagesInGame={messagesInGame}
+                        inGameReady
+                    />
+                )
+            );
+        const shown = markup("all");
+        expect(shown.indexOf("From your apps")).toBeGreaterThan(-1);
+        expect(shown.indexOf("From your apps")).toBeLessThan(
+            shown.indexOf("Messages in Minecraft")
+        );
+        expect(markup(null)).not.toContain("From your apps");
+        expect(markup(null)).not.toContain("Messages in Minecraft");
     });
 
     it("offers the three choices once it does", () => {

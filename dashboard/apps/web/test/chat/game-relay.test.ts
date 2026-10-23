@@ -3,7 +3,7 @@
  *
  * Exactly the ones the corner note would have been for - the same mute, the same
  * notify level, the same blocks - and only for accounts it is on for: by default
- * a direct message or a small group, turned on everything, turned off nothing.
+ * everything, set to direct a direct message or a small group, turned off nothing.
  * What is pinned: the author never gets their own; a reader of a public channel with
  * no row on it is reached, and one who lost the conversation or Chat is not; a
  * muted conversation, one set to nothing, and one set to mentions without a
@@ -36,6 +36,10 @@ const fake = vi.hoisted(() => ({
     members: [] as Member[],
     optedIn: new Set<string>(),
     optedOut: new Set<string>(),
+    /** Accounts set to direct messages and small groups only. */
+    direct: new Set<string>(),
+    /** Who the apps say is playing now, or null for an app that cannot say. */
+    playing: null as Set<string> | null,
     reaches: new Map<string, Set<string>>(),
     chatUse: new Set<string>(),
     levels: new Map<string, string>(),
@@ -57,16 +61,10 @@ vi.mock("@polaris/db", () => ({
             findMany: async (query: MemberQuery) => {
                 fake.asked.push(query);
                 const user = query.select.user as { select?: Record<string, unknown> } | undefined;
-                if (user?.select?.messagesInGame) {
+                if (user?.select?.inGameMessages) {
                     return fake.members.map((member) => ({
                         userId: member.userId,
-                        user: {
-                            messagesInGame: fake.optedIn.has(member.userId)
-                                ? true
-                                : fake.optedOut.has(member.userId)
-                                  ? false
-                                  : null
-                        }
+                        user: { inGameMessages: stored(member.userId) }
                     }));
                 }
                 if (user) {
@@ -85,16 +83,20 @@ vi.mock("@polaris/db", () => ({
                 fake.authorsRead += 1;
                 return { name: "Carla" };
             },
-            findMany: async (query: { where: { id: { not: string } } }) => {
+            findMany: async (query: { where: { id: { not?: string; in?: string[] } } }) => {
                 fake.asked.push(query);
-                return [...fake.optedIn]
+                // Every account it is on everything for: chosen, or never chosen.
+                return [ANA, BEN, DANI]
                     .filter((id) => id !== query.where.id.not)
+                    .filter((id) => !query.where.id.in || query.where.id.in.includes(id))
+                    .filter((id) => stored(id) === null || stored(id) === "all")
                     .map((id) => ({ id }));
             }
         }
     }
 }));
 vi.mock("@/lib/app-extensions/registry", () => ({
+    chatRelayAccounts: async () => (fake.playing ? new Set(fake.playing) : null),
     chatRelayer: async () =>
         fake.offered
             ? async (message: Record<string, unknown>) => {
@@ -121,6 +123,14 @@ vi.mock("@/lib/chat/notify", () => ({
 vi.mock("@/lib/blocks", () => ({
     blockedBy: async (userId: string) => fake.blocked.get(userId) ?? new Set()
 }));
+
+/** What an account has stored, as the fake database holds it. */
+function stored(userId: string): string | null {
+    if (fake.optedIn.has(userId)) return "all";
+    if (fake.optedOut.has(userId)) return "off";
+    if (fake.direct.has(userId)) return "auto";
+    return null;
+}
 
 const { relayToGames } = await import("@/lib/chat/game-relay");
 const { SMALL_GROUP_SIZE: SMALL_GROUP } = await import("@/lib/chat/in-game-choice");
@@ -151,6 +161,8 @@ beforeEach(() => {
     fake.members = [member(AUTHOR, "Carla"), member(ANA, "Ana"), member(BEN, "Ben")];
     fake.optedIn = new Set([ANA, BEN]);
     fake.optedOut = new Set();
+    fake.direct = new Set();
+    fake.playing = null;
     fake.reaches = new Map([AUTHOR, ANA, BEN, DANI].map((id) => [id, new Set(["c1"])]));
     fake.chatUse = new Set([AUTHOR, ANA, BEN, DANI]);
     fake.levels = new Map();
@@ -223,14 +235,20 @@ describe("relaying a message into a game", () => {
         expect(fake.relayed[0]).toMatchObject({ text: "Raid tonight?", poll: ["Yes", "No"] });
     });
 
-    it("reaches a direct message or small group by default, and nobody who turned it off", async () => {
+    it("reaches a direct message or small group by default and when set to direct, and nobody who turned it off", async () => {
         fake.optedIn = new Set();
         fake.optedOut = new Set([BEN]);
         await relayToGames("m1");
         expect(fake.relayed.map((one) => one.userId)).toEqual([ANA]);
+
+        fake.relayed = [];
+        fake.optedOut = new Set();
+        fake.direct = new Set([ANA]);
+        await relayToGames("m1");
+        expect(fake.relayed.map((one) => one.userId)).toEqual([ANA, BEN]);
     });
 
-    it("reaches a large group only for the accounts that turned everything on", async () => {
+    it("reaches a large group for everybody on everything, the default, and not for those set to direct", async () => {
         fake.members = [
             member(AUTHOR, "Carla"),
             member(ANA, "Ana"),
@@ -242,8 +260,11 @@ describe("relaying a message into a game", () => {
         fake.chatUse = new Set(fake.members.map((one) => one.userId));
         fake.reaches = new Map(fake.members.map((one) => [one.userId, new Set(["c1"])]));
         fake.optedIn = new Set([ANA]);
+        fake.direct = new Set([BEN]);
         await relayToGames("m1");
-        expect(fake.relayed.map((one) => one.userId)).toEqual([ANA]);
+        expect(fake.relayed.map((one) => one.userId)).toEqual(
+            fake.members.map((one) => one.userId).filter((id) => id !== AUTHOR && id !== BEN)
+        );
     });
 
     it("reads nobody's name when everybody turned it off", async () => {
@@ -256,11 +277,30 @@ describe("relaying a message into a game", () => {
 
     it("reaches a reader of a public channel they never joined, and reads no member list for it", async () => {
         fake.message = message("raid at dusk", { channel: { spaceId: "s1", name: "builders" } });
-        fake.optedIn = new Set([ANA, DANI]);
+        fake.optedIn = new Set([ANA]);
+        fake.direct = new Set([BEN]);
         await relayToGames("m1");
         expect(fake.relayed.map((one) => one.userId)).toEqual([ANA, DANI]);
         expect(fake.relayed[1]).toMatchObject({ conversation: "builders", inChannel: true });
         expect(fake.namesRead).toBe(0);
+    });
+
+    it("looks at a public channel only for the accounts playing now, when the apps can say", async () => {
+        fake.message = message("raid at dusk", { channel: { spaceId: "s1", name: "builders" } });
+        fake.playing = new Set([DANI, AUTHOR]);
+        await relayToGames("m1");
+        expect(fake.relayed.map((one) => one.userId)).toEqual([DANI]);
+        expect(fake.asked).toContainEqual(
+            expect.objectContaining({ where: expect.objectContaining({ id: { in: [DANI] } }) })
+        );
+    });
+
+    it("asks for no account at all for a public channel when nobody is playing", async () => {
+        fake.message = message("raid at dusk", { channel: { spaceId: "s1", name: "builders" } });
+        fake.playing = new Set();
+        await relayToGames("m1");
+        expect(fake.relayed).toEqual([]);
+        expect(fake.asked).toEqual([]);
     });
 
     it("skips an account that no longer reaches the conversation or has lost Chat", async () => {

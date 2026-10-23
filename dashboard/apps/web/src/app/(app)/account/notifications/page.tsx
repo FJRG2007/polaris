@@ -46,7 +46,7 @@ export default async function NotificationsPage() {
         chatRelayReady(user.id).catch(() => false),
         prisma.user.findUnique({
             where: { id: user.id },
-            select: { messagesInGame: true, badgesClearOnVisit: true }
+            select: { inGameMessages: true, badgesClearOnVisit: true }
         }),
         getQuietHours(user.id),
         resolveDisplayPreferencesFor(user.id),
@@ -68,9 +68,7 @@ export default async function NotificationsPage() {
                 destinations={destinations}
                 senders={senders}
                 deliveries={deliveries}
-                messagesInGame={
-                    inGameOffered ? inGameChoice(account?.messagesInGame ?? null) : null
-                }
+                messagesInGame={inGameOffered ? inGameChoice(account?.inGameMessages) : null}
                 inGameReady={inGameReady}
                 quiet={{ hours: quietHours, timeZone: display.timeZone }}
                 paused={paused?.on ? paused : null}

@@ -203,8 +203,9 @@ export function VolumeDetailDialog({
     return (
         <Dialog open={volumeId !== null} onOpenChange={onOpenChange}>
             <DialogContent
+                data-service-panel=""
                 className={cn(
-                    "left-auto right-0 top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
+                    "left-auto right-0 top-0 flex bg-background h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
                     full
                         ? "w-full max-w-none"
                         : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
@@ -221,7 +222,10 @@ export function VolumeDetailDialog({
                         {volume && (
                             <p className="truncate text-xs text-muted-foreground">
                                 {volume.applicationName
-                                    ? t("volume.mountedIn", { service: volume.applicationName, path: volume.mountPath })
+                                    ? t("volume.mountedIn", {
+                                          service: volume.applicationName,
+                                          path: volume.mountPath
+                                      })
                                     : t("volume.mountedAt", { path: volume.mountPath })}
                             </p>
                         )}
@@ -303,7 +307,12 @@ function toEditVolume(volume: VolumeDetail): EditVolume {
 function FilesTab({ volume }: { volume: VolumeDetail }) {
     const t = useTranslations("deployData");
     if (!volume.applicationId) {
-        return <Notice title={t("volume.files.unattachedTitle")} body={t("volume.files.unattachedBody")} />;
+        return (
+            <Notice
+                title={t("volume.files.unattachedTitle")}
+                body={t("volume.files.unattachedBody")}
+            />
+        );
     }
     if (!volume.serviceRunning) {
         return (
@@ -321,7 +330,10 @@ function FilesTab({ volume }: { volume: VolumeDetail }) {
             <FilesPanel applicationId={volume.applicationId} root={volume.mountPath} />
             <p className="text-xs text-muted-foreground">
                 {volume.applicationName
-                    ? t("volume.files.readInside", { service: volume.applicationName, path: volume.mountPath })
+                    ? t("volume.files.readInside", {
+                          service: volume.applicationName,
+                          path: volume.mountPath
+                      })
                     : t("volume.files.readInsideService", { path: volume.mountPath })}
             </p>
         </div>
@@ -368,11 +380,19 @@ function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
                                 : t("volume.metrics.noCap")
                     }
                 />
-                <Stat label={t("volume.metrics.kind")} value={kindLabel(volume, t)} hint={volume.source} />
+                <Stat
+                    label={t("volume.metrics.kind")}
+                    value={kindLabel(volume, t)}
+                    hint={volume.source}
+                />
                 <Stat
                     label={t("volume.server")}
                     value={volume.serverName}
-                    hint={volume.serverKind === "local" ? t("volume.metrics.thisHost") : t("volume.metrics.remote")}
+                    hint={
+                        volume.serverKind === "local"
+                            ? t("volume.metrics.thisHost")
+                            : t("volume.metrics.remote")
+                    }
                 />
             </div>
 
@@ -383,9 +403,7 @@ function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
                     live={`/api/deploy/volumes/${volume.id}/metrics/stream`}
                     metrics={volumeMetrics(t)}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                    {t("volume.metrics.gaps")}
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("volume.metrics.gaps")}</p>
             </div>
         </div>
     );
@@ -450,9 +468,7 @@ function SettingsTab({
     // A service that mounts a volume has a path it expects to exist. Removing the
     // last thing providing it is a decision about the service, not about the
     // volume, so it is refused here and pointed at the service instead.
-    const blockedReason = !volume.applicationId
-        ? t("volume.settings.unattached")
-        : null;
+    const blockedReason = !volume.applicationId ? t("volume.settings.unattached") : null;
 
     // The mount is editable in place, not through a dialog on top of the panel -
     // but only when it has a service to be mounted in, since that is what the
@@ -491,10 +507,7 @@ function SettingsTab({
 
     return (
         <div className="flex flex-col gap-5">
-            <Section
-                title={t("volume.settings.mount")}
-                hint={t("volume.settings.mountHint")}
-            >
+            <Section title={t("volume.settings.mount")} hint={t("volume.settings.mountHint")}>
                 {editable ? (
                     <VolumeForm
                         applicationId={volume.applicationId ?? ""}
@@ -528,10 +541,7 @@ function SettingsTab({
                 )}
             </Section>
 
-            <Section
-                title={t("volume.settings.region")}
-                hint={t("volume.settings.regionHint")}
-            >
+            <Section title={t("volume.settings.region")} hint={t("volume.settings.regionHint")}>
                 <Rows>
                     <Row
                         label={t("volume.server")}
@@ -551,7 +561,9 @@ function SettingsTab({
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="min-w-0">
                                 <p className="text-sm">{t("volume.settings.wipe")}</p>
-                                <p className="text-xs text-muted-foreground">{t("volume.settings.wipeHint")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("volume.settings.wipeHint")}
+                                </p>
                             </div>
                             <Button
                                 variant="danger"
@@ -571,7 +583,9 @@ function SettingsTab({
                         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-danger-edge pt-3">
                             <div className="min-w-0">
                                 <p className="text-sm">{t("volume.settings.delete")}</p>
-                                <p className="text-xs text-muted-foreground">{t("volume.settings.deleteHint")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("volume.settings.deleteHint")}
+                                </p>
                             </div>
                             <Button variant="danger" size="sm" onClick={() => setDeleting(true)}>
                                 <Trash2 className="size-4" /> {t("volume.settings.deleteButton")}
@@ -612,7 +626,9 @@ function SettingsTab({
                 <label className="flex items-start justify-between gap-3 rounded-md border border-border/60 p-3">
                     <span className="min-w-0">
                         <span className="block text-sm">{t("volume.settings.destroyData")}</span>
-                        <span className="block text-xs text-muted-foreground">{t("volume.settings.destroyDataHint")}</span>
+                        <span className="block text-xs text-muted-foreground">
+                            {t("volume.settings.destroyDataHint")}
+                        </span>
                     </span>
                     <Switch
                         checked={wipeOnDelete}

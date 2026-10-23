@@ -38,9 +38,9 @@ describe("messages in the game", () => {
         expect(await setMessagesInGameAction("off")).toEqual({ choice: "off" });
         expect(await setMessagesInGameAction("auto")).toEqual({ choice: "auto" });
         expect(updates).toEqual([
-            { where: { id: "u1" }, data: { messagesInGame: true } },
-            { where: { id: "u1" }, data: { messagesInGame: false } },
-            { where: { id: "u1" }, data: { messagesInGame: null } }
+            { where: { id: "u1" }, data: { inGameMessages: "all" } },
+            { where: { id: "u1" }, data: { inGameMessages: "off" } },
+            { where: { id: "u1" }, data: { inGameMessages: "auto" } }
         ]);
     });
 
@@ -59,9 +59,12 @@ describe("messages in the game", () => {
     });
 
     it("reads a stored value back as the choice it was", () => {
-        expect(inGameChoice(null)).toBe("auto");
-        expect(inGameChoice(true)).toBe("all");
-        expect(inGameChoice(false)).toBe("off");
+        expect(inGameChoice("auto")).toBe("auto");
+        expect(inGameChoice("all")).toBe("all");
+        expect(inGameChoice("off")).toBe("off");
+        // Never chosen, or a value this version does not know: everything.
+        expect(inGameChoice(null)).toBe("all");
+        expect(inGameChoice("later")).toBe("all");
     });
 
     it("is the default for every account until it is chosen", () => {
@@ -69,6 +72,6 @@ describe("messages in the game", () => {
             join(__dirname, "../../../../packages/db/prisma/schema.prisma"),
             "utf8"
         );
-        expect(schema).toMatch(/messagesInGame Boolean\?\n/);
+        expect(schema).toMatch(/inGameMessages String\?\n/);
     });
 });

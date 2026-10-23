@@ -112,6 +112,7 @@ export function NotificationSettingsView({
     /** Quiet hours and the zone they are read in; null leaves the card out. */
     quiet?: { hours: QuietHours; timeZone: string } | null;
 }) {
+    const t = useTranslations("accountNotifications");
     const [state, setState] = useState(
         () => new Map(rules.map((entry) => [entry.event, entry.rule]))
     );
@@ -149,9 +150,6 @@ export function NotificationSettingsView({
             <SoundCard />
             <TabIconCard />
             {badgesClearOnVisit !== null ? <BadgesCard initial={badgesClearOnVisit} /> : null}
-            {messagesInGame !== null ? (
-                <InGameCard initial={messagesInGame} ready={inGameReady} />
-            ) : null}
 
             {groups.map((group) => (
                 <EventGroup
@@ -162,6 +160,24 @@ export function NotificationSettingsView({
                     onChange={update}
                 />
             ))}
+
+            {/* What installed apps add. Absent, heading and all, until one does:
+                the Minecraft row exists only where Game servers can show a
+                message in a game. */}
+            {messagesInGame !== null ? (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t("groups.apps")}</CardTitle>
+                    </CardHeader>
+                    <CardBody className="p-0">
+                        <ul className="divide-y divide-border">
+                            <li className="px-4 py-3">
+                                <InGameRow initial={messagesInGame} ready={inGameReady} />
+                            </li>
+                        </ul>
+                    </CardBody>
+                </Card>
+            ) : null}
 
             <DestinationsCard
                 destinations={destinations}
@@ -180,7 +196,7 @@ export function NotificationSettingsView({
  * this person is, not which machine they are at. Optimistic, and put back with
  * the reason if the save is refused.
  */
-function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: boolean }) {
+function InGameRow({ initial, ready }: { initial: inGame.InGameChoice; ready: boolean }) {
     const t = useTranslations("accountNotifications");
     const connectionsLink = useConnectionsHref();
     const hint = (option: inGame.InGameChoice) =>
@@ -206,43 +222,39 @@ function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: b
     }
 
     return (
-        <Card>
-            <CardBody className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("inGame.title")}</p>
-                        <p className="text-xs text-muted-foreground">
-                            {ready
-                                ? t("inGame.descriptionWith", { hint: hint(choice) })
-                                : t("inGame.description")}
-                        </p>
-                    </div>
-                    <SegmentedControl
-                        value={choice}
-                        onValueChange={choose}
-                        aria-label={t("inGame.label")}
-                        className="shrink-0"
-                        options={inGame.IN_GAME_CHOICES.map((option) => ({
-                            value: option,
-                            label: t(`inGame.choices.${option}` as const),
-                            title: ready ? hint(option) : t("inGame.notReady"),
-                            disabled: !ready
-                        }))}
-                    />
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-sm font-medium">{t("inGame.title")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {ready
+                            ? t("inGame.descriptionWith", { hint: hint(choice) })
+                            : t("inGame.description")}
+                    </p>
                 </div>
-                {ready ? null : (
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                        <p className="min-w-0 text-xs text-muted-foreground">
-                            {t("inGame.notReady")}
-                        </p>
-                        <Button asChild size="sm" variant="outline" className="shrink-0">
-                            <Link href={connectionsLink}>{t("inGame.connectedAccounts")}</Link>
-                        </Button>
-                    </div>
-                )}
-                {problem ? <p className="text-xs text-danger">{problem}</p> : null}
-            </CardBody>
-        </Card>
+                <SegmentedControl
+                    value={choice}
+                    onValueChange={choose}
+                    aria-label={t("inGame.label")}
+                    className="shrink-0"
+                    options={inGame.IN_GAME_CHOICES.map((option) => ({
+                        value: option,
+                        label: t(`inGame.choices.${option}` as const),
+                        title: ready ? hint(option) : t("inGame.notReady"),
+                        disabled: !ready
+                    }))}
+                />
+            </div>
+            {ready ? null : (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                    <p className="min-w-0 text-xs text-muted-foreground">{t("inGame.notReady")}</p>
+                    <Button asChild size="sm" variant="outline" className="shrink-0">
+                        <Link href={connectionsLink}>{t("inGame.connectedAccounts")}</Link>
+                    </Button>
+                </div>
+            )}
+            {problem ? <p className="text-xs text-danger">{problem}</p> : null}
+        </div>
     );
 }
 

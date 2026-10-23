@@ -205,9 +205,10 @@ change:
 
 The shell can show a notice above the page - a disk warning, a denied-access
 line - through `PageNotices` (`apps/web/src/components/page-notices.tsx`),
-which measures what it rendered and publishes it as `--notice-height` on the
-document root; it is `0px` (`packages/ui/src/styles/tokens.css`) when nothing
-is up. A screen that fills the window has to subtract that variable or a
+which measures what it rendered and publishes it as `--page-notice-height` on
+the document root. `--notice-height` (`packages/ui/src/styles/tokens.css`) is
+that plus `--connection-banner-height`, the offline strip above the whole
+shell, and is `0px` when nothing is up. A screen that fills the window has to subtract that variable or a
 notice pushes its bottom off a window that does not scroll.
 
 - **`PAGE_FILL` and `PAGE_BLEED`** (`packages/ui/src/shell/app-shell.tsx`)

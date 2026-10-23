@@ -2,8 +2,9 @@
 
 /**
  * The shell's notices above every page, and the height they take published as
- * `--notice-height`, which the screens that fill the window subtract (see
- * PAGE_NOTICES). Measured rather than assumed: a notice wraps to three lines at
+ * `--page-notice-height`, which `--notice-height` adds to the connection
+ * strip's for the screens that fill the window to subtract (see PAGE_NOTICES).
+ * Measured rather than assumed: a notice wraps to three lines at
  * phone width and to one on a desktop, and a disk warning grows a line while a
  * move runs.
  */
@@ -11,7 +12,7 @@
 import { PAGE_NOTICES } from "@polaris/ui";
 import { useEffect, useRef, type ReactNode } from "react";
 
-const VARIABLE = "--notice-height";
+const VARIABLE = "--page-notice-height";
 
 export function PageNotices({ children }: { children: ReactNode }) {
     const strip = useRef<HTMLDivElement>(null);

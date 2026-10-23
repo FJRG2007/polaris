@@ -575,7 +575,8 @@
         "people": "Personas",
         "agents": "Agentes",
         "polar": "Polar",
-        "system": "Polaris"
+        "system": "Polaris",
+        "apps": "De tus apps"
     },
     "badges": {
         "title": "Quitar avisos al abrir la pantalla",

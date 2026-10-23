@@ -575,7 +575,8 @@
         "people": "People",
         "agents": "Agents",
         "polar": "Polar",
-        "system": "Polaris"
+        "system": "Polaris",
+        "apps": "From your apps"
     },
     "badges": {
         "title": "Clear badges when I open the screen",

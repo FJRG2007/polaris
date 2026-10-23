@@ -332,6 +332,12 @@ export interface AppExtension {
      *  chooses which messages go there is not offered. */
     readonly chatRelayReady?: (userId: string) => Promise<boolean>;
 
+    /** The accounts with a player on one of this app's servers right now, by
+     *  its own record of who is on: the only accounts a message in a channel
+     *  could reach in the game. Bounded by who is playing, not by how many
+     *  accounts there are. */
+    readonly chatRelayAccounts?: () => Promise<readonly string[]>;
+
     /**
      * Which of these accounts are playing on one of this app's servers right
      * now, by the app's own record of who is on and its own rule for which

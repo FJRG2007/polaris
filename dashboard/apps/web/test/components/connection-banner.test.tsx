@@ -24,7 +24,8 @@ vi.mock("@/lib/host-internet", () => ({
     subscribeHostOffline: () => () => {}
 }));
 
-const { ConnectionBanner, SlowConnectionNotice } = await import("@/components/connection-banner");
+const { BANNER_HEIGHT_VAR, ConnectionBanner, SlowConnectionNotice } =
+    await import("@/components/connection-banner");
 const { noteStreamTrouble, probeNow, resetReachability } = await import("@/lib/reachability");
 const { clearUpdateInProgress, markUpdateInProgress } = await import("@/lib/update-in-progress");
 
@@ -32,7 +33,9 @@ const { clearUpdateInProgress, markUpdateInProgress } = await import("@/lib/upda
 let answering = true;
 const fetchMock = vi.fn(async () =>
     answering
-        ? new Response(JSON.stringify({ build: "b1" }), { headers: { "content-type": "application/json" } })
+        ? new Response(JSON.stringify({ build: "b1" }), {
+              headers: { "content-type": "application/json" }
+          })
         : Promise.reject(new TypeError("Failed to fetch"))
 );
 
@@ -72,6 +75,16 @@ describe("the connection banner", () => {
     it("says nothing on a page that opened online", () => {
         const { container } = render(<ConnectionBanner />, { wrapper: MessagesWrapper });
         expect(container.textContent).toBe("");
+    });
+
+    it("sits in the page instead of over it, and gives its height back when it goes", () => {
+        state = { online: false, recovered: false, slow: false };
+        const { unmount } = render(<ConnectionBanner />, { wrapper: MessagesWrapper });
+        // Floating, it covered the search box and the header's text.
+        expect(screen.getByRole("status").className).not.toContain("fixed");
+        expect(document.documentElement.style.getPropertyValue(BANNER_HEIGHT_VAR)).not.toBe("");
+        unmount();
+        expect(document.documentElement.style.getPropertyValue(BANNER_HEIGHT_VAR)).toBe("");
     });
 
     it("says so the moment the device is offline", () => {
@@ -172,7 +185,9 @@ describe("when Polaris itself does not answer", () => {
         answering = false;
         const { unmount } = render(withMessages(<ConnectionBanner />, "es-ES"));
         await streamDrops();
-        expect(screen.getByRole("status").textContent).toContain("No se puede contactar con Polaris");
+        expect(screen.getByRole("status").textContent).toContain(
+            "No se puede contactar con Polaris"
+        );
         expect(screen.getByRole("button", { name: "Reintentar" })).toBeTruthy();
         unmount();
         markUpdateInProgress();

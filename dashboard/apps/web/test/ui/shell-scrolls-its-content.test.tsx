@@ -81,7 +81,7 @@ describe("the shell scrolls its content, not the window", () => {
         );
         const main = screen.getByRole("main");
         const shell = main.parentElement!.parentElement!;
-        expect(shell.className).toContain("h-dvh");
+        expect(shell.className).toContain("h-[calc(100dvh-var(--connection-banner-height,0px))]");
         expect(shell.className).toContain("overflow-hidden");
         expect(shell.className).not.toContain("min-h-dvh");
         // The row between header and bottom edge may shrink below its content.
@@ -175,7 +175,7 @@ describe("the shell scrolls its content, not the window", () => {
 
     it("lets a printout run past the first page", () => {
         const main = renderShell();
-        const root = main.closest(".h-dvh");
+        const root = main.parentElement!.parentElement;
         expect(root?.className).toContain("print:h-auto");
         expect(root?.className).toContain("print:overflow-visible");
         expect(main.className).toContain("print:overflow-visible");
