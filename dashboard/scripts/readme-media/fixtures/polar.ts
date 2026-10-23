@@ -82,10 +82,71 @@ Want me to post it in #announcements?`,
 ¿Lo publico en #anuncios?`
 };
 
-/** The open chat as the server stores it: a question and its answer. */
-export function polarThread(ctx: SceneContext) {
+/** The product page the extension's side panel is opened beside: an invented shop. */
+export const SHOP = {
+    url: "https://shop.example/p/trailhead-28l",
+    store: "Example Outfitters",
+    product: { en: "Trailhead 28L hiking backpack", es: "Mochila de senderismo Trailhead 28L" },
+    price: "89,00 €",
+    rating: 4.4,
+    reviews: 1286,
+    points: {
+        en: ["28 L main compartment", "Padded sleeve for laptops up to 15.6\"", "Rain cover included", "1.1 kg"],
+        es: ["Compartimento principal de 28 L", "Funda acolchada para portátiles de hasta 15,6\"", "Funda para lluvia incluida", "1,1 kg"]
+    },
+    quotes: {
+        en: [
+            ["Comfortable on a full day out, the hip belt takes the weight.", 5],
+            ["My 16-inch laptop does not fit the sleeve.", 2],
+            ["Zips feel cheap but held up for a year.", 4]
+        ],
+        es: [
+            ["Cómoda en un día entero, el cinturón reparte el peso.", 5],
+            ["Mi portátil de 16 pulgadas no cabe en la funda.", 2],
+            ["Las cremalleras parecen flojas pero aguantan un año.", 4]
+        ]
+    }
+} as const;
+
+const SHOP_QUESTION = {
+    en: "Summarise the reviews on this page. Will my 16-inch laptop fit?",
+    es: "Resume las opiniones de esta página. ¿Cabe mi portátil de 16 pulgadas?"
+};
+
+const SHOP_ANSWER = {
+    en: `From the **1,286 reviews** (4.4 of 5):
+
+- **Liked:** comfortable all day, the hip belt carries the weight, the rain cover
+- **Disliked:** zips feel light, side pockets are shallow
+
+**Your laptop:** the sleeve takes up to **15.6"**, and several reviewers say a
+16-inch one does not fit. Carry it in the main compartment, or look at a 30 L model.`,
+    es: `De las **1286 opiniones** (4,4 de 5):
+
+- **Gusta:** cómoda todo el día, el cinturón reparte el peso, la funda para lluvia
+- **No gusta:** cremalleras flojas, bolsillos laterales poco profundos
+
+**Tu portátil:** la funda admite hasta **15,6"** y varios dicen que uno de 16
+pulgadas no cabe. Llévalo en el compartimento principal o mira un modelo de 30 L.`
+};
+
+/** How far a chat has got in the animation: asked, answering, answered. */
+export type PolarStage = "asked" | "answering" | "answered";
+
+/** The first lines of an answer, the way it reads while it is still arriving. */
+function partOf(text: string): string {
+    const lines = text.split("\n");
+    return lines.slice(0, Math.ceil(lines.length / 2)).join("\n");
+}
+
+/**
+ * The open chat as the server stores it: a question and, once Polar has got
+ * that far, its answer. `shop` is the side panel's chat about the product page.
+ */
+export function polarThread(ctx: SceneContext, stage: PolarStage = "answered", shop = false) {
     const say = (pair: { en: string; es: string }) => (ctx.locale === "es-ES" ? pair.es : pair.en);
-    const question = id("polar-message", 1);
+    const question = id("polar-message", shop ? 3 : 1);
+    const answer = say(shop ? SHOP_ANSWER : ANSWER);
     return {
         id: OPEN_THREAD_ID,
         projectId: null,
@@ -96,14 +157,18 @@ export function polarThread(ctx: SceneContext) {
                 id: question,
                 role: "user",
                 parentId: null,
-                parts: [{ type: "text", text: say(QUESTION) }]
+                parts: [{ type: "text", text: say(shop ? SHOP_QUESTION : QUESTION) }]
             },
-            {
-                id: id("polar-message", 2),
-                role: "assistant",
-                parentId: question,
-                parts: [{ type: "text", text: say(ANSWER) }]
-            }
+            ...(stage === "asked"
+                ? []
+                : [
+                      {
+                          id: id("polar-message", shop ? 4 : 2),
+                          role: "assistant",
+                          parentId: question,
+                          parts: [{ type: "text", text: stage === "answering" ? partOf(answer) : answer }]
+                      }
+                  ])
         ]
     };
 }
