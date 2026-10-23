@@ -57,7 +57,7 @@ export const HUMIDITY = "humidity";
 /** A climate extra's switch is `option:<name>`, one per extra the unit has. */
 const OPTION_PREFIX = "option:";
 /** The colours a card offers, as hues: the full slider is the device panel's. */
-const CARD_HUES: Readonly<Record<string, number>> = {
+const CARD_HUES = {
     red: 0,
     orange: 30,
     yellow: 55,
@@ -66,7 +66,8 @@ const CARD_HUES: Readonly<Record<string, number>> = {
     blue: 230,
     purple: 275,
     pink: 320
-};
+} as const satisfies Readonly<Record<string, number>>;
+type CardColor = keyof typeof CARD_HUES;
 /** What a glance card draws, and so all it may be pressed for. */
 const GLANCE_CONTROLS: readonly string[] = [POWER, LOCK, UNLOCK, STOP];
 
@@ -340,7 +341,7 @@ export function deviceItem(
                 id: COLOR,
                 label: t("overview.color"),
                 value: picked ? picked[0] : null,
-                options: Object.keys(CARD_HUES).map((value) => ({
+                options: (Object.keys(CARD_HUES) as CardColor[]).map((value) => ({
                     value,
                     label: t(`overview.colors.${value}`)
                 })),
@@ -437,8 +438,8 @@ export function pressAsAction(
     if (control === WARMTH && typeof value === "number" && Number.isFinite(value)) {
         return { action: "set-color-temp", command: { action: "set-color-temp", kelvin: value } };
     }
-    if (control === COLOR && typeof value === "string" && value in CARD_HUES) {
-        const hue = CARD_HUES[value]!;
+    if (control === COLOR && typeof value === "string" && Object.hasOwn(CARD_HUES, value)) {
+        const hue = CARD_HUES[value as CardColor];
         return { action: "set-color", command: { action: "set-color", hue, saturation: 100 } };
     }
     if (control === HUMIDITY && typeof value === "number" && Number.isFinite(value)) {

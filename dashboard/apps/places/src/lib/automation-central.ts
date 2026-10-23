@@ -18,6 +18,7 @@
 
 import { placesTFor } from "./i18n";
 import { prisma } from "@polaris/db";
+import type { ZodType, ZodTypeDef } from "zod";
 import { homeInstall } from "./access";
 import * as auto from "./automation-kinds";
 import * as nodes from "./automation-nodes";
@@ -26,9 +27,19 @@ import { host, type AppHostTypes } from "@polaris/app-host";
 import { automationEngine, mayOperate } from "./automation-runtime";
 import { MAX_DEPTH, RECHECK_MS, type AutomationRecord } from "./automation-engine";
 
-type ServerNode = Awaited<
+type AnyServerNode = Awaited<
     ReturnType<NonNullable<AppHostTypes["AppExtension"]["automationNodes"]>>
 >[number];
+type NodeRun = NonNullable<AnyServerNode["run"]>;
+/** The engine's node with its config typed, as the dashboard declares it. */
+type ServerNode<Config = unknown> = Omit<AnyServerNode, "config" | "run"> & {
+    readonly config: ZodType<Config, ZodTypeDef, unknown>;
+    readonly run?: (
+        config: Config,
+        context: Parameters<NodeRun>[1],
+        io: Parameters<NodeRun>[2]
+    ) => ReturnType<NodeRun>;
+};
 
 const { StepError, StepRefusal } = host.automations;
 const { deliverAutomationNotice } = host.automationsNotice;

@@ -61,15 +61,16 @@ export async function listAutomationsAction(scope?: unknown): Promise<{
     const { install } = await requireHome("home.read");
     const asked = listScope.safeParse(scope);
     if (!asked.success) return { error: (await placesT())("automations.errors.placeGone") };
+    const wanted = asked.data;
     const result = await guard(async () => {
         const { current, places: every } = await currentPlace(install.id);
         // An id from another install is not one of these, and lists nothing.
         const ids =
-            asked.data === "all"
+            wanted === "all"
                 ? every.map((place) => place.id)
-                : asked.data
-                  ? every.some((place) => place.id === asked.data.placeId)
-                      ? [asked.data.placeId]
+                : wanted
+                  ? every.some((place) => place.id === wanted.placeId)
+                      ? [wanted.placeId]
                       : []
                   : [current.id];
         const list = ids.length > 0 ? await automations.listAutomations(install.id, ids) : [];

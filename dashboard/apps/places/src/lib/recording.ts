@@ -448,7 +448,7 @@ export async function deleteInstallFootage(installedAppId: string): Promise<void
             });
             await remove(clips.map((clip) => clip.path));
             if (clips.length < FOOTAGE_PAGE) break;
-            after = clips[clips.length - 1].id;
+            after = clips[clips.length - 1]!.id;
         }
 
         after = undefined;
@@ -465,7 +465,7 @@ export async function deleteInstallFootage(installedAppId: string): Promise<void
             });
             await remove(events.flatMap((event) => (event.stillKey ? [event.stillKey] : [])));
             if (events.length < FOOTAGE_PAGE) break;
-            after = events[events.length - 1].id;
+            after = events[events.length - 1]!.id;
         }
     } finally {
         for (const driver of drivers.values())
