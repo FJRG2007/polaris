@@ -77,9 +77,8 @@ vi.mock("../../src/lib/notifications/outbound-hooks", () => ({
 }));
 vi.mock("../../src/lib/notifications/sms-service", () => ({ sendSms: async () => ({}) }));
 
-const { notify, QUIET_HOURS, QUIET_SEVERITY } = await import(
-    "../../src/lib/notifications/dispatch"
-);
+const { notify, QUIET_HOURS, QUIET_SEVERITY } =
+    await import("../../src/lib/notifications/dispatch");
 
 /** Let the fan-out the caller does not wait for finish. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
