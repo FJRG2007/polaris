@@ -333,29 +333,27 @@ describe("an acid rain's weather", () => {
 
     it("keeps every rule for every length", () => {
         const problems: string[] = [];
-        for (let minutes = 1; minutes <= 30; minutes += 1)
-            {
-                const total = minutes * 60_000;
-                const spells = acid.forecast(total, 3);
-                const fail = (what: string) => problems.push(`${minutes}: ${what}`);
-                if (spells[0]?.from !== 0) fail("does not start at Go");
-                if (spells.at(-1)?.to !== total || spells.at(-1)?.sky !== "downpour")
-                    fail("does not end in a downpour");
-                const downpour = spells.at(-1)!;
-                if (downpour.to - downpour.from > acid.DOWNPOUR_MS + 5_000)
-                    fail("downpour too long");
-                const collapsed = spells.flatMap((one) =>
-                    one.collapse === null ? [] : [one.collapse]
-                );
-                if (new Set(collapsed).size !== collapsed.length) fail("a hut falls twice");
-                if (collapsed.some((hut) => hut < 0 || hut >= 3)) fail("no such hut");
-                for (const one of spells) {
-                    if (one.sky !== "downpour" && one.to - one.from < 5_000) fail("a sliver");
-                    if (one.sky === "calm" && one.strikes.length > 0) fail("a stormy calm");
-                    if (one.strikes.some((when) => when < one.from || when >= one.to))
-                        fail("a strike outside its spell");
-                }
+        for (let minutes = 1; minutes <= 30; minutes += 1) {
+            const total = minutes * 60_000;
+            const spells = acid.forecast(total, 3);
+            const fail = (what: string) => problems.push(`${minutes}: ${what}`);
+            if (spells[0]?.from !== 0) fail("does not start at Go");
+            if (spells.at(-1)?.to !== total || spells.at(-1)?.sky !== "downpour")
+                fail("does not end in a downpour");
+            const downpour = spells.at(-1)!;
+            if (downpour.to - downpour.from > acid.DOWNPOUR_MS + 5_000) fail("downpour too long");
+            const collapsed = spells.flatMap((one) =>
+                one.collapse === null ? [] : [one.collapse]
+            );
+            if (new Set(collapsed).size !== collapsed.length) fail("a hut falls twice");
+            if (collapsed.some((hut) => hut < 0 || hut >= 3)) fail("no such hut");
+            for (const one of spells) {
+                if (one.sky !== "downpour" && one.to - one.from < 5_000) fail("a sliver");
+                if (one.sky === "calm" && one.strikes.length > 0) fail("a stormy calm");
+                if (one.strikes.some((when) => when < one.from || when >= one.to))
+                    fail("a strike outside its spell");
             }
+        }
         expect(problems.slice(0, 5)).toEqual([]);
     });
 
