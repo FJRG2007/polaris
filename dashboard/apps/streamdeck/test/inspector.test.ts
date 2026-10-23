@@ -14,7 +14,7 @@ const UI = join(__dirname, "..", "io.github.fjrg2007.polaris.sdPlugin", "ui");
 
 type Sent = { event: string; action?: string; context?: string; payload?: Record<string, unknown> };
 
-function openScreen(screen: "key" | "timer") {
+function openScreen(screen: "key" | "timer" | "folder") {
     const dom = new JSDOM(
         `<!doctype html><body data-screen="${screen}"><main id="root"></main></body>`,
         {
@@ -52,6 +52,13 @@ function openScreen(screen: "key" | "timer") {
 }
 
 describe("the settings screen", () => {
+    it("says what the folder key does, and asks nothing", () => {
+        const { dom } = openScreen("folder");
+        const root = dom.window.document.getElementById("root")!;
+        expect(root.textContent).toContain("this same key brings you back");
+        expect(root.querySelector("input, button")).toBeNull();
+    });
+
     it("signs Connect with its own id, not the action's", () => {
         const { dom, sent, action, listeners } = openScreen("key");
         // What the plugin answers the screen's hello with.

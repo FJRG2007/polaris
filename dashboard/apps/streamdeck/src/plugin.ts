@@ -8,7 +8,7 @@
 import { hub } from "./hub";
 import streamDeck from "@elgato/streamdeck";
 import { tellInspector } from "./inspector";
-import { PolarisDial, PolarisKey, TimerAction } from "./actions";
+import { FolderKey, PolarisDial, PolarisKey, TimerAction } from "./actions";
 import { CALL_UUID, PLACES_DIAL_UUID, PLACES_UUID, SOUND_UUID, surfaceOf } from "./surfaces";
 
 // Never "trace": the log would carry every message, the deck's key among them.
@@ -21,6 +21,7 @@ streamDeck.actions.registerAction(new PolarisKey(SOUND_UUID));
 streamDeck.actions.registerAction(new PolarisKey(PLACES_UUID));
 streamDeck.actions.registerAction(new PolarisDial(PLACES_DIAL_UUID));
 streamDeck.actions.registerAction(new TimerAction());
+streamDeck.actions.registerAction(new FolderKey());
 
 // Whatever changes - connected, offline, a code to show - the open settings
 // screen hears about it.

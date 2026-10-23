@@ -2,6 +2,10 @@
     "Name": "Polaris",
     "Description": "Teclas y diales para tu Polaris: envía un mensaje, cambia tu estado, silencia o cuelga tu llamada, pon un sonido, mira mensajes sin leer, alarmas y despliegues, y maneja los dispositivos de tus lugares.",
     "Category": "Polaris",
+    "io.github.fjrg2007.polaris.folder": {
+        "Name": "Carpeta",
+        "Tooltip": "Abre una página de teclas de Polaris hecha para tu deck; la misma tecla allí te devuelve."
+    },
     "io.github.fjrg2007.polaris.key": {
         "Name": "Acción",
         "Tooltip": "Ejecuta una acción de Polaris o muestra su estado en vivo."

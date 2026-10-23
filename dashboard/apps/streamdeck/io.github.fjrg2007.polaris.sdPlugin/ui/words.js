@@ -9,6 +9,8 @@
     const WORDS = {
         en: {
             connection: "Polaris",
+            folderHint:
+                "Opens a page of your Polaris keys laid out for this deck, where this same key brings you back. The first time, the Stream Deck app asks to add that page.",
             address: "Address",
             addressHint:
                 "The address you open Polaris at, for example https://polaris.example.com (https:// is optional).",
@@ -86,6 +88,8 @@
         },
         es: {
             connection: "Polaris",
+            folderHint:
+                "Abre una página con tus teclas de Polaris ordenadas para este deck, donde esta misma tecla te devuelve. La primera vez, la app de Stream Deck pide añadir esa página.",
             address: "Dirección",
             addressHint:
                 "La dirección en la que abres Polaris, por ejemplo https://polaris.example.com (https:// es opcional).",

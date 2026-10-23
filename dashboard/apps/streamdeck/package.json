@@ -5,7 +5,7 @@
     "type": "module",
     "description": "Polaris on a Stream Deck: keys and dials that run Polaris actions and show live Polaris state.",
     "scripts": {
-        "build": "rollup -c",
+        "build": "node scripts/profiles.mjs && rollup -c",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "validate": "streamdeck validate io.github.fjrg2007.polaris.sdPlugin --no-update-check",
