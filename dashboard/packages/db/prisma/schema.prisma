@@ -7072,6 +7072,11 @@ model OfficeLink {
     lastUsedAt   DateTime?
     /// Who it was made for, in the maker's own words. Shown only to them.
     note         String    @default("")
+    /// The address rules every public link carries (lib/link-guards).
+    /// JSON string arrays; empty means anyone.
+    allowedCidrs      String @default("[]")
+    allowedCountries  String @default("[]")
+    allowedContinents String @default("[]")
 
     /// Who made it. Not a relation: a link outlives the account that made it,
     /// and the document's owner is who answers for it either way.

@@ -15,6 +15,7 @@
 
 import * as core from "@polaris/core";
 import { cookies } from "next/headers";
+import { clientIp } from "@/lib/request-context";
 import { documentAccess } from "./documents";
 import { linkPassCookie, linkPassStanding } from "./links";
 
@@ -49,6 +50,6 @@ export async function officeReader(
     // promoted by editing the half in front of the dot - see `signLinkPass` - and
     // the link that issued it is asked whether it still stands, so revoking a
     // link ends the passes it handed out.
-    const role = await linkPassStanding(documentId, pass);
+    const role = await linkPassStanding(documentId, pass, await clientIp());
     return role ? { userId, role } : null;
 }

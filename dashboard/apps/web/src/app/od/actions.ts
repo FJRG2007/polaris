@@ -45,7 +45,7 @@ export async function unlockOfficeLinkAction(
     password: string
 ): Promise<{ error?: string }> {
     const t = await getTranslations("publicPages");
-    const visit = await links.resolveLink(token);
+    const visit = await links.resolveLink(token, await clientIp());
     if (!visit || visit.refusal) return { error: t("office.unavailable") };
 
     const parsed = core.officeLinkUnlockSchema.safeParse({ password });
@@ -86,7 +86,7 @@ export async function openOfficeLinkAction(
     token: string
 ): Promise<{ ok: true; role: core.OfficeRole } | { error: string }> {
     const t = await getTranslations("publicPages");
-    const visit = await links.resolveLink(token);
+    const visit = await links.resolveLink(token, await clientIp());
     if (!visit || visit.refusal) return { error: t("office.unavailable") };
 
     if (visit.needsPassword) {

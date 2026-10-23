@@ -38,8 +38,14 @@ export type OfficeLinkGate =
  * draw a password form would make a link worth three openings worth one.
  */
 export async function gateOfficeLink(token: string): Promise<OfficeLinkGate> {
-    const visit = await links.resolveLink(token);
+    const ip = await clientIp();
+    const visit = await links.resolveLink(token, ip);
     if (!visit) return { ok: false, status: 404, reason: "not_found" };
+    // An address or region the link does not take is the same card as one the
+    // fraud check flags: it cannot be opened from here.
+    if (visit.refusal === "ip_not_allowed" || visit.refusal === "country_not_allowed") {
+        return { ok: false, status: 403, reason: "ip_flagged" };
+    }
     // `unknown` is what the shared usability reader says when it cannot place a
     // reason. It means the same thing here as every other refusal does from
     // outside - the link does not work - and is folded in rather than leaking a
@@ -54,7 +60,7 @@ export async function gateOfficeLink(token: string): Promise<OfficeLinkGate> {
 
     // Fraud check. A no-op unless the integration is on, and it fails open: an
     // outage at somebody else's service must not close everybody's links.
-    if (!(await dymoIpAllowed(await clientIp())).allowed) {
+    if (!(await dymoIpAllowed(ip)).allowed) {
         return { ok: false, status: 403, reason: "ip_flagged" };
     }
 

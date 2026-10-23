@@ -161,6 +161,7 @@
         "checkedOn": "Comprobado el {date}"
     },
     "links": {
+        "openings": "Cuántas aperturas",
         "theLinkIsOnYour": "El enlace está en tu portapapeles.",
         "copyItFromTheBox": "Cópialo del cuadro de arriba.",
         "thatLinkCouldNotBe": "No se pudo crear el enlace.",

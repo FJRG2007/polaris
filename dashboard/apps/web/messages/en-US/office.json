@@ -161,6 +161,7 @@
         "checkedOn": "Checked {date}"
     },
     "links": {
+        "openings": "How many openings",
         "theLinkIsOnYour": "The link is on your clipboard.",
         "copyItFromTheBox": "Copy it from the box above.",
         "thatLinkCouldNotBe": "That link could not be made.",

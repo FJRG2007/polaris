@@ -104,7 +104,7 @@ describe("a pass against the link that issued it", () => {
             passwordHash: null
         });
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
         ).toBe("editor");
     });
 
@@ -116,7 +116,7 @@ describe("a pass against the link that issued it", () => {
             passwordHash: null
         });
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
         ).toBeNull();
     });
 
@@ -128,14 +128,14 @@ describe("a pass against the link that issued it", () => {
             passwordHash: null
         });
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
         ).toBeNull();
     });
 
     it("is worth nothing when the link is gone or names another role", async () => {
         findFirst.mockResolvedValueOnce(null);
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
         ).toBeNull();
         findFirst.mockResolvedValueOnce({
             role: "viewer",
@@ -144,7 +144,7 @@ describe("a pass against the link that issued it", () => {
             passwordHash: null
         });
         expect(
-            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null), undefined)
         ).toBeNull();
     });
 
@@ -156,14 +156,47 @@ describe("a pass against the link that issued it", () => {
             expiresAt: null,
             passwordHash: "scrypt$salt-one$hash-one"
         });
-        expect(await links.linkPassStanding(DOC, pass)).toBe("editor");
+        expect(await links.linkPassStanding(DOC, pass, undefined)).toBe("editor");
         findFirst.mockResolvedValueOnce({
             role: "editor",
             revokedAt: null,
             expiresAt: null,
             passwordHash: "scrypt$salt-two$hash-two"
         });
-        expect(await links.linkPassStanding(DOC, pass)).toBeNull();
+        expect(await links.linkPassStanding(DOC, pass, undefined)).toBeNull();
+    });
+});
+
+describe("a pass against the addresses its link takes", () => {
+    const row = (allowedCidrs: string) => ({
+        role: "editor",
+        revokedAt: null,
+        expiresAt: null,
+        passwordHash: null,
+        allowedCidrs,
+        allowedCountries: "[]",
+        allowedContinents: "[]"
+    });
+    const pass = () => links.signLinkPass(DOC, LINK, "editor", null);
+
+    it("is worth its role from an address inside the list", async () => {
+        findFirst.mockResolvedValueOnce(row('["10.0.0.0/8"]'));
+        expect(await links.linkPassStanding(DOC, pass(), "10.1.2.3")).toBe("editor");
+    });
+
+    it("is worth nothing carried to an address outside it", async () => {
+        findFirst.mockResolvedValueOnce(row('["10.0.0.0/8"]'));
+        expect(await links.linkPassStanding(DOC, pass(), "203.0.113.5")).toBeNull();
+    });
+
+    it("is worth nothing when the caller's address cannot be read and the link has rules", async () => {
+        findFirst.mockResolvedValueOnce(row('["10.0.0.0/8"]'));
+        expect(await links.linkPassStanding(DOC, pass(), undefined)).toBeNull();
+    });
+
+    it("needs no address when the link has no rules, as every existing link", async () => {
+        findFirst.mockResolvedValueOnce(row("[]"));
+        expect(await links.linkPassStanding(DOC, pass(), undefined)).toBe("editor");
     });
 });
 
