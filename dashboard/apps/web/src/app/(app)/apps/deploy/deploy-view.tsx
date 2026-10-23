@@ -97,6 +97,7 @@ import {
     TerminalSquare,
     Trash2
 } from "lucide-react";
+import * as polls from "./deploy-polls";
 
 // Grouped the way the picker reads: relational, key-value, documents, search,
 // analytics, object storage, messaging.
@@ -729,7 +730,7 @@ function DatabaseConnectionDialog({
         setError(null);
         setRevealed(false);
         let active = true;
-        void deployActions.databaseConnectionAction(database.id).then((result) => {
+        void polls.databaseConnection(database.id).then((result) => {
             if (!active) return;
             if (result.connection) setConnection(result.connection);
             else setError(result.error ?? t("view.connection.unreadable"));
@@ -1470,7 +1471,7 @@ function NewDatabaseFields({
             return;
         }
         let active = true;
-        void deployActions.listDatabaseInstancesAction(environmentId, engine).then((rows) => {
+        void polls.databaseInstances(environmentId, engine).then((rows) => {
             if (active) setInstances(rows);
         });
         return () => {

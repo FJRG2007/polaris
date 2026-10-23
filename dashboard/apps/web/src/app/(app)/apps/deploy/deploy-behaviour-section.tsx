@@ -22,6 +22,7 @@ import {
     setExternalNetworksAction,
     setOverlapVolumesAction
 } from "./deploy-behaviour-actions";
+import * as polls from "./deploy-polls";
 
 /** One row of the networks form, as typed: the aliases as one comma-separated line. */
 interface NetworkRow {
@@ -76,7 +77,7 @@ export function useDeployBehaviour(applicationId: string) {
 
     useEffect(() => {
         let active = true;
-        void deployBehaviourAction(applicationId).then((result) => {
+        void polls.deployBehaviour(applicationId).then((result) => {
             if (!active) return;
             if (result.view) {
                 setView(result.view);

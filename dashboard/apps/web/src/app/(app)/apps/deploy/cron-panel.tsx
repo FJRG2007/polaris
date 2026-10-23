@@ -22,11 +22,11 @@ import { CodeEditor } from "@/components/json-view";
 import { ChevronRight, Clock, Loader2, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import {
     deleteServiceCronAction,
-    listServiceCronRunsAction,
     listServiceCronsAction,
     runServiceCronAction,
     saveServiceCronAction
 } from "./cron-actions";
+import * as polls from "./deploy-polls";
 
 /** Schedules offered with one click, because most jobs are one of these. */
 const PRESETS = [
@@ -596,7 +596,7 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
     const [tick, setTick] = useState(0);
     useEffect(() => {
         let active = true;
-        void listServiceCronRunsAction(applicationId, cronId).then((result) => {
+        void polls.serviceCronRuns(applicationId, cronId).then((result) => {
             if (active) setRuns(result.runs ?? []);
         });
         return () => {

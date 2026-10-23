@@ -59,6 +59,166 @@ vi.mock("@/app/(app)/apps/deploy/deploy-polls", () => {
             () => import("@/app/(app)/apps/deploy/project-actions"),
             "listPromotionsAction",
             1
+        ),
+        buildMachine: forward(
+            () => import("@/app/(app)/apps/deploy/source-actions"),
+            "buildMachineAction",
+            1
+        ),
+        serviceCronRuns: forward(
+            () => import("@/app/(app)/apps/deploy/cron-actions"),
+            "listServiceCronRunsAction",
+            2
+        ),
+        deployBehaviour: forward(
+            () => import("@/app/(app)/apps/deploy/deploy-behaviour-actions"),
+            "deployBehaviourAction",
+            1
+        ),
+        databaseConnection: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "databaseConnectionAction",
+            1
+        ),
+        databaseInstances: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "listDatabaseInstancesAction",
+            2
+        ),
+        providerChoices: forward(
+            () => import("@/app/(app)/apps/deploy/external-actions"),
+            "listProviderChoicesAction",
+            1
+        ),
+        providerAccounts: forward(
+            () => import("@/app/(app)/apps/deploy/external-actions"),
+            "listProviderAccountsAction",
+            0
+        ),
+        moveOutPlan: forward(
+            () => import("@/app/(app)/apps/deploy/external-actions"),
+            "moveOutPlanAction",
+            2
+        ),
+        moveHomePlan: forward(
+            () => import("@/app/(app)/apps/deploy/external-actions"),
+            "moveHomePlanAction",
+            2
+        ),
+        serviceGpu: forward(
+            () => import("@/app/(app)/apps/deploy/gpu-actions"),
+            "serviceGpuAction",
+            1
+        ),
+        deploymentDiagnosis: forward(
+            () => import("@/app/(app)/apps/deploy/fix-actions"),
+            "deploymentDiagnosisAction",
+            1
+        ),
+        servicePorts: forward(
+            () => import("@/app/(app)/apps/deploy/public-networking-actions"),
+            "servicePortsAction",
+            1
+        ),
+        domainReadings: forward(
+            () => import("@/app/(app)/apps/deploy/public-networking-actions"),
+            "domainReadingsAction",
+            1
+        ),
+        tcpProxies: forward(
+            () => import("@/app/(app)/apps/deploy/public-networking-actions"),
+            "tcpProxiesAction",
+            1
+        ),
+        serviceScaling: forward(
+            () => import("@/app/(app)/apps/deploy/scaling-actions"),
+            "serviceScalingAction",
+            1
+        ),
+        serviceFollowState: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "serviceFollowStateAction",
+            1
+        ),
+        serviceHistory: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "serviceHistoryAction",
+            1
+        ),
+        deployServers: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "listDeployServersAction",
+            1
+        ),
+        quickTunnelStatus: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "quickTunnelStatusAction",
+            1
+        ),
+        ngrokTunnelStatus: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "ngrokTunnelStatusAction",
+            1
+        ),
+        namedTunnelStatus: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "namedTunnelStatusAction",
+            1
+        ),
+        domainHealth: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "domainHealthAction",
+            1
+        ),
+        cloudflareAccountStatus: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "cloudflareAccountStatusAction",
+            0
+        ),
+        serviceSource: forward(
+            () => import("@/app/(app)/apps/deploy/source-actions"),
+            "serviceSourceAction",
+            1
+        ),
+        uploadedSource: forward(
+            () => import("@/app/(app)/apps/deploy/source-actions"),
+            "uploadedSourceAction",
+            1
+        ),
+        automationRuns: forward(
+            () => import("@/app/(app)/apps/deploy/automation-actions"),
+            "listAutomationRunsAction",
+            1
+        ),
+        promotionPreview: forward(
+            () => import("@/app/(app)/apps/deploy/project-actions"),
+            "previewPromotionAction",
+            1
+        ),
+        volumeDetail: forward(
+            () => import("@/app/(app)/apps/deploy/project-actions"),
+            "volumeDetailAction",
+            1
+        ),
+        variableGroupReach: forward(
+            () => import("@/app/(app)/apps/deploy/variable-group-actions"),
+            "variableGroupReachAction",
+            1
+        ),
+        serviceTags: forward(
+            () => import("@/app/(app)/apps/deploy/variable-group-actions"),
+            "serviceTagsAction",
+            1
+        ),
+        envScopeValues: forward(
+            () => import("@/app/(app)/apps/deploy/variable-actions"),
+            "revealEnvScopeAction",
+            1
+        ),
+        nasConnections: forward(
+            () => import("@/app/(app)/apps/deploy/actions"),
+            "listNasConnectionsAction",
+            0
         )
     };
 });

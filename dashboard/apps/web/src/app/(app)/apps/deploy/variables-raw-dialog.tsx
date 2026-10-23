@@ -22,7 +22,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CodeSurface } from "@/components/code-surface";
 import { FindBar } from "@/app/(app)/drive/viewer/find-bar";
 import { findMatches, stepMatch } from "@/app/(app)/drive/viewer/find-in-file";
-import { revealEnvScopeAction } from "./variable-actions";
 import type { VariableDraft, VariableRow } from "@/lib/deploy/variable-changes";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -47,6 +46,7 @@ import {
     shortcutPressed
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import * as polls from "./deploy-polls";
 
 /** The highlight.js grammar each format is painted with: a `.env` reads as
  *  INI's key = value lines, comments included. */
@@ -109,7 +109,8 @@ export function VariablesRawDialog({
 
     useEffect(() => {
         let live = true;
-        void revealEnvScopeAction({ scope, scopeId })
+        void polls
+            .envScopeValues({ scope, scopeId })
             .then((result) => {
                 if (!live) return;
                 if (result.values) {

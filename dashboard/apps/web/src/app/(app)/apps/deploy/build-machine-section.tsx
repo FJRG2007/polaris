@@ -9,8 +9,9 @@ import { Badge, Select } from "@polaris/ui";
 import { SettingsCard, useSavedFlash } from "./settings-kit";
 import { useEffect, useState } from "react";
 import type { BuildMachineView } from "@/lib/deploy/build-machine";
-import { buildMachineAction, setBuildMachineAction } from "./source-actions";
+import { setBuildMachineAction } from "./source-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./deploy-polls";
 
 export function BuildMachineSection({ applicationId }: { applicationId: string }) {
     const t = useTranslations("deployService");
@@ -20,7 +21,7 @@ export function BuildMachineSection({ applicationId }: { applicationId: string }
 
     useEffect(() => {
         let active = true;
-        void buildMachineAction(applicationId).then((result) => {
+        void polls.buildMachine(applicationId).then((result) => {
             if (active && result.view) setView(result.view);
         });
         return () => {

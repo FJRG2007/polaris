@@ -15,9 +15,10 @@ import { Button, Input } from "@polaris/ui";
 import { Lightbulb, Loader2 } from "lucide-react";
 import type { DeployFix, Diagnosis } from "@polaris/deploy";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { applyDeployFixAction, deploymentDiagnosisAction } from "./fix-actions";
+import { applyDeployFixAction } from "./fix-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
+import * as polls from "./deploy-polls";
 
 type ServiceT = NamespaceTranslator<"deployService">;
 
@@ -97,7 +98,7 @@ export function LikelyCause({
             return;
         }
         let active = true;
-        void deploymentDiagnosisAction(deploymentId)
+        void polls.deploymentDiagnosis(deploymentId)
             .catch(() => ({ diagnosis: null }))
             .then((result) => {
                 answers.set(deploymentId, result.diagnosis);

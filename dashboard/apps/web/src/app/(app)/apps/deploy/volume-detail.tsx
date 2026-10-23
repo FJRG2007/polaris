@@ -56,6 +56,7 @@ import {
     Trash2,
     TriangleAlert
 } from "lucide-react";
+import * as polls from "./deploy-polls";
 
 const TABS = ["Metrics", "Files", "Settings"] as const;
 export type VolumeTab = (typeof TABS)[number];
@@ -149,7 +150,7 @@ export function VolumeDetailDialog({
         setTab(openOn);
         let active = true;
 
-        void volumeDetailAction(volumeId).then((result) => {
+        void polls.volumeDetail(volumeId).then((result) => {
             if (!active) return;
             if (result.error || !result.volume) {
                 setError(result.error ?? t("volume.loadFailed"));

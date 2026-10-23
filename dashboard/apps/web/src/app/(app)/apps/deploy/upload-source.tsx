@@ -18,7 +18,7 @@ import * as deployActions from "./actions";
 import { formatBytes } from "@polaris/core";
 import { Button, Input, cn } from "@polaris/ui";
 import { FolderUp, Loader2 } from "lucide-react";
-import { uploadedSourceAction } from "./source-actions";
+
 import { SettingsCard } from "./settings-kit";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDesktopBridge } from "@/components/desktop-app";
@@ -26,6 +26,7 @@ import type { UploadedSource } from "@/lib/deploy/source-upload";
 import { useEffect, useRef, useState, useTransition, type DragEvent, type ReactNode } from "react";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import * as polls from "./deploy-polls";
 
 /** The largest zip the server takes, and the most a folder may hold before it. */
 const MAX_ZIP = 200 * 1024 ** 2;
@@ -410,7 +411,7 @@ export function UploadedSourceSection({
 
     useEffect(() => {
         let active = true;
-        void uploadedSourceAction(applicationId).then((result) => {
+        void polls.uploadedSource(applicationId).then((result) => {
             if (active && !result.error)
                 setState({ upload: result.upload ?? null, uploadable: Boolean(result.uploadable) });
         });

@@ -14,6 +14,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
 import { createVolumeAction, updateVolumeAction, listNasConnectionsAction } from "./actions";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, SegmentedControl, Select } from "@polaris/ui";
+import * as polls from "./deploy-polls";
 
 type Kind = "volume" | "bind" | "nas";
 type NasConnection = Awaited<ReturnType<typeof listNasConnectionsAction>>[number];
@@ -77,7 +78,7 @@ export function VolumeForm({
     // inline form is handed a fresh object on every render of its panel, and
     // depending on that identity would re-fetch the connections forever.
     useEffect(() => {
-        void listNasConnectionsAction().then((rows) => {
+        void polls.nasConnections().then((rows) => {
             setConnections(rows);
             // Pre-select when there's a single usable connection (create only - edit
             // keeps the volume's own connection).

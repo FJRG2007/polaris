@@ -538,7 +538,7 @@ function AddDialog({
         setChosen("");
         setChild("");
         void (async () => {
-            const result = await actions.listProviderChoicesAction(account);
+            const result = await polls.providerChoices(account);
             if (cancelled) return;
             if (result.error) setError(result.error);
             setChoices(result.choices ?? []);

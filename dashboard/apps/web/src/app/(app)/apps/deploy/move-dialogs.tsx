@@ -47,6 +47,7 @@ import {
     Select,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./deploy-polls";
 
 interface ProviderAccount {
     id: string;
@@ -183,8 +184,8 @@ export function MoveOutDialog({
         let cancelled = false;
         void (async () => {
             const [planned, linked] = await Promise.all([
-                actions.moveOutPlanAction(projectId, application.id),
-                actions.listProviderAccountsAction()
+                polls.moveOutPlan(projectId, application.id),
+                polls.providerAccounts()
             ]);
             if (cancelled) return;
             if (planned.error) setError(planned.error);
@@ -209,7 +210,7 @@ export function MoveOutDialog({
         setChosen("");
         setChild("");
         void (async () => {
-            const result = await actions.listProviderChoicesAction(account);
+            const result = await polls.providerChoices(account);
             if (cancelled) return;
             if (result.error) setError(result.error);
             setChoices(result.choices ?? []);
@@ -484,7 +485,7 @@ export function MoveHomeDialog({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const result = await actions.moveHomePlanAction(projectId, service.id);
+            const result = await polls.moveHomePlan(projectId, service.id);
             if (cancelled) return;
             if (result.error) setError(result.error);
             if (result.canCopyVariables === false) {

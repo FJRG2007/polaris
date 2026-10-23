@@ -26,7 +26,7 @@ import {
     Input,
     Select
 } from "@polaris/ui";
-import { previewPromotionAction, promoteEnvironmentAction } from "../project-actions";
+import { promoteEnvironmentAction } from "../project-actions";
 
 export function PromoteDialog({
     environments,
@@ -80,22 +80,24 @@ export function PromoteDialog({
         if (!source || !targetId) return;
         let current = true;
         setPreview(null);
-        void previewPromotionAction({
-            sourceEnvironmentId: source.id,
-            targetEnvironmentId: targetId
-        }).then((result) => {
-            if (!current) return;
-            if (result.error || !result.preview)
-                setError(result.error ?? t("promotion.loadFailed"));
-            else {
-                setError(null);
-                setPreview({
-                    preview: result.preview,
-                    canDeploy: result.canDeploy ?? false,
-                    canCopyData: result.canCopyData ?? false
-                });
-            }
-        });
+        void polls
+            .promotionPreview({
+                sourceEnvironmentId: source.id,
+                targetEnvironmentId: targetId
+            })
+            .then((result) => {
+                if (!current) return;
+                if (result.error || !result.preview)
+                    setError(result.error ?? t("promotion.loadFailed"));
+                else {
+                    setError(null);
+                    setPreview({
+                        preview: result.preview,
+                        canDeploy: result.canDeploy ?? false,
+                        canCopyData: result.canCopyData ?? false
+                    });
+                }
+            });
         return () => {
             current = false;
         };

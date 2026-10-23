@@ -20,6 +20,7 @@ import {
     type ServiceTemplate
 } from "@polaris/core";
 import { Field } from "./form-field";
+import * as polls from "./deploy-polls";
 
 export interface ServerOption {
     id: string;
@@ -42,8 +43,8 @@ export function useDeployServers(environmentId: string): {
         // Scoped to the environment being deployed into, so the list is the
         // project owner's machines rather than the machines of whoever happens to
         // be filling the form in.
-        void deployActions
-            .listDeployServersAction(environmentId)
+        void polls
+            .deployServers(environmentId)
             .then((list) => {
                 setServers(list);
                 if (list[0]) setServerId(list[0].id);

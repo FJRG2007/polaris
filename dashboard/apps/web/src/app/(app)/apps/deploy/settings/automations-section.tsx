@@ -65,7 +65,6 @@ import {
 } from "lucide-react";
 import {
     deleteAutomationAction,
-    listAutomationRunsAction,
     listAutomationsAction,
     rotateAutomationWebhookAction,
     runAutomationAction,
@@ -73,6 +72,7 @@ import {
     setAutomationEnabledAction,
     type AutomationsLoad
 } from "../automation-actions";
+import * as polls from "../deploy-polls";
 
 type T = ReturnType<typeof useTranslations<"deploySettings">>;
 type Key = NamespaceKey<"deploySettings">;
@@ -615,7 +615,7 @@ function RunHistory({
     useEffect(() => {
         let alive = true;
         function fetchRuns() {
-            void listAutomationRunsAction({ projectId, automationId }).then((result) => {
+            void polls.automationRuns({ projectId, automationId }).then((result) => {
                 if (!alive) return;
                 if (result.error) {
                     setError(result.error);

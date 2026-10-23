@@ -1,0 +1,15 @@
+// an environment's database instances. A route, not an action: see lib/poll-route.
+import { z } from "zod";
+import { pollRoute } from "@/lib/poll-route";
+import { listDatabaseInstancesAction } from "@/app/(app)/apps/deploy/actions";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export const GET = pollRoute(
+    z.object({
+        environmentId: z.string().trim().min(1).max(200),
+        engine: z.string().trim().min(1).max(200)
+    }),
+    ({ environmentId, engine }) => listDatabaseInstancesAction(environmentId, engine)
+);
