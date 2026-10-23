@@ -5798,7 +5798,7 @@ describe("a meteor shower", () => {
         expect(world.sent).toContain("execute in minecraft:overworld run forceload remove 288 0");
     });
 
-    it("lands a heart and a scorched rim on solid ground, guides the way, and takes back only its rim", async () => {
+    it("lands a scorched rim on solid ground, guides the way, and takes back only its rim", async () => {
         world.ground = 70;
         setUp([shower()]);
         await start();
@@ -5806,7 +5806,13 @@ describe("a meteor shower", () => {
         await play(8_100);
         const first = state().run!.meteors[0]!;
         const key = (cell: { x: number; y: number; z: number }) => `${cell.x} ${cell.y} ${cell.z}`;
-        expect(first.blocks.map((block) => block.block)).toContain("minecraft:ancient_debris");
+        // The first of four down: no heart, and none announced (`heartAt`).
+        expect(first.blocks.map((block) => block.block)).not.toContain("minecraft:ancient_debris");
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("tellraw @a") && visible(line).includes("Its heart is")
+            )
+        ).toBe(false);
         expect(first.crust.length).toBeGreaterThan(0);
         for (const cell of first.crust) {
             expect(world.blocks.get(key(cell))).toBe(cell.block);
@@ -5816,11 +5822,6 @@ describe("a meteor shower", () => {
                     first.crust.some((under) => key(under) === key({ ...cell, y: cell.y - 1 }))
                 ).toBe(true);
         }
-        expect(
-            world.sent.some(
-                (line) => line.startsWith("tellraw @a") && visible(line).includes("Its heart is")
-            )
-        ).toBe(true);
         // Far from it: a line of light only Ana sees, an arrow, and the bar's count.
         expect(
             world.sent.some(
@@ -5855,6 +5856,35 @@ describe("a meteor shower", () => {
         expect(world.blocks.get(key(broken))).toBe(broken.block);
         for (const cell of first.crust.slice(1)) expect(world.blocks.has(key(cell))).toBe(false);
         expect(world.sent).toContain("scoreboard objectives remove pe_mh");
+    });
+
+    it("gives the shower its one heart in a meteor still standing when the last one lands on nothing open", async () => {
+        world.ground = 70;
+        setUp([shower()]);
+        await start();
+        // Every meteor after the first comes down on the first's heap: none takes.
+        await play(4 * 60_000);
+        const run = state().run!;
+        expect(run.landings).toBe(4);
+        expect(run.meteors).toHaveLength(1);
+        const hearts = run.meteors[0]!.blocks.filter(
+            (block) => block.block === "minecraft:ancient_debris"
+        );
+        expect(hearts).toHaveLength(1);
+        expect(world.blocks.get(`${hearts[0]!.x} ${hearts[0]!.y} ${hearts[0]!.z}`)).toBe(
+            "minecraft:ancient_debris"
+        );
+        expect(
+            world.sent.filter(
+                (line) =>
+                    line.includes("setblock") && line.endsWith("minecraft:ancient_debris keep")
+            )
+        ).toHaveLength(1);
+        expect(
+            world.sent.filter(
+                (line) => line.startsWith("tellraw @a") && visible(line).includes("Its heart is")
+            )
+        ).toHaveLength(1);
     });
 
     it("guides by heading alone when it cannot tell which way a player looks", async () => {

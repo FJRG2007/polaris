@@ -224,13 +224,17 @@ left out.
   so it is used again and taken back. Silk touch is spelled with `levels` up
   to 1.21.4 and as a plain map from 1.21.5: the brush is given in the first
   spelling, then in the second and plain only to whoever still has none.
-- **Meteor shower** meteors are worth finding. From 1.16 each one has a heart
-  in the middle of its heap (`meteor-shower.HEART`: ancient debris, or diamond
-  ore where the mix has no diamond) that counts `HEART_POINTS` (5) blocks, and
-  a scorched rim of blackstone, basalt and some gilded blackstone round the
-  heap's foot (`crustCells`): only on the ground beside the heap, never on an
-  ore, a second layer only on rim, each block put into air over something
-  solid and taken back at the end only while it is still exactly that block.
+- **Meteor shower** meteors are worth finding. From 1.16 a shower has one
+  heart (`meteor-shower.HEART`: ancient debris, or diamond ore where the mix
+  has no diamond), in the middle of the last meteor's heap (`heartAt`) - or,
+  when that one is let go or its middle is not open, swapped for an ore of the
+  newest meteor still standing (`heartIntoStanding`) - that counts
+  `HEART_POINTS` (5) blocks. One a meteor made every shower a netherite farm.
+  Each meteor has a scorched rim of blackstone, basalt and some gilded
+  blackstone round the heap's foot (`crustCells`): only on the ground beside
+  the heap, never on an ore, a second layer only on rim, each block put into
+  air over something solid and taken back at the end only while it is still
+  exactly that block.
   A rim block a player breaks is forgotten like an ore. Older servers keep the
   plain heap, with a diamond-ore heart where the mix allows. Finding one: every
   look, the beam, smoke and embers over each meteor still to mine; for each

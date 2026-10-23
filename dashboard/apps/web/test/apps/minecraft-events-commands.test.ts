@@ -1831,6 +1831,16 @@ describe("a meteor shower", () => {
         expect(meteors.heartOf("common", false)).toBe("diamond_ore");
     });
 
+    it("gives only the last meteor of a shower a heart", () => {
+        const hearts = Array.from({ length: 10 }, (_, landing) =>
+            meteors.heartAt("precious", true, landing, 10)
+        );
+        expect(hearts.filter(Boolean)).toEqual(["ancient_debris"]);
+        expect(hearts[9]).toBe("ancient_debris");
+        expect(meteors.heartAt("precious", false, 9, 10)).toBeNull();
+        expect(meteors.heartAt("common", false, 0, 1)).toBe("diamond_ore");
+    });
+
     it("rims the heap on the ground beside it, never on it, and stacks rim only on rim", () => {
         const heap = meteors.meteorCells(point, 12, "common", Math.random);
         for (let run = 0; run < 200; run += 1) {
