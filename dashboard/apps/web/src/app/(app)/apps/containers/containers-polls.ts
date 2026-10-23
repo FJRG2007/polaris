@@ -5,7 +5,7 @@
  * Each answers exactly what the action it replaces answers.
  */
 
-import { readPoll } from "@/lib/poll-fetch";
+import { sendAction } from "@/lib/poll-fetch";
 import type * as driveLinkActionsModule from "@/app/(app)/apps/containers/[containerId]/drive-link-actions";
 
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
@@ -14,8 +14,8 @@ export const containerDriveLink = (
     input: Parameters<typeof driveLinkActionsModule.containerDriveLinkAction>[0],
     signal?: AbortSignal
 ) =>
-    readPoll<Answer<typeof driveLinkActionsModule.containerDriveLinkAction>>(
+    sendAction<Answer<typeof driveLinkActionsModule.containerDriveLinkAction>>(
         "/api/containers/drive-link",
-        { input: JSON.stringify(input) },
+        { input },
         signal
     );

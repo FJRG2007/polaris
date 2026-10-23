@@ -490,7 +490,7 @@ vi.mock("@/app/(app)/office/link-actions", () => ({
 
 type Handler = (request: Request) => Promise<Response>;
 
-const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
+const ROUTES: Record<string, () => Promise<{ GET?: Handler; POST?: Handler }>> = {
     "/api/deploy/databases/overview": () => import("@/app/api/deploy/databases/overview/route"),
     "/api/deploy/databases/processes": () => import("@/app/api/deploy/databases/processes/route"),
     "/api/deploy/cutover": () => import("@/app/api/deploy/cutover/route"),
@@ -2637,13 +2637,22 @@ beforeEach(() => {
     for (const spy of Object.values(actions)) spy.mockReset();
     vi.stubGlobal(
         "fetch",
-        vi.fn(async (url: string) => {
+        vi.fn(async (url: string, init?: RequestInit) => {
             const request = new Request(`http://polaris.test${url}`, {
-                headers: { "sec-fetch-site": "same-origin" }
+                method: init?.method,
+                body: init?.body,
+                headers: {
+                    ...(init?.headers as Record<string, string> | undefined),
+                    "sec-fetch-site": "same-origin",
+                    origin: "http://polaris.test",
+                    host: "polaris.test"
+                }
             });
-            const load = ROUTES[new URL(request.url).pathname];
-            if (!load) return new Response("{}", { status: 404 });
-            return (await load()).GET(request);
+            const handler = (await ROUTES[new URL(request.url).pathname]?.())?.[
+                request.method === "POST" ? "POST" : "GET"
+            ];
+            if (!handler) return new Response("{}", { status: 404 });
+            return handler(request);
         })
     );
 });
@@ -2659,5 +2668,36 @@ describe("each screen poll through its route", () => {
         await expect(entry.ask()).resolves.toEqual(answer);
         expect(actions[entry.action]).toHaveBeenCalledTimes(1);
         expect(actions[entry.action]).toHaveBeenCalledWith(...entry.args);
+    });
+});
+
+describe("a read that reveals a secret or reaches a machine", () => {
+    it.each(["/api/automations/hook-address", "/api/runners/probe"])(
+        "%s refuses another site",
+        async (path) => {
+            const { GET } = (await ROUTES[path]!()) as { GET: Handler };
+            const response = await GET(
+                new Request(`http://polaris.test${path}`, {
+                    headers: { "sec-fetch-site": "cross-site" }
+                })
+            );
+            expect(response.status).toBe(403);
+        }
+    );
+});
+
+describe("where a container's folder opens in Drive", () => {
+    it("carries mounts longer than any query could", async () => {
+        actions.containerDriveLinkAction.mockResolvedValue("/drive?c=host");
+        const mounts = Array.from({ length: 200 }, (_, index) => ({
+            source: `/srv/${"a".repeat(100)}/${index}`,
+            destination: `/data/${"b".repeat(100)}/${index}`
+        }));
+        const input = { connectionId: "c", containerName: "n", path: "/", mounts };
+        const { containerDriveLink } = await actual<
+            typeof import("@/app/(app)/apps/containers/containers-polls")
+        >("@/app/(app)/apps/containers/containers-polls");
+        await expect(containerDriveLink(input)).resolves.toBe("/drive?c=host");
+        expect(actions.containerDriveLinkAction).toHaveBeenCalledWith(input);
     });
 });

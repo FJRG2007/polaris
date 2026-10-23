@@ -8,5 +8,6 @@ export const dynamic = "force-dynamic";
 
 export const GET = pollRoute(
     z.object({ serverId: z.string().trim().min(1).max(200) }),
-    ({ serverId }) => probeRunnerHostAction(serverId)
+    ({ serverId }) => probeRunnerHostAction(serverId),
+    { sameOrigin: true }
 );

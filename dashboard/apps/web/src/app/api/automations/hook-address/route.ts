@@ -12,5 +12,6 @@ export const GET = pollRoute(
         nodeId: z.string().trim().min(1).max(200),
         rotation: jsonParam
     }),
-    ({ automationId, nodeId, rotation }) => hookAddressAction(automationId, nodeId, rotation)
+    ({ automationId, nodeId, rotation }) => hookAddressAction(automationId, nodeId, rotation),
+    { sameOrigin: true }
 );
