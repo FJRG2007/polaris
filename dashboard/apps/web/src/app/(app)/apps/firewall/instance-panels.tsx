@@ -16,7 +16,7 @@
  */
 
 import Link from "next/link";
-import { grouped } from "./page-parts";
+import { grouped } from "./grouped";
 import { ChipList, validAddress } from "./chip-list";
 import { AddressAccounts } from "./address-accounts";
 import { localizeJail } from "./waf-words";

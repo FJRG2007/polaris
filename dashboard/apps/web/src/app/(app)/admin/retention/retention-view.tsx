@@ -17,7 +17,7 @@
 
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { grouped } from "@/app/(app)/apps/firewall/page-parts";
+import { grouped } from "@/app/(app)/apps/firewall/grouped";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button, Card, CardBody, Select, Skeleton } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";

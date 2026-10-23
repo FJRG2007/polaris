@@ -342,3 +342,74 @@ export function scanFolder(root: string, index: TagIndex, base: string): TaggedC
         )
     );
 }
+
+/**
+ * The literal keys in one file that no catalog of their translator holds. A
+ * missing key draws as the key itself (`tasks.trackers.connect` on the
+ * connections hub), and nothing at build time says so. Only calls whose
+ * translator is bound to a namespace in the file are judged, and a translator
+ * bound to several (two components in one file) is blamed only when none of
+ * them holds the key.
+ */
+export function missingKeys(
+    path: string,
+    source: string,
+    index: TagIndex,
+    label = path
+): TaggedCallFinding[] {
+    const file = ts.createSourceFile(
+        path,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+    );
+    const bound = bindings(file, index);
+    const findings: TaggedCallFinding[] = [];
+    const visit = (node: ts.Node) => {
+        if (ts.isCallExpression(node) && node.arguments.length > 0) {
+            let callee = unwrap(node.expression);
+            if (ts.isPropertyAccessExpression(callee) && callee.name.text === "rich")
+                callee = unwrap(callee.expression);
+            const namespaces = ts.isIdentifier(callee)
+                ? [...(bound.get(callee.text) ?? [])]
+                : ts.isCallExpression(callee)
+                  ? [namespaceArgument(callee, index)].filter((name) => name !== undefined)
+                  : [];
+            const key = unwrap(node.arguments[0]!);
+            if (
+                namespaces.length > 0 &&
+                ts.isStringLiteralLike(key) &&
+                !namespaces.some((namespace) => index.get(namespace)?.has(key.text))
+            ) {
+                const { line } = file.getLineAndCharacterOfPosition(node.getStart());
+                findings.push({
+                    file: label,
+                    line: line + 1,
+                    key: key.text,
+                    namespace: namespaces.join("|"),
+                    problem: "is in no catalog"
+                });
+            }
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(file);
+    return findings;
+}
+
+/** Every missing key under a source folder, with paths relative to `base`. */
+export function missingKeysInFolder(
+    root: string,
+    index: TagIndex,
+    base: string
+): TaggedCallFinding[] {
+    return sourceFiles(root).flatMap((path) =>
+        missingKeys(
+            path,
+            readFileSync(path, "utf8"),
+            index,
+            relative(base, path).replace(/\\/g, "/")
+        )
+    );
+}

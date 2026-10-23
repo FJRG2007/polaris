@@ -41,13 +41,21 @@ import { PanelRightOpen, ShieldOff, ShieldQuestion, Smartphone } from "lucide-re
 
 /** Where a pass was granted, as one line, for the layouts too narrow to hold the
  *  columns. */
-function origin(device: TrustedDeviceRow, t: NamespaceTranslator<"accountSecurity">): string {
-    return [addressLine(device), device.host].filter(Boolean).join(" - ") || t("passkeys.notRecorded");
+function origin(
+    device: TrustedDeviceRow,
+    t: NamespaceTranslator<"accountSecurity">,
+    via: string
+): string {
+    return (
+        [addressLine(device, via), device.host].filter(Boolean).join(" - ") ||
+        t("passkeys.notRecorded")
+    );
 }
 
 export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] }) {
     const router = useRouter();
     const t = useTranslations("accountSecurity");
+    const tc = useTranslations("components");
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -90,7 +98,9 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("sessions.trusted.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("sessions.trusted.description")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("sessions.trusted.description")}
+                        </p>
                     </div>
                     {devices.length > 1 ? (
                         <Button
@@ -118,18 +128,31 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                 {/* w-full max-w-0: the folded origin line under the name is
                                     nowrap, and without the cap it sets a floor under this
                                     column that spills the table sideways. */}
-                                <th className="w-full max-w-0 px-3 py-2 font-medium">{t("sessions.trusted.columns.device")}</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("sessions.trusted.columns.address")}</th>
-                                <th className="hidden px-3 py-2 font-medium xl:table-cell">{t("sessions.trusted.columns.domain")}</th>
-                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">{t("sessions.trusted.columns.remembered")}</th>
-                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">{t("sessions.trusted.columns.until")}</th>
+                                <th className="w-full max-w-0 px-3 py-2 font-medium">
+                                    {t("sessions.trusted.columns.device")}
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                    {t("sessions.trusted.columns.address")}
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium xl:table-cell">
+                                    {t("sessions.trusted.columns.domain")}
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">
+                                    {t("sessions.trusted.columns.remembered")}
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">
+                                    {t("sessions.trusted.columns.until")}
+                                </th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
                         <tbody>
                             {devices.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
+                                    <td
+                                        colSpan={6}
+                                        className="px-3 py-8 text-center text-muted-foreground"
+                                    >
                                         {t("sessions.trusted.empty")}
                                     </td>
                                 </tr>
@@ -158,14 +181,26 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                                 className="min-w-0 truncate text-left hover:underline"
                                                                 onClick={() => setOpened(device)}
                                                             >
-                                                                {named ? device.device : t("sessions.trusted.rememberedEarlier")}
+                                                                {named
+                                                                    ? device.device
+                                                                    : t(
+                                                                          "sessions.trusted.rememberedEarlier"
+                                                                      )}
                                                             </button>
                                                             {device.current ? (
-                                                                <Badge variant="primary">{t("sessions.trusted.thisDevice")}</Badge>
+                                                                <Badge variant="primary">
+                                                                    {t(
+                                                                        "sessions.trusted.thisDevice"
+                                                                    )}
+                                                                </Badge>
                                                             ) : null}
                                                         </p>
                                                         <p className="truncate text-xs text-muted-foreground lg:hidden">
-                                                            {origin(device, t)}
+                                                            {origin(
+                                                                device,
+                                                                t,
+                                                                tc("deviceAddress.via")
+                                                            )}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -174,7 +209,9 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                 <DeviceAddress address={device} />
                                             </td>
                                             <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
-                                                <span className="block truncate">{device.host ?? t("passkeys.notRecorded")}</span>
+                                                <span className="block truncate">
+                                                    {device.host ?? t("passkeys.notRecorded")}
+                                                </span>
                                             </td>
                                             <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
                                                 {device.rememberedAt ? (
@@ -184,7 +221,10 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                 )}
                                             </td>
                                             <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
-                                                <RelativeTime iso={device.expiresAt} tense="future" />
+                                                <RelativeTime
+                                                    iso={device.expiresAt}
+                                                    tense="future"
+                                                />
                                             </td>
                                             <td className="px-3 py-2">
                                                 <div className="flex justify-end gap-1">
@@ -194,7 +234,9 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                         title={t("sessions.trusted.openTitle")}
                                                         aria-label={
                                                             named
-                                                                ? t("sessions.trusted.openNamed", { device: device.device })
+                                                                ? t("sessions.trusted.openNamed", {
+                                                                      device: device.device
+                                                                  })
                                                                 : t("sessions.trusted.openThis")
                                                         }
                                                         onClick={() => setOpened(device)}
@@ -207,7 +249,9 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                         title={t("sessions.trusted.forgetButton")}
                                                         aria-label={
                                                             named
-                                                                ? t("sessions.trusted.stopNamed", { device: device.device })
+                                                                ? t("sessions.trusted.stopNamed", {
+                                                                      device: device.device
+                                                                  })
                                                                 : t("sessions.trusted.stopThis")
                                                         }
                                                         disabled={busyId !== null}

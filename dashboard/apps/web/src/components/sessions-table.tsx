@@ -91,15 +91,21 @@ function ActiveNowBadge() {
     );
 }
 
+/** The name a session arrived on, or that none was recorded - muted, as every
+ *  placeholder in the table is, while a recorded one reads like the other columns. */
+export function HostName({ host }: { host: string | null }) {
+    const t = useTranslations("components");
+    return (
+        <span className={cn("block truncate", !host && "text-muted-foreground")}>
+            {host ?? t("sessionsTable.notRecorded")}
+        </span>
+    );
+}
+
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
-export function sessionOrigin(
-    session: SessionView,
-    // The reader's words for it where there is a reader; the English default
-    // keeps callers that have none, and the tests, as they were.
-    unknown = "Unknown location" // i18n-ignore
-): string {
-    return [addressLine(session), session.host].filter(Boolean).join(" - ") || unknown;
+export function sessionOrigin(session: SessionView, unknown: string, via: string): string {
+    return [addressLine(session, via), session.host].filter(Boolean).join(" - ") || unknown;
 }
 
 /**
@@ -379,7 +385,8 @@ export function SessionsTable({
                                             >
                                                 {sessionOrigin(
                                                     session,
-                                                    t("sessionsTable.unknownLocation")
+                                                    t("sessionsTable.unknownLocation"),
+                                                    t("deviceAddress.via")
                                                 )}
                                             </p>
                                             {compact ? (
@@ -415,13 +422,11 @@ export function SessionsTable({
                                                 version={session.osVersion}
                                             />
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
                                             <DeviceAddress address={session} />
                                         </td>
-                                        <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
-                                            <span className="block truncate">
-                                                {session.host ?? t("sessionsTable.notRecorded")}
-                                            </span>
+                                        <td className="hidden max-w-[12rem] px-3 py-2 text-xs xl:table-cell">
+                                            <HostName host={session.host} />
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                             <LastActive iso={session.lastSeenAt} />
@@ -532,16 +537,12 @@ export function SessionsTable({
                                         />
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
-                                        {extension.ip ?? (
-                                            <span className="text-muted-foreground">
-                                                {t("sessionsTable.notRecorded")}
-                                            </span>
-                                        )}
+                                        <DeviceAddress
+                                            address={{ ip: extension.ip, publicIp: null }}
+                                        />
                                     </td>
                                     <td className="hidden max-w-[12rem] px-3 py-2 text-xs xl:table-cell">
-                                        <span className="block truncate">
-                                            {extension.host ?? t("sessionsTable.notRecorded")}
-                                        </span>
+                                        <HostName host={extension.host} />
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                         <LastActive iso={extension.lastSeenAt} />

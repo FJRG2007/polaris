@@ -20,11 +20,14 @@
 import Link from "next/link";
 import { Badge } from "@polaris/ui";
 import { Users } from "lucide-react";
-import { grouped } from "./page-parts";
+import { grouped } from "./grouped";
 import { Avatar } from "@/components/avatar";
 import { signInText } from "@/lib/sign-in-words";
 import { RelativeTime } from "@/components/relative-time";
-import type { AddressAccount, AddressAccounts as AddressAccountsView } from "@/lib/address-accounts";
+import type {
+    AddressAccount,
+    AddressAccounts as AddressAccountsView
+} from "@/lib/address-accounts";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** As many accounts and sessions as read as a list rather than as a wall. Each
@@ -44,9 +47,7 @@ export function AddressAccounts({ accounts }: { accounts: AddressAccountsView })
                 {t("accounts.title")}
             </div>
             {list.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                    {t("accounts.none")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("accounts.none")}</p>
             ) : (
                 <ul className="flex flex-col gap-2">
                     {list.slice(0, ACCOUNT_ROWS).map((account) => (
@@ -93,17 +94,23 @@ export function AddressAccounts({ accounts }: { accounts: AddressAccountsView })
                                                 ) : null}
                                                 <span>{signInText(tc, session.signIn)}</span>
                                                 <span>
-                                                    {session.live ? t("accounts.active") : t("accounts.lastActive")}{" "}
+                                                    {session.live
+                                                        ? t("accounts.active")
+                                                        : t("accounts.lastActive")}{" "}
                                                     <RelativeTime iso={session.lastSeenAt} />
                                                 </span>
-                                                {!session.live ? <Badge>{t("accounts.expired")}</Badge> : null}
+                                                {!session.live ? (
+                                                    <Badge>{t("accounts.expired")}</Badge>
+                                                ) : null}
                                                 {session.approval === "pending" ? (
                                                     <Badge variant="warning">
                                                         {t("accounts.waiting")}
                                                     </Badge>
                                                 ) : null}
                                                 {session.approval === "denied" ? (
-                                                    <Badge variant="danger">{t("accounts.refused")}</Badge>
+                                                    <Badge variant="danger">
+                                                        {t("accounts.refused")}
+                                                    </Badge>
                                                 ) : null}
                                             </li>
                                         ))}
@@ -112,7 +119,9 @@ export function AddressAccounts({ accounts }: { accounts: AddressAccountsView })
                                         <p className="mt-0.5 text-xs text-muted-foreground">
                                             {t("accounts.moreSessions", {
                                                 count: account.sessions.length - SESSION_ROWS,
-                                                shown: grouped(account.sessions.length - SESSION_ROWS)
+                                                shown: grouped(
+                                                    account.sessions.length - SESSION_ROWS
+                                                )
                                             })}
                                         </p>
                                     ) : null}
@@ -142,9 +151,15 @@ export function AddressAccounts({ accounts }: { accounts: AddressAccountsView })
 function SignInTally({ signIns }: { signIns: AddressAccount["signIns"] }) {
     const t = useTranslations("firewall");
     const parts = [
-        signIns.accepted > 0 ? t("accounts.tallySigned", { shown: grouped(signIns.accepted) }) : null,
-        signIns.refused > 0 ? t("accounts.tallyRefused", { shown: grouped(signIns.refused) }) : null,
-        signIns.awaiting > 0 ? t("accounts.tallyWaiting", { shown: grouped(signIns.awaiting) }) : null
+        signIns.accepted > 0
+            ? t("accounts.tallySigned", { shown: grouped(signIns.accepted) })
+            : null,
+        signIns.refused > 0
+            ? t("accounts.tallyRefused", { shown: grouped(signIns.refused) })
+            : null,
+        signIns.awaiting > 0
+            ? t("accounts.tallyWaiting", { shown: grouped(signIns.awaiting) })
+            : null
     ].filter(Boolean);
     if (parts.length === 0) return null;
     return (

@@ -299,24 +299,51 @@ describe("the session table", () => {
 });
 
 describe("the one-line origin", () => {
+    const origin = (overrides?: Parameters<typeof session>[0]) =>
+        sessionOrigin(session(overrides), "Unknown location", "via");
+
     it("reads address, country, then the name it was opened on", () => {
-        expect(sessionOrigin(session())).toBe("10.0.1.131 - ES - polaris.local");
+        expect(origin()).toBe("10.0.1.131 - ES - polaris.local");
     });
 
     it("carries both addresses when the session came in over the local network", () => {
-        expect(sessionOrigin(session({ publicIp: "198.51.100.88" }))).toBe(
+        expect(origin({ publicIp: "198.51.100.88" })).toBe(
             "10.0.1.131 via 198.51.100.88 - ES - polaris.local"
         );
     });
 
     it("skips what was never recorded rather than printing gaps", () => {
-        expect(sessionOrigin(session({ country: null, host: null }))).toBe("10.0.1.131");
+        expect(origin({ country: null, host: null })).toBe("10.0.1.131");
     });
 
     it("says something when nothing at all is known", () => {
-        expect(sessionOrigin(session({ ip: null, country: null, host: null }))).toBe(
-            "Unknown location"
+        expect(origin({ ip: null, country: null, host: null })).toBe("Unknown location");
+    });
+
+    it("joins the two addresses in the reader's word", () => {
+        expect(
+            sessionOrigin(session({ publicIp: "198.51.100.88" }), "Ubicación desconocida", "vía")
+        ).toBe("10.0.1.131 vía 198.51.100.88 - ES - polaris.local");
+    });
+});
+
+describe("the address and domain columns", () => {
+    // A browser's row drew them grey while an extension's and the command line's
+    // drew them like every other column: one rule now, for every kind of row.
+    it("draw a recorded address and domain like the other columns", () => {
+        const markup = render([session()]);
+        expect(markup).toContain('<span class="block truncate">polaris.local</span>');
+        expect(markup).not.toMatch(
+            /text-muted-foreground[^"]*"><span class="font-mono">10\.0\.1\.131/
         );
+    });
+
+    it("mute only what was not recorded", () => {
+        const markup = render([session({ ip: null, host: null })]);
+        expect(markup).toContain(
+            '<span class="block truncate text-muted-foreground">Not recorded</span>'
+        );
+        expect(markup).toContain('<span class="text-muted-foreground">Not recorded</span>');
     });
 });
 

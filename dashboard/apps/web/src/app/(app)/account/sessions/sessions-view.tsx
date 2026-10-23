@@ -56,7 +56,11 @@ function Origin({ session }: { session: SessionView }) {
         <>
             <p className="text-xs text-muted-foreground">
                 {t.rich("sessions.origin", {
-                    origin: sessionOrigin(session, tc("sessionsTable.unknownLocation")),
+                    origin: sessionOrigin(
+                        session,
+                        tc("sessionsTable.unknownLocation"),
+                        tc("deviceAddress.via")
+                    ),
                     time: <RelativeTime key="time" iso={session.lastSeenAt} />
                 })}
             </p>

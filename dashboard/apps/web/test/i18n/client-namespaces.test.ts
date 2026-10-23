@@ -47,8 +47,11 @@ function provided(source: string): string[] {
 
 /** Imports that can draw something: a component, a hook, a default or a
  *  whole-module import, a re-export, or a dynamic import. A plain helper or a
- *  type pulled out of a screen's file does not render that screen's words. */
-function renderedImports(source: string): string[] {
+ *  type pulled out of a screen's file does not render that screen's words -
+ *  unless it is a function of a module that draws (`.tsx`), which can hand
+ *  back that module's elements: the connections hub builds its sections with
+ *  `hubCoreSections()`, and Tasks' trackers printed their keys there. */
+function renderedImports(source: string, from: string): string[] {
     const found: string[] = [];
     for (const match of source.matchAll(/^\s*import\s+(type\s+)?([^"';]*?)\s*from\s*"([^"]+)"/gm)) {
         if (match[1]) continue;
@@ -63,7 +66,9 @@ function renderedImports(source: string): string[] {
             .map((part) => part.trim())
             .filter((part) => part && !part.startsWith("type "))
             .some((part) => /^([A-Z]|use[A-Z])/.test(part.split(/\s+as\s+/)[0]!));
-        if (outside || draws) found.push(match[3]!);
+        const builds =
+            named.trim().length > 0 && !!resolveImport(from, match[3]!)?.endsWith(".tsx");
+        if (outside || draws || builds) found.push(match[3]!);
     }
     for (const match of source.matchAll(/^\s*export\s+(?!type\b)[^"';]*?\s*from\s*"([^"]+)"/gm)) {
         found.push(match[1]!);
@@ -111,7 +116,7 @@ describe("client translation namespaces", () => {
 
         const imports = new Map<string, string[]>();
         for (const [path, source] of sources) {
-            const targets = renderedImports(source).map((specifier) =>
+            const targets = renderedImports(source, path).map((specifier) =>
                 resolveImport(path, specifier)
             );
             imports.set(
