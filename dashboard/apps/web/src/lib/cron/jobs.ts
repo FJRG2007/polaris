@@ -30,6 +30,7 @@ import { appJobs } from "@/lib/app-extensions/registry";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
 import { compactOutages } from "@/lib/connectivity/outage-tracker";
+import { sampleConnectivity } from "@/lib/connectivity/line-sampler";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepUploads } from "@/lib/chat/uploads";
@@ -184,6 +185,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // once count every outage exactly once.
         leaseMs: null,
         run: compactOutages
+    },
+    {
+        key: "connectivity-samples",
+        // Every minute: the line's latency and loss, and the down or up that two
+        // samples in a row decide. A late pass is a minute of history missing and
+        // a notification a minute late.
+        everyMs: MINUTE,
+        // Leased: two samplers would each announce the same outage.
+        leaseMs: 2 * MINUTE,
+        run: sampleConnectivity
     },
     {
         key: "dns-blocker-clock",

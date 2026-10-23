@@ -6397,6 +6397,51 @@ model ConnectivityOutageMonth {
 
     @@unique([month, kind])
 }
+
+// One minute of the line, as the connectivity sampler measured it: whether the
+// internet answered, how fast and how much was lost, whether a name resolved
+// through the box's own resolver, the public address it had, and whether the
+// dashboard's public name still pointed at it. Kept two days; the hours below
+// keep the history.
+model ConnectivitySample {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    at         DateTime
+    up         Boolean
+    dnsOk      Boolean
+    // The median connect time over the targets that answered; null when none did.
+    latencyMs  Float?
+    // Share of the attempts that got no answer, 0-100.
+    lossPct    Float
+    dnsMs      Float?
+    publicIp   String?
+    // Null when there is no public name to check, or it never pointed here.
+    outsideOk  Boolean?
+
+    @@index([at])
+}
+
+// The samples of one UTC hour, added up. Kept a year: the 90-day charts read
+// these, never the raw minutes.
+model ConnectivityHour {
+    bucket         DateTime @id
+    samples        Int      @default(0)
+    upSamples      Int      @default(0)
+    dnsFailSamples Int      @default(0)
+    latencySum     Float    @default(0)
+    latencyCount   Int      @default(0)
+    latencyMax     Float?
+    lossSum        Float    @default(0)
+}
+
+// Every time the public address changed, as the sampler saw it.
+model PublicIpChange {
+    id       String   @id @default(uuid(7)) @db.Uuid
+    at       DateTime
+    previous String?
+    current  String
+
+    @@index([at])
+}
 // ---------------------------------------------------------------------------
 // Organizations and teams
 // ---------------------------------------------------------------------------

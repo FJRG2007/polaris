@@ -870,6 +870,38 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "network.internetDown",
+        group: "network",
+        label: "The internet goes down",
+        description: "Polaris lost its connection, or the DNS server stopped answering.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "network.internetBack",
+        group: "network",
+        label: "The internet comes back",
+        description: "The connection works again, with how long it was gone.",
+        level: "success",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "network.publicIp",
+        group: "network",
+        label: "Your public IP changes",
+        description: "The address your connection has on the internet changed.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "network.unreachable",
+        group: "network",
+        label: "Polaris is unreachable from outside",
+        description: "The public name no longer points at your connection.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "integration.attention",
         group: "system",
         label: "An integration needs attention",
