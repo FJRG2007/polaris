@@ -690,3 +690,16 @@ vi.mock("@/app/(app)/apps/runners/runners-polls", () => ({
     ),
     scopePreview: forward(() => import("@/app/(app)/apps/runners/actions"), "previewScopeAction", 1)
 }));
+
+vi.mock("@/app/(app)/apps/telemetry/telemetry-polls", () => ({
+    telemetryOverview: forward(
+        () => import("@/app/(app)/apps/telemetry/actions"),
+        "telemetryOverviewAction",
+        1
+    ),
+    telemetryIssue: forward(
+        () => import("@/app/(app)/apps/telemetry/actions"),
+        "openIssueAction",
+        2
+    )
+}));

@@ -154,7 +154,9 @@ const actions = vi.hoisted(() => {
         "listTemplateTargetsAction",
         "probeRunnerHostAction",
         "runnerPrincipalsAction",
-        "previewScopeAction"
+        "previewScopeAction",
+        "telemetryOverviewAction",
+        "openIssueAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -439,6 +441,10 @@ vi.mock("@/app/(app)/apps/runners/actions", () => ({
     runnerPrincipalsAction: actions.runnerPrincipalsAction,
     previewScopeAction: actions.previewScopeAction
 }));
+vi.mock("@/app/(app)/apps/telemetry/actions", () => ({
+    telemetryOverviewAction: actions.telemetryOverviewAction,
+    openIssueAction: actions.openIssueAction
+}));
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -606,7 +612,9 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
         import("@/app/api/marketplace/template-targets/route"),
     "/api/runners/probe": () => import("@/app/api/runners/probe/route"),
     "/api/runners/principals": () => import("@/app/api/runners/principals/route"),
-    "/api/runners/scope-preview": () => import("@/app/api/runners/scope-preview/route")
+    "/api/runners/scope-preview": () => import("@/app/api/runners/scope-preview/route"),
+    "/api/telemetry/overview": () => import("@/app/api/telemetry/overview/route"),
+    "/api/telemetry/issue": () => import("@/app/api/telemetry/issue/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -2357,6 +2365,30 @@ const CASES: Case[] = [
             ).scopePreview({ kind: "sample" }),
         action: "previewScopeAction",
         args: [{ kind: "sample" }]
+    },
+    {
+        name: "the projects and the open project's faults",
+        path: "/api/telemetry/overview",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/telemetry/telemetry-polls")>(
+                    "@/app/(app)/apps/telemetry/telemetry-polls"
+                )
+            ).telemetryOverview({ projectId: "project-1", status: "open", query: "timeout" }),
+        action: "telemetryOverviewAction",
+        args: [{ projectId: "project-1", status: "open", query: "timeout" }]
+    },
+    {
+        name: "one fault's detail",
+        path: "/api/telemetry/issue",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/telemetry/telemetry-polls")>(
+                    "@/app/(app)/apps/telemetry/telemetry-polls"
+                )
+            ).telemetryIssue("projectId-1", "issueId-1"),
+        action: "openIssueAction",
+        args: ["projectId-1", "issueId-1"]
     }
 ];
 

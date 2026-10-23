@@ -49,6 +49,7 @@ import {
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
+import * as polls from "./telemetry-polls";
 
 type Overview = actions.TelemetryOverview;
 
@@ -92,7 +93,7 @@ export function TelemetryView({
     // skeleton with nothing said and nothing to press.
     const load = useCallback(async () => {
         const result = await runAction(
-            () => actions.telemetryOverviewAction({ projectId, status, query: search }),
+            () => polls.telemetryOverview({ projectId, status, query: search }),
             setError
         );
         if (!result) return;
@@ -131,14 +132,12 @@ export function TelemetryView({
         // The same rule as the list above, and this is the call it was written
         // for: opening a fault from a tab whose build had been replaced refused
         // silently, so the row was pressed and the screen did not move.
-        void runAction(() => actions.openIssueAction(project.id, issueId), setError).then(
-            (result) => {
-                if (!live) return;
-                if (!result) return;
-                if (result.error) setError(result.error);
-                setIssue(result.issue ?? null);
-            }
-        );
+        void runAction(() => polls.telemetryIssue(project.id, issueId), setError).then((result) => {
+            if (!live) return;
+            if (!result) return;
+            if (result.error) setError(result.error);
+            setIssue(result.issue ?? null);
+        });
         return () => {
             live = false;
         };
