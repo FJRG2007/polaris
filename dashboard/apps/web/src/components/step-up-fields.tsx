@@ -20,17 +20,20 @@ import type { StepUpChoice } from "@/lib/step-up";
 import { Button, Input, Select } from "@polaris/ui";
 import type { StepUpProofInput } from "@polaris/core";
 import { useEffect, useId, useRef, useState } from "react";
-import { sendStepUpCodeAction, stepUpOptionsAction } from "@/app/(app)/account/step-up-actions";
+import { sendStepUpCodeAction } from "@/app/(app)/account/step-up-actions";
 import { codeDigits } from "@/components/code-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import * as polls from "./shared-polls";
 
 const PROOFS = new Set(["totp", "email", "whatsapp", "password"]);
 
 /** How a proof is named, from its id; one this build has no words for keeps the
  *  label the service gave it. */
 function proofLabel(t: NamespaceTranslator<"components">, choice: StepUpChoice): string {
-    return PROOFS.has(choice.proof) ? t(`stepUp.proofs.${choice.proof}` as NamespaceKey<"components">) : choice.label;
+    return PROOFS.has(choice.proof)
+        ? t(`stepUp.proofs.${choice.proof}` as NamespaceKey<"components">)
+        : choice.label;
 }
 
 export function StepUpFields({
@@ -60,7 +63,8 @@ export function StepUpFields({
         setSent("");
         setError("");
         let live = true;
-        void stepUpOptionsAction()
+        void polls
+            .stepUpOptions()
             .then((result) => {
                 if (!live) return;
                 setChoices(result.choices);
@@ -122,7 +126,10 @@ export function StepUpFields({
                         value={proof?.proof ?? ""}
                         className="h-9"
                         aria-label={t("stepUp.how")}
-                        options={choices.map((choice) => ({ value: choice.proof, label: proofLabel(t, choice) }))}
+                        options={choices.map((choice) => ({
+                            value: choice.proof,
+                            label: proofLabel(t, choice)
+                        }))}
                         onValueChange={(next) => {
                             setProof(choices.find((choice) => choice.proof === next) ?? null);
                             setValue("");
@@ -140,18 +147,38 @@ export function StepUpFields({
                         id={fieldId}
                         value={value}
                         className="h-9"
-                        autoComplete={proof?.proof === "password" ? "current-password" : "one-time-code"}
+                        autoComplete={
+                            proof?.proof === "password" ? "current-password" : "one-time-code"
+                        }
                         type={proof?.proof === "password" ? "password" : "text"}
                         inputMode={proof?.proof === "password" ? undefined : "numeric"}
-                        placeholder={proof?.proof === "password" ? t("stepUp.proofs.password") : t("stepUp.codePlaceholder")}
+                        placeholder={
+                            proof?.proof === "password"
+                                ? t("stepUp.proofs.password")
+                                : t("stepUp.codePlaceholder")
+                        }
                         disabled={Boolean(proof?.sends) && !sent}
                         onChange={(event) =>
-                            setValue(proof?.proof === "password" ? event.target.value : codeDigits(event.target.value))
+                            setValue(
+                                proof?.proof === "password"
+                                    ? event.target.value
+                                    : codeDigits(event.target.value)
+                            )
                         }
                     />
                     {proof?.sends && (
-                        <Button type="button" size="sm" variant="secondary" disabled={sending} onClick={() => void send()}>
-                            {sending ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Send className="size-4 shrink-0" />}
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={sending}
+                            onClick={() => void send()}
+                        >
+                            {sending ? (
+                                <Loader2 className="size-4 shrink-0 animate-spin" />
+                            ) : (
+                                <Send className="size-4 shrink-0" />
+                            )}
                             {sent ? t("stepUp.resend") : t("stepUp.send")}
                         </Button>
                     )}

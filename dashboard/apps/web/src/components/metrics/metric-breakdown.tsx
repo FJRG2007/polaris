@@ -26,7 +26,7 @@ import { formatBytes } from "@polaris/core";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { subjectBreakdownAction } from "@/app/(app)/breakdown-actions";
+
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import { formatRate, percent } from "@/components/metrics-history";
 import { Box, HardDrive, Layers, MoreHorizontal, SearchX } from "lucide-react";
@@ -40,6 +40,7 @@ import {
     EmptyState,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "../shared-polls";
 
 /** Which metric is open, over which window. Null while the dialog is shut. */
 export interface OpenBreakdown {
@@ -94,10 +95,17 @@ export function MetricBreakdownDialog({
         // question, and last question's rows under this question's title is the
         // one thing worse than a skeleton.
         setResult(null);
-        void subjectBreakdownAction({ kind: subject.kind, id: subject.id, ...open }).then(
-            (answer) => {
-                if (live) setResult(answer);
-            }
+        void polls.subjectBreakdown({ kind: subject.kind, id: subject.id, ...open }).then(
+            (answer) => live && setResult(answer),
+            () =>
+                live &&
+                setResult({
+                    rows: [],
+                    total: null,
+                    note: "",
+                    unavailable: t("text.breakdownFailed"),
+                    at: null
+                })
         );
         return () => {
             live = false;

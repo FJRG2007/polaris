@@ -16,7 +16,8 @@ import type { ServiceGpuView } from "@/lib/deploy/gpu-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
-import { saveServiceGpuAction, serviceGpuAction } from "./gpu-actions";
+import { saveServiceGpuAction } from "./gpu-actions";
+import * as polls from "./deploy-polls";
 
 export function GpuCard({
     applicationId,
@@ -35,11 +36,14 @@ export function GpuCard({
 
     useEffect(() => {
         let active = true;
-        void serviceGpuAction(applicationId).then((result) => {
-            if (!active) return;
-            if (result.gpu) setView(result.gpu);
-            else setError(result.error ?? null);
-        });
+        void polls.serviceGpu(applicationId).then(
+            (result) => {
+                if (!active) return;
+                if (result.gpu) setView(result.gpu);
+                else setError(result.error ?? null);
+            },
+            () => active && setError(t("gpu.loadFailed"))
+        );
         return () => {
             active = false;
         };

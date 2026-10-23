@@ -19,17 +19,24 @@ import { NextResponse } from "next/server";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { backgroundUser } from "@/lib/session";
 import { toWire } from "@/lib/app-bundles/wire";
-import { sameOrigin } from "@/lib/same-origin";
+import { sameOrigin, sameOriginRead } from "@/lib/same-origin";
 
 const NO_STORE = { "cache-control": "no-store" };
 
-/** A GET handler that validates the query against `query` and answers `read`. */
+/**
+ * A GET handler that validates the query against `query` and answers `read`.
+ * `sameOrigin` refuses another site's request, for a read that reveals a secret
+ * or leaves a record, as an action's POST was refused.
+ */
 export function pollRoute<Q extends z.ZodTypeAny>(
     query: Q,
     read: (input: z.infer<Q>) => Promise<unknown>,
-    options: { signedIn?: boolean } = {}
+    options: { signedIn?: boolean; sameOrigin?: boolean } = {}
 ): (request: Request) => Promise<Response> {
     return async (request) => {
+        // i18n-ignore: status bodies no screen shows; the caller keeps what it had
+        if (options.sameOrigin && !sameOriginRead(request))
+            return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: NO_STORE });
         // i18n-ignore: status bodies no screen shows; the caller keeps what it had
         if (options.signedIn !== false && !(await backgroundUser()))
             return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });

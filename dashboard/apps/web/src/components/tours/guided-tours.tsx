@@ -17,7 +17,7 @@ import type { RunningTour, TourWords } from "@/lib/tours/runtime";
 import { OPEN_TOURS_EVENT, usableTarget } from "@/lib/tours/target";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { markOverviewAction, shouldOfferOverviewAction } from "@/app/(app)/tour-actions";
+import { markOverviewAction } from "@/app/(app)/tour-actions";
 import {
     Dialog,
     DialogContent,
@@ -37,6 +37,7 @@ import {
     type TourId,
     type TourStep
 } from "@/lib/tours/registry";
+import * as polls from "../shared-polls";
 
 /** How long a freshly opened screen gets to draw what a tour points at. */
 const TARGET_WAIT_MS = 4000;
@@ -212,7 +213,7 @@ export function GuidedTours({
         if (!canOffer || readOffered(userId)) return;
         let cancelled = false;
         const timer = window.setTimeout(async () => {
-            const offer = await shouldOfferOverviewAction().catch(() => false);
+            const offer = await polls.shouldOfferOverview().catch(() => false);
             writeOffered(userId);
             if (!offer || cancelled) return;
             void markOverviewAction("offered");

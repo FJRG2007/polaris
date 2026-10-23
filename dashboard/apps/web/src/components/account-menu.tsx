@@ -14,7 +14,6 @@ import { usePresence, usePresenceRefresh } from "@/components/presence-store";
 import { openTourList } from "@/lib/tours/target";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
 import {
-    presenceNowAction,
     setPresenceAction,
     setStatusAction,
     type PresenceNow
@@ -67,6 +66,7 @@ import {
     Select,
     useToast
 } from "@polaris/ui";
+import * as polls from "./shared-polls";
 
 /**
  * How close two presses on the face have to be to count as one gesture.
@@ -326,7 +326,8 @@ export function AccountMenu({
         if (now - askedAt.current < ASK_AGAIN_MS) return;
         askedAt.current = now;
         refreshPresence();
-        void presenceNowAction()
+        void polls
+            .presenceNow()
             .then(settle)
             .catch(() => undefined);
     }, [overdue, now]); // eslint-disable-line react-hooks/exhaustive-deps

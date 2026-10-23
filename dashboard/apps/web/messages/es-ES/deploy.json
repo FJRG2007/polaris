@@ -494,7 +494,9 @@
             "setByHand": "Lo que no se haya podido leer hay que ponerlo a mano en la pestaña Variables del servicio.",
             "settingUp": "Preparándolo",
             "submit": "Ejecutar aquí"
-        }
+        },
+        "loadFailed": "No se pudo leer qué haría este traslado.",
+        "choicesFailed": "No se pudo listar lo que hay en esa cuenta."
     },
     "elsewhere": {
         "status": {

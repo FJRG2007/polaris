@@ -18,7 +18,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ServiceSourceView } from "@/lib/deploy/service-source";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { CardError, CardSkeleton, SettingsCard } from "./settings-kit";
-import { changeSourceAction, disconnectSourceAction, serviceSourceAction } from "./source-actions";
+import { changeSourceAction, disconnectSourceAction } from "./source-actions";
 import {
     ArrowUpRight,
     Box,
@@ -41,6 +41,7 @@ import {
     DialogTitle,
     Input
 } from "@polaris/ui";
+import * as polls from "./deploy-polls";
 
 /** One fact of the source card: a muted label and its value. */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -186,7 +187,8 @@ export function SourceRepositoryCard({
 
     useEffect(() => {
         let active = true;
-        void serviceSourceAction(app.id)
+        void polls
+            .serviceSource(app.id)
             .then((result) => {
                 if (!active) return;
                 if (result.source) {

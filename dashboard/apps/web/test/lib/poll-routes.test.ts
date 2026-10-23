@@ -35,7 +35,54 @@ const actions = vi.hoisted(() => {
         "readOwnerDomainAction",
         "dnsPropagationAction",
         "readCallAction",
-        "recoveryStatusAction"
+        "recoveryStatusAction",
+        "buildMachineAction",
+        "listServiceCronRunsAction",
+        "deployBehaviourAction",
+        "databaseConnectionAction",
+        "listDatabaseInstancesAction",
+        "listProviderChoicesAction",
+        "listProviderAccountsAction",
+        "moveOutPlanAction",
+        "moveHomePlanAction",
+        "serviceGpuAction",
+        "deploymentDiagnosisAction",
+        "servicePortsAction",
+        "domainReadingsAction",
+        "tcpProxiesAction",
+        "serviceScalingAction",
+        "serviceFollowStateAction",
+        "serviceHistoryAction",
+        "listDeployServersAction",
+        "quickTunnelStatusAction",
+        "ngrokTunnelStatusAction",
+        "namedTunnelStatusAction",
+        "domainHealthAction",
+        "cloudflareAccountStatusAction",
+        "serviceSourceAction",
+        "uploadedSourceAction",
+        "listAutomationRunsAction",
+        "previewPromotionAction",
+        "volumeDetailAction",
+        "variableGroupReachAction",
+        "serviceTagsAction",
+        "revealEnvScopeAction",
+        "listNasConnectionsAction",
+        "presenceNowAction",
+        "noticeChannelsAction",
+        "listRecentSearchesAction",
+        "diskAlertsAction",
+        "readDomainSecurityAction",
+        "planDomainSecurityAction",
+        "securityInventoryAction",
+        "namespaceMessagesAction",
+        "subjectBreakdownAction",
+        "listHistoryAction",
+        "setupStateAction",
+        "setupInstalledAction",
+        "stepUpOptionsAction",
+        "shouldOfferOverviewAction",
+        "getUserProfileAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -54,7 +101,11 @@ vi.mock("@/app/(app)/apps/deploy/dns-cutover-actions", () => ({
     cutoverPanelAction: actions.cutoverPanelAction
 }));
 vi.mock("@/app/(app)/apps/deploy/external-actions", () => ({
-    refreshExternalServiceAction: actions.refreshExternalServiceAction
+    refreshExternalServiceAction: actions.refreshExternalServiceAction,
+    listProviderChoicesAction: actions.listProviderChoicesAction,
+    listProviderAccountsAction: actions.listProviderAccountsAction,
+    moveOutPlanAction: actions.moveOutPlanAction,
+    moveHomePlanAction: actions.moveHomePlanAction
 }));
 vi.mock("@/app/(app)/apps/deploy/glance-actions", () => ({
     projectGlanceAction: actions.projectGlanceAction,
@@ -62,10 +113,23 @@ vi.mock("@/app/(app)/apps/deploy/glance-actions", () => ({
     imageUpdateAction: actions.imageUpdateAction
 }));
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
-    listDeploymentsAction: actions.listDeploymentsAction
+    listDeploymentsAction: actions.listDeploymentsAction,
+    databaseConnectionAction: actions.databaseConnectionAction,
+    listDatabaseInstancesAction: actions.listDatabaseInstancesAction,
+    serviceFollowStateAction: actions.serviceFollowStateAction,
+    serviceHistoryAction: actions.serviceHistoryAction,
+    listDeployServersAction: actions.listDeployServersAction,
+    quickTunnelStatusAction: actions.quickTunnelStatusAction,
+    ngrokTunnelStatusAction: actions.ngrokTunnelStatusAction,
+    namedTunnelStatusAction: actions.namedTunnelStatusAction,
+    domainHealthAction: actions.domainHealthAction,
+    cloudflareAccountStatusAction: actions.cloudflareAccountStatusAction,
+    listNasConnectionsAction: actions.listNasConnectionsAction
 }));
 vi.mock("@/app/(app)/apps/deploy/project-actions", () => ({
-    listPromotionsAction: actions.listPromotionsAction
+    listPromotionsAction: actions.listPromotionsAction,
+    previewPromotionAction: actions.previewPromotionAction,
+    volumeDetailAction: actions.volumeDetailAction
 }));
 vi.mock("@/app/(app)/apps/servers/actions", () => ({
     serverEdgeAction: actions.serverEdgeAction,
@@ -93,7 +157,10 @@ vi.mock("@/app/(app)/admin/inbox/actions", () => ({
 vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
     serverDetailAction: actions.serverDetailAction
 }));
-vi.mock("@/app/(app)/automations/actions", () => ({ getRunAction: actions.getRunAction }));
+vi.mock("@/app/(app)/automations/actions", () => ({
+    getRunAction: actions.getRunAction,
+    noticeChannelsAction: actions.noticeChannelsAction
+}));
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
     checkUpdatesAction: actions.checkUpdatesAction
 }));
@@ -106,6 +173,77 @@ vi.mock("@/app/(app)/account/domains/dns-actions", () => ({
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({ readCallAction: actions.readCallAction }));
 vi.mock("@/app/oauth/recover/actions", () => ({
     recoveryStatusAction: actions.recoveryStatusAction
+}));
+vi.mock("@/app/(app)/apps/deploy/source-actions", () => ({
+    buildMachineAction: actions.buildMachineAction,
+    serviceSourceAction: actions.serviceSourceAction,
+    uploadedSourceAction: actions.uploadedSourceAction
+}));
+vi.mock("@/app/(app)/apps/deploy/cron-actions", () => ({
+    listServiceCronRunsAction: actions.listServiceCronRunsAction
+}));
+vi.mock("@/app/(app)/apps/deploy/deploy-behaviour-actions", () => ({
+    deployBehaviourAction: actions.deployBehaviourAction
+}));
+vi.mock("@/app/(app)/apps/deploy/gpu-actions", () => ({
+    serviceGpuAction: actions.serviceGpuAction
+}));
+vi.mock("@/app/(app)/apps/deploy/fix-actions", () => ({
+    deploymentDiagnosisAction: actions.deploymentDiagnosisAction
+}));
+vi.mock("@/app/(app)/apps/deploy/public-networking-actions", () => ({
+    servicePortsAction: actions.servicePortsAction,
+    domainReadingsAction: actions.domainReadingsAction,
+    tcpProxiesAction: actions.tcpProxiesAction
+}));
+vi.mock("@/app/(app)/apps/deploy/scaling-actions", () => ({
+    serviceScalingAction: actions.serviceScalingAction
+}));
+vi.mock("@/app/(app)/apps/deploy/automation-actions", () => ({
+    listAutomationRunsAction: actions.listAutomationRunsAction
+}));
+vi.mock("@/app/(app)/apps/deploy/variable-group-actions", () => ({
+    variableGroupReachAction: actions.variableGroupReachAction,
+    serviceTagsAction: actions.serviceTagsAction
+}));
+vi.mock("@/app/(app)/apps/deploy/variable-actions", () => ({
+    revealEnvScopeAction: actions.revealEnvScopeAction
+}));
+vi.mock("@/app/(app)/account/preferences/actions", () => ({
+    presenceNowAction: actions.presenceNowAction
+}));
+vi.mock("@/app/(app)/search-actions", () => ({
+    listRecentSearchesAction: actions.listRecentSearchesAction
+}));
+vi.mock("@/app/(app)/disk-alert-actions", () => ({
+    diskAlertsAction: actions.diskAlertsAction
+}));
+vi.mock("@/app/(app)/account/domains/security-actions", () => ({
+    readDomainSecurityAction: actions.readDomainSecurityAction,
+    planDomainSecurityAction: actions.planDomainSecurityAction,
+    securityInventoryAction: actions.securityInventoryAction
+}));
+vi.mock("@/components/i18n/namespace-actions", () => ({
+    namespaceMessagesAction: actions.namespaceMessagesAction
+}));
+vi.mock("@/app/(app)/breakdown-actions", () => ({
+    subjectBreakdownAction: actions.subjectBreakdownAction
+}));
+vi.mock("@/app/(app)/apps/deploy/restore-actions", () => ({
+    listHistoryAction: actions.listHistoryAction
+}));
+vi.mock("@/app/(app)/setup-actions", () => ({
+    setupStateAction: actions.setupStateAction,
+    setupInstalledAction: actions.setupInstalledAction
+}));
+vi.mock("@/app/(app)/account/step-up-actions", () => ({
+    stepUpOptionsAction: actions.stepUpOptionsAction
+}));
+vi.mock("@/app/(app)/tour-actions", () => ({
+    shouldOfferOverviewAction: actions.shouldOfferOverviewAction
+}));
+vi.mock("@/app/(app)/drive/activity-actions", () => ({
+    getUserProfileAction: actions.getUserProfileAction
 }));
 
 type Handler = (request: Request) => Promise<Response>;
@@ -139,7 +277,66 @@ const ROUTES: Record<string, () => Promise<{ GET: Handler }>> = {
     "/api/domains/owner-domain": () => import("@/app/api/domains/owner-domain/route"),
     "/api/domains/dns-propagation": () => import("@/app/api/domains/dns-propagation/route"),
     "/api/guest-call": () => import("@/app/api/guest-call/route"),
-    "/api/account-recovery/status": () => import("@/app/api/account-recovery/status/route")
+    "/api/account-recovery/status": () => import("@/app/api/account-recovery/status/route"),
+    "/api/deploy/services/build-machine": () =>
+        import("@/app/api/deploy/services/build-machine/route"),
+    "/api/deploy/services/cron-runs": () => import("@/app/api/deploy/services/cron-runs/route"),
+    "/api/deploy/services/deploy-behaviour": () =>
+        import("@/app/api/deploy/services/deploy-behaviour/route"),
+    "/api/deploy/databases/connection": () => import("@/app/api/deploy/databases/connection/route"),
+    "/api/deploy/databases/instances": () => import("@/app/api/deploy/databases/instances/route"),
+    "/api/deploy/providers/choices": () => import("@/app/api/deploy/providers/choices/route"),
+    "/api/deploy/providers/accounts": () => import("@/app/api/deploy/providers/accounts/route"),
+    "/api/deploy/move/out-plan": () => import("@/app/api/deploy/move/out-plan/route"),
+    "/api/deploy/move/home-plan": () => import("@/app/api/deploy/move/home-plan/route"),
+    "/api/deploy/services/gpu": () => import("@/app/api/deploy/services/gpu/route"),
+    "/api/deploy/deployments/diagnosis": () =>
+        import("@/app/api/deploy/deployments/diagnosis/route"),
+    "/api/deploy/services/ports": () => import("@/app/api/deploy/services/ports/route"),
+    "/api/deploy/services/domain-readings": () =>
+        import("@/app/api/deploy/services/domain-readings/route"),
+    "/api/deploy/services/tcp-proxies": () => import("@/app/api/deploy/services/tcp-proxies/route"),
+    "/api/deploy/services/scaling": () => import("@/app/api/deploy/services/scaling/route"),
+    "/api/deploy/services/follow-state": () =>
+        import("@/app/api/deploy/services/follow-state/route"),
+    "/api/deploy/services/history": () => import("@/app/api/deploy/services/history/route"),
+    "/api/deploy/servers": () => import("@/app/api/deploy/servers/route"),
+    "/api/deploy/services/quick-tunnel": () =>
+        import("@/app/api/deploy/services/quick-tunnel/route"),
+    "/api/deploy/services/ngrok-tunnel": () =>
+        import("@/app/api/deploy/services/ngrok-tunnel/route"),
+    "/api/deploy/services/named-tunnel": () =>
+        import("@/app/api/deploy/services/named-tunnel/route"),
+    "/api/deploy/services/domain-health": () =>
+        import("@/app/api/deploy/services/domain-health/route"),
+    "/api/deploy/cloudflare/account-status": () =>
+        import("@/app/api/deploy/cloudflare/account-status/route"),
+    "/api/deploy/services/source": () => import("@/app/api/deploy/services/source/route"),
+    "/api/deploy/services/uploaded-source": () =>
+        import("@/app/api/deploy/services/uploaded-source/route"),
+    "/api/deploy/automations/runs": () => import("@/app/api/deploy/automations/runs/route"),
+    "/api/deploy/promotions/preview": () => import("@/app/api/deploy/promotions/preview/route"),
+    "/api/deploy/volumes/detail": () => import("@/app/api/deploy/volumes/detail/route"),
+    "/api/deploy/variable-groups/reach": () =>
+        import("@/app/api/deploy/variable-groups/reach/route"),
+    "/api/deploy/services/tags": () => import("@/app/api/deploy/services/tags/route"),
+    "/api/deploy/variables/reveal": () => import("@/app/api/deploy/variables/reveal/route"),
+    "/api/deploy/nas-connections": () => import("@/app/api/deploy/nas-connections/route"),
+    "/api/account/presence": () => import("@/app/api/account/presence/route"),
+    "/api/automations/notice-channels": () => import("@/app/api/automations/notice-channels/route"),
+    "/api/search/recent": () => import("@/app/api/search/recent/route"),
+    "/api/disk-alerts": () => import("@/app/api/disk-alerts/route"),
+    "/api/domains/security": () => import("@/app/api/domains/security/route"),
+    "/api/domains/security/plan": () => import("@/app/api/domains/security/plan/route"),
+    "/api/domains/security/inventory": () => import("@/app/api/domains/security/inventory/route"),
+    "/api/i18n/namespaces": () => import("@/app/api/i18n/namespaces/route"),
+    "/api/watch/breakdown": () => import("@/app/api/watch/breakdown/route"),
+    "/api/deploy/restore-points": () => import("@/app/api/deploy/restore-points/route"),
+    "/api/setup/state": () => import("@/app/api/setup/state/route"),
+    "/api/setup/installed": () => import("@/app/api/setup/installed/route"),
+    "/api/account/step-up/options": () => import("@/app/api/account/step-up/options/route"),
+    "/api/tours/overview-offer": () => import("@/app/api/tours/overview-offer/route"),
+    "/api/users/profile": () => import("@/app/api/users/profile/route")
 };
 
 const actual = <T>(path: string) => vi.importActual<T>(path);
@@ -450,6 +647,578 @@ const CASES: Case[] = [
             ).recoveryStatus("ticket-1"),
         action: "recoveryStatusAction",
         args: ["ticket-1"]
+    },
+    {
+        name: "a service's build machine",
+        path: "/api/deploy/services/build-machine",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).buildMachine("applicationId-1"),
+        action: "buildMachineAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service cron's runs",
+        path: "/api/deploy/services/cron-runs",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).serviceCronRuns("applicationId-1", "cronId-1"),
+        action: "listServiceCronRunsAction",
+        args: ["applicationId-1", "cronId-1"]
+    },
+    {
+        name: "a service's deploy behaviour",
+        path: "/api/deploy/services/deploy-behaviour",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).deployBehaviour("applicationId-1"),
+        action: "deployBehaviourAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a database's connection details",
+        path: "/api/deploy/databases/connection",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).databaseConnection("databaseId-1"),
+        action: "databaseConnectionAction",
+        args: ["databaseId-1"]
+    },
+    {
+        name: "an environment's database instances",
+        path: "/api/deploy/databases/instances",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).databaseInstances("environmentId-1", "engine-1"),
+        action: "listDatabaseInstancesAction",
+        args: ["environmentId-1", "engine-1"]
+    },
+    {
+        name: "what a provider account can deploy into",
+        path: "/api/deploy/providers/choices",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).providerChoices("connectionId-1"),
+        action: "listProviderChoicesAction",
+        args: ["connectionId-1"]
+    },
+    {
+        name: "the provider accounts one has linked",
+        path: "/api/deploy/providers/accounts",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).providerAccounts(),
+        action: "listProviderAccountsAction",
+        args: []
+    },
+    {
+        name: "the plan for moving a service out",
+        path: "/api/deploy/move/out-plan",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).moveOutPlan("projectId-1", "applicationId-1"),
+        action: "moveOutPlanAction",
+        args: ["projectId-1", "applicationId-1"]
+    },
+    {
+        name: "the plan for moving a service home",
+        path: "/api/deploy/move/home-plan",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).moveHomePlan("projectId-1", "serviceId-1"),
+        action: "moveHomePlanAction",
+        args: ["projectId-1", "serviceId-1"]
+    },
+    {
+        name: "a service's GPU",
+        path: "/api/deploy/services/gpu",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).serviceGpu("applicationId-1"),
+        action: "serviceGpuAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a failed deployment's likely cause",
+        path: "/api/deploy/deployments/diagnosis",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).deploymentDiagnosis("deploymentId-1"),
+        action: "deploymentDiagnosisAction",
+        args: ["deploymentId-1"]
+    },
+    {
+        name: "a service's ports",
+        path: "/api/deploy/services/ports",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).servicePorts("applicationId-1"),
+        action: "servicePortsAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service's domain readings",
+        path: "/api/deploy/services/domain-readings",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).domainReadings("applicationId-1"),
+        action: "domainReadingsAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service's TCP proxies",
+        path: "/api/deploy/services/tcp-proxies",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).tcpProxies("applicationId-1"),
+        action: "tcpProxiesAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service's scaling",
+        path: "/api/deploy/services/scaling",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).serviceScaling("applicationId-1"),
+        action: "serviceScalingAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "whether one follows a service",
+        path: "/api/deploy/services/follow-state",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).serviceFollowState("applicationId-1"),
+        action: "serviceFollowStateAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service's history",
+        path: "/api/deploy/services/history",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).serviceHistory("applicationId-1"),
+        action: "serviceHistoryAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "the machines a service can deploy to",
+        path: "/api/deploy/servers",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).deployServers("environmentId-1"),
+        action: "listDeployServersAction",
+        args: ["environmentId-1"]
+    },
+    {
+        name: "a service's quick tunnel",
+        path: "/api/deploy/services/quick-tunnel",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).quickTunnelStatus("applicationId-1"),
+        action: "quickTunnelStatusAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service's ngrok tunnel",
+        path: "/api/deploy/services/ngrok-tunnel",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).ngrokTunnelStatus("applicationId-1"),
+        action: "ngrokTunnelStatusAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service's named tunnel",
+        path: "/api/deploy/services/named-tunnel",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).namedTunnelStatus("applicationId-1"),
+        action: "namedTunnelStatusAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service's domain health",
+        path: "/api/deploy/services/domain-health",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).domainHealth("applicationId-1"),
+        action: "domainHealthAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "whether a Cloudflare account is connected",
+        path: "/api/deploy/cloudflare/account-status",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).cloudflareAccountStatus(),
+        action: "cloudflareAccountStatusAction",
+        args: []
+    },
+    {
+        name: "a service's source",
+        path: "/api/deploy/services/source",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).serviceSource("applicationId-1"),
+        action: "serviceSourceAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a service's uploaded source",
+        path: "/api/deploy/services/uploaded-source",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).uploadedSource("applicationId-1"),
+        action: "uploadedSourceAction",
+        args: ["applicationId-1"]
+    },
+    {
+        name: "a project automation's runs",
+        path: "/api/deploy/automations/runs",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).automationRuns({ projectId: "projectId-1", automationId: "automationId-1" }),
+        action: "listAutomationRunsAction",
+        args: [{ projectId: "projectId-1", automationId: "automationId-1" }]
+    },
+    {
+        name: "what a promotion would change",
+        path: "/api/deploy/promotions/preview",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).promotionPreview({
+                sourceEnvironmentId: "sourceEnvironmentId-1",
+                targetEnvironmentId: "targetEnvironmentId-1"
+            }),
+        action: "previewPromotionAction",
+        args: [
+            {
+                sourceEnvironmentId: "sourceEnvironmentId-1",
+                targetEnvironmentId: "targetEnvironmentId-1"
+            }
+        ]
+    },
+    {
+        name: "a volume's detail",
+        path: "/api/deploy/volumes/detail",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).volumeDetail("volumeId-1"),
+        action: "volumeDetailAction",
+        args: ["volumeId-1"]
+    },
+    {
+        name: "how far a variable group reaches",
+        path: "/api/deploy/variable-groups/reach",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).variableGroupReach({ groupId: "groupId-1" }),
+        action: "variableGroupReachAction",
+        args: [{ groupId: "groupId-1" }]
+    },
+    {
+        name: "a service's tags",
+        path: "/api/deploy/services/tags",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).serviceTags({ applicationId: "applicationId-1" }),
+        action: "serviceTagsAction",
+        args: [{ applicationId: "applicationId-1" }]
+    },
+    {
+        name: "a scope's variables, shown in the raw editor",
+        path: "/api/deploy/variables/reveal",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).envScopeValues({ scope: "scope-1", scopeId: "scopeId-1" }),
+        action: "revealEnvScopeAction",
+        args: [{ scope: "scope-1", scopeId: "scopeId-1" }]
+    },
+    {
+        name: "the NAS connections a volume can use",
+        path: "/api/deploy/nas-connections",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
+                    "@/app/(app)/apps/deploy/deploy-polls"
+                )
+            ).nasConnections(),
+        action: "listNasConnectionsAction",
+        args: []
+    },
+    {
+        name: "one's own presence, asked again when the menu opens",
+        path: "/api/account/presence",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).presenceNow(),
+        action: "presenceNowAction",
+        args: []
+    },
+    {
+        name: "the channels a notice can be sent through",
+        path: "/api/automations/notice-channels",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).noticeChannels(),
+        action: "noticeChannelsAction",
+        args: []
+    },
+    {
+        name: "what the account searched lately",
+        path: "/api/search/recent",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).recentSearches(),
+        action: "listRecentSearchesAction",
+        args: []
+    },
+    {
+        name: "the disks running out of room, asked again on a timer",
+        path: "/api/disk-alerts",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).diskAlerts(),
+        action: "diskAlertsAction",
+        args: []
+    },
+    {
+        name: "a domain's mail security",
+        path: "/api/domains/security",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).domainSecurity({ kind: "sample" }, "domain-1"),
+        action: "readDomainSecurityAction",
+        args: [{ kind: "sample" }, "domain-1"]
+    },
+    {
+        name: "what fixing a domain's mail security would change",
+        path: "/api/domains/security/plan",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).domainSecurityPlan({ kind: "sample" }, "domain-1", { kind: "sample" }),
+        action: "planDomainSecurityAction",
+        args: [{ kind: "sample" }, "domain-1", { kind: "sample" }]
+    },
+    {
+        name: "every domain's mail security",
+        path: "/api/domains/security/inventory",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).securityInventory(),
+        action: "securityInventoryAction",
+        args: []
+    },
+    {
+        name: "a screen's extra translations",
+        path: "/api/i18n/namespaces",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).namespaceMessages(["automations"]),
+        action: "namespaceMessagesAction",
+        args: [["automations"]]
+    },
+    {
+        name: "a chart's breakdown by subject",
+        path: "/api/watch/breakdown",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).subjectBreakdown({ kind: "sample" }),
+        action: "subjectBreakdownAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "the points a thing can be restored to",
+        path: "/api/deploy/restore-points",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).restoreHistory({ kind: "sample" }),
+        action: "listHistoryAction",
+        args: [{ kind: "sample" }]
+    },
+    {
+        name: "whether the first-run setup is still to do",
+        path: "/api/setup/state",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).setupState(),
+        action: "setupStateAction",
+        args: []
+    },
+    {
+        name: "the apps the first-run setup installed",
+        path: "/api/setup/installed",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).setupInstalled(),
+        action: "setupInstalledAction",
+        args: []
+    },
+    {
+        name: "the ways one can confirm it is them",
+        path: "/api/account/step-up/options",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).stepUpOptions(),
+        action: "stepUpOptionsAction",
+        args: []
+    },
+    {
+        name: "whether to offer the overview tour",
+        path: "/api/tours/overview-offer",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).shouldOfferOverview(),
+        action: "shouldOfferOverviewAction",
+        args: []
+    },
+    {
+        name: "a person's profile card",
+        path: "/api/users/profile",
+        ask: async () =>
+            (
+                await actual<typeof import("@/components/shared-polls")>(
+                    "@/components/shared-polls"
+                )
+            ).userProfile("userId-1"),
+        action: "getUserProfileAction",
+        args: ["userId-1"]
     }
 ];
 
@@ -461,7 +1230,9 @@ beforeEach(() => {
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {
-            const request = new Request(`http://polaris.test${url}`);
+            const request = new Request(`http://polaris.test${url}`, {
+                headers: { "sec-fetch-site": "same-origin" }
+            });
             const load = ROUTES[new URL(request.url).pathname];
             if (!load) return new Response("{}", { status: 404 });
             return (await load()).GET(request);

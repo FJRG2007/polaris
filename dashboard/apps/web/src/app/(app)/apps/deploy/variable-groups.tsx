@@ -45,6 +45,7 @@ import * as groupActions from "./variable-group-actions";
 import type { ServiceGroupsView, VariableGroupsView } from "./variable-group-actions";
 import type { LinkingService } from "@/lib/deploy/variable-groups";
 import type { VariableSource } from "@polaris/core/variable-groups";
+import * as polls from "./deploy-polls";
 
 const ICON_BUTTON =
     "rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50";
@@ -207,10 +208,13 @@ function GroupDetail({
     const dirty = name.trim() !== group.name || description.trim() !== group.description;
 
     useEffect(() => {
-        void groupActions.variableGroupReachAction({ groupId: group.id }).then((result) => {
-            setDeployed(result.deployed ?? 0);
-            setUsedBy({ services: result.services ?? [], hidden: result.hidden ?? 0 });
-        });
+        void polls.variableGroupReach({ groupId: group.id }).then(
+            (result) => {
+                setDeployed(result.deployed ?? 0);
+                setUsedBy({ services: result.services ?? [], hidden: result.hidden ?? 0 });
+            },
+            () => undefined
+        );
     }, [group.id]);
 
     function save(): void {
@@ -730,11 +734,10 @@ export function TagsEditor({
 export function ServiceTags({ applicationId }: { applicationId: string }) {
     const [state, setState] = useState<{ tags: string[]; canEdit: boolean } | null>(null);
     useEffect(() => {
-        void groupActions
-            .serviceTagsAction({ applicationId })
-            .then((result) =>
-                setState({ tags: result.tags ?? [], canEdit: Boolean(result.canEdit) })
-            );
+        void polls.serviceTags({ applicationId }).then(
+            (result) => setState({ tags: result.tags ?? [], canEdit: Boolean(result.canEdit) }),
+            () => setState({ tags: [], canEdit: false })
+        );
     }, [applicationId]);
     if (state === null)
         return <div className="h-8 animate-pulse rounded-md bg-muted" aria-busy="true" />;

@@ -470,6 +470,7 @@
         "noServices": "El proyecto aún no tiene servicios, así que solo puede avisar.",
         "noCommands": "Ejecutar un comando requiere acceso a la consola del proyecto.",
         "cancel": "Cancelar",
-        "save": "Guardar"
+        "save": "Guardar",
+        "runsFailed": "Error al leer las ejecuciones"
     }
 }

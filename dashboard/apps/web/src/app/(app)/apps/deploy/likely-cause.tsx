@@ -15,9 +15,10 @@ import { Button, Input } from "@polaris/ui";
 import { Lightbulb, Loader2 } from "lucide-react";
 import type { DeployFix, Diagnosis } from "@polaris/deploy";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { applyDeployFixAction, deploymentDiagnosisAction } from "./fix-actions";
+import { applyDeployFixAction } from "./fix-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
+import * as polls from "./deploy-polls";
 
 type ServiceT = NamespaceTranslator<"deployService">;
 
@@ -32,7 +33,12 @@ function inputFor(fix: DeployFix, typed: string): unknown {
         case "set-root-directory":
             return { kind: fix.kind, value: typed };
         case "add-variable":
-            return { kind: fix.kind, name: fix.name, value: fix.generate ? null : (fix.value ?? typed), generate: fix.generate };
+            return {
+                kind: fix.kind,
+                name: fix.name,
+                value: fix.generate ? null : (fix.value ?? typed),
+                generate: fix.generate
+            };
         default:
             return fix;
     }
@@ -50,7 +56,9 @@ function asks(fix: DeployFix, t: ServiceT): { label: string; placeholder: string
         case "set-root-directory":
             return { label: t("fix.rootDirectory"), placeholder: "apps/web" };
         case "add-variable":
-            return fix.generate || fix.value !== null ? null : { label: t("fix.valueFor", { name: fix.name }), placeholder: "" };
+            return fix.generate || fix.value !== null
+                ? null
+                : { label: t("fix.valueFor", { name: fix.name }), placeholder: "" };
         default:
             return null;
     }
@@ -64,7 +72,9 @@ function pressLabel(fix: DeployFix, t: ServiceT): string {
         case "set-runtime-version":
             return t("fix.buildOn", { version: fix.version });
         case "add-variable":
-            return fix.generate ? t("fix.generate", { name: fix.name }) : t("fix.set", { name: fix.name });
+            return fix.generate
+                ? t("fix.generate", { name: fix.name })
+                : t("fix.set", { name: fix.name });
         case "use-detected-build":
             return t("fix.detected");
         default:
@@ -86,7 +96,9 @@ export function LikelyCause({
     onFixed: () => void;
 }) {
     const t = useTranslations("deployService");
-    const [diagnosis, setDiagnosis] = useState<Diagnosis | null | undefined>(() => answers.get(deploymentId));
+    const [diagnosis, setDiagnosis] = useState<Diagnosis | null | undefined>(() =>
+        answers.get(deploymentId)
+    );
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -97,7 +109,8 @@ export function LikelyCause({
             return;
         }
         let active = true;
-        void deploymentDiagnosisAction(deploymentId)
+        void polls
+            .deploymentDiagnosis(deploymentId)
             .catch(() => ({ diagnosis: null }))
             .then((result) => {
                 answers.set(deploymentId, result.diagnosis);
@@ -138,9 +151,14 @@ export function LikelyCause({
             <div className="flex items-start gap-2">
                 <Lightbulb className="mt-0.5 size-4 text-primary" />
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">{t("fix.likely", { title: diagnosis.title })}</p>
+                    <p className="text-sm font-medium text-foreground">
+                        {t("fix.likely", { title: diagnosis.title })}
+                    </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{diagnosis.detail}</p>
-                    <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={diagnosis.evidence}>
+                    <p
+                        className="mt-1 truncate font-mono text-xs text-muted-foreground"
+                        title={diagnosis.evidence}
+                    >
                         {diagnosis.evidence}
                     </p>
                 </div>
@@ -162,8 +180,13 @@ export function LikelyCause({
                             />
                         </label>
                     )}
-                    <Button size="sm" disabled={pending || !ready || problem !== null} onClick={apply}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} {prompt ? t("fix.save") : pressLabel(fix, t)}
+                    <Button
+                        size="sm"
+                        disabled={pending || !ready || problem !== null}
+                        onClick={apply}
+                    >
+                        {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                        {prompt ? t("fix.save") : pressLabel(fix, t)}
                     </Button>
                 </div>
             )}

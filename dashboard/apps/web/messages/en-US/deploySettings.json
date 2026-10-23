@@ -470,6 +470,7 @@
         "noServices": "This project has no services yet, so it can only notify.",
         "noCommands": "Running a command needs console access to this project.",
         "cancel": "Cancel",
-        "save": "Save"
+        "save": "Save",
+        "runsFailed": "Could not read the recent runs"
     }
 }

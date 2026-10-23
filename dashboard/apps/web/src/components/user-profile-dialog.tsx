@@ -26,6 +26,7 @@ import {
     type UserProfile
 } from "@/app/(app)/drive/activity-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as polls from "./shared-polls";
 
 export function UserProfileDialog({
     userId,
@@ -50,12 +51,19 @@ export function UserProfileDialog({
         setLoading(true);
         setError(null);
         setReason("");
-        void getUserProfileAction(userId).then((result) => {
-            if (!active) return;
-            if (result.error) setError(result.error);
-            else setProfile(result.profile ?? null);
-            setLoading(false);
-        });
+        void polls.userProfile(userId).then(
+            (result) => {
+                if (!active) return;
+                if (result.error) setError(result.error);
+                else setProfile(result.profile ?? null);
+                setLoading(false);
+            },
+            () => {
+                if (!active) return;
+                setError(t("userProfile.loadFailed"));
+                setLoading(false);
+            }
+        );
         return () => {
             active = false;
         };
@@ -114,7 +122,9 @@ export function UserProfileDialog({
                                     {profile.isAdmin ? (
                                         <Badge variant="neutral">{t("userProfile.admin")}</Badge>
                                     ) : null}
-                                    {profile.banned ? <Badge variant="danger">{t("userProfile.banned")}</Badge> : null}
+                                    {profile.banned ? (
+                                        <Badge variant="danger">{t("userProfile.banned")}</Badge>
+                                    ) : null}
                                 </p>
                                 {profile.email ? (
                                     <p className="truncate text-sm text-muted-foreground">

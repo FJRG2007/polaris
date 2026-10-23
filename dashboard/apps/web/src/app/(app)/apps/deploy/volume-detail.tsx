@@ -56,6 +56,7 @@ import {
     Trash2,
     TriangleAlert
 } from "lucide-react";
+import * as polls from "./deploy-polls";
 
 const TABS = ["Metrics", "Files", "Settings"] as const;
 export type VolumeTab = (typeof TABS)[number];
@@ -149,14 +150,17 @@ export function VolumeDetailDialog({
         setTab(openOn);
         let active = true;
 
-        void volumeDetailAction(volumeId).then((result) => {
-            if (!active) return;
-            if (result.error || !result.volume) {
-                setError(result.error ?? t("volume.loadFailed"));
-                return;
-            }
-            setData({ volume: result.volume, canManage: result.canManage ?? false });
-        });
+        void polls.volumeDetail(volumeId).then(
+            (result) => {
+                if (!active) return;
+                if (result.error || !result.volume) {
+                    setError(result.error ?? t("volume.loadFailed"));
+                    return;
+                }
+                setData({ volume: result.volume, canManage: result.canManage ?? false });
+            },
+            () => active && setError(t("volume.loadFailed"))
+        );
 
         // Measured alongside, not after: the panel is already on screen and
         // usable while this is still walking the volume - and it shows the last

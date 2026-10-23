@@ -90,6 +90,7 @@ import {
     TriangleAlert,
     X
 } from "lucide-react";
+import * as polls from "./deploy-polls";
 
 type ServiceT = NamespaceTranslator<"deployService">;
 
@@ -218,8 +219,8 @@ function QuickTunnelRow({
     const t = useTranslations("deployService");
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void deployActions
-            .quickTunnelStatusAction(appId)
+        void polls
+            .quickTunnelStatus(appId)
             .then((result) => {
                 setStatus(result);
                 const held = result.running && result.url ? result.url : null;
@@ -274,8 +275,8 @@ function NgrokTunnelRow({
     const t = useTranslations("deployService");
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void deployActions
-            .ngrokTunnelStatusAction(appId)
+        void polls
+            .ngrokTunnelStatus(appId)
             .then((result) => {
                 setStatus(result);
                 const held = result.running && result.url ? result.url : null;
@@ -322,8 +323,8 @@ function NamedTunnelRow({
     const t = useTranslations("deployService");
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void deployActions
-            .namedTunnelStatusAction(appId)
+        void polls
+            .namedTunnelStatus(appId)
             .then((result) => {
                 setStatus(result);
                 const held = result.configured && result.hostname ? result.hostname : null;
@@ -664,8 +665,8 @@ function useDomainHealth(
     useEffect(() => {
         if (settled || rounds > 30) return;
         const timer = setTimeout(() => {
-            void deployActions
-                .domainHealthAction(applicationId)
+            void polls
+                .domainHealth(applicationId)
                 .then((rows) => setHealth(new Map(rows.map((row) => [row.id, row]))))
                 .catch(() => undefined)
                 .finally(() => setRounds((count) => count + 1));
@@ -1508,8 +1509,8 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
     const [added, markAdded] = useSavedFlash();
 
     useEffect(() => {
-        void deployActions
-            .cloudflareAccountStatusAction()
+        void polls
+            .cloudflareAccountStatus()
             .then((status) => setCfConnected(status.connected))
             .catch(() => undefined);
         void deployActions
@@ -2517,8 +2518,8 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void deployActions
-            .listDeployServersAction(app.environmentId)
+        void polls
+            .deployServers(app.environmentId)
             .then((list) => setServers(list))
             .catch(() => undefined);
     }, [app.environmentId]);

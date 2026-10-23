@@ -17,7 +17,7 @@ import { ChevronDown, ChevronRight, Globe } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import type { InventoryEntry } from "@/lib/domain-security/service";
-import { securityInventoryAction } from "@/app/(app)/account/domains/security-actions";
+import * as polls from "../shared-polls";
 
 const CACHE_KEY = "domain-security:inventory";
 const SNAPSHOT_MS = 30_000;
@@ -33,7 +33,7 @@ export function SecurityInventory() {
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const result = await securityInventoryAction().catch(() => null);
+            const result = await polls.securityInventory().catch(() => null);
             if (cancelled) return;
             if (result?.domains) {
                 setDomains(result.domains);

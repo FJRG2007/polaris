@@ -1252,7 +1252,8 @@
         "banReason": "Motivo del veto (opcional)",
         "banPlaceholder": "¿Por qué se bloquea esta cuenta?",
         "banning": "Bloqueando...",
-        "ban": "Vetar"
+        "ban": "Vetar",
+        "loadFailed": "No se pudo cargar este usuario."
     },
     "agentSelect": {
         "custom": "Otro",

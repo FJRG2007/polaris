@@ -764,7 +764,8 @@
         "using": "Usa {used} de memoria de GPU.",
         "notUsing": "Ahora mismo no ocupa memoria de GPU.",
         "saved": "Guardado. El servicio se está iniciando de nuevo con el cambio.",
-        "noConfigure": "No puedes cambiar cómo se ejecuta este servicio."
+        "noConfigure": "No puedes cambiar cómo se ejecuta este servicio.",
+        "loadFailed": "No se pudo leer la configuración de GPU"
     },
     "deployHooks": {
         "title": "Hooks de deploy",

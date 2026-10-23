@@ -10,8 +10,9 @@
 import { Button } from "@polaris/ui";
 import type { Namespaces } from "@polaris/core";
 import { useEffect, useState, type ReactNode } from "react";
-import { namespaceMessagesAction } from "./namespace-actions";
+
 import { MessagesProvider, useLocale, useTranslations } from "./i18n-provider";
+import * as polls from "../shared-polls";
 
 /** The namespaces the action hands out; anything else it refuses. */
 type Askable = readonly "automations"[];
@@ -42,7 +43,8 @@ export function ClientMessages({
         }
         let cancelled = false;
         setFailed(false);
-        void namespaceMessagesAction([...namespaces])
+        void polls
+            .namespaceMessages([...namespaces])
             .then((answer) => {
                 if (cancelled) return;
                 if (!answer) {

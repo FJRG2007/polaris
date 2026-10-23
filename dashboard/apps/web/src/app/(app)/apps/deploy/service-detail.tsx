@@ -1108,9 +1108,10 @@ function FollowToggle({ applicationId }: { applicationId: string }) {
 
     useEffect(() => {
         setFollowing(null);
-        void deployActions
-            .serviceFollowStateAction(applicationId)
-            .then((state) => setFollowing(state.following));
+        void polls
+            .serviceFollowState(applicationId)
+            .then((state) => setFollowing(state.following))
+            .catch(() => undefined);
     }, [applicationId]);
 
     if (following === null) return null;
@@ -1207,7 +1208,10 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
 
     useEffect(() => {
         setLines(null);
-        void deployActions.serviceHistoryAction(applicationId).then(setLines);
+        void polls
+            .serviceHistory(applicationId)
+            .then(setLines)
+            .catch(() => setLines([]));
     }, [applicationId]);
 
     // Nothing yet means nothing to open, and a heading over an empty box is a

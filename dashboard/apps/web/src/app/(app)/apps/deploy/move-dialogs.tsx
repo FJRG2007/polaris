@@ -47,6 +47,7 @@ import {
     Select,
     Skeleton
 } from "@polaris/ui";
+import * as polls from "./deploy-polls";
 
 interface ProviderAccount {
     id: string;
@@ -182,11 +183,17 @@ export function MoveOutDialog({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [planned, linked] = await Promise.all([
-                actions.moveOutPlanAction(projectId, application.id),
-                actions.listProviderAccountsAction()
-            ]);
+            const answers = await Promise.all([
+                polls.moveOutPlan(projectId, application.id),
+                polls.providerAccounts()
+            ]).catch(() => null);
             if (cancelled) return;
+            if (!answers) {
+                setError(t("move.loadFailed"));
+                setAccounts([]);
+                return;
+            }
+            const [planned, linked] = answers;
             if (planned.error) setError(planned.error);
             if (planned.plan) setPlan(planned.plan);
             if (planned.canCopyVariables === false) {
@@ -209,7 +216,9 @@ export function MoveOutDialog({
         setChosen("");
         setChild("");
         void (async () => {
-            const result = await actions.listProviderChoicesAction(account);
+            const result = await polls
+                .providerChoices(account)
+                .catch(() => ({ error: t("move.choicesFailed"), choices: [] }));
             if (cancelled) return;
             if (result.error) setError(result.error);
             setChoices(result.choices ?? []);
@@ -266,7 +275,9 @@ export function MoveOutDialog({
         const moved = result.result;
         setDone(
             [
-                moved.copied > 0 ? t("move.out.copied", { count: moved.copied }) : t("move.out.noneCopied"),
+                moved.copied > 0
+                    ? t("move.out.copied", { count: moved.copied })
+                    : t("move.out.noneCopied"),
                 moved.stopped
                     ? t("move.out.stopped")
                     : moved.stopError
@@ -304,19 +315,26 @@ export function MoveOutDialog({
                                 <Note>
                                     {plan.repoUrl
                                         ? plan.branch
-                                            ? t("move.out.builtFromBranch", { repo: plan.repoUrl, branch: plan.branch })
+                                            ? t("move.out.builtFromBranch", {
+                                                  repo: plan.repoUrl,
+                                                  branch: plan.branch
+                                              })
                                             : t("move.out.builtFrom", { repo: plan.repoUrl })
                                         : t("move.out.noRepo")}
                                 </Note>
                                 <Note>{variableNote(plan, canCopy, t)}</Note>
                                 {plan.volumes.length > 0 && (
                                     <Note>
-                                        {t("move.out.volumes", { volumes: plan.volumes.join(", ") })}
+                                        {t("move.out.volumes", {
+                                            volumes: plan.volumes.join(", ")
+                                        })}
                                     </Note>
                                 )}
                                 {plan.domains.length > 0 && (
                                     <Note>
-                                        {t("move.out.domains", { domains: plan.domains.join(", ") })}
+                                        {t("move.out.domains", {
+                                            domains: plan.domains.join(", ")
+                                        })}
                                     </Note>
                                 )}
                             </ul>
@@ -467,7 +485,9 @@ export function MoveHomeDialog({
     const t = useTranslations("deploy");
     const [plan, setPlan] = useState<MoveHomePlan | null>(null);
     const [targets, setTargets] = useState<{ id: string; name: string }[]>([]);
-    const [environment, setEnvironment] = useState(service.environmentId || environments[0]?.id || "");
+    const [environment, setEnvironment] = useState(
+        service.environmentId || environments[0]?.id || ""
+    );
     const [target, setTarget] = useState("");
     const [name, setName] = useState(service.name);
     const [repoUrl, setRepoUrl] = useState("");
@@ -484,8 +504,12 @@ export function MoveHomeDialog({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const result = await actions.moveHomePlanAction(projectId, service.id);
+            const result = await polls.moveHomePlan(projectId, service.id).catch(() => null);
             if (cancelled) return;
+            if (!result) {
+                setError(t("move.loadFailed"));
+                return;
+            }
             if (result.error) setError(result.error);
             if (result.canCopyVariables === false) {
                 setCanCopy(false);
@@ -538,7 +562,9 @@ export function MoveHomeDialog({
         setDone(
             [
                 moved.deploying ? t("move.home.building") : t("move.home.created"),
-                moved.copied > 0 ? t("move.home.copied", { count: moved.copied }) : t("move.home.noneCopied"),
+                moved.copied > 0
+                    ? t("move.home.copied", { count: moved.copied })
+                    : t("move.home.noneCopied"),
                 moved.variablesError ?? ""
             ]
                 .filter(Boolean)
@@ -558,14 +584,19 @@ export function MoveHomeDialog({
                         />
                         {t("move.home.title", { name: service.name })}
                     </DialogTitle>
-                    <DialogDescription>{t("move.home.description", { provider: service.provider })}</DialogDescription>
+                    <DialogDescription>
+                        {t("move.home.description", { provider: service.provider })}
+                    </DialogDescription>
                 </DialogHeader>
 
                 {done ? (
                     <div className="flex flex-col gap-3">
                         <p className="text-sm">{done}</p>
                         <p className="text-xs text-muted-foreground">
-                            {t("move.home.doneHint", { name: service.name, provider: service.provider })}
+                            {t("move.home.doneHint", {
+                                name: service.name,
+                                provider: service.provider
+                            })}
                         </p>
                     </div>
                 ) : (
@@ -577,16 +608,15 @@ export function MoveHomeDialog({
                                 <Note>
                                     {plan.source
                                         ? plan.source.branch
-                                            ? t("move.home.buildsBranch", { repo: plan.source.repo, branch: plan.source.branch })
+                                            ? t("move.home.buildsBranch", {
+                                                  repo: plan.source.repo,
+                                                  branch: plan.source.branch
+                                              })
                                             : t("move.home.builds", { repo: plan.source.repo })
                                         : t("move.home.noSource", { provider: service.provider })}
                                 </Note>
-                                <Note>
-                                    {plan.variablesError ?? variableNote(plan, canCopy, t)}
-                                </Note>
-                                <Note>
-                                    {t("move.home.domains")}
-                                </Note>
+                                <Note>{plan.variablesError ?? variableNote(plan, canCopy, t)}</Note>
+                                <Note>{t("move.home.domains")}</Note>
                             </ul>
                         )}
 

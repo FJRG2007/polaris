@@ -37,6 +37,7 @@ import {
     Input,
     Select
 } from "@polaris/ui";
+import * as polls from "./deploy-polls";
 
 type ServiceT = NamespaceTranslator<"deployService">;
 
@@ -48,8 +49,8 @@ export function useServicePorts(applicationId: string): ServicePorts | null {
     const [ports, setPorts] = useState<ServicePorts | null>(null);
     useEffect(() => {
         let active = true;
-        void netActions
-            .servicePortsAction(applicationId)
+        void polls
+            .servicePorts(applicationId)
             .then((result) => {
                 if (active && !("error" in result)) setPorts(result);
             })
@@ -371,8 +372,8 @@ export function useDomainReadings(
     useEffect(() => {
         let active = true;
         setLoading(true);
-        void netActions
-            .domainReadingsAction(applicationId)
+        void polls
+            .domainReadings(applicationId)
             .then((result) => {
                 if (!active || "error" in result) return;
                 setReadings(new Map(result.readings.map((reading) => [reading.id, reading])));
@@ -533,8 +534,8 @@ export function TcpProxyList({
             setStale(true);
         }
         let active = true;
-        void netActions
-            .tcpProxiesAction(applicationId)
+        void polls
+            .tcpProxies(applicationId)
             .then((result) => {
                 if (active && !("error" in result)) setView(result);
             })

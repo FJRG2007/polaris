@@ -22,7 +22,8 @@ import { useKeptSnapshot } from "@/components/use-live-resource";
 import { dropSnapshots, writeSnapshot } from "@/lib/snapshot-cache";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { ServiceScalingView } from "@/lib/deploy/scaling-service";
-import { saveServiceScalingAction, serviceScalingAction } from "./scaling-actions";
+import { saveServiceScalingAction } from "./scaling-actions";
+import * as polls from "./deploy-polls";
 
 interface Draft {
     replicas: string;
@@ -142,18 +143,21 @@ export function ScalingSection({
 
     useEffect(() => {
         let active = true;
-        void serviceScalingAction(applicationId).then((result) => {
-            if (!active) return;
-            const fresh = result.scaling;
-            if (fresh) {
-                answered.current = applicationId;
-                writeSnapshot(cacheKey, fresh);
-                setView((current) => (current ? mergeUnchanged(current, fresh) : fresh));
-                setDraft(draftOf(fresh));
-                setBase(draftOf(fresh));
-                setKept(false);
-            } else setError(result.error ?? t("scaling.unreadable"));
-        });
+        void polls.serviceScaling(applicationId).then(
+            (result) => {
+                if (!active) return;
+                const fresh = result.scaling;
+                if (fresh) {
+                    answered.current = applicationId;
+                    writeSnapshot(cacheKey, fresh);
+                    setView((current) => (current ? mergeUnchanged(current, fresh) : fresh));
+                    setDraft(draftOf(fresh));
+                    setBase(draftOf(fresh));
+                    setKept(false);
+                } else setError(result.error ?? t("scaling.unreadable"));
+            },
+            () => active && setError(t("scaling.unreadable"))
+        );
         return () => {
             active = false;
         };

@@ -38,6 +38,7 @@ import {
     type PreviewChange,
     type SecurityRef
 } from "@/app/(app)/account/domains/security-actions";
+import * as polls from "../shared-polls";
 
 type Policy = "keep" | "quarantine" | "reject";
 
@@ -154,11 +155,9 @@ export function FixDialog({
         let cancelled = false;
         setChanges(null);
         void (async () => {
-            const result = await planDomainSecurityAction(
-                scope,
-                domain,
-                policy === "keep" ? null : policy
-            ).catch(() => null);
+            const result = await polls
+                .domainSecurityPlan(scope, domain, policy === "keep" ? null : policy)
+                .catch(() => null);
             if (cancelled) return;
             if (result?.changes) setChanges(result.changes);
             else setError(result?.error ?? t("errors.failed"));
