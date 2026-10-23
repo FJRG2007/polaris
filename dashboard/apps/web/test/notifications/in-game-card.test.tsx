@@ -54,6 +54,28 @@ describe("the Messages in Minecraft card", () => {
         expect(markup).toContain('href="/account/connections?return=%2Faccount%2Fnotifications"');
     });
 
+    it("sits under the apps' own heading, which is absent with nothing an app adds", () => {
+        expect(card(true)).toBeTruthy();
+        const markup = (messagesInGame: "all" | null) =>
+            renderToStaticMarkup(
+                withMessages(
+                    <NotificationSettingsView
+                        rules={[]}
+                        destinations={[]}
+                        senders={[]}
+                        deliveries={[]}
+                        messagesInGame={messagesInGame}
+                        inGameReady
+                    />
+                )
+            );
+        const shown = markup("all");
+        expect(shown.indexOf("From your apps")).toBeGreaterThan(-1);
+        expect(shown.indexOf("From your apps")).toBeLessThan(shown.indexOf("Messages in Minecraft"));
+        expect(markup(null)).not.toContain("From your apps");
+        expect(markup(null)).not.toContain("Messages in Minecraft");
+    });
+
     it("offers the three choices once it does", () => {
         const markup = card(true);
         expect(markup).not.toContain(IN_GAME_NOT_READY.slice(0, 40));

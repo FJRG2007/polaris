@@ -153,12 +153,15 @@ model User {
     // order, as a stringified JSON array of app ids. Null is none pinned, which
     // fills that row with recent and suggested apps instead.
     favoriteApps  String?
-    // Whether the messages this account receives in Chat are also shown to it,
-    // and only to it, inside the game server it is playing on right now. Null
-    // is the default: direct messages and small groups only. True adds every
-    // channel and large group, false is none. An app that can deliver one
-    // decides how.
+    // Replaced by `inGameMessages`, which can say "direct only" now that the
+    // default is everything. Neither read nor written any more; kept so the
+    // column and what it held are not dropped.
     messagesInGame Boolean?
+    // Which of the messages this account receives in Chat are also shown to it,
+    // and only to it, inside the game server it is playing on right now: "all",
+    // "auto" (direct messages and small groups) or "off". Null is the default,
+    // which is "all". An app that can deliver one decides how.
+    inGameMessages String?
     // Whether opening the screen a badge points at clears it - an update
     // waiting clears on the Update screen, a report on Safety - until something
     // new arrives. Null is the default, which is yes. See `badge-seen.ts`.

@@ -9,9 +9,9 @@
  * Who gets one is exactly who the corner note would have been for - the same
  * mute, the same "all / mentions / nothing" level, the same blocks, read through
  * the same functions - and then only the accounts it is on for
- * (`User.messagesInGame`): by default a direct message or a group of up to
- * `SMALL_GROUP_SIZE`, where somebody is writing to you; turned on, every channel and
- * group too; turned off, nothing. Which game, which player and whether they are on is
+ * (`User.inGameMessages`): by default every conversation, channels included; set
+ * to direct, only a direct message or a group of up to `SMALL_GROUP_SIZE`, where
+ * somebody is writing to you; turned off, nothing. Which game, which player and whether they are on is
  * the app's business, behind `relayChatMessage`; core knows nothing of any game.
  *
  * Never awaited by the send and never able to fail it: a message going out
@@ -21,10 +21,10 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
-import { channelRelayer, chatRelayer } from "@/lib/app-extensions/registry";
+import { channelRelayer, chatRelayAccounts, chatRelayer } from "@/lib/app-extensions/registry";
 import { conversationName, filesLabel } from "./toasts";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
-import { SMALL_GROUP_SIZE } from "./in-game-choice";
+import { SMALL_GROUP_SIZE, inGameChoice } from "./in-game-choice";
 import { messageable, reachableChannelIds } from "./access";
 import { mentionsReader, notifyLevels, readerTeams } from "./notify";
 
@@ -39,8 +39,8 @@ const POLL_OPTIONS = 10;
  *  a whole server's worth of traffic. */
 const MOST_READERS = 50;
 
-/** The most accounts that turned it on looked at for one channel message, most
- *  of whom will not be reading that channel at all. */
+/** The most accounts looked at for one channel message, most of whom will not
+ *  be reading that channel at all. */
 const MOST_CANDIDATES = 200;
 
 /**
@@ -139,9 +139,12 @@ export async function relayToGames(messageId: string): Promise<void> {
  *
  * A direct message or a group is read only by its members, so they are the
  * whole list: each one it is not turned off for, or in a group larger than
- * `SMALL_GROUP_SIZE` each one that turned everything on. A channel in a space is also
- * read by everybody who reaches the space or was handed the room, with no row of
- * their own on it, so it starts from the accounts that turned everything on.
+ * `SMALL_GROUP_SIZE` each one it is on everything for. A channel in a space is
+ * also read by everybody who reaches the space or was handed the room, with no
+ * row of their own on it, so it starts from the accounts it is on everything for
+ * - and, since that is everybody who has not chosen, only those an app says are
+ * playing right now, so the list is as long as who is on rather than as long as
+ * the instance. An older app that cannot say gets the capped scan instead.
  */
 async function readersOf(
     channelId: string,
@@ -149,14 +152,7 @@ async function readersOf(
     authorId: string
 ): Promise<{ userId: string; muted: boolean; mutedUntil: Date | null }[]> {
     const candidates = spaceId
-        ? (
-              await prisma.user.findMany({
-                  where: { messagesInGame: true, id: { not: authorId } },
-                  select: { id: true },
-                  orderBy: { id: "asc" },
-                  take: MOST_CANDIDATES
-              })
-          ).map((user) => user.id)
+        ? await everythingReaders(authorId)
         : await groupMembers(channelId, authorId);
     if (candidates.length === 0) return [];
 
@@ -181,8 +177,26 @@ async function readersOf(
     }));
 }
 
+/** The accounts it is on everything for, among those playing right now when the
+ *  apps can say who that is. */
+async function everythingReaders(authorId: string): Promise<string[]> {
+    const playing = await chatRelayAccounts();
+    if (playing) playing.delete(authorId);
+    if (playing && playing.size === 0) return [];
+    const users = await prisma.user.findMany({
+        where: {
+            id: playing ? { in: [...playing] } : { not: authorId },
+            OR: [{ inGameMessages: null }, { inGameMessages: "all" }]
+        },
+        select: { id: true },
+        orderBy: { id: "asc" },
+        take: MOST_CANDIDATES
+    });
+    return users.map((user) => user.id);
+}
+
 /** The members of a direct message or group it is on for, asked of the
- *  database before the cap so a large group's opted-in members are not cut. */
+ *  database before the cap so a large group's members it is on for are not cut. */
 async function groupMembers(channelId: string, authorId: string): Promise<string[]> {
     const size = await prisma.chatChannelMember.count({ where: { channelId } });
     const small = size <= SMALL_GROUP_SIZE;
@@ -191,10 +205,10 @@ async function groupMembers(channelId: string, authorId: string): Promise<string
             channelId,
             userId: { not: authorId },
             user: small
-                ? { OR: [{ messagesInGame: true }, { messagesInGame: null }] }
-                : { messagesInGame: true }
+                ? { OR: [{ inGameMessages: null }, { inGameMessages: { not: "off" } }] }
+                : { OR: [{ inGameMessages: null }, { inGameMessages: "all" }] }
         },
-        select: { userId: true, user: { select: { messagesInGame: true } } },
+        select: { userId: true, user: { select: { inGameMessages: true } } },
         orderBy: { userId: "asc" },
         take: MOST_CANDIDATES
     });
@@ -203,16 +217,17 @@ async function groupMembers(channelId: string, authorId: string): Promise<string
 
 /** The members of a direct message or group it is on for, as `readersOf` says. */
 export function groupCandidates(
-    members: readonly { userId: string; user: { messagesInGame: boolean | null } }[],
+    members: readonly { userId: string; user: { inGameMessages: string | null } }[],
     authorId: string,
     size: number = members.length
 ): string[] {
     const small = size <= SMALL_GROUP_SIZE;
     return members
         .filter((member) => member.userId !== authorId)
-        .filter((member) =>
-            member.user.messagesInGame === null ? small : member.user.messagesInGame
-        )
+        .filter((member) => {
+            const choice = inGameChoice(member.user.inGameMessages);
+            return choice === "all" || (choice === "auto" && small);
+        })
         .map((member) => member.userId);
 }
 

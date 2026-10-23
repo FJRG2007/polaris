@@ -24,16 +24,25 @@ const fake = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         gamePlayerLink: {
-            findMany: async ({ where }: { where: { userId?: { in: string[] }; installedAppId?: string } }) =>
+            findMany: async ({
+                where
+            }: {
+                where: { userId?: { in: string[] }; installedAppId?: string | { in: string[] } };
+            }) =>
                 fake.links.filter(
                     (link) =>
                         (!where.userId || where.userId.in.includes(link.userId)) &&
-                        (!where.installedAppId || link.installedAppId === where.installedAppId)
+                        (!where.installedAppId ||
+                            (typeof where.installedAppId === "string"
+                                ? link.installedAppId === where.installedAppId
+                                : where.installedAppId.in.includes(link.installedAppId)))
                 )
         },
         installedApp: {
-            findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-                fake.installs.filter((install) => where.id.in.includes(install.id) && install.status !== "removed")
+            findMany: async ({ where }: { where: { id?: { in: string[] } } }) =>
+                fake.installs.filter(
+                    (install) => (!where.id || where.id.in.includes(install.id)) && install.status !== "removed"
+                )
         },
         userConnection: {
             findMany: async ({ where }: { where: { userId: { in: string[] }; provider: string } }) =>
@@ -50,7 +59,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { playingMinecraftNow, accountsOfPlayers } = await import(
+const { playingMinecraftNow, accountsOfPlayers, accountsPlayingMinecraftNow } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/playing-now"
 );
 
@@ -120,5 +129,29 @@ describe("whose screens are told a player arrived", () => {
         ];
         expect(await accountsOfPlayers("s1", ["adaplays"])).toEqual([ADA]);
         expect(await accountsOfPlayers("s1", [])).toEqual([]);
+    });
+});
+
+describe("the accounts a Chat message in a channel is looked at for", () => {
+    it("are the accounts linked to a player on now, matched whatever the case, on a live Minecraft server", async () => {
+        fake.installs.push({ id: "ark", ownerId: "owner", catalogId: "ark", name: "Ark", status: "running" });
+        fake.sessions.push(
+            { installedAppId: "s1", name: "Gone", joinedAt: JOINED, leftAt: JOINED },
+            { installedAppId: "ark", name: "Rex", joinedAt: JOINED, leftAt: null },
+            { installedAppId: "gone", name: "Old", joinedAt: JOINED, leftAt: null }
+        );
+        fake.links = [
+            { installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: false },
+            { installedAppId: "s1", player: "Gone", userId: "left", followSignIns: true },
+            { installedAppId: "ark", player: "Rex", userId: "ark-player", followSignIns: true },
+            { installedAppId: "gone", player: "Old", userId: "removed", followSignIns: true }
+        ];
+        expect(await accountsPlayingMinecraftNow()).toEqual([ADA]);
+    });
+
+    it("are nobody when nobody is on", async () => {
+        fake.sessions = [];
+        fake.links = [{ installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: true }];
+        expect(await accountsPlayingMinecraftNow()).toEqual([]);
     });
 });

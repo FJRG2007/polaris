@@ -1,7 +1,7 @@
 /**
  * Which Chat messages an account sees inside the game it is playing on, as the
- * settings screen offers it and as `User.messagesInGame` stores it: null for the
- * default (direct messages and small groups), true for everything, false for none.
+ * settings screen offers it and as `User.inGameMessages` stores it: the choice
+ * itself, or null for the default, which is everything.
  */
 
 /** The largest group shown in the game by default. Past it a group is a room
@@ -18,10 +18,17 @@ export type InGameChoice = (typeof IN_GAME_CHOICES)[number];
 export const IN_GAME_NOT_READY =
     "No server knows which player is you yet. Add your Minecraft username in Connected accounts, or ask whoever runs the server to link your player to your account.";
 
-export function inGameChoice(stored: boolean | null): InGameChoice {
-    return stored === null ? "auto" : stored ? "all" : "off";
+/** What an account gets when it has not chosen. */
+export const DEFAULT_IN_GAME: InGameChoice = "all";
+
+/** The stored value as a choice; null, or anything this version does not know,
+ *  is the default. */
+export function inGameChoice(stored: string | null | undefined): InGameChoice {
+    return (IN_GAME_CHOICES as readonly string[]).includes(stored ?? "")
+        ? (stored as InGameChoice)
+        : DEFAULT_IN_GAME;
 }
 
-export function storedInGame(choice: InGameChoice): boolean | null {
-    return choice === "auto" ? null : choice === "all";
+export function storedInGame(choice: InGameChoice): string {
+    return choice;
 }

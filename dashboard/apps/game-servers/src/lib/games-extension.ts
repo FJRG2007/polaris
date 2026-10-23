@@ -124,6 +124,9 @@ export const gameServersExtension: AppExtension = {
 
     chatRelayReady: async (userId) => (await import("./minecraft/chat-relay")).relayReady(userId),
 
+    chatRelayAccounts: async () =>
+        (await import("./minecraft/playing-now")).accountsPlayingMinecraftNow(),
+
     // "Playing Minecraft" beside somebody's face, from the visits the activity
     // sweep already keeps - no server is asked.
     playingNow: async (userIds) =>

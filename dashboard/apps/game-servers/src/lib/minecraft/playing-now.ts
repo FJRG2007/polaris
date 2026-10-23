@@ -21,6 +21,10 @@ import { prisma } from "@polaris/db";
 import { gameOfServer } from "@polaris/core";
 import { accountAgrees, connectedMinecraftNames } from "../link-agreement";
 
+/** The most open visits read to say who is playing: past it the cap on
+ *  readers in `chat/game-relay` cuts the list anyway. */
+const MOST_PLAYING = 2000;
+
 /** One visit, as the dashboard's presence card reads it. */
 export interface MinecraftVisit {
     readonly userId: string;
@@ -98,6 +102,42 @@ export async function playingMinecraftNow(userIds: readonly string[]): Promise<M
         });
     }
     return visits;
+}
+
+/**
+ * The accounts with a player on a Minecraft server here right now: the open
+ * visits, matched to the links on the same server. Every link counts, agreed or
+ * not - this only narrows who a Chat message is looked at for, and the relay
+ * applies its own rule to each. Bounded by who is on, never by the number of
+ * accounts, so a channel message is not checked against everybody.
+ */
+export async function accountsPlayingMinecraftNow(): Promise<string[]> {
+    const installs = await prisma.installedApp.findMany({
+        where: { status: { not: "removed" } },
+        select: { id: true, catalogId: true }
+    });
+    const minecraft = installs
+        .filter((install) => gameOfServer(install.catalogId)?.id === "minecraft")
+        .map((install) => install.id);
+    if (minecraft.length === 0) return [];
+    const on = await prisma.gamePlayerSession.findMany({
+        where: { installedAppId: { in: minecraft }, leftAt: null },
+        select: { installedAppId: true, name: true },
+        take: MOST_PLAYING
+    });
+    if (on.length === 0) return [];
+    const names = new Set(on.map((row) => `${row.installedAppId}:${row.name.toLowerCase()}`));
+    const links = await prisma.gamePlayerLink.findMany({
+        where: { installedAppId: { in: [...new Set(on.map((row) => row.installedAppId))] } },
+        select: { installedAppId: true, player: true, userId: true }
+    });
+    return [
+        ...new Set(
+            links
+                .filter((link) => names.has(`${link.installedAppId}:${link.player.toLowerCase()}`))
+                .map((link) => link.userId)
+        )
+    ];
 }
 
 /**

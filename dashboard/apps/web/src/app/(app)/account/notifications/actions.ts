@@ -69,7 +69,7 @@ export async function setMessagesInGameAction(
     }
     await prisma.user.update({
         where: { id: user.id },
-        data: { messagesInGame: storedInGame(parsed.data) }
+        data: { inGameMessages: storedInGame(parsed.data) }
     });
     return { choice: parsed.data };
 }
