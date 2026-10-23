@@ -7,9 +7,11 @@ import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { POLARIS_APP_CATALOG } from "@/lib/apps/catalog";
-import { appScreenshots, screenshotLanguage } from "@/lib/apps/app-screenshots";
+import { builtInApps } from "@/lib/apps/marketplace-store";
+import { appScreenshots, builtInScenes, screenshotLanguage } from "@/lib/apps/app-screenshots";
 
 const PUBLIC = resolve(__dirname, "../../public");
+const MEDIA = resolve(__dirname, "../../../../../docs/assets/media");
 
 describe("app screenshots", () => {
     it("picks the capture in the reader's language", () => {
@@ -44,5 +46,19 @@ describe("app screenshots", () => {
             }
         }
         expect(count).toBeGreaterThan(0);
+    });
+
+    it("every built-in app has captures, each taken in both themes, languages and sizes", () => {
+        for (const app of builtInApps()) {
+            const scenes = builtInScenes(app.id);
+            expect(scenes.length, app.id).toBeGreaterThan(0);
+            for (const scene of scenes)
+                for (const theme of ["dark", "light"])
+                    for (const language of ["en", "es"])
+                        for (const form of ["desktop", "mobile"]) {
+                            const file = `${scene}-${theme}-${language}-${form}.webp`;
+                            expect(existsSync(resolve(MEDIA, file)), file).toBe(true);
+                        }
+        }
     });
 });

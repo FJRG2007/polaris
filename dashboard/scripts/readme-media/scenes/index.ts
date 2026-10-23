@@ -24,6 +24,10 @@ import { soundboard } from "./soundboard";
 import { vault, vaultSends } from "./vault";
 import { deploy, deployLogs, deployProject } from "./deploy";
 import { taskPanel, tasks } from "./tasks";
+import { notes } from "./notes";
+import { polar } from "./polar";
+import { watch } from "./watch";
+import { automations } from "./automations";
 import type { SceneDefinition } from "../runtime/scene";
 
 /** Every scene the README shows, in the order the capture takes them. */
@@ -56,6 +60,10 @@ export const SCENES: readonly SceneDefinition[] = [
     officeDoc,
     vault,
     vaultSends,
+    notes,
+    polar,
+    automations,
+    watch,
     placesOverview,
     marketplace,
     marketplaceInstall,

@@ -5,10 +5,19 @@
  * browser: the whole list is in the page, so filtering it needs no server.
  */
 
+import Link from "next/link";
 import { useState } from "react";
 import * as store from "@polaris/ui/store-card";
+import { BuiltInAppsSection } from "@polaris/ui/built-in-apps";
 import { Badge, Input, SegmentedControl } from "@polaris/ui";
-import { fill, matchesApp, siteCategories, type SiteApp } from "@/data/builders";
+import {
+    fill,
+    matchesApp,
+    siteCategories,
+    type BuiltInSiteApp,
+    type BuiltInWords,
+    type SiteApp
+} from "@/data/builders";
 
 /** The mark the build rendered from the dashboard's own component; no input reaches it. */
 function Markup({ html }: { html: string }) {
@@ -56,10 +65,58 @@ export interface MarketWords {
     readonly count: string;
 }
 
-export function MarketplaceGrid({ apps, t }: { apps: readonly SiteApp[]; t: MarketWords }) {
+/**
+ * The apps every Polaris comes with, the dashboard's own section: found by the
+ * same search, each leading to its page on this site.
+ */
+function BuiltIn({
+    apps,
+    words,
+    pageOf
+}: {
+    apps: readonly BuiltInSiteApp[];
+    words: BuiltInWords;
+    pageOf: (id: string) => string;
+}) {
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    return (
+        <BuiltInAppsSection
+            apps={apps.map((app) => ({
+                id: app.id,
+                label: app.name,
+                href: pageOf(app.id),
+                replaces: app.replaces.map((item) => ({
+                    name: item.name,
+                    src: `${base}/logos/${item.logo}.svg`
+                }))
+            }))}
+            words={words}
+            link={Link}
+        />
+    );
+}
+
+export function MarketplaceGrid({
+    apps,
+    builtIn,
+    builtInWords,
+    pages,
+    t
+}: {
+    apps: readonly SiteApp[];
+    builtIn: readonly BuiltInSiteApp[];
+    builtInWords: BuiltInWords;
+    /** The marketplace's own path, which every built-in app's page sits under. */
+    pages: string;
+    t: MarketWords;
+}) {
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState("");
     const shown = apps.filter((app) => matchesApp(app, query, category));
+    const needle = query.trim().toLowerCase();
+    const builtInShown = builtIn.filter(
+        (app) => !needle || app.name.toLowerCase().includes(needle)
+    );
     const options = [
         { value: "", label: t.all },
         ...siteCategories(apps).map((entry) => ({ value: entry.id, label: entry.label }))
@@ -84,13 +141,16 @@ export function MarketplaceGrid({ apps, t }: { apps: readonly SiteApp[]; t: Mark
                     />
                 </div>
                 <span className="text-xs text-muted-foreground">
-                    {fill(t.count, { n: shown.length })}
+                    {fill(t.count, { n: shown.length + builtInShown.length })}
                 </span>
             </div>
+            <BuiltIn apps={builtInShown} words={builtInWords} pageOf={(id) => `${pages}${id}/`} />
             {shown.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                    {t.empty}
-                </p>
+                builtInShown.length > 0 ? null : (
+                    <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                        {t.empty}
+                    </p>
+                )
             ) : (
                 <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {shown.map((app) => (

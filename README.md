@@ -142,6 +142,26 @@ the full feature list. Mobile versions are in
       <br><sub><a href="docs/features/office.md"><b>Office</b></a>: documents, sheets, slides and diagrams</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/notes.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/notes-light-en-desktop.webp">
+        <img src="docs/assets/media/notes-dark-en-desktop.webp" alt="Notes: notes for you and notebooks for your team">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/notes.md"><b>Notes</b></a>: notes for you and notebooks for your team</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/polar.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/polar-light-en-desktop.webp">
+        <img src="docs/assets/media/polar-dark-en-desktop.webp" alt="Polar: ask about any page and have things done">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/polar.md"><b>Polar</b></a>: ask about any page and have things done</sub>
+    </td>
+  </tr>
 </table>
 
 ### Files and secrets
@@ -208,6 +228,26 @@ the full feature list. Mobile versions are in
         <img src="docs/assets/media/places-dark-en-desktop.webp" alt="Places: a place's cameras beside each room's locks, lights and climate">
       </picture>
       <br><sub><b>Places</b>: cameras and device controls for each place</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/automations.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/automations-light-en-desktop.webp">
+        <img src="docs/assets/media/automations-dark-en-desktop.webp" alt="Automations: when something happens, do something">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/automations.md"><b>Automations</b></a>: when something happens, do something</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/watch.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/watch-light-en-desktop.webp">
+        <img src="docs/assets/media/watch-dark-en-desktop.webp" alt="Watch: servers, services and containers at a glance">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/watch.md"><b>Watch</b></a>: servers, services and containers at a glance</sub>
     </td>
   </tr>
 </table>

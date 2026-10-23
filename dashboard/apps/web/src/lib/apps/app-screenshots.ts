@@ -49,3 +49,43 @@ export function appPreview(catalogId: string, locale: string): AppScreenshot | n
 export function hasScreenshots(catalogId: string): boolean {
     return (SHOTS[catalogId]?.length ?? 0) > 0;
 }
+
+/**
+ * Every capture that pictures each built-in app, by its switcher id, in the
+ * order its page shows them - the README's own first, then the rest the capture
+ * script takes (`scripts/readme-media/scenes`). The public site's page for the
+ * app reads this; an app with no entry has no capture yet and its page shows none.
+ */
+const BUILT_IN_SCENES: Readonly<Record<string, readonly string[]>> = {
+    drive: ["drive", "drive-links"],
+    vault: ["vault", "vault-sends"],
+    apps: ["deploy-project", "deploy", "deploy-logs"],
+    tasks: ["tasks", "task-panel"],
+    chat: [
+        "chat",
+        "in-call",
+        "call-direct",
+        "call-group",
+        "soundboard",
+        "chat-thread",
+        "chat-media",
+        "chat-poll",
+        "chat-direct",
+        "call",
+        "call-meeting",
+        "chat-channel-settings",
+        "chat-rules",
+        "chat-privacy"
+    ],
+    mail: ["mail", "mail-thread"],
+    notes: ["notes"],
+    polar: ["polar"],
+    automations: ["automations"],
+    office: ["office", "office-doc"],
+    watch: ["watch"]
+};
+
+/** The capture scenes of built-in app `appId`; empty for one nobody has captured. */
+export function builtInScenes(appId: string): readonly string[] {
+    return BUILT_IN_SCENES[appId] ?? [];
+}

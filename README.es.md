@@ -133,6 +133,26 @@ página con todas sus funciones. Las versiones para móvil están en
       <br><sub><a href="docs/features/office.es.md"><b>Office</b></a>: documentos, hojas, presentaciones y diagramas</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/notes.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/notes-light-es-desktop.webp">
+        <img src="docs/assets/media/notes-dark-es-desktop.webp" alt="Notas: notas para ti y libretas para tu equipo">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/notes.es.md"><b>Notas</b></a>: notas para ti y libretas para tu equipo</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/polar.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/polar-light-es-desktop.webp">
+        <img src="docs/assets/media/polar-dark-es-desktop.webp" alt="Polar: pregunta por cualquier página y haz cosas">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/polar.es.md"><b>Polar</b></a>: pregunta por cualquier página y haz cosas</sub>
+    </td>
+  </tr>
 </table>
 
 ### Archivos y secretos
@@ -199,6 +219,26 @@ página con todas sus funciones. Las versiones para móvil están en
         <img src="docs/assets/media/places-dark-es-desktop.webp" alt="Lugares: las cámaras de un lugar junto a las cerraduras, luces y clima de cada estancia">
       </picture>
       <br><sub><b>Lugares</b>: cámaras y control de dispositivos de cada lugar</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/automations.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/automations-light-es-desktop.webp">
+        <img src="docs/assets/media/automations-dark-es-desktop.webp" alt="Automatizaciones: cuando algo ocurre, se hace otra cosa">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/automations.es.md"><b>Automatizaciones</b></a>: cuando algo ocurre, se hace otra cosa</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/watch.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/watch-light-es-desktop.webp">
+        <img src="docs/assets/media/watch-dark-es-desktop.webp" alt="Monitorización: servidores, servicios y contenedores de un vistazo">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/watch.es.md"><b>Monitorización</b></a>: servidores, servicios y contenedores de un vistazo</sub>
     </td>
   </tr>
 </table>

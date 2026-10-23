@@ -20,7 +20,9 @@ import {
     STREAMDECK_TAG_PREFIX
 } from "@polaris/ui/account-downloads/app-releases";
 import { initialsInk, tintFor } from "@polaris/core";
-import { appPreview } from "@/lib/apps/app-screenshots";
+import { appPreview, builtInScenes } from "@/lib/apps/app-screenshots";
+import { builtInApps } from "@/lib/apps/marketplace-store";
+import { appReplaces } from "@/lib/apps/replaces";
 import { appProvenance } from "@/lib/apps/provenance";
 import { catalogApps, isOffered } from "@/lib/apps/catalog";
 import {
@@ -89,6 +91,90 @@ function localize(sections: site.ShowcaseSection[], locale: "en" | "es"): site.S
             light: item.light ? swap(item.light) : null
         }))
     }));
+}
+
+/**
+ * The apps every Polaris comes with, named and described in the dashboard's own
+ * words, with what each replaces and every capture that shows it.
+ */
+function builtIn(webLocale: string, showcase: site.ShowcaseSection[]): site.BuiltInSiteApp[] {
+    const nav = JSON.parse(read(join(web, "messages", webLocale, "nav.json")));
+    const items = showcase.flatMap((section) => section.items);
+    return builtInApps().map((app) => ({
+        id: app.id,
+        name: nav.labels?.[app.label] ?? app.label,
+        description: nav.apps?.[app.id]?.description ?? app.description,
+        replaces: appReplaces(app.id)
+            .filter((item) => logos.has(`${item.logo}.svg`))
+            .map((item) => ({ name: item.name, logo: item.logo })),
+        shots: builtInScenes(app.id).flatMap((scene) => {
+            const listed = items.find((item) => item.dark.startsWith(`${scene}-dark-`));
+            return listed ? [listed] : captured(scene, webLocale);
+        })
+    }));
+}
+
+/** The feature pages under `docs/features`, by language, read once. */
+const featurePages = (() => {
+    const dir = join(root, "docs", "features");
+    const all = existsSync(dir) ? readdirSync(dir).filter((file) => file.endsWith(".md")) : [];
+    const of = (es: boolean) =>
+        all.filter((file) => file.endsWith(".es.md") === es).map((file) => read(join(dir, file)));
+    return { en: of(false), es: of(true) };
+})();
+
+/**
+ * A capture the README does not list, captioned the way its feature page does:
+ * the section heading above the picture, and the picture's own description.
+ * Nothing when no feature page shows it or the file is missing - a page never
+ * points at a picture that is not there, nor one nobody has described.
+ */
+function captured(scene: string, webLocale: string): site.ShowcaseItem[] {
+    const language = webLocale.startsWith("es") ? "es" : "en";
+    const dark = `${scene}-dark-${language}-desktop.webp`;
+    const light = `${scene}-light-${language}-desktop.webp`;
+    if (!existsSync(join(media, dark))) return [];
+    const shown = new RegExp(
+        `<img src="\\.\\./assets/media/${dark.replace(/\./g, "\\.")}"[^>]*alt="([^"]*)"`
+    );
+    for (const page of featurePages[language]) {
+        const at = shown.exec(page);
+        if (!at) continue;
+        const heading = /^## (.+)$/gm;
+        let name = "";
+        for (
+            let match = heading.exec(page);
+            match && match.index < at.index;
+            match = heading.exec(page)
+        )
+            name = match[1]!.trim();
+        const alt = at[1] ?? "";
+        return [
+            {
+                name: name || alt,
+                caption: name ? alt : "",
+                dark,
+                light: existsSync(join(media, light)) ? light : null,
+                alt
+            }
+        ];
+    }
+    return [];
+}
+
+/** The dashboard's marketplace words the built-in row and an app's page use. */
+function builtInWords(webLocale: string): site.BuiltInWords {
+    const all = JSON.parse(read(join(web, "messages", webLocale, "marketplace.json")));
+    return {
+        title: all.polaris.builtIn,
+        open: all.card.open,
+        replaces: all.detail.replaces,
+        back: all.detail.back,
+        screenshots: all.detail.screenshots,
+        about: all.detail.about,
+        needsNothing: all.detail.needsNothing,
+        by: all.card.by
+    };
 }
 
 const readmeEn = read(join(root, "README.md"));
@@ -221,20 +307,30 @@ async function guides(spanish: boolean): Promise<docs.DocPage[]> {
 }
 const [docsEn, docsEs] = await Promise.all([guides(false), guides(true)]);
 
+const showcaseEn = localize(site.parseShowcase(readmeEn), "en");
+const showcaseEsLocal = localize(
+    showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn),
+    "es"
+);
+
 const data: site.SiteData = {
     repo,
     install: site.parseInstallLines(readmeEn),
     locales: {
         en: {
             apps: site.siteApps(catalog, "en", words("en-US")),
+            builtIn: builtIn("en-US", showcaseEn),
+            builtInWords: builtInWords("en-US"),
             replaces: replacesEn,
-            showcase: localize(site.parseShowcase(readmeEn), "en")
+            showcase: showcaseEn
         },
         es: {
             apps: site.siteApps(catalog, "es", words("es-ES")),
             // The English table stands in if the Spanish README ever loses its own.
             replaces: replacesEs.length ? replacesEs : replacesEn,
-            showcase: localize(showcaseEs.length ? showcaseEs : site.parseShowcase(readmeEn), "es")
+            showcase: showcaseEsLocal,
+            builtIn: builtIn("es-ES", showcaseEsLocal),
+            builtInWords: builtInWords("es-ES")
         }
     },
     docs: { en: docsEn, es: docsEs },
@@ -265,6 +361,10 @@ const pictures = new Set<string>();
 for (const locale of Object.values(data.locales))
     for (const section of locale.showcase)
         for (const item of section.items)
+            for (const file of [item.dark, item.light]) if (file) pictures.add(file);
+for (const locale of Object.values(data.locales))
+    for (const app of locale.builtIn)
+        for (const item of app.shots)
             for (const file of [item.dark, item.light]) if (file) pictures.add(file);
 for (const file of docMedia) pictures.add(file);
 for (const file of pictures)

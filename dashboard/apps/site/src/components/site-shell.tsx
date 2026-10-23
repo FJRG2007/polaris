@@ -33,24 +33,27 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
                     {t.nav.skip}
                 </a>
                 <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-                    <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 py-3 text-sm">
+                    <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-1 px-4 py-3 text-sm">
                         <Link
                             href={href(locale)}
                             className="mr-3 flex shrink-0 items-center gap-2 font-semibold"
                         >
                             Polaris
                         </Link>
-                        {PAGES.slice(1).map((entry) => (
-                            <NavLink
-                                key={entry.key}
-                                href={href(locale, entry.page)}
-                                section={entry.key === "docs"}
-                                except={href(locale, "docs/api/")}
-                                className="shrink-0 rounded-md px-2.5 py-1.5 text-muted-foreground hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground"
-                            >
-                                {t.nav[entry.key]}
-                            </NavLink>
-                        ))}
+                        {/* On a phone the pages take a row of their own, under the name and the two links. */}
+                        <div className="order-last -mx-2.5 flex w-[calc(100%+1.25rem)] min-w-0 flex-wrap gap-1 sm:order-none sm:mx-0 sm:w-auto">
+                            {PAGES.slice(1).map((entry) => (
+                                <NavLink
+                                    key={entry.key}
+                                    href={href(locale, entry.page)}
+                                    section={entry.key === "docs"}
+                                    except={href(locale, "docs/api/")}
+                                    className="shrink-0 rounded-md px-2.5 py-1.5 text-muted-foreground hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground"
+                                >
+                                    {t.nav[entry.key]}
+                                </NavLink>
+                            ))}
+                        </div>
                         <span className="flex-1" />
                         <Link
                             href={href(other)}

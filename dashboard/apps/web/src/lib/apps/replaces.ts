@@ -100,3 +100,8 @@ export function appReplaces(appId: string): readonly ReplacedProduct[] {
 export function replacedLogoSrc(item: ReplacedProduct): string {
     return `/logos/brands/${item.logo}.svg`;
 }
+
+/** What `appId` replaces, each with the address its tile is served from. */
+export function replacedLogos(appId: string): { name: string; src: string }[] {
+    return appReplaces(appId).map((item) => ({ name: item.name, src: replacedLogoSrc(item) }));
+}
