@@ -25,7 +25,15 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { TaskCreateDialog } from "./task-create-dialog";
 import type { CreateContext } from "@/lib/tasks/space-service";
 import { CheckSquare, FileText, FolderPlus, ListPlus, Loader2, Target, Timer } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input
+} from "@polaris/ui";
 import * as polls from "./tasks-polls";
 
 /** Where a create menu was opened. */
@@ -76,7 +84,14 @@ export function createOptionsFor(at: CreateAt, t: NamespaceTranslator<"tasks">):
     return [
         option("task"),
         option("list"),
-        ...(nestable ? [option("folder", at.kind === "folder" ? t("create.kind.subfolder") : t("create.kind.folder"))] : []),
+        ...(nestable
+            ? [
+                  option(
+                      "folder",
+                      at.kind === "folder" ? t("create.kind.subfolder") : t("create.kind.folder")
+                  )
+              ]
+            : []),
         option("doc"),
         option("sprint"),
         ...(at.kind === "space" ? [option("goal")] : [])
@@ -194,7 +209,15 @@ function SprintDialog({
     );
 }
 
-function GoalDialog({ at, onClose, onDone }: { at: CreateAt; onClose: () => void; onDone: () => void }) {
+function GoalDialog({
+    at,
+    onClose,
+    onDone
+}: {
+    at: CreateAt;
+    onClose: () => void;
+    onDone: () => void;
+}) {
     const t = useTranslations("tasks");
     const tc = useTranslations("common");
     const [name, setName] = useState("");
@@ -320,7 +343,10 @@ export function TreeCreate({
         }
         setLoading(true);
         void (async () => {
-            const result = await runAction(() => polls.createContext(at.spaceId, at.folderId), onError);
+            const result = await runAction(
+                () => polls.createContext(at.spaceId, at.folderId),
+                onError
+            );
             setLoading(false);
             if (!result?.context) {
                 onClose();
@@ -331,7 +357,10 @@ export function TreeCreate({
             // the list is made where the task was asked for and the dialog opens
             // on it, rather than sending them off to create one and come back.
             if (!at.listId && result.context.lists.length === 0) {
-                const made = await runAction(() => actions.ensureListAction(at.spaceId, at.folderId), onError);
+                const made = await runAction(
+                    () => actions.ensureListAction(at.spaceId, at.folderId),
+                    onError
+                );
                 if (made?.error) {
                     onError(made.error);
                     onClose();

@@ -1032,8 +1032,8 @@ export function VaultApp() {
                                         title={t("app.sections.signIn")}
                                         when={Boolean(
                                             current.login.username ||
-                                                loginEmail(current) ||
-                                                current.login.password
+                                            loginEmail(current) ||
+                                            current.login.password
                                         )}
                                     >
                                         <Row

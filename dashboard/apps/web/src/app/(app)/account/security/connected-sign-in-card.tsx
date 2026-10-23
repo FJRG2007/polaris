@@ -90,7 +90,8 @@ export function ConnectedSignInCard({
     // nothing.
     useEffect(() => {
         let live = true;
-        void polls.stepUpRemaining(PURPOSE)
+        void polls
+            .stepUpRemaining(PURPOSE)
             .then((result) => live && setProved(result.remainingMs > 0))
             .catch(() => undefined);
         return () => {
@@ -199,7 +200,9 @@ function ChallengeRow({
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                     <p className="text-sm">{t("connected.challenge.title")}</p>
-                    <p className="text-xs text-muted-foreground">{t("connected.challenge.description")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("connected.challenge.description")}
+                    </p>
                 </div>
                 <Switch
                     checked={challenge.enforced || enabled}

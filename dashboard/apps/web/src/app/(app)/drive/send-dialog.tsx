@@ -69,7 +69,8 @@ export function SendDialog({
         setNote("");
         setGiveUp(false);
         setError(null);
-        void polls.transferOrgs()
+        void polls
+            .transferOrgs()
             .then((rows) => setOrgs(rows.map((org) => ({ ...org, allowed: true, isOrg: true }))))
             .catch(() => setOrgs([]));
     }, [open]);
@@ -250,7 +251,9 @@ export function SendDialog({
                         </Button>
                         <Button onClick={send} disabled={busy || chosen.length === 0}>
                             <Send className="size-4 shrink-0" />
-                            {chosen.length > 1 ? t("send.sendTo", { count: chosen.length }) : t("send.send")}
+                            {chosen.length > 1
+                                ? t("send.sendTo", { count: chosen.length })
+                                : t("send.send")}
                         </Button>
                     </div>
                 </div>

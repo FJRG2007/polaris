@@ -234,17 +234,31 @@ export function StateIcon({ state, kind }: { state: CodeItem["state"]; kind: Cod
     const t = useTranslations("code");
     if (kind === "issue") {
         return state === "closed" ? (
-            <CircleSlash className="mt-0.5 size-4 shrink-0 text-[#8957e5]" aria-label={t("states.closed")} />
+            <CircleSlash
+                className="mt-0.5 size-4 shrink-0 text-[#8957e5]"
+                aria-label={t("states.closed")}
+            />
         ) : (
-            <CircleDot className="mt-0.5 size-4 shrink-0 text-[#3fb950]" aria-label={t("states.open")} />
+            <CircleDot
+                className="mt-0.5 size-4 shrink-0 text-[#3fb950]"
+                aria-label={t("states.open")}
+            />
         );
     }
     if (state === "merged") {
-        return <GitMerge className="mt-0.5 size-4 shrink-0 text-[#a371f7]" aria-label={t("states.merged")} />;
+        return (
+            <GitMerge
+                className="mt-0.5 size-4 shrink-0 text-[#a371f7]"
+                aria-label={t("states.merged")}
+            />
+        );
     }
     if (state === "closed") {
         return (
-            <GitPullRequest className="mt-0.5 size-4 shrink-0 text-[#f85149]" aria-label={t("states.closed")} />
+            <GitPullRequest
+                className="mt-0.5 size-4 shrink-0 text-[#f85149]"
+                aria-label={t("states.closed")}
+            />
         );
     }
     if (state === "draft") {
@@ -255,5 +269,10 @@ export function StateIcon({ state, kind }: { state: CodeItem["state"]; kind: Cod
             />
         );
     }
-    return <GitPullRequest className="mt-0.5 size-4 shrink-0 text-[#3fb950]" aria-label={t("states.open")} />;
+    return (
+        <GitPullRequest
+            className="mt-0.5 size-4 shrink-0 text-[#3fb950]"
+            aria-label={t("states.open")}
+        />
+    );
 }

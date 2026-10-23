@@ -189,7 +189,9 @@ export function PeopleShareDialog({
 
                     {groupOptions.length > 0 && (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">{t("peopleShare.orAGroup")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("peopleShare.orAGroup")}
+                            </span>
                             <Select
                                 value={groupId}
                                 onValueChange={setGroupId}
@@ -204,15 +206,22 @@ export function PeopleShareDialog({
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">{t("peopleShare.theyMay")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("peopleShare.theyMay")}
+                            </span>
                             <Select
                                 value={role}
                                 onValueChange={(value) => setRole(value as DriveShareRole)}
-                                options={ROLE_OPTIONS.map((one) => ({ value: one.value, label: t(one.label) }))}
+                                options={ROLE_OPTIONS.map((one) => ({
+                                    value: one.value,
+                                    label: t(one.label)
+                                }))}
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">{t("peopleShare.until")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("peopleShare.until")}
+                            </span>
                             <ExpirySelect onChange={setExpiresAt} />
                         </label>
                     </div>
@@ -243,9 +252,13 @@ export function PeopleShareDialog({
                             {t("peopleShare.peopleWithAccess")}
                         </h3>
                         {holders === null ? (
-                            <p className="text-sm text-muted-foreground">{t("peopleShare.looking")}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {t("peopleShare.looking")}
+                            </p>
                         ) : holders.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("peopleShare.onlyYouSoFar")}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {t("peopleShare.onlyYouSoFar")}
+                            </p>
                         ) : (
                             <ul className="flex flex-col gap-1">
                                 {holders.map((holder) => {
@@ -277,7 +290,9 @@ export function PeopleShareDialog({
                                             <Badge>{t(ROLE_LABELS[holder.role])}</Badge>
                                             {holder.expiresAt && (
                                                 <Badge variant={lapsed ? "neutral" : "warning"}>
-                                                    {lapsed ? t("peopleShare.lapsed") : t("peopleShare.until")}{" "}
+                                                    {lapsed
+                                                        ? t("peopleShare.lapsed")
+                                                        : t("peopleShare.until")}{" "}
                                                     {format.date(holder.expiresAt)}
                                                 </Badge>
                                             )}
@@ -286,7 +301,9 @@ export function PeopleShareDialog({
                                                 variant="ghost"
                                                 disabled={busy}
                                                 title={t("peopleShare.stopSharing")}
-                                                aria-label={t("peopleShare.stopWith", { name: holder.name })}
+                                                aria-label={t("peopleShare.stopWith", {
+                                                    name: holder.name
+                                                })}
                                                 onClick={() => void stop(holder)}
                                             >
                                                 <Trash2 className="size-4" />

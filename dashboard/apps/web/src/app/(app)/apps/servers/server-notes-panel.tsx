@@ -72,7 +72,10 @@ export function ServerNotesPanel({ hostId }: { hostId: string }) {
             {history && history.length > 0 ? (
                 <section className="flex flex-col gap-2">
                     <h2 className="text-sm font-medium">{t("notes.history")}</h2>
-                    <ActivityFeed lines={history} describe={(line) => describeServerEvent(line, t)} />
+                    <ActivityFeed
+                        lines={history}
+                        describe={(line) => describeServerEvent(line, t)}
+                    />
                 </section>
             ) : null}
         </div>

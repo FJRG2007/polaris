@@ -150,13 +150,13 @@ function HandOffDialog({
                 </DialogHeader>
 
                 {noRepos ? (
-                    <p className="text-sm text-muted-foreground">
-                        {t("agent.noRepos")}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("agent.noRepos")}</p>
                 ) : (
                     <div className="space-y-3">
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">{t("agent.repository")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("agent.repository")}
+                            </span>
                             <Select
                                 value={repoId}
                                 onValueChange={setRepoId}
@@ -168,7 +168,9 @@ function HandOffDialog({
                             />
                         </label>
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">{t("agent.agent")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("agent.agent")}
+                            </span>
                             <AgentSelect
                                 options={agents}
                                 value={cli}
@@ -178,7 +180,9 @@ function HandOffDialog({
                         </label>
                         {unlinked ? <SignInNotice agent={unlinked} /> : null}
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">{t("agent.prompt")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("agent.prompt")}
+                            </span>
                             <Textarea
                                 value={prompt}
                                 onChange={(event) => setPrompt(event.target.value)}

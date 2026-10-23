@@ -120,9 +120,9 @@ export function SessionChanges({ session }: { session: SessionView }) {
         const files = [...answer.listing.files];
         // The pages somebody already opened stay open.
         while (next && files.length < shown.current) {
-            const page = await polls.sessionChanges({ sessionId: session.id, offset: next }).catch(
-                () => null
-            );
+            const page = await polls
+                .sessionChanges({ sessionId: session.id, offset: next })
+                .catch(() => null);
             if (read !== reads.current) return;
             if (page?.answer?.kind !== "listing" || page.answer.listing.kind !== "ok") break;
             files.push(...page.answer.listing.files);

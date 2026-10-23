@@ -164,7 +164,9 @@ export function TransfersPanel() {
                                     {offer.name}
                                 </span>
                                 <Badge variant="neutral" className="shrink-0">
-                                    {offer.mode === "move" ? t("transfers.sendingIt") : t("transfers.copy")}
+                                    {offer.mode === "move"
+                                        ? t("transfers.sendingIt")
+                                        : t("transfers.copy")}
                                 </Badge>
                                 <Button
                                     size="sm"

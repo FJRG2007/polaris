@@ -35,7 +35,10 @@ export function Elsewhere({
 
     useEffect(() => {
         let alive = true;
-        void runAction(() => polls.conversationsElsewhere(), () => undefined).then((result) => {
+        void runAction(
+            () => polls.conversationsElsewhere(),
+            () => undefined
+        ).then((result) => {
             if (alive && result?.chats) setChats(result.chats);
         });
         return () => {
@@ -59,7 +62,9 @@ export function Elsewhere({
 
     return (
         <div className="mt-3 flex flex-col gap-0.5 border-t border-border pt-3">
-            <p className="text-foreground-subtle px-2 pb-1 text-xs">{t("elsewhereLabel.somewhereElse")}</p>
+            <p className="text-foreground-subtle px-2 pb-1 text-xs">
+                {t("elsewhereLabel.somewhereElse")}
+            </p>
             {chats.map((chat) => (
                 <button
                     key={chat.orgId ?? "shared"}

@@ -153,7 +153,9 @@ function Step({
                     <span className="text-xs text-muted-foreground">{format.dateTime(iso)}</span>
                 ) : (
                     <span className="text-xs text-muted-foreground">
-                        {reached ? t("messageInfo.theTimeWasNotRecorded") : (waiting ?? t("messageInfo.notYet"))}
+                        {reached
+                            ? t("messageInfo.theTimeWasNotRecorded")
+                            : (waiting ?? t("messageInfo.notYet"))}
                     </span>
                 )}
             </span>

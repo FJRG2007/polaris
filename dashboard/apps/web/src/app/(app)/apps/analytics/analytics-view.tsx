@@ -20,10 +20,44 @@ import { HeaderPortal } from "@/components/header-portal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { ANALYTICS_SCOPES, scopeNeedsTarget, type AnalyticsScope, type SiteOption } from "./site-catalog";
-import { countryFlag, countryName, type VisitDimension, type VisitRange, type VisitRow } from "@polaris/core";
-import { Activity, Check, Copy, Globe, MonitorSmartphone, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn, Input, ScrollRow, Select, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
+import {
+    ANALYTICS_SCOPES,
+    scopeNeedsTarget,
+    type AnalyticsScope,
+    type SiteOption
+} from "./site-catalog";
+import {
+    countryFlag,
+    countryName,
+    type VisitDimension,
+    type VisitRange,
+    type VisitRow
+} from "@polaris/core";
+import {
+    Activity,
+    Check,
+    Copy,
+    Globe,
+    MonitorSmartphone,
+    RefreshCw,
+    ShieldCheck,
+    TrendingUp
+} from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Input,
+    ScrollRow,
+    Select,
+    Skeleton,
+    Switch,
+    TimeSeriesChart
+} from "@polaris/ui";
 import {
     rotateTrackerKeyAction,
     setAnalyticsSettingsAction,
@@ -80,7 +114,8 @@ export function AnalyticsView({
     // reach, and it only fills the picker in the header.
     useEffect(() => {
         let cancelled = false;
-        void polls.analyticsSites()
+        void polls
+            .analyticsSites()
             .then((result) => {
                 if (!cancelled) setServices(result.sites);
             })
@@ -97,7 +132,9 @@ export function AnalyticsView({
     useEffect(() => {
         if (!scopeNeedsTarget(scope) || siteId || !services || services.length === 0) return;
         const first = services[0]!.id;
-        router.replace(`/apps/analytics?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`);
+        router.replace(
+            `/apps/analytics?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`
+        );
     }, [scope, siteId, services, range, router]);
 
     const load = useCallback(() => {
@@ -106,7 +143,11 @@ export function AnalyticsView({
         // something Polaris measures", which is a sentence about a URL nobody typed.
         if (scopeNeedsTarget(scope) && !siteId) return;
         startLoad(async () => {
-            const result = await polls.analyticsOverview({ scopeType: scope, scopeId: siteId, range });
+            const result = await polls.analyticsOverview({
+                scopeType: scope,
+                scopeId: siteId,
+                range
+            });
             if ("error" in result) {
                 setFailure(result.error);
                 setData(null);
@@ -122,7 +163,10 @@ export function AnalyticsView({
     /** Move the screen first and let the server confirm, so a switch follows the
      *  finger. Only a real failure puts it back. */
     const mutate = useCallback(
-        (patch: (current: AnalyticsOverview) => AnalyticsOverview, run: () => Promise<{ error?: string }>) => {
+        (
+            patch: (current: AnalyticsOverview) => AnalyticsOverview,
+            run: () => Promise<{ error?: string }>
+        ) => {
             setData((current) => {
                 if (!current) return current;
                 const previous = current;
@@ -147,7 +191,9 @@ export function AnalyticsView({
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
             <div className="flex flex-col gap-3">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-2">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("view.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("view.title")}
+                    </h1>
                     {data ? (
                         <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline">
                             {data.site.name}
@@ -160,12 +206,19 @@ export function AnalyticsView({
                         </span>
                     ) : null}
                 </div>
-                <SitePicker scope={scope} siteId={siteId} services={services} canOperate={canOperate} />
+                <SitePicker
+                    scope={scope}
+                    siteId={siteId}
+                    services={services}
+                    canOperate={canOperate}
+                />
                 <RangeTabs range={range} />
             </div>
 
             {failure ? (
-                <p className="rounded-md border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink">{failure}</p>
+                <p className="rounded-md border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink">
+                    {failure}
+                </p>
             ) : null}
 
             {nothingToMeasure ? (
@@ -177,7 +230,9 @@ export function AnalyticsView({
                     <Overview data={data} range={range} />
                     <Breakdowns data={data} />
                     <Recent data={data} />
-                    {data ? <TrackerPanel data={data} scope={scope} siteId={siteId} mutate={mutate} /> : null}
+                    {data ? (
+                        <TrackerPanel data={data} scope={scope} siteId={siteId} mutate={mutate} />
+                    ) : null}
                     {data && canOperate ? <SettingsPanel data={data} mutate={mutate} /> : null}
                 </>
             )}
@@ -217,7 +272,10 @@ function SitePicker({
             value={scope}
             aria-label={t("view.whatToMeasure")}
             className="h-8 min-w-0 flex-1 font-medium md:w-36 md:min-w-[9rem] md:flex-none"
-            options={scopes.map((entry) => ({ value: entry.value, label: t(`scopes.${entry.value}`) }))}
+            options={scopes.map((entry) => ({
+                value: entry.value,
+                label: t(`scopes.${entry.value}`)
+            }))}
             onValueChange={(value) => {
                 const next = value as AnalyticsScope;
                 go(next, next === "application" ? (services?.[0]?.id ?? "") : "");
@@ -238,7 +296,9 @@ function SitePicker({
             onValueChange={(value) => go(scope, value)}
         />
     ) : (
-        <span className="whitespace-nowrap text-sm text-muted-foreground">{t("view.noServicesShort")}</span>
+        <span className="whitespace-nowrap text-sm text-muted-foreground">
+            {t("view.noServicesShort")}
+        </span>
     );
 
     return (
@@ -304,7 +364,11 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
                   // that means something different at every range.
                   hint: multiDay ? t("cards.dailyVisitorsHint") : t("cards.visitorsHint")
               },
-              { label: t("cards.pageviews"), value: grouped(data.view.overview.views), hint: t("cards.pageviewsHint") },
+              {
+                  label: t("cards.pageviews"),
+                  value: grouped(data.view.overview.views),
+                  hint: t("cards.pageviewsHint")
+              },
               {
                   label: t("cards.bounce"),
                   value: percent(data.view.overview.bounceRate),
@@ -328,7 +392,9 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
                                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                       {card.label}
                                   </span>
-                                  <span className="text-2xl font-semibold tabular-nums">{card.value}</span>
+                                  <span className="text-2xl font-semibold tabular-nums">
+                                      {card.value}
+                                  </span>
                                   <span className="text-xs text-muted-foreground">{card.hint}</span>
                               </CardBody>
                           </Card>
@@ -356,7 +422,10 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
                 <CardBody>
                     {data ? (
                         <TimeSeriesChart
-                            points={data.view.series.map((point) => ({ t: point.t, v: point.views }))}
+                            points={data.view.series.map((point) => ({
+                                t: point.t,
+                                v: point.views
+                            }))}
                             from={data.view.from}
                             to={data.view.to}
                             summary="sum"
@@ -391,7 +460,7 @@ interface Panel {
 /** One card: a row of tabs and the list under whichever is chosen. The bar behind a
  *  row is its share of the top row, the only comparison that survives a list where
  *  the first entry is ten times the second. */
-function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Panel[]; }) {
+function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Panel[] }) {
     const [active, setActive] = useState(0);
     const panel = panels[Math.min(active, panels.length - 1)];
     if (!panel) return null;
@@ -429,20 +498,32 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
                         ))}
                     </div>
                 ) : rows.length === 0 ? (
-                    <p className="px-2 py-6 text-center text-sm text-muted-foreground">{panel.empty}</p>
+                    <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                        {panel.empty}
+                    </p>
                 ) : (
                     <ul className="flex flex-col">
                         {rows.map((row) => (
-                            <li key={row.key} className="relative flex items-center gap-3 py-1.5 text-sm">
+                            <li
+                                key={row.key}
+                                className="relative flex items-center gap-3 py-1.5 text-sm"
+                            >
                                 <span
                                     aria-hidden
                                     className="absolute inset-y-0.5 left-0 rounded bg-primary/10"
-                                    style={{ width: `${top > 0 ? Math.max(2, (row.visitors / top) * 100) : 0}%` }}
+                                    style={{
+                                        width: `${top > 0 ? Math.max(2, (row.visitors / top) * 100) : 0}%`
+                                    }}
                                 />
-                                <span className="relative min-w-0 flex-1 truncate pl-2" title={row.key}>
+                                <span
+                                    className="relative min-w-0 flex-1 truncate pl-2"
+                                    title={row.key}
+                                >
                                     {panel.render ? panel.render(row.key) : row.key}
                                 </span>
-                                <span className="relative shrink-0 pr-2 tabular-nums">{grouped(row.visitors)}</span>
+                                <span className="relative shrink-0 pr-2 tabular-nums">
+                                    {grouped(row.visitors)}
+                                </span>
                             </li>
                         ))}
                     </ul>
@@ -452,7 +533,7 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
     );
 }
 
-function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
+function Breakdowns({ data }: { data: AnalyticsOverview | null }) {
     const t = useTranslations("analytics");
     const rows = data?.view.breakdowns ?? null;
     // Over a long range these come from the daily totals, which do not carry the
@@ -460,23 +541,41 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
     // a screen size this quarter".
     const unavailable = new Set(data?.view.unavailable ?? []);
     const why = (dimension: VisitDimension, otherwise: string) =>
-        unavailable.has(dimension)
-            ? t("breakdowns.notKept")
-            : otherwise;
+        unavailable.has(dimension) ? t("breakdowns.notKept") : otherwise;
 
     return (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <BreakdownCard
                 panels={[
-                    { label: t("breakdowns.pages"), rows: rows?.path ?? null, empty: t("breakdowns.noPages") },
-                    { label: t("breakdowns.entry"), rows: rows?.entry ?? null, empty: why("entry", t("breakdowns.noVisits")) },
-                    { label: t("breakdowns.exit"), rows: rows?.exit ?? null, empty: why("exit", t("breakdowns.noVisits")) }
+                    {
+                        label: t("breakdowns.pages"),
+                        rows: rows?.path ?? null,
+                        empty: t("breakdowns.noPages")
+                    },
+                    {
+                        label: t("breakdowns.entry"),
+                        rows: rows?.entry ?? null,
+                        empty: why("entry", t("breakdowns.noVisits"))
+                    },
+                    {
+                        label: t("breakdowns.exit"),
+                        rows: rows?.exit ?? null,
+                        empty: why("exit", t("breakdowns.noVisits"))
+                    }
                 ]}
             />
             <BreakdownCard
                 panels={[
-                    { label: t("breakdowns.referrers"), rows: rows?.referrer ?? null, empty: t("breakdowns.nowhere") },
-                    { label: t("breakdowns.channels"), rows: rows?.channel ?? null, empty: t("breakdowns.nothing") },
+                    {
+                        label: t("breakdowns.referrers"),
+                        rows: rows?.referrer ?? null,
+                        empty: t("breakdowns.nowhere")
+                    },
+                    {
+                        label: t("breakdowns.channels"),
+                        rows: rows?.channel ?? null,
+                        empty: t("breakdowns.nothing")
+                    },
                     {
                         label: t("breakdowns.campaigns"),
                         rows: rows?.campaign ?? null,
@@ -487,9 +586,21 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
             <BreakdownCard
                 icon={MonitorSmartphone}
                 panels={[
-                    { label: t("breakdowns.browsers"), rows: rows?.browser ?? null, empty: t("breakdowns.nothing") },
-                    { label: t("breakdowns.systems"), rows: rows?.os ?? null, empty: t("breakdowns.nothing") },
-                    { label: t("breakdowns.devices"), rows: rows?.device ?? null, empty: t("breakdowns.nothing") },
+                    {
+                        label: t("breakdowns.browsers"),
+                        rows: rows?.browser ?? null,
+                        empty: t("breakdowns.nothing")
+                    },
+                    {
+                        label: t("breakdowns.systems"),
+                        rows: rows?.os ?? null,
+                        empty: t("breakdowns.nothing")
+                    },
+                    {
+                        label: t("breakdowns.devices"),
+                        rows: rows?.device ?? null,
+                        empty: t("breakdowns.nothing")
+                    },
                     {
                         label: t("breakdowns.screens"),
                         rows: rows?.screen ?? null,
@@ -506,7 +617,11 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
                         empty: t("breakdowns.noCountries"),
                         render: (code) => `${countryFlag(code)} ${countryName(code)}`
                     },
-                    { label: t("breakdowns.languages"), rows: rows?.language ?? null, empty: why("language", t("breakdowns.nothing")) }
+                    {
+                        label: t("breakdowns.languages"),
+                        rows: rows?.language ?? null,
+                        empty: why("language", t("breakdowns.nothing"))
+                    }
                 ]}
             />
             <BreakdownCard
@@ -576,13 +691,27 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                         <table className="w-full min-w-[40rem] text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr className="border-b border-border/60">
-                                    <th className="px-2 py-1.5 font-medium">{t("recent.lastSeen")}</th>
-                                    <th className="px-2 py-1.5 font-medium">{t("recent.address")}</th>
-                                    <th className="px-2 py-1.5 font-medium">{t("recent.whereFrom")}</th>
-                                    <th className="whitespace-nowrap px-2 py-1.5 font-medium">{t("recent.lastPage")}</th>
-                                    <th className="px-2 py-1.5 font-medium">{t("recent.client")}</th>
-                                    <th className="px-2 py-1.5 text-right font-medium">{t("breakdowns.pages")}</th>
-                                    <th className="px-2 py-1.5 text-right font-medium">{t("recent.time")}</th>
+                                    <th className="px-2 py-1.5 font-medium">
+                                        {t("recent.lastSeen")}
+                                    </th>
+                                    <th className="px-2 py-1.5 font-medium">
+                                        {t("recent.address")}
+                                    </th>
+                                    <th className="px-2 py-1.5 font-medium">
+                                        {t("recent.whereFrom")}
+                                    </th>
+                                    <th className="whitespace-nowrap px-2 py-1.5 font-medium">
+                                        {t("recent.lastPage")}
+                                    </th>
+                                    <th className="px-2 py-1.5 font-medium">
+                                        {t("recent.client")}
+                                    </th>
+                                    <th className="px-2 py-1.5 text-right font-medium">
+                                        {t("breakdowns.pages")}
+                                    </th>
+                                    <th className="px-2 py-1.5 text-right font-medium">
+                                        {t("recent.time")}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/40">
@@ -598,15 +727,25 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                                             {visit.country ? `${countryFlag(visit.country)} ` : ""}
                                             {visit.referrerSource ?? t("recent.direct")}
                                         </td>
-                                        <td className="max-w-[16rem] truncate px-2 py-1.5 font-mono text-xs" title={visit.lastPath ?? undefined}>
+                                        <td
+                                            className="max-w-[16rem] truncate px-2 py-1.5 font-mono text-xs"
+                                            title={visit.lastPath ?? undefined}
+                                        >
                                             {visit.lastPath ?? "-"}
                                         </td>
                                         <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">
-                                            {t("recent.clientOn", { browser: visit.browser, os: visit.os })}
+                                            {t("recent.clientOn", {
+                                                browser: visit.browser,
+                                                os: visit.os
+                                            })}
                                         </td>
-                                        <td className="px-2 py-1.5 text-right tabular-nums">{grouped(visit.views)}</td>
+                                        <td className="px-2 py-1.5 text-right tabular-nums">
+                                            {grouped(visit.views)}
+                                        </td>
                                         <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                                            {visit.durationSec > 0 ? duration(visit.durationSec) : "-"}
+                                            {visit.durationSec > 0
+                                                ? duration(visit.durationSec)
+                                                : "-"}
                                         </td>
                                     </tr>
                                 ))}
@@ -619,7 +758,10 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
     );
 }
 
-type Mutate = (patch: (current: AnalyticsOverview) => AnalyticsOverview, run: () => Promise<{ error?: string }>) => void;
+type Mutate = (
+    patch: (current: AnalyticsOverview) => AnalyticsOverview,
+    run: () => Promise<{ error?: string }>
+) => void;
 
 function TrackerPanel({
     data,
@@ -656,15 +798,25 @@ function TrackerPanel({
                         checked={data.site.trackerEnabled}
                         onChange={(checked) =>
                             mutate(
-                                (current) => ({ ...current, site: { ...current.site, trackerEnabled: checked } }),
-                                () => setTrackerEnabledAction({ scopeType: scope, scopeId: siteId, enabled: checked })
+                                (current) => ({
+                                    ...current,
+                                    site: { ...current.site, trackerEnabled: checked }
+                                }),
+                                () =>
+                                    setTrackerEnabledAction({
+                                        scopeType: scope,
+                                        scopeId: siteId,
+                                        enabled: checked
+                                    })
                             )
                         }
                         aria-label={t("tracker.accept")}
                     />
                     <span className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">{t("tracker.accept")}</span>
-                        <span className="text-xs text-muted-foreground">{t("tracker.acceptHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("tracker.acceptHint")}
+                        </span>
                     </span>
                 </label>
 
@@ -674,7 +826,11 @@ function TrackerPanel({
                             {t("tracker.paste")}
                         </span>
                         <div className="flex items-center gap-2">
-                            <Input readOnly value={snippet} className="min-w-0 flex-1 font-mono text-xs" />
+                            <Input
+                                readOnly
+                                value={snippet}
+                                className="min-w-0 flex-1 font-mono text-xs"
+                            />
                             <Button
                                 type="button"
                                 variant="outline"
@@ -687,7 +843,11 @@ function TrackerPanel({
                                     });
                                 }}
                             >
-                                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                                {copied ? (
+                                    <Check className="size-4" />
+                                ) : (
+                                    <Copy className="size-4" />
+                                )}
                                 {copied ? t("tracker.copied") : t("tracker.copy")}
                             </Button>
                         </div>
@@ -700,11 +860,15 @@ function TrackerPanel({
                                 disabled={rotating}
                                 onClick={() =>
                                     startRotate(async () => {
-                                        await rotateTrackerKeyAction({ scopeType: scope, scopeId: siteId });
+                                        await rotateTrackerKeyAction({
+                                            scopeType: scope,
+                                            scopeId: siteId
+                                        });
                                     })
                                 }
                             >
-                                <RefreshCw className={cn("size-3.5", rotating && "animate-spin")} /> {t("tracker.newKey")}
+                                <RefreshCw className={cn("size-3.5", rotating && "animate-spin")} />{" "}
+                                {t("tracker.newKey")}
                             </Button>
                         </div>
                     </div>
@@ -741,7 +905,9 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                     />
                     <span className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">{t("settings.edgeLog")}</span>
-                        <span className="text-xs text-muted-foreground">{t("settings.edgeLogHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("settings.edgeLogHint")}
+                        </span>
                     </span>
                 </label>
 
@@ -753,7 +919,9 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                     />
                     <span className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">{t("settings.bots")}</span>
-                        <span className="text-xs text-muted-foreground">{t("settings.botsHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("settings.botsHint")}
+                        </span>
                     </span>
                 </label>
 
@@ -772,7 +940,8 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                                     setRetention(String(settings.retentionDays));
                                     return;
                                 }
-                                if (days !== settings.retentionDays) save({ ...settings, retentionDays: Math.round(days) });
+                                if (days !== settings.retentionDays)
+                                    save({ ...settings, retentionDays: Math.round(days) });
                             }}
                             className="w-28"
                         />

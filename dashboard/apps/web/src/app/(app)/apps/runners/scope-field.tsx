@@ -109,7 +109,8 @@ export function ScopeField({
 
     useEffect(() => {
         if (!needsPeople) return;
-        void polls.runnerPrincipals()
+        void polls
+            .runnerPrincipals()
             .then(setPrincipals)
             .catch(() => undefined);
     }, [needsPeople]);
@@ -128,7 +129,8 @@ export function ScopeField({
         let live = true;
         setChecking(true);
         const timer = setTimeout(() => {
-            void polls.scopePreview(JSON.parse(serialized))
+            void polls
+                .scopePreview(JSON.parse(serialized))
                 .then((result) => {
                     if (!live) return;
                     const next = {
@@ -216,9 +218,7 @@ export function ScopeField({
                                 placeholder={t("scopeField.repoPlaceholder")}
                                 maxHeightClass="max-h-40"
                             />
-                            {!connected ? (
-                                <Hint>{t("scopeField.notConnected")}</Hint>
-                            ) : null}
+                            {!connected ? <Hint>{t("scopeField.notConnected")}</Hint> : null}
                         </>
                     ) : null}
                 </div>
@@ -236,7 +236,9 @@ export function ScopeField({
                         spellCheck={false}
                     />
                     <Hint>
-                        {state.kind === "org" ? t("scopeField.orgHint") : t("scopeField.accountHint")}
+                        {state.kind === "org"
+                            ? t("scopeField.orgHint")
+                            : t("scopeField.accountHint")}
                     </Hint>
                 </label>
             ) : null}
@@ -291,7 +293,10 @@ export function ScopeField({
                             placeholder={t("schema.pickGroup")}
                             options={principals.groups.map((group) => ({
                                 value: group.id,
-                                label: t("scopeField.groupLinked", { name: group.name, count: group.linked })
+                                label: t("scopeField.groupLinked", {
+                                    name: group.name,
+                                    count: group.linked
+                                })
                             }))}
                         />
                     )}
@@ -322,9 +327,7 @@ function ScopePreview({
     if (!preview) return null;
     if (preview.note) return <span className="text-xs text-danger">{preview.note}</span>;
     if (preview.count === 0) return null;
-    return (
-        <Hint>{t("scopeField.serves", { count: preview.count })}</Hint>
-    );
+    return <Hint>{t("scopeField.serves", { count: preview.count })}</Hint>;
 }
 
 function Hint({ children }: { children: React.ReactNode }) {

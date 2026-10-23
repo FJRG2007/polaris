@@ -105,10 +105,13 @@ export function KeysPanel() {
             <Card>
                 <CardBody className="flex flex-col gap-3 text-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                        <p className="max-w-prose text-muted-foreground">
-                            {t("keys.intro")}
-                        </p>
-                        <Button size="sm" variant="secondary" onClick={() => setRotating(true)} disabled={keys === null}>
+                        <p className="max-w-prose text-muted-foreground">{t("keys.intro")}</p>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setRotating(true)}
+                            disabled={keys === null}
+                        >
                             <RefreshCw className="size-4" /> {t("keys.new")}
                         </Button>
                     </div>
@@ -122,7 +125,10 @@ export function KeysPanel() {
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {keys.map((key) => (
-                                <li key={key.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                                <li
+                                    key={key.id}
+                                    className="flex flex-wrap items-center gap-2 px-3 py-2"
+                                >
                                     <KeyRound className="size-4 text-muted-foreground" />
                                     <code className="text-xs">{key.id.slice(0, 8)}</code>
                                     {key.retiredAt ? (
@@ -131,7 +137,10 @@ export function KeysPanel() {
                                         <Badge variant="success">{t("keys.current")}</Badge>
                                     )}
                                     <span className="text-xs text-muted-foreground">
-                                        {t("keys.made", { when: format.date(key.createdAt), count: key.copies })}
+                                        {t("keys.made", {
+                                            when: format.date(key.createdAt),
+                                            count: key.copies
+                                        })}
                                     </span>
                                     <Button
                                         size="sm"
@@ -140,7 +149,9 @@ export function KeysPanel() {
                                         disabled={revealing !== null}
                                         onClick={() => void reveal(key.id)}
                                     >
-                                        {revealing === key.id && <Loader2 className="size-4 animate-spin" />}{" "}
+                                        {revealing === key.id && (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        )}{" "}
                                         {t("keys.recovery")}
                                     </Button>
                                 </li>
@@ -169,7 +180,8 @@ export function KeysPanel() {
                                 onClick={() => void add()}
                                 disabled={adding || !trimmed || pastedProblem !== null}
                             >
-                                {adding && <Loader2 className="size-4 animate-spin" />} {t("destinations.addShort")}
+                                {adding && <Loader2 className="size-4 animate-spin" />}{" "}
+                                {t("destinations.addShort")}
                             </Button>
                         </div>
                     </label>
@@ -201,8 +213,13 @@ export function KeysPanel() {
                     </DialogHeader>
                     {revealed && (
                         <div className="flex items-center gap-2 rounded-md border border-border p-2">
-                            <code className="min-w-0 flex-1 break-all text-xs">{revealed.recoveryKey}</code>
-                            <CopyButton value={revealed.recoveryKey} label={t("keys.theRecoveryKey")} />
+                            <code className="min-w-0 flex-1 break-all text-xs">
+                                {revealed.recoveryKey}
+                            </code>
+                            <CopyButton
+                                value={revealed.recoveryKey}
+                                label={t("keys.theRecoveryKey")}
+                            />
                         </div>
                     )}
                 </DialogContent>

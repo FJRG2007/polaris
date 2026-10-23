@@ -802,7 +802,8 @@ function NetworkExposure({ nonce }: { nonce: number }) {
         // failed with, or the error stays under a panel that has just loaded fine.
         setError(null);
         setLoading(true);
-        void polls.networkStatus()
+        void polls
+            .networkStatus()
             .then((next) => {
                 const previous = loaded.current;
                 loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };

@@ -92,7 +92,9 @@ export function MailBodyForm({ kept }: { kept: number }) {
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("retention.mail.title")}</h2>
-                    <p className="max-w-xl text-sm text-muted-foreground">{t("retention.mail.intro")}</p>
+                    <p className="max-w-xl text-sm text-muted-foreground">
+                        {t("retention.mail.intro")}
+                    </p>
                 </div>
 
                 <label className="flex max-w-[12rem] flex-col gap-1 text-sm">
@@ -110,14 +112,18 @@ export function MailBodyForm({ kept }: { kept: number }) {
                         onChange={(event) => setValue(event.target.value)}
                     />
                     <span className="text-xs text-muted-foreground">
-                        {parsed === 0 && valid ? t("retention.mail.zeroHint") : t("retention.mail.hint")}
+                        {parsed === 0 && valid
+                            ? t("retention.mail.zeroHint")
+                            : t("retention.mail.hint")}
                     </span>
                 </label>
 
                 <p className="text-sm text-muted-foreground">{heldLine(t, held, countFailed)}</p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
-                {saved && !dirty && <p className="text-sm text-muted-foreground">{t("retention.mail.saved")}</p>}
+                {saved && !dirty && (
+                    <p className="text-sm text-muted-foreground">{t("retention.mail.saved")}</p>
+                )}
 
                 <Button
                     className="self-start"
