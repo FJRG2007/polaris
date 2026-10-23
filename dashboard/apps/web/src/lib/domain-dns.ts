@@ -105,7 +105,11 @@ async function resolveOrEmpty(hostname: string): Promise<string[]> {
 }
 
 /** The sentence for a name the public resolvers still answer with an old address. */
-function staleDetail(addresses: readonly string[], expectedIp: string | null, left: number | null): string {
+function staleDetail(
+    addresses: readonly string[],
+    expectedIp: string | null,
+    left: number | null
+): string {
     if (expectedIp && left !== null) {
         return `Updated: the domain's nameservers already answer ${expectedIp}. Resolvers that cached ${addresses.filter((address) => address !== expectedIp).join(", ")} drop it within ${left} seconds.`;
     }
@@ -159,7 +163,10 @@ export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<Z
             if (elsewhere.length > 0) {
                 const left = expectedIp
                     ? propagationLeft(
-                          await Promise.all([authoritativeA(record.host), authoritativeA(wildcardProbe)]),
+                          await Promise.all([
+                              authoritativeA(record.host),
+                              authoritativeA(wildcardProbe)
+                          ]),
                           expectedIp
                       )
                     : null;
@@ -248,7 +255,9 @@ async function checkGameZoneDns(
                 ? addresses.filter((address) => address !== expectedIp)
                 : [];
             if (elsewhere.length > 0) {
-                const left = expectedIp ? propagationLeft([await authoritativeA(probe)], expectedIp) : null;
+                const left = expectedIp
+                    ? propagationLeft([await authoritativeA(probe)], expectedIp)
+                    : null;
                 return {
                     game: record.game,
                     wildcard: record.wildcard,
@@ -355,7 +364,9 @@ export interface ZoneDnsProvisionResult {
  * host and wildcard, then each installed game's wildcard. The address follower owns
  * exactly these and nothing else in the zone.
  */
-export async function ownedZoneNames(config: Awaited<ReturnType<typeof getDomainZones>>): Promise<string[]> {
+export async function ownedZoneNames(
+    config: Awaited<ReturnType<typeof getDomainZones>>
+): Promise<string[]> {
     const games = await installedGames().catch(() => []);
     return [
         ...zoneRecords(config).flatMap((record) => [record.host, record.wildcard]),

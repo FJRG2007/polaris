@@ -50,7 +50,12 @@ export function AddressFollowCard() {
             title={t("domains.follow.title")}
             description={t("domains.follow.description")}
             actions={
-                <Button size="sm" variant="secondary" onClick={() => void check()} disabled={busy || !view}>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void check()}
+                    disabled={busy || !view}
+                >
                     <RefreshCw className={busy ? "size-4 animate-spin" : "size-4"} />
                     {busy ? t("domains.follow.checking") : t("domains.follow.check")}
                 </Button>
@@ -108,7 +113,8 @@ function Facts({ status }: { status: FollowStatus }) {
 
 function StatusLine({ status }: { status: FollowStatus | null }) {
     const t = useTranslations("admin");
-    if (!status?.checkedAt) return <p className="text-xs text-muted-foreground">{t("domains.follow.never")}</p>;
+    if (!status?.checkedAt)
+        return <p className="text-xs text-muted-foreground">{t("domains.follow.never")}</p>;
     const detail = status.detail ?? "-";
     switch (status.problem) {
         case "no-token":
@@ -116,7 +122,11 @@ function StatusLine({ status }: { status: FollowStatus | null }) {
                 <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                     {t.rich("domains.follow.problem.noToken", {
                         link: (chunks) => (
-                            <Link key="link" href="/admin/integrations" className="text-primary hover:underline">
+                            <Link
+                                key="link"
+                                href="/admin/integrations"
+                                className="text-primary hover:underline"
+                            >
                                 {chunks}
                             </Link>
                         )

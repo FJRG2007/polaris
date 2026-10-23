@@ -122,7 +122,13 @@ export function formerAddresses(
 ): Set<string> {
     const candidates = published
         ? [published, ...written]
-        : [...written, ...history, ...dashboardRecords.filter((record) => !record.proxied).map((record) => record.content)];
+        : [
+              ...written,
+              ...history,
+              ...dashboardRecords
+                  .filter((record) => !record.proxied)
+                  .map((record) => record.content)
+          ];
     return new Set(candidates.filter((ip) => ip !== current && isPublicIpv4(ip)));
 }
 
@@ -177,7 +183,14 @@ export interface ZoneAddressSync {
     readonly skipped: string | null;
 }
 
-const NOTHING: ZoneAddressSync = { from: null, to: null, repointed: [], conflicts: [], failed: [], skipped: null };
+const NOTHING: ZoneAddressSync = {
+    from: null,
+    to: null,
+    repointed: [],
+    conflicts: [],
+    failed: [],
+    skipped: null
+};
 
 function message(caught: unknown): string {
     return caught instanceof Error ? caught.message : "Cloudflare refused the request";
@@ -187,7 +200,9 @@ async function readWritten(): Promise<string[]> {
     try {
         const raw = await getSetting(WRITTEN_KEY);
         const parsed: unknown = raw ? JSON.parse(raw) : [];
-        return Array.isArray(parsed) ? parsed.filter((ip): ip is string => typeof ip === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((ip): ip is string => typeof ip === "string")
+            : [];
     } catch {
         return [];
     }
@@ -216,7 +231,10 @@ export interface AddressFollowView {
 }
 
 export async function addressFollowView(): Promise<AddressFollowView> {
-    const [config, status] = await Promise.all([getDomainZones().catch(() => null), followStatus()]);
+    const [config, status] = await Promise.all([
+        getDomainZones().catch(() => null),
+        followStatus()
+    ]);
     return { configured: Boolean(config?.baseDomain), status };
 }
 
@@ -237,7 +255,8 @@ const EMPTY_STATUS: FollowStatus = {
  * costs two echo requests and one Cloudflare read per owned name.
  */
 export async function syncZoneAddress(): Promise<ZoneAddressSync> {
-    if (await backupAccessActive()) return { ...NOTHING, skipped: "Backup access owns the records" };
+    if (await backupAccessActive())
+        return { ...NOTHING, skipped: "Backup access owns the records" };
     const config = await getDomainZones().catch(() => null);
     if (!config?.baseDomain) return { ...NOTHING, skipped: "No domain is configured" };
 
@@ -246,7 +265,12 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
     const save = (status: Partial<FollowStatus>): Promise<void> =>
         setSetting(
             STATUS_KEY,
-            JSON.stringify({ ...EMPTY_STATUS, ...previous, ...status, checkedAt: now.toISOString() })
+            JSON.stringify({
+                ...EMPTY_STATUS,
+                ...previous,
+                ...status,
+                checkedAt: now.toISOString()
+            })
         );
 
     // Two reads from different services, and only an agreement counts. One that
@@ -312,7 +336,10 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
         try {
             await repointRecord(token, zoneId, record.id, current);
             repointed.push(name);
-            ttl = Math.max(ttl, record.ttl === undefined || record.ttl <= 1 ? AUTO_TTL_S : record.ttl);
+            ttl = Math.max(
+                ttl,
+                record.ttl === undefined || record.ttl <= 1 ? AUTO_TTL_S : record.ttl
+            );
         } catch (caught) {
             failed.push({ name, detail: message(caught) });
         }
@@ -336,10 +363,18 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
             ? new Date(now.getTime() + ttl * 1000 + REACH_GRACE_MS).toISOString()
             : (previous?.reachBy ?? null);
     const probed = owned.find((entry) => entry.name === dashboardHost) ?? owned[0];
-    const reach = reachBy ? await checkReach(config.baseDomain, probed, current, reachBy, now) : null;
+    const reach = reachBy
+        ? await checkReach(config.baseDomain, probed, current, reachBy, now)
+        : null;
 
     const problem: FollowProblem | null =
-        failed.length > 0 ? "failed" : plan.conflicts.length > 0 ? "conflict" : reach === "unreached" ? "unreached" : null;
+        failed.length > 0
+            ? "failed"
+            : plan.conflicts.length > 0
+              ? "conflict"
+              : reach === "unreached"
+                ? "unreached"
+                : null;
     const detail =
         failed.length > 0
             ? failed.map((entry) => `${entry.name}: ${entry.detail}`).join("; ")
@@ -347,12 +382,18 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
               ? plan.conflicts.map((entry) => `${entry.name} -> ${entry.content}`).join(", ")
               : null;
     if (problem === "failed") await fail(config.baseDomain, current, "failed", detail);
-    else if (problem === "conflict") await fail(config.baseDomain, current, "conflict", null, plan.conflicts);
+    else if (problem === "conflict")
+        await fail(config.baseDomain, current, "conflict", null, plan.conflicts);
     else if (problem === null) await setSetting(FAILING_KEY, null);
     // One notice per change: what was repointed, or that it moved with nothing to do.
     // A problem has its own notice above, which names the new address.
     if (repointed.length > 0) {
-        await announceUpdated(config.baseDomain, from ?? [...former][0] ?? null, current, repointed.length);
+        await announceUpdated(
+            config.baseDomain,
+            from ?? [...former][0] ?? null,
+            current,
+            repointed.length
+        );
     } else if (from && problem === null) await announceMoved(from, current);
 
     await save({
@@ -360,7 +401,9 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
         problem,
         detail,
         reachBy: reach === "pending" ? reachBy : null,
-        ...(repointed.length > 0 ? { updatedAt: now.toISOString(), updatedCount: repointed.length } : {})
+        ...(repointed.length > 0
+            ? { updatedAt: now.toISOString(), updatedCount: repointed.length }
+            : {})
     });
     return { from, to: current, repointed, conflicts: plan.conflicts, failed, skipped: null };
 }
@@ -403,7 +446,10 @@ async function administrators(): Promise<string[]> {
     return rows.map((row) => row.id);
 }
 
-type Notice = Pick<Parameters<typeof createNotification>[0], "type" | "title" | "body" | "level" | "actionRequired">;
+type Notice = Pick<
+    Parameters<typeof createNotification>[0],
+    "type" | "title" | "body" | "level" | "actionRequired"
+>;
 
 async function notifyAdmins(
     build: (t: Awaited<ReturnType<typeof wordsFor<"notices">>>) => Promise<Notice> | Notice
@@ -436,11 +482,18 @@ async function announceMoved(from: string, to: string): Promise<void> {
     }));
 }
 
-async function announceUpdated(domain: string, from: string | null, to: string, count: number): Promise<void> {
+async function announceUpdated(
+    domain: string,
+    from: string | null,
+    to: string,
+    count: number
+): Promise<void> {
     await notifyAdmins((t) => ({
         type: "domain.address-changed",
         title: t("domainAddress.pointsTitle", { domain, to }),
-        body: from ? t("domainAddress.changedBody", { from, to, count }) : t("domainAddress.setBody", { to, count }),
+        body: from
+            ? t("domainAddress.changedBody", { from, to, count })
+            : t("domainAddress.setBody", { to, count }),
         level: "info"
     }));
 }

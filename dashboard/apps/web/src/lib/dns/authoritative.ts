@@ -33,12 +33,18 @@ function resolverAt(servers: readonly string[]): Resolver {
 
 /** The A records a name has, with their TTL, as the zone's own nameservers hold
  *  them. Null when the nameservers could not be found or asked. */
-export async function authoritativeA(name: string): Promise<{ addresses: string[]; ttl: number } | null> {
+export async function authoritativeA(
+    name: string
+): Promise<{ addresses: string[]; ttl: number } | null> {
     try {
         const nameservers = await nameserversOf(name);
         const addresses = (
             await Promise.all(
-                nameservers.slice(0, 2).map((ns) => resolverAt(PUBLIC_RESOLVERS).resolve4(ns).catch(() => []))
+                nameservers.slice(0, 2).map((ns) =>
+                    resolverAt(PUBLIC_RESOLVERS)
+                        .resolve4(ns)
+                        .catch(() => [])
+                )
             )
         ).flat();
         if (addresses.length === 0) return null;
@@ -56,7 +62,11 @@ export async function authoritativeA(name: string): Promise<{ addresses: string[
  *  of them gave. Empty when neither answered. */
 export async function publicA(name: string): Promise<string[]> {
     const answers = await Promise.all(
-        PUBLIC_RESOLVERS.map((server) => resolverAt([server]).resolve4(name).catch(() => [] as string[]))
+        PUBLIC_RESOLVERS.map((server) =>
+            resolverAt([server])
+                .resolve4(name)
+                .catch(() => [] as string[])
+        )
     );
     return [...new Set(answers.flat())];
 }

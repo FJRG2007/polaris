@@ -47,7 +47,12 @@ describe("where a domain's record points", () => {
         // The zone sync only corrects records that named this machine's previous
         // address; a record naming another server is somebody's deliberate record.
         const plan = planRepoint(
-            [{ name: "example.com", records: [{ id: "r1", content: EC2, ttl: 300, proxied: false }] }],
+            [
+                {
+                    name: "example.com",
+                    records: [{ id: "r1", content: EC2, ttl: 300, proxied: false }]
+                }
+            ],
             "54.0.0.20",
             new Set(["54.0.0.30"])
         );

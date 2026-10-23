@@ -20,7 +20,8 @@ const history = vi.fn<() => Promise<string[]>>(async () => []);
 const token = vi.fn<() => Promise<string | null>>(async () => "cf-token");
 const records = new Map<string, { id: string; content: string; ttl: number; proxied: boolean }[]>();
 async function editRecord(_t: string, _z: string, id: string, content: string): Promise<void> {
-    for (const list of records.values()) for (const record of list) if (record.id === id) record.content = content;
+    for (const list of records.values())
+        for (const record of list) if (record.id === id) record.content = content;
 }
 const repoint = vi.fn(editRecord);
 const remove = vi.fn(async () => undefined);
@@ -59,7 +60,9 @@ vi.mock("@/lib/domain-dns", () => ({
         "*.mc.example.com"
     ]
 }));
-vi.mock("@/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: () => token() }));
+vi.mock("@/lib/integrations/cloudflare-account-service", () => ({
+    loadCloudflareToken: () => token()
+}));
 vi.mock("@/lib/integrations/cloudflare-api", () => ({
     findDnsRecords: find,
     repointRecord: repoint,
@@ -74,9 +77,8 @@ vi.mock("@/lib/notifications/notice-words", () => ({
 vi.mock("@/lib/dns/authoritative", () => ({ publicA: (name: string) => publicA(name) }));
 vi.mock("@/lib/backup-access", () => ({ backupAccessActive: async () => false }));
 
-const { formerAddresses, planRepoint, syncZoneAddress, PUBLISHED_KEY } = await import(
-    "@/lib/domain-address-sync"
-);
+const { formerAddresses, planRepoint, syncZoneAddress, PUBLISHED_KEY } =
+    await import("@/lib/domain-address-sync");
 
 function record(id: string, content: string, extra: { ttl?: number; proxied?: boolean } = {}) {
     return { id, content, ttl: extra.ttl ?? 300, proxied: extra.proxied ?? false };
@@ -115,7 +117,9 @@ describe("which records are ours", () => {
     });
 
     it("does not learn an address from a proxied dashboard record", () => {
-        expect([...formerAddresses(null, [], [record("a", "104.16.0.1", { proxied: true })], NEW)]).toEqual([]);
+        expect([
+            ...formerAddresses(null, [], [record("a", "104.16.0.1", { proxied: true })], NEW)
+        ]).toEqual([]);
     });
 
     it("never counts the current or a private address", () => {
@@ -168,7 +172,9 @@ describe("a run", () => {
         await syncZoneAddress();
         const call = repoint.mock.calls.find((entry) => entry[2] === "c");
         expect(call?.slice(2)).toEqual(["c", NEW]);
-        expect(records.get("plr.example.com")?.[0]).toEqual(record("c", NEW, { proxied: true, ttl: 1 }));
+        expect(records.get("plr.example.com")?.[0]).toEqual(
+            record("c", NEW, { proxied: true, ttl: 1 })
+        );
     });
 
     it("leaves a record pointing at another host", async () => {
@@ -221,7 +227,8 @@ describe("a run", () => {
 
     it("says the address moved even when there was nothing to repoint", async () => {
         settings.set("network.dnsFollowLastIp", OLD);
-        for (const list of records.values()) for (const entry of list) if (entry.content === OLD) entry.content = NEW;
+        for (const list of records.values())
+            for (const entry of list) if (entry.content === OLD) entry.content = NEW;
         await syncZoneAddress();
         expect(notify.mock.calls.map((call) => call[0].type)).toEqual(["domain.address-moved"]);
     });
@@ -232,7 +239,9 @@ describe("a run", () => {
         await syncZoneAddress();
         await syncZoneAddress();
         await syncZoneAddress();
-        const failures = notify.mock.calls.filter((call) => call[0].type === "domain.address-stale");
+        const failures = notify.mock.calls.filter(
+            (call) => call[0].type === "domain.address-stale"
+        );
         expect(failures).toHaveLength(1);
         expect(settings.get(PUBLISHED_KEY)).toBe(OLD);
     });
@@ -242,7 +251,9 @@ describe("a run", () => {
         token.mockResolvedValue(null);
         await syncZoneAddress();
         await syncZoneAddress();
-        const failures = notify.mock.calls.filter((call) => call[0].type === "domain.address-stale");
+        const failures = notify.mock.calls.filter(
+            (call) => call[0].type === "domain.address-stale"
+        );
         expect(failures).toHaveLength(1);
         expect(failures[0][0].body).toBe("domainAddress.noToken");
     });
@@ -252,12 +263,16 @@ describe("a run", () => {
         vi.useFakeTimers({ now: new Date("2026-10-23T10:00:00Z"), toFake: ["Date"] });
         try {
             await syncZoneAddress();
-            expect(notify.mock.calls.some((call) => call[0].type === "domain.address-unreached")).toBe(false);
+            expect(
+                notify.mock.calls.some((call) => call[0].type === "domain.address-unreached")
+            ).toBe(false);
             vi.setSystemTime(new Date("2026-10-23T10:10:00Z"));
             await syncZoneAddress();
             vi.setSystemTime(new Date("2026-10-23T10:12:00Z"));
             await syncZoneAddress();
-            const unreached = notify.mock.calls.filter((call) => call[0].type === "domain.address-unreached");
+            const unreached = notify.mock.calls.filter(
+                (call) => call[0].type === "domain.address-unreached"
+            );
             expect(unreached).toHaveLength(1);
         } finally {
             vi.useRealTimers();
@@ -273,7 +288,9 @@ describe("a run", () => {
             await syncZoneAddress();
             vi.setSystemTime(new Date("2026-10-23T10:30:00Z"));
             await syncZoneAddress();
-            expect(notify.mock.calls.some((call) => call[0].type === "domain.address-unreached")).toBe(false);
+            expect(
+                notify.mock.calls.some((call) => call[0].type === "domain.address-unreached")
+            ).toBe(false);
             expect(publicA).not.toHaveBeenCalled();
         } finally {
             vi.useRealTimers();

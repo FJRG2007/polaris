@@ -185,7 +185,11 @@ export async function detectPlacement(force = false): Promise<ServerPlacement> {
 const DETECT_TTL_MS = 6 * 60 * 60 * 1000;
 
 /** The echo services asked for the public address, in the order a plain lookup tries them. */
-const ECHO_SERVICES = ["https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"] as const;
+const ECHO_SERVICES = [
+    "https://api.ipify.org",
+    "https://ifconfig.me/ip",
+    "https://icanhazip.com"
+] as const;
 
 /** How many addresses this box answered on before the current one are remembered. */
 const HISTORY_SIZE = 10;
@@ -223,7 +227,9 @@ export async function probePublicIp(first = 0): Promise<string | null> {
 export async function publicIpHistory(): Promise<string[]> {
     try {
         const parsed: unknown = JSON.parse((await getSetting(KEYS.history)) ?? "[]");
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -233,7 +239,10 @@ export async function publicIpHistory(): Promise<string[]> {
 export async function rememberPublicIp(ip: string): Promise<void> {
     const previous = await getSetting(KEYS.detectedIp);
     if (previous && previous !== ip) {
-        const history = [previous, ...(await publicIpHistory()).filter((entry) => entry !== previous && entry !== ip)];
+        const history = [
+            previous,
+            ...(await publicIpHistory()).filter((entry) => entry !== previous && entry !== ip)
+        ];
         await setSetting(KEYS.history, JSON.stringify(history.slice(0, HISTORY_SIZE)));
     }
     await setSetting(KEYS.detectedIp, ip);
