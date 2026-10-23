@@ -543,6 +543,12 @@ services:
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      # Traefik 3 reads a whole request, body included, in 60 seconds by default
+      # and then drops it: an upload bigger than the uplink sends in a minute (a
+      # drop point, Drive, a backup) failed at exactly 60s with a 502. Long enough
+      # for a large file on a slow line, and still a bound.
+      - "--entrypoints.web.transport.respondingTimeouts.readTimeout=6h"
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=6h"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"

@@ -22,7 +22,10 @@ let events: { action: string; values?: unknown }[] = [];
 vi.mock("@polaris/config", () => ({
     loadEnv: () => ({ POLARIS_ACME_EMAIL: "ops@example.com", POLARIS_AUTH_SECRET: "s3cret-value" })
 }));
-vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null, setSetting: async () => undefined }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    setSetting: async () => undefined
+}));
 vi.mock("@/lib/domain-service", () => ({
     publicAppUrl: async () => "https://polaris.example.com"
 }));
@@ -75,6 +78,7 @@ const {
     isSettingUp,
     NEEDS_ROOT,
     prepareServerEdge,
+    readEdgeProbe,
     readServerEdge,
     SETUP_RUNNING,
     setUpNewServer,
@@ -266,5 +270,20 @@ describe("which enrollments are set up", () => {
         expect(setsUpOnEnrollment("server", payload({ platform: "darwin" }))).toBe(false);
         expect(setsUpOnEnrollment("runner", payload())).toBe(false);
         expect(setsUpOnEnrollment("local", payload())).toBe(false);
+    });
+});
+
+describe("an edge that cuts long uploads", () => {
+    it("is reported on a Traefik started without a longer read timeout", () => {
+        expect(readEdgeProbe("traefik=true\npushable=true\nuploads=false\n").uploads).toBe(false);
+        expect(readEdgeProbe("traefik=true\npushable=true\n").uploads).toBe(false);
+        expect(readEdgeProbe("traefik=true\npushable=true\nuploads=true\n").uploads).toBe(true);
+    });
+
+    it("is what the probe asks Traefik's own arguments for", async () => {
+        await readServerEdge("h1", "o1");
+        expect(commands.map((c) => c.command).join("\n")).toContain(
+            "respondingTimeouts.readTimeout"
+        );
     });
 });

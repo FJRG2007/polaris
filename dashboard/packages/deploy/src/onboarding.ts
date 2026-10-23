@@ -186,6 +186,11 @@ export function onboardingScript(options: OnboardingOptions): string {
             "--providers.file.watch=true",
             "--entrypoints.web.address=:80",
             "--entrypoints.websecure.address=:443",
+            // Traefik 3 drops a request whose body takes longer than 60 seconds,
+            // which cuts any large upload on a slow line; the same bound as the edge
+            // on the Polaris host.
+            "--entrypoints.web.transport.respondingTimeouts.readTimeout=6h",
+            "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=6h",
             "--certificatesresolvers.letsencrypt.acme.httpchallenge=true",
             "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web",
             `--certificatesresolvers.letsencrypt.acme.email=${options.acmeEmail}`,

@@ -333,6 +333,8 @@
         "pushNo": "Solo lee lo que le dice un contenedor desplegado, así que un dominio nuevo o una regla de cortafuegos editada esperan a que ese servicio se vuelva a compilar, y un despliegue sustituye la versión en marcha con un breve corte.",
         "offlineYes": "Los bloqueos y las sesiones cerradas se guardan aquí, así que siguen valiendo con Polaris apagado.",
         "offlineNo": "Los bloqueos y las sesiones cerradas de Polaris aún no llegan a este servidor. Configúralo otra vez.",
+        "uploadsYes": "Espera a que termine una subida grande por una línea lenta.",
+        "uploadsNo": "Corta cualquier subida que tarde más de un minuto en enviarse. Configúralo otra vez.",
         "settingUp": "Preparándolo",
         "again": "Volver a prepararlo",
         "setUp": "Preparar este servidor",
