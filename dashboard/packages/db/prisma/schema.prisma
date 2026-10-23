@@ -8078,6 +8078,14 @@ model TaskShare {
     // How often the link has been opened, so the owner can tell a dead link from
     // one that is being read.
     views        Int      @default(0)
+    /// The limits every public link carries (lib/link-guards). Null or an
+    /// empty list means no restriction.
+    passwordHash      String?
+    expiresAt         DateTime?
+    maxViews          Int?
+    allowedCidrs      String    @default("[]")
+    allowedCountries  String    @default("[]")
+    allowedContinents String    @default("[]")
     // No FK: the link outlives the account that created it.
     createdById  String?  @db.Uuid
     createdAt    DateTime @default(now())

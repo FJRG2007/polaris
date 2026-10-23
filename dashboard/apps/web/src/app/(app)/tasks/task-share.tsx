@@ -18,6 +18,12 @@
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
+import {
+    LinkAdvancedFields,
+    EMPTY_LINK_ADVANCED,
+    linkAddressRules,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import { runAction } from "@/lib/run-action";
 import { schemaMessage } from "./schema-message";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -103,6 +109,8 @@ export function ShareDialog({
     const [privateUrl, setPrivateUrl] = useState("");
     const [canShare, setCanShare] = useState(false);
     const [share, setShare] = useState<TaskShareView | null>(null);
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
+    const [savingLimits, setSavingLimits] = useState(false);
 
     const [userIds, setUserIds] = useState<string[]>([]);
     const [emails, setEmails] = useState<string[]>([]);
@@ -124,6 +132,7 @@ export function ShareDialog({
             if (result?.error) setError(result.error);
             setPrivateUrl(result?.privateUrl ?? "");
             setShare(result?.share ?? null);
+            setAdvanced(advancedOf(result?.share ?? null));
             setCanShare(result?.canShare ?? false);
             setLoading(false);
         })();
@@ -154,10 +163,18 @@ export function ShareDialog({
         setShare(
             enabled
                 ? {
-                      url: previous?.url ?? "",
-                      showComments,
-                      views: previous?.views ?? 0,
-                      createdAt: ""
+                      ...(previous ?? {
+                          url: "",
+                          views: 0,
+                          createdAt: "",
+                          hasPassword: false,
+                          expiresAt: null,
+                          maxViews: null,
+                          allowedCidrs: [],
+                          allowedCountries: [],
+                          allowedContinents: []
+                      }),
+                      showComments
                   }
                 : null
         );
@@ -171,6 +188,41 @@ export function ShareDialog({
             return;
         }
         setShare(result?.share ?? null);
+        if (!enabled || !previous) setAdvanced(advancedOf(result?.share ?? null));
+    };
+
+    // The limits as saved: a typed password is always a change, because a
+    // stored one cannot be read back to compare.
+    const limitsChanged =
+        share !== null &&
+        (advanced.password !== "" || JSON.stringify(advanced) !== JSON.stringify(advancedOf(share)));
+
+    const saveLimits = async () => {
+        if (!share) return;
+        setSavingLimits(true);
+        setError("");
+        const result = await runAction(
+            () =>
+                actions.setTaskShareAction({
+                    taskId,
+                    enabled: true,
+                    showComments: share.showComments,
+                    limits: {
+                        ...(advanced.password ? { password: advanced.password } : {}),
+                        maxViews: advanced.maxUses ? Number(advanced.maxUses) : null,
+                        expiresAt: advanced.expiresAt || null,
+                        ...linkAddressRules(advanced)
+                    }
+                }),
+            setError
+        );
+        setSavingLimits(false);
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            return;
+        }
+        setShare(result.share ?? null);
+        setAdvanced(advancedOf(result.share ?? null));
     };
 
     const send = async () => {
@@ -389,6 +441,22 @@ export function ShareDialog({
                                         />
                                         {t("share.public.comments")}
                                     </label>
+                                    <LinkAdvancedFields
+                                        value={advanced}
+                                        onChange={setAdvanced}
+                                        passwordSet={share?.hasPassword ?? false}
+                                        idPrefix="task-share"
+                                    />
+                                    <div className="flex justify-end">
+                                        <Button
+                                            size="sm"
+                                            disabled={savingLimits || !limitsChanged}
+                                            onClick={() => void saveLimits()}
+                                        >
+                                            {savingLimits && <Loader2 className="size-4 animate-spin" />}
+                                            {t("share.public.saveLimits")}
+                                        </Button>
+                                    </div>
                                 </div>
                             </Section>
                         )}
@@ -397,4 +465,17 @@ export function ShareDialog({
             </DialogContent>
         </Dialog>
     );
+}
+
+/** A saved link's limits as the Advanced section edits them. */
+function advancedOf(share: TaskShareView | null): LinkAdvancedValue {
+    if (!share) return EMPTY_LINK_ADVANCED;
+    return {
+        password: "",
+        expiresAt: share.expiresAt ? share.expiresAt.slice(0, 10) : "",
+        maxUses: share.maxViews === null ? "" : String(share.maxViews),
+        allowedCidrs: share.allowedCidrs,
+        allowedCountries: share.allowedCountries,
+        allowedContinents: share.allowedContinents
+    };
 }

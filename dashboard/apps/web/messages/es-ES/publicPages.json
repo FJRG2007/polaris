@@ -204,6 +204,9 @@
         "send": "Enviar"
     },
     "task": {
+        "typePassword": "Escribe la contraseña",
+        "tooMany": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+        "wrongPassword": "Contraseña incorrecta.",
         "signIn": "Entrar",
         "unavailableTitle": "Esta tarea no está disponible",
         "unavailable": "Puede que el enlace se haya desactivado o que la tarea se haya eliminado.",

@@ -28,6 +28,8 @@ import { translate } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import type { Locale } from "@polaris/core";
 import { TaskRefusal } from "./refusal";
+import { hashLinkPassword } from "@polaris/core/link-password";
+import { readAddressRules, storedAddressRules } from "@/lib/link-guards";
 
 /** A task's public link as its owner sees it. */
 export interface TaskShareView {
@@ -36,7 +38,26 @@ export interface TaskShareView {
     /** How often the link has been opened, so a dead link reads as dead. */
     readonly views: number;
     readonly createdAt: string;
+    readonly hasPassword: boolean;
+    readonly expiresAt: string | null;
+    readonly maxViews: number | null;
+    readonly allowedCidrs: string[];
+    readonly allowedCountries: string[];
+    readonly allowedContinents: string[];
 }
+
+const SHARE_FIELDS = {
+    token: true,
+    showComments: true,
+    views: true,
+    createdAt: true,
+    passwordHash: true,
+    expiresAt: true,
+    maxViews: true,
+    allowedCidrs: true,
+    allowedCountries: true,
+    allowedContinents: true
+} as const;
 
 /** The link to the task inside Polaris. Only resolves for people with access,
  *  which is exactly what makes it the safe one to paste internally. */
@@ -53,19 +74,45 @@ async function toShareView(share: {
     showComments: boolean;
     views: number;
     createdAt: Date;
+    passwordHash: string | null;
+    expiresAt: Date | null;
+    maxViews: number | null;
+    allowedCidrs: string;
+    allowedCountries: string;
+    allowedContinents: string;
 }): Promise<TaskShareView> {
     return {
         url: await publicUrl(share.token),
         showComments: share.showComments,
         views: share.views,
-        createdAt: share.createdAt.toISOString()
+        createdAt: share.createdAt.toISOString(),
+        hasPassword: Boolean(share.passwordHash),
+        expiresAt: share.expiresAt?.toISOString() ?? null,
+        maxViews: share.maxViews,
+        ...readAddressRules(share)
+    };
+}
+
+/** The columns a saved set of limits writes. The password is only touched when
+ *  one is typed or it is being taken off. */
+async function limitColumns(limits: core.TaskShareInput["limits"]) {
+    if (!limits) return {};
+    return {
+        ...(limits.password
+            ? { passwordHash: await hashLinkPassword(limits.password) }
+            : limits.clearPassword
+              ? { passwordHash: null }
+              : {}),
+        expiresAt: limits.expiresAt,
+        maxViews: limits.maxViews,
+        ...storedAddressRules(limits)
     };
 }
 
 export async function getTaskShare(taskId: string): Promise<TaskShareView | null> {
     const share = await prisma.taskShare.findUnique({
         where: { taskId },
-        select: { token: true, showComments: true, views: true, createdAt: true }
+        select: SHARE_FIELDS
     });
     return share ? toShareView(share) : null;
 }
@@ -83,16 +130,18 @@ export async function setTaskShare(
         await prisma.taskShare.deleteMany({ where: { taskId: input.taskId } });
         return null;
     }
+    const limits = await limitColumns(input.limits);
     const share = await prisma.taskShare.upsert({
         where: { taskId: input.taskId },
-        update: { showComments: input.showComments },
+        update: { showComments: input.showComments, ...limits },
         create: {
             taskId: input.taskId,
             token: generateToken(),
             showComments: input.showComments,
-            createdById: actorId
+            createdById: actorId,
+            ...limits
         },
-        select: { token: true, showComments: true, views: true, createdAt: true }
+        select: SHARE_FIELDS
     });
     return toShareView(share);
 }
@@ -151,6 +200,7 @@ export async function getPublicTask(token: string): Promise<PublicTaskView | nul
         select: {
             id: true,
             showComments: true,
+            maxViews: true,
             task: {
                 select: {
                     id: true,
@@ -196,7 +246,13 @@ export async function getPublicTask(token: string): Promise<PublicTaskView | nul
           })
         : null;
 
-    await prisma.taskShare.update({ where: { id: share.id }, data: { views: { increment: 1 } } });
+    // Counted conditionally: two people opening the last permitted view at the
+    // same moment must not both get it.
+    const counted = await prisma.taskShare.updateMany({
+        where: { id: share.id, ...(share.maxViews === null ? {} : { views: { lt: share.maxViews } }) },
+        data: { views: { increment: 1 } }
+    });
+    if (counted.count === 0) return null;
 
     return {
         reference: core.taskReference(task.space.prefix, task.number),

@@ -17,6 +17,7 @@
 import { z } from "zod";
 import { emailField } from "./auth.js";
 import { commentBody } from "./comments.js";
+import { addressRuleFields } from "./link-rules.js";
 
 // ---------------------------------------------------------------------------
 // Shared field primitives
@@ -1230,11 +1231,27 @@ export const reminderSchema = z.object({
  * suspending it, so turning it back on mints a new token: a link that was pasted
  * somewhere it should not have been stops working for good.
  */
+/**
+ * The limits on a task's public link: the same password, expiry, cap on opens
+ * and address rules every public link in Polaris offers. Sent whole when they
+ * are saved; absent, the link keeps the limits it has.
+ */
+export const taskShareLimitsSchema = z.object({
+    /** Stored as a hash, never in the clear. Absent keeps the current one. */
+    password: z.string().min(1).max(256).optional(),
+    /** Sent to take a password off a link that had one. */
+    clearPassword: z.boolean().default(false),
+    maxViews: z.number().int().positive().max(1_000_000).nullable().default(null),
+    expiresAt: z.coerce.date().nullable().default(null),
+    ...addressRuleFields
+});
+
 export const taskShareSchema = z.object({
     taskId: uuid,
     enabled: z.boolean(),
     /** Whether the public page carries the discussion as well as the work. */
-    showComments: z.boolean().default(false)
+    showComments: z.boolean().default(false),
+    limits: taskShareLimitsSchema.optional()
 });
 
 export type TaskShareInput = z.infer<typeof taskShareSchema>;

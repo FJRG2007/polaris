@@ -19,6 +19,10 @@ import { getSession } from "@/lib/session";
 import { signInHref } from "@/lib/safe-redirect";
 import { getTranslations } from "@/lib/i18n/request";
 import { getPublicTask } from "@/lib/tasks/share-service";
+import { gateTaskShare } from "@/lib/tasks/share-access";
+import { linkDenialMessage } from "@/lib/link-denial";
+import { LinkPasswordForm } from "@/components/link-password-form";
+import { unlockTaskShareAction } from "./actions";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 
@@ -72,8 +76,14 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default async function PublicTaskPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
+    // The gate runs before anything is read: a link with a password, an expiry
+    // or an address rule must not count a view it did not serve.
+    const gate = await gateTaskShare(token);
+    if (!gate.ok && gate.reason === "password_required") {
+        return <LinkPasswordForm token={token} unlock={unlockTaskShareAction} />;
+    }
     const [task, session, format, t, tp, tt] = await Promise.all([
-        getPublicTask(token),
+        gate.ok ? getPublicTask(token) : null,
         getSession(),
         getDisplayFormat(),
         getTranslations("publicPages"),
@@ -86,10 +96,12 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
         return (
             <Shell signedIn={signedIn} signInLabel={t("task.signIn")} back={`/t/${token}`}>
                 <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                        {t("task.unavailableTitle")}
-                    </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">{t("task.unavailable")}</p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("task.unavailableTitle")}</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {gate.ok || gate.reason === "not_found"
+                            ? t("task.unavailable")
+                            : await linkDenialMessage(gate.reason)}
+                    </p>
                 </div>
             </Shell>
         );

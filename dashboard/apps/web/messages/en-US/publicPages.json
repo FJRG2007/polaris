@@ -204,6 +204,9 @@
         "send": "Send"
     },
     "task": {
+        "typePassword": "Type the password",
+        "tooMany": "Too many attempts. Wait a few minutes and try again.",
+        "wrongPassword": "Incorrect password.",
         "signIn": "Sign in",
         "unavailableTitle": "This task is not available",
         "unavailable": "The link may have been turned off, or the task may have been deleted.",

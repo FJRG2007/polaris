@@ -99,7 +99,8 @@
             "off": "Off",
             "opened": "Opened {count} {count, plural, one {time} other {times}}",
             "label": "the public link",
-            "comments": "Include the discussion"
+            "comments": "Include the discussion",
+            "saveLimits": "Save the limits"
         }
     },
     "activity": {
