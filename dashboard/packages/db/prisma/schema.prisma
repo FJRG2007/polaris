@@ -10745,6 +10745,12 @@ model Meeting {
     // then the link still names the meeting and the only way through it is
     // signing in.
     requireAccount Boolean  @default(false)
+    /// The guest link's password and address rules (lib/link-guards). Null or
+    /// an empty list means no restriction.
+    linkPasswordHash  String?
+    allowedCidrs      String   @default("[]")
+    allowedCountries  String   @default("[]")
+    allowedContinents String   @default("[]")
     // When it is meant to happen, for a meeting somebody put in the diary rather
     // than started on the spot. Null for a call that began the moment a button
     // was pressed, which is every call started from a conversation.

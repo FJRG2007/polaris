@@ -47,14 +47,17 @@ import {
     Loader2,
     MoreHorizontal,
     Pencil,
+    Shield,
     UserPlus,
     Video
 } from "lucide-react";
+import { MeetingLinkLimits } from "@/app/(app)/chat/meeting-link-limits";
 import {
     Button,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -96,6 +99,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     /** Whether the name and hour are being changed. */
     const [editing, setEditing] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [limiting, setLimiting] = useState(false);
     /** Who the host is about to show out, until they confirm it. */
     const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
 
@@ -277,6 +281,17 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             {copied ? t("meetingRoom.copied") : t("meetingRoom.copyLink")}
                         </Button>
                     )}
+                    {host && about?.guestToken && (
+                        <Button
+                            size="icon-xs"
+                            variant="secondary"
+                            title={t("meetingLink.limits")}
+                            aria-label={t("meetingLink.limitsFor")}
+                            onClick={() => setLimiting(true)}
+                        >
+                            <Shield className="size-3.5" />
+                        </Button>
+                    )}
                     {host && (
                         <>
                             <Button size="xs" variant="secondary" onClick={() => setInviting(true)}>
@@ -385,6 +400,18 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 >
                     <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
                 </SidePane>
+            )}
+
+            {host && (
+                <Dialog open={limiting} onOpenChange={setLimiting}>
+                    <DialogContent className="max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>{t("meetingLink.limitsFor")}</DialogTitle>
+                            <DialogDescription>{t("meetingLink.hint")}</DialogDescription>
+                        </DialogHeader>
+                        {limiting && <MeetingLinkLimits meetingId={meetingId} />}
+                    </DialogContent>
+                </Dialog>
             )}
 
             <MeetingDetailsDialog

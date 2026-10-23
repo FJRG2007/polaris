@@ -1707,6 +1707,14 @@
         "notRestarted": "El servidor de llamadas no se reinició. Los ajustes del chat dicen qué está haciendo.",
         "restarting": "El servidor de llamadas se está reiniciando y volverá a pedir la dirección de esta red. Podrás llamar en unos segundos."
     },
+    "meetingLink": {
+        "limits": "Límites",
+        "limitsFor": "Límites del enlace de invitado",
+        "hint": "Quién puede usar el enlace. Deja de funcionar al acabar la llamada.",
+        "save": "Guardar límites",
+        "saved": "Guardado",
+        "checkLimits": "Revisa las direcciones y los países."
+    },
     "guestCall": {
         "unavailableTitle": "No disponible",
         "unavailable": "Esta llamada ha terminado, o el enlace ya no vale.",

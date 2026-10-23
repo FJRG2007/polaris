@@ -20,6 +20,8 @@ import * as core from "@polaris/core";
 import { cookies } from "next/headers";
 import * as chat from "@/lib/chat/chat-service";
 import * as meetings from "@/lib/chat/meetings";
+import * as meetingLink from "@/lib/chat/meeting-link-access";
+import { linkDenialMessage } from "@/lib/link-denial";
 import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { mayRing } from "@/lib/privacy-service";
@@ -178,11 +180,24 @@ const guestJoinSchema = z.object({
  * asked for when they closed the door to guests - so the link goes on working
  * for the people it was sent to, instead of refusing them at it.
  */
+/** The guest link's own limits, checked before any seat is made on it. A
+ *  sentence when they refuse, otherwise null. */
+async function linkRefusal(token: string): Promise<string | null> {
+    const gate = await meetingLink.gateMeetingLink(token);
+    if (gate.ok) return null;
+    if (gate.reason === "not_found" || gate.reason === "password_required") {
+        return (await getTranslations("chat"))("guestCall.unavailable");
+    }
+    return linkDenialMessage(gate.reason);
+}
+
 export async function joinOnLinkAction(
     token: string
 ): Promise<{ meetingId?: string; admission?: string; error?: string }> {
     const user = await requirePermission("chat.use");
     if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
+    const refused = await linkRefusal(String(token ?? ""));
+    if (refused) return { error: refused };
     const result = await guard(() =>
         meetings.joinOnLink({ id: user.id, name: user.name }, String(token ?? ""))
     );
@@ -201,6 +216,9 @@ export async function joinAsGuestAction(
                 parsed.error.issues[0]?.message ??
                 (await getTranslations("chat"))("errors.didNotWork")
         };
+
+    const refused = await linkRefusal(parsed.data.token);
+    if (refused) return { error: refused };
 
     const result = await guard(() => meetings.joinAsGuest(parsed.data.token, parsed.data.name));
     if (result.error || !result.value)
@@ -355,6 +373,28 @@ export async function setGuestLinkAction(
         meetings.setGuestLink({ id: user.id }, meetingId, open, approveGuests)
     );
     return result.error ? { error: result.error } : { token: result.value ?? null };
+}
+
+/** The guest link's password and address rules, for its host. */
+export async function getGuestLinkLimitsAction(
+    meetingId: string
+): Promise<{ limits?: meetingLink.MeetingLinkLimitsView; error?: string }> {
+    const user = await requirePermission("chat.use");
+    const result = await guard(() => meetingLink.getMeetingLinkLimits(user.id, String(meetingId ?? "")));
+    return result.error ? { error: result.error } : { limits: result.value };
+}
+
+export async function setGuestLinkLimitsAction(
+    meetingId: string,
+    input: unknown
+): Promise<{ limits?: meetingLink.MeetingLinkLimitsView; error?: string }> {
+    const user = await requirePermission("chat.use");
+    const parsed = meetingLink.meetingLinkLimitsSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("meetingLink.checkLimits") };
+    const result = await guard(() =>
+        meetingLink.setMeetingLinkLimits(user.id, String(meetingId ?? ""), parsed.data)
+    );
+    return result.error ? { error: result.error } : { limits: result.value };
 }
 
 /** A call running in a conversation, and who is sitting in it - with their

@@ -217,6 +217,11 @@
     "note": {
         "lastChanged": "Último cambio: {time}"
     },
+    "meetingLink": {
+        "typePassword": "Escribe la contraseña",
+        "tooMany": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+        "wrongPassword": "Contraseña incorrecta."
+    },
     "form": {
         "typePassword": "Escribe la contraseña",
         "tooManyTries": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
