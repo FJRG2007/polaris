@@ -131,7 +131,12 @@ import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { answeredNothing } from "@/lib/polar/unanswered";
 import { repoStepOf } from "@/lib/polar/code-host";
-import { browserStepOf, isBrowserTool } from "@/lib/polar/browser-steps";
+import {
+    noBrowserIn,
+    browserStepOf,
+    isBrowserTool,
+    ALWAYS_SITE_REASON
+} from "@/lib/polar/browser-steps";
 import { GithubAppGapNotice, gapIdentity, gapsOf } from "@/components/github-app-gap";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
@@ -2528,11 +2533,12 @@ export function PolarChat({
                                             const target = versions[at + step];
                                             if (target) switchVersion(index, target);
                                         }}
-                                        onApprove={(id, approved) => {
+                                        onApprove={(id, approved, reason) => {
                                             setLastApproved(approved);
                                             void chat.addToolApprovalResponse({
                                                 id,
-                                                approved
+                                                approved,
+                                                ...(reason ? { reason } : {})
                                             });
                                         }}
                                         onEdit={() => {
@@ -2768,7 +2774,7 @@ function MessageView({
     explained: boolean;
     version: { current: number; total: number };
     onVersion: (step: -1 | 1) => void;
-    onApprove: (id: string, approved: boolean) => void;
+    onApprove: (id: string, approved: boolean, reason?: string) => void;
     onEdit: () => void;
     onQuote: () => void;
     onSaveCommand: () => void;
@@ -2819,12 +2825,8 @@ function MessageView({
         const browser = browserStepOf(name, input);
         if (browser) {
             const values = { site: browser.site, element: browser.element || "?" };
-            if (browser.kind === "open") return t("web.browserOpen", values);
-            if (browser.kind === "read") return t("web.browserRead", values);
-            if (browser.kind === "find") return t("web.browserFind", values);
-            if (browser.kind === "click") return t("web.browserClick", values);
-            if (browser.kind === "type") return t("web.browserType", values);
-            return t("web.browserClose");
+            if (browser.kind === "close") return t("web.browserClose");
+            return t(`web.browserSteps.${browser.kind}`, values);
         }
         const step = webStepOf(name, input);
         if (!step) return toolName(name);
@@ -3015,6 +3017,11 @@ function MessageView({
                                 tool={described?.writes ? name : undefined}
                                 onApprove={() => tool.approval && onApprove(tool.approval.id, true)}
                                 onReject={() => tool.approval && onApprove(tool.approval.id, false)}
+                                site={browserStepOf(name, tool.input)?.site || undefined}
+                                onAlwaysSite={() =>
+                                    tool.approval &&
+                                    onApprove(tool.approval.id, true, ALWAYS_SITE_REASON)
+                                }
                             />
                         );
                     }
@@ -3035,6 +3042,16 @@ function MessageView({
                     onUseBrowser={!streaming && last && !busy ? onAsk : undefined}
                 />
             ))}
+            {/* The browser tool found no extension connected: the step that
+                connects one, as a button. */}
+            {!mine && noBrowserIn(message.parts as never) ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm text-foreground-muted">
+                    <span className="min-w-0">{t("web.browserMissing")}</span>
+                    <Button size="sm" variant="outline" asChild>
+                        <a href="/account/downloads">{t("web.browserConnect")}</a>
+                    </Button>
+                </div>
+            ) : null}
             {/* A turn that ended on its steps with nothing said is named, so
                 the empty space under them never reads as an answer. */}
             {unanswered ? (

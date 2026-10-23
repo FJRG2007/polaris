@@ -990,8 +990,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     {
         id: "polar.chatReady",
         group: "polar",
-        label: "Chat answered while away",
-        description: "A Polar chat you left finished its answer, or is waiting for your approval.",
+        label: "Polar finished while you were away",
+        description: "A Polar answer finished, stopped or needs you while you were elsewhere.",
         // Only the bell: the person was in Polaris a moment ago, and an answer
         // they walked away from is not worth a mail.
         level: "info",

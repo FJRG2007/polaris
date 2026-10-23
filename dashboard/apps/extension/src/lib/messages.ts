@@ -368,10 +368,10 @@ export type Request =
      * already open, so the marks appear without a reload.
      */
     | { readonly kind: "startInline" }
-    /** Whether Polar may use this browser, and the sites it may always use. */
+    /** The sites Polar may always use in this browser. */
     | { readonly kind: "polarBrowser" }
-    | { readonly kind: "setPolarBrowser"; readonly on: boolean }
-    | { readonly kind: "forgetPolarSites" }
+    /** Withdraws one site, or every one when no site is named. */
+    | { readonly kind: "forgetPolarSites"; readonly site?: string }
     /** The site question's answer, from the extension's own grant window. */
     | {
           readonly kind: "polarBrowserGrant";
@@ -465,7 +465,7 @@ export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
     | {
           readonly ok: true;
-          readonly polarBrowser: { readonly on: boolean; readonly sites: readonly string[] };
+          readonly polarBrowser: { readonly sites: readonly string[] };
       }
     /**
      * A build newer than this one, or null when this one is current - and the
@@ -556,8 +556,8 @@ export type Reply =
  * way.
  */
 export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
-    // Stop on the bar in a tab Polar is using. It can only ever switch Polar
-    // off, so a page that found a way to send it gains nothing.
+    // Stop on the bar in a tab Polar is using. It can only ever stop Polar,
+    // so a page that found a way to send it gains nothing.
     "polarBrowserStop",
     "blocked",
     "itemsFor",

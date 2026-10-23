@@ -35,6 +35,8 @@ export interface PolarRunEnd {
     state: Exclude<PolarRunState, "running">;
     /** Whether any screen was following it when it ended. */
     watched: boolean;
+    /** Why a failed run stopped, as the answer's failure part said it. */
+    failure?: { code: string; kind?: string; provider?: string } | null;
 }
 
 interface Run {
@@ -51,6 +53,10 @@ interface Run {
     listeners: Set<(chunk: string | null) => void>;
     /** Screens following it: the request that started it, and each resume. */
     watchers: number;
+    /** When the last screen stopped following it, 0 while none has. */
+    leftAt: number;
+    /** The failure part the answer carried, if any. */
+    failure: PolarRunEnd["failure"];
     controller: AbortController;
     onEnd: (end: PolarRunEnd) => void;
 }
@@ -59,6 +65,14 @@ interface Run {
 export const POLAR_RUNS_MAX = 6;
 /** Most of one answer kept for a replay. */
 const REPLAY_BYTES_MAX = 4 * 1024 * 1024;
+/**
+ * A screen that let go this close to the end still saw it. The browser reads
+ * its copy of the stream ahead of the copy kept here, and the chat hangs up the
+ * moment it reads an error - so on a failed answer the screen was always gone
+ * by the time this copy reached the end, and a run the person watched fail in
+ * front of them was announced as one they had left.
+ */
+export const WATCH_GRACE_MS = 3_000;
 /** How long an ended run stays listed: long enough to be seen in the sidebar. */
 const ENDED_TTL_MS = 30 * 60_000;
 
@@ -76,18 +90,49 @@ function isLive(run: Run | undefined): run is Run {
     return !!run && run.state === "running" && !run.controller.signal.aborted;
 }
 
-/** The type of one server-sent chunk, or null for a keep-alive or the end marker. */
-export function chunkType(chunk: string): string | null {
+/** One server-sent chunk's object, or null for a keep-alive or the end marker. */
+function chunkObject(chunk: string): Record<string, unknown> | null {
     const data = chunk.startsWith("data: ") ? chunk.slice(6).trim() : "";
     if (!data || data === "[DONE]") return null;
     try {
         const parsed: unknown = JSON.parse(data);
-        return parsed && typeof parsed === "object" && "type" in parsed
-            ? String((parsed as { type: unknown }).type)
-            : null;
+        return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
     } catch {
         return null;
     }
+}
+
+/** The type of one server-sent chunk, or null for a keep-alive or the end marker. */
+export function chunkType(chunk: string): string | null {
+    const parsed = chunkObject(chunk);
+    return parsed && "type" in parsed ? String(parsed.type) : null;
+}
+
+/** The failure a `data-polar-failure` chunk names, or null. */
+export function chunkFailure(chunk: string): NonNullable<PolarRunEnd["failure"]> | null {
+    const parsed = chunkObject(chunk);
+    if (parsed?.type !== "data-polar-failure") return null;
+    const data = parsed.data as Record<string, unknown> | null | undefined;
+    if (!data || typeof data.code !== "string") return null;
+    return {
+        code: data.code.slice(0, 40),
+        ...(typeof data.kind === "string" ? { kind: data.kind.slice(0, 40) } : {}),
+        ...(typeof data.provider === "string" ? { provider: data.provider.slice(0, 80) } : {})
+    };
+}
+
+/** Counts one screen as following a run until `signal` aborts. */
+function follow(run: Run, signal: AbortSignal, onLeave?: () => void): void {
+    run.watchers += 1;
+    signal.addEventListener(
+        "abort",
+        () => {
+            run.watchers -= 1;
+            run.leftAt = Date.now();
+            onLeave?.();
+        },
+        { once: true }
+    );
 }
 
 export type BeginRefusal = "busy" | "too_many";
@@ -131,6 +176,8 @@ export function beginPolarRun(
         replayable: true,
         listeners: new Set(),
         watchers: 0,
+        leftAt: 0,
+        failure: null,
         controller: new AbortController(),
         onEnd
     };
@@ -138,8 +185,7 @@ export function beginPolarRun(
 
     const watch = (signal: AbortSignal) => {
         if (signal.aborted) return;
-        run.watchers += 1;
-        signal.addEventListener("abort", () => (run.watchers -= 1), { once: true });
+        follow(run, signal);
     };
 
     const consume = ({ stream }: { stream: ReadableStream<string> }) => {
@@ -154,6 +200,7 @@ export function beginPolarRun(
                     const type = chunkType(value);
                     if (type === "tool-approval-request") approval = true;
                     else if (type === "error") failed = true;
+                    else if (type === "data-polar-failure") run.failure = chunkFailure(value);
                     if (run.replayable) {
                         run.bytes += value.length;
                         if (run.bytes > REPLAY_BYTES_MAX) {
@@ -191,10 +238,17 @@ function finish(run: Run, state: Exclude<PolarRunState, "running">): void {
     // The newest run of the thread is the one that speaks; a stopped one was
     // stopped by the person, who needs no telling.
     if (runs.get(run.threadId) !== run || state === "stopped") return;
-    const watched = run.watchers > 0;
+    const watched =
+        run.watchers > 0 || (run.leftAt > 0 && run.endedAt - run.leftAt <= WATCH_GRACE_MS);
     run.unread = !watched;
     try {
-        run.onEnd({ userId: run.userId, threadId: run.threadId, state, watched });
+        run.onEnd({
+            userId: run.userId,
+            threadId: run.threadId,
+            state,
+            watched,
+            ...(state === "failed" ? { failure: run.failure } : {})
+        });
     } catch (error) {
         console.error("polar: could not tell about a finished run", error);
     }
@@ -229,17 +283,7 @@ export function replayPolarRun(
                 } else controller.enqueue(chunk);
             };
             run.listeners.add(listener);
-            if (signal) {
-                run.watchers += 1;
-                signal.addEventListener(
-                    "abort",
-                    () => {
-                        run.watchers -= 1;
-                        detach();
-                    },
-                    { once: true }
-                );
-            }
+            if (signal) follow(run, signal, detach);
         },
         cancel: detach
     });

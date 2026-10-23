@@ -310,18 +310,16 @@
         "removeOnlyList": "Nobody is signed in on it here, so it only leaves this list."
     },
     "polar": {
-        "browserUse": "Polar can use this browser",
-        "browserUseHint": "Reads pages you can see, signed in as you.",
-        "browserOn": "On",
-        "browserOff": "Off",
-        "browserSites": "{count, plural, one {# site always allowed} other {# sites always allowed}}",
         "browserForget": "Forget",
-        "browserBar": "Polar is using this tab",
+        "browserBar": "Polar is controlling this tab",
         "browserAsk": "Let Polar use {site}?",
-        "browserAskBody": "Polar reads it signed in as you. Clicks and typing still ask first in Polar.",
+        "browserAskBody": "Polar uses it signed in as you. Sending, buying or deleting still asks first in Polar.",
         "browserOnce": "Allow once",
         "browserAlways": "Always allow",
         "browserDeny": "Don't allow",
+        "browserAskAction": "Let Polar use \"{element}\" on {site}?",
+        "browserAskActionBody": "It may send, buy or delete something, signed in as you.",
+        "browserAllow": "Allow",
         "title": "Polar",
         "open": "Open Polar beside the page",
         "change": "Change",
@@ -336,7 +334,10 @@
         "allowAny": "Allow",
         "notNow": "Not now",
         "reading": "Polar can read {site}",
-        "stop": "Stop"
+        "stop": "Stop",
+        "browserSitesTitle": "Sites Polar may always use",
+        "browserSitesHint": "Polar asks before using any other site.",
+        "browserForgetSite": "Stop letting Polar use {site}"
     },
     "settings": {
         "shortcuts": "Shortcuts",

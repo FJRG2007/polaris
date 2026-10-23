@@ -5,7 +5,19 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { RefTable, clickRef, readText, snapshot, typeRef } from "../src/lib/page-agent";
+import { vi } from "vitest";
+import {
+    RefTable,
+    clickRef,
+    readText,
+    snapshot,
+    typeRef,
+    hoverRef,
+    pressKeys,
+    selectRef,
+    scrollPage,
+    riskOf
+} from "../src/lib/page-agent";
 
 function page(html: string): Document {
     document.body.innerHTML = html;
@@ -113,5 +125,84 @@ describe("acting", () => {
         const [button] = snapshot(doc, refs);
         doc.body.innerHTML = "";
         expect(clickRef(refs, button!.ref)).toEqual({ ok: false, refusal: "unknown-ref" });
+    });
+});
+
+describe("scrolling, keys, pointing and picking", () => {
+    it("scrolls the page by screens, the way a key never would from a script", () => {
+        const doc = page("<p>long</p>");
+        const scrollBy = vi.fn();
+        window.scrollBy = scrollBy as never;
+        Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+        expect(scrollPage(doc, new RefTable(), "down", 2)).toEqual({ ok: true });
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1600, left: 0 });
+        expect(pressKeys(doc, "PageUp")).toEqual({ ok: true });
+        expect(scrollBy).toHaveBeenLastCalledWith({ top: -720, left: 0 });
+    });
+
+    it("scrolls to a ref, and refuses one the snapshot never gave", () => {
+        const doc = page("<button>Load more</button>");
+        const refs = new RefTable();
+        const [entry] = snapshot(doc, refs);
+        const into = vi.fn();
+        (doc.querySelector("button") as HTMLElement).scrollIntoView = into;
+        expect(scrollPage(doc, refs, "down", 1, entry!.ref)).toEqual({ ok: true });
+        expect(into).toHaveBeenCalled();
+        expect(scrollPage(doc, refs, "down", 1, "e999")).toEqual({
+            ok: false,
+            refusal: "unknown-ref"
+        });
+    });
+
+    it("never presses keys into a password box", () => {
+        const doc = page('<input type="password" id="p">');
+        (doc.getElementById("p") as HTMLInputElement).focus();
+        expect(pressKeys(doc, "Enter")).toEqual({ ok: false, refusal: "password-field" });
+    });
+
+    it("picks an option by its text, and hovers with the events a menu waits for", () => {
+        const doc = page(
+            '<label for="s">Sort</label><select id="s"><option value="new">Newest</option><option value="top">Top</option></select><a href="#" id="m">Menu</a>'
+        );
+        const refs = new RefTable();
+        const found = snapshot(doc, refs);
+        const select = found.find((entry) => entry.name === "Sort")!;
+        expect(selectRef(refs, select.ref, "Top")).toEqual({ ok: true });
+        expect((doc.getElementById("s") as HTMLSelectElement).value).toBe("top");
+        expect(selectRef(refs, select.ref, "Oldest")).toEqual({ ok: false, refusal: "failed" });
+        const link = found.find((entry) => entry.name === "Menu")!;
+        const seen: string[] = [];
+        doc.getElementById("m")!.addEventListener("mouseover", () => seen.push("over"));
+        expect(hoverRef(refs, link.ref)).toEqual({ ok: true });
+        expect(seen).toEqual(["over"]);
+    });
+});
+
+describe("judging an action from the real element", () => {
+    it("finds what sends, deletes or takes a card, whatever the model called it", () => {
+        const doc = page(`
+            <form><input aria-label="Title"><button id="go">Go</button></form>
+            <button id="red" aria-label="Red button">Delete</button>
+            <button id="like" type="button">Like</button>
+            <input id="cc" autocomplete="cc-number" aria-label="Number">
+            <select id="plan"><option>Free</option><option>Pay yearly</option></select>
+        `);
+        const refs = new RefTable();
+        const ref = (id: string) => refs.refOf(doc.getElementById(id)!);
+        expect(riskOf(doc, refs, { op: "click", ref: ref("go") })).toMatchObject({
+            risky: true,
+            name: "Go"
+        });
+        expect(riskOf(doc, refs, { op: "click", ref: ref("red") }).risky).toBe(true);
+        expect(riskOf(doc, refs, { op: "click", ref: ref("like") }).risky).toBe(false);
+        expect(riskOf(doc, refs, { op: "type", ref: ref("cc"), text: "4242" }).risky).toBe(true);
+        expect(riskOf(doc, refs, { op: "select", ref: ref("plan"), value: "Free" }).risky).toBe(
+            false
+        );
+        expect(
+            riskOf(doc, refs, { op: "select", ref: ref("plan"), value: "Pay yearly" }).risky
+        ).toBe(true);
+        expect(riskOf(doc, refs, { op: "key", keys: "Enter" }).risky).toBe(true);
+        expect(riskOf(doc, refs, { op: "key", keys: "PageDown" }).risky).toBe(false);
     });
 });

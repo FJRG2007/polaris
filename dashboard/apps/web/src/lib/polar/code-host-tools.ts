@@ -154,7 +154,7 @@ class RepoFailure extends Error {
 export function gapSentence(gap: GithubAppGap, what: string): string {
     const base = appSentence(gap, what);
     if (!gap.browser) return base;
-    return `${base} There is a second way, because the person's browser is connected to Polar: their own browser can open ${gap.browser.url} signed in as they are. If they would rather do that, or they ask for it, open it with browser_open and read it with browser_read and browser_find instead of read_page. A "Read it through your browser" button is shown under this answer too. Offer both and let them choose.`;
+    return `${base} There is a second way, because the person's browser is connected to Polar: their own browser can open ${gap.browser.url} signed in as they are. If they would rather do that, or they ask for it, use the browser tool: action open on that address, then read and find, instead of read_page. A "Read it through your browser" button is shown under this answer too. Offer both and let them choose.`;
 }
 
 function appSentence(gap: GithubAppGap, what: string): string {

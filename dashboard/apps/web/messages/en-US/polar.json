@@ -5,7 +5,15 @@
         "waitingTitle": "Polar is waiting: {title}",
         "waitingBody": "A step in this chat needs your approval to go on.",
         "failedTitle": "Polar stopped: {title}",
-        "failedBody": "The answer ended early. Open the chat to see why."
+        "failedBody": "The answer ended early. Open the chat to see why.",
+        "failed": {
+            "key": "The model did not answer ({where}): the key was refused. Check the key or pick another model.",
+            "credit": "The model did not answer ({where}): the account is out of credit. Add credit or pick another model.",
+            "rate": "The model did not answer ({where}): too many requests for now. Ask again in a minute or pick another model.",
+            "down": "The model did not answer ({where}): the provider is having trouble. Ask again later or pick another model.",
+            "model": "The model did not answer ({where}). Ask again or pick another model.",
+            "other": "The model did not answer ({where}). Ask again or pick another model."
+        }
     },
     "toggle": {
         "title": "Ask Polar ({keys})",
@@ -251,7 +259,10 @@
         "alwaysRevoke": "Undo it in Polar permissions.",
         "alwaysBack": "Back",
         "alwaysConfirm": "Allow and run",
-        "alwaysFailed": "Couldn't save that, so nothing ran. Try again."
+        "alwaysFailed": "Couldn't save that, so nothing ran. Try again.",
+        "siteAsk": "Polar wants to use {site} in your browser.",
+        "siteOnce": "Allow once",
+        "siteAlways": "Always for {site}"
     },
     "page": {
         "title": "Polar"
@@ -426,6 +437,15 @@
         "back": "Back to chat",
         "nav": {
             "permissions": "Permissions and connectors"
+        },
+        "browserSites": {
+            "title": "Your browser",
+            "intro": "Sites Polar may use in your browser without asking. It asks before any other site.",
+            "empty": "No site yet. Polar asks the first time it needs one.",
+            "notConnected": "Your browser is not connected to Polar.",
+            "forget": "Forget",
+            "forgetLabel": "Stop letting Polar use {site}",
+            "forgetFailed": "Could not reach your browser. Try again."
         }
     },
     "temporary": {
@@ -596,18 +616,30 @@
         "snowballing": "Snowballing"
     },
     "web": {
-        "browserOpen": "Opening {site} in your browser",
-        "browserRead": "Reading {site} in your browser",
-        "browserFind": "Looking over {site}",
-        "browserClick": "Click {element} on {site}",
-        "browserType": "Type into {element} on {site}",
         "browserClose": "Closing a tab",
         "toggle": "Search the web",
         "searching": "Searching: {query}",
         "searched": "Searched the web",
         "reading": "Reading {site}",
         "sources": "Sources",
-        "calls": "{searches, plural, one {# search} other {# searches}} - {pages, plural, one {# page read} other {# pages read}}"
+        "calls": "{searches, plural, one {# search} other {# searches}} - {pages, plural, one {# page read} other {# pages read}}",
+        "browserMissing": "Polar needs the Polaris extension connected in this browser.",
+        "browserConnect": "Get the extension",
+        "browserSteps": {
+            "open": "Opening {site} in your browser",
+            "read": "Reading {site} in your browser",
+            "find": "Looking over {site}",
+            "click": "Click {element} on {site}",
+            "type": "Type into {element} on {site}",
+            "key": "Press keys on {site}",
+            "scroll": "Scrolling {site}",
+            "hover": "Point at {element} on {site}",
+            "select": "Pick in {element} on {site}",
+            "back": "Going back on {site}",
+            "forward": "Going forward on {site}",
+            "reload": "Reloading {site}",
+            "wait": "Waiting for the page"
+        }
     },
     "repo": {
         "overview": "Looking at {repo}",

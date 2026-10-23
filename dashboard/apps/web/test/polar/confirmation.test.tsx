@@ -101,3 +101,39 @@ describe("the approval card", () => {
         await waitFor(() => expect(onApprove).toHaveBeenCalledTimes(1));
     });
 });
+
+describe("the browser's site card", () => {
+    function siteCard() {
+        const onApprove = vi.fn();
+        const onAlwaysSite = vi.fn();
+        const onReject = vi.fn();
+        render(
+            <MessagesWrapper>
+                <Confirmation
+                    state="approval-requested"
+                    approval={{ id: "a2" }}
+                    action="Scrolling x.com"
+                    affects={[]}
+                    destructive={false}
+                    input={{ action: "scroll", site: "x.com" }}
+                    site="x.com"
+                    onApprove={onApprove}
+                    onAlwaysSite={onAlwaysSite}
+                    onReject={onReject}
+                />
+            </MessagesWrapper>
+        );
+        return { onApprove, onAlwaysSite, onReject };
+    }
+
+    it("asks for the site: allow once, always for it, or not", () => {
+        const { onApprove, onAlwaysSite, onReject } = siteCard();
+        expect(screen.getByText("Polar wants to use x.com in your browser.")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Always for x.com" }));
+        expect(onAlwaysSite).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole("button", { name: "Allow once" }));
+        expect(onApprove).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+        expect(onReject).toHaveBeenCalledTimes(1);
+    });
+});
