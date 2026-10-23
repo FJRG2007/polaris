@@ -689,7 +689,7 @@
             "notSet": "Sin configurar",
             "noAnswer": "Sin respuesta",
             "ms": "{ms} ms",
-            "insideOnly": "Comprobado desde dentro. Este router no vuelve a su propia dirección pública, así que una línea con CGNAT puede pasar desapercibida.",
+            "insideOnly": "Solo comprobado desde dentro: este router no vuelve a su propia IP pública, así que una línea con CGNAT puede pasar inadvertida. Añade un servidor en la nube para comprobar desde fuera.",
             "udpSkipped": "El relé solo lleva TCP. Los puertos UDP {ports} no llegan por él.",
             "physics": "Las dos rutas salen desde aquí. Ayudan si el router pasa a una línea móvil o se bloquea la entrada, no si no sale nada.",
             "conflicts": "No se tocaron porque alguien los cambió durante el respaldo: {names}.",
@@ -700,7 +700,10 @@
                 "no-server": "El servidor relé ya no existe. Elige otro.",
                 "no-address": "El servidor relé no tiene dirección pública.",
                 "failed": "La última pasada falló: {detail}"
-            }
+            },
+            "tcpCarried": "El relé lleva TCP {ports}.",
+            "fromOutside": "desde {server}",
+            "fromInside": "desde este servidor"
         }
     },
     "domainsPorts": {

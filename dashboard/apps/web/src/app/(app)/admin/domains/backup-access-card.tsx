@@ -175,6 +175,11 @@ export function BackupAccessCard() {
                     <Latency view={view} />
                     <Problem view={view} />
 
+                    {view.relay && view.relay.tcp.length > 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("domains.backup.tcpCarried", { ports: view.relay.tcp.join(", ") })}
+                        </p>
+                    ) : null}
                     {view.relay && view.relay.skippedUdp.length > 0 ? (
                         <p className="text-xs text-muted-foreground">
                             {t("domains.backup.udpSkipped", { ports: view.relay.skippedUdp.join(", ") })}
@@ -259,6 +264,10 @@ function StateLine({ view }: { view: BackupView }) {
                     <dt className="text-muted-foreground">{t("domains.backup.checked")}</dt>
                     <dd className="min-w-0 truncate">
                         <RelativeTime iso={probe.checkedAt} />
+                        {" - "}
+                        {probe.from
+                            ? t("domains.backup.fromOutside", { server: probe.from })
+                            : t("domains.backup.fromInside")}
                     </dd>
                 </>
             ) : null}
@@ -291,7 +300,7 @@ function Latency({ view }: { view: BackupView }) {
                     </div>
                 ))}
             </dl>
-            {view.probe && !view.probe.calibrated ? (
+            {view.probe && !view.probe.from && !view.probe.calibrated ? (
                 <p className="text-xs text-muted-foreground">{t("domains.backup.insideOnly")}</p>
             ) : null}
         </div>

@@ -17,8 +17,11 @@
  */
 
 import { z } from "zod";
-import { connect } from "node:net";
 import { prisma } from "@polaris/db";
+import { connect, isIP } from "node:net";
+import { execCommand } from "@polaris/ssh";
+import { borrowSsh } from "@/lib/connection-pool";
+import { getHostConnection } from "@/lib/host-service";
 import { getPorts } from "@/lib/deploy/runtime";
 import type { RuntimePorts } from "@polaris/deploy";
 import { ownedZoneNames } from "@/lib/domain-dns";
@@ -31,6 +34,7 @@ import { PUBLISHED_KEY } from "@/lib/domain-address-sync";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { internetOffline } from "@/lib/offline/outbound-lookup";
+import { forwardedPorts } from "@/lib/app-extensions/registry";
 import { generateKeyPair } from "@/lib/deploy/wireguard/tunnel-config";
 import { openKey, sealKey } from "@/lib/deploy/wireguard/tunnel-service";
 import {
@@ -78,6 +82,7 @@ import {
     renderHomeConfig,
     renderRelayConfig
 } from "./relay";
+import { combineVerdicts, outsideScript, readOutside, type OutsideAnswer } from "./outside-check";
 
 const TTL_KEY = "backupAccess.ttl";
 const TUNNEL_KEY = "backupAccess.tunnel";
@@ -92,6 +97,8 @@ const EDGE_ORIGIN = "https://traefik:443";
 /** Where a tunnel connector dials: what the tunnel path adds before the edge. */
 const TUNNEL_EDGE = { host: "region1.v2.argotunnel.com", port: 7844 };
 const CONNECT_TIMEOUT_MS = 3_000;
+/** How long the cloud server is given to answer the SSH handshake. */
+const OUTSIDE_READY_MS = 8_000;
 
 export const configSchema = z.object({
     mode: z.enum(BACKUP_MODES),
@@ -128,6 +135,8 @@ const relaySchema = z.object({
     relayPrivate: z.string(),
     homePublic: z.string(),
     homePrivate: z.string(),
+    /** The TCP ports both ends were last brought up with. */
+    tcp: z.array(z.number()).default([]),
     skippedUdp: z.array(z.number()).default([])
 });
 
@@ -152,6 +161,8 @@ const probeSchema = z.object({
     }),
     /** This box reached its own public address once, so that check means something. */
     calibrated: z.boolean(),
+    /** The cloud server that checked from outside; null when only the inside check ran. */
+    from: z.string().nullable().default(null),
     lastIp: z.string().nullable(),
     problem: z.string().nullable(),
     detail: z.string().nullable(),
@@ -180,7 +191,7 @@ export interface BackupView {
     readonly state: FlipState;
     readonly probe: Probe | null;
     readonly tunnelReady: boolean;
-    readonly relay: { address: string; skippedUdp: number[] } | null;
+    readonly relay: { address: string; tcp: number[]; skippedUdp: number[] } | null;
     readonly servers: { id: string; name: string }[];
     readonly cloudflare: boolean;
 }
@@ -209,7 +220,7 @@ export async function backupView(): Promise<BackupView> {
         state,
         probe,
         tunnelReady: tunnel !== null,
-        relay: relay ? { address: relay.address, skippedUdp: relay.skippedUdp } : null,
+        relay: relay ? { address: relay.address, tcp: relay.tcp, skippedUdp: relay.skippedUdp } : null,
         servers,
         cloudflare: Boolean(token)
     };
@@ -254,7 +265,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     // While on backup, a path that failed to warm is still the one serving.
     if (!target && saved && config.path) target = saved.target;
 
-    const measured = await measure(before, previous.serving, uplink);
+    const measured = await measure(before, previous.serving, uplink, config.relayTargetId);
     const now = new Date();
     const decision = decide(previous, {
         mode: config.mode,
@@ -463,12 +474,18 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
             relayPrivate: sealKey(relay.privateKey),
             homePublic: home.publicKey,
             homePrivate: sealKey(home.privateKey),
+            tcp: [],
             skippedUdp: []
         };
     }
-    // enigma: the game ports the relay carries; only the web ports until a source
-    // of the published game ports is wired in here.
-    const ports = relayPorts([]);
+    // The ports the installed game servers publish, as the router is asked to
+    // forward them; a server added or removed changes what both ends carry.
+    const games = await forwardedPorts().catch(() => []);
+    const ports = relayPorts(games.flatMap((row) => row.ports));
+    // Fresh keys start with no ports, so they always bring both ends up again.
+    const changed = stored.tcp.join(",") !== ports.tcp.join(",");
+    // The keys are kept now and the ports only once both ends run with them, so a
+    // bring-up that failed is tried again on the next pass.
     stored = { ...stored, skippedUdp: ports.skippedUdp };
     await setSetting(RELAY_KEY, JSON.stringify(stored));
     const keys = {
@@ -477,10 +494,14 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
     };
     const relayConfig = renderRelayConfig(keys, ports.tcp);
     const homeConfig = renderHomeConfig(keys, address, ports.tcp);
-    await keepUp(await getPorts(target, target.ownerId), relayProject("relay"), () =>
-        relaySpec("relay", relayConfig, ports.tcp)
+    await keepUp(
+        await getPorts(target, target.ownerId),
+        relayProject("relay"),
+        () => relaySpec("relay", relayConfig, ports.tcp),
+        changed
     );
-    await keepUp(new HostdPorts(), relayProject("home"), () => relaySpec("home", homeConfig, ports.tcp));
+    await keepUp(new HostdPorts(), relayProject("home"), () => relaySpec("home", homeConfig, ports.tcp), changed);
+    if (changed) await setSetting(RELAY_KEY, JSON.stringify({ ...stored, tcp: ports.tcp }));
     return { kind: "relay", address };
 }
 
@@ -506,11 +527,15 @@ async function retireRelay(): Promise<void> {
     await setSetting(RELAY_KEY, null);
 }
 
-/** Start a project when none of its containers is there. Quiet when it already runs. */
+/**
+ * Start a project when none of its containers is there, or bring it up again when
+ * what it carries changed. Quiet when it already runs as it should.
+ */
 async function keepUp(
     ports: RuntimePorts,
     project: string,
-    spec: () => ComposeSpec
+    spec: () => ComposeSpec,
+    changed = false
 ): Promise<void> {
     try {
         // A runtime that cannot list is given the spec every pass: compose leaves an
@@ -519,7 +544,7 @@ async function keepUp(
         const running = await list(project).catch((caught: unknown) => {
             throw /hostd|ECONNREFUSED|ENOENT|501/i.test(message(caught)) ? new PathRefusal("no-daemon") : caught;
         });
-        if (running.length === 0) await ports.composeUp(spec());
+        if (changed || running.length === 0) await ports.composeUp(spec());
     } finally {
         await ports.dispose();
     }
@@ -541,7 +566,11 @@ export function connectTime(host: string, port: number, timeoutMs = CONNECT_TIME
 }
 
 /**
- * Check the direct path from inside and time each path.
+ * Check the direct path and time each path.
+ *
+ * From outside first: when an enrolled cloud server exists, it opens 443 on the
+ * house's public address the way a visitor would, and its answer decides
+ * (`combineVerdicts`). What follows is the fallback from inside.
  *
  * The strongest inside check is opening 443 on this server's own public address;
  * a router that does not loop that back makes it fail always, so it only counts
@@ -551,7 +580,8 @@ export function connectTime(host: string, port: number, timeoutMs = CONNECT_TIME
 async function measure(
     before: Probe | null,
     serving: FlipState["serving"],
-    uplink: boolean
+    uplink: boolean,
+    relayTargetId: string | null
 ): Promise<Omit<Probe, "checkedAt" | "problem" | "detail" | "conflicts">> {
     const [published, tunnel, relay] = await Promise.all([
         getSetting(PUBLISHED_KEY),
@@ -564,6 +594,7 @@ async function measure(
             verdict: "no-uplink",
             latency: { direct: null, tunnel: null, relay: null },
             calibrated,
+            from: null,
             lastIp: before?.lastIp ?? null
         };
     const [direct, tunnelMs, relayMs, ip] = await Promise.all([
@@ -573,18 +604,89 @@ async function measure(
         probePublicIp(0)
     ]);
     const nowCalibrated = calibrated || direct !== null;
-    let verdict: Verdict;
-    if (nowCalibrated) verdict = direct !== null ? "up" : "down";
-    else if (!ip || !published) verdict = "unknown";
+    let inside: Verdict;
+    if (nowCalibrated) inside = direct !== null ? "up" : "down";
+    else if (!ip || !published) inside = "unknown";
     // On backup the follower stands back, so a line back on a new address is "up"
     // once it holds still; the follower repoints it after the records are restored.
-    else verdict = ip === published || (serving === "backup" && ip === before?.lastIp) ? "up" : "down";
+    else inside = ip === published || (serving === "backup" && ip === before?.lastIp) ? "up" : "down";
+    // The address visitors would reach today: the one the line has now, else the
+    // one the records were last given.
+    const outside = await checkFromOutside(relayTargetId, ip ?? published);
+    const { verdict } = combineVerdicts(inside, outside?.answer ?? null);
     return {
         verdict,
-        latency: { direct, tunnel: tunnelMs, relay: relayMs },
+        latency: { direct: direct ?? outside?.answer.ms ?? null, tunnel: tunnelMs, relay: relayMs },
         calibrated: nowCalibrated,
+        from: outside?.from ?? null,
         lastIp: ip ?? before?.lastIp ?? null
     };
+}
+
+/**
+ * The cloud server that checks from outside: the relay's own when the relay path
+ * is chosen, else the first active machine enrolled as a VPS or cloud server. A
+ * machine whose address is the house's own is not outside.
+ */
+async function outsideMachine(relayTargetId: string | null, homeAddress: string) {
+    const preferred = relayTargetId
+        ? await prisma.deployTarget.findFirst({ where: { id: relayTargetId }, select: { hostId: true } })
+        : null;
+    const hosts = await prisma.host.findMany({
+        where: {
+            status: "active",
+            OR: [
+                { environment: { in: ["vps", "cloud"] } },
+                ...(preferred?.hostId ? [{ id: preferred.hostId }] : [])
+            ]
+        },
+        select: { id: true, name: true, ownerId: true, address: true },
+        orderBy: { createdAt: "asc" },
+        take: 20
+    });
+    const outside = hosts.filter((host) => host.address !== homeAddress);
+    return outside.find((host) => host.id === preferred?.hostId) ?? outside[0] ?? null;
+}
+
+/**
+ * Ask a cloud server whether 443 on the house's address opens. Null when there
+ * is none, or it could not be asked or did not say: the inside check stands then.
+ */
+async function checkFromOutside(
+    relayTargetId: string | null,
+    address: string | null
+): Promise<{ answer: OutsideAnswer; from: string } | null> {
+    if (!address || isIP(address) === 0) return null;
+    try {
+        const host = await outsideMachine(relayTargetId, address);
+        if (!host) return null;
+        const connection = await getHostConnection(host.id, host.ownerId);
+        const lease = await borrowSsh("exec", host.id, {
+            host: connection.address,
+            port: connection.port,
+            username: connection.username,
+            auth: connection.auth,
+            // Pinned like every other probe: an empty list refuses rather than trusts.
+            pinnedHostKey: connection.hostKey ?? [],
+            readyTimeoutMs: OUTSIDE_READY_MS
+        });
+        let output = "";
+        try {
+            await execCommand(lease.client, "sh -s", {
+                input: outsideScript(address),
+                onStdout: (chunk) => {
+                    output += chunk.toString("utf8");
+                }
+            });
+        } finally {
+            lease.release();
+        }
+        const answer = readOutside(output);
+        return answer ? { answer, from: host.name } : null;
+    } catch (caught) {
+        console.warn(`polaris: backup access could not check from outside: ${message(caught)}`);
+        return null;
+    }
 }
 
 /** One bell per flip, to every administrator. */
