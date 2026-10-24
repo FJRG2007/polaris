@@ -1,0 +1,31 @@
+{
+    "title": "Juegos",
+    "intro": "Juega solo, o con otros desde una llamada.",
+    "play": "Jugar",
+    "close": "Cerrar juego",
+    "multiplayer": "Se juega en grupo en llamadas",
+    "solo": "Para jugar solo",
+    "loading": "Cargando {game}",
+    "loadingCity": "Construyendo la ciudad",
+    "failed": "El juego no pudo arrancar. Recarga la página e inténtalo de nuevo.",
+    "noGpu": "Este navegador no puede dibujar 3D. Prueba un Chrome, Edge, Firefox o Safari recientes.",
+    "empty": "Todavía no hay juegos.",
+    "inCall": {
+        "button": "Juegos",
+        "pick": "Jugar juntos",
+        "pickHint": "Todos en la llamada pueden unirse.",
+        "started": "{name} ha empezado {game}",
+        "join": "Unirse",
+        "leave": "Salir del juego",
+        "end": "Terminar para todos",
+        "playing": "{count, plural, one {# jugando} other {# jugando}}",
+        "notAllowed": "Un administrador ha desactivado los juegos en llamadas para tu cuenta.",
+        "notInstalled": "Juegos no está instalado en este Polaris."
+    },
+    "games": {
+        "new-york": {
+            "name": "Nueva York",
+            "summary": "Recorre Manhattan a pie, en coche, en bici o en helicóptero."
+        }
+    }
+}

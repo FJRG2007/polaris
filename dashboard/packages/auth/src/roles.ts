@@ -10,6 +10,7 @@ import { can } from "./authz.js";
 import { prisma } from "@polaris/db";
 import {
     CHAT_CAPABILITIES,
+    GAMES_CAPABILITIES,
     DEFAULT_ROLES,
     mergeRolePermissions,
     type GrantedPermission,
@@ -25,11 +26,15 @@ export async function seedDefaultRoles(): Promise<void> {
             create: { name, permissions: JSON.stringify(permissions), isSystem: true }
         });
     }
-    await carryChatCapabilities();
+    await carryGrants(CHAT_CARRY_MARK, CHAT_CAPABILITIES);
+    await carryGrants(GAMES_CARRY_MARK, GAMES_CAPABILITIES);
 }
 
 /** That the carry-forward below has already happened, so it happens once. */
 const CHAT_CARRY_MARK = "roles.chatCapabilitiesCarried";
+
+/** The same, for the Games app's two grants. */
+const GAMES_CARRY_MARK = "roles.gamesCapabilitiesCarried";
 
 /**
  * Give the new chat grants to the roles that predate them.
@@ -44,10 +49,13 @@ const CHAT_CARRY_MARK = "roles.chatCapabilitiesCarried";
  * additive, only on roles that already hold the chat, and recorded so it is done
  * once. After it has run, these are ordinary grants an operator turns off like
  * any other - including the ones this added.
+ *
+ * The Games grants are carried the same way: a role holding the chat is a role
+ * whose members a fresh install lets play.
  */
-async function carryChatCapabilities(): Promise<void> {
+async function carryGrants(mark: string, carried: readonly Permission[]): Promise<void> {
     const done = await prisma.setting.findUnique({
-        where: { key: CHAT_CARRY_MARK },
+        where: { key: mark },
         select: { key: true }
     });
     if (done) return;
@@ -58,7 +66,7 @@ async function carryChatCapabilities(): Promise<void> {
         // A role holding the wildcard already holds these, and a role without
         // the chat is not being handed one.
         if (!grants.includes("chat.use")) continue;
-        const missing = CHAT_CAPABILITIES.filter((capability) => !grants.includes(capability));
+        const missing = carried.filter((capability) => !grants.includes(capability));
         if (missing.length === 0) continue;
         await prisma.role.update({
             where: { id: role.id },
@@ -69,9 +77,9 @@ async function carryChatCapabilities(): Promise<void> {
     // seed runs from several entry points - and the second must not fail on the
     // unique key after doing the same harmless work.
     await prisma.setting.upsert({
-        where: { key: CHAT_CARRY_MARK },
+        where: { key: mark },
         update: {},
-        create: { key: CHAT_CARRY_MARK, value: "done" }
+        create: { key: mark, value: "done" }
     });
 }
 

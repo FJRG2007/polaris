@@ -69,6 +69,8 @@
         "chat_groups": "Start group conversations",
         "chat_attach": "Send files in chat",
         "chat_call": "Join chat calls",
+        "arcade_open": "Open Games",
+        "arcade_calls": "Play games in calls",
         "chat_meetings": "Create meeting links",
         "deploy_read": "See apps, deployments and logs",
         "deploy_manage": "Deploy, restart and change apps",
