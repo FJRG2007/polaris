@@ -1,5 +1,5 @@
 /**
- * Mailboxes somebody let this person read (/mail/shared). Read only: see
+ * Mailboxes lent to this person (/mail/shared), each with how far: see
  * `lib/mailbox/delegate.ts`.
  */
 
@@ -49,7 +49,7 @@ export default async function SharedMailboxesPage() {
                                 >
                                     {mailbox.label || mailbox.address}
                                 </span>
-                                <Badge variant="neutral">{t("delegate.readOnly")}</Badge>
+                                <Badge variant="neutral">{t(`delegate.level.${mailbox.level}`)}</Badge>
                             </Link>
                         </li>
                     ))}

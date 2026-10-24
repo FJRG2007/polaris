@@ -250,7 +250,10 @@ export const mailAccountPatchSchema = z.object({
     appendToSent: z.boolean().optional(),
     signature: z.string().max(20000).optional(),
     signatureAboveQuote: z.boolean().optional(),
-    signatureAuto: mailSignatureAuto.optional()
+    signatureAuto: mailSignatureAuto.optional(),
+    /** Whether a delegate who may reply sends as this address rather than on
+     *  its behalf. */
+    delegateSendAs: z.boolean().optional()
 });
 
 export type MailAccountPatch = z.infer<typeof mailAccountPatchSchema>;
@@ -501,6 +504,58 @@ export const mailActionSchema = z.object({
     action: mailMessageAction,
     scope: mailActionScope.default("message")
 });
+
+/**
+ * What a delegate who may manage a lent mailbox does to its inbox: mark,
+ * star, archive, file as junk, put in the trash. Never a permanent delete,
+ * a restore or a move to a folder of the holder's choosing - those stay with
+ * the holder, as they do in Gmail and Outlook delegation.
+ */
+export const MAIL_DELEGATE_ACTIONS = [
+    "read",
+    "unread",
+    "star",
+    "unstar",
+    "archive",
+    "junk",
+    "trash"
+] as const;
+
+export type MailDelegateAction = (typeof MAIL_DELEGATE_ACTIONS)[number];
+
+export const mailDelegateActionSchema = z.object({
+    accountId: z.string().uuid(),
+    messageIds: z.array(z.string().uuid()).min(1).max(100),
+    action: z.enum(MAIL_DELEGATE_ACTIONS)
+});
+
+/**
+ * A message a delegate writes from a lent mailbox. Narrower than the holder's
+ * composer: no other identity, no attachments (an upload belongs to whoever
+ * made it), no reaction, no read receipt. The From line is the mailbox's own.
+ */
+export const mailDelegateComposeSchema = z
+    .object({
+        accountId: z.string().uuid(),
+        to: mailRecipientList,
+        cc: mailRecipientList.default([]),
+        bcc: mailRecipientList.default([]),
+        subject: z.string().transform(normalizeMailName).pipe(z.string().max(500)).default(""),
+        body: z.string().max(1_000_000).default(""),
+        inReplyToId: z.string().uuid().nullable().default(null),
+        draftId: z.string().uuid().nullable().default(null)
+    })
+    .superRefine((value, context) => {
+        if (value.to.length + value.cc.length + value.bcc.length === 0) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["to"],
+                message: "Add somebody to send it to"
+            });
+        }
+    });
+
+export type MailDelegateCompose = z.infer<typeof mailDelegateComposeSchema>;
 
 /**
  * Pinning a conversation to the top of every list, or muting it.

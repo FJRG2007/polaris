@@ -12333,6 +12333,12 @@ model MailAccount {
     // what every mailbox here did before this existed.
     trashKeepDays Int @default(30)
 
+    // Whether somebody this mailbox is lent to at `respond` or above sends AS
+    // its address (no trace of them on the message) rather than on its behalf
+    // (From is this address, Sender is the delegate). Off: on behalf is what
+    // Gmail and Outlook do unless the holder says otherwise.
+    delegateSendAs Boolean @default(false)
+
     vacationEnabled    Boolean   @default(false)
     vacationSubject    String    @default("")
     vacationBody       String    @default("")
@@ -12859,6 +12865,13 @@ model MailDraft {
     // replaces it rather than leaving a trail of half-written messages.
     serverUid BigInt?
 
+    // Who wrote it, when that is not the mailbox's holder: somebody it is lent
+    // to (`mail.mailbox`, respond or above). Null is the holder. A delegate's
+    // draft is theirs - it is never listed, sent, retried or thrown away by
+    // the holder, nor by anybody else it is lent to - and the grant is asked
+    // again at the moment it goes.
+    authorId String? @db.Uuid
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
@@ -12867,6 +12880,7 @@ model MailDraft {
     attachments MailUpload[]
 
     @@index([accountId, updatedAt])
+    @@index([accountId, authorId, updatedAt])
     @@index([state, sendAt])
 }
 

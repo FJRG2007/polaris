@@ -107,6 +107,10 @@ export async function checkSmtp(account: MailSendSource): Promise<void> {
 /** One outgoing message, as this app holds it before it becomes MIME. */
 export interface OutgoingMessage {
     readonly from: core.MailAddress;
+    /** Who actually sent it, when that is not `from`: a delegate writing on the
+     *  mailbox holder's behalf (RFC 5322 3.6.2), which a reader's client shows
+     *  as "sent by ... on behalf of ...". Absent for everything else. */
+    readonly sender?: core.MailAddress;
     readonly to: readonly core.MailAddress[];
     readonly cc: readonly core.MailAddress[];
     readonly bcc: readonly core.MailAddress[];
@@ -200,6 +204,7 @@ export async function composeMime(
     const options: Mail.Options = {
         ...(extra.messageId ? { messageId: extra.messageId } : {}),
         from: core.formatAddress(message.from),
+        ...(message.sender ? { sender: core.formatAddress(message.sender) } : {}),
         to: message.to.map(core.formatAddress),
         ...(message.cc.length > 0 ? { cc: message.cc.map(core.formatAddress) } : {}),
         ...(message.bcc.length > 0 ? { bcc: message.bcc.map(core.formatAddress) } : {}),

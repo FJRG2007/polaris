@@ -84,6 +84,7 @@ export const ACCOUNT_COLUMNS = {
     securityKeepMinutes: true,
     spamFilter: true,
     trashKeepDays: true,
+    delegateSendAs: true,
     vacationEnabled: true,
     vacationSubject: true,
     vacationBody: true,

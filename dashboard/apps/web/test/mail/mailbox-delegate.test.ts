@@ -1,5 +1,5 @@
 /**
- * A mailbox lent to somebody to read (`mail.mailbox`): only through a live
+ * A mailbox lent to somebody (`mail.mailbox`): read only through a live
  * grant, never their own mailbox a second way, never what is not in it, lent
  * only by the person who linked it, and gone with the mailbox.
  */
@@ -99,8 +99,8 @@ beforeEach(() => {
 });
 
 describe("a mailbox lent to read", () => {
-    it("is a read-only subject, never a link", () => {
-        expect(core.GRANT_CAPABILITIES["mail.mailbox"]).toEqual(["view"]);
+    it("is lent on its own ladder, never as a link", () => {
+        expect(core.GRANT_CAPABILITIES["mail.mailbox"]).toEqual(["view", "respond", "manage"]);
         expect(core.GRANT_ACTIONS["mail.mailbox"]).toEqual([]);
         expect(core.isGrantLinkSubject("mail.mailbox")).toBe(false);
     });
