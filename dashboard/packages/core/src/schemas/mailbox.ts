@@ -253,7 +253,10 @@ export const mailAccountPatchSchema = z.object({
     signatureAuto: mailSignatureAuto.optional(),
     /** Whether a delegate who may reply sends as this address rather than on
      *  its behalf. */
-    delegateSendAs: z.boolean().optional()
+    delegateSendAs: z.boolean().optional(),
+    /** Left out of this patch once, so the trash setting on the mailboxes
+     *  screen was dropped on the way in and never saved. */
+    trashKeepDays: z.number().int().min(0).max(365).optional()
 });
 
 export type MailAccountPatch = z.infer<typeof mailAccountPatchSchema>;
