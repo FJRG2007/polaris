@@ -108,7 +108,7 @@
         }
     },
     "games": {
-        "name": "Juegos",
+        "name": "Multijugador",
         "summary": "Crea, encuentra y gestiona servidores de juegos.",
         "steps": {
             "create": {

@@ -3,7 +3,7 @@
         "messagingHub": "Mensajería",
         "messagingChannel": "Canal",
         "aiAssistant": "Asistente de IA",
-        "gameManager": "Juegos",
+        "gameManager": "Multijugador",
         "gameServer": "Servidor de juegos",
         "cameraHub": "Cámaras",
         "mqttBroker": "Bróker local",

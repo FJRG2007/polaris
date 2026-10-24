@@ -74,7 +74,7 @@
             "description": "Todas las apps que puede abrir esta cuenta."
         },
         "games": {
-            "label": "Juegos",
+            "label": "Multijugador",
             "description": "Qué servidores tuyos están en marcha y lo llenos que están."
         },
         "calendar": {

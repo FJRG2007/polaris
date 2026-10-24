@@ -65,6 +65,16 @@ export function useCallActivity(
     const [loading, setLoading] = useState<Loading>({ kind: "loading", done: 0 });
     const frame = useRef<HTMLIFrameElement | null>(null);
     const asked = useRef(false);
+    const { setActivity } = call;
+    // The moment claims are judged against, so a pass that ran out stops
+    // counting without anybody having to say so.
+    const [clock, setClock] = useState(() => Date.now());
+    const anyClaims = call.states.size > 0 && enabled;
+    useEffect(() => {
+        if (!anyClaims) return;
+        const timer = window.setInterval(() => setClock(Date.now()), 30_000);
+        return () => window.clearInterval(timer);
+    }, [anyClaims]);
 
     const claims = useMemo(() => {
         const found = new Map<string, callGame.ActivityClaim>();
@@ -116,9 +126,37 @@ export function useCallActivity(
             people.push({ seat: self, claim: mine });
             trusted.add(self);
         }
-        return callGame.activitySession(people, trusted);
-    }, [claims, vouched, mine, self]);
+        return callGame.activitySession(people, trusted, clock);
+    }, [claims, vouched, mine, self, clock]);
     const playing = Boolean(session && mine && session.players.includes(self));
+
+    // Renew the pass while playing. The server asks everything again, so a
+    // player whose permission was taken away is refused here and leaves.
+    useEffect(() => {
+        if (!mine) return;
+        const due = callGame.passExpiresAt(mine.pass) - callGame.RENEW_BEFORE_MS - Date.now();
+        const timer = window.setTimeout(
+            () => {
+                void actions
+                    .renewCallGame(meetingId, mine)
+                    .then((result) => {
+                        if ("claim" in result) {
+                            setMine(result.claim);
+                            setActivity(callGame.encodeClaim(result.claim));
+                        } else {
+                            setMine(null);
+                            setActivity("");
+                            setAnswer({ ok: false, reason: result.reason });
+                        }
+                    })
+                    // Offline for a moment: tried again on the clock's next
+                    // tick, and the pass carries on until it runs out.
+                    .catch(() => undefined);
+            },
+            Math.max(0, due)
+        );
+        return () => window.clearTimeout(timer);
+    }, [mine, meetingId, clock, setActivity]);
 
     const ask = useCallback(() => {
         if (asked.current) return;
@@ -136,7 +174,6 @@ export function useCallActivity(
         if (session) ask();
     }, [session, ask]);
 
-    const { setActivity } = call;
     const leave = useCallback(() => {
         setMine(null);
         setActivity("");

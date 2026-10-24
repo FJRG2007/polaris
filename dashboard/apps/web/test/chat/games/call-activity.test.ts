@@ -6,7 +6,12 @@
 import { describe, expect, it } from "vitest";
 import * as activity from "@/lib/chat/call-activity";
 
-const claim = (game: string, at: number) => ({ game, at, pass: `${at}.sig` });
+/** A pass good until 2100, unless told otherwise. */
+const claim = (game: string, at: number, expires = 4_102_444_800_000) => ({
+    game,
+    at,
+    pass: `${expires}.sig`
+});
 
 describe("the session a call is playing", () => {
     it("is nobody's until somebody vouched for starts one", () => {
@@ -73,6 +78,35 @@ describe("the session a call is playing", () => {
             new Set(people.map((person) => person.seat))
         );
         expect(session?.players).toHaveLength(activity.MAX_PLAYERS);
+    });
+});
+
+describe("a pass that ran out", () => {
+    it("stops counting, so a player who could not renew it leaves the game", () => {
+        const people = [
+            { seat: "a", claim: claim("new-york", 10, 2_000_000_000_000) },
+            { seat: "b", claim: claim("new-york", 20, 1_000_000_000_000) }
+        ];
+        const vouched = new Set(["a", "b"]);
+        expect(activity.activitySession(people, vouched, 900_000_000_000)?.players).toEqual([
+            "a",
+            "b"
+        ]);
+        expect(activity.activitySession(people, vouched, 1_000_000_000_000)?.players).toEqual([
+            "a"
+        ]);
+        expect(activity.activitySession(people, vouched, 2_000_000_000_000)).toBeNull();
+    });
+
+    it("is read off the pass, and a pass that says nothing has run out", () => {
+        expect(activity.passExpiresAt("1700000000000.sig")).toBe(1_700_000_000_000);
+        expect(activity.passExpiresAt("soon.sig")).toBe(0);
+        expect(activity.passExpiresAt("")).toBe(0);
+    });
+
+    it("lasts a few minutes, renewed well before it runs out", () => {
+        expect(activity.PASS_TTL_MS).toBeLessThanOrEqual(10 * 60 * 1000);
+        expect(activity.RENEW_BEFORE_MS).toBeLessThan(activity.PASS_TTL_MS);
     });
 });
 

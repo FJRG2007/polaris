@@ -15,9 +15,16 @@
 
 import { loadEnv } from "@polaris/config";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { PASS_TTL_MS } from "./call-activity";
 
-/** How long a pass stays good: longer than any call anybody plays through. */
-export const PASS_TTL_MS = 12 * 60 * 60 * 1000;
+/**
+ * How long a pass stays good. Short on purpose: a player's browser renews it
+ * while they play (see `RENEW_BEFORE_MS`), and every renewal asks again
+ * whether they hold `arcade.calls`, so taking the permission away removes them
+ * from the game within this window - every other browser stops counting a
+ * claim whose pass has run out.
+ */
+export { PASS_TTL_MS } from "./call-activity";
 
 export interface PassFacts {
     readonly meetingId: string;

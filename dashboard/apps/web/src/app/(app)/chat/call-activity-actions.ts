@@ -77,6 +77,35 @@ export async function claimCallGame(
     return { claim: { game: wanted.data, at, pass: activityPass(facts) } };
 }
 
+/** How long after a pass ran out it may still be renewed: a laptop that slept
+ *  through the renewal is not thrown out of the game for it. */
+const RENEW_GRACE_MS = 60 * 1000;
+
+/**
+ * Renew the reader's pass while they play, asking every question again: still
+ * `arcade.calls`, still installed, still their admitted seat, still a game
+ * the app offers. A refusal is how a revoked player leaves the game - their
+ * browser takes its claim back, and everybody else's stops counting it once
+ * the old pass runs out. Keeps the moment they joined, so the order of
+ * players does not change; only a pass this server minted for this seat can
+ * be renewed.
+ */
+export async function renewCallGame(
+    meetingId: unknown,
+    claim: unknown
+): Promise<{ readonly claim: ActivityClaim } | { readonly reason: CallGamesRefusal }> {
+    const id = meetingIdSchema.safeParse(meetingId);
+    const held = activityClaimSchema.safeParse(claim);
+    if (!id.success || !held.success) return { reason: "missing" };
+    const answer = await access(id.data);
+    if (!answer.ok) return { reason: answer.reason };
+    const { game, at, pass } = held.data;
+    if (!answer.games.some((offered) => offered.id === game)) return { reason: "missing" };
+    const facts = { meetingId: id.data, seat: answer.seat, game, at };
+    if (!readActivityPass(pass, facts, Date.now() - RENEW_GRACE_MS)) return { reason: "seat" };
+    return { claim: { game, at, pass: activityPass(facts) } };
+}
+
 const vouchSchema = z
     .array(z.object({ seat: z.string().min(1).max(128), claim: activityClaimSchema }).strict())
     .max(MAX_PLAYERS * 2);

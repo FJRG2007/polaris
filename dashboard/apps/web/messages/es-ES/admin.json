@@ -2639,7 +2639,7 @@
             "calendar": "Calendario",
             "chat": "Chat",
             "apps": "Apps",
-            "gameServers": "Juegos",
+            "gameServers": "Multijugador",
             "home": "Casa",
             "tools": "Útiles",
             "tasks": "Tareas",
@@ -3611,7 +3611,7 @@
             "originShared": "Otro volumen sigue usando el original, así que solo se puede conservar."
         },
         "policy": {
-            "title": "Juegos",
+            "title": "Multijugador",
             "description": "Dónde guardan sus mundos los servidores de juego.",
             "default": "Servidores nuevos",
             "defaultHint": "Se aplica a los servidores que se creen a partir de ahora. Los que ya existen se quedan donde están hasta que alguien elija.",

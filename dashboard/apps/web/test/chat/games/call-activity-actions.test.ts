@@ -87,6 +87,63 @@ describe("arcade.calls on the server", () => {
     });
 });
 
+describe("renewing a pass", () => {
+    async function started() {
+        const result = await actions.claimCallGame(MEETING, "new-york");
+        if (!("claim" in result)) throw new Error("expected a claim");
+        return result.claim;
+    }
+
+    it("keeps the moment of joining and gives a fresh pass", async () => {
+        const claim = await started();
+        const renewed = await actions.renewCallGame(MEETING, claim);
+        if (!("claim" in renewed)) throw new Error("expected a claim");
+        expect(renewed.claim).toMatchObject({ game: claim.game, at: claim.at });
+        expect(
+            await actions.vouchCallGames(MEETING, [{ seat: "seat-1", claim: renewed.claim }])
+        ).toEqual(["seat-1"]);
+    });
+
+    it("is refused once arcade.calls is taken away, the app removed or the seat lost", async () => {
+        const claim = await started();
+        state.can = new Set(["arcade.open"]);
+        expect(await actions.renewCallGame(MEETING, claim)).toEqual({ reason: "denied" });
+        state.can = new Set(["arcade.calls"]);
+        state.installed = false;
+        expect(await actions.renewCallGame(MEETING, claim)).toEqual({ reason: "missing" });
+        state.installed = true;
+        state.seat = null;
+        expect(await actions.renewCallGame(MEETING, claim)).toEqual({ reason: "seat" });
+    });
+
+    it("renews only a pass this server minted for the reader's own seat", async () => {
+        const claim = await started();
+        state.seat = { meetingId: MEETING, participantId: "seat-2", admission: "admitted" };
+        expect(await actions.renewCallGame(MEETING, claim)).toEqual({ reason: "seat" });
+        state.seat = { meetingId: MEETING, participantId: "seat-1", admission: "admitted" };
+        expect(await actions.renewCallGame(MEETING, { ...claim, at: 1 })).toEqual({
+            reason: "seat"
+        });
+        expect(
+            await actions.renewCallGame(MEETING, { ...claim, pass: "4102444800000.forged" })
+        ).toEqual({
+            reason: "seat"
+        });
+    });
+
+    it("leaves a revoked player out of the game once the old pass runs out", async () => {
+        const claim = await started();
+        const expires = Number(claim.pass.split(".")[0]);
+        expect(expires - Date.now()).toBeLessThanOrEqual(passes.PASS_TTL_MS);
+        const session = await import("@/lib/chat/call-activity");
+        const people = [{ seat: "seat-1", claim }];
+        expect(session.activitySession(people, new Set(["seat-1"]), expires - 1)?.players).toEqual([
+            "seat-1"
+        ]);
+        expect(session.activitySession(people, new Set(["seat-1"]), expires)).toBeNull();
+    });
+});
+
 describe("a pass", () => {
     it("is minted for the seat and vouched for by anybody seated in the call", async () => {
         const result = await actions.claimCallGame(MEETING, "new-york");

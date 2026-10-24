@@ -30,6 +30,18 @@ export const ACTIVITY_ATTRIBUTE = "activity";
 /** The data topic positions travel on. */
 export const ACTIVITY_TOPIC = "polaris-activity";
 
+/** How long a pass stays good, and how long before it runs out a playing
+ *  browser renews it - see `lib/chat/activity-pass`. */
+export const PASS_TTL_MS = 5 * 60 * 1000;
+export const RENEW_BEFORE_MS = 2 * 60 * 1000;
+
+/** When a pass runs out, read off its own first half, or 0 for a pass that
+ *  does not say. Says nothing about whether it is real: that is the server's. */
+export function passExpiresAt(pass: string): number {
+    const expires = pass.split(".")[0] ?? "";
+    return /^\d{10,16}$/.test(expires) ? Number(expires) : 0;
+}
+
 /** The most players drawn in one game, which is also what the frame accepts. */
 export const MAX_PLAYERS = 32;
 
@@ -116,10 +128,16 @@ export interface ActivitySession {
  */
 export function activitySession(
     people: readonly ActivityPerson[],
-    vouched: ReadonlySet<string>
+    vouched: ReadonlySet<string>,
+    /** Claims whose pass ran out by then count for nothing: a player who lost
+     *  the permission cannot renew theirs. */
+    now = Date.now()
 ): ActivitySession | null {
     const claimed = people
-        .filter((person) => person.claim && vouched.has(person.seat))
+        .filter(
+            (person) =>
+                person.claim && vouched.has(person.seat) && passExpiresAt(person.claim.pass) > now
+        )
         .map((person) => ({ seat: person.seat, claim: person.claim! }))
         .sort(
             (left, right) => left.claim.at - right.claim.at || left.seat.localeCompare(right.seat)
