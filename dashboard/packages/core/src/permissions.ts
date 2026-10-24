@@ -81,7 +81,10 @@ export const CHAT_CAPABILITIES = [
  * chat (`seedDefaultRoles`), so an update does not leave existing members
  * without a feature a fresh install grants them.
  */
-export const GAMES_CAPABILITIES = ["arcade.open", "arcade.calls"] as const satisfies readonly Permission[];
+export const GAMES_CAPABILITIES = [
+    "arcade.open",
+    "arcade.calls"
+] as const satisfies readonly Permission[];
 
 /** A wildcard a role may hold to mean "all current and future permissions". */
 export const ALL_PERMISSIONS = "*" as const;

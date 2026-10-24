@@ -80,7 +80,10 @@ const dropThreeLinks = {
     name: "drop-three-links",
     setup(build) {
         build.onLoad({ filter: /[\\/]node_modules[\\/]three[\\/].*\.js$/ }, (args) => ({
-            contents: readFileSync(args.path, "utf8").replace(/https?:\/\/(?!www\.w3\.org\/)[^\s"'`)<>\\]+/g, ""),
+            contents: readFileSync(args.path, "utf8").replace(
+                /https?:\/\/(?!www\.w3\.org\/)[^\s"'`)<>\\]+/g,
+                ""
+            ),
             loader: "js"
         }));
     }
@@ -136,12 +139,13 @@ async function buildNewYork() {
 
     const template = readFileSync(join(source, "index.html"), "utf8");
     for (const placeholder of ["GAME_FILE", "STYLE_FILE", "GEO_FILE"]) {
-        if (!template.includes(`./${placeholder}"`)) throw new Error(`index.html lost ${placeholder}`);
+        if (!template.includes(`./${placeholder}"`))
+            throw new Error(`index.html lost ${placeholder}`);
     }
     const page = template
-        .replace("./GAME_FILE\"", `./${game}"`)
-        .replace("./STYLE_FILE\"", `./${style}"`)
-        .replace("./GEO_FILE\"", `./${geo}" data-bytes="${geoBytes.length}"`);
+        .replace('./GAME_FILE"', `./${game}"`)
+        .replace('./STYLE_FILE"', `./${style}"`)
+        .replace('./GEO_FILE"', `./${geo}" data-bytes="${geoBytes.length}"`);
     write("index.html", page);
 
     for (const [name, bytes] of files) {

@@ -32,7 +32,9 @@ export function GamesScreen() {
                                                     {t(`games.${game.id}.name` as never)}
                                                 </p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    {game.multiplayer ? t("multiplayer") : t("solo")}
+                                                    {game.multiplayer
+                                                        ? t("multiplayer")
+                                                        : t("solo")}
                                                 </p>
                                             </div>
                                         </div>

@@ -24,20 +24,20 @@ game sends, or from `iframe.contentWindow`.
 
 From the game to the host:
 
-| `type`                  | Fields                                              | When                                         |
-| ----------------------- | --------------------------------------------------- | -------------------------------------------- |
-| `polaris-game:progress` | `stage`: `"data"`, `"build"` or `"compile"`; `done`: 0 to 1 | While loading, in stage order           |
-| `polaris-game:ready`    |                                                     | Once, when the first frame is on screen      |
-| `polaris-game:failed`   | `reason`: `"graphics"` (no WebGPU or WebGL2), `"data"`, `"error"` | Once, instead of `ready`       |
-| `polaris-game:state`    | `x`, `y`, `z`, `heading` (radians, -pi to pi), `mode`, `speed` (m/s) | Up to ten times a second, while joined |
+| `type`                  | Fields                                                               | When                                    |
+| ----------------------- | -------------------------------------------------------------------- | --------------------------------------- |
+| `polaris-game:progress` | `stage`: `"data"`, `"build"` or `"compile"`; `done`: 0 to 1          | While loading, in stage order           |
+| `polaris-game:ready`    |                                                                      | Once, when the first frame is on screen |
+| `polaris-game:failed`   | `reason`: `"graphics"` (no WebGPU or WebGL2), `"data"`, `"error"`    | Once, instead of `ready`                |
+| `polaris-game:state`    | `x`, `y`, `z`, `heading` (radians, -pi to pi), `mode`, `speed` (m/s) | Up to ten times a second, while joined  |
 
 From the host to the game:
 
-| `type`                 | Fields                                                     | Effect                                          |
-| ---------------------- | ---------------------------------------------------------- | ----------------------------------------------- |
-| `polaris-game:join`    | `self`: `{ id, name }`                                     | Starts sending `state`                          |
-| `polaris-game:players` | `players`: `[{ id, name, x, y, z, heading, mode }]`        | Everyone else in the session. Replaces the previous list, so a missing player is removed |
-| `polaris-game:leave`   |                                                            | Stops sending `state` and removes every marker  |
+| `type`                 | Fields                                              | Effect                                                                                   |
+| ---------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `polaris-game:join`    | `self`: `{ id, name }`                              | Starts sending `state`                                                                   |
+| `polaris-game:players` | `players`: `[{ id, name, x, y, z, heading, mode }]` | Everyone else in the session. Replaces the previous list, so a missing player is removed |
+| `polaris-game:leave`   |                                                     | Stops sending `state` and removes every marker                                           |
 
 `mode` is one of `person`, `car`, `cyclist` or `helicopter`. `id` is at most 128
 characters and `name` at most 64. The game draws at most 32 other players, skips

@@ -22,7 +22,9 @@ describe("games registry", () => {
         const game = findGame("new-york");
         expect(game?.multiplayer).toBe(true);
         expect(findGame("nope")).toBeNull();
-        expect(gameFrameSrc(game!)).toBe("/api/app-bundles/arcade/current/assets/new-york/index.html");
+        expect(gameFrameSrc(game!)).toBe(
+            "/api/app-bundles/arcade/current/assets/new-york/index.html"
+        );
     });
 });
 
@@ -60,7 +62,9 @@ describe("geo codec", () => {
     });
 
     it("decodes the shipped city and writes the same bytes back", () => {
-        const file = fileURLToPath(new URL("../../../arcade/game/new-york/data/geo.bin", import.meta.url));
+        const file = fileURLToPath(
+            new URL("../../../arcade/game/new-york/data/geo.bin", import.meta.url)
+        );
         const bytes = new Uint8Array(readFileSync(file));
         const geo = decodeGeo(bytes);
         expect(geo.version).toBe(1);
