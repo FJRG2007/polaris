@@ -84,7 +84,8 @@
         "Messaging": "Mensajería",
         "Productivity": "Productividad",
         "AI": "IA",
-        "Home": "Hogar"
+        "Home": "Hogar",
+        "Games": "Juegos"
     },
     "apps": {
         "messaging-bridge": {
@@ -141,6 +142,10 @@
         "cloud-servers": {
             "summary": "Crea servidores en tus proveedores cloud, listos en Polaris al arrancar.",
             "description": "Conecta DigitalOcean, Hetzner Cloud, Vultr, Linode, AWS, Azure, Google Cloud o IONOS y crea servidores desde aquí. Cada uno se une a tus servidores de Polaris en su primer arranque. Enciéndelos y apágalos, reinicia, cambia su tamaño y destrúyelos, y consulta lo que cuesta cada uno cuando el proveedor publica sus precios."
+        },
+        "arcade": {
+            "summary": "Juegos para jugar solo o con otros desde una llamada.",
+            "description": "Abre un juego desde la página de Juegos, o empieza uno en una llamada y todos los que estén pueden unirse y verse jugar. Los juegos se ejecutan en el navegador y nada se ejecuta en tus servidores. Los administradores eligen quién puede jugar y quién puede jugar en llamadas."
         }
     },
     "help": {

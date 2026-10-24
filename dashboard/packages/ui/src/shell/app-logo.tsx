@@ -168,6 +168,18 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // A joystick: Games, played in the browser - Game servers keeps the pad.
+    arcade: {
+        palette: ["#FDBA74", "#FB923C", "#C2410C"],
+        draw: ({ base, face }) => (
+            <>
+                <rect x="14.5" y="11" width="3" height="11" rx="1.5" fill={base} />
+                <rect x="5" y="20" width="22" height="8" rx="3.5" fill={base} />
+                <circle cx="16" cy="9" r="5" fill={face} />
+                <circle cx="22.5" cy="24" r="1.6" fill={WHITE} />
+            </>
+        )
+    },
     // A ticked box.
     tasks: {
         palette: ["#86EFAC", "#22C55E", "#15803D"],

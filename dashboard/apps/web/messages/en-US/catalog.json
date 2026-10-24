@@ -84,7 +84,8 @@
         "Messaging": "Messaging",
         "Productivity": "Productivity",
         "AI": "AI",
-        "Home": "Home"
+        "Home": "Home",
+        "Games": "Games"
     },
     "apps": {
         "messaging-bridge": {
@@ -141,6 +142,10 @@
         "cloud-servers": {
             "summary": "Create servers at your cloud providers, ready in Polaris as they boot.",
             "description": "Connect DigitalOcean, Hetzner Cloud, Vultr, Linode, AWS, Azure, Google Cloud or IONOS and create servers from here. Each one joins your Polaris servers on its first boot. Switch them on and off, restart, resize and destroy them, and see what each costs where the provider publishes its prices."
+        },
+        "arcade": {
+            "summary": "Games to play on your own, or together from a call.",
+            "description": "Open a game from the Games page, or start one in a call and everyone there can join and see each other play. Games run in the browser and nothing runs on your servers. Admins choose who may play and who may play in calls."
         }
     },
     "help": {

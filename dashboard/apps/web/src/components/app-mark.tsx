@@ -58,6 +58,7 @@ const OWN_APPS: Readonly<Record<string, string>> = {
     tools: "tools",
     calendar: "calendar",
     crm: "crm",
+    arcade: "arcade",
     "status-pages": "status-pages",
     "dns-blocker": "dns-blocker",
     home: "home",

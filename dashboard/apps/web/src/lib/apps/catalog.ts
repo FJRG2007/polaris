@@ -19,6 +19,7 @@ import {
     CalendarDays,
     Gamepad2,
     Handshake,
+    Joystick,
     Activity,
     ShieldCheck,
     Cloud,
@@ -33,7 +34,14 @@ import {
     type LucideIcon
 } from "lucide-react";
 
-export type AppCategory = "Messaging" | "Productivity" | "AI" | "Game servers" | "Home" | "Tools";
+export type AppCategory =
+    | "Messaging"
+    | "Productivity"
+    | "AI"
+    | "Games"
+    | "Game servers"
+    | "Home"
+    | "Tools";
 
 /** What an installed app provides, driving derived nav and which adapted
  *  dashboard is mounted. An app may declare several. */
@@ -327,6 +335,25 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Companies, people and the deals you are working, in one pipeline.",
         description:
             "Keep the companies you work with, the people at them and every opportunity from first call to signed deal, in tables you edit in place, with totals under each column. A personal CRM for yourself, or a shared one for an organization with its own roles. Installing it runs nothing; uninstalling keeps every record for when it comes back.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Games played in the browser, alone or together in a call. Installing
+        // it runs nothing: a game's page is a bundle asset fetched only when
+        // somebody opens it, and uninstalling leaves nothing behind.
+        id: "arcade",
+        name: "Games",
+        category: "Games",
+        icon: Joystick,
+        opensAt: "/games",
+        summary: "Games to play on your own, or together from a call.",
+        description:
+            "Open a game from the Games page, or start one in a call and everyone there can join and see each other play. Games run in the browser and nothing runs on your servers. Admins choose who may play and who may play in calls.", // i18n-ignore
+        keywords: ["games", "play", "arcade", "activities"],
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
@@ -1557,6 +1584,7 @@ const CATEGORY_ORDER: readonly AppCategory[] = [
     "Messaging",
     "Productivity",
     "AI",
+    "Games",
     "Game servers",
     "Home",
     "Tools"

@@ -43,6 +43,7 @@ import {
     FolderOpen,
     Gamepad2,
     Gauge,
+    Joystick,
     Handshake,
     Cloud,
     GitCompareArrows,
@@ -310,6 +311,22 @@ export const POLARIS_APPS: AppEntry[] = [
         href: "/apps/games",
         permission: "games.read",
         requiresApp: GAME_SERVERS_APP_ID
+    },
+    {
+        /**
+         * Games people play in the browser, on their own or together from a
+         * call. Not Game servers: nothing runs anywhere but the reader's tab.
+         *
+         * Installable: a Polaris where nobody plays carries no entry for it.
+         */
+        id: "arcade",
+        category: "games",
+        label: "Games", // i18n-ignore
+        description: "Play on your own, or together from a call", // i18n-ignore
+        icon: Joystick,
+        href: "/games",
+        permission: "arcade.open",
+        requiresApp: "arcade"
     },
     {
         id: "tasks",

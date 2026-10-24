@@ -67,6 +67,7 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/drive/drop-points/text/[id]", kind: "text request", id: "id" },
     { route: "/drive/drop-points/[id]", kind: "drop point", id: "id" },
     { route: "/drive/snippets/[id]", kind: "snippet", id: "id" },
+    { route: "/games/[[...path]]", kind: null },
     { route: "/mail/a/[accountId]", kind: "mail account", id: "accountId" },
     { route: "/mail/shared/[accountId]", kind: "shared mailbox", id: "accountId" },
     { route: "/mail/f/[folderId]", kind: "mail folder", id: "folderId" },

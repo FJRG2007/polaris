@@ -2647,7 +2647,8 @@
             "management": "Gestión",
             "crm": "CRM",
             "automations": "Automatizaciones",
-            "statusPages": "Estado público"
+            "statusPages": "Estado público",
+            "games": "Juegos"
         },
         "permissions": {
             "drive": {
@@ -2745,6 +2746,10 @@
             "automations": {
                 "use": "Crear automatizaciones que actúan por ti",
                 "secrets": "Guardar secretos para automatizaciones"
+            },
+            "arcade": {
+                "open": "Abrir Juegos",
+                "calls": "Jugar en llamadas"
             }
         }
     },
