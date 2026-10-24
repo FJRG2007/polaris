@@ -181,3 +181,111 @@ Da a cada dispositivo una dirección fija en tu router cuando puedas, para que
 siga respondiendo en la dirección que escribiste. Las bombillas Hue Bluetooth y
 los televisores Philips aparecen en la lista pero no se pueden conectar; la
 pantalla explica por qué.
+
+## Linear y Jira
+
+Trae las incidencias de un gestor a tu tablero de Tareas como tareas, con su
+referencia. Abre **Cuenta > Cuentas conectadas**, busca **Gestores de tareas** y
+elige **Conectar un gestor**. Elige el gestor, ponle nombre y elige el espacio
+y la lista donde caen sus incidencias.
+
+- Linear: una Personal API key (Linear > Settings > Security & access > Personal
+  API keys). Opcionalmente la clave de un equipo, como ENG; vacía trae todas las
+  incidencias que la clave puede ver.
+- Jira: el sitio (tu-empresa.atlassian.net), el email de la cuenta y un API
+  token (id.atlassian.com > Security > Create and manage API tokens).
+  Opcionalmente una consulta JQL; vacía trae todo, lo más nuevo primero.
+
+**Devolver los cambios de estado** hace que mover una tarea aquí mueva la
+incidencia allí. Empieza apagado. **Traer ahora** trae los cambios al momento, y
+desconectar deja las tareas donde están.
+
+## iCloud, Nextcloud y otros calendarios CalDAV
+
+En Calendario, elige **Añadir calendario > Servidor CalDAV**. Elige iCloud,
+Fastmail, Yahoo, Nextcloud (escribe su dirección) u otro servidor, y luego tu
+usuario y una clave de app; **Cómo crear una contraseña de app** abre los pasos
+del propio proveedor. iCloud rechaza la contraseña de tu Apple Account. Los
+calendarios aparecen según se sincronizan y quedan al día en ambos sentidos.
+
+**Suscribirse por URL (.ics)** acepta cualquier calendario que publique un enlace
+.ics o webcal, de solo lectura.
+
+## Entrada: Telegram, WhatsApp, Discord y Slack
+
+Las conversaciones de estas plataformas en un solo sitio, respondidas desde
+Polaris. Instala **Puente de mensajería** desde **Apps > Catálogo**; entonces
+aparece **Gestión > Entrada**. Elige **Conectar canal**, una plataforma y cómo
+conectarla.
+
+| Plataforma | Cómo | Qué le das |
+| --- | --- | --- |
+| Telegram | Un bot de @BotFather | El token que te da @BotFather. Un bot no puede iniciar un chat: la persona abre tu bot y envía /start primero |
+| WhatsApp (QR) | Tu teléfono, vinculado por QR | Nada: elige **Mostrar QR** y luego WhatsApp > Dispositivos vinculados > Vincular un dispositivo. Gratis pero no oficial; usa un número de repuesto |
+| WhatsApp Cloud | La API oficial de Meta, de pago | El token de acceso de Meta y el id del número de la página de configuración de la API de WhatsApp; apunta su webhook a este Polaris |
+| Discord | Una aplicación con bot | El token del bot del Developer Portal. Polaris muestra lo que falta: **Añadir el bot a un servidor** y los dos intents privilegiados que hay que activar en Bot > Privileged Gateway Intents |
+| Webhook de Discord | Avisos en un sentido | Edit > Integrations > Webhooks > New Webhook > Copy Webhook URL del canal |
+| Slack | Una app del workspace | Su Bot User OAuth token (empieza por xoxb-) |
+| Webhook de Slack | Avisos en un sentido | La URL de un Incoming Webhook de tu app de Slack |
+
+## UniFi UNAS
+
+Muestra un NAS de UniFi en Drive con sus pools, bahías y copias. En Drive, en
+**Ubicaciones**, elige **Añadir conexión > UniFi UNAS** (detectar un NAS por IP
+encuentra uno en tu red). Usa una cuenta local de la consola, no un inicio de
+sesión SSO de Ubiquiti con 2FA.
+
+## Docker
+
+Vigila y gestiona los contenedores de un engine de Docker. El host local
+aparece solo en la edición completa. Para otro engine, abre **Contenedores** y
+elige **Añadir host**, y luego un transporte: Socket local, SSH (Engine del
+host) con usuario y clave privada, o TCP con certificados TLS opcionales.
+
+## Vercel, Railway y AWS
+
+Pone los servicios que tienes allí en el tablero de un proyecto, con lo último
+que publicó cada uno y un botón para publicarlo de nuevo. Ellos siguen
+construyéndolo y sirviéndolo. En **Cuenta > Cuentas conectadas**, elige **Usar
+un token**:
+
+- Vercel: un token de cuenta con acceso al equipo donde están los proyectos.
+- Railway: un token de cuenta, que llega a todos los workspaces; un token de
+  proyecto no puede listar el resto.
+- AWS: un access key ID, su secreto y la región donde están tus servicios de
+  ECS y ramas de Amplify. Solo lectura basta para vigilar; publicar de nuevo
+  necesita ecs:UpdateService o amplify:StartJob.
+
+Después, en la sección **Externos** de un proyecto, elige **Añadir servicio**.
+
+## GitHub Copilot
+
+Copilot CLI se ejecuta en las sesiones de agente ya conectado con el token de
+GitHub de la sesión, así que no hay que vincular nada. Copilot como cliente MCP
+se conecta desde **Cuenta > Asistentes de IA**.
+
+## Bitwarden, Vaultwarden y KeePassXC
+
+Vault habla el protocolo de Bitwarden, así que sus apps y extensiones funcionan
+con él como con un servidor Vaultwarden. Abre **Vault > Conectar una app**,
+copia **Dirección del servidor** y, en la pantalla de inicio de sesión de la app,
+elige Self-hosted y pégala en Server URL. Entra con tu email de Polaris y tu
+contraseña maestra.
+
+Para traer contraseñas, usa **Importar** en **Vault > Ajustes**: un export JSON
+de Bitwarden, un export XML de KeePass (KeePass y KeePassXC: File > Export) o un
+CSV. Una base .kdbx no es un export.
+
+## Obsidian
+
+En Notas, elige **Importar Markdown** en un cuaderno y escoge archivos, una
+carpeta o un vault comprimido. Los enlaces escritos como [[otra nota]] se
+conectan cuando todo está dentro.
+
+## PostgreSQL, MySQL, MariaDB, MongoDB y Redis
+
+Las bases de datos que Polaris ejecuta para tus servicios aparecen solas en
+**Bases de datos**. Para cualquier otra, elige **Nueva conexión**, el motor y
+rellena los campos, o pega una **URL de conexión** y pulsa **Importar**. Puede
+pasar por uno de tus servidores, usar SSL eligiendo cuánto se comprueba el
+certificado, y ser de **Solo lectura**.

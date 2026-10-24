@@ -173,3 +173,109 @@ network or from anywhere, and lists its steps.
 Give a device a fixed address in your router where you can, so it keeps
 answering at the address you typed. Hue Bluetooth bulbs and Philips TVs are
 listed but cannot be connected; the screen says why.
+
+## Linear and Jira
+
+Brings a tracker's issues onto your Tasks board as tasks, keeping their
+reference. Open **Account > Connected accounts**, find **Issue trackers** and
+choose **Connect a tracker**. Pick the tracker, name it, and choose the space
+and list its issues land in.
+
+- Linear: a Personal API key (Linear > Settings > Security & access > Personal
+  API keys). Optionally a team key, such as ENG; empty brings every issue the
+  key can see.
+- Jira: the site (your-company.atlassian.net), the account email and an API
+  token (id.atlassian.com > Security > Create and manage API tokens).
+  Optionally a JQL query; empty brings everything, newest first.
+
+**Send status changes back** makes moving a task here move the issue there. It
+starts off. **Pull now** brings changes in straight away, and disconnecting
+leaves the tasks where they are.
+
+## iCloud, Nextcloud and other CalDAV calendars
+
+In Calendar, choose **Add a calendar > CalDAV server**. Pick iCloud, Fastmail,
+Yahoo, Nextcloud (type its address) or Other server, then your username and an
+app password; **How to make an app password** opens the provider's own steps.
+iCloud refuses your Apple Account password. Calendars appear as they sync and
+stay in step both ways.
+
+**Subscribe by URL (.ics)** takes any calendar that publishes an .ics or webcal
+link, read-only.
+
+## Inbox: Telegram, WhatsApp, Discord and Slack
+
+Conversations from these platforms in one place, answered from Polaris. Install
+**Messaging bridge** from **Apps > Marketplace**; **Management > Inbox** then
+appears. Choose **Connect channel**, pick a platform and how to connect it.
+
+| Platform | How | What you give it |
+| --- | --- | --- |
+| Telegram | A @BotFather bot | The token @BotFather gives you. Bots cannot start a chat: the person opens your bot and sends /start first |
+| WhatsApp (QR) | Your phone, linked by QR | Nothing: choose **Show QR**, then WhatsApp > Linked devices > Link a device. Free but unofficial; use a spare number |
+| WhatsApp Cloud | Meta's official API, paid | The Meta access token and phone number id from the WhatsApp API setup page; point its webhook at this Polaris |
+| Discord | A bot application | The bot token from the Developer Portal. Polaris then shows what is left: **Add the bot to a server**, and the two privileged intents to switch on under Bot > Privileged Gateway Intents |
+| Discord webhook | One-way alerts | The channel's Edit > Integrations > Webhooks > New Webhook > Copy Webhook URL |
+| Slack | A workspace app | Its Bot User OAuth token (starts with xoxb-) |
+| Slack webhook | One-way alerts | The URL of an Incoming Webhook in your Slack app |
+
+## UniFi UNAS
+
+Shows a UniFi NAS in Drive with its pools, bays and backups. In Drive, under
+**Locations**, choose **Add connection > UniFi UNAS** (**Detect a NAS by IP**
+finds one on your network). Use a local console account, not a Ubiquiti SSO
+login with 2FA.
+
+## Docker
+
+Monitors and manages the containers on a Docker engine. The local host appears
+by itself in the full edition. For another engine, open **Containers** and
+choose **Add host**, then a transport: Local socket, SSH (host Engine) with a
+username and private key, or TCP with optional TLS certificates.
+
+## Vercel, Railway and AWS
+
+Puts the services you run there on a project's board, with what each last
+released and a button to release it again. They still build and serve it.
+Under **Account > Connected accounts**, choose **Use a token**:
+
+- Vercel: an account token with access to the team the projects are under.
+- Railway: an account token, which reaches every workspace; a project token
+  cannot list the rest.
+- AWS: an access key ID, its secret and the region your ECS services and
+  Amplify branches are in. Read-only is enough to watch; releasing again needs
+  ecs:UpdateService or amplify:StartJob.
+
+Then, in a project's **Elsewhere** section, choose **Add a service**.
+
+## GitHub Copilot
+
+Copilot CLI runs in agent sessions already signed in with the session's GitHub
+token, so nothing has to be linked. Copilot as an MCP client connects from
+**Account > AI assistants**.
+
+## Bitwarden, Vaultwarden and KeePassXC
+
+Vault speaks the Bitwarden protocol, so Bitwarden's apps and extensions work
+with it as they would with a Vaultwarden server. Open **Vault > Connect an
+app**, copy **Your server address**, and on the app's sign-in screen choose
+Self-hosted and paste it into Server URL. Sign in with your Polaris email and
+master password.
+
+To bring passwords in, use **Import** under **Vault > Settings**: a Bitwarden
+JSON export, a KeePass XML export (KeePass and KeePassXC: File > Export) or a
+CSV. A .kdbx database is not an export.
+
+## Obsidian
+
+In Notes, choose **Import Markdown** on a notebook and pick files, a folder or
+a zipped vault. Links written as [[another note]] are connected once
+everything is in.
+
+## PostgreSQL, MySQL, MariaDB, MongoDB and Redis
+
+Databases Polaris runs for your services are listed in **Databases** by
+themselves. For any other, choose **New connection**, pick the engine and fill
+in the fields, or paste a **Connection URL** and press **Import**. It can go
+through one of your servers, use SSL with a choice of how strictly the
+certificate is checked, and be **Read-only**.
