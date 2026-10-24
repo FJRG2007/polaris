@@ -220,11 +220,13 @@ the full feature list. Mobile versions are in
       <br><sub><a href="docs/features/game-servers.md"><b>Game servers</b></a>: Minecraft, ARK and FiveM on your own machines</sub>
     </td>
     <td width="50%" valign="top">
+      <a href="docs/features/places.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/places-light-en-desktop.webp">
         <img src="docs/assets/media/places-dark-en-desktop.webp" alt="Places: a place's cameras beside each room's locks, lights and climate">
       </picture>
-      <br><sub><b>Places</b>: cameras and device controls for each place</sub>
+      </a>
+      <br><sub><a href="docs/features/places.md"><b>Places</b></a>: cameras and device controls for each place</sub>
     </td>
   </tr>
   <tr>
@@ -374,7 +376,7 @@ Each app is enabled per account and per role.
   season pass, bingo and community goals). Worlds can live on a NAS.
 - **Runners** - GitHub Actions compatible CI on your own machines, with per-repo
   policy and budgets.
-- **Agents** - coding agents on your repositories: headless runs that open pull
+- **[Agents](docs/features/agents.md)** - coding agents on your repositories: headless runs that open pull
   requests and answer reviews with your own model keys, and live sessions of
   Claude Code, Codex and other CLIs in a terminal you can watch and steer. A
   task can be assigned to an agent, which updates it through Polaris's MCP

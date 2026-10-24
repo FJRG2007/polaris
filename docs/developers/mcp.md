@@ -1,5 +1,7 @@
 # MCP: tools, search and categories
 
+[Leer en español](mcp.es.md) - [Back to the README](../../README.md)
+
 Polaris is one MCP server (`/api/mcp`) for every app installed in it. A model
 connects once and reaches home, mail, calendar, games and the rest through it, so
 two things matter more than any single tool: the model has to be able to find

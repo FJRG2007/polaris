@@ -210,11 +210,13 @@ página con todas sus funciones. Las versiones para móvil están en
       <br><sub><a href="docs/features/game-servers.es.md"><b>Servidores de juegos</b></a>: Minecraft, ARK y FiveM en tus propias máquinas</sub>
     </td>
     <td width="50%" valign="top">
+      <a href="docs/features/places.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/places-light-es-desktop.webp">
         <img src="docs/assets/media/places-dark-es-desktop.webp" alt="Lugares: las cámaras de un lugar junto a las cerraduras, luces y clima de cada estancia">
       </picture>
-      <br><sub><b>Lugares</b>: cámaras y control de dispositivos de cada lugar</sub>
+      </a>
+      <br><sub><a href="docs/features/places.es.md"><b>Lugares</b></a>: cámaras y control de dispositivos de cada lugar</sub>
     </td>
   </tr>
   <tr>

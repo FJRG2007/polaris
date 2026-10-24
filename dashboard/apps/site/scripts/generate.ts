@@ -416,13 +416,28 @@ const featuresDir = join(root, "docs", "features");
 const featureFiles = readdirSync(featuresDir)
     .filter((file) => file.endsWith(".md") && !file.endsWith(".es.md"))
     .sort();
-// Guides that live outside `docs/features` but belong on the site: how to
-// connect an assistant, and what the MCP server offers it. English only; the
-// Spanish site shows the English text until a translation exists.
-const extraGuides = ["docs/connecting-ai-assistants.md", "docs/developers/mcp.md"].filter((file) =>
-    existsSync(join(root, file))
-);
+// Guides that live outside `docs/features` but belong on the site: setting up
+// the services Polaris connects to, how to connect an assistant, and what the
+// MCP server offers it. The Spanish site reads `<name>.es.md` beside each one
+// where it exists, and the English text where it does not.
+const extraGuides = [
+    "docs/integrations-setup.md",
+    "docs/connecting-ai-assistants.md",
+    "docs/developers/mcp.md"
+].filter((file) => existsSync(join(root, file)));
+/** The guide in the page's language: its `.es.md` sibling on the Spanish site, when there is one. */
+const ownGuide = (file: string, spanish: boolean) => {
+    const own = file.replace(/\.md$/, ".es.md");
+    return spanish && existsSync(join(root, own)) ? own : file;
+};
 const extraPaths = new Map(extraGuides.map((file) => [file, docs.docSlug(file.split("/").pop()!)]));
+// A link to either language's file opens the guide's page.
+const linkPaths = new Map<string, string>(
+    [...extraPaths].flatMap(([file, slug]): [string, string][] => [
+        [file, slug],
+        [file.replace(/\.md$/, ".es.md"), slug]
+    ])
+);
 const INTEGRATIONS = "integrations";
 const docSlugs = new Set([...featureFiles.map(docs.docSlug), ...extraPaths.values(), INTEGRATIONS]);
 const docMedia = new Set<string>();
@@ -468,7 +483,7 @@ async function renderDoc(
         slugs: docSlugs,
         repo,
         dir,
-        paths: extraPaths
+        paths: linkPaths
     });
     for (const picture of pictures) docMedia.add(picture);
     // The text under each heading, so search can land on the section.
@@ -485,14 +500,15 @@ async function guides(spanish: boolean): Promise<docs.DocPage[]> {
     const connected =
         docs.integrationsGuide(spanish ? readmeEs : readmeEn) ?? docs.integrationsGuide(readmeEn);
     const extra = await Promise.all([
-        ...extraGuides.map((file) =>
-            renderDoc(
+        ...extraGuides.map((file) => {
+            const own = ownGuide(file, spanish);
+            return renderDoc(
                 extraPaths.get(file)!,
-                read(join(root, file)),
+                read(join(root, own)),
                 file.slice(0, file.lastIndexOf("/")),
-                file
-            )
-        ),
+                own
+            );
+        }),
         ...(connected
             ? [
                   renderDoc(
