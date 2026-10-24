@@ -20,7 +20,9 @@ describe("LinkUnavailable sign-in", () => {
             wrapper: MessagesWrapper
         });
         const button = screen.getByRole("link", { name: "Sign in" });
-        expect(button.getAttribute("href")).toBe(`/oauth/login?redirect=${encodeURIComponent("/k/abc")}`);
+        expect(button.getAttribute("href")).toBe(
+            `/oauth/login?redirect=${encodeURIComponent("/k/abc")}`
+        );
     });
 
     it("offers another account when this one is not let in", () => {

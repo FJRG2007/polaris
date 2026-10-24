@@ -34,7 +34,8 @@ vi.mock("@polaris/db", () => ({
                 return { id: `g${grants.length}` };
             },
             createMany: async ({ data }: { data: Row[] }) => {
-                for (const one of data) grants.push({ ...one, id: `g${grants.length + 1}`, uses: 0 });
+                for (const one of data)
+                    grants.push({ ...one, id: `g${grants.length + 1}`, uses: 0 });
                 return { count: data.length };
             },
             findFirst: async ({ where }: { where: Row }) =>
@@ -83,7 +84,10 @@ vi.mock("next/headers", () => ({
     })
 }));
 vi.mock("@polaris/config", () => ({
-    loadEnv: () => ({ POLARIS_AUTH_SECRET: "test-secret-test-secret-test-secret", POLARIS_SECURE_COOKIES: false })
+    loadEnv: () => ({
+        POLARIS_AUTH_SECRET: "test-secret-test-secret-test-secret",
+        POLARIS_SECURE_COOKIES: false
+    })
 }));
 let attempts = 0;
 vi.mock("@/lib/rate-limit-service", () => ({
@@ -112,8 +116,7 @@ const { unlockGrantLinkAction } = await import("@/app/k/[[...path]]/actions");
 
 const DOOR = "00000000-0000-4000-8000-000000000001";
 const ORG = "00000000-0000-4000-8000-0000000000f1";
-const link = (audience: string) =>
-    core.grantLinkSchema.parse({ capability: "view", audience });
+const link = (audience: string) => core.grantLinkSchema.parse({ capability: "view", audience });
 
 beforeEach(() => {
     grants = [];
@@ -126,7 +129,11 @@ beforeEach(() => {
 
 describe("link password", () => {
     const locked = () =>
-        core.grantLinkSchema.parse({ capability: "view", audience: "anyone", password: "open sesame" });
+        core.grantLinkSchema.parse({
+            capability: "view",
+            audience: "anyone",
+            password: "open sesame"
+        });
 
     it("stores only a stretched hash, and leaves a link without one open", async () => {
         const { token } = await writeGrantLink("place.device", DOOR, locked(), "u1");
@@ -141,7 +148,9 @@ describe("link password", () => {
 
     it("opens once the right password is given, and never for a wrong one", async () => {
         const { token } = await writeGrantLink("place.device", DOOR, locked(), "u1");
-        expect(await unlockGrantLinkAction(token, "nope")).toEqual({ error: "errors.wrongPassword" });
+        expect(await unlockGrantLinkAction(token, "nope")).toEqual({
+            error: "errors.wrongPassword"
+        });
         expect((await linkReach(token))?.standing).toBe("password");
         expect(await unlockGrantLinkAction(token, "open sesame")).toEqual({});
         expect((await linkReach(token))?.standing).toBe("live");
@@ -168,7 +177,11 @@ describe("link password", () => {
         const { token } = await writeGrantLink(
             "place.device",
             DOOR,
-            core.grantLinkSchema.parse({ capability: "view", audience: "restricted", password: "x" }),
+            core.grantLinkSchema.parse({
+                capability: "view",
+                audience: "restricted",
+                password: "x"
+            }),
             "u1"
         );
         expect((await linkReach(token))?.standing).toBe("signin");
@@ -289,9 +302,19 @@ describe("people with access, a page at a time", () => {
     it("narrows to principals whose name matches, and answers empty when none does", async () => {
         grants.push(person(1));
         const me = { id: "u-viewer", isAdmin: false };
-        const hit = await listSubjectGrantPage("task.space", DOOR, { links: false, search: "ana" }, me);
+        const hit = await listSubjectGrantPage(
+            "task.space",
+            DOOR,
+            { links: false, search: "ana" },
+            me
+        );
         expect(hit.total).toBe(1);
-        const miss = await listSubjectGrantPage("task.space", DOOR, { links: false, search: "zz" }, me);
+        const miss = await listSubjectGrantPage(
+            "task.space",
+            DOOR,
+            { links: false, search: "zz" },
+            me
+        );
         expect(miss).toEqual({ grants: [], total: 0, nextCursor: null });
     });
 
@@ -302,7 +325,12 @@ describe("people with access, a page at a time", () => {
         expect(userSearch?.id).toEqual({ in: [ANA] });
         userSearch = null;
         grants = [];
-        const none = await listSubjectGrantPage("task.space", DOOR, { links: false, search: "ana" }, me);
+        const none = await listSubjectGrantPage(
+            "task.space",
+            DOOR,
+            { links: false, search: "ana" },
+            me
+        );
         expect(none.total).toBe(0);
         expect(userSearch).toBeNull();
     });
@@ -325,7 +353,13 @@ describe("writeGrants", () => {
 
     it("writes every one, or none when any is refused", async () => {
         await expect(
-            writeGrants("task.space", DOOR, [to(ANA), to("00000000-0000-4000-8000-0000000000b2")], "me", [])
+            writeGrants(
+                "task.space",
+                DOOR,
+                [to(ANA), to("00000000-0000-4000-8000-0000000000b2")],
+                "me",
+                []
+            )
         ).rejects.toThrow();
         expect(grants).toHaveLength(0);
         await expect(writeGrants("task.space", DOOR, [to(ANA)], "me", [])).resolves.toBe(1);

@@ -20,9 +20,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Read `ownerId`-style column `column` off `model` for these ids. */
 function byColumn(model: string, column: string, fallback?: string): OwnerReader {
     return async (ids) => {
-        const delegate = (prisma as unknown as Record<string, {
-            findMany(args: unknown): Promise<Record<string, string | null>[]>;
-        }>)[model];
+        const delegate = (
+            prisma as unknown as Record<
+                string,
+                {
+                    findMany(args: unknown): Promise<Record<string, string | null>[]>;
+                }
+            >
+        )[model];
         const select: Record<string, true> = { id: true, [column]: true };
         if (fallback) select[fallback] = true;
         const rows = await delegate!.findMany({ where: { id: { in: ids } }, select });
@@ -75,7 +80,9 @@ const READERS: Partial<Record<core.GrantSubject, OwnerReader>> = {
                 select: {
                     id: true,
                     application: {
-                        select: { environment: { select: { project: { select: { ownerId: true } } } } }
+                        select: {
+                            environment: { select: { project: { select: { ownerId: true } } } }
+                        }
                     }
                 }
             })
@@ -100,7 +107,11 @@ const READERS: Partial<Record<core.GrantSubject, OwnerReader>> = {
         ).map((row) => [row.id, row.repo?.ownerId ?? row.startedById ?? null] as const),
     // "<kind>:<uuid>": one read per kind present, never one per record.
     "crm.record": async (ids) => {
-        const kinds = { companies: "crmCompany", people: "crmPerson", opportunities: "crmOpportunity" };
+        const kinds = {
+            companies: "crmCompany",
+            people: "crmPerson",
+            opportunities: "crmOpportunity"
+        };
         const pairs: (readonly [string, string | null])[] = [];
         for (const [kind, model] of Object.entries(kinds)) {
             const wanted = ids

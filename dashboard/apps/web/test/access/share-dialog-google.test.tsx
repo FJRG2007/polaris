@@ -83,16 +83,17 @@ beforeEach(() => {
             url: "https://polaris.example.test/tasks/s/1"
         }
     });
-    actions.grantPageAction.mockImplementation(async (_s: string, _id: string, q: { links?: boolean }) =>
-        q.links
-            ? { page: { grants: [], total: 0, nextCursor: null } }
-            : {
-                  page: {
-                      grants: [row("1", "Ana"), row("2", "Luis")],
-                      total: 1284,
-                      nextCursor: null
+    actions.grantPageAction.mockImplementation(
+        async (_s: string, _id: string, q: { links?: boolean }) =>
+            q.links
+                ? { page: { grants: [], total: 0, nextCursor: null } }
+                : {
+                      page: {
+                          grants: [row("1", "Ana"), row("2", "Luis")],
+                          total: 1284,
+                          nextCursor: null
+                      }
                   }
-              }
     );
 });
 afterEach(() => {
@@ -103,7 +104,13 @@ afterEach(() => {
 
 const open = () =>
     render(
-        <ShareDialog open onOpenChange={() => {}} subject="task.space" subjectId="s1" name="Indoor Studio" />,
+        <ShareDialog
+            open
+            onOpenChange={() => {}}
+            subject="task.space"
+            subjectId="s1"
+            name="Indoor Studio"
+        />,
         { wrapper: MessagesWrapper }
     );
 
@@ -169,10 +176,14 @@ describe("ShareDialog", () => {
         await pick("Access for Ana", "Admin");
         await waitFor(() => expect(actions.updateShareAction).toHaveBeenCalled());
         expect(actions.updateShareAction.mock.calls[0]?.[3]).toMatchObject({ capability: "admin" });
-        expect(screen.getByRole("combobox", { name: "Access for Ana" }).textContent).toContain("Admin");
+        expect(screen.getByRole("combobox", { name: "Access for Ana" }).textContent).toContain(
+            "Admin"
+        );
         await act(async () => answer({ error: "No" }));
         await waitFor(() =>
-            expect(screen.getByRole("combobox", { name: "Access for Ana" }).textContent).not.toContain("Admin")
+            expect(
+                screen.getByRole("combobox", { name: "Access for Ana" }).textContent
+            ).not.toContain("Admin")
         );
     });
 
@@ -205,7 +216,9 @@ describe("ShareDialog", () => {
             targets: [{ type: "user", id: `p${++next}`, name: `Person ${next}`, detail: "" }]
         }));
         open();
-        const box = screen.getByRole("combobox", { name: "Add people, teams or roles" }) as HTMLInputElement;
+        const box = screen.getByRole("combobox", {
+            name: "Add people, teams or roles"
+        }) as HTMLInputElement;
         for (let index = 0; index < core.MAX_SHARE_TARGETS; index++) {
             fireEvent.change(box, { target: { value: "pe" } });
             const option = await screen.findByRole("option", {}, { timeout: 2000 });
@@ -213,9 +226,13 @@ describe("ShareDialog", () => {
             await act(async () => option.click());
         }
         fireEvent.change(box, { target: { value: "pe" } });
-        await waitFor(() => expect(actions.findShareTargetsAction).toHaveBeenCalledTimes(core.MAX_SHARE_TARGETS + 1));
+        await waitFor(() =>
+            expect(actions.findShareTargetsAction).toHaveBeenCalledTimes(core.MAX_SHARE_TARGETS + 1)
+        );
         expect(screen.queryByRole("option")).toBeNull();
-        expect(screen.getByText(`Up to ${core.MAX_SHARE_TARGETS} at a time. Share these first.`)).toBeTruthy();
+        expect(
+            screen.getByText(`Up to ${core.MAX_SHARE_TARGETS} at a time. Share these first.`)
+        ).toBeTruthy();
     }, 30_000);
 
     it("fits a phone: rows and names truncate instead of overflowing", async () => {

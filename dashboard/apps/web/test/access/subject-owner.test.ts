@@ -42,9 +42,8 @@ vi.mock("@/lib/privacy-service", () => ({
         new Map(people.map((one) => [one.id, `@${one.username}`]))
 }));
 
-const { subjectHasOwner, subjectOwner, subjectOwnerIds } = await import(
-    "@/lib/access/subject-owner"
-);
+const { subjectHasOwner, subjectOwner, subjectOwnerIds } =
+    await import("@/lib/access/subject-owner");
 
 beforeEach(() => {
     calls.length = 0;
@@ -68,7 +67,11 @@ describe("subjectOwnerIds", () => {
     });
 
     it("reads CRM records once per kind, keyed as they were asked", async () => {
-        const owners = await subjectOwnerIds("crm.record", [`companies:${A}`, `people:${B}`, "people:bad"]);
+        const owners = await subjectOwnerIds("crm.record", [
+            `companies:${A}`,
+            `people:${B}`,
+            "people:bad"
+        ]);
         expect(owners.get(`companies:${A}`)).toBe(CREATOR);
         expect(owners.get(`people:${B}`)).toBe(OWNER);
         expect(calls.map((call) => call.model)).toEqual(["crmCompany", "crmPerson"]);

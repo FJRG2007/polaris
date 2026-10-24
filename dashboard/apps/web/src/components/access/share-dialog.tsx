@@ -568,7 +568,10 @@ export function ShareDialog({
                         />
                     </div>
                 ) : editing ? (
-                    <section className="flex min-w-0 flex-col gap-3" aria-label={t("share.limitsOf", { name: who(editing.grant) })}>
+                    <section
+                        className="flex min-w-0 flex-col gap-3"
+                        aria-label={t("share.limitsOf", { name: who(editing.grant) })}
+                    >
                         <p className="truncate text-[13px] font-medium text-foreground">
                             {t("share.limitsOf", { name: who(editing.grant) })}
                         </p>
@@ -588,7 +591,9 @@ export function ShareDialog({
                                 disabled={busy || badFence(subject, editing.value)}
                                 onClick={() => void saveLimits()}
                             >
-                                {busy ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : null}
+                                {busy ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                ) : null}
                                 {t("share.save")}
                             </Button>
                         </div>
@@ -646,7 +651,9 @@ export function ShareDialog({
                                             setActive((at) => (at + 1) % found.length);
                                         } else if (event.key === "ArrowUp" && found.length) {
                                             event.preventDefault();
-                                            setActive((at) => (at - 1 + found.length) % found.length);
+                                            setActive(
+                                                (at) => (at - 1 + found.length) % found.length
+                                            );
                                         } else if (event.key === "Enter" && found[active]) {
                                             event.preventDefault();
                                             stage(found[active]);
@@ -717,14 +724,22 @@ export function ShareDialog({
                                     )
                                 ) : null
                             ) : query.trim().length >= 2 && !searching ? (
-                                <p className="text-[12px] text-muted-foreground">{t("share.noMatch")}</p>
+                                <p className="text-[12px] text-muted-foreground">
+                                    {t("share.noMatch")}
+                                </p>
                             ) : null}
                         </div>
 
                         {staged.length > 0 ? (
-                            <section className="flex min-w-0 flex-col gap-3" aria-label={t("share.more")}>
+                            <section
+                                className="flex min-w-0 flex-col gap-3"
+                                aria-label={t("share.more")}
+                            >
                                 <div className="flex min-w-0 flex-col gap-1">
-                                    <label className="text-[12px] text-muted-foreground" htmlFor="share-what">
+                                    <label
+                                        className="text-[12px] text-muted-foreground"
+                                        htmlFor="share-what"
+                                    >
                                         {t("share.can")}
                                     </label>
                                     <Select
@@ -745,14 +760,19 @@ export function ShareDialog({
                                         </legend>
                                         <div className="flex flex-wrap gap-x-4 gap-y-1">
                                             {reachable.map((one) => (
-                                                <label key={one} className="flex items-center gap-2 text-[13px] text-foreground">
+                                                <label
+                                                    key={one}
+                                                    className="flex items-center gap-2 text-[13px] text-foreground"
+                                                >
                                                     <Checkbox
                                                         checked={actions.includes(one)}
                                                         onChange={(event) =>
                                                             setActions((now) =>
                                                                 event.target.checked
                                                                     ? [...now, one]
-                                                                    : now.filter((held) => held !== one)
+                                                                    : now.filter(
+                                                                          (held) => held !== one
+                                                                      )
                                                             )
                                                         }
                                                     />
@@ -775,7 +795,9 @@ export function ShareDialog({
                                         <label className="flex items-center gap-2 text-[13px] text-foreground">
                                             <Checkbox
                                                 checked={notify}
-                                                onChange={(event) => setNotify(event.target.checked)}
+                                                onChange={(event) =>
+                                                    setNotify(event.target.checked)
+                                                }
                                             />
                                             {t("share.notify")}
                                         </label>
@@ -797,17 +819,27 @@ export function ShareDialog({
                                     </Button>
                                     <Button
                                         disabled={busy || noAction || badFence(subject, limits)}
-                                        aria-disabled={busy || noAction || badFence(subject, limits)}
+                                        aria-disabled={
+                                            busy || noAction || badFence(subject, limits)
+                                        }
                                         onClick={() => void share()}
                                     >
-                                        {busy ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : null}
+                                        {busy ? (
+                                            <Loader2
+                                                className="size-4 shrink-0 animate-spin"
+                                                aria-hidden
+                                            />
+                                        ) : null}
                                         {t("share.share")}
                                     </Button>
                                 </div>
                             </section>
                         ) : (
                             <>
-                                <section className="flex min-w-0 flex-col gap-2" aria-label={t("share.peopleWithAccess")}>
+                                <section
+                                    className="flex min-w-0 flex-col gap-2"
+                                    aria-label={t("share.peopleWithAccess")}
+                                >
                                     <div className="flex min-w-0 items-center justify-between gap-2">
                                         <h3 className="truncate text-[13px] font-medium text-foreground">
                                             {t("share.peopleWithAccess")}
@@ -853,7 +885,12 @@ export function ShareDialog({
                                             className="max-h-72 min-w-0 overflow-y-auto"
                                             role="list"
                                         >
-                                            <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+                                            <div
+                                                style={{
+                                                    height: virtualizer.getTotalSize(),
+                                                    position: "relative"
+                                                }}
+                                            >
                                                 {items.map((item) => {
                                                     const grant = people[item.index];
                                                     if (!grant) return null;
@@ -864,45 +901,82 @@ export function ShareDialog({
                                                             role="listitem"
                                                             data-index={item.index}
                                                             className="absolute left-0 right-0 flex min-w-0 items-center gap-3 px-1"
-                                                            style={{ top: item.start, height: ROW_HEIGHT }}
+                                                            style={{
+                                                                top: item.start,
+                                                                height: ROW_HEIGHT
+                                                            }}
                                                         >
                                                             <PrincipalFace grant={grant} />
                                                             <div className="min-w-0 flex-1">
                                                                 <p className="flex min-w-0 items-center gap-2 text-[13px] text-foreground">
-                                                                    <span className="min-w-0 truncate" title={who(grant)}>
+                                                                    <span
+                                                                        className="min-w-0 truncate"
+                                                                        title={who(grant)}
+                                                                    >
                                                                         {who(grant)}
                                                                     </span>
                                                                     {grant.standing !== "live" ? (
-                                                                        <Badge variant={STANDING_TONE[grant.standing]}>
-                                                                            {t(`share.standings.${grant.standing}`)}
+                                                                        <Badge
+                                                                            variant={
+                                                                                STANDING_TONE[
+                                                                                    grant.standing
+                                                                                ]
+                                                                            }
+                                                                        >
+                                                                            {t(
+                                                                                `share.standings.${grant.standing}`
+                                                                            )}
                                                                         </Badge>
                                                                     ) : grant.schedule.endsAt ? (
                                                                         <Badge variant="neutral">
                                                                             {t("share.untilOnly", {
-                                                                                to: grant.schedule.endsAt.slice(0, 10)
+                                                                                to: grant.schedule.endsAt.slice(
+                                                                                    0,
+                                                                                    10
+                                                                                )
                                                                             })}
                                                                         </Badge>
                                                                     ) : null}
                                                                 </p>
                                                                 <p
                                                                     className="truncate text-[12px] text-muted-foreground"
-                                                                    title={[grant.contact || grant.orgName, line].filter(Boolean).join(" - ")}
+                                                                    title={[
+                                                                        grant.contact ||
+                                                                            grant.orgName,
+                                                                        line
+                                                                    ]
+                                                                        .filter(Boolean)
+                                                                        .join(" - ")}
                                                                 >
-                                                                    {[grant.contact || grant.orgName, line].filter(Boolean).join(" - ")}
+                                                                    {[
+                                                                        grant.contact ||
+                                                                            grant.orgName,
+                                                                        line
+                                                                    ]
+                                                                        .filter(Boolean)
+                                                                        .join(" - ")}
                                                                 </p>
                                                             </div>
                                                             {bounded ? (
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    aria-label={t("share.log.ofKey", { name: who(grant) })}
-                                                                    title={t("share.log.ofKey", { name: who(grant) })}
+                                                                    aria-label={t(
+                                                                        "share.log.ofKey",
+                                                                        { name: who(grant) }
+                                                                    )}
+                                                                    title={t("share.log.ofKey", {
+                                                                        name: who(grant)
+                                                                    })}
                                                                     onClick={() => {
                                                                         setLogGrant(grant);
                                                                         setHistory(true);
                                                                     }}
                                                                 >
-                                                                    <History className="size-4 shrink-0" aria-hidden />
+                                                                    <History
+                                                                        className="size-4 shrink-0"
+                                                                        aria-hidden
+                                                                    />
                                                                 </Button>
                                                             ) : null}
                                                             {roleMenu(grant)}
@@ -914,7 +988,10 @@ export function ShareDialog({
                                     )}
                                     {pageFailed && rows !== null && rows.length > 0 ? (
                                         <div className="flex min-w-0 items-center gap-2">
-                                            <p role="alert" className="min-w-0 flex-1 text-[12px] text-danger-ink">
+                                            <p
+                                                role="alert"
+                                                className="min-w-0 flex-1 text-[12px] text-danger-ink"
+                                            >
                                                 {t("share.loadFailed")}
                                             </p>
                                             <Button
@@ -929,8 +1006,13 @@ export function ShareDialog({
                                     ) : null}
                                 </section>
 
-                                <section className="flex min-w-0 flex-col gap-2" aria-label={t("share.general")}>
-                                    <h3 className="text-[13px] font-medium text-foreground">{t("share.general")}</h3>
+                                <section
+                                    className="flex min-w-0 flex-col gap-2"
+                                    aria-label={t("share.general")}
+                                >
+                                    <h3 className="text-[13px] font-medium text-foreground">
+                                        {t("share.general")}
+                                    </h3>
                                     {links === null ? (
                                         <Skeleton className="h-12 w-full" />
                                     ) : (
@@ -939,9 +1021,15 @@ export function ShareDialog({
                                                 const Icon = AUDIENCE_ICON[grant.audience];
                                                 const line = describe(grant);
                                                 return (
-                                                    <div key={grant.id} className="flex min-w-0 items-start gap-3 px-1 py-1">
+                                                    <div
+                                                        key={grant.id}
+                                                        className="flex min-w-0 items-start gap-3 px-1 py-1"
+                                                    >
                                                         <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
-                                                            <Icon className="size-4 shrink-0" aria-hidden />
+                                                            <Icon
+                                                                className="size-4 shrink-0"
+                                                                aria-hidden
+                                                            />
                                                         </span>
                                                         <div className="flex min-w-0 flex-1 flex-col gap-1">
                                                             <Select
@@ -949,24 +1037,47 @@ export function ShareDialog({
                                                                 className="w-full sm:w-auto"
                                                                 value={grant.audience}
                                                                 onValueChange={(next) =>
-                                                                    void changeAudience(grant, next as core.LinkAudience)
+                                                                    void changeAudience(
+                                                                        grant,
+                                                                        next as core.LinkAudience
+                                                                    )
                                                                 }
-                                                                options={audiences.map(audienceOption)}
+                                                                options={audiences.map(
+                                                                    audienceOption
+                                                                )}
                                                             />
-                                                            <p className="truncate text-[12px] text-muted-foreground" title={line}>
-                                                                {t(`share.audiences.${grant.audience}.hint`, { org: setup?.org?.name ?? "" })}
+                                                            <p
+                                                                className="truncate text-[12px] text-muted-foreground"
+                                                                title={line}
+                                                            >
+                                                                {t(
+                                                                    `share.audiences.${grant.audience}.hint`,
+                                                                    { org: setup?.org?.name ?? "" }
+                                                                )}
                                                                 {line ? ` - ${line}` : ""}
                                                             </p>
-                                                            {grant.standing !== "live" || grant.password ? (
+                                                            {grant.standing !== "live" ||
+                                                            grant.password ? (
                                                                 <div className="flex flex-wrap gap-1">
                                                                     {grant.standing !== "live" ? (
-                                                                        <Badge variant={STANDING_TONE[grant.standing]}>
-                                                                            {t(`share.standings.${grant.standing}`)}
+                                                                        <Badge
+                                                                            variant={
+                                                                                STANDING_TONE[
+                                                                                    grant.standing
+                                                                                ]
+                                                                            }
+                                                                        >
+                                                                            {t(
+                                                                                `share.standings.${grant.standing}`
+                                                                            )}
                                                                         </Badge>
                                                                     ) : null}
                                                                     {grant.password ? (
                                                                         <Badge variant="neutral">
-                                                                            <Lock className="size-3 shrink-0" aria-hidden />
+                                                                            <Lock
+                                                                                className="size-3 shrink-0"
+                                                                                aria-hidden
+                                                                            />
                                                                             {t("share.hasPassword")}
                                                                         </Badge>
                                                                     ) : null}
@@ -980,7 +1091,10 @@ export function ShareDialog({
                                             {links.length === 0 && !draftAudience ? (
                                                 <div className="flex min-w-0 items-start gap-3 px-1 py-1">
                                                     <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
-                                                        <Lock className="size-4 shrink-0" aria-hidden />
+                                                        <Lock
+                                                            className="size-4 shrink-0"
+                                                            aria-hidden
+                                                        />
                                                     </span>
                                                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                                                         {linkable ? (
@@ -990,17 +1104,27 @@ export function ShareDialog({
                                                                 value="restricted"
                                                                 onValueChange={(next) =>
                                                                     next !== "restricted" &&
-                                                                    setDraftAudience(next as core.LinkAudience)
+                                                                    setDraftAudience(
+                                                                        next as core.LinkAudience
+                                                                    )
                                                                 }
-                                                                options={audiences.map(audienceOption)}
+                                                                options={audiences.map(
+                                                                    audienceOption
+                                                                )}
                                                             />
                                                         ) : (
                                                             <p className="text-[13px] text-foreground">
-                                                                {t("share.audiences.restricted.label")}
+                                                                {t(
+                                                                    "share.audiences.restricted.label"
+                                                                )}
                                                             </p>
                                                         )}
                                                         <p className="text-[12px] text-muted-foreground">
-                                                            {linkable ? t("share.audiences.restricted.hint") : t("share.noLinks")}
+                                                            {linkable
+                                                                ? t(
+                                                                      "share.audiences.restricted.hint"
+                                                                  )
+                                                                : t("share.noLinks")}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1012,7 +1136,10 @@ export function ShareDialog({
                                                     className="self-start"
                                                     onClick={() => setDraftAudience("anyone")}
                                                 >
-                                                    <Link2 className="size-4 shrink-0" aria-hidden />
+                                                    <Link2
+                                                        className="size-4 shrink-0"
+                                                        aria-hidden
+                                                    />
                                                     {t("share.anotherLink")}
                                                 </Button>
                                             ) : null}
@@ -1021,11 +1148,18 @@ export function ShareDialog({
                                                     <Select
                                                         aria-label={t("share.audienceOf")}
                                                         value={draftAudience}
-                                                        onValueChange={(next) => setDraftAudience(next as core.LinkAudience)}
+                                                        onValueChange={(next) =>
+                                                            setDraftAudience(
+                                                                next as core.LinkAudience
+                                                            )
+                                                        }
                                                         options={audiences.map(audienceOption)}
                                                     />
                                                     <p className="text-[12px] text-muted-foreground">
-                                                        {t(`share.audiences.${draftAudience}.hint`, { org: setup?.org?.name ?? "" })}
+                                                        {t(
+                                                            `share.audiences.${draftAudience}.hint`,
+                                                            { org: setup?.org?.name ?? "" }
+                                                        )}
                                                     </p>
                                                     <Select
                                                         aria-label={t("share.linkRole")}
@@ -1036,24 +1170,43 @@ export function ShareDialog({
                                                             label: capabilityLabel(one)
                                                         }))}
                                                     />
-                                                    {linkCapabilities.length < capabilities.length ? (
-                                                        <p className="text-[12px] text-foreground-subtle">{t("share.linkSeeOnly")}</p>
+                                                    {linkCapabilities.length <
+                                                    capabilities.length ? (
+                                                        <p className="text-[12px] text-foreground-subtle">
+                                                            {t("share.linkSeeOnly")}
+                                                        </p>
                                                     ) : null}
                                                     <LinkAdvancedFields
                                                         value={linkRules}
                                                         onChange={setLinkRules}
-                                                        omit={draftAudience === "restricted" ? ["password"] : []}
+                                                        omit={
+                                                            draftAudience === "restricted"
+                                                                ? ["password"]
+                                                                : []
+                                                        }
                                                         idPrefix="share-link"
                                                     />
                                                     <div className="flex justify-end gap-2">
-                                                        <Button variant="ghost" onClick={() => setDraftAudience(null)}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            onClick={() => setDraftAudience(null)}
+                                                        >
                                                             {t("share.cancel")}
                                                         </Button>
-                                                        <Button disabled={busy} onClick={() => void makeLink()}>
+                                                        <Button
+                                                            disabled={busy}
+                                                            onClick={() => void makeLink()}
+                                                        >
                                                             {busy ? (
-                                                                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                                                <Loader2
+                                                                    className="size-4 shrink-0 animate-spin"
+                                                                    aria-hidden
+                                                                />
                                                             ) : (
-                                                                <Link2 className="size-4 shrink-0" aria-hidden />
+                                                                <Link2
+                                                                    className="size-4 shrink-0"
+                                                                    aria-hidden
+                                                                />
                                                             )}
                                                             {t("share.makeLink")}
                                                         </Button>
@@ -1061,14 +1214,21 @@ export function ShareDialog({
                                                 </div>
                                             ) : null}
                                             {madeLink ? (
-                                                <div role="status" className="flex min-w-0 flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
-                                                    <p className="text-[12px] text-muted-foreground">{t("share.linkMade")}</p>
+                                                <div
+                                                    role="status"
+                                                    className="flex min-w-0 flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3"
+                                                >
+                                                    <p className="text-[12px] text-muted-foreground">
+                                                        {t("share.linkMade")}
+                                                    </p>
                                                     <div className="flex min-w-0 items-center gap-2">
                                                         <Input
                                                             readOnly
                                                             value={madeLink}
                                                             aria-label={t("share.linkName")}
-                                                            onFocus={(event) => event.target.select()}
+                                                            onFocus={(event) =>
+                                                                event.target.select()
+                                                            }
                                                             className="min-w-0 flex-1"
                                                         />
                                                         <Button
@@ -1078,7 +1238,10 @@ export function ShareDialog({
                                                             title={t("share.copyLink")}
                                                             onClick={() => void copy(madeLink)}
                                                         >
-                                                            <Copy className="size-4 shrink-0" aria-hidden />
+                                                            <Copy
+                                                                className="size-4 shrink-0"
+                                                                aria-hidden
+                                                            />
                                                         </Button>
                                                     </div>
                                                 </div>
@@ -1139,7 +1302,12 @@ function TargetFace({ target, size }: { target: ShareTarget; size: number }) {
 function PrincipalFace({ grant }: { grant: GrantView }) {
     if (grant.principalType === "user") {
         return (
-            <Avatar person={{ id: grant.principalId, name: grant.principalName }} size={32} status={false} lazy />
+            <Avatar
+                person={{ id: grant.principalId, name: grant.principalName }}
+                size={32}
+                status={false}
+                lazy
+            />
         );
     }
     const Icon = grant.principalType === "team" ? Users : Shield;

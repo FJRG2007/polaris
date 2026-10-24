@@ -46,7 +46,10 @@ import {
 } from "@polaris/ui";
 
 function roleOptions(t: NamespaceTranslator<"tasks">) {
-    return core.SPACE_ROLES.map((role) => ({ value: role, label: optionLabel(t, "spaceRole", role) }));
+    return core.SPACE_ROLES.map((role) => ({
+        value: role,
+        label: optionLabel(t, "spaceRole", role)
+    }));
 }
 
 /** Where the grants being edited actually live. */
@@ -296,7 +299,9 @@ export function AccessDialog({
                                             <Select
                                                 value={member.role}
                                                 options={ROLE_OPTIONS}
-                                                aria-label={t("access.roleFor", { name: member.name })}
+                                                aria-label={t("access.roleFor", {
+                                                    name: member.name
+                                                })}
                                                 className="h-8 w-28 text-xs"
                                                 onValueChange={async (next) => {
                                                     await runAction(
@@ -319,7 +324,9 @@ export function AccessDialog({
                                             />
                                             <button
                                                 type="button"
-                                                aria-label={t("pickers.remove", { name: member.name })}
+                                                aria-label={t("pickers.remove", {
+                                                    name: member.name
+                                                })}
                                                 title={t("access.remove")}
                                                 onClick={async () => {
                                                     await runAction(
@@ -409,9 +416,7 @@ export function AccessDialog({
                         <p className="text-xs font-medium">{t("access.teams")}</p>
                         {granted.length === 0 ? (
                             <p className="text-xs text-muted-foreground">
-                                {whole
-                                    ? t("access.noTeamSpace")
-                                    : t("access.noTeamFolder")}
+                                {whole ? t("access.noTeamSpace") : t("access.noTeamFolder")}
                             </p>
                         ) : (
                             <ul className="flex flex-col gap-1">
@@ -431,7 +436,9 @@ export function AccessDialog({
                                                 <Select
                                                     value={grant.role}
                                                     options={ROLE_OPTIONS}
-                                                    aria-label={t("access.roleFor", { name: grant.teamName })}
+                                                    aria-label={t("access.roleFor", {
+                                                        name: grant.teamName
+                                                    })}
                                                     className="h-8 w-28 text-xs"
                                                     onValueChange={async (next) => {
                                                         if (!scopeId) return;
@@ -455,7 +462,9 @@ export function AccessDialog({
                                                 />
                                                 <button
                                                     type="button"
-                                                    aria-label={t("pickers.remove", { name: grant.teamName })}
+                                                    aria-label={t("pickers.remove", {
+                                                        name: grant.teamName
+                                                    })}
                                                     title={t("access.remove")}
                                                     onClick={async () => {
                                                         if (!scopeId) return;
@@ -618,9 +627,7 @@ function RoleGrants({
             <p className="text-xs font-medium">{t("access.roles")}</p>
             {grants.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    {whole
-                        ? t("access.noRoleSpace")
-                        : t("access.noRoleFolder")}
+                    {whole ? t("access.noRoleSpace") : t("access.noRoleFolder")}
                 </p>
             ) : (
                 <ul className="flex flex-col gap-1">

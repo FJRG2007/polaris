@@ -240,7 +240,9 @@ export function LimitsFields({
                                         type="time"
                                         value={value.hours.from}
                                         onChange={(event) =>
-                                            set({ hours: { ...value.hours, from: event.target.value } })
+                                            set({
+                                                hours: { ...value.hours, from: event.target.value }
+                                            })
                                         }
                                     />
                                 </Field>
@@ -250,7 +252,9 @@ export function LimitsFields({
                                         type="time"
                                         value={value.hours.to}
                                         onChange={(event) =>
-                                            set({ hours: { ...value.hours, to: event.target.value } })
+                                            set({
+                                                hours: { ...value.hours, to: event.target.value }
+                                            })
                                         }
                                     />
                                 </Field>
@@ -278,7 +282,10 @@ export function LimitsFields({
                 <div className="flex flex-col gap-2">
                     <label className="flex items-center justify-between gap-2 text-[13px] text-foreground">
                         <span className="flex min-w-0 items-center gap-2">
-                            <MapPin className="size-4 shrink-0 text-foreground-subtle" aria-hidden />
+                            <MapPin
+                                className="size-4 shrink-0 text-foreground-subtle"
+                                aria-hidden
+                            />
                             {t("share.nearbyLabel")}
                         </span>
                         <Switch
