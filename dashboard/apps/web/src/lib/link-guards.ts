@@ -35,8 +35,7 @@ export interface LinkLimits {
 
 /** Why a link cannot be used right now, or `ok`. */
 export type LinkUsability =
-    | { ok: true }
-    | { ok: false; reason: "revoked" | "expired" | "exhausted" | "scheduled" };
+    { ok: true } | { ok: false; reason: "revoked" | "expired" | "exhausted" | "scheduled" };
 
 /** Where a link's rules refused the caller, in the order they are checked. */
 export type LinkDenial =
@@ -242,7 +241,12 @@ export function peopleRuleChanges(rules: {
     schedule?: LinkSchedule | null;
     requireLogin?: boolean;
     allowedUsers?: readonly string[];
-}): { startsAt?: Date | null; linkSchedule?: string; requireLogin?: boolean; allowedUsers?: string } {
+}): {
+    startsAt?: Date | null;
+    linkSchedule?: string;
+    requireLogin?: boolean;
+    allowedUsers?: string;
+} {
     return {
         ...(rules.startsAt !== undefined ? { startsAt: rules.startsAt } : {}),
         ...(rules.schedule !== undefined

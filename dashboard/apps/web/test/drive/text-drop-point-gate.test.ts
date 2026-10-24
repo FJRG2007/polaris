@@ -61,9 +61,8 @@ vi.mock("@/lib/text-request-service", () => ({
     countTextSubmissions: async () => 0
 }));
 
-const { submitTextAction } = await import(
-    "../../src/app/(app)/drive/drop-points/text-request-actions"
-);
+const { submitTextAction } =
+    await import("../../src/app/(app)/drive/drop-points/text-request-actions");
 
 /** An open drop point with no restrictions on it. */
 const OPEN = {

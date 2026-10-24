@@ -28,8 +28,7 @@ import {
 } from "@/lib/notes/share-service";
 
 export type NoteShareGate =
-    | { ok: true; share: NoteShareRecord }
-    | { ok: false; status: number; reason: string };
+    { ok: true; share: NoteShareRecord } | { ok: false; status: number; reason: string };
 
 /** Why a gate refused, in words the visitor can act on and in their language. */
 export async function noteDenialMessage(reason: string): Promise<string> {

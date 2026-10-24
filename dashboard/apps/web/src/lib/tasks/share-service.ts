@@ -179,8 +179,7 @@ export interface PublicTaskView {
     }[];
     /** Present only when the sharer chose to include the discussion. */
     readonly comments:
-        | { readonly author: string; readonly body: string; readonly createdAt: string }[]
-        | null;
+        { readonly author: string; readonly body: string; readonly createdAt: string }[] | null;
     readonly createdAt: string;
     readonly updatedAt: string;
 }

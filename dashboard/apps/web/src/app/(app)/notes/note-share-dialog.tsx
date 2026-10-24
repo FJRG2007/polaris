@@ -113,7 +113,10 @@ export function NoteShareDialog({
                 allowedCidrs: share.allowedCidrs,
                 allowedCountries: share.allowedCountries,
                 allowedContinents: share.allowedContinents,
-                people: linkPeopleLimits({ ...EMPTY_LINK_ADVANCED, ...linkGuardFields(share.guards) })
+                people: linkPeopleLimits({
+                    ...EMPTY_LINK_ADVANCED,
+                    ...linkGuardFields(share.guards)
+                })
             },
             {
                 includeChildren,
@@ -233,7 +236,8 @@ export function NoteShareDialog({
                                 </Button>
                                 <Button
                                     disabled={busy || unchanged || linkHoursIncomplete(advanced)}
-                                    onClick={() => void save()}>
+                                    onClick={() => void save()}
+                                >
                                     {t("share.save")}
                                 </Button>
                             </div>

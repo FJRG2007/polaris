@@ -60,13 +60,7 @@ export default async function SharePage({
     await noteActivity(session?.session?.id);
 
     const share = await resolveShareByToken(token);
-    if (!share)
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("denied.notFound")}
-            />
-        );
+    if (!share) return <LinkUnavailable signedIn={signedIn} message={t("denied.notFound")} />;
 
     // Same check as the token routes so the landing never shows a listing the
     // download endpoints would refuse, then the fraud check.
@@ -80,12 +74,7 @@ export default async function SharePage({
         return <LinkUnavailable signedIn={signedIn} message={message} />;
     }
     if (!(await dymoIpAllowed(ip)).allowed) {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("denied.network")}
-            />
-        );
+        return <LinkUnavailable signedIn={signedIn} message={t("denied.network")} />;
     }
 
     if (share.passwordHash) {
@@ -124,12 +113,7 @@ export default async function SharePage({
         isFile = stat.kind === "file";
         if (isFile) fileSize = stat.size.toString();
     } catch {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("share.unreadable")}
-            />
-        );
+        return <LinkUnavailable signedIn={signedIn} message={t("share.unreadable")} />;
     } finally {
         await driver.dispose();
     }
@@ -137,7 +121,9 @@ export default async function SharePage({
     return (
         <PublicShell signedIn={signedIn} className="max-w-6xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("share.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("share.title")}
+                </h1>
                 {share.maxDownloads !== null ? (
                     <Badge variant="neutral">
                         {t("share.downloadsLeft", {

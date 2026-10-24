@@ -48,8 +48,12 @@ export default async function SharedPage() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("pages.sharedLinks.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("pages.sharedLinks.description")}</p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("pages.sharedLinks.title")}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                    {t("pages.sharedLinks.description")}
+                </p>
             </div>
             <SharedView shares={rows} />
         </div>

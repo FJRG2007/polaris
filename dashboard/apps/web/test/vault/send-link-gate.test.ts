@@ -117,7 +117,7 @@ describe("a Send's link", () => {
     });
 
     it("tells the /vs page outside its hours apart from a refused address", async () => {
-        const other = 1 << (new Date().getUTCDay() + 3) % 7;
+        const other = 1 << ((new Date().getUTCDay() + 3) % 7);
         findUnique.mockResolvedValueOnce(
             row({
                 linkSchedule: JSON.stringify({

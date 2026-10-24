@@ -160,7 +160,10 @@ export const noteFolderName = z
     .max(120)
     // The characters a folder cannot be named because a vault on disk cannot
     // name one that either, so a folder made here can always be written back out.
-    .refine((name) => !/[\\/:*?"<>|]/.test(name), "A folder name cannot contain \\ / : * ? \" < > |");
+    .refine(
+        (name) => !/[\\/:*?"<>|]/.test(name),
+        'A folder name cannot contain \\ / : * ? " < > |'
+    );
 
 export const noteFolderCreateSchema = z.object({
     name: noteFolderName,

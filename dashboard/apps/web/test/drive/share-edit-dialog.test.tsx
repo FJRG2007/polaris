@@ -22,9 +22,8 @@ vi.mock("@/app/(app)/mention-actions", () => ({
     searchAccountsAction: async () => ({ results: [] })
 }));
 
-const { EditShareDialog } = await import(
-    "../../src/app/(app)/drive/shared-links/shared-links-view"
-);
+const { EditShareDialog } =
+    await import("../../src/app/(app)/drive/shared-links/shared-links-view");
 type ShareRow = import("../../src/app/(app)/drive/shared-links/shared-links-view").ShareRow;
 
 afterEach(cleanup);

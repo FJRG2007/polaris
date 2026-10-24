@@ -296,7 +296,10 @@ export function ShareDialog({
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="mt-1 flex justify-end gap-2">
-                            <Button type="submit" disabled={pending || linkHoursIncomplete(advanced)}>
+                            <Button
+                                type="submit"
+                                disabled={pending || linkHoursIncomplete(advanced)}
+                            >
                                 <Link2 className="size-4" />
                                 {pending
                                     ? t("share.creating")

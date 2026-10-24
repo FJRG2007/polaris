@@ -456,11 +456,7 @@ export function judgeGrant(schedule: GrantSchedule, now: Date, fallbackZone = "U
  * 23:59 would shut every such grant for the final minute of each day.
  */
 function judgeDays(schedule: GrantSchedule, now: Date, fallbackZone: string): GrantVerdict {
-    return judgeWindow(
-        { ...schedule, startMinute: 0, endMinute: 0 },
-        now,
-        fallbackZone
-    );
+    return judgeWindow({ ...schedule, startMinute: 0, endMinute: 0 }, now, fallbackZone);
 }
 
 function judgeWindow(schedule: GrantSchedule, now: Date, fallbackZone: string): GrantVerdict {
