@@ -235,6 +235,9 @@ export interface EndSpecInput {
     readonly networks: string[];
     /** The UDP port published on the public end. */
     readonly listenPort?: number;
+    /** More files the helper writes beside the config, for a container that joins
+     *  the same namespace. Root-owned and readable by root only. */
+    readonly extraFiles?: readonly { name: string; content: string }[];
 }
 
 /**
@@ -247,14 +250,31 @@ export interface EndSpecInput {
 export function endSpec(input: EndSpecInput): ComposeSpec {
     const names = endNames(input.tunnelId, input.end);
     const volume = `${names.helper}-conf`;
+    const extras = input.extraFiles ?? [];
+    for (const file of extras)
+        if (!/^[a-z0-9][a-z0-9.-]{0,63}$/.test(file.name) || file.name === "config")
+            throw new Error("A tunnel file name is not a plain file name");
+    const extraEnv = Object.fromEntries(
+        extras.map((file, index) => [
+            `WG_FILE_${index}`,
+            Buffer.from(file.content, "utf8").toString("base64")
+        ])
+    );
+    const owned = ["config", ...extras.map((file) => file.name)]
+        .map((name) => `/etc/wireproxy/${name}`)
+        .join(" ");
     const script = [
         "set -e",
         'printf %s "$WG_CONFIG" | base64 -d > /etc/wireproxy/config',
         // The WireGuard image runs as the distroless nonroot user.
         "chown 65532:65532 /etc/wireproxy/config",
         "chmod 0400 /etc/wireproxy/config",
-        // The file holds a private key: it does not outlive the tunnel's containers.
-        "trap 'rm -f /etc/wireproxy/config; exit 0' TERM INT",
+        ...extras.flatMap((file, index) => [
+            `printf %s "$WG_FILE_${index}" | base64 -d > /etc/wireproxy/${file.name}`,
+            `chmod 0400 /etc/wireproxy/${file.name}`
+        ]),
+        // The files hold secrets: they do not outlive the tunnel's containers.
+        `trap 'rm -f ${owned}; exit 0' TERM INT`,
         "while :; do sleep 3600 & wait $!; done"
     ].join("; ");
     return {
@@ -264,7 +284,10 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
                 name: names.helper,
                 image: HELPER_IMAGE,
                 pullPolicy: "missing",
-                env: { WG_CONFIG: Buffer.from(input.config, "utf8").toString("base64") },
+                env: {
+                    WG_CONFIG: Buffer.from(input.config, "utf8").toString("base64"),
+                    ...extraEnv
+                },
                 ports: input.listenPort
                     ? [{ host: input.listenPort, container: input.listenPort, protocol: "udp" }]
                     : [],
