@@ -19,6 +19,7 @@ import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
 import { createPortal } from "react-dom";
+import { keepOwnScroll } from "@/lib/keep-own-scroll";
 import { suggestContactsAction } from "./actions";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
@@ -184,6 +185,7 @@ export function ContactSuggestionList({
     if (!showing || !place || typeof document === "undefined") return null;
     return createPortal(
         <ul
+            ref={keepOwnScroll}
             role="listbox"
             data-contact-suggestions=""
             style={{

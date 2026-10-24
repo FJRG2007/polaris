@@ -35,6 +35,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
 import {
     EMOJI_MENU_KEY,
+    mountPopup,
     POPUP_CLASS,
     POPUP_ITEM_CLASS,
     POPUP_LAYER_CLASS,
@@ -290,7 +291,7 @@ function emojiSuggestion(
                         editor: props.editor,
                         className: POPUP_LAYER_CLASS
                     });
-                    unmount = props.mount(renderer.element as HTMLElement);
+                    unmount = mountPopup(props.mount, renderer.element as HTMLElement);
                 },
                 onUpdate: (props) => renderer?.updateProps(props),
                 onKeyDown: (props) => {
