@@ -46,6 +46,12 @@ api:
     # closing: only a restart closes it, and a camera that caps its sessions
     # refuses a new one while the stalled one is held.
     - /api/restart
+    # Talking through a camera. Polaris pushes the speaker's voice here as a
+    # live A-law WAV into a stream of its own, and the camera's stream then
+    # plays that stream into the camera's speaker. Pushed rather than pulled
+    # because the relay often has no way back to Polaris: another network,
+    # another machine, or reached only through SSH.
+    - /api/stream
     - /api/frame.jpeg
     - /api/stream.mp4
     - /api/stream.m3u8
