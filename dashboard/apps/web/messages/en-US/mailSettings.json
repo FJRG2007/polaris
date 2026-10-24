@@ -251,7 +251,7 @@
         "trashKeep": "{days, plural, =0 {Until I empty it} other {After # days}}",
         "checkNow": "Check this mailbox now",
         "edit": "Edit this mailbox",
-        "share": "Let someone read this mailbox",
+        "share": "Share this mailbox",
         "remove": "Remove this mailbox",
         "removeTitle": "Remove {address}?",
         "removeBody": "Polaris stops checking it and deletes what it holds for it: the mail it cached, its filters, templates, signature, send-as addresses, drafts and what its spam filter learned. Nothing on the mail server is touched.{oauth, select, yes { Your connected account stays connected: it is on your profile and may be authorizing other things too.} other {}}",
@@ -267,7 +267,9 @@
             "never": "Waiting for its first check.",
             "recent": "Checked recently.",
             "connected": "Connected."
-        }
+        },
+        "delegateSendAs": "Delegates send as me",
+        "delegateSendAsHint": "People you share this mailbox with send as this address, with no trace of them. Off, recipients see who sent it on your behalf."
     },
     "rules": {
         "fields": {

@@ -24,6 +24,7 @@ import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepOAuth } from "@/lib/mcp/oauth/sweep";
 import { sweepRateLimits } from "@/lib/rate-limit-service";
 import { sweepDueSends } from "@/lib/mailbox/compose";
+import { pruneOrphanDelegateDrafts } from "@/lib/mailbox/delegate-act";
 import { pruneTelemetry } from "@/lib/telemetry/store";
 import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { appJobs } from "@/lib/app-extensions/registry";
@@ -470,6 +471,14 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         leaseMs: null,
         run: sweepOrphanUploads
+    },
+    {
+        key: "mail-delegate-drafts",
+        // What a delegate left unsent on a mailbox no longer lent to them,
+        // which nobody can reach any more. Nothing is waiting on this.
+        everyMs: HOUR,
+        leaseMs: null,
+        run: () => pruneOrphanDelegateDrafts()
     },
     {
         key: "chat-uploads",

@@ -596,6 +596,14 @@
             "edit": {
                 "label": "Puede editar",
                 "hint": "Cambiarlo y mantenerlo al día. No borrarlo."
+            },
+            "respond": {
+                "label": "Responder",
+                "hint": "Leer, responder y escribir desde esta dirección. No mover ni borrar."
+            },
+            "manage": {
+                "label": "Gestionar",
+                "hint": "Además marcar, archivar y borrar. No sus ajustes."
             }
         },
         "standings": {

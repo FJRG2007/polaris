@@ -299,6 +299,7 @@ function AccountRow({
     const [sharing, setSharing] = useState(false);
     const [unified, setUnified] = useState(account.unified);
     const [notify, setNotify] = useState(account.notify);
+    const [sendAs, setSendAs] = useState(account.delegateSendAs);
     const [trashDays, setTrashDays] = useState(account.trashKeepDays);
 
     const refused = account.state === "auth";
@@ -410,6 +411,34 @@ function AccountRow({
                         aria-label={t("accounts.notifyLabel")}
                     />
                     {t("accounts.notify")}
+                </label>
+
+                {/* How somebody this mailbox is lent to at Can reply or above
+                    sends: on its behalf (Sender names them) unless this is on. */}
+                <label
+                    className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground"
+                    title={t("accounts.delegateSendAsHint")}
+                >
+                    <Switch
+                        checked={sendAs}
+                        onChange={(next) => {
+                            setSendAs(next);
+                            startBusy(async () => {
+                                const answer = await editAccountAction(account.id, {
+                                    delegateSendAs: next
+                                });
+                                const said = refusalOf(answer);
+                                if (said) {
+                                    setSendAs(!next);
+                                    toast.show({ title: said });
+                                    return;
+                                }
+                                router.refresh();
+                            });
+                        }}
+                        aria-label={t("accounts.delegateSendAs")}
+                    />
+                    {t("accounts.delegateSendAs")}
                 </label>
 
                 {/* What every mail service does, said where the mailbox's own

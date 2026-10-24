@@ -93,7 +93,16 @@ import {
 } from "@polaris/ui";
 
 /** The capabilities this dialog has words for, as `share.capabilities.<id>`. */
-const CAPABILITIES = new Set(["guest", "member", "admin", "view", "control", "edit"]);
+const CAPABILITIES = new Set([
+    "guest",
+    "member",
+    "admin",
+    "view",
+    "control",
+    "edit",
+    "respond",
+    "manage"
+]);
 
 /** What a standing looks like beside a row. Only `live` is quiet. */
 const STANDING_TONE: Record<core.GrantStanding, "success" | "warning" | "neutral"> = {

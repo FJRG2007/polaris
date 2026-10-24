@@ -54,7 +54,9 @@ export async function recordSend(sent: RecordedSend): Promise<string | null> {
     const partial = sent.refused.length > 0;
     try {
         const row = await prisma.mailDelivery.upsert({
-            where: { accountId_messageId: { accountId: sent.accountId, messageId: sent.messageId } },
+            where: {
+                accountId_messageId: { accountId: sent.accountId, messageId: sent.messageId }
+            },
             create: {
                 accountId: sent.accountId,
                 messageId: sent.messageId,
@@ -127,25 +129,41 @@ async function ownerWords(userId: string) {
     return translatorFor(await getUserLocale(userId), "mail");
 }
 
+/** Who hears about a message that did not go as written: whoever wrote it -
+ *  somebody the mailbox is lent to, on the shared mailbox where their drafts
+ *  are, or else its holder, at `fallback`. */
+function writerOf(
+    account: { readonly userId: string },
+    accountId: string,
+    authorId: string | null,
+    fallback: string
+): { readonly userId: string; readonly href: string } {
+    return authorId
+        ? { userId: authorId, href: `/mail/shared/${accountId}` }
+        : { userId: account.userId, href: fallback };
+}
+
 /** Say that a message was refused for good, so nothing is waiting on it. */
 export async function announceUnsent(
     accountId: string,
     subject: string,
-    detail: string
+    detail: string,
+    authorId: string | null = null
 ): Promise<void> {
     const account = await prisma.mailAccount.findUnique({
         where: { id: accountId },
         select: { userId: true, address: true, orgId: true }
     });
     if (!account) return;
-    const t = await ownerWords(account.userId);
+    const writer = writerOf(account, accountId, authorId, "/mail/drafts");
+    const t = await ownerWords(writer.userId);
     await announce({
-        userId: account.userId,
+        userId: writer.userId,
         orgId: account.orgId,
         event: UNSENT_EVENT,
         title: t("notify.unsentTitle", { subject: subject || t("noSubject") }),
         body: t("notify.unsentBody", { detail: mailRefusalText(t, detail) }),
-        href: "/mail/drafts",
+        href: writer.href,
         metadata: { accountId }
     });
 }
@@ -161,21 +179,23 @@ export async function announceUnsent(
 export async function announcePartial(
     accountId: string,
     subject: string,
-    detail: string
+    detail: string,
+    authorId: string | null = null
 ): Promise<void> {
     const account = await prisma.mailAccount.findUnique({
         where: { id: accountId },
         select: { userId: true, address: true, orgId: true }
     });
     if (!account) return;
-    const t = await ownerWords(account.userId);
+    const writer = writerOf(account, accountId, authorId, "/mail");
+    const t = await ownerWords(writer.userId);
     await announce({
-        userId: account.userId,
+        userId: writer.userId,
         orgId: account.orgId,
         event: UNSENT_EVENT,
         title: t("notify.partialTitle", { subject: subject || t("noSubject") }),
         body: t("notify.partialBody", { detail: mailRefusalText(t, detail) }),
-        href: "/mail",
+        href: writer.href,
         metadata: { accountId }
     });
 }

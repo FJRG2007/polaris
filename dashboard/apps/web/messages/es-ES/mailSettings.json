@@ -251,7 +251,7 @@
         "trashKeep": "{days, plural, =0 {Hasta que la vacíe} other {Después de # días}}",
         "checkNow": "Revisar este buzón ahora",
         "edit": "Editar este buzón",
-        "share": "Dejar que alguien lea este buzón",
+        "share": "Compartir este buzón",
         "remove": "Quitar este buzón",
         "removeTitle": "¿Quitar {address}?",
         "removeBody": "Polaris deja de revisarlo y elimina lo que guarda de él: el correo en caché, sus filtros, plantillas, firma, direcciones para enviar como, borradores y lo que aprendió su filtro de spam. No se toca nada en el servidor de correo.{oauth, select, yes { Tu cuenta conectada sigue conectada: está en tu perfil y puede estar autorizando otras cosas.} other {}}",
@@ -267,7 +267,9 @@
             "never": "Esperando su primera revisión.",
             "recent": "Revisado hace poco.",
             "connected": "Conectado."
-        }
+        },
+        "delegateSendAs": "Delegados envían como yo",
+        "delegateSendAsHint": "Quien tenga este buzón compartido envía como esta dirección, sin rastro suyo. Desactivado, se ve quién lo envió en tu nombre."
     },
     "rules": {
         "fields": {

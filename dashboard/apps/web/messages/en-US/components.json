@@ -596,6 +596,14 @@
             "edit": {
                 "label": "Can change",
                 "hint": "Change it and keep it up to date. Not delete it."
+            },
+            "respond": {
+                "label": "Can reply",
+                "hint": "Read, reply and write from this address. Not move or delete."
+            },
+            "manage": {
+                "label": "Can manage",
+                "hint": "Also mark, archive and delete. Not its settings."
             }
         },
         "standings": {

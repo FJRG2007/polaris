@@ -247,10 +247,14 @@ export const GRANT_CAPABILITIES = {
     // covered; ones moved to another place are not. Its settings, its people
     // and connecting things to it stay with the people who run the house.
     "place.place": ["view", "control"],
-    // A mailbox, lent by the person who linked it: its inbox and its messages,
-    // read as Polaris already holds them. Never sending, replying, moving or
-    // marking anything - sending on somebody's behalf is another trust entirely.
-    "mail.mailbox": ["view"]
+    // A mailbox, lent by the person who linked it - delegation as Gmail and
+    // Outlook have it. `view` reads its inbox as Polaris already holds it;
+    // `respond` also replies and writes from its address, through its own
+    // outgoing server, with the delegate named as the Sender unless its holder
+    // chose "send as"; `manage` also marks, archives, files as junk and deletes.
+    // Its settings, rules, password and who else it is shared with stay with
+    // the person who linked it.
+    "mail.mailbox": ["view", "respond", "manage"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];

@@ -29,6 +29,8 @@ import { readUpload, attachUploads } from "./uploads";
 import { addressesFrom, asJson, stringsFrom } from "./json";
 import { withImap, type MailConnectionSource } from "./imap";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount } from "./access";
+import { delegateSender } from "./delegate";
+import { recordGrantUse } from "@/lib/access/grants";
 import { composeMime, sendMime, MailRejectedError, type OutgoingMessage } from "./send";
 import {
     announcePartial,
@@ -69,7 +71,14 @@ export interface ComposeInput {
  * clients that do it are complained about for. It is written when the composer
  * closes.
  */
-export async function saveDraft(userId: string, input: ComposeInput): Promise<string> {
+export async function saveDraft(
+    userId: string,
+    input: ComposeInput,
+    /** Somebody the mailbox is lent to, writing from it; null is its holder.
+     *  `userId` is the holder either way - see `delegate-act`, the only
+     *  caller that passes one, after asking the grant. */
+    authorId: string | null = null
+): Promise<string> {
     await ownedAccount(userId, input.accountId);
     // The address it goes from belongs to the mailbox it goes through: an
     // identity of another mailbox would put one address on the From line of a
@@ -85,6 +94,7 @@ export async function saveDraft(userId: string, input: ComposeInput): Promise<st
 
     const data = {
         accountId: input.accountId,
+        authorId,
         identityId: input.identityId,
         toJson: asJson(input.to),
         ccJson: asJson(input.cc),
@@ -108,7 +118,7 @@ export async function saveDraft(userId: string, input: ComposeInput): Promise<st
 
     const draft = input.draftId
         ? await prisma.mailDraft.update({
-              where: { id: await ownedDraftId(userId, input.draftId) },
+              where: { id: await ownedDraftId(userId, input.draftId, authorId) },
               data,
               select: { id: true }
           })
@@ -127,20 +137,21 @@ export async function saveDraft(userId: string, input: ComposeInput): Promise<st
  */
 export async function queueSend(
     userId: string,
-    input: ComposeInput
+    input: ComposeInput,
+    authorId: string | null = null
 ): Promise<{ draftId: string; sendAt: Date }> {
-    const draftId = await saveDraft(userId, input);
+    const draftId = await saveDraft(userId, input, authorId);
     // A message somebody scheduled goes when they said. Everything else waits
     // out the reader's own undo window - see `mail-prefs`, where zero means Send
     // is final and is a choice somebody has to make rather than the default.
-    const held = await readMailPreferences(userId);
+    const held = await readMailPreferences(authorId ?? userId);
     const sendAt = input.sendAt ?? new Date(Date.now() + held.undoSeconds * 1_000);
     await prisma.mailDraft.update({
         where: { id: draftId },
         data: { state: "queued", sendAt, attempts: 0, failure: "", permanent: false }
     });
     scheduleQueued(draftId, sendAt);
-    publishMail({ accountId: input.accountId, kind: "sending", actorId: userId });
+    publishMail({ accountId: input.accountId, kind: "sending", actorId: authorId ?? userId });
     return { draftId, sendAt };
 }
 
@@ -152,8 +163,12 @@ export async function queueSend(
  * reaches zero for exactly this reason, and this refuses anyway, because the
  * screen's clock and this one's are not the same clock.
  */
-export async function cancelSend(userId: string, draftId: string): Promise<boolean> {
-    const id = await ownedDraftId(userId, draftId);
+export async function cancelSend(
+    userId: string,
+    draftId: string,
+    authorId: string | null = null
+): Promise<boolean> {
+    const id = await ownedDraftId(userId, draftId, authorId);
     const undone = await prisma.mailDraft.updateMany({
         where: { id, state: "queued" },
         data: { state: "draft", sendAt: null }
@@ -169,8 +184,12 @@ export async function cancelSend(userId: string, draftId: string): Promise<boole
  * wait runs out. Only possible while it is still queued - a message already on
  * its way has nothing left to skip.
  */
-export async function sendNow(userId: string, draftId: string): Promise<boolean> {
-    const id = await ownedDraftId(userId, draftId);
+export async function sendNow(
+    userId: string,
+    draftId: string,
+    authorId: string | null = null
+): Promise<boolean> {
+    const id = await ownedDraftId(userId, draftId, authorId);
     const now = new Date();
     const moved = await prisma.mailDraft.updateMany({
         where: { id, state: "queued" },
@@ -181,10 +200,15 @@ export async function sendNow(userId: string, draftId: string): Promise<boolean>
     return true;
 }
 
-/** The draft, if it is on one of this person's mailboxes. */
-async function ownedDraftId(userId: string, draftId: string): Promise<string> {
+/** The draft, if it is on one of this person's mailboxes and was written by
+ *  `authorId` - null being the holder, so neither side reaches the other's. */
+async function ownedDraftId(
+    userId: string,
+    draftId: string,
+    authorId: string | null = null
+): Promise<string> {
     const draft = await prisma.mailDraft.findFirst({
-        where: { id: draftId, account: { userId } },
+        where: { id: draftId, account: { userId }, authorId },
         select: { id: true }
     });
     if (!draft) throw new MailAccessError("That draft is not yours.");
@@ -277,6 +301,55 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
     });
     if (!account) return false;
 
+    // Written by somebody the mailbox is lent to: the grant is asked again now,
+    // not when they pressed Send, so taking it back stops a message still
+    // waiting out its undo window or its scheduled hour.
+    let delegate: Awaited<ReturnType<typeof delegateSender>> = null;
+    try {
+        delegate = draft.authorId ? await delegateSender(draft.authorId, account.id) : null;
+    } catch (caught) {
+        console.warn("polaris: could not check a delegated send's grant:", caught);
+        await prisma.mailDraft.update({
+            where: { id: draft.id },
+            data: {
+                state: "failed",
+                failure:
+                    "Not sent yet. Polaris could not check this mailbox is still shared, and will try again.",
+                permanent: false
+            }
+        });
+        publishMail({
+            accountId: account.id,
+            kind: "sending",
+            actorId: draft.authorId ?? account.userId
+        });
+        return false;
+    }
+    if (draft.authorId && !delegate) {
+        await prisma.mailDraft.update({
+            where: { id: draft.id },
+            data: {
+                state: "failed",
+                failure: "Not sent. This mailbox is no longer shared with you.",
+                permanent: true,
+                sendAt: null
+            }
+        });
+        await recordGrantUse({
+            grantId: null,
+            subjectType: "mail.mailbox",
+            subjectId: account.id,
+            targetType: "mail.draft",
+            targetId: draft.id,
+            userId: draft.authorId,
+            action: "send",
+            outcome: "refused",
+            reason: "no longer shared"
+        });
+        publishMail({ accountId: account.id, kind: "sending", actorId: draft.authorId });
+        return false;
+    }
+
     /**
      * Whether the outgoing server has taken the message.
      *
@@ -288,10 +361,27 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
     let gone = false;
     let sentCopy: { readonly messageId: string; readonly copy: MailSentCopy } | null = null;
     try {
-        const message = await outgoingFromDraft(draft, account, { signature: true });
+        const written = await outgoingFromDraft(draft, account, { signature: true });
+        // On the holder's behalf unless they chose otherwise: From stays their
+        // address, Sender names who wrote it, and the envelope and the outgoing
+        // server are the mailbox's own either way.
+        const message =
+            delegate && !account.delegateSendAs ? { ...written, sender: delegate.sender } : written;
         const composed = await composeMime(message);
         const outcome = await sendMime(account, message, composed.mime);
         gone = true;
+        if (delegate && draft.authorId) {
+            await recordGrantUse({
+                grantId: delegate.grantId,
+                subjectType: "mail.mailbox",
+                subjectId: account.id,
+                targetType: "mail.message",
+                targetId: composed.messageId,
+                userId: draft.authorId,
+                action: account.delegateSendAs ? "send as" : "send on behalf",
+                outcome: "done"
+            });
+        }
         // Written before anything else that can fail, because from here on the
         // message exists in the world and this row is the only thing that knows
         // it - including for the report that may come back about it days later.
@@ -315,7 +405,8 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             await announcePartial(
                 account.id,
                 draft.subject,
-                core.partialSendSentence(outcome.refused)
+                core.partialSendSentence(outcome.refused),
+                draft.authorId
             ).catch(() => undefined);
         }
         await rememberContacts(account.id, "sent", {
@@ -383,7 +474,9 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             data: { state: "failed", failure, permanent, ...(permanent ? { sendAt: null } : {}) }
         });
         if (permanent) {
-            await announceUnsent(account.id, draft.subject, failure).catch(() => undefined);
+            await announceUnsent(account.id, draft.subject, failure, draft.authorId).catch(
+                () => undefined
+            );
         }
         publishMail({ accountId: draft.accountId, kind: "sending", actorId: account.userId });
         return false;
@@ -399,8 +492,12 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
  * the same lock `deliverQueued` uses, for the same reason: this is the button
  * whose bug is sending somebody's message twice.
  */
-export async function retrySend(userId: string, draftId: string): Promise<boolean> {
-    const id = await ownedDraftId(userId, draftId);
+export async function retrySend(
+    userId: string,
+    draftId: string,
+    authorId: string | null = null
+): Promise<boolean> {
+    const id = await ownedDraftId(userId, draftId, authorId);
     const now = new Date();
     const moved = await prisma.mailDraft.updateMany({
         where: { id, state: "failed" },
@@ -418,6 +515,7 @@ export async function retrySend(userId: string, draftId: string): Promise<boolea
 export const DRAFT_COLUMNS = {
     id: true,
     accountId: true,
+    authorId: true,
     attempts: true,
     probe: true,
     subject: true,
@@ -602,7 +700,9 @@ async function fileInSent(
  */
 export async function fileDraftOnServer(userId: string, draftId: string): Promise<void> {
     const draft = await prisma.mailDraft.findFirst({
-        where: { id: draftId, account: { userId }, state: "draft" },
+        // The holder's own drafts only: a delegate's half-written message is
+        // theirs, and is not put in the holder's Drafts folder for them to find.
+        where: { id: draftId, account: { userId }, authorId: null, state: "draft" },
         select: DRAFT_COLUMNS
     });
     if (!draft) return;
@@ -808,7 +908,9 @@ export async function listDrafts(userId: string): Promise<MailDraftView[]> {
         // The sending check's own message is Polaris writing to itself. It is
         // reported on its own screen and has no business appearing in somebody's
         // drafts as a message they half wrote.
-        where: { account: { userId }, probe: false },
+        // A delegate writing from one of these mailboxes keeps their drafts to
+        // themselves: they are listed on the shared mailbox, never here.
+        where: { account: { userId }, authorId: null, probe: false },
         orderBy: { updatedAt: "desc" },
         take: 200
     });
@@ -833,9 +935,13 @@ export async function listDrafts(userId: string): Promise<MailDraftView[]> {
 
 /** Throw one away. Nothing was ever sent, so there is nothing to take back -
  *  except its copy in the server's Drafts folder, which goes with it. */
-export async function discardDraft(userId: string, draftId: string): Promise<void> {
+export async function discardDraft(
+    userId: string,
+    draftId: string,
+    authorId: string | null = null
+): Promise<void> {
     const draft = await prisma.mailDraft.findFirst({
-        where: { id: draftId, account: { userId } },
+        where: { id: draftId, account: { userId }, authorId },
         select: { id: true, account: { select: ACCOUNT_COLUMNS } }
     });
     if (!draft) return;

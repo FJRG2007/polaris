@@ -3,10 +3,8 @@
         "title": "Buzones compartidos contigo",
         "back": "Volver a Correo",
         "none": "Nadie ha compartido un buzón contigo.",
-        "readOnly": "Solo lectura",
         "sharedWithYou": "Compartido contigo",
         "allShared": "Todos los compartidos",
-        "note": "Puedes leer este buzón. Responder, enviar y cambiarlo quedan para su dueño.",
         "inbox": "Entrada",
         "empty": "Aún no hay mensajes aquí.",
         "unknownSender": "Sin remitente",
@@ -19,7 +17,57 @@
         "cc": "Cc",
         "date": "Fecha",
         "bodyPending": "De momento solo se ha descargado la vista previa.",
-        "pick": "Elige un mensaje para leerlo."
+        "pick": "Elige un mensaje para leerlo.",
+        "level": {
+            "view": "Puede ver",
+            "respond": "Responder",
+            "manage": "Gestionar"
+        },
+        "levelNote": {
+            "view": "Puedes leer esta bandeja. Responder, enviar y cambiarla queda en manos de su dueño.",
+            "respond": "Puedes leer esta bandeja y escribir desde su dirección. Mover y borrar queda en manos de su dueño.",
+            "manage": "Puedes leer, escribir desde esta dirección, marcar, archivar y borrar. Los ajustes son de su dueño."
+        },
+        "needsRespond": "Requiere Responder: pídelo al dueño",
+        "needsManage": "Requiere Gestionar: pídelo al dueño",
+        "write": "Escribir",
+        "compose": "Mensaje nuevo",
+        "fromOnBehalf": "Desde {address}, enviado por ti en su nombre",
+        "fromAs": "Desde {address}, como su dueño",
+        "toPlaceholder": "Direcciones, separadas por comas",
+        "subject": "Asunto",
+        "body": "Mensaje",
+        "send": "Enviar",
+        "cancel": "Cancelar",
+        "queued": "Enviando",
+        "undo": "Deshacer",
+        "tooLate": "Ya se envió",
+        "retry": "Reintentar",
+        "edit": "Editar",
+        "discard": "Descartar",
+        "unsent": "Tus mensajes sin enviar",
+        "state": {
+            "draft": "Borrador",
+            "queued": "En espera",
+            "sending": "Enviando",
+            "failed": "No enviado"
+        },
+        "actions": "Acciones",
+        "reply": "Responder",
+        "markRead": "Marcar leído",
+        "markUnread": "No leído",
+        "star": "Destacar",
+        "unstar": "No destacar",
+        "starred": "Destacado",
+        "archive": "Archivar",
+        "junk": "Spam",
+        "trash": "Borrar",
+        "errors": {
+            "notAllowed": "Este buzón no se ha compartido contigo para eso. Pídeselo a su dueño.",
+            "failed": "No ha funcionado. Inténtalo de nuevo.",
+            "input": "Revisa el mensaje e inténtalo de nuevo.",
+            "to": "Añade al menos una dirección válida."
+        }
     },
     "labels": {
         "signatureAuto": {
@@ -188,7 +236,9 @@
         "labelNotYours": "Esa etiqueta no es tuya.",
         "forwardLoop": "Esa dirección es un buzón de aquí. Reenviar a ella crearía un bucle.",
         "forwardUnverified": "Reenvía solo a una dirección que hayas verificado en tu cuenta.",
-        "filtersFull": "Este buzón ya tiene todos los filtros que puede tener."
+        "filtersFull": "Este buzón ya tiene todos los filtros que puede tener.",
+        "noLongerShared": "No enviado. Este buzón ya no se comparte contigo.",
+        "shareUnchecked": "Todavía no se ha enviado. Polaris no pudo comprobar que este buzón se sigue compartiendo y lo volverá a intentar."
     },
     "schema": {
         "matchOn": "Añade algo con lo que coincidir",

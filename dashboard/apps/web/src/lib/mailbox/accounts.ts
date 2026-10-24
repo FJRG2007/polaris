@@ -68,6 +68,9 @@ export interface MailAccountView {
     /** How long the trash keeps what was thrown away, in days. Zero is until
      *  somebody empties it. */
     readonly trashKeepDays: number;
+    /** Whether a delegate who may reply sends as this address rather than on
+     *  its behalf - see `MailAccount.delegateSendAs`. */
+    readonly delegateSendAs: boolean;
     readonly vacationEnabled: boolean;
     readonly pollSeconds: number;
     readonly position: number;
@@ -109,6 +112,7 @@ export function accountView(row: AccountRow): MailAccountView {
         securityKeepMinutes: row.securityKeepMinutes,
         spamFilter: row.spamFilter,
         trashKeepDays: row.trashKeepDays,
+        delegateSendAs: row.delegateSendAs,
         vacationEnabled: row.vacationEnabled,
         pollSeconds: row.pollSeconds,
         position: row.position

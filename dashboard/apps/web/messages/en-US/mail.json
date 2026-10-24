@@ -3,10 +3,8 @@
         "title": "Mailboxes shared with you",
         "back": "Back to Mail",
         "none": "Nobody has shared a mailbox with you.",
-        "readOnly": "Read only",
         "sharedWithYou": "Shared with you",
         "allShared": "All shared mailboxes",
-        "note": "You can read this mailbox. Replying, sending and changing it stay with its owner.",
         "inbox": "Inbox",
         "empty": "No messages in this inbox yet.",
         "unknownSender": "Unknown sender",
@@ -19,7 +17,57 @@
         "cc": "Cc",
         "date": "Date",
         "bodyPending": "Only the preview has been downloaded so far.",
-        "pick": "Pick a message to read it."
+        "pick": "Pick a message to read it.",
+        "level": {
+            "view": "Can see",
+            "respond": "Can reply",
+            "manage": "Can manage"
+        },
+        "levelNote": {
+            "view": "You can read this inbox. Replying, sending and changing it stay with its owner.",
+            "respond": "You can read this inbox and write from its address. Moving and deleting stay with its owner.",
+            "manage": "You can read, write from this address, mark, archive and delete. Settings stay with its owner."
+        },
+        "needsRespond": "Needs Can reply - ask the owner",
+        "needsManage": "Needs Can manage - ask the owner",
+        "write": "Write",
+        "compose": "New message",
+        "fromOnBehalf": "From {address}, sent by you on its behalf",
+        "fromAs": "From {address}, as the owner",
+        "toPlaceholder": "Addresses, separated by commas",
+        "subject": "Subject",
+        "body": "Message",
+        "send": "Send",
+        "cancel": "Cancel",
+        "queued": "Sending",
+        "undo": "Undo send",
+        "tooLate": "Already sent",
+        "retry": "Try again",
+        "edit": "Edit",
+        "discard": "Discard",
+        "unsent": "Your unsent messages",
+        "state": {
+            "draft": "Draft",
+            "queued": "Waiting",
+            "sending": "Sending",
+            "failed": "Not sent"
+        },
+        "actions": "Message actions",
+        "reply": "Reply to sender",
+        "markRead": "Mark read",
+        "markUnread": "Mark unread",
+        "star": "Add star",
+        "unstar": "Remove star",
+        "starred": "Starred",
+        "archive": "Archive",
+        "junk": "Junk",
+        "trash": "Delete",
+        "errors": {
+            "notAllowed": "This mailbox is not shared with you for that. Ask its owner.",
+            "failed": "That did not work. Try again.",
+            "input": "Check the message and try again.",
+            "to": "Add at least one valid address."
+        }
     },
     "labels": {
         "signatureAuto": {
@@ -188,7 +236,9 @@
         "labelNotYours": "That label is not one of yours.",
         "forwardLoop": "That address is a mailbox here. Forwarding to it would loop.",
         "forwardUnverified": "Forward only to an address you have verified on your account.",
-        "filtersFull": "This mailbox has as many filters as it can hold."
+        "filtersFull": "This mailbox has as many filters as it can hold.",
+        "noLongerShared": "Not sent. This mailbox is no longer shared with you.",
+        "shareUnchecked": "Not sent yet. Polaris could not check this mailbox is still shared, and will try again."
     },
     "schema": {
         "matchOn": "Add something to match on",
