@@ -53,7 +53,7 @@
         "personal": "Solo yo",
         "submit": "Crear",
         "cancel": "Cancelar",
-        "untitled": "Automatización sin nombre"
+        "untitled": "Nueva automatización"
     },
     "editor": {
         "back": "Automatizaciones",
@@ -108,8 +108,8 @@
         "references": "Usa {example} para insertar un valor del disparo o de un paso anterior.",
         "onErrorPort": "Camino de error",
         "tryThen": "Los pasos tras el Intentar siguen cuando los de dentro salen bien.",
-        "rename": "Cambiar nombre de la automatización",
-        "renameSave": "Guardar nombre"
+        "rename": "Cambiar nombre",
+        "renameSave": "Guardar"
     },
     "nodes": {
         "manual": "A mano",
@@ -891,8 +891,8 @@
     "picker": {
         "firstTitle": "Empieza con un disparador",
         "firstHint": "Elige qué pone en marcha esta automatización: una hora, un webhook, algo de Polaris o un dispositivo de Lugares.",
-        "firstAction": "Añadir el primer paso",
-        "byTarget": "Por elemento",
+        "firstAction": "Añadir primer paso",
+        "byTarget": "Por objeto",
         "byType": "Por app",
         "blocks": "Bloques",
         "back": "Atrás",
@@ -902,7 +902,7 @@
         "groups": {
             "basics": "Básicos",
             "polaris": "Polaris",
-            "automations": "Automatizaciones",
+            "automations": "Flujos",
             "places": "Lugares",
             "logic": "Lógica",
             "timing": "Tiempo",
@@ -912,10 +912,10 @@
         "presets": {
             "publicIpChanged": "Cambió la IP pública",
             "nasOffline": "El NAS se desconectó",
-            "nasDiskUnhealthy": "Disco del NAS con problemas",
-            "nasDiskTemperature": "Disco del NAS demasiado caliente",
-            "nasPoolUsage": "El almacenamiento del NAS se llena",
-            "nasPoolUnprotected": "Almacenamiento del NAS sin protección",
+            "nasDiskUnhealthy": "Disco del NAS dañado",
+            "nasDiskTemperature": "Disco del NAS caliente",
+            "nasPoolUsage": "Volumen NAS casi lleno",
+            "nasPoolUnprotected": "Volumen NAS sin protección",
             "nasBackupFailed": "Falló la copia del NAS",
             "nasBackupOverdue": "Copia del NAS atrasada",
             "automationFinished": "Terminó otra automatización"
