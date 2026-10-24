@@ -1632,7 +1632,7 @@
         "to": "Hasta",
         "hoursHint": "A cualquier hora si ambas están vacías. Horas en {zone}.",
         "hoursIncomplete": "Indica una hora de inicio y otra de fin distinta, o deja ambas vacías.",
-        "requireLogin": "Exigir inicio de sesión",
+        "requireLogin": "Pedir cuenta",
         "requireLoginHint": "Solo personas con cuenta aquí. Desactivado: cualquiera con el enlace.",
         "people": "Solo estas personas",
         "peoplePlaceholder": "Usuario o correo, separados por comas",

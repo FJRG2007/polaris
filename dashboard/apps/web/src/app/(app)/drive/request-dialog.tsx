@@ -17,6 +17,8 @@ import { Check, Copy, Inbox } from "lucide-react";
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
+    linkHoursIncomplete,
+    linkSchedule,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { AccountInput } from "@/components/account-input";
@@ -250,6 +252,7 @@ export function RequestDialog({
             allowedContinents: advanced.allowedContinents,
             allowedUsers,
             startsAt: startsRaw ? new Date(startsRaw).toISOString() : undefined,
+            schedule: linkSchedule(advanced),
             allowUploaderDelete: form.get("allowUploaderDelete") === "on",
             allowOverwrite: form.get("allowOverwrite") === "on",
             uploaderDeleteWindowSeconds:
@@ -499,17 +502,23 @@ export function RequestDialog({
                                     {t("form.usersHint")}
                                 </span>
                             </label>
+                            {/* Expiry, start, sign-in and people have their own fields
+                                in this dialog, and the file cap is the drop point's own
+                                limit on uses, so the shared section leaves them out. */}
                             <LinkAdvancedFields
                                 value={advanced}
                                 onChange={setAdvanced}
-                                omit={["expiry", "uses"]}
+                                omit={["expiry", "uses", "starts", "signin", "people"]}
                                 idPrefix="drop-point"
                             />
                         </Section>
 
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="mt-1 flex justify-end gap-2">
-                            <Button type="submit" disabled={pending}>
+                            <Button
+                                type="submit"
+                                disabled={pending || linkHoursIncomplete(advanced)}
+                            >
                                 <Inbox className="size-4" />
                                 {pending ? t("create.creating") : t("create.submit")}
                             </Button>

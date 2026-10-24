@@ -15,17 +15,21 @@ import { getDriverForConnection } from "@/lib/storage-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
-import { normalizeRelPath, randomDropPointName, userAllowedForRequest } from "@polaris/core";
+import { normalizeRelPath, randomDropPointName } from "@polaris/core";
 import {
-    linkIpAllowed,
+    checkLink,
     linkUsability,
     parseStringList,
+    sessionLinkViewer,
     signMarker,
     signUnlock,
     unlockCookieName,
     verifyMarker,
     verifyUnlock,
-    type LinkUsability
+    type LinkCheck,
+    type LinkSchedule,
+    type LinkUsability,
+    type LinkViewerSource
 } from "@/lib/link-guards";
 
 /** The unlock-cookie namespace drop points are signed under. */
@@ -65,6 +69,7 @@ export async function createFileRequest(
             allowedContinents: JSON.stringify(input.allowedContinents),
             allowedUsers: JSON.stringify(input.allowedUsers),
             startsAt: input.startsAt ?? null,
+            linkSchedule: input.schedule ? JSON.stringify(input.schedule) : "",
             allowUploaderDelete: input.allowUploaderDelete,
             allowOverwrite: input.allowOverwrite,
             uploaderDeleteWindowSeconds: input.uploaderDeleteWindowSeconds ?? null,
@@ -98,6 +103,7 @@ export async function getFileRequestForOwner(ownerId: string, requestId: string)
             allowedContinents: true,
             allowedUsers: true,
             startsAt: true,
+            linkSchedule: true,
             allowUploaderDelete: true,
             allowOverwrite: true,
             uploaderDeleteWindowSeconds: true,
@@ -150,6 +156,8 @@ export interface UpdateFileRequestInput {
     allowedUsers?: string[];
     /** New start time, `null` to clear it, or `undefined` to keep it. */
     startsAt?: Date | null;
+    /** New weekly window, `null` for any time, or `undefined` to keep it. */
+    schedule?: LinkSchedule | null;
     allowUploaderDelete?: boolean;
     allowOverwrite?: boolean;
     /** New window (seconds), `null` to clear it, or `undefined` to keep it. */
@@ -188,6 +196,9 @@ export async function updateFileRequest(
         data.allowedContinents = JSON.stringify(input.allowedContinents);
     if (input.allowedUsers !== undefined) data.allowedUsers = JSON.stringify(input.allowedUsers);
     if (input.startsAt !== undefined) data.startsAt = input.startsAt;
+    if (input.schedule !== undefined) {
+        data.linkSchedule = input.schedule ? JSON.stringify(input.schedule) : "";
+    }
     if (input.allowUploaderDelete !== undefined)
         data.allowUploaderDelete = input.allowUploaderDelete;
     if (input.allowOverwrite !== undefined) data.allowOverwrite = input.allowOverwrite;
@@ -283,6 +294,7 @@ export async function resolveFileRequestByToken(token: string) {
             allowedContinents: true,
             allowedUsers: true,
             startsAt: true,
+            linkSchedule: true,
             allowUploaderDelete: true,
             allowOverwrite: true,
             uploaderDeleteWindowSeconds: true,
@@ -314,31 +326,41 @@ export function fileRequestUsability(request: {
 }
 
 /**
- * Whether a client IP is permitted by a request's IP/CIDR allowlist. An empty or
- * unparseable list means no restriction. Enforced before any upload is accepted.
+ * The one link check a drop point's page and upload route run: open, started,
+ * unexpired, inside its weekly hours, from an accepted address and region, and
+ * for the account it needs. The PIN is its own gate, and the file cap is counted
+ * against the submissions table, so neither is part of this.
  */
-export function fileRequestIpAllowed(allowedCidrsJson: string, ip: string | undefined): boolean {
-    return linkIpAllowed(allowedCidrsJson, ip);
-}
-
-/**
- * Whether a signed-in uploader passes a drop point's per-user allowlist. An empty
- * list is open to anyone; otherwise the caller must be signed in and their email
- * or username must appear in the list. Enforced before any upload is accepted.
- */
-export async function fileRequestUserAllowed(
-    allowedUsersJson: string,
-    userId: string | null
-): Promise<boolean> {
-    const allowed = parseStringArray(allowedUsersJson);
-    if (allowed.length === 0) return true;
-    if (!userId) return false;
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { email: true, username: true }
-    });
-    if (!user) return false;
-    return userAllowedForRequest(user, allowed);
+export async function fileRequestGate(
+    request: NonNullable<FileRequestRecord>,
+    ip: string | undefined,
+    now: Date = new Date(),
+    viewer: LinkViewerSource = sessionLinkViewer
+): Promise<LinkCheck> {
+    return checkLink(
+        {
+            limits: {
+                revokedAt: request.revokedAt,
+                expiresAt: request.expiresAt,
+                startsAt: request.startsAt,
+                maxUses: null,
+                useCount: 0
+            },
+            rules: {
+                allowedCidrs: request.allowedCidrs,
+                allowedCountries: request.allowedCountries,
+                allowedContinents: request.allowedContinents
+            },
+            guards: {
+                requireLogin: request.requireLogin,
+                allowedUsers: request.allowedUsers,
+                linkSchedule: request.linkSchedule
+            }
+        },
+        ip,
+        now,
+        viewer
+    );
 }
 
 /** Constant-time PIN/password check. No password set means always open. */

@@ -30,7 +30,16 @@ vi.mock("next/headers", () => ({
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_AUTH_SECRET: "s" }) }));
 vi.mock("@/lib/session", () => ({ getSession: session }));
 vi.mock("@/lib/dymo-service", () => ({ dymoIpAllowed: dymo }));
-vi.mock("@/lib/link-guards", () => ({ linkAddressDenial: addressDenial }));
+// The gate now asks the shared link check for liveness and the address rules
+// at once; this stand-in answers from the same two knobs the cases turn.
+vi.mock("@/lib/link-guards", () => ({
+    checkLink: async () => {
+        const live = usability();
+        if (!live.ok) return live;
+        const denial = await addressDenial();
+        return denial ? { ok: false, reason: denial } : { ok: true };
+    }
+}));
 vi.mock("@/lib/request-context", () => ({
     clientIp: async () => "1.2.3.4",
     clientUserAgent: async () => "agent",

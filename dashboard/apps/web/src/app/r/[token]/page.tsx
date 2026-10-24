@@ -3,7 +3,8 @@
  * the owner's chosen folder; the token is the credential. Gates are enforced
  * server-side on each upload (see the upload route); this page mirrors the
  * relevant ones for a clear experience - it refuses when the request is
- * unavailable or blocked for this network, and asks for sign-in when required.
+ * unavailable, outside its hours or blocked for this network or region, and
+ * asks for sign-in when required.
  */
 
 import Link from "next/link";
@@ -24,10 +25,8 @@ import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
 import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import {
-    fileRequestIpAllowed,
+    fileRequestGate,
     fileRequestUnlockCookie,
-    fileRequestUsability,
-    fileRequestUserAllowed,
     parseStringArray,
     resolveFileRequestByToken,
     verifyFileRequestUnlock
@@ -50,37 +49,86 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
             />
         );
 
-    const usable = fileRequestUsability(request);
-    if (!usable.ok) {
-        if (usable.reason === "scheduled") {
-            return (
-                <LinkUnavailable
-                    title={t("dropPoint.notOpenTitle")}
-                    message={
-                        request.startsAt
-                            ? t("dropPoint.opensOn", { date: format.dateTime(request.startsAt) })
-                            : t("dropPoint.opensLater")
-                    }
-                />
-            );
+    // One check for everything but the PIN: open, started, unexpired, inside its
+    // hours, from an allowed address and region, and for the account it needs.
+    // The account comes before the PIN, so nobody types a PIN only to be told
+    // the drop point is not for them.
+    const gate = await fileRequestGate(request, await clientIp());
+    if (!gate.ok) {
+        switch (gate.reason) {
+            case "scheduled":
+                return (
+                    <LinkUnavailable
+                        title={t("dropPoint.notOpenTitle")}
+                        message={
+                            request.startsAt
+                                ? t("dropPoint.opensOn", {
+                                      date: format.dateTime(request.startsAt)
+                                  })
+                                : t("dropPoint.opensLater")
+                        }
+                    />
+                );
+            case "outside_hours":
+                return (
+                    <LinkUnavailable
+                        title={t("dropPoint.outsideHoursTitle")}
+                        message={t("dropPoint.outsideHours")}
+                    />
+                );
+            case "ip_not_allowed":
+            case "not_allowed":
+            case "country_not_allowed":
+                return (
+                    <LinkUnavailable
+                        title={t("dropPoint.notAvailableTitle")}
+                        message={
+                            gate.reason === "country_not_allowed"
+                                ? t("dropPoint.location")
+                                : t("dropPoint.network")
+                        }
+                    />
+                );
+            case "sign_in_required":
+                return (
+                    <PublicShell>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{request.title}</CardTitle>
+                            </CardHeader>
+                            <CardBody className="flex flex-col gap-3 text-sm">
+                                <p className="text-muted-foreground">
+                                    {t("dropPoint.signInFirst")}
+                                </p>
+                                <Link
+                                    href={signInHref(`/r/${token}`)}
+                                    className="inline-flex w-fit items-center rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/90"
+                                >
+                                    {t("dropPoint.signIn")}
+                                </Link>
+                            </CardBody>
+                        </Card>
+                    </PublicShell>
+                );
+            case "not_invited":
+                return (
+                    <LinkUnavailable
+                        title={t("dropPoint.notAvailableTitle")}
+                        message={t("dropPoint.restricted")}
+                    />
+                );
+            default:
+                return (
+                    <LinkUnavailable
+                        title={tc("publicShell.unavailable")}
+                        message={
+                            gate.reason === "expired"
+                                ? t("dropPoint.expired")
+                                : t("dropPoint.closed")
+                        }
+                    />
+                );
         }
-        return (
-            <LinkUnavailable
-                title={tc("publicShell.unavailable")}
-                message={
-                    usable.reason === "expired" ? t("dropPoint.expired") : t("dropPoint.closed")
-                }
-            />
-        );
-    }
-
-    if (!fileRequestIpAllowed(request.allowedCidrs, await clientIp())) {
-        return (
-            <LinkUnavailable
-                title={t("dropPoint.notAvailableTitle")}
-                message={t("dropPoint.network")}
-            />
-        );
     }
 
     if (request.passwordHash) {
@@ -108,41 +156,6 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
     // other way to learn that: the session guard runs on the dashboard, not on a
     // public page like this one.
     await noteActivity((await getSession())?.session?.id);
-
-    // A per-user allowlist also forces sign-in, even when requireLogin is off.
-    const allowedUsers = parseStringArray(request.allowedUsers);
-    if (request.requireLogin || allowedUsers.length > 0) {
-        const session = await getSession();
-        const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
-        if (!userId) {
-            return (
-                <PublicShell>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{request.title}</CardTitle>
-                        </CardHeader>
-                        <CardBody className="flex flex-col gap-3 text-sm">
-                            <p className="text-muted-foreground">{t("dropPoint.signInFirst")}</p>
-                            <Link
-                                href={signInHref(`/r/${token}`)}
-                                className="inline-flex w-fit items-center rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/90"
-                            >
-                                {t("dropPoint.signIn")}
-                            </Link>
-                        </CardBody>
-                    </Card>
-                </PublicShell>
-            );
-        }
-        if (!(await fileRequestUserAllowed(request.allowedUsers, userId))) {
-            return (
-                <LinkUnavailable
-                    title={t("dropPoint.notAvailableTitle")}
-                    message={t("dropPoint.restricted")}
-                />
-            );
-        }
-    }
 
     const allowedExtensions = parseStringArray(request.allowedExtensions);
     const deniedExtensions = parseStringArray(request.deniedExtensions);

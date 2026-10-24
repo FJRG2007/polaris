@@ -7,6 +7,7 @@
  */
 
 import { notFound } from "next/navigation";
+import { parseLinkSchedule } from "@/lib/link-guards";
 import { requirePermission } from "@/lib/session";
 import {
     getFileRequestForOwner,
@@ -63,6 +64,7 @@ export default async function DropPointDetailPage({ params }: { params: Promise<
         allowedContinents: parseStringArray(request.allowedContinents),
         allowedUsers: parseStringArray(request.allowedUsers),
         startsAt: request.startsAt ? request.startsAt.toISOString() : null,
+        schedule: parseLinkSchedule(request.linkSchedule),
         allowUploaderDelete: request.allowUploaderDelete,
         allowOverwrite: request.allowOverwrite,
         uploaderDeleteWindowSeconds: request.uploaderDeleteWindowSeconds,

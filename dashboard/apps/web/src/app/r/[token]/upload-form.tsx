@@ -46,6 +46,7 @@ function explain(t: NamespaceTranslator<"publicPages">, status: number, body: st
     if (status === 409 || body === "full") return t("dropPoint.reasons.full");
     if (status === 403 && body === "user_not_allowed") return t("dropPoint.reasons.account");
     if (status === 403 && body === "scheduled") return t("dropPoint.reasons.notOpen");
+    if (status === 403 && body === "outside_hours") return t("dropPoint.reasons.hours");
     if (status === 401) return t("dropPoint.reasons.signIn");
     if (status === 403 && body === "country_not_allowed") return t("dropPoint.reasons.location");
     if (status === 403) return t("dropPoint.reasons.network");
@@ -244,7 +245,9 @@ export function DropUploader({
             >
                 <UploadCloud className="size-8" />
                 <span className="font-medium">{t("dropPoint.dropHere")}</span>
-                <span className="text-xs">{t("dropPoint.upTo", { size: formatBytes(BigInt(maxSizeBytes)) })}</span>
+                <span className="text-xs">
+                    {t("dropPoint.upTo", { size: formatBytes(BigInt(maxSizeBytes)) })}
+                </span>
             </button>
             <input
                 ref={inputRef}
@@ -252,7 +255,9 @@ export function DropUploader({
                 multiple
                 hidden
                 accept={accept}
-                onChange={(event) => onFiles(event.target.files ? Array.from(event.target.files) : [])}
+                onChange={(event) =>
+                    onFiles(event.target.files ? Array.from(event.target.files) : [])
+                }
             />
 
             {items.length > 0 ? (

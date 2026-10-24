@@ -16,7 +16,8 @@ import {
     addressRuleFields,
     addressRuleUpdateFields,
     linkPeopleFields,
-    linkPeopleUpdateFields
+    linkPeopleUpdateFields,
+    linkScheduleSchema
 } from "./link-rules.js";
 
 /** Who can open a snippet. */
@@ -185,6 +186,8 @@ export const createTextRequestSchema = z.object({
     allowedUsers: accountIdentityList.default([]),
     startsAt: z.coerce.date().optional(),
     expiresAt: z.coerce.date().optional(),
+    /** The weekdays and hours it accepts text in; null is any time. */
+    schedule: linkScheduleSchema.nullable().default(null),
     ...addressRuleFields
 });
 
@@ -201,6 +204,8 @@ export const updateTextRequestSchema = z.object({
     allowedUsers: z.array(z.string().trim().toLowerCase()).optional(),
     startsAt: z.coerce.date().nullable().optional(),
     expiresAt: z.coerce.date().nullable().optional(),
+    /** The weekly window, `null` for any time, absent to keep it. */
+    schedule: linkScheduleSchema.nullable().optional(),
     ...addressRuleUpdateFields
 });
 

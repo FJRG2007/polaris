@@ -694,6 +694,8 @@
         "linkUnrecoverable": "This drop point's link cannot be recovered. Open a new one.",
         "dropPointNotYours": "This drop point is not yours.",
         "notOpenYet": "This drop point is not open yet.",
+        "outsideHours": "This drop point only accepts text at set times. Try again during them.",
+        "locationDenied": "This drop point is not available from your location.",
         "closed": "This drop point is closed.",
         "networkDenied": "This drop point is not available from your network.",
         "signInToSend": "Sign in to send this.",

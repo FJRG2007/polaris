@@ -15,11 +15,9 @@ const OWNER = "018f2b7a-0000-7000-8000-0000000000a1";
 const REQUEST = "018f2b7a-0000-7000-8000-0000000000c1";
 
 const resolveByToken = vi.fn();
-const usability = vi.fn(() => ({ ok: true }) as { ok: boolean; reason?: string });
-const userAllowed = vi.fn(async () => true);
+const gate = vi.fn(async () => ({ ok: true }) as { ok: boolean; reason?: string });
 const verifyUnlock = vi.fn(() => true);
 const submitText = vi.fn(async () => ({ ok: true, snippetId: "snip-1" }));
-const addressDenial = vi.fn(async () => null as string | null);
 const dymo = vi.fn(async () => ({ allowed: true }));
 const rateLimit = vi.fn(async () => ({ ok: true }));
 const notify = vi.fn(async () => undefined);
@@ -40,7 +38,6 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify }));
 vi.mock("@/lib/dymo-service", () => ({ dymoIpAllowed: dymo }));
-vi.mock("@/lib/link-guards", () => ({ linkAddressDenial: addressDenial }));
 vi.mock("@/lib/public-reach", () => ({ ensureShareReachability: async () => undefined }));
 vi.mock("@/lib/request-context", () => ({
     clientIp: async () => "1.2.3.4",
@@ -49,8 +46,7 @@ vi.mock("@/lib/request-context", () => ({
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit, resetRateLimit: async () => undefined }));
 vi.mock("@/lib/text-request-service", () => ({
     resolveTextRequestByToken: resolveByToken,
-    textRequestUsability: usability,
-    textRequestUserAllowed: userAllowed,
+    textRequestGate: gate,
     textRequestUnlockCookie: () => "cookie",
     verifyTextRequestUnlock: verifyUnlock,
     submitText,
@@ -84,6 +80,7 @@ const OPEN = {
     allowedCountries: "[]",
     allowedContinents: "[]",
     startsAt: null,
+    linkSchedule: "",
     expiresAt: null,
     revokedAt: null
 };
@@ -93,10 +90,8 @@ const BODY = { name: "a.env", body: "A=1" };
 beforeEach(() => {
     vi.clearAllMocks();
     resolveByToken.mockResolvedValue(OPEN);
-    usability.mockReturnValue({ ok: true });
-    userAllowed.mockResolvedValue(true);
+    gate.mockResolvedValue({ ok: true });
     verifyUnlock.mockReturnValue(true);
-    addressDenial.mockResolvedValue(null);
     dymo.mockResolvedValue({ allowed: true });
     rateLimit.mockResolvedValue({ ok: true });
     submitText.mockResolvedValue({ ok: true, snippetId: "snip-1" });
@@ -117,30 +112,33 @@ describe("submitTextAction", () => {
     });
 
     it("refuses a closed drop point, and says so differently before it opens", async () => {
-        usability.mockReturnValueOnce({ ok: false, reason: "revoked" });
+        gate.mockResolvedValueOnce({ ok: false, reason: "revoked" });
         expect((await submitTextAction("tok", BODY)).error).toContain("closed");
-        usability.mockReturnValueOnce({ ok: false, reason: "scheduled" });
+        gate.mockResolvedValueOnce({ ok: false, reason: "scheduled" });
         expect((await submitTextAction("tok", BODY)).error).toContain("not open yet");
+        gate.mockResolvedValueOnce({ ok: false, reason: "outside_hours" });
+        expect((await submitTextAction("tok", BODY)).error).toContain("set times");
         expect(submitText).not.toHaveBeenCalled();
     });
 
     it("refuses an address the rules exclude, and one the fraud check flags", async () => {
-        addressDenial.mockResolvedValueOnce("ip_not_allowed");
+        gate.mockResolvedValueOnce({ ok: false, reason: "ip_not_allowed" });
         expect((await submitTextAction("tok", BODY)).error).toContain("network");
+        gate.mockResolvedValueOnce({ ok: false, reason: "country_not_allowed" });
+        expect((await submitTextAction("tok", BODY)).error).toContain("location");
         dymo.mockResolvedValueOnce({ allowed: false });
         expect((await submitTextAction("tok", BODY)).error).toContain("network");
         expect(submitText).not.toHaveBeenCalled();
     });
 
     it("refuses an anonymous sender when the owner asked for a name", async () => {
-        resolveByToken.mockResolvedValueOnce({ ...OPEN, requireLogin: true });
+        gate.mockResolvedValueOnce({ ok: false, reason: "sign_in_required" });
         expect((await submitTextAction("tok", BODY)).error).toContain("Sign in");
         expect(submitText).not.toHaveBeenCalled();
     });
 
     it("refuses somebody who is signed in but not on the list", async () => {
-        session.mockResolvedValueOnce({ user: { id: "someone-else" } });
-        userAllowed.mockResolvedValueOnce(false);
+        gate.mockResolvedValueOnce({ ok: false, reason: "not_invited" });
         expect((await submitTextAction("tok", BODY)).error).toContain("does not accept");
         expect(submitText).not.toHaveBeenCalled();
     });

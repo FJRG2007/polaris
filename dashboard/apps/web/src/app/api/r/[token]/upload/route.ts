@@ -2,8 +2,9 @@
  * File-request upload. Receives one file at a time into a drop point's
  * destination folder. The token in the URL is the credential; no session is
  * required unless the request demands login. Every limit is enforced here, in
- * order: the request exists and is usable (unexpired, unrevoked); the client IP
- * is allowed; login is satisfied when required; the total-file cap is not yet
+ * order: the request passes the shared link check (open, started, unexpired,
+ * inside its weekly hours, from an allowed address and region, for the account
+ * it needs); the PIN is unlocked; the total-file cap is not yet
  * met; the file's extension is permitted; and the byte size is capped mid-stream
  * so an oversized upload is aborted, never buffered. Node runtime for Prisma and
  * the drivers.
@@ -14,8 +15,8 @@ import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { notify } from "@/lib/notifications/dispatch";
-import { geoAllowedForIp } from "@/lib/geo-service";
 import { scanDropPointUpload } from "@/lib/scan-service";
+import type { LinkCheck } from "@/lib/link-guards";
 import * as fileRequests from "@/lib/file-request-service";
 import { recordItemCreator } from "@/lib/drive-meta-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
@@ -26,6 +27,28 @@ import { claimUploadPath, replaceWithStaged } from "@/lib/upload-naming";
 import { cappedStream } from "@/lib/stream-cap";
 import { baseName, checkUploadCandidate, normalizeRelPath } from "@polaris/core";
 import { wordsFor } from "@/lib/notifications/notice-words";
+
+/**
+ * What a refused upload answers, by the gate's reason. A not-yet-started or
+ * closed-for-the-hour drop point is a 403 (temporary); revoked or expired is a
+ * 410; a missing sign-in is a 401 so the page offers one. The body is the code
+ * the upload page turns into words.
+ */
+const GATE_RESPONSES: Record<
+    Exclude<LinkCheck, { ok: true }>["reason"],
+    { body: string; status: number }
+> = {
+    scheduled: { body: "scheduled", status: 403 },
+    outside_hours: { body: "outside_hours", status: 403 },
+    revoked: { body: "revoked", status: 410 },
+    expired: { body: "expired", status: 410 },
+    exhausted: { body: "exhausted", status: 410 },
+    ip_not_allowed: { body: "ip_not_allowed", status: 403 },
+    not_allowed: { body: "ip_not_allowed", status: 403 },
+    country_not_allowed: { body: "country_not_allowed", status: 403 },
+    sign_in_required: { body: "login_required", status: 401 },
+    not_invited: { body: "user_not_allowed", status: 403 }
+};
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,24 +61,11 @@ export async function PUT(
     const fileRequest = await fileRequests.resolveFileRequestByToken(token);
     if (!fileRequest) return new Response("Not found", { status: 404 });
 
-    const usable = fileRequests.fileRequestUsability(fileRequest);
-    // A not-yet-started drop point is a 403 (temporary); revoked/expired is a 410.
-    if (!usable.ok) {
-        return new Response(usable.reason, { status: usable.reason === "scheduled" ? 403 : 410 });
-    }
-
     const ip = await clientIp();
-    if (!fileRequests.fileRequestIpAllowed(fileRequest.allowedCidrs, ip)) {
-        return new Response("ip_not_allowed", { status: 403 });
-    }
-    if (
-        !(await geoAllowedForIp(
-            ip,
-            fileRequests.parseStringArray(fileRequest.allowedCountries),
-            fileRequests.parseStringArray(fileRequest.allowedContinents)
-        ))
-    ) {
-        return new Response("country_not_allowed", { status: 403 });
+    const gate = await fileRequests.fileRequestGate(fileRequest, ip);
+    if (!gate.ok) {
+        const refused = GATE_RESPONSES[gate.reason];
+        return new Response(refused.body, { status: refused.status });
     }
 
     // Dymo IP-fraud gate (no-op unless the integration is enabled). Fails open.
@@ -77,15 +87,10 @@ export async function PUT(
         }
     }
 
+    // Sign-in and the per-user allowlist were settled by the gate; the account is
+    // read again here only to credit the upload to it.
     const session = await getSession();
     const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
-    if (fileRequest.requireLogin && !userId) return new Response("login_required", { status: 401 });
-    // Per-user allowlist: a non-empty list requires sign-in and a matching account.
-    if (!(await fileRequests.fileRequestUserAllowed(fileRequest.allowedUsers, userId))) {
-        return new Response(userId ? "user_not_allowed" : "login_required", {
-            status: userId ? 403 : 401
-        });
-    }
 
     if (
         fileRequest.maxFiles !== null &&
@@ -212,7 +217,9 @@ export async function PUT(
         await notify({
             userId: fileRequest.ownerId,
             event: "drive.dropPoint.received",
-            title: (await wordsFor(fileRequest.ownerId, "notices"))("dropPoint.received", { title: fileRequest.title }),
+            title: (await wordsFor(fileRequest.ownerId, "notices"))("dropPoint.received", {
+                title: fileRequest.title
+            }),
             body: safeName,
             href: `/drive/drop-points/${fileRequest.id}`
         });

@@ -24,6 +24,7 @@ import type { StorageDriver } from "@polaris/storage";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import * as core from "@polaris/core";
 import {
     cidrOrIp,
     createFileRequestSchema,
@@ -197,6 +198,8 @@ const updateDropPointSchema = z
             )
             .optional(),
         startsAt: z.string().nullable().optional(),
+        /** The weekly window, `null` for any time, `undefined` to keep it. */
+        schedule: core.linkScheduleSchema.nullable().optional(),
         allowUploaderDelete: z.boolean().optional(),
         allowOverwrite: z.boolean().optional(),
         uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional(),
