@@ -1,7 +1,7 @@
 /** Marketplace: the apps Polaris can install, and the ones already in. */
 
 import { Chrome } from "../runtime/chrome";
-import { label, press } from "../runtime/interact";
+import { label } from "../runtime/interact";
 import { defineScene } from "../runtime/scene";
 import { VIEWER, ago, id } from "../fixtures/people";
 import { connections } from "../fixtures/drive";
@@ -69,6 +69,39 @@ export const marketplaceInstall = defineScene({
                 .map((connection) => ({ id: connection.id, name: connection.name }))
     }),
     render: (ctx) => <Marketplace ctx={ctx} />,
-    // The one app here that runs something of its own, so the one with choices.
-    prepare: (ctx) => press(label(ctx.locale, "marketplace.card.configure"))
+    // The first app here that runs something of its own, so the one with choices.
+    prepare: (ctx) => configureFirst(ctx)
 });
+
+/** A beat of the scene's clock: a menu takes its first ticks to open or close. */
+const beat = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+/**
+ * Configure sits in each card's overflow menu, beside Details, on an app that
+ * runs something of its own. Open the menus in order, the way a reader looks
+ * for it, and choose it from the first one that has it.
+ */
+async function configureFirst(ctx: SceneContext): Promise<void> {
+    const configure = label(ctx.locale, "marketplace.card.configure");
+    const more = label(ctx.locale, "marketplace.card.more").split("{name}")[0]!;
+    const triggers = [...document.querySelectorAll<HTMLElement>("[aria-haspopup=menu]")].filter(
+        (element) =>
+            element.getAttribute("aria-label")?.startsWith(more) && element.offsetParent !== null
+    );
+    for (const trigger of triggers) {
+        trigger.dispatchEvent(
+            new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+        );
+        await beat();
+        const item = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")].find(
+            (element) => element.textContent?.trim() === configure
+        );
+        if (item) {
+            item.click();
+            return;
+        }
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await beat();
+    }
+    throw new Error(`no card offers "${configure}"`);
+}

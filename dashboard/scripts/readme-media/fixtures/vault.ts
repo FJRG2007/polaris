@@ -10,8 +10,10 @@ import { VIEWER, ago, id } from "./people";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import type { SceneContext } from "../runtime/scene";
 import type { VaultView } from "@/app/(app)/vault/share-actions";
-import type { VaultState } from "@/app/(app)/vault/vault-actions";
+import type { VaultState, vaultContentsAction } from "@/app/(app)/vault/vault-actions";
 import { emptyItem, encryptItem, type VaultItem } from "@/app/(app)/vault/vault-model";
+
+type VaultContents = Awaited<ReturnType<typeof vaultContentsAction>>;
 
 /** The vault key of the capture: 64 fixed bytes, a fixture and nothing else. */
 export const VAULT_KEY = vaultCrypto.symmetricKeyFromBytes(
@@ -159,7 +161,7 @@ function items(ctx: SceneContext): VaultItem[] {
 }
 
 /** What the server would hold: every field sealed, folders included. */
-export async function vaultContents(ctx: SceneContext) {
+export async function vaultContents(ctx: SceneContext): Promise<VaultContents> {
     const ciphers = await Promise.all(
         items(ctx).map(async (item, index) => ({
             ...(await encryptItem(item, VAULT_KEY)),
@@ -172,7 +174,8 @@ export async function vaultContents(ctx: SceneContext) {
         { id: WORK_FOLDER, name: await vaultCrypto.encrypt(ctx.say("Work", "Trabajo"), VAULT_KEY) },
         { id: HOME_FOLDER, name: await vaultCrypto.encrypt(ctx.say("Home", "Casa"), VAULT_KEY) }
     ];
-    return { ciphers, folders, sends: await sends(ctx) };
+    // No send carries address rules of its own, so each opens anywhere.
+    return { ciphers, folders, sends: await sends(ctx), sendRules: {} };
 }
 
 /** What they handed out of the vault to people who have none: sealed like the
