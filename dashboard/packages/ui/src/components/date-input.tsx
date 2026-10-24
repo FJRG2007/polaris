@@ -275,7 +275,7 @@ export function DateInput({
                         align="start"
                         sideOffset={6}
                         collisionPadding={8}
-                        className="z-50 max-h-[--radix-popover-content-available-height] w-[min(18rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border-strong bg-elevated p-3 text-foreground shadow-popover"
+                        className="z-50 max-h-[--radix-popover-content-available-height] w-[min(18rem,calc(100vw-1rem))] overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-3 text-foreground shadow-popover"
                         onOpenAutoFocus={(event) => event.preventDefault()}
                     >
                         <CalendarGrid

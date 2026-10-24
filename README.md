@@ -415,6 +415,8 @@ Each app is enabled per account and per role.
 - **Notes** - nested notes; imports an Obsidian vault or a folder of Markdown.
 - **Inbox** - Telegram, WhatsApp, Discord and Slack conversations in one place.
 - **Organizations** - teams with their own members and roles.
+- **[CRM](docs/features/crm.md)** - companies, people and the deals an
+  organization is working, with workflows, dashboards and a forecast.
 
 **Keeping an eye on it**
 

@@ -71,13 +71,15 @@ function open(share: ShareRow, onSave = vi.fn()) {
 }
 
 const field = (id: string) => document.getElementById(`drive-share-edit-${id}`) as HTMLInputElement;
+/** A date field is the design system's picker: a button that shows the day it holds. */
+const day = (id: string) => document.getElementById(`drive-share-edit-${id}`)?.textContent;
 const save = () => screen.getByRole("button", { name: /save/i });
 
 describe("EditShareDialog", () => {
     it("opens with every stored rule filled in", () => {
         open(guarded());
-        expect(field("starts").value).toBe("2026-11-01");
-        expect(field("expires").value).toBe("2026-12-31");
+        expect(day("starts")).toBe("Nov 1, 2026");
+        expect(day("expires")).toBe("Dec 31, 2026");
         expect(field("uses").value).toBe("5");
         expect(field("from").value).toBe("09:00");
         expect(field("to").value).toBe("18:00");

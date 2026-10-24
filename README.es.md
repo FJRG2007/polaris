@@ -30,6 +30,9 @@ Capturas de la interfaz real con datos de ejemplo. Casi todas enlazan a una
 página con todas sus funciones. Las versiones para móvil están en
 [docs/assets/media](docs/assets/media).
 
+[Agentes](docs/features/agents.es.md) y [CRM](docs/features/crm.es.md) tienen
+también su propia página.
+
 ### En todas partes
 
 <p align="center">

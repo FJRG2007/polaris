@@ -11,9 +11,9 @@ import "@/components/app-host/client";
 import { MessagesWrapper } from "../../setup/i18n";
 import * as engine from "@polaris-app/calendar/src/engine";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { EventEditor } from "@polaris-app/calendar/src/screens/event-editor";
 import { DEFAULT_PREFERENCES } from "@polaris-app/calendar/src/lib/preferences";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { CalendarSummary, EventDetail } from "@polaris-app/calendar/src/lib/wire";
 
 const CALENDAR_ID = "11111111-1111-4111-8111-111111111111";
@@ -124,8 +124,9 @@ describe("the event editor's Save", () => {
     it("treats an emptied required field as incomplete, not as an error, and does not send", async () => {
         renderEditor();
         await screen.findByRole("textbox", { name: "Title" });
+        // The start day is the design system's picker; its own Clear empties it.
         const start = screen.getByLabelText("Starts");
-        fireEvent.change(start, { target: { value: "" } });
+        fireEvent.click(within(start.parentElement!).getByRole("button", { name: "Clear" }));
         const save = screen.getByRole("button", { name: "Save" });
         expect(save.getAttribute("aria-disabled")).toBe("true");
         expect(save.getAttribute("title")).toBe("Fill in the required fields");
