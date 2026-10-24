@@ -329,7 +329,12 @@ export function ClampedBio({ text }: { text: string }) {
     useLayoutEffect(() => {
         const element = box.current;
         if (!element || whole) return;
-        setCut(element.scrollHeight > element.clientHeight + 1);
+        const measure = () => setCut(element.scrollHeight > element.clientHeight + 1);
+        measure();
+        if (typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(measure);
+        observer.observe(element);
+        return () => observer.disconnect();
     }, [text, whole]);
 
     return (

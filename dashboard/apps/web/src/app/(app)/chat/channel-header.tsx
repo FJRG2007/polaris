@@ -769,7 +769,9 @@ function HeaderSearch({
                 className="relative ml-1 hidden w-40 min-w-0 md:block lg:w-48"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    onSearch(term.trim());
+                    const trimmed = term.trim();
+                    if (!trimmed) return;
+                    onSearch(trimmed);
                     setTerm("");
                 }}
             >

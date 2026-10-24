@@ -1171,12 +1171,17 @@ export async function groupFromDirectAction(
 ): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatGroupFromDirectSchema.safeParse(input);
-    if (!parsed.success)
+    if (!parsed.success) {
+        const t = await getTranslations("chat");
+        const tooMany = parsed.error.issues.some(
+            (issue) => issue.code === "too_big" && issue.path[0] === "userIds"
+        );
         return {
-            error:
-                parsed.error.issues[0]?.message ??
-                (await getTranslations("chat"))("errors.pickFirst")
+            error: tooMany
+                ? t("errors.groupFull", { count: core.MAX_GROUP_MEMBERS })
+                : t("errors.pickSomebodyToMessage")
         };
+    }
 
     const result = await guard(() =>
         chat.groupFromDirect(me, parsed.data.channelId, parsed.data.userIds)

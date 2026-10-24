@@ -743,7 +743,7 @@ export const chatGroupFromDirectSchema = z.object({
     channelId: z.string().uuid(),
     userIds: z
         .array(z.string().uuid())
-        .min(1, "Pick somebody")
+        .min(1)
         .max(MAX_GROUP_MEMBERS - 2)
 });
 
