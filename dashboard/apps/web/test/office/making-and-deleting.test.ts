@@ -170,7 +170,8 @@ describe("taking somebody's access back", () => {
 
     it("drops the row on that answer and restores it on a refusal", async () => {
         const source = await dialog;
-        expect(source).toContain("const before = grants;");
-        expect(source).toContain("setGrants(before);");
+        expect(source).toContain("const before = isLink ? links : rows;");
+        expect(source).toContain("(isLink ? setLinks : setRows)(before);");
+        expect(source).toContain("setTotal(beforeTotal);");
     });
 });

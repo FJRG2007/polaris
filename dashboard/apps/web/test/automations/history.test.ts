@@ -80,9 +80,12 @@ async function seed(draft: core.AutomationGraph, extra: Record<string, unknown> 
     return row.id as string;
 }
 
-/** Step a run until it ends: the editor's kick and this loop share the lease, so whichever holds it steps it. */
+/** Step a run until it ends: the editor's kick and this loop share the lease, so whichever holds it steps it.
+ *  Bounded by time, not by attempts: on a loaded machine the kick can hold the lease for longer than a fixed
+ *  number of 2 ms waits adds up to. */
 async function settle(runId: string) {
-    for (let attempt = 0; attempt < 100; attempt++) {
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
         await engine.advanceRun(runId);
         const row = fake().tables.automationRun!.find((entry) => entry.id === runId)!;
         if (core.runFinished(row.status as string)) return row;

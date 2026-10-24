@@ -687,7 +687,7 @@ export function ShareDialog({
                                             id="share-add-list"
                                             role="listbox"
                                             style={listAt}
-                                            className="pointer-events-auto fixed z-[60] overflow-y-auto rounded-md border border-border bg-surface-raised p-1 shadow-lg"
+                                            className="pointer-events-auto fixed z-[60] overflow-y-auto overscroll-contain rounded-md border border-border bg-surface-raised p-1 shadow-lg"
                                         >
                                             {found.map((one, index) => (
                                                 <li
@@ -882,7 +882,7 @@ export function ShareDialog({
                                     ) : (
                                         <div
                                             ref={scroller}
-                                            className="max-h-72 min-w-0 overflow-y-auto"
+                                            className="max-h-72 min-w-0 overflow-y-auto overscroll-contain"
                                             role="list"
                                         >
                                             <div
