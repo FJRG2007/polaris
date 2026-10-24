@@ -18,6 +18,7 @@ import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
     linkHoursIncomplete,
+    linkExpiry,
     linkPeopleLimits,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
@@ -90,7 +91,7 @@ export function ShareDialog({
             kind: "public" as const,
             password: advanced.password || undefined,
             maxDownloads: advanced.maxUses ? Number(advanced.maxUses) : undefined,
-            expiresAt: advanced.expiresAt || undefined,
+            expiresAt: linkExpiry(advanced.expiresAt)?.toISOString(),
             allowUpload: form.get("allowUpload") === "on",
             allowRename: form.get("allowRename") === "on",
             allowDelete: form.get("allowDelete") === "on",
