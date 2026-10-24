@@ -2148,6 +2148,7 @@
         "web/src/components/polar/polar-threads.tsx",
         "web/src/components/polar/use-polar-sidebar.ts",
         "web/src/components/polar/polar-panel.tsx",
+        "web/src/components/polar/polar-goal.tsx",
         "web/src/components/polar/visuals/visual-view.tsx",
         "web/src/components/polar/visuals/visual-chart.tsx",
         "web/src/components/polar/visuals/visual-diagram.tsx",

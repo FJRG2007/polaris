@@ -197,6 +197,7 @@
             "branch": "Continue from here in a new chat",
             "temp": "Start a temporary chat, or leave one",
             "memory": "Open what Polar remembers",
+            "goal": "Keep working until a condition is met",
             "help": "Show every command"
         }
     },
@@ -806,5 +807,33 @@
         "answering": "Answering",
         "approval": "This answer is waiting for your approval. Continue with this chat to answer it.",
         "continue": "Continue with this one"
+    },
+    "goal": {
+        "state": {
+            "active": "Working toward the goal",
+            "idle": "Goal paused: no progress in the last turns",
+            "unchecked": "Goal paused: the check didn't answer",
+            "met": "Goal met",
+            "impossible": "Goal can't be met",
+            "limit": "Goal stopped at its limit"
+        },
+        "progress": "Turn {turns} of {max}, {minutes} of {limit} min, {tokens} tokens",
+        "verdict": {
+            "not_met": "Goal not met yet.",
+            "met": "Goal met.",
+            "impossible": "Goal can't be met.",
+            "limit": "Goal stopped after its turn or time limit.",
+            "idle": "Goal paused: no tools used in the last turns.",
+            "unchecked": "Goal paused: the check didn't answer."
+        },
+        "continued": "Kept working toward the goal",
+        "resumed": "Continued the goal",
+        "continue": "Continue toward the goal",
+        "clear": "Clear goal",
+        "dismiss": "Dismiss",
+        "cleared": "Goal cleared",
+        "clearFailed": "Couldn't clear the goal. Try again.",
+        "none": "No goal set. Type /goal and what done looks like.",
+        "tooLong": "A goal can be up to {max} characters."
     }
 }

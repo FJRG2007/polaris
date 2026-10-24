@@ -80,9 +80,12 @@ import {
     Eraser,
     Minimize2,
     SquareSlash,
+    Target,
     Zap,
     X
 } from "lucide-react";
+import * as polarGoal from "@/components/polar/polar-goal";
+import * as goals from "@/lib/polar/goals";
 import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
 import { PolarCodeView, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
@@ -558,11 +561,12 @@ const CONTROL_ICONS: Record<Control, SuggestionListItem["icon"]> = {
     branch: GitBranchPlus,
     temp: Ghost,
     memory: Brain,
+    goal: Target,
     help: CircleHelp
 };
 /** Control commands that take words after them, so picking one from the list
  *  puts it in the box instead of running it. */
-const TAKES_TEXT = new Set<Control>(["rename"]);
+const TAKES_TEXT = new Set<Control>(["rename", "goal"]);
 
 /** One row of the "/" list: a command of Polar's, one that acts on the chat
  *  itself, or one of the person's own. */
@@ -979,6 +983,7 @@ export function PolarChat({
         resume: true
     });
     const busy = chat.status === "submitted" || chat.status === "streaming";
+    const goalState = polarGoal.usePolarGoal(threadId);
     const conversationRef = useRef(onConversation);
     conversationRef.current = onConversation;
     useEffect(() => {
@@ -1699,9 +1704,54 @@ export function PolarChat({
         toast.show({ title: t("control.renameFailed") });
     };
 
+    /** Sends a turn on the chat's goal: the one that sets it, or one that
+     *  keeps it going (`goals.ts`). The server admits it only while the goal
+     *  has turns and time left. */
+    const sendGoalTurn = (kind: goals.GoalTurn, text: string) => {
+        turnChoice.current = null;
+        setLastApproved(false);
+        void sendWithRoom({ text, metadata: { goal: kind } });
+    };
+
+    /** Clears the goal, saying which one went. */
+    const clearGoal = async () => {
+        const gone = await goalState.clear();
+        if (gone === undefined) return void toast.show({ title: t("goal.clearFailed") });
+        toast.show(
+            gone ? { title: t("goal.cleared"), body: gone.condition } : { title: t("goal.none") }
+        );
+    };
+
+    /** `/goal`: shows, clears or sets the chat's goal, as Claude Code's does. */
+    const runGoal = (rest: string) => {
+        const asked = goals.parseGoalCommand(rest);
+        const current = goalState.goal;
+        if (asked.kind === "clear") return void clearGoal();
+        if (asked.kind === "show") {
+            if (!current) return void toast.show({ title: t("goal.none") });
+            return void toast.show({
+                title: t(`goal.state.${polarGoal.goalStateKey(current)}`),
+                body: current.condition
+            });
+        }
+        if (asked.kind === "too_long") {
+            setInput(`/goal ${rest}`);
+            return void toast.show({
+                title: t("goal.tooLong", { max: goals.GOAL_CONDITION_MAX })
+            });
+        }
+        if (!choice || busy || compacting || waitingApproval) {
+            setInput(`/goal ${rest}`);
+            return void toast.show({ title: t("control.busy") });
+        }
+        goalState.begin(asked.condition);
+        sendGoalTurn("set", asked.condition);
+    };
+
     /** What a command that acts on the chat itself does. Never sent as text. */
     const runControl = (command: Control, rest: string) => {
         setInput("");
+        if (command === "goal") return runGoal(rest);
         if (command === "clear") return startNew();
         if (command === "temp") {
             startNew();
@@ -1733,6 +1783,28 @@ export function PolarChat({
             link.click();
         }
     };
+
+    // An answer this screen watched finish brings its goal's judgement to the
+    // bar, and a not-met one sends the next turn. One read back from history
+    // never does: opening a chat does not start work on its own.
+    const watchedAnswer = useRef<string | null>(null);
+    const judgedAnswer = useRef<string | null>(null);
+    useEffect(() => {
+        const last = chat.messages.at(-1);
+        if (last?.role !== "assistant") return;
+        if (busy) {
+            watchedAnswer.current = last.id;
+            return;
+        }
+        if (watchedAnswer.current !== last.id || judgedAnswer.current === last.id) return;
+        const judged = goals.goalPartOf(last);
+        if (!judged) return;
+        judgedAnswer.current = last.id;
+        goalState.learn(judged);
+        if (goals.continuesAfter(judged) && !goalState.isCleared(judged.id) && !chat.error) {
+            sendGoalTurn("continue", goals.continuationText(judged));
+        }
+    }, [busy, chat.messages]);
 
     const submit = () => {
         const raw = input.trim();
@@ -2071,6 +2143,17 @@ export function PolarChat({
             ) : null}
             {/* Voice mode takes the composer's place, as in ChatGPT; the
                 composer stays mounted, so a draft is still there after. */}
+            {goalState.goal && !inCall ? (
+                <polarGoal.PolarGoalBar
+                    goal={goalState.goal}
+                    busy={busy || compacting || !!waitingApproval}
+                    onContinue={() => {
+                        const current = goalState.goal;
+                        if (current) sendGoalTurn("resume", goals.continuationText(current));
+                    }}
+                    onClear={() => void clearGoal()}
+                />
+            ) : null}
             <PolarComposer
                 kit={voiceKit}
                 notice={voiceNotice}
@@ -2930,6 +3013,11 @@ function MessageView({
             </Tool>
         );
     };
+    // A turn the goal sent itself reads as a line, not as something typed.
+    const goalTurn = goals.goalTurnOf(message);
+    if (goalTurn === "continue" || goalTurn === "resume") {
+        return <polarGoal.PolarGoalStep resumed={goalTurn === "resume"} />;
+    }
     return (
         <Message from={from}>
             {meta.fellBackFrom ? (
@@ -2983,6 +3071,10 @@ function MessageView({
                             )}
                         </Work>
                     );
+                }
+                if (part.type === goals.GOAL_PART) {
+                    const judged = goals.readGoal("data" in part ? part.data : null);
+                    return judged ? <polarGoal.PolarGoalVerdict key={index} goal={judged} /> : null;
                 }
                 if (folded(part)) return null;
                 const failure = polarFailure.failureOf(part);
