@@ -87,10 +87,14 @@ const APP_PERMISSION: Readonly<Record<core.AppEventApp, core.Permission>> = {
     "game-servers": "deploy.read",
     deploy: "deploy.read",
     chat: "chat.use",
-    tasks: "tasks.read"
+    tasks: "tasks.read",
+    mail: "mail.use",
+    drive: "drive.read",
+    calendar: "calendar.use"
 };
 const INSTALLABLE: Partial<Record<core.AppEventApp, string>> = {
-    "game-servers": core.GAME_SERVERS_APP_ID
+    "game-servers": core.GAME_SERVERS_APP_ID,
+    calendar: "calendar"
 };
 
 /** The apps whose events this account may build automations on. */

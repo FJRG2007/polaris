@@ -154,6 +154,12 @@ export async function fireDueReminders(
     let dropped = 0;
     const replan = new Set<string>();
     const levels = new Map<string, Reach | null>();
+    const told = new Set<string>();
+    const listening =
+        due.length > 0 &&
+        (await Promise.resolve()
+            .then(() => host.automations.anyListening(STARTING_EVENT))
+            .catch(() => false));
     for (const reminder of due) {
         // Claimed before anything is sent: a pass that dies half way must not
         // send this one again on the next.
@@ -169,6 +175,12 @@ export async function fireDueReminders(
         const item = tryItemOf(object.ics);
         if (!item) continue;
         const calendar = { id: object.calendarId, ...object.calendar };
+        // Once per occurrence and alarm, however many people this alarm reminds.
+        const occurrenceKey = `${reminder.objectId}:${reminder.occurrence.toISOString()}:${reminder.alarmKey}`;
+        if (listening && !told.has(occurrenceKey)) {
+            told.add(occurrenceKey);
+            await announceStarting(reminder.objectId, item, reminder.occurrence, calendar, occurrenceKey);
+        }
         const key = `${reminder.userId}:${calendar.id}`;
         if (!levels.has(key))
             levels.set(key, (await reachOf(reminder.userId, [calendar])).get(calendar.id) ?? null);
@@ -205,6 +217,49 @@ export async function fireDueReminders(
         await planObject(objectId, tryItemOf(row.ics), new Date(now.getTime() + 1000));
     }
     return { sent, dropped };
+}
+
+const STARTING_EVENT = "calendar.event-starting";
+
+/**
+ * An event's alarm going off, told to the automations listening for one
+ * starting soon - the alarm is what "soon" means for that event. Only to
+ * automations whose runner sees the event in full (or it is public), the rule a
+ * reminder's own words follow. Never throws: the reminder still goes out.
+ */
+export async function announceStarting(
+    objectId: string,
+    item: engine.CalendarItem,
+    occurrence: Date,
+    calendar: { id: string; name: string; ownerId: string; kind: string; trashedAt: Date | null },
+    key: string
+): Promise<void> {
+    if (item.component !== "VEVENT") return;
+    const event = item.master ?? item.overrides[0];
+    if (!event) return;
+    const open = publicItem(item);
+    await Promise.resolve()
+        .then(() =>
+            host.automations.emitAppEvent(
+                STARTING_EVENT,
+                {
+                    eventId: objectId,
+                    calendarId: calendar.id,
+                    calendar: calendar.name.slice(0, 200),
+                    title: (event.summary ?? "").slice(0, 500),
+                    startsAt: occurrence.toISOString(),
+                    allDay: Boolean(event.start && "date" in event.start)
+                },
+                {
+                    key,
+                    mayReceive: async (runner) => {
+                        const level = (await reachOf(runner.id, [calendar])).get(calendar.id);
+                        return reaches(level ?? null, open ? "read" : "write");
+                    }
+                }
+            )
+        )
+        .catch(() => undefined);
 }
 
 /**

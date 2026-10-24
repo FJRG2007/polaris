@@ -106,6 +106,8 @@ const load = {
     activityLive: once(() => import("@/lib/presence-activity/live")),
     apiSession: once(() => import("@/lib/api-session")),
     automations: once(() => import("@/lib/automations/app-bridge")),
+    automationsAppEvents: once(() => import("@/lib/automations/app-events")),
+    automationsGameServerEvents: once(() => import("@/lib/automations/game-server-events")),
     appContainerMetrics: once(() => import("@/lib/app-container-metrics")),
     appsInstallAccess: once(() => import("@/lib/apps/install-access")),
     appsInstallConfig: once(() => import("@/lib/apps/install-config")),
@@ -529,6 +531,12 @@ export const serverHost = {
     },
     // An app's own triggers firing runs, a move of its automations, its waits woken.
     automations: {
+        announceGameServerEvent: later(
+            load.automationsGameServerEvents,
+            "announceGameServerEvent"
+        ),
+        anyListening: later(load.automationsAppEvents, "anyListening"),
+        emitAppEvent: later(load.automationsAppEvents, "emitAppEvent"),
         appTriggers: later(load.automations, "appTriggers"),
         automationForLegacy: later(load.automations, "automationForLegacy"),
         automationsForLegacy: later(load.automations, "automationsForLegacy"),

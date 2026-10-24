@@ -15,10 +15,22 @@ const id = z.string().min(1).max(64);
 const label = z.string().max(200);
 
 /** The apps that send events, by the id their install (or built-in entry) has. */
-export const APP_EVENT_APPS = ["game-servers", "deploy", "chat", "tasks"] as const;
+export const APP_EVENT_APPS = [
+    "game-servers",
+    "deploy",
+    "chat",
+    "tasks",
+    "mail",
+    "drive",
+    "calendar"
+] as const;
 export type AppEventApp = (typeof APP_EVENT_APPS)[number];
 
 const gameServer = z.object({ installId: id, name: label, game: z.string().max(64) }).strict();
+const gameServerCrashed = gameServer
+    .extend({ restarts: z.number().int().min(0), cause: z.string().max(300).nullable() })
+    .strict();
+const playerJoined = gameServer.extend({ player: z.string().min(1).max(64) }).strict();
 const deploy = z
     .object({
         deploymentId: id,
@@ -49,14 +61,50 @@ const chatMessage = z
     })
     .strict();
 
+const mailReceived = z
+    .object({
+        messageId: id,
+        accountId: id,
+        mailbox: z.string().max(320),
+        from: z.string().max(320),
+        fromName: label,
+        subject: z.string().max(500),
+        snippet: z.string().max(500)
+    })
+    .strict();
+const driveUpload = z
+    .object({
+        connectionId: id,
+        path: z.string().min(1).max(1024),
+        name: z.string().min(1).max(255),
+        size: z.number().int().min(0),
+        uploaderId: id
+    })
+    .strict();
+const calendarEvent = z
+    .object({
+        eventId: id,
+        calendarId: id,
+        calendar: label,
+        title: z.string().max(500),
+        startsAt: z.string().datetime(),
+        allDay: z.boolean()
+    })
+    .strict();
+
 export const APP_EVENTS = {
     "game-server.started": { app: "game-servers", payload: gameServer },
     "game-server.stopped": { app: "game-servers", payload: gameServer },
+    "game-server.crashed": { app: "game-servers", payload: gameServerCrashed },
+    "game-server.player-joined": { app: "game-servers", payload: playerJoined },
     "deploy.succeeded": { app: "deploy", payload: deploy },
     "deploy.failed": { app: "deploy", payload: deploy },
     "task.created": { app: "tasks", payload: task },
     "task.completed": { app: "tasks", payload: task },
-    "chat.message": { app: "chat", payload: chatMessage }
+    "chat.message": { app: "chat", payload: chatMessage },
+    "mail.received": { app: "mail", payload: mailReceived },
+    "drive.file-uploaded": { app: "drive", payload: driveUpload },
+    "calendar.event-starting": { app: "calendar", payload: calendarEvent }
 } as const satisfies Record<string, { app: AppEventApp; payload: z.ZodTypeAny }>;
 
 export type AppEventName = keyof typeof APP_EVENTS;

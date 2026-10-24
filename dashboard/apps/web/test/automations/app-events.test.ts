@@ -128,7 +128,12 @@ describe("picker", () => {
             apps: ["game-servers", "deploy", "chat", "tasks"]
         });
         expect(all.find((group) => group.id === "game-servers")!.items.map((i) => i.value)).toEqual(
-            ["core.onEvent#gameServerStarted", "core.onEvent#gameServerStopped"]
+            [
+                "core.onEvent#gameServerStarted",
+                "core.onEvent#gameServerStopped",
+                "core.onEvent#gameServerCrashed",
+                "core.onEvent#playerJoined"
+            ]
         );
         for (const group of all)
             for (const item of group.items)
@@ -144,9 +149,17 @@ describe("picker", () => {
 
     it("lists an installable app only when installed, and each app only with its permission", async () => {
         const user = { id: "u", email: "", name: "", isAdmin: false, sessionId: "" };
-        expect(await events.eventApps(user)).toEqual(["game-servers", "deploy", "chat", "tasks"]);
+        expect(await events.eventApps(user)).toEqual([
+            "game-servers",
+            "deploy",
+            "chat",
+            "tasks",
+            "mail",
+            "drive",
+            "calendar"
+        ]);
         installed.mockResolvedValue(false);
-        expect(await events.eventApps(user)).toEqual(["deploy", "chat", "tasks"]);
+        expect(await events.eventApps(user)).toEqual(["deploy", "chat", "tasks", "mail", "drive"]);
         can.mockResolvedValue(false);
         expect(await events.eventApps(user)).toEqual([]);
     });

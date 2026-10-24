@@ -34,6 +34,8 @@ import { ACCOUNT_COLUMNS } from "./access";
 import { decodePart, unflow } from "./decode";
 import { rememberContacts } from "./contacts";
 import { applyRulesToMessage, filterHeaderNames } from "./rules";
+import { anyListening } from "@/lib/automations/app-events";
+import { announceMail } from "@/lib/automations/mail-events";
 import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
@@ -795,6 +797,9 @@ async function storeMessages(
      *  time: filing opens a connection, and this function is already inside one. */
     const judged: string[] = [];
     let stored = 0;
+    /** Asked once a page: nobody listening is the common case, and costs one read. */
+    const toAutomations =
+        arrivals && folder.role === "inbox" && (await anyListening("mail.received").catch(() => false));
 
     for (const message of fetched) {
         const envelope = message.envelope;
@@ -948,7 +953,18 @@ async function storeMessages(
                 // the end of the pass. Answering junk with an out-of-office is
                 // how a mailbox confirms to a sender that the address is real,
                 // so the two are ordered rather than left to chance.
-                else await replyIfAway(account.id, row.id);
+                else {
+                    await replyIfAway(account.id, row.id);
+                    // Junk starts no automation, for the reason it gets no away reply.
+                    if (toAutomations)
+                        await announceMail({
+                            messageId: row.id,
+                            account,
+                            from,
+                            subject: shape.subject,
+                            snippet
+                        });
+                }
             }
         }
     }

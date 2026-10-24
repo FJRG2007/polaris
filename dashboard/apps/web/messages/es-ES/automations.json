@@ -911,7 +911,10 @@
             "game-servers": "Servidores de juegos",
             "deploy": "Deploy",
             "chat": "Chat",
-            "tasks": "Tareas"
+            "tasks": "Tareas",
+            "mail": "Correo",
+            "drive": "Drive",
+            "calendar": "Calendario"
         },
         "presets": {
             "publicIpChanged": "Cambió la IP pública",
@@ -929,7 +932,12 @@
             "deployFailed": "Deploy fallido",
             "taskCreated": "Tarea creada",
             "taskCompleted": "Tarea completada",
-            "chatMessage": "Nuevo mensaje de chat"
+            "chatMessage": "Nuevo mensaje de chat",
+            "gameServerCrashed": "El servidor de juegos no deja de fallar",
+            "playerJoined": "Un jugador ha entrado",
+            "mailReceived": "Correo recibido",
+            "driveFileUploaded": "Archivo subido a Drive",
+            "calendarEventStarting": "Un evento del calendario empieza pronto"
         }
     }
 }

@@ -51,11 +51,16 @@ export const EVENT_PRESETS = {
     automationFinished: { name: core.AUTOMATION_FINISHED_EVENT, outcomes: [] },
     gameServerStarted: { name: "game-server.started", outcomes: [] },
     gameServerStopped: { name: "game-server.stopped", outcomes: [] },
+    gameServerCrashed: { name: "game-server.crashed", outcomes: [] },
+    playerJoined: { name: "game-server.player-joined", outcomes: [] },
     deploySucceeded: { name: "deploy.succeeded", outcomes: [] },
     deployFailed: { name: "deploy.failed", outcomes: [] },
     taskCreated: { name: "task.created", outcomes: [] },
     taskCompleted: { name: "task.completed", outcomes: [] },
-    chatMessage: { name: "chat.message", outcomes: [] }
+    chatMessage: { name: "chat.message", outcomes: [] },
+    mailReceived: { name: "mail.received", outcomes: [] },
+    driveFileUploaded: { name: "drive.file-uploaded", outcomes: [] },
+    calendarEventStarting: { name: "calendar.event-starting", outcomes: [] }
 } as const satisfies Record<string, { name: string; outcomes: readonly never[] }>;
 export type PresetKey = keyof typeof EVENT_PRESETS;
 
@@ -68,10 +73,13 @@ const preset = (key: PresetKey): CatalogItem => ({
 
 /** Each app's events, in the order its group lists them. */
 const APP_EVENT_PRESETS: Readonly<Record<core.AppEventApp, readonly PresetKey[]>> = {
-    "game-servers": ["gameServerStarted", "gameServerStopped"],
+    "game-servers": ["gameServerStarted", "gameServerStopped", "gameServerCrashed", "playerJoined"],
     deploy: ["deploySucceeded", "deployFailed"],
     chat: ["chatMessage"],
-    tasks: ["taskCreated", "taskCompleted"]
+    tasks: ["taskCreated", "taskCompleted"],
+    mail: ["mailReceived"],
+    drive: ["driveFileUploaded"],
+    calendar: ["calendarEventStarting"]
 };
 
 const PLACES_TRIGGERS = ["time", "interval", "change", "stays", "threshold", "sun"].map(

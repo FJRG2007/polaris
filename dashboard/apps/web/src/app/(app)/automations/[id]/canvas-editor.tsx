@@ -43,6 +43,9 @@ import {
     Zap,
     ZoomIn,
     ZoomOut,
+    Mail,
+    HardDrive,
+    CalendarClock,
     type LucideIcon
 } from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
@@ -796,6 +799,9 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
     deploy: Rocket,
     chat: MessagesSquare,
     tasks: ListChecks,
+    mail: Mail,
+    drive: HardDrive,
+    calendar: CalendarClock,
     logic: GitBranch,
     timing: Hourglass,
     data: Database,

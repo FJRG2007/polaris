@@ -255,6 +255,19 @@ export async function sweepCrashLoops(
             level: "warning",
             actionRequired: true
         });
+        // And to the automations listening for it. Stopping ends the loop, so this
+        // is said once per loop like the notification.
+        await Promise.resolve()
+            .then(() =>
+                host.automations.announceGameServerEvent(
+                    ownerId,
+                    install.id,
+                    "game-server.crashed",
+                    { restarts: loop.restarts, cause: loop.cause?.slice(0, 300) ?? null },
+                    `crash:${Math.floor(now.getTime() / 60_000)}`
+                )
+            )
+            .catch(() => undefined);
     }
     return { checked, stopped, resumed };
 }
