@@ -14,7 +14,12 @@ import { revalidatePath } from "next/cache";
 import { loadEnv } from "@polaris/config";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { ensureShareReachability } from "@/lib/public-reach";
-import { createShareSchema, isCidr, isIpAddress, type DriveAction } from "@polaris/core";
+import {
+    createShareSchema,
+    updateShareSchema,
+    type DriveAction,
+    type UpdateShareInput
+} from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { toLinkVisitor, type LinkVisitor } from "@/lib/link-visitor";
 import {
@@ -38,21 +43,6 @@ import { clientIp, hashForLog } from "@/lib/request-context";
 /** Attempts allowed before a public password gate blocks, and the window. */
 const UNLOCK_LIMIT = 10;
 const UNLOCK_WINDOW_MS = 15 * 60 * 1000;
-
-/** Interface a share owner uses to edit an existing link's guardrails. */
-export interface UpdateShareInput {
-    password?: string | null;
-    maxDownloads?: number | null;
-    expiresAt?: string | null;
-    allowDownload?: boolean;
-    allowPreview?: boolean;
-    allowUpload?: boolean;
-    allowRename?: boolean;
-    allowDelete?: boolean;
-    allowCreateFolder?: boolean;
-    allowOverwrite?: boolean;
-    allowedCidrs?: string[];
-}
 
 /** The powers a link hands its holder, and the Drive verb each one exercises. */
 type SharePowers = Pick<
@@ -167,44 +157,50 @@ export async function revealShareLinkAction(
     return { url };
 }
 
-/** Edit an existing share's guardrails (owner-scoped). */
+/**
+ * Edit an existing share's guardrails (owner-scoped): the same limits the create
+ * dialog offers, validated by the shared schema. Only the fields sent change.
+ */
 export async function updateShareAction(
     shareId: string,
-    input: UpdateShareInput
+    input: unknown
 ): Promise<{ error?: string }> {
     const user = await requirePermission("shares.create");
-    const cidrs = (input.allowedCidrs ?? []).map((value) => value.trim()).filter(Boolean);
-    const invalid = cidrs.find((value) => !isCidr(value) && !isIpAddress(value));
-    if (invalid)
+    const parsed = updateShareSchema.safeParse(input);
+    if (!parsed.success)
         return {
-            error: (await getTranslations("drive"))("errors.invalidCidr", { value: invalid })
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidShare")
         };
+    const edit = parsed.data;
     const target = await findOwnedShareTarget(user.id, shareId);
     if (!target) return { error: (await getTranslations("drive"))("errors.invalidShare") };
     try {
-        await authorizeSharePowers(user.id, target.connectionId, target.path, input);
+        await authorizeSharePowers(user.id, target.connectionId, target.path, edit);
     } catch (caught) {
         const error = await driveRefusal(caught);
         if (error) return { error };
         throw caught;
     }
     await updateShare(user.id, shareId, {
-        password: input.password === undefined ? undefined : input.password || null,
-        maxDownloads: input.maxDownloads === undefined ? undefined : input.maxDownloads || null,
-        expiresAt:
-            input.expiresAt === undefined
-                ? undefined
-                : input.expiresAt
-                  ? new Date(input.expiresAt)
-                  : null,
-        allowDownload: input.allowDownload,
-        allowPreview: input.allowPreview,
-        allowUpload: input.allowUpload,
-        allowRename: input.allowRename,
-        allowDelete: input.allowDelete,
-        allowCreateFolder: input.allowCreateFolder,
-        allowOverwrite: input.allowOverwrite,
-        allowedCidrs: input.allowedCidrs === undefined ? undefined : cidrs
+        password: edit.password ? edit.password : edit.clearPassword ? null : undefined,
+        maxDownloads: edit.maxDownloads,
+        expiresAt: edit.expiresAt,
+        allowDownload: edit.allowDownload,
+        allowPreview: edit.allowPreview,
+        allowUpload: edit.allowUpload,
+        allowRename: edit.allowRename,
+        allowDelete: edit.allowDelete,
+        allowCreateFolder: edit.allowCreateFolder,
+        allowOverwrite: edit.allowOverwrite,
+        allowedCidrs: edit.allowedCidrs,
+        allowedCountries: edit.allowedCountries,
+        allowedContinents: edit.allowedContinents,
+        startsAt: edit.startsAt,
+        schedule: edit.schedule,
+        requireLogin: edit.requireLogin,
+        allowedUsers: edit.allowedUsers
     });
     await recordAudit({
         actorId: user.id,

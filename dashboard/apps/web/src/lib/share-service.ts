@@ -10,7 +10,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { normalizeRelPath } from "@polaris/core";
-import type { CreateShareInput } from "@polaris/core";
+import type { CreateShareInput, LinkSchedule } from "@polaris/core";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
@@ -20,6 +20,7 @@ import {
     linkGeoAllowed,
     linkIpAllowed,
     linkUsability,
+    peopleRuleChanges,
     storedPeopleRules,
     LINK_GUARD_FIELDS,
     type LinkCheck,
@@ -101,12 +102,16 @@ export async function listSharesForOwner(ownerId: string) {
             allowPreview: true,
             allowOverwrite: true,
             allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true,
+            passwordHash: true,
             maxDownloads: true,
             downloadCount: true,
             expiresAt: true,
             revokedAt: true,
             createdAt: true,
             encryptedToken: true,
+            ...LINK_GUARD_FIELDS,
             connection: { select: { name: true } }
         }
     });
@@ -146,6 +151,12 @@ export async function updateShare(
         allowCreateFolder?: boolean;
         allowOverwrite?: boolean;
         allowedCidrs?: string[];
+        allowedCountries?: string[];
+        allowedContinents?: string[];
+        startsAt?: Date | null;
+        schedule?: LinkSchedule | null;
+        requireLogin?: boolean;
+        allowedUsers?: string[];
     }
 ): Promise<void> {
     const data: Record<string, unknown> = {};
@@ -162,6 +173,13 @@ export async function updateShare(
     if (input.allowCreateFolder !== undefined) data.allowCreateFolder = input.allowCreateFolder;
     if (input.allowOverwrite !== undefined) data.allowOverwrite = input.allowOverwrite;
     if (input.allowedCidrs !== undefined) data.allowedCidrs = JSON.stringify(input.allowedCidrs);
+    if (input.allowedCountries !== undefined) {
+        data.allowedCountries = JSON.stringify(input.allowedCountries);
+    }
+    if (input.allowedContinents !== undefined) {
+        data.allowedContinents = JSON.stringify(input.allowedContinents);
+    }
+    Object.assign(data, peopleRuleChanges(input));
     await prisma.share.updateMany({ where: { id: shareId, ownerId }, data });
 }
 
