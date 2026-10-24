@@ -1939,5 +1939,25 @@
         "goTo": "Ir al servidor"
     },
     "callDoNotDisturb": "{name} está en No molestar",
-    "callDoNotDisturbBody": "Ve la llamada, pero no le suena."
+    "callDoNotDisturbBody": "Ve la llamada, pero no le suena.",
+    "callGames": {
+        "button": "Juegos",
+        "title": "Jugar juntos",
+        "synced": "Todos en la llamada pueden unirse. Los jugadores ven dónde está cada uno y qué conduce; cada navegador ejecuta su propia ciudad.",
+        "checking": "Comprobando...",
+        "start": "Empezar",
+        "join": "Unirse",
+        "leave": "Salir",
+        "oneAtATime": "Ya hay otro juego en esta llamada.",
+        "started": "{name} empezó {game}",
+        "someone": "Alguien",
+        "someGame": "un juego",
+        "playing": "{count, plural, one {# jugando} other {# jugando}}",
+        "loading": "Cargando {game}",
+        "failed": "El juego no pudo arrancar. Sal y vuelve a unirte.",
+        "noGraphics": "Este navegador no puede dibujar 3D. Prueba un Chrome, Edge, Firefox o Safari reciente.",
+        "denied": "Un administrador ha desactivado los juegos en llamadas para tu cuenta.",
+        "missing": "Juegos no está instalado en este Polaris. Un administrador puede añadirlo desde la tienda.",
+        "seat": "Únete a la llamada para jugar."
+    }
 }

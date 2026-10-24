@@ -35,13 +35,7 @@ import {
 } from "lucide-react";
 
 export type AppCategory =
-    | "Messaging"
-    | "Productivity"
-    | "AI"
-    | "Games"
-    | "Game servers"
-    | "Home"
-    | "Tools";
+    "Messaging" | "Productivity" | "AI" | "Games" | "Game servers" | "Home" | "Tools";
 
 /** What an installed app provides, driving derived nav and which adapted
  *  dashboard is mounted. An app may declare several. */

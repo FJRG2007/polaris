@@ -120,6 +120,14 @@ export interface ConnectionsViewer {
     readonly returnTo: string | null;
 }
 
+/** A game people in a call can play together, named in the reader's language. */
+export interface CallActivityGame {
+    readonly id: string;
+    readonly name: string;
+    /** The game's page, same origin, framed inside the call. */
+    readonly src: string;
+}
+
 export interface AppExtension {
     /** The catalog id of the app, the one its install row carries. */
     readonly id: string;
@@ -269,6 +277,10 @@ export interface AppExtension {
      * through the same checks. Asked only while the app is installed.
      */
     readonly deckActions?: () => Promise<readonly AppDeckAction[]>;
+
+    /** The games people in a call can play together. Asked only when somebody
+     *  in a call opens the games button. */
+    readonly callActivities?: (locale: Locale) => Promise<readonly CallActivityGame[]>;
 
     /** The ports the router has to forward for it. */
     readonly forwardedPorts?: () => Promise<readonly GamePortRow[]>;

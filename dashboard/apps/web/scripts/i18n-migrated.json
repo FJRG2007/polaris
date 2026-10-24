@@ -795,6 +795,7 @@
         "web/src/app/(app)/chat/ask-friend-button.tsx",
         "web/src/app/(app)/chat/audio-download.ts",
         "web/src/app/(app)/chat/bans-dialog.tsx",
+        "web/src/app/(app)/chat/call-activity-panel.tsx",
         "web/src/app/(app)/chat/call-audio.tsx",
         "web/src/app/(app)/chat/call-combine-panel.tsx",
         "web/src/app/(app)/chat/call-elsewhere.tsx",

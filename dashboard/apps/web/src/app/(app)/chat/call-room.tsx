@@ -69,6 +69,7 @@ import { Cue, SoundboardButton } from "./soundboard-picker";
 import { LiveBadge } from "./call-roster";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
+import { CallGamesButton, CallGamesPanel, useCallActivity } from "./call-activity-panel";
 import { useCallVolume } from "./call-volumes";
 import { MicLevelMeter } from "./mic-level-meter";
 import { GAIN_MAX, GAIN_MIN, useMicGain } from "./mic-gain";
@@ -235,6 +236,8 @@ export function CallRoom({
 }) {
     const t = useTranslations("chat");
     const ts = useTranslations("shortcuts");
+    // Games played together in this call - see `call-activity-panel`.
+    const activity = useCallActivity(meetingId, call, Boolean(viewerId));
     // The key in force for deafening, named in its control's title.
     const deafenKey = useShortcutHint("chat.toggleDeafen");
     const withKey = (label: string) =>
@@ -717,6 +720,9 @@ export function CallRoom({
                         </span>
                     )}
                 </button>
+                {/* Play a game together, like an activity in the call. Only
+                    for an account: a guest holds no permission to play. */}
+                {viewerId && <CallGamesButton activity={activity} />}
                 {/* The band, made the whole column and back. Where a
                     watched stream gets the people in a row under it -
                     see `directLayout`. */}
@@ -796,6 +802,10 @@ export function CallRoom({
                 on the faces because a hand raised in a grid of eight thumbnails
                 is a hand nobody sees - see `call-hands-panel`. */}
             <HandStrip call={call} />
+
+            {/* A game somebody started in the call: offered to the others, and
+                played here by whoever joined. */}
+            {viewerId && <CallGamesPanel activity={activity} />}
 
             {waiting && waiting.length > 0 && (
                 <ul className="flex flex-col gap-1">
