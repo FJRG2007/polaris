@@ -11,7 +11,7 @@ import { AppInstallPanel } from "./[appId]/app-detail";
 import { uninstallAccess } from "@/lib/apps/install-access";
 import { gameForCatalogId } from "@/lib/apps/games-catalog";
 import { sessionCan, type SessionUser } from "@/lib/session";
-import { storeScope, type StoreScope } from "@/lib/apps/marketplace-store";
+import { builtInAlternatives, storeScope, type StoreScope } from "@/lib/apps/marketplace-store";
 import {
     installForReader,
     instanceWideInstallIds,
@@ -54,12 +54,34 @@ export async function storeInstalls(
 
 /** Whether this Polaris has the app, and what this reader may do about it. */
 export async function AppInstallState({ appId, user }: { appId: string; user: SessionUser }) {
-    const [installed, canInstall] = await Promise.all([
+    const [installed, canInstall, openable] = await Promise.all([
         instanceWideInstallIds().then((ids) => listInstalledApps(user.id, ids)),
-        sessionCan(user, "deploy.manage")
+        sessionCan(user, "deploy.manage"),
+        openableBuiltIns(user)
     ]);
     const installs = await Promise.all(
         installed.filter((item) => item.catalogId === appId).map((item) => readerRow(user, item))
     );
-    return <AppInstallPanel appId={appId} canInstall={canInstall} installs={installs} />;
+    return (
+        <AppInstallPanel
+            appId={appId}
+            canInstall={canInstall}
+            installs={installs}
+            openableBuiltIns={openable}
+        />
+    );
+}
+
+/**
+ * The addresses of the built-in screens this reader may open, for the note a
+ * template carries when one of them already does its job. Asked with
+ * `sessionCan`, the same question each screen answers, so the note only links
+ * where the link would work.
+ */
+export async function openableBuiltIns(user: SessionUser): Promise<string[]> {
+    const screens = builtInAlternatives();
+    const allowed = await Promise.all(
+        screens.map((screen) => (screen.permission ? sessionCan(user, screen.permission) : true))
+    );
+    return screens.filter((_, index) => allowed[index]).map((screen) => screen.href);
 }

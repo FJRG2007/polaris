@@ -16,7 +16,7 @@
  */
 
 import { redirect } from "next/navigation";
-import { storeInstalls } from "./store-installs";
+import { openableBuiltIns, storeInstalls } from "./store-installs";
 import { requirePermission } from "@/lib/session";
 import { MarketplaceView } from "./marketplace-view";
 import { adoptAppInstalls } from "@/lib/app-extensions/registry";
@@ -39,13 +39,17 @@ export default async function MarketplacePage({
     const { app } = await searchParams;
     const focus = typeof app === "string" ? findStoreApp(app) : undefined;
     if (focus && storeScope(focus) === "polaris") redirect(polarisAppsHref(focus.id));
-    const { installed, canInstall } = await storeInstalls(user, "deployable");
+    const [{ installed, canInstall }, openable] = await Promise.all([
+        storeInstalls(user, "deployable"),
+        openableBuiltIns(user)
+    ]);
     return (
         <MarketplaceView
             installed={installed}
             initialQuery={focus?.name ?? ""}
             canInstall={canInstall}
             canBrowsePolaris={user.isAdmin}
+            openableBuiltIns={openable}
         />
     );
 }

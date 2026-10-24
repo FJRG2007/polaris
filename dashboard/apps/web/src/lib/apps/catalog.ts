@@ -216,6 +216,9 @@ export interface AppManifest {
     thirdParty?: boolean;
     /** The Deploy template an entry stands for, for `deploy-template`. */
     deployTemplate?: string;
+    /** Where the app's own logo is served from, for an entry Polaris has the
+     *  project's mark for (`AppMark` draws it instead of the icon). */
+    logo?: string;
     /** Not offered in the marketplace: it is created from inside another app that
      *  owns it (a Minecraft server is created by the Game servers app). Still a
      *  real manifest - it is what the install is made from. */

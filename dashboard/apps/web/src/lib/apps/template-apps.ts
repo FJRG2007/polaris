@@ -47,6 +47,23 @@ const TEMPLATE_CATEGORIES: Readonly<Record<string, AppCategory>> = {
     wordpress: "Productivity"
 };
 
+/**
+ * Templates whose logo is a picture rather than a vector, by template id.
+ *
+ * Every template's logo is served from `public/logos/apps/<template id>`, and is
+ * the project's own mark as collected by homarr-labs/dashboard-icons (commit
+ * d3b9234, Apache-2.0; each mark is its owner's trademark). Langflow is not in
+ * that set and comes from Simple Icons 16.32.0. Only three projects publish no
+ * vector there, so they are the exception listed here rather than an extension
+ * kept per template; the marketplace test checks every template has its file.
+ */
+const RASTER_LOGOS: ReadonlySet<string> = new Set(["code-server", "ghost", "memos"]);
+
+/** Where a template's logo is served from. */
+export function templateLogoSrc(templateId: string): string {
+    return `/logos/apps/${templateId}.${RASTER_LOGOS.has(templateId) ? "webp" : "svg"}`;
+}
+
 /** The store entry for one template. */
 export function templateApp(template: ServiceTemplate): AppManifest {
     return {
@@ -54,6 +71,7 @@ export function templateApp(template: ServiceTemplate): AppManifest {
         name: template.name,
         category: TEMPLATE_CATEGORIES[template.id] ?? "Tools",
         icon: LayoutTemplate,
+        logo: templateLogoSrc(template.id),
         summary: template.description,
         description: template.description,
         installMethod: "deploy-template",

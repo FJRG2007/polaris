@@ -3,8 +3,9 @@
 [Read in English](vault.md) - [Volver al README](../../README.es.md)
 
 Un gestor de contraseñas que habla el protocolo de Bitwarden, así que las apps
-y extensiones de Bitwarden apuntan a tu propio Polaris. Todo se cifra en el
-navegador; el servidor nunca ve la contraseña maestra ni lo que guardas.
+y extensiones de Bitwarden apuntan a tu propio Polaris, como lo harían a
+Vaultwarden. Todo se cifra en el navegador; el servidor nunca ve la contraseña
+maestra ni lo que guardas.
 
 Cada imagen es la interfaz real dibujada con personas y datos inventados, y
 sigue tu ajuste claro u oscuro. Las versiones para móvil están en

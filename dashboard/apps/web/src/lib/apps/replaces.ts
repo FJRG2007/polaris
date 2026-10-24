@@ -17,9 +17,14 @@ export interface ReplacedProduct {
     readonly name: string;
     /** The tile's file name, without `.svg`. */
     readonly logo: string;
+    /** The app's own screen that does the product's job, by its `href`, where
+     *  that is one section of the app rather than the app itself (Analytics
+     *  inside Apps). */
+    readonly section?: string;
 }
 
-const product = (name: string, logo: string): ReplacedProduct => ({ name, logo });
+const product = (name: string, logo: string, section?: string): ReplacedProduct =>
+    section ? { name, logo, section } : { name, logo };
 
 export const APP_REPLACES: Readonly<Record<string, readonly ReplacedProduct[]>> = {
     // Built in: Deploy, Analytics and the rest of Apps.
@@ -28,8 +33,9 @@ export const APP_REPLACES: Readonly<Record<string, readonly ReplacedProduct[]>> 
         product("Render", "render"),
         product("Fly.io", "fly-io"),
         product("Vercel", "vercel"),
-        product("Google Analytics", "google-analytics"),
-        product("Plausible", "plausible")
+        product("Google Analytics", "google-analytics", "/apps/analytics"),
+        product("Plausible", "plausible", "/apps/analytics"),
+        product("Umami", "umami", "/apps/analytics")
     ],
     chat: [
         product("Discord", "discord"),
@@ -39,21 +45,27 @@ export const APP_REPLACES: Readonly<Record<string, readonly ReplacedProduct[]>> 
         product("Signal", "signal"),
         product("Zoom", "zoom"),
         product("Google Meet", "google-meet"),
-        product("Microsoft Teams", "microsoft-teams")
+        product("Microsoft Teams", "microsoft-teams"),
+        product("Mattermost", "mattermost")
     ],
     tasks: [
         product("ClickUp", "clickup"),
         product("Jira", "jira"),
         product("Linear", "linear"),
         product("Asana", "asana"),
-        product("Trello", "trello")
+        product("Trello", "trello"),
+        product("Vikunja", "vikunja")
     ],
     drive: [
         product("Google Drive", "google-drive"),
         product("Dropbox", "dropbox"),
         product("Nextcloud", "nextcloud")
     ],
-    vault: [product("Bitwarden", "bitwarden"), product("1Password", "1password")],
+    vault: [
+        product("Bitwarden", "bitwarden"),
+        product("1Password", "1password"),
+        product("Vaultwarden", "vaultwarden")
+    ],
     mail: [product("Gmail", "gmail"), product("Microsoft Outlook", "microsoft-outlook")],
     notes: [product("Notion", "notion"), product("Obsidian", "obsidian")],
     office: [

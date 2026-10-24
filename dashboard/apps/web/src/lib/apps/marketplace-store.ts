@@ -5,7 +5,9 @@
  * app's own page and the tests all read the same answers.
  */
 
-import { POLARIS_APPS, type AppEntry } from "@/lib/apps";
+import type { Permission } from "@polaris/core";
+import { APP_SECTIONS, POLARIS_APPS, type AppEntry } from "@/lib/apps";
+import { appReplaces, type ReplacedProduct } from "@/lib/apps/replaces";
 import { appProvenance } from "@/lib/apps/provenance";
 import { hasScreenshots } from "@/lib/apps/app-screenshots";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
@@ -243,4 +245,59 @@ const NOT_AN_APP = new Set(["overview", "admin", "account"]);
  */
 export function builtInApps(): AppEntry[] {
     return POLARIS_APPS.filter((app) => !app.requiresApp && !app.hidden && !NOT_AN_APP.has(app.id));
+}
+
+/** A built-in screen that does a Deploy template's job, and what opens it. */
+export interface BuiltInAlternative {
+    /** The catalogue label, translated where it is drawn (`useNavLabel`). */
+    label: string;
+    href: string;
+    /** What the reader needs to open it; none for a screen open to anyone. */
+    permission?: Permission;
+}
+
+function alternativeFor(entry: AppEntry, item: ReplacedProduct): BuiltInAlternative | undefined {
+    if (!item.section)
+        return { label: entry.label, href: entry.href, permission: entry.permission };
+    const section = APP_SECTIONS[entry.id]?.find((candidate) => candidate.href === item.section);
+    if (!section) return undefined;
+    return {
+        label: section.label,
+        href: section.href,
+        permission: section.needs ?? entry.permission
+    };
+}
+
+/**
+ * The built-in screen that already does a Deploy template's job, if one does.
+ *
+ * Read off what each built-in replaces (`APP_REPLACES`) rather than kept as a
+ * second table: a built-in that lists a template's own product - the product's
+ * tile is named after the template id, as Vaultwarden's is `vaultwarden` - does
+ * that template's job, so the card can say so. A claim only has to be made once,
+ * in the table the store page and the README already read. Where the product
+ * names one section of the app (Umami's is Analytics, inside Apps), that section
+ * is the screen, with the permission it needs rather than the app's.
+ */
+export function builtInAlternative(app: AppManifest): BuiltInAlternative | undefined {
+    const product = app.deployTemplate;
+    if (!product) return undefined;
+    for (const entry of builtInApps()) {
+        const item = appReplaces(entry.id).find((candidate) => candidate.logo === product);
+        if (item) return alternativeFor(entry, item);
+    }
+    return undefined;
+}
+
+/** Every screen `builtInAlternative` can name, once each, for the server to ask
+ *  which of them a reader may open. */
+export function builtInAlternatives(): BuiltInAlternative[] {
+    const byHref = new Map<string, BuiltInAlternative>();
+    for (const entry of builtInApps()) {
+        for (const item of appReplaces(entry.id)) {
+            const alternative = alternativeFor(entry, item);
+            if (alternative) byHref.set(alternative.href, alternative);
+        }
+    }
+    return [...byHref.values()];
 }

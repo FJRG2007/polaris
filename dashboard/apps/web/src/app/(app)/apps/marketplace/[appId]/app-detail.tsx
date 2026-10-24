@@ -36,6 +36,7 @@ import {
 } from "@/lib/apps/marketplace-store";
 import { GameLogo } from "@/components/game-logo";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
+import { BuiltInAlternativeNote } from "../built-in-alternative";
 import { ReplacesRow } from "../replaces-row";
 import { useLocalizeStoreApp } from "../use-store-words";
 import { TemplateDeployDialog } from "../template-deploy-dialog";
@@ -232,12 +233,16 @@ export interface DetailInstall extends InstalledAppReaderView {
 export function AppInstallPanel({
     appId,
     canInstall,
-    installs
+    installs,
+    openableBuiltIns = []
 }: {
     appId: string;
     /** deploy.manage, the permission the install action requires. */
     canInstall: boolean;
     installs: DetailInstall[];
+    /** Addresses of the built-in screens this reader may open
+     *  (`BuiltInAlternativeNote`). */
+    openableBuiltIns?: readonly string[];
 }) {
     const t = useTranslations("marketplace");
     const app = useLocalizedApp(appId);
@@ -285,6 +290,7 @@ export function AppInstallPanel({
             {action.kind === "locked" && (
                 <p className="text-muted-foreground text-sm">{t("detail.readOnly")}</p>
             )}
+            <BuiltInAlternativeNote app={manifest} openable={new Set(openableBuiltIns)} />
             {error && <p className="text-danger text-sm">{error}</p>}
 
             {installs.length > 0 && (

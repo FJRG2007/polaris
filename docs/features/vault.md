@@ -3,8 +3,9 @@
 [Leer en español](vault.es.md) - [Back to the README](../../README.md)
 
 A password manager that speaks the Bitwarden protocol, so the Bitwarden apps
-and browser extensions point at your own Polaris. Everything is encrypted in
-the browser; the server never sees the master password or what is stored.
+and browser extensions point at your own Polaris, as they would at Vaultwarden.
+Everything is encrypted in the browser; the server never sees the master
+password or what is stored.
 
 Every picture is the real interface drawn with made-up people and data, and
 follows your light or dark setting. Phone-sized versions are in

@@ -65,6 +65,8 @@
     "card": {
         "by": "De {developer}",
         "byImage": "De {developer} - imagen de {distributor}",
+        "builtIn": "Polaris ya lo hace con {app}: integrado con el resto de Polaris y sin nada que desplegar.",
+        "builtInOpen": "Abrir {app}",
         "consent": "Instalar supone aceptar <link>{label}</link>.",
         "installedCount": "{count, plural, one {# instalada} other {# instaladas}}",
         "open": "Abrir",
