@@ -97,6 +97,12 @@ vi.mock("@/lib/polar/threads", () => ({
     }
 }));
 vi.mock("@/lib/polar/run-notices", () => ({ noticePolarRunEnd: async () => undefined }));
+// No chat here has a /goal (`goal-route.test.ts` covers the ones that do).
+vi.mock("@/lib/polar/goal-store", () => ({
+    polarGoal: async () => null,
+    setPolarGoal: async () => null,
+    savePolarGoal: async () => false
+}));
 vi.mock("@/lib/polar/titles", () => ({
     startPolarTitle: (...args: unknown[]) => void state.titled.push(args)
 }));

@@ -12,7 +12,10 @@
  * prompt: the prompt stays byte-identical across screens and the tools across
  * screens of one app, so the provider's prompt cache keeps hitting. The model
  * is sent the core tools and the current app's (`tool-relevance.ts`);
- * `find_tools` brings in the rest.
+ * `find_tools` brings in the rest. A chat with a `/goal` has each finished
+ * turn judged against it inside this same stream (`goal-service.ts`); the
+ * screen sends the next turn only on a not-met verdict, and this route admits
+ * it only while the goal has turns and time left.
  */
 
 import { z } from "zod";
@@ -78,6 +81,9 @@ import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import { POLAR_RUNS_MAX, beginPolarRun } from "@/lib/polar/runs";
+import { GOAL_CONDITION_MAX, goalHasRoom, goalTurnOf } from "@/lib/polar/goals";
+import { goalCheckStream } from "@/lib/polar/goal-service";
+import { polarGoal, savePolarGoal, setPolarGoal } from "@/lib/polar/goal-store";
 import { noticePolarRunEnd } from "@/lib/polar/run-notices";
 import {
     FAILURE_PART,
@@ -283,6 +289,24 @@ export async function POST(request: Request): Promise<Response> {
     if (!owned) return refuse("not_found", 404);
     // The stored kind decides, whatever this request said.
     const temporary = owned.temporary;
+    // The chat's /goal (`goals.ts`): the message that sets it names it, and a
+    // turn the goal sends itself is admitted only while it has room left.
+    const goalTurn = goalTurnOf(messages.at(-1));
+    let goal = await polarGoal(user.id, body.data.threadId);
+    if (goalTurn === "set") {
+        const condition = firstText(messages.at(-1)).trim();
+        if (!condition || condition.length > GOAL_CONDITION_MAX) return refuse("invalid", 400);
+        goal = await setPolarGoal(user.id, body.data.threadId, condition);
+    } else if (goalTurn && (!goal || !goalHasRoom(goal, Date.now()))) {
+        return refuse("goal_ended", 409);
+    } else if (goal?.status === "active" && goal.idle > 0 && messages.at(-1)?.role === "user") {
+        // A goal paused for want of tool use is judged again from the next
+        // message the person sends, as Claude Code resumes it.
+        if (goalTurn !== "continue") {
+            goal = { ...goal, idle: 0 };
+            await savePolarGoal(user.id, body.data.threadId, goal);
+        }
+    }
     const [instructions, remembers] = await Promise.all([
         polarThreadInstructions(user.id, body.data.threadId),
         temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id)
@@ -487,6 +511,7 @@ export async function POST(request: Request): Promise<Response> {
         }
     });
 
+    const activeGoal = goal?.status === "active" ? goal : null;
     const stream = createUIMessageStream({
         originalMessages: messages,
         // The answer's id is decided here and sent with its first chunk, so the
@@ -494,7 +519,32 @@ export async function POST(request: Request): Promise<Response> {
         // an empty id, which every later answer collides with and is dropped.
         // A turn that continues an answer keeps that answer's id.
         generateId,
-        execute: ({ writer }) => writer.merge(answer.pipeThrough(failureIntoAnswer())),
+        execute: ({ writer }) => {
+            const told = answer.pipeThrough(failureIntoAnswer());
+            writer.merge(
+                activeGoal
+                    ? told.pipeThrough(
+                          goalCheckStream({
+                              userId: user.id,
+                              threadId: body.data.threadId,
+                              goal: activeGoal,
+                              messages,
+                              helper: () =>
+                                  polarPreferences(user.id)
+                                      .catch(() => null)
+                                      .then((settings) =>
+                                          polarHelperModel(
+                                              user.id,
+                                              resolved,
+                                              settings?.helperModel ?? null,
+                                              access
+                                          )
+                                      )
+                          })
+                      )
+                    : told
+            );
+        },
         onFinish: async ({ messages: finished, responseMessage }) => {
             await save(finished);
             if (spent) {

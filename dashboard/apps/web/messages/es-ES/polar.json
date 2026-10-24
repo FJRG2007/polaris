@@ -197,6 +197,7 @@
             "branch": "Seguir desde aquí en un chat nuevo",
             "temp": "Abrir un chat temporal, o salir de él",
             "memory": "Abrir lo que Polar recuerda",
+            "goal": "Seguir trabajando hasta cumplir una condición",
             "help": "Ver todos los comandos"
         }
     },
@@ -806,5 +807,33 @@
         "answering": "Respondiendo",
         "approval": "Esta respuesta espera tu aprobación. Sigue con este chat para responderla.",
         "continue": "Seguir con esta"
+    },
+    "goal": {
+        "state": {
+            "active": "Trabajando en el objetivo",
+            "idle": "Objetivo en pausa: sin avances en los últimos turnos",
+            "unchecked": "Objetivo en pausa: la comprobación no respondió",
+            "met": "Objetivo cumplido",
+            "impossible": "El objetivo no se puede cumplir",
+            "limit": "Objetivo detenido en su límite"
+        },
+        "progress": "Turno {turns} de {max}, {minutes} de {limit} min, {tokens} tokens",
+        "verdict": {
+            "not_met": "Objetivo aún sin cumplir.",
+            "met": "Objetivo cumplido.",
+            "impossible": "El objetivo no se puede cumplir.",
+            "limit": "Objetivo detenido al llegar a su límite de turnos o tiempo.",
+            "idle": "Objetivo en pausa: no se usaron herramientas en los últimos turnos.",
+            "unchecked": "Objetivo en pausa: la comprobación no respondió."
+        },
+        "continued": "Siguió trabajando en el objetivo",
+        "resumed": "Objetivo reanudado",
+        "continue": "Seguir con el objetivo",
+        "clear": "Quitar objetivo",
+        "dismiss": "Descartar",
+        "cleared": "Objetivo quitado",
+        "clearFailed": "No se pudo quitar el objetivo. Inténtalo de nuevo.",
+        "none": "No hay objetivo. Escribe /goal y cuándo se da por terminado.",
+        "tooLong": "Un objetivo puede tener hasta {max} caracteres."
     }
 }

@@ -528,6 +528,7 @@ export type BuiltinCommand = (typeof POLAR_BUILTIN_COMMANDS)[number];
 /**
  * The commands that act on the conversation itself, as Claude Code's /clear
  * and /compact do (https://code.claude.com/docs/en/commands): they run here,
+ * /goal included (it sends its condition as the turn that starts it),
  * never reach the model as text, and no command of a person's can take their
  * name. Left out of Claude Code's list: /init, /rewind and /resume (a chat has
  * no project files to set up or restore; the history list already reopens
@@ -543,6 +544,7 @@ export const POLAR_CONTROL_COMMANDS = [
     "branch",
     "temp",
     "memory",
+    "goal",
     "help"
 ] as const;
 export type ControlCommand = (typeof POLAR_CONTROL_COMMANDS)[number];

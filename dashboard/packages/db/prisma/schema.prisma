@@ -15507,6 +15507,9 @@ model PolarThread {
     // The chat a branch was first copied from, shared by every branch of a
     // branch, so files they carry in common are looked for only in that family.
     branchRootId String?          @db.Uuid
+    // The chat's /goal (`lib/polar/goals.ts`): the condition Polar keeps
+    // working toward, its counters and the newest judgement. Null for none.
+    goal        Json?
     createdAt   DateTime          @default(now())
     updatedAt   DateTime          @updatedAt
     messages    PolarMessage[]
