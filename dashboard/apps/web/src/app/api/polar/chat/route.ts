@@ -293,10 +293,9 @@ export async function POST(request: Request): Promise<Response> {
     // turn the goal sends itself is admitted only while it has room left.
     const goalTurn = goalTurnOf(messages.at(-1));
     let goal = await polarGoal(user.id, body.data.threadId);
-    if (goalTurn === "set") {
-        const condition = firstText(messages.at(-1)).trim();
+    const condition = goalTurn === "set" ? firstText(messages.at(-1)).trim() : null;
+    if (condition !== null) {
         if (!condition || condition.length > GOAL_CONDITION_MAX) return refuse("invalid", 400);
-        goal = await setPolarGoal(user.id, body.data.threadId, condition);
     } else if (goalTurn && (!goal || !goalHasRoom(goal, Date.now()))) {
         return refuse("goal_ended", 409);
     } else if (goal?.status === "active" && goal.idle > 0 && messages.at(-1)?.role === "user") {
@@ -418,6 +417,12 @@ export async function POST(request: Request): Promise<Response> {
         return refusedTurn(messages, { code: "too_many_runs", max: POLAR_RUNS_MAX }, save);
     }
     run.watch(request.signal);
+    if (condition) {
+        goal = await setPolarGoal(user.id, body.data.threadId, condition).catch((error) => {
+            console.error("polar: could not set the goal", error);
+            return null;
+        });
+    }
     // A new question is kept now, so the chat opened again mid-answer shows it;
     // a turn that continues an answer is already stored.
     if (messages.at(-1)?.role === "user") await save(messages);

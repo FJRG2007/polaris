@@ -45,7 +45,8 @@ const state = {
     models: [] as MockLanguageModelV4[],
     unreadable: null as string | null,
     failWith: null as null | { statusCode: number; message: string },
-    prompts: [] as unknown[]
+    prompts: [] as unknown[],
+    goalsSet: [] as unknown[][]
 };
 
 vi.mock("@/lib/polar/access", async () => ({
@@ -100,7 +101,10 @@ vi.mock("@/lib/polar/run-notices", () => ({ noticePolarRunEnd: async () => undef
 // No chat here has a /goal (`goal-route.test.ts` covers the ones that do).
 vi.mock("@/lib/polar/goal-store", () => ({
     polarGoal: async () => null,
-    setPolarGoal: async () => null,
+    setPolarGoal: async (...args: unknown[]) => {
+        state.goalsSet.push(args);
+        return null;
+    },
     savePolarGoal: async () => false
 }));
 vi.mock("@/lib/polar/titles", () => ({
@@ -284,6 +288,7 @@ beforeEach(() => {
     state.unreadable = null;
     state.failWith = null;
     state.prompts = [];
+    state.goalsSet = [];
 });
 
 /** The messages a turn saved, from its savePolarMessages call. */
@@ -391,6 +396,26 @@ describe("what a request has to look like", () => {
             type: "data-polar-failure",
             data: { code: "usage_limit", used: 120, amount: 100, period: "day" }
         });
+    });
+
+    it("keeps the chat's goal when the turn setting a new one is refused", async () => {
+        state.source = "instance";
+        state.hit = { used: 120, amount: 100, period: "day" };
+        const goal = {
+            messages: [
+                {
+                    id: "u1",
+                    role: "user",
+                    parts: [{ type: "text", text: "all tests pass" }],
+                    metadata: { goal: "set" }
+                }
+            ]
+        };
+        await (await post(body(goal))).text();
+        expect(state.goalsSet).toEqual([]);
+        state.hit = null;
+        await (await post(body(goal))).text();
+        expect(state.goalsSet).toEqual([[USER.id, THREAD, "all tests pass"]]);
     });
 
     it("keeps a turn whose file the model could not read, with the file's name", async () => {

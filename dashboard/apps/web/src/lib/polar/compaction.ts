@@ -160,20 +160,43 @@ export function keepFor(messages: readonly MessageLike[], auto: boolean): number
     return 0;
 }
 
-/** One message as the summariser reads it: its words, and each tool it used
+/** How a transcript names the assistant and cuts each tool it used. */
+export interface TranscriptStyle {
+    assistant: string;
+    /** Longest tool input or result kept, in characters. */
+    toolChars: number;
+    /** Whether each tool's input is shown next to its name. */
+    toolInput?: boolean;
+}
+
+function cutValue(value: unknown, most: number): string {
+    let text = "";
+    try {
+        text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+    } catch {
+        text = "";
+    }
+    return text.length > most ? `${text.slice(0, most)}...` : text;
+}
+
+/** One message as a helper model reads it: its words, and each tool it used
  *  with its result cut short. */
-function transcriptLine(message: MessageLike): string {
+export function transcriptLine(message: MessageLike, style: TranscriptStyle): string {
     const pieces: string[] = [];
     for (const part of message.parts) {
         const entry = part as {
             type?: string;
             text?: unknown;
             toolName?: unknown;
+            state?: unknown;
+            input?: unknown;
             output?: unknown;
+            errorText?: unknown;
             filename?: unknown;
         };
-        if (entry?.type === "text" && typeof entry.text === "string") pieces.push(entry.text);
-        else if (entry?.type === "file")
+        if (entry?.type === "text" && typeof entry.text === "string") {
+            if (entry.text.trim()) pieces.push(entry.text.trim());
+        } else if (entry?.type === "file")
             pieces.push(`[file ${typeof entry.filename === "string" ? entry.filename : ""}]`);
         else if (
             typeof entry?.type === "string" &&
@@ -183,20 +206,19 @@ function transcriptLine(message: MessageLike): string {
                 entry.type === "dynamic-tool"
                     ? String(entry.toolName ?? "tool")
                     : entry.type.slice(5);
-            let output = "";
-            try {
-                output = entry.output === undefined ? "" : JSON.stringify(entry.output);
-            } catch {
-                output = "";
-            }
-            const cut =
-                output.length > TOOL_RESULT_CHARS
-                    ? `${output.slice(0, TOOL_RESULT_CHARS)}...`
-                    : output;
-            pieces.push(`[tool ${name}${cut ? `: ${cut}` : ""}]`);
+            const input = style.toolInput ? `(${cutValue(entry.input, style.toolChars)})` : "";
+            const result =
+                entry.state === "output-error"
+                    ? `error: ${cutValue(entry.errorText, style.toolChars)}`
+                    : entry.state === "output-denied"
+                      ? "denied by the person"
+                      : entry.output === undefined
+                        ? ""
+                        : cutValue(entry.output, style.toolChars);
+            pieces.push(`[tool ${name}${input}${result ? `: ${result}` : ""}]`);
         }
     }
-    return `${message.role === "user" ? "User" : "Polar"}: ${pieces.join("\n")}`;
+    return `${message.role === "user" ? "User" : style.assistant}: ${pieces.join("\n")}`;
 }
 
 /**
@@ -208,7 +230,9 @@ export function compactionTranscript(
     previous: string | null,
     messages: readonly MessageLike[]
 ): string {
-    const lines = messages.map(transcriptLine);
+    const lines = messages.map((message) =>
+        transcriptLine(message, { assistant: "Polar", toolChars: TOOL_RESULT_CHARS })
+    );
     let text = lines.join("\n\n");
     if (text.length > POLAR_TRANSCRIPT_MAX) text = text.slice(-POLAR_TRANSCRIPT_MAX);
     return previous ? `Summary so far:\n${previous}\n\nConversation since:\n${text}` : text;
