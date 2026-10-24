@@ -18,7 +18,7 @@ import { hostUi } from "@polaris/app-host/client";
 import { StatusNote, useIssueText } from "../public/kit";
 import * as proposalActions from "../../actions/proposals";
 import type { ProposalView } from "../../lib/scheduling-wire";
-import { Button, Input, Select, Switch, Textarea, isDirty } from "@polaris/ui";
+import { Button, Input, Select, Switch, Textarea, isDirty, DateInput } from "@polaris/ui";
 import { emailSchema, proposalInputSchema } from "../../lib/scheduling-schemas";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
@@ -301,8 +301,8 @@ export function ProposalEditor({
                 <ul className="flex flex-col gap-1.5">
                     {draft.dates.map((date, index) => (
                         <li key={index} className="flex items-center gap-2">
-                            <Input
-                                type="datetime-local"
+                            <DateInput
+                                mode="datetime"
                                 value={date}
                                 onChange={(event) =>
                                     set(

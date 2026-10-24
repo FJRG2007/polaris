@@ -38,7 +38,8 @@ import {
     Select,
     Skeleton,
     Switch,
-    useToast
+    useToast,
+    DateInput
 } from "@polaris/ui";
 
 type Draft = model.AlarmInput & { readonly id: string | null };
@@ -370,8 +371,8 @@ function AlarmDialog({
                                 {" *"}
                             </span>
                         </span>
-                        <Input
-                            type="time"
+                        <DateInput
+                            mode="time"
                             required
                             value={form.time}
                             onChange={(event) => setForm({ ...form, time: event.target.value })}

@@ -16,7 +16,7 @@ import { hostUi } from "@polaris/app-host/client";
 import * as calendarActions from "../actions/calendars";
 import * as preferenceActions from "../actions/preferences";
 import { cacheKey, unwrap, useCachedRead } from "./cached-read";
-import { Button, cn, Input, SegmentedControl, Skeleton } from "@polaris/ui";
+import { Button, cn, SegmentedControl, Skeleton, DateInput } from "@polaris/ui";
 import type { CalendarSummary, OccurrenceView, RangeView } from "../lib/wire";
 import {
     DEFAULT_PREFERENCES,
@@ -193,8 +193,8 @@ export function PrintView({ view, date }: { view: string | null; date: string | 
             <div className="pc-no-print flex flex-wrap items-end gap-3">
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                     {t("printPage.from")}
-                    <Input
-                        type="date"
+                    <DateInput
+                        mode="date"
                         className="w-40 tabular-nums"
                         value={span.start}
                         onChange={(event) => setSpan({ ...span, start: event.target.value })}
@@ -202,8 +202,8 @@ export function PrintView({ view, date }: { view: string | null; date: string | 
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                     {t("printPage.to")}
-                    <Input
-                        type="date"
+                    <DateInput
+                        mode="date"
                         className="w-40 tabular-nums"
                         value={lastDay}
                         onChange={(event) =>

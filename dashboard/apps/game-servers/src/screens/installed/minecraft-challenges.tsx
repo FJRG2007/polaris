@@ -995,8 +995,8 @@ export function MinecraftChallenges({
                                                         <span className="font-medium">
                                                             {t("goals.start")}
                                                         </span>
-                                                        <ui.Input
-                                                            type="date"
+                                                        <ui.DateInput
+                                                            mode="date"
                                                             disabled={locked}
                                                             value={goal.start}
                                                             onChange={(event) =>
@@ -1343,8 +1343,8 @@ function SettingsFields({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("settings.resetAt")}</span>
-                        <ui.Input
-                            type="time"
+                        <ui.DateInput
+                            mode="time"
                             value={settings.resetAt}
                             disabled={locked}
                             onChange={(event) => change({ resetAt: event.target.value })}
@@ -1553,8 +1553,8 @@ function SettingsFields({
                     />
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("settings.seasonStart")}</span>
-                        <ui.Input
-                            type="date"
+                        <ui.DateInput
+                            mode="date"
                             value={settings.season.start}
                             disabled={locked}
                             onChange={(event) => nested("season", { start: event.target.value })}

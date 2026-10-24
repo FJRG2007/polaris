@@ -39,7 +39,8 @@ import {
     EmptyState,
     Select,
     Skeleton,
-    cn
+    cn,
+    DateInput
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -328,19 +329,19 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                         ]}
                     />
                 ) : null}
-                <input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={from}
                     onChange={(event) => setFrom(event.target.value)}
                     aria-label={t("events.from")}
-                    className="h-9 rounded-md border border-border bg-field px-2 text-[0.8125rem] text-foreground"
+                    className="w-56"
                 />
-                <input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={to}
                     onChange={(event) => setTo(event.target.value)}
                     aria-label={t("events.to")}
-                    className="h-9 rounded-md border border-border bg-field px-2 text-[0.8125rem] text-foreground"
+                    className="w-56"
                 />
                 {cameraId || kind || label || zone || from || to ? (
                     <Button

@@ -12,7 +12,7 @@ import { useState } from "react";
 import * as engine from "../engine";
 import { useCalendarT, useRuleT } from "./i18n";
 import type { AlarmDraft } from "./editor-model";
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, Input, Select, DateInput } from "@polaris/ui";
 import { Bell, Mail, Plus, Volume2, X } from "lucide-react";
 
 /** Google's limit, and plenty. */
@@ -269,8 +269,8 @@ export function RemindersEditor({
                             />
                         </>
                     ) : (
-                        <Input
-                            type="datetime-local"
+                        <DateInput
+                            mode="datetime"
                             aria-label={t("reminderEditor.onDate")}
                             className="w-56 tabular-nums"
                             value={custom.at}

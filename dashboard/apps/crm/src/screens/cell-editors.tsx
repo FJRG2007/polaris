@@ -14,7 +14,7 @@ import { useCrmT } from "./i18n";
 import { Star, X } from "lucide-react";
 import { OptionChip } from "./cell-display";
 import { currencyName } from "./format";
-import { cn, Select } from "@polaris/ui";
+import { Checkbox, cn, Select, DateInput } from "@polaris/ui";
 import { CURRENCIES } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import type { FieldDef, FieldValue, FullName, Money } from "../model/objects";
@@ -332,17 +332,27 @@ export function DateEditor({ field, value, onCommit, onCancel }: EditorProps) {
     const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
     return (
         <Overlay onOutside={keep} error={result.error} className="w-[13rem]">
-            <div className="flex items-center gap-1">
-                <input
+            <div
+                className="flex items-center gap-1"
+                onKeyDown={(event) => {
+                    // The calendar's own keys (Enter picks a day, Escape closes it)
+                    // stay the calendar's; on the field they keep or drop the edit.
+                    const target = event.target as Element;
+                    if (!target.closest("[data-radix-popper-content-wrapper]")) {
+                        keys(event, keep, onCancel);
+                    }
+                }}
+            >
+                <DateInput
                     autoFocus
-                    type="date"
-                    className={FIELD_INPUT}
+                    mode="date"
+                    clearable={false}
+                    className="min-w-0 flex-1"
                     value={text}
                     min="1900-01-01"
                     max="2999-12-31"
                     aria-label={t("fields.valueOf")}
                     onChange={(event) => setText(event.target.value)}
-                    onKeyDown={(event) => keys(event, keep, onCancel)}
                 />
                 {text ? (
                     <button
@@ -442,8 +452,7 @@ export function ChoicesEditor({ field, value, onCommit, onCancel }: EditorProps)
                         key={option}
                         className="flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-card-hover"
                     >
-                        <input
-                            type="checkbox"
+                        <Checkbox
                             autoFocus={index === 0}
                             checked={chosen.includes(option)}
                             onChange={(event) =>

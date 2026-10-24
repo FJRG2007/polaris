@@ -15,7 +15,7 @@ import { ToggleChip } from "./ui";
 import * as engine from "../engine";
 import { useCalendarT, useRuleT } from "./i18n";
 import { useId, useMemo, useState } from "react";
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, Checkbox, Input, Select, DateInput } from "@polaris/ui";
 import { AlertTriangle, Repeat } from "lucide-react";
 
 type Model = engine.RuleEditorModel;
@@ -285,14 +285,12 @@ export function RecurrenceEditor({
                         ))}
                     </div>
                     <label className="flex items-center gap-1.5 text-xs">
-                        <input
-                            type="checkbox"
+                        <Checkbox
                             checked={value.monthlyMode === "ordinal"}
                             disabled={disabled}
                             onChange={(event) =>
                                 set({ monthlyMode: event.target.checked ? "ordinal" : "day" })
                             }
-                            className="accent-[hsl(var(--primary))]"
                         />
                         {t("repeat.yearlyOrdinal")}
                     </label>
@@ -333,8 +331,8 @@ export function RecurrenceEditor({
                         }))}
                     />
                     {value.end.kind === "until" ? (
-                        <Input
-                            type="date"
+                        <DateInput
+                            mode="date"
                             aria-label={t("repeat.untilDate")}
                             className="w-40 tabular-nums"
                             disabled={disabled}

@@ -22,7 +22,7 @@ import type { AuditReading } from "../actions/audit";
 import { ArrowRight, Download, History } from "lucide-react";
 import { EVENT_KINDS, type EventKind } from "../model/timeline";
 import { CRM_OBJECTS, fieldsOf, type CrmObject } from "../model/objects";
-import { Button, EmptyState, Input, Select, useToast } from "@polaris/ui";
+import { Button, EmptyState, Select, useToast, DateInput } from "@polaris/ui";
 import { auditRange, type AuditEvent, type AuditQuery } from "../model/audit";
 
 const ALL = "all";
@@ -338,8 +338,8 @@ export function AuditScreen() {
                 />
                 <label className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
                     {t("audit.from")}
-                    <Input
-                        type="date"
+                    <DateInput
+                        mode="date"
                         className="h-8 w-[9.5rem]"
                         value={filters.from}
                         max={filters.to || undefined}
@@ -348,8 +348,8 @@ export function AuditScreen() {
                 </label>
                 <label className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
                     {t("audit.to")}
-                    <Input
-                        type="date"
+                    <DateInput
+                        mode="date"
                         className="h-8 w-[9.5rem]"
                         value={filters.to}
                         min={filters.from || undefined}

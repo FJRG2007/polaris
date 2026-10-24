@@ -67,7 +67,9 @@ import {
     Skeleton,
     Textarea,
     useToast,
-    shortcutBindings
+    shortcutBindings,
+    DateInput,
+    Checkbox
 } from "@polaris/ui";
 
 export type EditorTarget =
@@ -606,14 +608,12 @@ function EditForm({
                                 className="flex items-center gap-2 text-[0.8125rem]"
                                 title={inSeries ? t("editor.allDayLocked") : undefined}
                             >
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={form.allDay}
                                     disabled={inSeries}
                                     onChange={(event) =>
                                         setForm(model.withAllDay(form, event.target.checked, zone))
                                     }
-                                    className="accent-[hsl(var(--primary))]"
                                 />
                                 {t("editor.allDay")}
                             </label>
@@ -636,9 +636,9 @@ function EditForm({
                                 error={errorText("start") ?? errorText("allDay")}
                             >
                                 <div className="flex gap-2">
-                                    <Input
+                                    <DateInput
                                         id={`${ids}-start`}
-                                        type="date"
+                                        mode="date"
                                         className="min-w-0 flex-1 tabular-nums"
                                         value={form.startDate}
                                         onChange={(event) =>
@@ -653,8 +653,8 @@ function EditForm({
                                         }
                                     />
                                     {!form.allDay ? (
-                                        <Input
-                                            type="time"
+                                        <DateInput
+                                            mode="time"
                                             aria-label={t("editor.startTime")}
                                             className="w-28 tabular-nums"
                                             value={form.startTime}
@@ -694,16 +694,16 @@ function EditForm({
                                 error={errorText("end")}
                             >
                                 <div className="flex gap-2">
-                                    <Input
+                                    <DateInput
                                         id={`${ids}-end`}
-                                        type="date"
+                                        mode="date"
                                         className="min-w-0 flex-1 tabular-nums"
                                         value={form.endDate}
                                         onChange={(event) => set({ endDate: event.target.value })}
                                     />
                                     {!form.allDay ? (
-                                        <Input
-                                            type="time"
+                                        <DateInput
+                                            mode="time"
                                             aria-label={t("editor.endTime")}
                                             className="w-28 tabular-nums"
                                             value={form.endTime}

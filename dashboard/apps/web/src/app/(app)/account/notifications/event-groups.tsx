@@ -39,8 +39,8 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Input,
-    cn
+    cn,
+    DateInput
 } from "@polaris/ui";
 import { WeekdayPicker } from "@/components/weekday-picker";
 import { useDisplayFormat } from "@/components/display-format";
@@ -483,15 +483,19 @@ function ScheduleDialog({
                     <div className="grid grid-cols-2 gap-3">
                         <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
                             {t("quiet.from")}
-                            <Input
-                                type="time"
+                            <DateInput
+                                mode="time"
                                 value={from}
                                 onChange={(e) => setFrom(e.target.value)}
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
                             {t("quiet.until")}
-                            <Input type="time" value={to} onChange={(e) => setTo(e.target.value)} />
+                            <DateInput
+                                mode="time"
+                                value={to}
+                                onChange={(e) => setTo(e.target.value)}
+                            />
                         </label>
                     </div>
                     {problem ? <p className="text-xs text-danger">{problem}</p> : null}

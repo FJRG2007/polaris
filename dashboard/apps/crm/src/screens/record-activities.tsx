@@ -16,7 +16,7 @@ import * as actions from "../actions/activities";
 import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject } from "../model/objects";
 import { useCallback, useId, useState } from "react";
-import { Button, Checkbox, cn, Input, Select, Textarea, useToast } from "@polaris/ui";
+import { Button, Checkbox, cn, Input, Select, Textarea, useToast, DateInput } from "@polaris/ui";
 import * as links from "../model/links";
 
 function Block({ className }: { className?: string }) {
@@ -606,8 +606,8 @@ function TaskForm({
                         label: `${list.spaceName} / ${list.name}`
                     }))}
                 />
-                <Input
-                    type="date"
+                <DateInput
+                    mode="date"
                     aria-label={t("activities.taskDue")}
                     value={due}
                     onChange={(event) => setDue(event.target.value)}

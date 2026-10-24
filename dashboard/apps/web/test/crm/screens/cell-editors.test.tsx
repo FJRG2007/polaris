@@ -14,6 +14,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
     AddressEditor,
     ChoicesEditor,
+    DateEditor,
     RatingEditor,
     editorFor
 } from "@polaris-app/crm/src/screens/cell-editors";
@@ -32,6 +33,7 @@ const tags = customDef({
     kind: "multiSelect",
     options: ["Red", "Blue"]
 });
+const due = customDef({ id: "f4", slot: "cDate1", label: "Due", kind: "date", options: [] });
 const score = customDef({ id: "f3", slot: "cNum1", label: "Score", kind: "rating", options: [] });
 
 afterEach(cleanup);
@@ -144,5 +146,26 @@ describe("cell editors", () => {
         });
         fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
         expect(blank).not.toHaveBeenCalled();
+    });
+
+    it("keeps a day on Enter and drops it on Escape, leaving the calendar's own keys alone", () => {
+        const onCommit = vi.fn();
+        const onCancel = vi.fn();
+        render(
+            <DateEditor field={due} value="2026-03-04" onCommit={onCommit} onCancel={onCancel} />,
+            { wrapper: MessagesWrapper }
+        );
+        const field = screen.getByRole("button", { name: "Value" });
+        fireEvent.keyDown(field, { key: "Enter" });
+        expect(onCommit).toHaveBeenCalledWith("2026-03-04");
+        fireEvent.keyDown(field, { key: "Escape" });
+        expect(onCancel).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(field);
+        const day = screen.getByRole("grid").querySelector("[data-day='2026-03-10']")!;
+        fireEvent.keyDown(day, { key: "Enter" });
+        fireEvent.keyDown(day, { key: "Escape" });
+        expect(onCommit).toHaveBeenCalledTimes(1);
+        expect(onCancel).toHaveBeenCalledTimes(1);
     });
 });
