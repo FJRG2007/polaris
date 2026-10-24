@@ -86,6 +86,7 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/tasks/l/[listId]", kind: "task list", id: "listId" },
     { route: "/tasks/s/[spaceId]", kind: "task space", id: "spaceId" },
     { route: "/tasks/t/[taskId]", kind: "task", id: "taskId" },
+    { route: "/wall/[id]", kind: "wall panel", id: "id" },
     { route: "/watch/[kind]/[id]", kind: "watched resource", id: "id" }
 ];
 
