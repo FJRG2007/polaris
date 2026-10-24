@@ -14,6 +14,7 @@
 import { INNER_SCENES, SCENES } from "../scenes";
 import { chromeActions, chromeApi } from "../fixtures/chrome";
 import { scenePath } from "./route";
+import { pollAnswer } from "./poll-routes";
 import { SceneEventSource, scriptStream } from "./stream";
 import enUS from "@/../messages/en-US";
 import esES from "@/../messages/es-ES";
@@ -85,6 +86,10 @@ function patchFetch(
         const method = (init?.method ?? "GET").toUpperCase();
         const route = table.find((row) => row.method === method && row.match.test(address));
         if (!route) {
+            // A timed read that was an action is answered by the scene's
+            // handler for that action (`poll-routes.ts`).
+            const polled = local && method === "GET" ? await pollAnswer(url) : null;
+            if (polled) return Response.json(polled);
             missing(`${method} ${address}`);
             return new Response(JSON.stringify({ error: "not in this scene" }), { status: 404 });
         }

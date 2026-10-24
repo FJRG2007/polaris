@@ -20,6 +20,7 @@ import {
     conversation,
     launchThread,
     profileOf,
+    soundClip,
     spaceEmoji,
     voicePresence
 } from "../fixtures/chat";
@@ -57,7 +58,8 @@ export function chatApi(ctx: SceneContext) {
     return {
         "GET /api/chat/voice-presence": () => ({ inRoom: voicePresence() }),
         "GET /api/chat/channels/:id/live-call": () => ({ live: null }),
-        "GET /api/chat/meetings/:id/soundboard": () => ({ board: callSoundboard(ctx) })
+        "GET /api/chat/meetings/:id/soundboard": () => ({ board: callSoundboard(ctx) }),
+        "GET /api/chat/sounds/:id": () => soundClip()
     };
 }
 
