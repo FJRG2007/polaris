@@ -173,6 +173,8 @@ export async function load(actor: RunActor, id: string, write: boolean) {
 export interface AutomationDetail {
     /** Where installed apps draw their nodes' settings, by app id; filled in by the screen's action. */
     readonly appNodes?: Readonly<Record<string, AppSlot>>;
+    /** Still under the name it was created with, in any language; filled in by the screen's action. */
+    readonly unnamed?: boolean;
     readonly id: string;
     readonly name: string;
     readonly description: string;

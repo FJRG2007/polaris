@@ -89,6 +89,7 @@ import {
 } from "../shared";
 import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode } from "./node-fields";
 import { FailureFields, WhenFields } from "./flow-fields";
+import { isTriggerType } from "./node-catalog";
 
 /** The list it belongs in: narrowed to the app and the thing of it that made it. */
 function listHref(detail: Pick<AutomationDetail, "origin" | "originRef"> | undefined): string {
@@ -219,6 +220,38 @@ function Loaded({
     const flow = useMemo(() => core.listFromGraph(graph), [graph]);
     const dirty = JSON.stringify(graph) !== saved;
     const readOnly = !detail.canEdit;
+    const [name, setName] = useState(detail.name);
+    const [naming, setNaming] = useState<string | null>(null);
+    useEffect(() => setName(detail.name), [detail.name]);
+
+    /** Saves a new name at once, shown before the answer and put back when it is refused. */
+    const rename = async (next: string): Promise<void> => {
+        const parsed = core.automationSettingsSchema.shape.name.safeParse(next);
+        if (!parsed.success || parsed.data === name) return;
+        const before = name;
+        setName(parsed.data);
+        const answer = await updateSettingsAction(detail.id, {
+            name: parsed.data,
+            description: detail.description,
+            mode: detail.mode,
+            maxRuns: detail.maxRuns,
+            rateLimit: detail.rateLimit
+        });
+        if (!answer.ok) {
+            setName(before);
+            toast.show({ title: answer.error });
+            return;
+        }
+        onChanged();
+    };
+
+    // A new automation is created unnamed; its first trigger names it until somebody does.
+    const onAdded = (type: string) => {
+        if (!readOnly && detail.unnamed && name === detail.name && isTriggerType(type))
+            void rename(nodeTitle(t, type));
+    };
+    const nameValid =
+        naming !== null && core.automationSettingsSchema.shape.name.safeParse(naming).success;
 
     useEffect(() => setChosen(readView()), []);
     const view: View = !flow ? "canvas" : (chosen ?? (wide ? "canvas" : "list"));
@@ -303,12 +336,59 @@ function Loaded({
 
     return (
         <EditorGraphProvider value={editorGraph}>
+            {naming !== null ? (
+                <form
+                    className="mb-5 flex min-w-0 flex-wrap items-center gap-2"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!nameValid) return;
+                        setNaming(null);
+                        void rename(naming);
+                    }}
+                >
+                    <Input
+                        autoFocus
+                        className="min-w-0 flex-1 sm:max-w-md"
+                        value={naming}
+                        maxLength={core.AUTOMATION_LIMITS.nameLength}
+                        aria-label={t("create.name")}
+                        onChange={(event) => setNaming(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Escape") setNaming(null);
+                        }}
+                    />
+                    <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!nameValid}
+                        aria-disabled={!nameValid}
+                    >
+                        <Check aria-hidden="true" />
+                        {t("editor.renameSave")}
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setNaming(null)}>
+                        {t("create.cancel")}
+                    </Button>
+                </form>
+            ) : null}
             <PageHeader
-                title={detail.name}
+                title={name}
                 description={detail.description || undefined}
                 actions={
                     readOnly ? undefined : (
                         <div className="flex flex-wrap gap-2">
+                            {naming === null ? (
+                                <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="self-center"
+                                    aria-label={t("editor.rename")}
+                                    title={t("editor.rename")}
+                                    onClick={() => setNaming(name)}
+                                >
+                                    <Pencil aria-hidden="true" />
+                                </Button>
+                            ) : null}
                             {dirty ? (
                                 <span className="self-center text-xs text-muted-foreground">
                                     {t("editor.unsaved")}
@@ -461,6 +541,7 @@ function Loaded({
                     samples={samples}
                     states={states}
                     onChanged={onChanged}
+                    onAdded={onAdded}
                     onRunFrom={
                         readOnly || testing
                             ? undefined
@@ -568,7 +649,9 @@ function Loaded({
             ) : null}
 
             <div className="mx-auto w-full max-w-4xl space-y-6">
-                {readOnly ? null : <Settings detail={detail} onSaved={onChanged} />}
+                {readOnly ? null : (
+                    <Settings key={detail.name} detail={detail} onSaved={onChanged} />
+                )}
                 <section className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-4">
                     <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{t("editor.localNetwork")}</p>

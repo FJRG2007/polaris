@@ -94,6 +94,18 @@ export const AUTOMATION_LIMITS = {
 export const AUTOMATION_FINISHED_EVENT = "automation.finished";
 /** Event names under this prefix are sent by Polaris itself; Announce may not use them. */
 export const RESERVED_EVENT_PREFIX = "automation.";
+/** The event automations see when the public address changes. */
+export const PUBLIC_IP_CHANGED_EVENT = "network.public-ip-changed";
+/** The events a watched NAS sends. */
+export const NAS_EVENT_NAMES = [
+    "nas.offline",
+    "nas.pool-unprotected",
+    "nas.pool-usage",
+    "nas.disk-unhealthy",
+    "nas.disk-temperature",
+    "nas.backup-failed",
+    "nas.backup-overdue"
+] as const;
 
 // ---------------------------------------------------------------------------
 // Statuses and modes

@@ -12,6 +12,7 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
 import * as service from "@/lib/automations/service";
 import * as history from "@/lib/automations/history";
 import * as secrets from "@/lib/automations/secrets";
@@ -99,7 +100,10 @@ export async function getAutomationAction(
             service.getAutomation(who, parsed.data),
             appAutomationNodeSlots().catch(() => ({}))
         ]);
-        const automation = { ...found, appNodes };
+        const unnamed = core.LOCALES.some(
+            (locale) => translate(locale, "automations.create.untitled") === found.name
+        );
+        const automation = { ...found, appNodes, unnamed };
         const shelf = await service.shelfOf(parsed.data);
         return {
             ok: true,

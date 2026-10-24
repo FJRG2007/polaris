@@ -12,6 +12,13 @@ import {
     ClipboardPaste,
     Copy,
     CopyPlus,
+    Database,
+    GitBranch,
+    House,
+    Hourglass,
+    Send,
+    Server,
+    Workflow,
     LayoutGrid,
     Maximize,
     PanelRight,
@@ -29,8 +36,10 @@ import {
     Trash2,
     Undo2,
     X,
+    Zap,
     ZoomIn,
-    ZoomOut
+    ZoomOut,
+    type LucideIcon
 } from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -45,9 +54,11 @@ import {
     type CanvasViewActions
 } from "./canvas-board";
 import { comparatorSymbol } from "@/lib/automations/threshold-form";
-import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode, type T } from "./node-fields";
+import { NodeFields, configValid, newNode, type T } from "./node-fields";
+import * as catalog from "./node-catalog";
+import { AddBlockDialog, type AddGroup } from "@polaris/ui/automation-add";
 import { FailureFields, WhenFields } from "./flow-fields";
-import { nodeTitle } from "../shared";
+import { NodeIcon, nodeHint, nodeTitle } from "../shared";
 import {
     Button,
     ContextMenuGroup,
@@ -109,6 +120,7 @@ export function CanvasEditor({
     samples,
     states,
     onChanged,
+    onAdded,
     onRunFrom
 }: {
     graph: core.AutomationGraph;
@@ -121,6 +133,8 @@ export function CanvasEditor({
     samples: Readonly<Record<string, unknown>>;
     states?: Readonly<Record<string, string>>;
     onChanged: () => void;
+    /** A node of this type was just added: the first trigger names an unnamed automation. */
+    onAdded?: (type: string) => void;
     /** Start a test that really runs this node and what follows, with data standing in for what comes before. */
     onRunFrom?: (nodeId: string) => void;
 }) {
@@ -502,11 +516,18 @@ export function CanvasEditor({
         toast.show({ title: t("canvas.tidied") });
     };
 
-    const addNode = (type: string) => {
+    const addNode = (value: string) => {
+        const picked = catalog.pickedNode(value);
+        if (!picked) return;
         if (graph.nodes.length >= core.AUTOMATION_LIMITS.nodes)
             return void toast.show({ title: t("canvas.pasteTooMany") });
+        const fresh = (): core.GraphNode => {
+            const node = newNode(picked.type);
+            return picked.config === undefined ? node : { ...node, config: picked.config };
+        };
+        onAdded?.(picked.type);
         if (insertOn) {
-            const node = newNode(type);
+            const node = fresh();
             const inserted = core.insertOnEdge(graph, insertOn, node);
             setInsertOn(null);
             if (!inserted) return void toast.show({ title: t("canvas.insertGone") });
@@ -516,7 +537,7 @@ export function CanvasEditor({
             return;
         }
         const node = {
-            ...newNode(type),
+            ...fresh(),
             position: {
                 x: Math.round(placeAt.current.x - core.CANVAS_NODE.width / 2),
                 y: Math.round(placeAt.current.y - core.CANVAS_NODE.height / 2)
@@ -573,7 +594,25 @@ export function CanvasEditor({
 
     return (
         <div className="flex h-[calc(100dvh-14rem)] min-h-[28rem] flex-col gap-3 lg:flex-row">
-            <div className="min-h-0 min-w-0 flex-1">
+            <div className="relative min-h-0 min-w-0 flex-1">
+                {graph.nodes.length === 0 && !readOnly ? (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
+                        <div className="pointer-events-auto flex max-w-xs flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-card p-6 text-center">
+                            <p className="text-sm font-semibold">{t("picker.firstTitle")}</p>
+                            <p className="text-xs text-muted-foreground">{t("picker.firstHint")}</p>
+                            <Button
+                                onClick={() => {
+                                    placeAt.current = { x: 0, y: 0 };
+                                    setInsertOn(null);
+                                    setPalette(true);
+                                }}
+                            >
+                                <Plus aria-hidden="true" />
+                                {t("picker.firstAction")}
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
                 <CanvasBoard
                     graph={graph}
                     readOnly={readOnly}
@@ -674,6 +713,7 @@ export function CanvasEditor({
             <Palette
                 open={palette}
                 stepsOnly={insertOn !== null}
+                apps={Object.keys(detail.appNodes ?? {})}
                 onOpenChange={(open) => {
                     setPalette(open);
                     if (!open) setInsertOn(null);
@@ -743,89 +783,75 @@ function RenameDialog({
     );
 }
 
-function Palette({
+const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
+    basics: Zap,
+    polaris: Server,
+    automations: Workflow,
+    places: House,
+    logic: GitBranch,
+    timing: Hourglass,
+    data: Database,
+    send: Send
+};
+
+/** The node picker: the shared add dialog, its groups from the catalog, each item with its icon. */
+export function Palette({
     open,
     stepsOnly,
+    apps,
     onOpenChange,
     onPick
 }: {
     open: boolean;
     stepsOnly: boolean;
+    apps: readonly string[];
     onOpenChange: (open: boolean) => void;
-    onPick: (type: string) => void;
+    onPick: (value: string) => void;
 }) {
     const t = useTranslations("automations");
-    const [query, setQuery] = useState("");
-    const groups = [
-        ...(stepsOnly
-            ? []
-            : [{ label: t("canvas.groupTriggers"), types: TRIGGER_TYPES as readonly string[] }]),
-        { label: t("canvas.groupSteps"), types: STEP_TYPES as readonly string[] }
-    ];
-    const needle = query.trim().toLowerCase();
-    const shown = groups
-        .map((group) => ({
-            ...group,
-            types: group.types.filter(
-                (type) =>
-                    !needle ||
-                    nodeTitle(t, type).toLowerCase().includes(needle) ||
-                    type.includes(needle)
-            )
-        }))
-        .filter((group) => group.types.length > 0);
-    const first = shown[0]?.types[0];
+    const groups = useMemo<AddGroup[]>(
+        () =>
+            catalog.catalogGroups({ triggers: !stepsOnly, apps }).map((group) => {
+                const Icon = GROUP_ICONS[group.id];
+                return {
+                    id: group.id,
+                    label: t(`picker.groups.${group.id}`),
+                    icon: <Icon aria-hidden="true" />,
+                    items: group.items.map((item) => ({
+                        value: item.value,
+                        label: item.preset
+                            ? t(`picker.presets.${item.preset}`)
+                            : nodeTitle(t, item.type),
+                        description: item.preset
+                            ? t("picker.presetHint", {
+                                  name: catalog.EVENT_PRESETS[item.preset].name
+                              })
+                            : (nodeHint(t, item.type) ?? undefined),
+                        icon: <NodeIcon type={item.type} />
+                    }))
+                };
+            }),
+        [stepsOnly, apps.join(","), t]
+    );
     return (
-        <Dialog
+        <AddBlockDialog
             open={open}
-            onOpenChange={(next) => {
-                onOpenChange(next);
-                if (!next) setQuery("");
+            title={stepsOnly ? t("canvas.insertTitle") : t("canvas.paletteTitle")}
+            strings={{
+                search: t("canvas.searchNodes"),
+                byTarget: t("picker.byTarget"),
+                byType: t("picker.byType"),
+                blocks: t("picker.blocks"),
+                back: t("picker.back"),
+                close: t("canvas.closePanel"),
+                noMatch: (term) => t("picker.noMatch", { term }),
+                nothingForTarget: t("canvas.noMatches"),
+                more: (count) => t("picker.more", { count })
             }}
-        >
-            <DialogContent className="max-w-md">
-                <DialogTitle>
-                    {stepsOnly ? t("canvas.insertTitle") : t("canvas.paletteTitle")}
-                </DialogTitle>
-                <DialogDescription>{t("canvas.paletteHint")}</DialogDescription>
-                <Input
-                    autoFocus
-                    value={query}
-                    placeholder={t("canvas.searchNodes")}
-                    aria-label={t("canvas.searchNodes")}
-                    onChange={(event) => setQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter" && first) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onPick(first);
-                        }
-                    }}
-                />
-                <div className="max-h-80 space-y-3 overflow-y-auto overscroll-contain">
-                    {shown.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("canvas.noMatches")}</p>
-                    ) : null}
-                    {shown.map((group) => (
-                        <div key={group.label} className="space-y-1">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-subtle">
-                                {group.label}
-                            </p>
-                            {group.types.map((type) => (
-                                <button
-                                    key={type}
-                                    type="button"
-                                    className="flex w-full min-w-0 items-center rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted focus-visible:bg-muted"
-                                    onClick={() => onPick(type)}
-                                >
-                                    <span className="truncate">{nodeTitle(t, type)}</span>
-                                </button>
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            </DialogContent>
-        </Dialog>
+            groups={groups}
+            onPick={(value) => onPick(value)}
+            onClose={() => onOpenChange(false)}
+        />
     );
 }
 
