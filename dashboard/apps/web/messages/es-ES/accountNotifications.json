@@ -141,6 +141,34 @@
         "email": "Correo",
         "destinationOff": "Este destino está desactivado"
     },
+    "holds": {
+        "summary": "{on} de {total} activas",
+        "options": "Opciones de {name}",
+        "muteFor": "Silenciar",
+        "durations": {
+            "1h": "Por 1 hora",
+            "8h": "Por 8 horas",
+            "24h": "Por 24 horas",
+            "1w": "Por 1 semana",
+            "off": "Hasta que lo reactive"
+        },
+        "muted": "En pausa",
+        "mutedUntil": "En pausa hasta {time}",
+        "unmute": "Reactivar",
+        "setSchedule": "Fijar horas",
+        "editSchedule": "Cambiar horas",
+        "scheduleTitle": "Cuándo puede avisarte {name}",
+        "scheduleHint": "Fuera de este horario se queda en tu bandeja, sin sonido, contador, correo ni webhook. Horas en {zone}.",
+        "days": "Días",
+        "needDays": "Elige al menos un día.",
+        "removeSchedule": "Sin horario",
+        "cancel": "Cancelar",
+        "everyDay": "Cada día",
+        "weekdays": "Lun-Vie",
+        "weekends": "Sáb y dom",
+        "allDay": "día entero",
+        "hours": "{from}-{to}"
+    },
     "destinations": {
         "title": "Destinos",
         "description": "Webhooks y números de teléfono a los que puedes enviar los eventos de arriba.",

@@ -14,7 +14,10 @@ import { cache } from "react";
 import { prisma } from "@polaris/db";
 import {
     parseQuietHours,
+    pruneHolds,
     NOTIFICATION_EVENTS,
+    parseNotificationHolds,
+    type NotificationHolds,
     type QuietHours,
     parseNotificationPreferences,
     resolveRule,
@@ -91,4 +94,26 @@ export async function saveQuietHours(userId: string, quiet: QuietHours): Promise
         where: { id: userId },
         data: { notifyQuietHours: JSON.stringify(quiet) }
     });
+}
+
+/** This account's mutes and schedules. Mutes that have run out are left out. */
+export async function getNotificationHolds(userId: string): Promise<NotificationHolds> {
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { notifyHolds: true }
+    });
+    return pruneHolds(parseNotificationHolds(row?.notifyHolds), new Date());
+}
+
+/** Change this account's mutes and schedules, dropping any that ran out. */
+export async function updateNotificationHolds(
+    userId: string,
+    change: (holds: NotificationHolds) => NotificationHolds
+): Promise<NotificationHolds> {
+    const next = pruneHolds(change(await getNotificationHolds(userId)), new Date());
+    await prisma.user.update({
+        where: { id: userId },
+        data: { notifyHolds: JSON.stringify(next) }
+    });
+    return next;
 }

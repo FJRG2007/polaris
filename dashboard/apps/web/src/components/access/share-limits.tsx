@@ -6,15 +6,14 @@
  * access" being changed, so both say the same thing in the same words.
  */
 
-import { useMemo } from "react";
 import * as core from "@polaris/core";
 import type { ReactNode } from "react";
-import { Input, Switch, cn } from "@polaris/ui";
+import { Input, Switch } from "@polaris/ui";
 import type { GrantView } from "@/lib/access/grants";
 import { CalendarClock, MapPin } from "lucide-react";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { useDisplayFormat } from "@/components/display-format";
-import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { WeekdayPicker } from "@/components/weekday-picker";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export interface LimitsValue {
     limited: boolean;
@@ -138,12 +137,6 @@ export function LimitsFields({
     idPrefix: string;
 }) {
     const t = useTranslations("components");
-    const locale = useLocale();
-    const format = useDisplayFormat();
-    const dayNames = useMemo(() => core.weekdayNames(locale, "short"), [locale]);
-    // The reader's own week, so Monday-first and Sunday-first both draw the
-    // days in the order the person expects to read them in.
-    const weekOrder = useMemo(() => core.weekOrderFrom(format.weekStartsOn), [format.weekStartsOn]);
     const set = (patch: Partial<LimitsValue>) => onChange({ ...value, ...patch });
     const id = (name: string) => `${idPrefix}-${name}`;
     const fenceable = isFenceable(subject);
@@ -205,34 +198,11 @@ export function LimitsFields({
                                     />
                                 </Field>
                             </div>
-                            <fieldset className="flex flex-col gap-1">
-                                <legend className="text-[12px] text-muted-foreground">
-                                    {t("share.days")}
-                                </legend>
-                                <div className="flex flex-wrap gap-1">
-                                    {weekOrder.map((day: number) => {
-                                        const on = core.runsOnDay(value.days, day);
-                                        return (
-                                            <button
-                                                key={day}
-                                                type="button"
-                                                aria-pressed={on}
-                                                onClick={() =>
-                                                    set({ days: core.toggleDay(value.days, day) })
-                                                }
-                                                className={cn(
-                                                    "rounded-md border px-2 py-1 text-[12px]",
-                                                    on
-                                                        ? "border-primary bg-primary/10 text-foreground"
-                                                        : "border-border text-muted-foreground"
-                                                )}
-                                            >
-                                                {dayNames[day]}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </fieldset>
+                            <WeekdayPicker
+                                legend={t("share.days")}
+                                days={value.days}
+                                onChange={(days) => set({ days })}
+                            />
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <Field label={t("share.fromHour")} htmlFor={id("from-hour")}>
                                     <Input

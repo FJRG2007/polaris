@@ -40,7 +40,11 @@ const EXACT: Readonly<Record<string, Key>> = {
     "Marked read: you had the page it points at open.": "delivery.markedRead",
     "Turned off for this event.": "delivery.eventOff",
     "Below the lowest severity set for this destination.": "delivery.belowSeverity",
-    "Held back: it arrived during your quiet hours.": "delivery.quietHours"
+    "Held back: it arrived during your quiet hours.": "delivery.quietHours",
+    "Held back: you muted it.": "delivery.muted",
+    "Held back: outside the hours you set for it.": "delivery.outsideSchedule",
+    "Recorded without a sound or badge: it is muted or outside its hours.":
+        "delivery.recordedQuietly"
 };
 
 const SHAPED: readonly (readonly [RegExp, Key])[] = [

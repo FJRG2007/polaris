@@ -1481,7 +1481,10 @@
         "markedRead": "Marked read: you had the page it points at open.",
         "eventOff": "Turned off for this event.",
         "belowSeverity": "Below the lowest severity set for this destination.",
-        "quietHours": "Held back: it arrived during your quiet hours."
+        "quietHours": "Held back: it arrived during your quiet hours.",
+        "muted": "Held back: you muted it.",
+        "outsideSchedule": "Held back: outside the hours you set for it.",
+        "recordedQuietly": "Recorded without a sound or badge: it is muted or outside its hours."
     },
     "runtimeLogs": {
         "live": "Live",

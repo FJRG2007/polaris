@@ -130,6 +130,10 @@ model User {
     // JSON ({ enabled, start, end, criticalBypass }) read in the account's own
     // timezone. Null is no quiet hours. The bell is never held.
     notifyQuietHours String?
+    // Mutes and weekly schedules per event or group, as stringified JSON
+    // ({ mutes, schedules } keyed "event:<id>" / "group:<id>"). Null is none,
+    // which is every account before this existed: everything rings as before.
+    notifyHolds String?
     // How loud Polaris' own sounds are for this account - the chime for an
     // alert, a message, a ring - as a percentage. Null follows the default in
     // code, which is full volume, so an account that never chose keeps what it

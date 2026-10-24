@@ -14,7 +14,7 @@
 import type { QuietHours } from "@polaris/core";
 import Link from "next/link";
 import { DeliveryLog } from "./delivery-log";
-import { eventDescription, eventLabel, groupLabel } from "./event-names";
+import { EventGroups } from "./event-groups";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConnectionsHref } from "@/components/use-connections-href";
 import { DestinationsCard } from "./destinations-card";
@@ -23,7 +23,9 @@ import {
     saveNotificationRuleAction,
     saveSoundVolumeAction,
     setMessagesInGameAction,
-    setBadgesClearOnVisitAction
+    setBadgesClearOnVisitAction,
+    setNotificationMuteAction,
+    setNotificationScheduleAction
 } from "./actions";
 import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
 import * as inGame from "@/lib/chat/in-game-choice";
@@ -51,7 +53,7 @@ import {
     setNoticeAllowed,
     type NoticeKind
 } from "@/lib/notifications/browser-notices";
-import { AlertTriangle, Bell, Mail, Smartphone, Volume2, Webhook } from "lucide-react";
+import { AlertTriangle, Bell, Volume2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -80,11 +82,14 @@ import {
     type FaviconStyle
 } from "@/lib/favicon-style";
 import {
-    isMuted,
-    NOTIFICATION_EVENTS,
-    NOTIFICATION_GROUPS,
-    type NotificationGroup,
-    type NotificationRule
+    EMPTY_NOTIFICATION_HOLDS,
+    holdKey,
+    muteUntil,
+    type HoldTarget,
+    type NotificationMuteDuration,
+    type NotificationHolds,
+    type NotificationRule,
+    type NotificationSchedule
 } from "@polaris/core";
 
 export function NotificationSettingsView({
@@ -95,7 +100,9 @@ export function NotificationSettingsView({
     messagesInGame = null,
     inGameReady = true,
     badgesClearOnVisit = null,
-    quiet = null
+    quiet = null,
+    holds: initialHolds = EMPTY_NOTIFICATION_HOLDS,
+    timeZone = "UTC"
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -111,6 +118,10 @@ export function NotificationSettingsView({
     badgesClearOnVisit?: boolean | null;
     /** Quiet hours and the zone they are read in; null leaves the card out. */
     quiet?: { hours: QuietHours; timeZone: string } | null;
+    /** Mutes and schedules per event or group. */
+    holds?: NotificationHolds;
+    /** The zone schedules are read in. */
+    timeZone?: string;
 }) {
     const t = useTranslations("accountNotifications");
     const [state, setState] = useState(
@@ -133,9 +144,46 @@ export function NotificationSettingsView({
         });
     }
 
-    const groups = NOTIFICATION_GROUPS.filter((group) =>
-        NOTIFICATION_EVENTS.some((entry) => entry.group === group)
-    );
+    const [holds, setHolds] = useState(initialHolds);
+
+    /** Save a mute or a schedule: shown at once, put back if the save fails. */
+    function saveHolds(
+        optimistic: NotificationHolds,
+        send: () => Promise<{ holds?: NotificationHolds; error?: string }>
+    ) {
+        const previous = holds;
+        setHolds(optimistic);
+        setError(null);
+        startSaving(async () => {
+            const result = await send().catch(() => ({
+                error: t("errors.notSavedTryAgain"),
+                holds: undefined
+            }));
+            if (result.holds) setHolds(result.holds);
+            else {
+                setHolds(previous);
+                setError(result.error ?? t("errors.notSavedTryAgain"));
+            }
+        });
+    }
+
+    function mute(target: HoldTarget, duration: NotificationMuteDuration | null) {
+        const key = holdKey(target);
+        const mutes = { ...holds.mutes };
+        if (duration === null) delete mutes[key];
+        else mutes[key] = { until: muteUntil(duration, new Date()) };
+        saveHolds({ ...holds, mutes }, () => setNotificationMuteAction({ target, duration }));
+    }
+
+    function schedule(target: HoldTarget, next: NotificationSchedule | null) {
+        const key = holdKey(target);
+        const schedules = { ...holds.schedules };
+        if (next === null) delete schedules[key];
+        else schedules[key] = next;
+        saveHolds({ ...holds, schedules }, () =>
+            setNotificationScheduleAction({ target, schedule: next })
+        );
+    }
 
     return (
         <div className="flex flex-col gap-4">
@@ -151,15 +199,12 @@ export function NotificationSettingsView({
             <TabIconCard />
             {badgesClearOnVisit !== null ? <BadgesCard initial={badgesClearOnVisit} /> : null}
 
-            {groups.map((group) => (
-                <EventGroup
-                    key={group}
-                    group={group}
-                    state={state}
-                    destinations={destinations}
-                    onChange={update}
-                />
-            ))}
+            <EventGroups
+                state={state}
+                destinations={destinations}
+                onChange={update}
+                hold={{ holds, timeZone, onMute: mute, onSchedule: schedule }}
+            />
 
             {/* What installed apps add. Absent, heading and all, until one does:
                 the Minecraft row exists only where Game servers can show a
@@ -662,164 +707,5 @@ function TabIconCard() {
                 />
             </CardBody>
         </Card>
-    );
-}
-
-function EventGroup({
-    group,
-    state,
-    destinations,
-    onChange
-}: {
-    group: NotificationGroup;
-    state: Map<string, NotificationRule>;
-    destinations: DestinationView[];
-    onChange: (event: string, rule: NotificationRule) => void;
-}) {
-    const events = NOTIFICATION_EVENTS.filter((entry) => entry.group === group);
-    const t = useTranslations("accountNotifications");
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{groupLabel(t, group)}</CardTitle>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-4 p-0">
-                <ul className="divide-y divide-border">
-                    {events.map((entry) => {
-                        const rule = state.get(entry.id);
-                        if (!rule) return null;
-                        return (
-                            <li key={entry.id} className="flex flex-col gap-2 px-4 py-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium">
-                                            {eventLabel(t, entry.id)}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {eventDescription(t, entry.id)}
-                                        </p>
-                                    </div>
-                                    {isMuted(rule) ? <Badge>{t("rules.muted")}</Badge> : null}
-                                </div>
-                                <RuleChips
-                                    eventId={entry.id}
-                                    rule={rule}
-                                    critical={entry.critical === true}
-                                    offBell={entry.offBell === true}
-                                    destinations={destinations}
-                                    onChange={onChange}
-                                />
-                            </li>
-                        );
-                    })}
-                </ul>
-            </CardBody>
-        </Card>
-    );
-}
-
-/** The delivery toggles for one event, as chips that read as on or off. */
-function RuleChips({
-    eventId,
-    rule,
-    critical,
-    offBell,
-    destinations,
-    onChange
-}: {
-    eventId: string;
-    rule: NotificationRule;
-    critical: boolean;
-    offBell: boolean;
-    destinations: DestinationView[];
-    onChange: (event: string, rule: NotificationRule) => void;
-}) {
-    const t = useTranslations("accountNotifications");
-
-    function toggleDestination(id: string) {
-        const on = rule.destinations.includes(id);
-        onChange(eventId, {
-            ...rule,
-            destinations: on
-                ? rule.destinations.filter((entry) => entry !== id)
-                : [...rule.destinations, id]
-        });
-    }
-
-    return (
-        <div className="flex flex-wrap items-center gap-1.5">
-            <Chip
-                icon={Bell}
-                label={t("rules.inApp")}
-                on={rule.inapp}
-                // A security alert always leaves a record; only where else it goes
-                // is negotiable.
-                // And one whose own screen already carries it never does.
-                disabled={critical || offBell}
-                title={
-                    critical
-                        ? t("rules.securityAlways")
-                        : offBell
-                          ? t("rules.shownOnItsScreen")
-                          : undefined
-                }
-                onClick={() => onChange(eventId, { ...rule, inapp: !rule.inapp })}
-            />
-            <Chip
-                icon={Mail}
-                label={t("rules.email")}
-                on={rule.email}
-                onClick={() => onChange(eventId, { ...rule, email: !rule.email })}
-            />
-            {destinations.map((destination) => (
-                <Chip
-                    key={destination.id}
-                    icon={destination.kind === "sms" ? Smartphone : Webhook}
-                    label={destination.name}
-                    on={rule.destinations.includes(destination.id)}
-                    disabled={!destination.enabled}
-                    title={destination.enabled ? destination.targetHint : t("rules.destinationOff")}
-                    onClick={() => toggleDestination(destination.id)}
-                />
-            ))}
-        </div>
-    );
-}
-
-function Chip({
-    icon: Icon,
-    label,
-    on,
-    disabled,
-    title,
-    onClick
-}: {
-    icon: typeof Webhook;
-    label: string;
-    on: boolean;
-    disabled?: boolean;
-    title?: string;
-    onClick: () => void;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            disabled={disabled}
-            title={title}
-            aria-pressed={on}
-            className={cn(
-                "inline-flex max-w-48 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors",
-                "",
-                on
-                    ? "border-transparent bg-primary/15 text-primary"
-                    : "border-border bg-muted text-muted-foreground hover:text-foreground",
-                disabled && "cursor-not-allowed opacity-60 hover:text-muted-foreground"
-            )}
-        >
-            <Icon className="size-3 shrink-0" />
-            <span className="truncate">{label}</span>
-        </button>
     );
 }

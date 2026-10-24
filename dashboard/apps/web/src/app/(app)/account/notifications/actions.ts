@@ -20,6 +20,12 @@ import { saveSoundVolume } from "@/lib/notifications/sound-volume-service";
 import {
     alertMinLevelSchema,
     destinationInputSchema,
+    holdKey,
+    holdTargetSchema,
+    NOTIFICATION_MUTE_DURATIONS,
+    muteUntil,
+    notificationScheduleSchema,
+    type NotificationHolds,
     isNotificationEvent,
     notificationRuleSchema,
     quietHoursSchema
@@ -27,7 +33,8 @@ import {
 import {
     getNotificationPreferences,
     saveNotificationPreferences,
-    saveQuietHours
+    saveQuietHours,
+    updateNotificationHolds
 } from "@/lib/notifications/preferences";
 import {
     createDestination,
@@ -267,4 +274,58 @@ export async function saveQuietHoursAction(input: unknown): Promise<{ error?: st
     await saveQuietHours(user.id, parsed.data);
     revalidatePath("/account/notifications");
     return {};
+}
+
+const muteInputSchema = z.object({
+    target: holdTargetSchema,
+    /** How long for, or null to unmute. */
+    duration: z.enum(NOTIFICATION_MUTE_DURATIONS).nullable()
+});
+
+/**
+ * Mute one event or a whole group for a while, or unmute it. The end is worked
+ * out here, on the server's clock, so a browser with the wrong time cannot set
+ * a mute that never lifts. Answers with every mute and schedule as saved.
+ */
+export async function setNotificationMuteAction(
+    input: unknown
+): Promise<{ holds?: NotificationHolds; error?: string }> {
+    const user = await requireUser();
+    const parsed = muteInputSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    const key = holdKey(parsed.data.target);
+    const duration = parsed.data.duration;
+    const holds = await updateNotificationHolds(user.id, (current) => {
+        const mutes = { ...current.mutes };
+        if (duration === null) delete mutes[key];
+        else mutes[key] = { until: muteUntil(duration, new Date()) };
+        return { ...current, mutes };
+    });
+    return { holds };
+}
+
+const scheduleInputSchema = z.object({
+    target: holdTargetSchema,
+    /** The hours it may ring in, or null to let it ring any time again. */
+    schedule: notificationScheduleSchema.nullable()
+});
+
+/** Set or clear the hours one event or a whole group may ring in. */
+export async function setNotificationScheduleAction(
+    input: unknown
+): Promise<{ holds?: NotificationHolds; error?: string }> {
+    const user = await requireUser();
+    const parsed = scheduleInputSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    const key = holdKey(parsed.data.target);
+    const schedule = parsed.data.schedule;
+    const holds = await updateNotificationHolds(user.id, (current) => {
+        const schedules = { ...current.schedules };
+        if (schedule === null) delete schedules[key];
+        else schedules[key] = schedule;
+        return { ...current, schedules };
+    });
+    return { holds };
 }
