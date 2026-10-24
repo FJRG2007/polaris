@@ -74,6 +74,7 @@ beforeEach(() => {
     actions.shareSetupAction.mockResolvedValue({
         setup: {
             viewer: { id: "me", name: "Maria", email: "maria@example.test" },
+            owner: null,
             candidates: [],
             located: null,
             org: null,
@@ -117,6 +118,24 @@ describe("ShareDialog", () => {
         expect(screen.getByRole("button", { name: /Copy link/ })).toBeTruthy();
         expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
         expect(screen.getByRole("combobox", { name: "Add people, teams or roles" })).toBeTruthy();
+    });
+
+    it("draws the real owner first, marked Owner, when it is somebody else", async () => {
+        actions.shareSetupAction.mockResolvedValue({
+            setup: {
+                viewer: { id: "me", name: "Maria", email: "maria@example.test" },
+                owner: { id: "o1", name: "Olga", contact: "@olga" },
+                candidates: [],
+                located: null,
+                org: null,
+                url: null
+            }
+        });
+        open();
+        expect(await screen.findByText("Olga")).toBeTruthy();
+        expect(screen.getByText("@olga")).toBeTruthy();
+        expect(screen.getByText("Owner")).toBeTruthy();
+        expect(screen.queryByText("Maria (you)")).toBeNull();
     });
 
     const pick = async (menuName: string, optionName: string) => {

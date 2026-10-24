@@ -720,6 +720,7 @@
         "searchAccess": "Buscar entre quien tiene acceso",
         "you": "{name} (tú)",
         "youCan": "Comparte",
+        "owner": "Propietario",
         "limits": "Límites",
         "limitsOf": "Límites de {name}",
         "removeAccess": "Quitar acceso",

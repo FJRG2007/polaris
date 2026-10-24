@@ -769,20 +769,7 @@ export function ShareDialog({
                                         </div>
                                     ) : null}
                                     {setup ? (
-                                        <div className="flex min-w-0 items-center gap-3 px-1 py-1">
-                                            <Avatar person={{ id: setup.viewer.id, name: setup.viewer.name }} size={32} status={false} />
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-[13px] text-foreground">
-                                                    {t("share.you", { name: setup.viewer.name })}
-                                                </p>
-                                                <p className="truncate text-[12px] text-muted-foreground">
-                                                    {setup.viewer.email}
-                                                </p>
-                                            </div>
-                                            <span className="shrink-0 text-[12px] text-muted-foreground">
-                                                {t("share.youCan")}
-                                            </span>
-                                        </div>
+                                        <OwnerRow setup={setup} />
                                     ) : (
                                         <Skeleton className="h-10 w-full" />
                                     )}
@@ -1075,5 +1062,36 @@ function PrincipalFace({ grant }: { grant: GrantView }) {
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
             <Icon className="size-4 shrink-0" aria-hidden />
         </span>
+    );
+}
+
+/**
+ * The first row: whoever owns the thing, marked "Owner" and never editable. A
+ * thing nobody owns (a door of the house) shows the person sharing instead.
+ */
+function OwnerRow({ setup }: { setup: ShareSetup }) {
+    const t = useTranslations("components");
+    const owner = setup.owner;
+    const id = owner?.id ?? setup.viewer.id;
+    const name = owner?.name ?? setup.viewer.name;
+    const contact = owner ? owner.contact : setup.viewer.email;
+    const isViewer = id === setup.viewer.id;
+    return (
+        <div className="flex min-w-0 items-center gap-3 px-1 py-1">
+            <Avatar person={{ id, name }} size={32} status={false} />
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] text-foreground" title={name}>
+                    {isViewer ? t("share.you", { name }) : name}
+                </p>
+                {contact ? (
+                    <p className="truncate text-[12px] text-muted-foreground" title={contact}>
+                        {contact}
+                    </p>
+                ) : null}
+            </div>
+            <span className="shrink-0 text-[12px] text-muted-foreground">
+                {owner ? t("share.owner") : t("share.youCan")}
+            </span>
+        </div>
     );
 }

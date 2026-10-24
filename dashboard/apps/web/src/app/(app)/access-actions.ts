@@ -33,6 +33,7 @@ import {
 import { appBaseUrl, sharingBaseUrl } from "@/lib/domain-service";
 import { translatorFor } from "@/lib/i18n/translate";
 import { createNotification } from "@/lib/notification-service";
+import { subjectOwner, type SubjectOwner } from "@/lib/access/subject-owner";
 import {
     GrantError,
     listSubjectGrantPage,
@@ -316,6 +317,9 @@ export async function revokeShareAction(
  *  may hand out to, and the address Copy link copies. */
 export interface ShareSetup {
     readonly viewer: { id: string; name: string; email: string };
+    /** Whoever owns the thing, or null for something nobody owns (the house's
+     *  doors, the network filter) - then the first row is the viewer. */
+    readonly owner: SubjectOwner | null;
     readonly candidates: GrantCandidate[];
     readonly located: boolean | null;
     /** The organization an "organization" link would open for, if any. */
@@ -332,7 +336,8 @@ export async function shareSetupAction(
         const user = await requireUser();
         const kind = subjectOf(subject);
         await requireMayShare(user, kind, String(subjectId));
-        const [candidates, located, org, base] = await Promise.all([
+        const [owner, candidates, located, org, base] = await Promise.all([
+            subjectOwner({ id: user.id, isAdmin: user.isAdmin }, kind, String(subjectId)),
             shareCandidates(user, kind, String(subjectId)),
             subjectPlaceLocated(kind, String(subjectId)),
             subjectOrg(kind, String(subjectId)),
@@ -342,6 +347,7 @@ export async function shareSetupAction(
         return {
             setup: {
                 viewer: { id: user.id, name: user.name, email: user.email },
+                owner,
                 candidates,
                 located,
                 org,
