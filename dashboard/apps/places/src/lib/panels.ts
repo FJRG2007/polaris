@@ -171,7 +171,7 @@ export async function panelContents(installedAppId: string, id: string): Promise
     return {
         panel,
         devices: all.filter((device) => ids.has(device.id)),
-        rooms: roomRows.map((room) => ({
+        rooms: roomRows.map((room: { id: string; name: string }) => ({
             id: room.id,
             name: room.name,
             deviceIds: byRoom.get(room.id) ?? []
@@ -201,7 +201,7 @@ export async function panelReach(installedAppId: string, id: string): Promise<Se
             },
             select: { id: true }
         });
-        const kept = new Set(here.map((device) => device.id));
+        const kept = new Set(here.map((device: { id: string }) => device.id));
         for (const deviceId of direct) {
             if (!kept.has(deviceId) && ![...byRoom.values()].some((list) => list.includes(deviceId)))
                 ids.delete(deviceId);

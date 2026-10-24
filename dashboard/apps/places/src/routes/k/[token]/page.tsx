@@ -6,7 +6,8 @@
  */
 
 import { notFound } from "next/navigation";
-import { guestKey, guestRoom } from "../../../lib/guest-key";
+import { guestKey, guestPanel, guestRoom } from "../../../lib/guest-key";
+import { PanelWall } from "../../../screens/panels/panel-wall";
 import { guestCamera } from "../../../lib/guest-camera";
 import { GuestKeyView } from "../../../screens/guest/guest-key-view";
 import { GuestCameraView } from "../../../screens/guest/guest-camera-view";
@@ -21,6 +22,20 @@ export default async function GuestKeyPage({
 }) {
     const { token } = await params;
     if (typeof token !== "string") notFound();
+    const panel = await guestPanel(token);
+    if (panel) {
+        if (panel.standing !== "live") notFound();
+        return (
+            <PanelWall
+                name={panel.panel.name}
+                placeId={panel.panel.placeId}
+                cards={panel.panel.cards}
+                devices={panel.devices}
+                rooms={panel.rooms}
+                access={{ kind: "link", token, allowed: panel.allowed }}
+            />
+        );
+    }
     const camera = await guestCamera(token);
     if (camera) {
         if (camera.standing !== "live") notFound();

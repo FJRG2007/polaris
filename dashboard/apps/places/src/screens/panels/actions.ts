@@ -105,13 +105,3 @@ export async function deletePanelAction(id: string): Promise<{ error?: string }>
     revalidatePath(PATH);
     return {};
 }
-
-/** Everything a panel draws, read again - what the wall asks for when its live
- *  channel reconnects, to catch up on what it was not told meanwhile. */
-export async function panelContentsAction(
-    id: string
-): Promise<{ contents?: panels.PanelContents; error?: string }> {
-    const { install } = await requireHome("home.read");
-    const result = await guard(() => panels.panelContents(install.id, String(id)));
-    return result.error ? { error: result.error } : { contents: result.value };
-}
