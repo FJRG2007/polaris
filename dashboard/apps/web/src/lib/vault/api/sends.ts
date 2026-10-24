@@ -16,6 +16,23 @@ import { dymoIpAllowed } from "@/lib/dymo-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
 import { readJsonBody, requirePrincipal, type VaultContext } from "@/lib/vault/api/router";
 
+/** The header the /vs page (send-reader.tsx) reads to tell one refusal from another. */
+const SEND_REFUSAL_HEADER = "x-polaris-send-refusal";
+
+/**
+ * What a client is told when the owner's own rules refuse it. A Bitwarden app
+ * never carries a Polaris session, so a Send that needs an account always lands
+ * on `sign_in_required` there: it is refused, and told where it does open.
+ */
+const SEND_REFUSALS: Partial<Record<string, string>> = {
+    address: "This Send is not available from your network or location.",
+    scheduled: "This Send is not open yet.",
+    outside_hours: "This Send is outside its hours. Try again during the times it opens.",
+    sign_in_required:
+        "This Send is only for people with a Polaris account. Open the link in a browser and sign in.",
+    not_invited: "This Send was not shared with your account."
+};
+
 /** Guesses allowed against a Send's password from one address, and the window. */
 const ACCESS_LIMIT = 20;
 const ACCESS_WINDOW_MS = 15 * 60 * 1000;
@@ -94,10 +111,14 @@ export async function accessSend(context: VaultContext): Promise<Response> {
     }
     const result = await sends.accessSend(context.params.id ?? "", password, ip);
     if (!result.ok) {
-        if (result.reason === "address") {
-            // 403 rather than 404: the Send is real and its owner limited where
-            // it opens. Every client shows this message as it is.
-            return vaultError("This Send is not available from your network or location.", 403);
+        const refusal = SEND_REFUSALS[result.reason];
+        if (refusal) {
+            // 403 rather than 404: the Send is real and its owner limited where,
+            // when or for whom it opens. Every client shows this message as it
+            // is; the /vs page reads the header to say it in the reader's words.
+            const response = vaultError(refusal, 403);
+            response.headers.set(SEND_REFUSAL_HEADER, result.reason);
+            return response;
         }
         if (result.reason === "password") {
             // 401 is what tells a client to ask for the password rather than to

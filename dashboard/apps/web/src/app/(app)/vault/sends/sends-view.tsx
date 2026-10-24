@@ -45,6 +45,9 @@ import {
     EMPTY_LINK_ADVANCED,
     linkExpiry,
     linkAddressRules,
+    linkGuardFields,
+    linkPeopleLimits,
+    linkHoursIncomplete,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 
@@ -63,8 +66,32 @@ interface SendRow {
     deletionDate: string;
     disabled: boolean;
     hasPassword: boolean;
-    /** Polaris's own address rules, outside the Send protocol. */
+    /** Polaris's own rules, outside the Send protocol. */
     rules: LinkAdvancedValue;
+}
+
+/** The rules part of a value, as the Send actions take it. */
+function sendRules(value: LinkAdvancedValue) {
+    return { ...linkAddressRules(value), ...linkPeopleLimits(value) };
+}
+
+/** A Send's stored rules as the value the section edits. */
+function rulesValue(
+    stored: Awaited<ReturnType<typeof vaultContentsAction>>["sendRules"][string] | undefined
+): LinkAdvancedValue {
+    if (!stored) return EMPTY_LINK_ADVANCED;
+    return {
+        ...EMPTY_LINK_ADVANCED,
+        allowedCidrs: stored.allowedCidrs,
+        allowedCountries: stored.allowedCountries,
+        allowedContinents: stored.allowedContinents,
+        ...linkGuardFields(stored.guards)
+    };
+}
+
+/** Whether a value needs a Polaris account, which no Bitwarden app carries. */
+function needsAccount(value: LinkAdvancedValue): boolean {
+    return value.requireLogin || value.allowedUsers.length > 0;
 }
 
 export function SendsView() {
@@ -103,7 +130,7 @@ export function SendsView() {
                 deletionDate: String(raw.deletionDate ?? ""),
                 disabled: raw.disabled === true,
                 hasPassword: raw.password !== null,
-                rules: { ...EMPTY_LINK_ADVANCED, ...contents.sendRules[String(raw.id ?? "")] }
+                rules: rulesValue(contents.sendRules[String(raw.id ?? "")])
             });
         }
         setRows(opened);
@@ -158,7 +185,7 @@ export function SendsView() {
                     disabled: false,
                     hideEmail: true
                 },
-                linkAddressRules(advanced)
+                sendRules(advanced)
             );
             if (result.error || !result.url) {
                 setError(result.error ?? t("sends.notCreated"));
@@ -180,7 +207,7 @@ export function SendsView() {
         if (!limiting || !key) return;
         setSavingRules(true);
         setRulesError(null);
-        const result = await setSendRulesAction(limiting.id, linkAddressRules(rulesDraft));
+        const result = await setSendRulesAction(limiting.id, sendRules(rulesDraft));
         setSavingRules(false);
         if (result.error) {
             setRulesError(result.error);
@@ -274,9 +301,17 @@ export function SendsView() {
                             usesLabel={t("sends.maxViews")}
                             idPrefix="send"
                         />
+                        {needsAccount(advanced) ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("sends.browserOnly")}
+                            </p>
+                        ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="flex justify-end">
-                            <Button type="submit" disabled={creating}>
+                            <Button
+                                type="submit"
+                                disabled={creating || linkHoursIncomplete(advanced)}
+                            >
                                 {creating ? (
                                     <Loader2 className="size-4 animate-spin" />
                                 ) : (
@@ -369,12 +404,16 @@ export function SendsView() {
                         </DialogTitle>
                         <DialogDescription>{t("sends.whereItOpensHint")}</DialogDescription>
                     </DialogHeader>
+                    {/* The password, expiry and cap are the Send's own protocol
+                        fields, which every Bitwarden app edits; only Polaris's
+                        rules are changed here. */}
                     <LinkAdvancedFields
                         value={rulesDraft}
                         onChange={setRulesDraft}
                         omit={["password", "expiry", "uses"]}
                         idPrefix={`send-${limiting?.id ?? ""}`}
                     />
+                    <p className="text-xs text-muted-foreground">{t("sends.browserOnly")}</p>
                     {rulesError ? <p className="text-sm text-danger">{rulesError}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => setLimiting(null)}>
@@ -384,8 +423,9 @@ export function SendsView() {
                             disabled={
                                 savingRules ||
                                 !limiting ||
-                                JSON.stringify(linkAddressRules(rulesDraft)) ===
-                                    JSON.stringify(linkAddressRules(limiting.rules))
+                                linkHoursIncomplete(rulesDraft) ||
+                                JSON.stringify(sendRules(rulesDraft)) ===
+                                    JSON.stringify(sendRules(limiting.rules))
                             }
                             onClick={() => void saveRules()}
                         >

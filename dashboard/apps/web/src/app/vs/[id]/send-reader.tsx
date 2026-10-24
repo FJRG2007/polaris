@@ -11,11 +11,13 @@
  * link's own key first, so what crosses the wire is useless for anything else.
  */
 
+import Link from "next/link";
 import * as crypto from "@/lib/vault/crypto";
+import { signInHref } from "@/lib/safe-redirect";
 import { PublicShell } from "@/components/public-shell";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, Loader2, Lock } from "lucide-react";
+import { Check, Copy, Loader2, Lock, LogIn } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 
 /** The 16 bytes in the fragment, or null. */
@@ -32,11 +34,63 @@ function keyFromFragment(): Uint8Array | null {
     }
 }
 
+/**
+ * Where the key waits while its reader signs in. The sign-in round trip keeps
+ * the path but drops the fragment, and the fragment must never ride in the
+ * redirect query, where the server would see it - so it stays in this tab.
+ */
+const keySlot = (accessId: string) => `polaris-send-key:${accessId}`;
+
+/** Put back a key parked before a sign-in, once, into the fragment it came from. */
+function restoreParkedKey(accessId: string): void {
+    try {
+        const parked = window.sessionStorage.getItem(keySlot(accessId));
+        if (!parked) return;
+        window.sessionStorage.removeItem(keySlot(accessId));
+        if (!window.location.hash) {
+            window.history.replaceState(null, "", `${window.location.pathname}${parked}`);
+        }
+    } catch {
+        // No storage here: the reader opens the link again from where they got it.
+    }
+}
+
+function parkKey(accessId: string): void {
+    try {
+        window.sessionStorage.setItem(keySlot(accessId), window.location.hash);
+    } catch {
+        // As above.
+    }
+}
+
+/** The owner's rules that refused this reader, as the server names them. */
+const REFUSALS = {
+    address: "blocked",
+    scheduled: "scheduled",
+    outside_hours: "closed",
+    sign_in_required: "signIn",
+    not_invited: "notInvited"
+} as const;
+
+type Refusal = (typeof REFUSALS)[keyof typeof REFUSALS];
+
+/** What each failure says; the owner's rules are worded as on every other link. */
+const FAILURE_WORDS = {
+    incomplete: "send.incomplete",
+    unavailable: "send.unavailable",
+    mismatch: "send.mismatch",
+    blocked: "send.blocked",
+    scheduled: "denied.scheduled",
+    closed: "denied.closed",
+    signIn: "denied.signIn",
+    notInvited: "denied.notInvited"
+} as const;
+
 type State =
     | { kind: "loading" }
     | { kind: "password" }
     | { kind: "open"; name: string; text: string }
-    | { kind: "error"; reason: "incomplete" | "unavailable" | "mismatch" | "blocked" };
+    | { kind: "error"; reason: "incomplete" | "unavailable" | "mismatch" | Refusal };
 
 export function SendReader({ accessId }: { accessId: string }) {
     const t = useTranslations("publicPages");
@@ -47,6 +101,7 @@ export function SendReader({ accessId }: { accessId: string }) {
 
     const open = useCallback(
         async (secret?: string) => {
+            restoreParkedKey(accessId);
             const urlKey = keyFromFragment();
             if (!urlKey) {
                 setState({ kind: "error", reason: "incomplete" });
@@ -66,9 +121,14 @@ export function SendReader({ accessId }: { accessId: string }) {
                 setState({ kind: "password" });
                 return;
             }
-            // The owner limited where it opens, and this is not one of them.
+            // The owner limited where, when or for whom it opens, and this
+            // reader is outside it. The header (lib/vault/api/sends.ts) says which.
             if (response.status === 403) {
-                setState({ kind: "error", reason: "blocked" });
+                const named = response.headers.get("x-polaris-send-refusal") ?? "";
+                setState({
+                    kind: "error",
+                    reason: REFUSALS[named as keyof typeof REFUSALS] ?? "blocked"
+                });
                 return;
             }
             if (!response.ok) {
@@ -149,8 +209,21 @@ export function SendReader({ accessId }: { accessId: string }) {
 
             {state.kind === "error" ? (
                 <Card>
-                    <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        {t(`send.${state.reason}`)}
+                    <CardBody className="flex flex-col items-center gap-4 p-8 text-center text-sm text-muted-foreground">
+                        <p>{t(FAILURE_WORDS[state.reason])}</p>
+                        {state.reason === "signIn" || state.reason === "notInvited" ? (
+                            <Button asChild>
+                                <Link
+                                    href={`${signInHref(`/vs/${accessId}`)}${state.reason === "notInvited" ? "&add=1" : ""}`}
+                                    onClick={() => parkKey(accessId)}
+                                >
+                                    <LogIn className="size-4" />
+                                    {state.reason === "notInvited"
+                                        ? t("send.anotherAccount")
+                                        : t("send.signInButton")}
+                                </Link>
+                            </Button>
+                        ) : null}
                     </CardBody>
                 </Card>
             ) : null}

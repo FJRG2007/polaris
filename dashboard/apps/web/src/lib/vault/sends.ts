@@ -18,7 +18,18 @@ import { bumpRevision } from "@/lib/vault/account";
 import { deleteVaultBlob } from "@/lib/vault/blobs";
 import { generateToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
-import { linkAddressDenial, readAddressRules, storedAddressRules } from "@/lib/link-guards";
+import {
+    checkLink,
+    LINK_GUARD_FIELDS,
+    readAddressRules,
+    readLinkGuards,
+    sessionLinkViewer,
+    storedAddressRules,
+    storedPeopleRules,
+    type LinkGuardsView,
+    type LinkSchedule,
+    type LinkViewerSource
+} from "@/lib/link-guards";
 
 /** The address rules a Send can carry. Polaris's own, outside the Send
  *  protocol: set from the Sends screen, never from a client's request body. */
@@ -28,11 +39,39 @@ export interface SendAddressRules {
     readonly allowedContinents: string[];
 }
 
+/**
+ * Everything Polaris adds to a Send beyond the protocol: where it opens, from
+ * when, in which hours, and for whom. The account rules can only be met on the
+ * /vs page - a Bitwarden client carries no Polaris session, so a Send that
+ * needs one refuses it rather than opening for it.
+ */
+export interface SendRules extends SendAddressRules {
+    readonly startsAt?: Date | null;
+    readonly schedule?: LinkSchedule | null;
+    readonly requireLogin?: boolean;
+    readonly allowedUsers?: readonly string[];
+}
+
+/** A Send's rules read back for the Sends screen. */
+export interface SendRulesView extends SendAddressRules {
+    guards: LinkGuardsView;
+}
+
 const RULE_SELECT = {
     allowedCidrs: true,
     allowedCountries: true,
-    allowedContinents: true
+    allowedContinents: true,
+    ...LINK_GUARD_FIELDS
 } as const;
+
+/** Rules ready to store, as the columns they live in. */
+function storedSendRules(rules: SendRules) {
+    return {
+        ...storedAddressRules(rules),
+        startsAt: rules.startsAt ?? null,
+        ...storedPeopleRules(rules)
+    };
+}
 
 /** What lives inside a Send's encrypted document. */
 interface SendDocument {
@@ -161,7 +200,7 @@ export async function getSend(
 export async function createSend(
     userId: string,
     input: SendInput,
-    rules?: SendAddressRules
+    rules?: SendRules
 ): Promise<Record<string, unknown>> {
     const row = await prisma.vaultSend.create({
         data: {
@@ -176,7 +215,7 @@ export async function createSend(
             disabled: input.disabled,
             hideEmail: input.hideEmail,
             accessId: generateToken(),
-            ...(rules ? storedAddressRules(rules) : {})
+            ...(rules ? storedSendRules(rules) : {})
         },
         select: SEND_SELECT
     });
@@ -231,24 +270,26 @@ export async function removeSendPassword(
     return row ? toSendResponse(row) : null;
 }
 
-/** The address rules of every Send this account has, by Send id. */
-export async function listSendRules(userId: string): Promise<Record<string, SendAddressRules>> {
+/** The rules of every Send this account has, by Send id. */
+export async function listSendRules(userId: string): Promise<Record<string, SendRulesView>> {
     const rows = await prisma.vaultSend.findMany({
         where: { userId },
         select: { id: true, ...RULE_SELECT }
     });
-    return Object.fromEntries(rows.map((row) => [row.id, readAddressRules(row)]));
+    return Object.fromEntries(
+        rows.map((row) => [row.id, { ...readAddressRules(row), guards: readLinkGuards(row) }])
+    );
 }
 
-/** Replace one Send's address rules. Owner-scoped; false when it is not theirs. */
+/** Replace one Send's rules. Owner-scoped; false when it is not theirs. */
 export async function setSendRules(
     userId: string,
     sendId: string,
-    rules: SendAddressRules
+    rules: SendRules
 ): Promise<boolean> {
     const { count } = await prisma.vaultSend.updateMany({
         where: { id: sendId, userId },
-        data: { ...storedAddressRules(rules), revisionDate: new Date() }
+        data: { ...storedSendRules(rules), revisionDate: new Date() }
     });
     if (count === 0) return false;
     await bumpRevision(userId);
@@ -287,7 +328,17 @@ export type SendAccess =
     | { ok: true; send: SendRow & { storedPath: string | null }; document: SendDocument }
     | {
           ok: false;
-          reason: "not_found" | "expired" | "exhausted" | "disabled" | "address" | "password";
+          reason:
+              | "not_found"
+              | "expired"
+              | "exhausted"
+              | "disabled"
+              | "address"
+              | "password"
+              | "scheduled"
+              | "outside_hours"
+              | "sign_in_required"
+              | "not_invited";
       };
 
 /**
@@ -301,25 +352,62 @@ export type SendAccess =
 export async function accessSend(
     accessId: string,
     password?: string,
-    ip?: string
+    ip?: string,
+    viewer: LinkViewerSource = sessionLinkViewer
 ): Promise<SendAccess> {
     const found = await prisma.vaultSend.findUnique({
         where: { accessId },
         select: { ...SEND_SELECT, ...RULE_SELECT, storedPath: true }
     });
     if (!found) return { ok: false, reason: "not_found" };
-    const { allowedCidrs, allowedCountries, allowedContinents, ...send } = found;
+    const {
+        allowedCidrs,
+        allowedCountries,
+        allowedContinents,
+        startsAt,
+        requireLogin,
+        allowedUsers,
+        linkSchedule,
+        ...send
+    } = found;
 
-    const now = Date.now();
-    if (send.deletionDate.getTime() <= now) return { ok: false, reason: "not_found" };
+    const now = new Date();
+    if (send.deletionDate.getTime() <= now.getTime()) return { ok: false, reason: "not_found" };
     if (send.disabled) return { ok: false, reason: "disabled" };
-    if (send.expirationDate && send.expirationDate.getTime() <= now) {
-        return { ok: false, reason: "expired" };
-    }
-    // Before the password, so a refused address cannot even guess at it, and
-    // before the count, so a refused open spends nothing.
-    if (await linkAddressDenial({ allowedCidrs, allowedCountries, allowedContinents }, ip)) {
-        return { ok: false, reason: "address" };
+    // Before the password, so a refused caller cannot even guess at it, and
+    // before the count, so a refused open spends nothing. The cap is left to the
+    // counting statement below, which is the only place it is race-free.
+    const verdict = await checkLink(
+        {
+            limits: {
+                revokedAt: null,
+                expiresAt: send.expirationDate,
+                startsAt,
+                maxUses: null,
+                useCount: 0
+            },
+            rules: { allowedCidrs, allowedCountries, allowedContinents },
+            guards: { requireLogin, allowedUsers, linkSchedule }
+        },
+        ip,
+        now,
+        viewer
+    );
+    if (!verdict.ok) {
+        switch (verdict.reason) {
+            case "expired":
+            case "scheduled":
+            case "outside_hours":
+            case "sign_in_required":
+            case "not_invited":
+                return { ok: false, reason: verdict.reason };
+            case "ip_not_allowed":
+            case "country_not_allowed":
+            case "not_allowed":
+                return { ok: false, reason: "address" };
+            default:
+                return { ok: false, reason: "not_found" };
+        }
     }
     if (send.passwordHash) {
         if (!password) return { ok: false, reason: "password" };

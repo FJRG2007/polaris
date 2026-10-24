@@ -611,10 +611,11 @@
         "untitled": "Untitled",
         "off": "Off",
         "expiresAfterDeletion": "It cannot expire after it is deleted. Pick a longer life or an earlier day.",
-        "whereItOpens": "Where it opens",
-        "whereItOpensNamed": "Where \"{name}\" opens",
+        "whereItOpens": "Limits",
+        "whereItOpensNamed": "Limits of \"{name}\"",
         "whereItOpensHint": "Checked on every open, from Polaris and from any Bitwarden app.",
         "saveRules": "Save",
+        "browserOnly": "With an account or named people set, it opens only on its web page. Bitwarden apps are refused.",
         "cancel": "Cancel"
     },
     "port": {
