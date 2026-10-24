@@ -926,7 +926,7 @@
             "timing": "Tiempo",
             "data": "Datos",
             "send": "Enviar",
-            "game-servers": "Servidores de juegos",
+            "game-servers": "Hosting juegos",
             "deploy": "Deploy",
             "chat": "Chat",
             "tasks": "Tareas",
@@ -944,18 +944,18 @@
             "nasBackupFailed": "Falló la copia del NAS",
             "nasBackupOverdue": "Copia del NAS atrasada",
             "automationFinished": "Terminó otra automatización",
-            "gameServerStarted": "Servidor de juego iniciado",
-            "gameServerStopped": "Servidor de juego detenido",
+            "gameServerStarted": "Servidor iniciado",
+            "gameServerStopped": "Servidor detenido",
             "deploySucceeded": "Deploy completado",
             "deployFailed": "Deploy fallido",
             "taskCreated": "Tarea creada",
             "taskCompleted": "Tarea completada",
-            "chatMessage": "Nuevo mensaje de chat",
-            "gameServerCrashed": "El servidor de juegos no deja de fallar",
-            "playerJoined": "Un jugador ha entrado",
+            "chatMessage": "Mensaje de chat",
+            "gameServerCrashed": "Servidor de juego se cuelga",
+            "playerJoined": "Entra un jugador",
             "mailReceived": "Correo recibido",
             "driveFileUploaded": "Archivo subido a Drive",
-            "calendarEventStarting": "Un evento del calendario empieza pronto"
+            "calendarEventStarting": "Evento del calendario pronto"
         }
     }
 }
