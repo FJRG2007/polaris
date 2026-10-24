@@ -23,7 +23,7 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import type { GameKey } from "../../../messages";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { saveGameScheduleAction, setWakeOnJoinAction } from "./minecraft-actions";
-import { Button, Card, CardBody, Input, Select, Switch, isDirty } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Select, Switch, isDirty, DateInput } from "@polaris/ui";
 import { CalendarClock, Loader2, Moon, Plus, Power, Trash2 } from "lucide-react";
 import {
     describeSchedule,
@@ -421,8 +421,8 @@ function WindowRow({
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
             <div className="flex flex-wrap items-end gap-2">
                 <Field label={t("schedule.from")}>
-                    <Input
-                        type="time"
+                    <DateInput
+                        mode="time"
                         className="w-28"
                         value={window.from}
                         aria-label={t("schedule.whenTheWindowStarts")}
@@ -430,8 +430,8 @@ function WindowRow({
                     />
                 </Field>
                 <Field label={t("schedule.to")}>
-                    <Input
-                        type="time"
+                    <DateInput
+                        mode="time"
                         className="w-28"
                         value={window.to}
                         aria-label={t("schedule.whenTheWindowEnds")}
@@ -612,8 +612,8 @@ function RoutineRow({
                     />
                 </Field>
                 <Field label={t("schedule.at")}>
-                    <Input
-                        type="time"
+                    <DateInput
+                        mode="time"
                         value={routine.at}
                         onChange={(event) => onChange({ at: event.target.value })}
                         className="w-32"

@@ -8,17 +8,25 @@
  * shows: `panelHolds` is the one answer to "is this device on it", read again
  * for every press, so a card taken off stops being reachable at once.
  *
+ * The same holds for its cameras and its automation buttons: a link watches
+ * only the cameras on the panel (`panelHoldsCamera`) and starts only the
+ * automations it has a button for (`panelHoldsAutomation`).
+ *
  * Server-only.
  */
 
 import { prisma } from "@polaris/db";
 import * as devices from "./devices";
 import { host } from "@polaris/app-host";
+import { getCamerasAt, type CameraView } from "./cameras";
 import { HomeError } from "./home-error";
 import type { DeviceView } from "./device-kinds";
 import {
     PANELS_PER_PLACE,
+    panelAutomationIds,
+    panelCameraIds,
     panelDeviceIds,
+    panelDirectDeviceIds,
     panelRoomIds,
     storedCards,
     type PanelCard,
@@ -92,11 +100,11 @@ export async function savePanelCards(
     cards: readonly PanelCard[]
 ): Promise<PanelView> {
     const panel = await requirePanel(installedAppId, id);
-    const deviceIds = [
-        ...new Set(cards.flatMap((card) => (card.type === "device" ? [card.deviceId] : [])))
-    ];
+    const deviceIds = panelDirectDeviceIds(cards);
     const roomIds = panelRoomIds(cards);
-    const [foundDevices, foundRooms] = await Promise.all([
+    const cameraIds = panelCameraIds(cards);
+    const automationIds = panelAutomationIds(cards);
+    const [foundDevices, foundRooms, foundCameras, foundAutomations] = await Promise.all([
         deviceIds.length
             ? prisma.placeDevice.count({
                   where: {
@@ -110,9 +118,28 @@ export async function savePanelCards(
             ? prisma.placeRoom.count({
                   where: { installedAppId, placeId: panel.placeId, id: { in: roomIds } }
               })
+            : 0,
+        cameraIds.length
+            ? prisma.camera.count({
+                  where: {
+                      installedAppId,
+                      id: { in: cameraIds },
+                      OR: [{ placeId: panel.placeId }, { placeId: null }]
+                  }
+              })
+            : 0,
+        automationIds.length
+            ? prisma.placeAutomation.count({
+                  where: { installedAppId, placeId: panel.placeId, id: { in: automationIds } }
+              })
             : 0
     ]);
-    if (foundDevices !== deviceIds.length || foundRooms !== roomIds.length) {
+    if (
+        foundDevices !== deviceIds.length ||
+        foundRooms !== roomIds.length ||
+        foundCameras !== cameraIds.length ||
+        foundAutomations !== automationIds.length
+    ) {
         throw new HomeError("A card on that panel is not at this place");
     }
     const row = await prisma.placePanel.update({
@@ -157,19 +184,54 @@ export interface PanelContents {
     readonly devices: readonly DeviceView[];
     /** Each room card's room: its name and the devices in it now. */
     readonly rooms: readonly { id: string; name: string; deviceIds: readonly string[] }[];
+    /** Each camera card's camera, still at the panel's place. */
+    readonly cameras: readonly CameraView[];
+    /** Each button's automation, still at the panel's place. */
+    readonly automations: readonly PanelAutomation[];
+}
+
+/** What a button shows of the automation it runs. */
+export interface PanelAutomation {
+    readonly id: string;
+    readonly name: string;
+    readonly enabled: boolean;
+}
+
+/** The cameras on these cards still at the place (or placed nowhere yet). */
+async function camerasHere(
+    installedAppId: string,
+    placeId: string,
+    cards: readonly PanelCard[]
+): Promise<CameraView[]> {
+    return getCamerasAt(installedAppId, placeId, panelCameraIds(cards));
+}
+
+async function automationsHere(
+    installedAppId: string,
+    placeId: string,
+    cards: readonly PanelCard[]
+): Promise<PanelAutomation[]> {
+    const ids = panelAutomationIds(cards);
+    if (ids.length === 0) return [];
+    return prisma.placeAutomation.findMany({
+        where: { installedAppId, placeId, id: { in: ids } },
+        select: { id: true, name: true, enabled: true }
+    });
 }
 
 export async function panelContents(installedAppId: string, id: string): Promise<PanelContents> {
     const panel = await requirePanel(installedAppId, id);
     const roomIds = panelRoomIds(panel.cards);
-    const [byRoom, roomRows] = await Promise.all([
+    const [byRoom, roomRows, cameras, automations] = await Promise.all([
         devicesInRooms(installedAppId, panel.placeId, roomIds),
         roomIds.length
             ? prisma.placeRoom.findMany({
                   where: { installedAppId, placeId: panel.placeId, id: { in: roomIds } },
                   select: { id: true, name: true }
               })
-            : []
+            : [],
+        camerasHere(installedAppId, panel.placeId, panel.cards),
+        automationsHere(installedAppId, panel.placeId, panel.cards)
     ]);
     const ids = panelDeviceIds(panel.cards, byRoom);
     const all = ids.size ? await devices.listDevices(installedAppId, panel.placeId) : [];
@@ -180,7 +242,9 @@ export async function panelContents(installedAppId: string, id: string): Promise
             id: room.id,
             name: room.name,
             deviceIds: byRoom.get(room.id) ?? []
-        }))
+        })),
+        cameras,
+        automations
     };
 }
 
@@ -204,7 +268,7 @@ export async function panelPlaceReach(
     const ids = panelDeviceIds(cards, byRoom);
     // A device card only reaches a device still at the panel's place (or
     // placed nowhere): moving a door to another place takes it off the link.
-    const direct = cards.flatMap((card) => (card.type === "device" ? [card.deviceId] : []));
+    const direct = panelDirectDeviceIds(cards);
     if (direct.length) {
         const here = await prisma.placeDevice.findMany({
             where: {
@@ -233,4 +297,62 @@ export async function panelHolds(
     deviceId: string
 ): Promise<boolean> {
     return (await panelReach(installedAppId, panelId)).has(deviceId);
+}
+
+async function panelRow(installedAppId: string, id: string) {
+    const row = await prisma.placePanel.findFirst({
+        where: { id, installedAppId },
+        select: { placeId: true, cards: true }
+    });
+    return row ? { placeId: row.placeId, cards: storedCards(row.cards) } : null;
+}
+
+/** The automations of a place a button can be made for, by name. */
+export async function automationChoices(
+    installedAppId: string,
+    placeId: string
+): Promise<PanelAutomation[]> {
+    return prisma.placeAutomation.findMany({
+        where: { installedAppId, placeId },
+        select: { id: true, name: true, enabled: true },
+        orderBy: { name: "asc" },
+        take: 500
+    });
+}
+
+/** Whether a camera is on this panel now, and still at the panel's place. */
+export async function panelHoldsCamera(
+    installedAppId: string,
+    panelId: string,
+    cameraId: string
+): Promise<boolean> {
+    const row = await panelRow(installedAppId, panelId);
+    if (!row || !panelCameraIds(row.cards).includes(cameraId)) return false;
+    const found = await prisma.camera.count({
+        where: {
+            installedAppId,
+            id: cameraId,
+            OR: [{ placeId: row.placeId }, { placeId: null }]
+        }
+    });
+    return found > 0;
+}
+
+/** Whether this panel has a button for an automation now, at its own place. */
+export async function panelHoldsAutomation(
+    installedAppId: string,
+    panelId: string,
+    automationId: string
+): Promise<boolean> {
+    const row = await panelRow(installedAppId, panelId);
+    if (!row || !panelAutomationIds(row.cards).includes(automationId)) return false;
+    const found = await prisma.placeAutomation.count({
+        where: { installedAppId, placeId: row.placeId, id: automationId }
+    });
+    return found > 0;
+}
+
+/** Where a panel is, for a fence on its link. */
+export async function panelPlaceId(installedAppId: string, id: string): Promise<string | null> {
+    return (await panelRow(installedAppId, id))?.placeId ?? null;
 }

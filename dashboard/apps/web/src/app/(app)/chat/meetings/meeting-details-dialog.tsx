@@ -29,7 +29,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    DateInput
 } from "@polaris/ui";
 
 /** What a `datetime-local` field holds, from a moment. It takes local wall-clock
@@ -108,7 +109,8 @@ export function MeetingDetailsDialog({
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium">
-                            {t("meetings.name")}<span className="text-danger"> *</span>
+                            {t("meetings.name")}
+                            <span className="text-danger"> *</span>
                         </span>
                         <Input
                             autoFocus
@@ -121,8 +123,8 @@ export function MeetingDetailsDialog({
 
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium">{t("meetingDetails.when")}</span>
-                        <Input
-                            type="datetime-local"
+                        <DateInput
+                            mode="datetime"
                             value={when}
                             onChange={(event) => setWhen(event.target.value)}
                         />

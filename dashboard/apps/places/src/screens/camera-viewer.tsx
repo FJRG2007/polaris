@@ -26,7 +26,10 @@
  * everything drawn over it.
  */
 
+import * as actions from "./actions";
 import { PtzPad } from "./ptz-pad";
+import { TapoControlsPanel } from "./tapo-controls-panel";
+import type { TapoControls } from "../lib/camera-control-kinds";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
 import { usePlacesT } from "./use-places-t";
@@ -50,6 +53,7 @@ import {
     Pause,
     Play,
     Volume2,
+    SlidersHorizontal,
     VolumeX,
     ZoomIn,
     ZoomOut
@@ -348,6 +352,25 @@ export function CameraViewer({
      * gesture the refusal is waiting for.
      */
     const [muted, setMuted] = useState(true);
+    /** A Tapo camera's own controls: whether the panel is open, and what the
+     *  camera answered for once it was. */
+    const [tapoOpen, setTapoOpen] = useState(false);
+    const [tapo, setTapo] = useState<TapoControls | null>(null);
+    const readsTapo = !camera.ptz && camera.privacyNative && canControl;
+    useEffect(() => {
+        setTapo(null);
+        if (!readsTapo) return;
+        let gone = false;
+        void actions
+            .tapoControlsAction(camera.id)
+            .then((result) => {
+                if (!gone && result.controls) setTapo(result.controls);
+            })
+            .catch(() => undefined);
+        return () => {
+            gone = true;
+        };
+    }, [camera.id, readsTapo]);
 
     /** Whether the reader has stopped it. Held rather than closed: the picture
      *  stays on screen, and starting again reconnects rather than resuming - what
@@ -780,6 +803,14 @@ export function CameraViewer({
                                 </Control>
                             </>
                         ) : null}
+                        {camera.privacyNative && canControl ? (
+                            <Control
+                                label={t("tapo.open")}
+                                onClick={() => setTapoOpen((current) => !current)}
+                            >
+                                <SlidersHorizontal className="size-4 shrink-0" />
+                            </Control>
+                        ) : null}
                         <Control
                             label={t("viewer.zoomOut")}
                             disabled={!isZoomed(zoom)}
@@ -819,6 +850,21 @@ export function CameraViewer({
                             privacyPreset={camera.privacyNative ? null : camera.privacyPreset}
                             onPrivacyPreset={onPrivacyPreset}
                         />
+                    ) : !camera.ptz && tapo?.ptz && canControl ? (
+                        <PtzPad cameraId={camera.id} zoom={false} />
+                    ) : null}
+
+                    {tapoOpen && camera.privacyNative && canControl ? (
+                        <div
+                            className="absolute right-2 top-2 max-h-[calc(100%-1rem)] w-[min(18rem,calc(100%-1rem))] overflow-y-auto rounded-lg bg-black/75 p-3 backdrop-blur-sm"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <TapoControlsPanel
+                                cameraId={camera.id}
+                                cameraName={camera.name}
+                                onControls={setTapo}
+                            />
+                        </div>
                     ) : null}
                 </div>
             </DialogContent>

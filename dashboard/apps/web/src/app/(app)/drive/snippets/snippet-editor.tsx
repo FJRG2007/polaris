@@ -26,7 +26,7 @@ import { CODE_LANGUAGES, languageForFile } from "@/lib/code-language";
 import { generateSealKey, seal, withSealKey } from "@/lib/browser-seal";
 import { MAX_SNIPPET_FILES, MAX_SNIPPET_TOTAL_CHARS } from "@polaris/core";
 import { createSnippetAction, updateSnippetAction } from "./snippet-actions";
-import { Button, Card, CardBody, Input, isDirty, Select, Textarea } from "@polaris/ui";
+import { Button, Card, CardBody, Input, isDirty, Select, Textarea, Checkbox } from "@polaris/ui";
 
 export interface EditorFile {
     name: string;
@@ -386,9 +386,8 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                         </label>
                         {visibility !== "private" ? (
                             <label className="flex items-start gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="mt-0.5 size-4"
+                                <Checkbox
+                                    className="mt-0.5"
                                     checked={sealed}
                                     onChange={(event) => setSealed(event.target.checked)}
                                 />

@@ -39,6 +39,31 @@ checklists, tablas e imágenes. Las hojas de cálculo tienen fórmulas y formato
 numéricos. Las presentaciones tienen diseños, temas, gráficos, transiciones y
 animaciones, notas del orador y vista de presentador.
 
+## Las apps de Office
+
+Cada tipo se abre en su propio editor. Empieza uno desde el menú de nuevo de
+Office, o abre un archivo que ya tengas.
+
+- **Documento** - escribe algo y dale formato: títulos, fuentes, colores,
+  listas de tareas, tablas e imágenes.
+- **Hoja de cálculo** - números, fórmulas y tablas, con formatos de número.
+- **Presentación** - algo que presentar, con diseños, temas, gráficos,
+  transiciones y animaciones, notas del orador y vista de presentador.
+- **Diagrama** - dibuja cómo encaja todo en un lienzo: rectángulos, rombos,
+  elipses, flechas, líneas, dibujo libre, texto, imágenes y marcos, con una
+  biblioteca de formas y un puntero láser para presentar.
+- **Comparativa** - enfrenta a tus competidores en lo que importa, con las
+  pruebas. Pulsa **Añadir competidor** y responde cada criterio con lo que
+  viste y dónde comprobarlo; una respuesta que nadie comprobó lo dice. Con dos
+  criterios que llevan un número - una nota, un precio, una cantidad - el
+  **Mapa** de posicionamiento se dibuja solo, y un competidor sin respuesta se
+  queda fuera en vez de colocarse en cero.
+
+## Traer archivos
+
+**Importar** abre un archivo como documento. **Abrir desde Google Drive** trae
+Docs y Sheets de Google como copia, y deja el original en Drive tal cual.
+
 ## Compartir y exportar
 
 Comparte con una persona, un equipo o un rol como lector, comentarista o

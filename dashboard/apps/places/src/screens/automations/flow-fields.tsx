@@ -14,7 +14,7 @@ import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import { Field, useIssue } from "@polaris/ui/automation";
-import { Button, Input, Select, cn, type SelectOption } from "@polaris/ui";
+import { Button, Input, Select, cn, type SelectOption, DateInput } from "@polaris/ui";
 import { Plus, X } from "lucide-react";
 import { createContext, useContext, useState } from "react";
 import type { RoomView } from "../../lib/room-kinds";
@@ -815,9 +815,9 @@ export function ClockField({
     return (
         <Field label={label} path={[...path, field]} required>
             {(id, invalid) => (
-                <Input
+                <DateInput
                     id={id}
-                    type="time"
+                    mode="time"
                     step={60}
                     disabled={disabled}
                     value={value}

@@ -35,6 +35,7 @@ function Inbox({ ctx, open }: { ctx: SceneContext; open: boolean }) {
                 viewerName={VIEWER.name}
                 viewerId={VIEWER.id}
                 shelf="personal"
+                lent={false}
             >
                 <MailView
                     page={{

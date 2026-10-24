@@ -9,6 +9,7 @@
  * their dashboard rather than a spinner over one.
  */
 
+import { cookies } from "next/headers";
 import { OverviewGrid } from "./overview-grid";
 import { Messages } from "@/components/i18n/messages";
 import { resolveOverviewLayout } from "@polaris/core";
@@ -17,6 +18,7 @@ import { SetupWizardOffer } from "@/components/setup/setup-wizard-entry";
 import { overviewFeatures } from "@/lib/overview/features";
 import { availableOverviewWidgets } from "@/lib/overview/catalog";
 import { availableAppWidgetKinds } from "@/lib/overview/app-widgets";
+import { EMPTY_CARDS_COOKIE, parseEmptyCardsCookie } from "@/lib/overview/empty-cards";
 import { getOverviewPreferences } from "@/lib/overview/prefs-service";
 import { heldSectionPermissions, installedSectionApps, reachableApps } from "@/lib/app-access";
 
@@ -26,7 +28,7 @@ export default async function OverviewPage() {
     const user = await requireUser();
     const access = accessFor(user);
     const features = await overviewFeatures(user.id);
-    const [preferences, available, apps, held, installed, appKinds] = await Promise.all([
+    const [preferences, available, apps, held, installed, appKinds, jar] = await Promise.all([
         getOverviewPreferences(user.id),
         availableOverviewWidgets({ ...access, features }),
         reachableApps(access),
@@ -34,7 +36,8 @@ export default async function OverviewPage() {
         installedSectionApps(access),
         // The cards the installed apps offer. Their names only: what each card
         // shows is read once the grid is on screen.
-        availableAppWidgetKinds().catch(() => [])
+        availableAppWidgetKinds().catch(() => []),
+        cookies()
     ]);
 
     return (
@@ -53,6 +56,7 @@ export default async function OverviewPage() {
                 }))}
                 gate={{ held, installed }}
                 appKinds={appKinds}
+                knownEmpty={parseEmptyCardsCookie(jar.get(EMPTY_CARDS_COOKIE)?.value)}
             />
             {/* Only an administrator is ever offered the first-run setup; it asks
                 the server after the Overview is drawn. */}

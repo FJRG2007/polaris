@@ -32,7 +32,7 @@ import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RichText } from "@/components/rich-text/rich-text";
-import { cn, Input, Button, SegmentedControl } from "@polaris/ui";
+import { cn, Input, Button, SegmentedControl, Checkbox } from "@polaris/ui";
 import { Composer } from "@/app/(app)/chat/composer";
 import { CheckCircle2, Paperclip, Play, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
@@ -459,8 +459,7 @@ export function TimeSection({
                     className="h-8 w-44 text-xs"
                 />
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <input
-                        type="checkbox"
+                    <Checkbox
                         checked={billable}
                         onChange={(event) => setBillable(event.target.checked)}
                     />

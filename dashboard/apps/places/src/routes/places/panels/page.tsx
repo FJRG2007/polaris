@@ -5,7 +5,8 @@
 
 import { PageHeader } from "@polaris/ui";
 import { placesT } from "../../../lib/i18n";
-import { listPanels } from "../../../lib/panels";
+import { automationChoices, listPanels } from "../../../lib/panels";
+import { listCameras } from "../../../lib/cameras";
 import { listRooms } from "../../../lib/rooms";
 import { listDevices } from "../../../lib/devices";
 import { requireHomeUser } from "../../../lib/access";
@@ -20,10 +21,12 @@ export default async function PanelsPage() {
     const { install, canControl, canManage } = await requireHomeUser("home.read");
     const place = await currentPlace(install.id);
     const placeId = place.current.id;
-    const [panels, devices, rooms] = await Promise.all([
+    const [panels, devices, rooms, cameras, automations] = await Promise.all([
         listPanels(install.id, placeId),
         listDevices(install.id, placeId),
-        listRooms(install.id, placeId)
+        listRooms(install.id, placeId),
+        listCameras(install.id, placeId),
+        automationChoices(install.id, placeId)
     ]);
     const boardRooms = rooms.map((room) => ({
         id: room.id,
@@ -46,6 +49,8 @@ export default async function PanelsPage() {
                 panels={panels}
                 devices={devices}
                 rooms={boardRooms}
+                cameras={cameras}
+                automations={automations}
                 canControl={canControl}
                 canManage={canManage}
             />

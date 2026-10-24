@@ -30,7 +30,7 @@ import { referenced } from "./message-references";
 import { RichText } from "@/components/rich-text/rich-text";
 import { Hash, Loader2, Search, Users, X } from "lucide-react";
 import { SidePane } from "./side-pane";
-import { Button, Input, SegmentedControl, cn } from "@polaris/ui";
+import { Button, Input, SegmentedControl, cn, DateInput } from "@polaris/ui";
 
 /** Wide enough for a line of a message and its filters, narrow enough to leave
  *  the conversation it is searching beside it. */
@@ -206,8 +206,8 @@ export function SearchPanel({
                 <div className="flex items-center gap-2">
                     <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
                         {t("search.after")}
-                        <Input
-                            type="date"
+                        <DateInput
+                            mode="date"
                             value={after}
                             aria-label={t("search.onOrAfter")}
                             onChange={(event) => setAfter(event.target.value)}
@@ -215,8 +215,8 @@ export function SearchPanel({
                     </label>
                     <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
                         {t("search.before")}
-                        <Input
-                            type="date"
+                        <DateInput
+                            mode="date"
                             value={before}
                             aria-label={t("search.onOrBefore")}
                             onChange={(event) => setBefore(event.target.value)}

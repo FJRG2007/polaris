@@ -9,15 +9,14 @@ import { requestSamples } from "@/data/docs";
 import type { SiteLocale } from "@/data/builders";
 import { CodeTabs } from "@/components/code-tabs";
 import { Badge, buttonVariants } from "@polaris/ui";
-import { SideList } from "@/views/docs";
+import { SideList, searchWords } from "@/views/docs";
 import { DocsSearch } from "@/components/docs-search";
 import { highlight, highlightAll } from "@/lib/highlight";
 import { EXAMPLE_ORIGIN } from "@/lib/example-origin";
-import { asset, href, siteData, words } from "@/lib/site";
+import { asset, siteData, words } from "@/lib/site";
 
 export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
     const t = words(locale).api;
-    const d = words(locale).docs;
     const { api } = siteData();
     const operations = api.groups.flatMap((group) => group.operations);
     const [samples, bodies, auth] = await Promise.all([
@@ -39,13 +38,7 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                 aria-label={t.title}
                 className="flex shrink-0 flex-col gap-3 text-sm lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-56 lg:self-start lg:overflow-y-auto"
             >
-                <DocsSearch
-                    index={asset(href(locale, "docs/search.json"))}
-                    label={d.search}
-                    empty={d.empty}
-                    loading={d.loading}
-                    failed={d.failed}
-                />
+                <DocsSearch locale={locale} words={searchWords(locale)} className="w-full" />
                 <SideList label={t.title}>
                     <a
                         href="#authentication"

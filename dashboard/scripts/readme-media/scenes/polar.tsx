@@ -1,7 +1,8 @@
 /**
- * Polar in use: asked for release notes on its own page in the dashboard, then
- * in the browser extension's side panel beside a shop's product page, asked
- * about that page and answering it.
+ * Polar in use, in a browser: asked for release notes on its own page in the
+ * dashboard (`polar`), and in the browser extension's side panel beside a
+ * shop's product page (`polar-side-panel`), asked about that page, answering
+ * it, and then working the page itself - a size picked, the basket filled.
  *
  * Both chats are `PolarChat` itself. The side panel draws it the way the
  * extension's frame does (`(embed)/polar/embed/polar-embed.tsx`): full page,
@@ -12,6 +13,7 @@
 import { Star } from "lucide-react";
 import { Chrome } from "../runtime/chrome";
 import { useEffect, useState } from "react";
+import { BrowserFrame, PHONE_WIDTH, PolarisTabIcon, framedScene } from "../runtime/browser-frame";
 import { PAGE_BLEED, cn } from "@polaris/ui";
 import { THREAD_KEY } from "@/lib/polar/stored";
 import { PolarChat } from "@/components/polar/polar-panel";
@@ -20,19 +22,26 @@ import {
     OPEN_THREAD_ID,
     POLAR_PROVIDERS,
     SHOP,
+    SHOP_SIZES,
     polarThread,
     polarThreads,
     type PolarStage
 } from "../fixtures/polar";
 
-/** The animation's steps: where the picture is, how far the chat has got, how long it holds. */
-const PLAY: { shop: boolean; stage: PolarStage; hold: number }[] = [
-    { shop: false, stage: "asked", hold: 1300 },
-    { shop: false, stage: "answering", hold: 1200 },
-    { shop: false, stage: "answered", hold: 2600 },
-    { shop: true, stage: "asked", hold: 1600 },
-    { shop: true, stage: "answering", hold: 1200 },
-    { shop: true, stage: "answered", hold: 3400 }
+/** The dashboard page's steps: how far the chat has got, how long it holds. */
+const PAGE_PLAY: { stage: PolarStage; hold: number }[] = [
+    { stage: "asked", hold: 1300 },
+    { stage: "answering", hold: 1200 },
+    { stage: "answered", hold: 2600 }
+];
+
+/** The side panel's steps: the page asked about, then worked. */
+const PANEL_PLAY: { stage: PolarStage; hold: number }[] = [
+    { stage: "asked", hold: 1500 },
+    { stage: "answering", hold: 1100 },
+    { stage: "answered", hold: 2600 },
+    { stage: "acting", hold: 1600 },
+    { stage: "acted", hold: 3200 }
 ];
 
 /**
@@ -43,10 +52,7 @@ const PLAY: { shop: boolean; stage: PolarStage; hold: number }[] = [
  */
 const PANEL = new URLSearchParams(window.location.search).get("panel") as PolarStage | null;
 
-/** The phone plays only the dashboard: the side panel is a desktop browser's. */
-const SHOWN = () => (window.innerWidth < 768 ? PLAY.filter((one) => !one.shop) : PLAY);
-
-/** The step on screen; the still shows the finished dashboard chat. */
+/** The step on screen; the still shows the answered chat. */
 let current = 2;
 const listeners = new Set<(step: number) => void>();
 
@@ -69,8 +75,14 @@ const BRAND = "#0f766e";
 const STARS = "#d97706";
 
 /** The product page: an invented shop, plainly so. */
-function ShopPage({ ctx }: { ctx: SceneContext }) {
+function ShopPage({ ctx, stage }: { ctx: SceneContext; stage: PolarStage }) {
     const lang = ctx.locale === "es-ES" ? "es" : "en";
+    const phone = window.innerWidth < PHONE_WIDTH;
+    // What Polar has done to the page so far: the size it picked, the button
+    // it is pressing, and the basket once it has.
+    const picked = stage === "acting" || stage === "acted" ? 1 : 0;
+    const pressing = stage === "acting";
+    const basket = stage === "acted" ? 1 : 0;
     return (
         <div
             style={{
@@ -101,13 +113,21 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
                     }}
                 />
                 <span style={{ fontSize: 13, color: MUTED }}>
-                    {ctx.say("Basket (0)", "Cesta (0)")}
+                    {ctx.say(`Basket (${basket})`, `Cesta (${basket})`)}
                 </span>
             </div>
-            <div style={{ display: "flex", gap: 28, padding: 28 }}>
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: phone ? "column" : "row",
+                    gap: phone ? 16 : 28,
+                    padding: phone ? 16 : 28
+                }}
+            >
                 <div
                     style={{
-                        flex: "0 0 38%",
+                        flex: phone ? "none" : "0 0 38%",
+                        maxHeight: phone ? 160 : undefined,
                         aspectRatio: "1",
                         borderRadius: 12,
                         display: "grid",
@@ -154,10 +174,28 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
                             <li key={point}>{point}</li>
                         ))}
                     </ul>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        {SHOP_SIZES.map((size, index) => (
+                            <span
+                                key={size}
+                                style={{
+                                    borderRadius: 8,
+                                    padding: "5px 12px",
+                                    fontSize: 13,
+                                    border: `1px solid ${index === picked ? BRAND : LINE}`,
+                                    color: index === picked ? BRAND : INK,
+                                    fontWeight: index === picked ? 600 : 400
+                                }}
+                            >
+                                {size}
+                            </span>
+                        ))}
+                    </div>
                     <span
                         style={{
                             width: "fit-content",
                             borderRadius: 999,
+                            boxShadow: pressing ? `0 0 0 3px ${BRAND}55` : "none",
                             background: BRAND,
                             color: "#fff",
                             padding: "8px 22px",
@@ -193,65 +231,11 @@ function ShopPage({ ctx }: { ctx: SceneContext }) {
     );
 }
 
-/** A browser window: its address bar, the shop, and the extension's side panel. */
-function Browser({ ctx, stage }: { ctx: SceneContext; stage: PolarStage }) {
-    const dark = ctx.theme === "dark";
-    return (
-        <div
-            style={{
-                display: "flex",
-                flexDirection: "column",
-                height: "100dvh",
-                background: dark ? "#2b2d31" : "#e3e5e8"
-            }}
-        >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px" }}>
-                <span style={{ display: "flex", gap: 6 }}>
-                    {["#f87171", "#fbbf24", "#4ade80"].map((color) => (
-                        <i
-                            key={color}
-                            style={{ width: 11, height: 11, borderRadius: 99, background: color }}
-                        />
-                    ))}
-                </span>
-                <div
-                    style={{
-                        flex: 1,
-                        borderRadius: 999,
-                        padding: "5px 14px",
-                        fontSize: 13,
-                        background: dark ? "#1e1f22" : "#fff",
-                        color: dark ? "#dbdee1" : MUTED
-                    }}
-                >
-                    {SHOP.url.replace("https://", "")}
-                </div>
-            </div>
-            <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-                <ShopPage ctx={ctx} />
-                {/* The extension's side panel, at the width a browser opens it. */}
-                <iframe
-                    key={stage}
-                    id="polar-side-panel"
-                    title="Polar"
-                    src={`${window.location.pathname}${window.location.search}&panel=${stage}`}
-                    className="border-l border-border bg-card"
-                    style={{ width: 420, flex: "none", height: "100%" }}
-                />
-            </div>
-        </div>
-    );
-}
-
 /** What the extension's side panel draws: the chat, with the page in front of the reader as its site. */
-function SidePanel({ ctx }: { ctx: SceneContext }) {
-    const lang = ctx.locale === "es-ES" ? "es" : "en";
+function SidePanel() {
     return (
         <div className="flex h-dvh bg-card">
-            <PolarChat
-                fullPage
-                site={{ url: SHOP.url, title: `${SHOP.product[lang]} - ${SHOP.store}` }}
-            />
+            <PolarChat fullPage site={{ url: SHOP.url, title: SHOP.store }} />
         </div>
     );
 }
@@ -266,12 +250,58 @@ async function panelDrawn(): Promise<void> {
     }
 }
 
-function PolarInUse({ ctx }: { ctx: SceneContext }) {
-    const step = SHOWN()[useStep()]!;
-    if (step.shop) return <Browser ctx={ctx} stage={step.stage} />;
+/** The shop in a browser, with the extension's side panel open beside it. */
+function ShopWithPanel({ ctx }: { ctx: SceneContext }) {
+    const stage = PANEL_PLAY[useStep()]!.stage;
+    const lang = ctx.locale === "es-ES" ? "es" : "en";
+    const phone = window.innerWidth < PHONE_WIDTH;
+    // The extension's side panel, at the width a browser opens it; on a phone,
+    // as a sheet over the page.
+    const panel = (
+        <iframe
+            key={stage}
+            id="polar-side-panel"
+            title="Polar"
+            src={`${window.location.pathname}${window.location.search}&panel=${stage}`}
+            className="border-border bg-card"
+            style={
+                phone
+                    ? {
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          width: "100%",
+                          height: "64%",
+                          borderTopWidth: 1,
+                          borderRadius: "14px 14px 0 0",
+                          boxShadow: "0 -12px 32px rgba(0,0,0,.25)"
+                      }
+                    : { width: 420, flex: "none", height: "100%", borderLeftWidth: 1 }
+            }
+        />
+    );
+    return (
+        <BrowserFrame
+            ctx={ctx}
+            tabs={[
+                { title: `${SHOP.product[lang]} - ${SHOP.store}`, color: BRAND },
+                { title: "Polaris", icon: <PolarisTabIcon /> }
+            ]}
+            url={SHOP.url}
+            extensionLit
+        >
+            <ShopPage ctx={ctx} stage={stage} />
+            {panel}
+        </BrowserFrame>
+    );
+}
+
+/** The page `/polar` draws, the way the dashboard draws it. */
+function PolarPage() {
+    const step = PAGE_PLAY[useStep()]!;
     return (
         <Chrome>
-            {/* The page `/polar` draws. */}
             <div className={cn(PAGE_BLEED, "flex bg-card")}>
                 <PolarChat key={`page-${step.stage}`} fullPage />
             </div>
@@ -279,10 +309,9 @@ function PolarInUse({ ctx }: { ctx: SceneContext }) {
     );
 }
 
-export const polar = defineScene({
-    id: "polar",
-    path: "/polar",
-    api: (ctx) => ({
+/** What every Polar screen asks the server, with the chat where `now` says. */
+function polarApi(ctx: SceneContext, now: () => { stage: PolarStage; shop: boolean }) {
+    return {
         "GET /api/polar/models": () => ({
             providers: POLAR_PROVIDERS,
             isAdmin: true,
@@ -290,8 +319,8 @@ export const polar = defineScene({
         }),
         "GET /api/polar/threads": () => ({ threads: polarThreads(ctx), pinned: [], projects: [] }),
         "GET /api/polar/threads/:id": () => {
-            const step = PANEL ? { stage: PANEL, shop: true } : SHOWN()[current]!;
-            return { thread: polarThread(ctx, step.stage, step.shop) };
+            const at = now();
+            return { thread: polarThread(ctx, at.stage, at.shop) };
         },
         "GET /api/polar/feedback": () => ({ marks: {} }),
         "GET /api/polar/preferences": () => ({}),
@@ -301,22 +330,58 @@ export const polar = defineScene({
         "GET /api/polar/code": () => ({ access: "none", sessions: [], next: null }),
         // Nothing is being answered in the background, which the route says with 204.
         "GET /api/polar/chat/:id/stream": () => new Response(null, { status: 204 })
-    }),
-    render: (ctx) => {
-        // The chat that was open before, which is the one the page reopens.
-        window.localStorage.setItem(THREAD_KEY, OPEN_THREAD_ID);
-        return PANEL ? <SidePanel ctx={ctx} /> : <PolarInUse ctx={ctx} />;
+    };
+}
+
+/** The chat that was open before, which is the one the page reopens. */
+function openThread() {
+    window.localStorage.setItem(THREAD_KEY, OPEN_THREAD_ID);
+}
+
+/** The dashboard's Polar page, drawn only inside the browser of `polar`. */
+export const polarPage = defineScene({
+    id: "polar-page",
+    path: "/polar",
+    api: (ctx) => polarApi(ctx, () => ({ stage: PAGE_PLAY[current]!.stage, shop: false })),
+    render: () => {
+        openThread();
+        return <PolarPage />;
     },
     animation: {
-        get frames() {
-            return SHOWN().length;
+        frames: PAGE_PLAY.length,
+        step: (index) => {
+            current = index;
+            for (const listener of listeners) listener(index);
         },
+        hold: (index) => PAGE_PLAY[index]!.hold,
+        advance: () => 900
+    }
+});
+
+export const polar = framedScene("polar", polarPage, (ctx) => ({
+    tabs: [
+        { title: "Polar - Polaris", icon: <PolarisTabIcon /> },
+        { title: ctx.say("Inbox - Polaris", "Bandeja - Polaris"), icon: <PolarisTabIcon /> }
+    ],
+    url: "https://polaris.example.com/polar"
+}));
+
+export const polarSidePanel = defineScene({
+    id: "polar-side-panel",
+    path: "/polar",
+    api: (ctx) => polarApi(ctx, () => ({ stage: PANEL ?? PANEL_PLAY[current]!.stage, shop: true })),
+    render: (ctx) => {
+        openThread();
+        return PANEL ? <SidePanel /> : <ShopWithPanel ctx={ctx} />;
+    },
+    animation: {
+        frames: PANEL_PLAY.length,
         step: async (index) => {
             current = index;
             for (const listener of listeners) listener(index);
-            if (SHOWN()[index]!.shop) await panelDrawn();
+            await panelDrawn();
         },
-        hold: (index) => SHOWN()[index]!.hold,
+        hold: (index) => PANEL_PLAY[index]!.hold,
         advance: () => 900
     }
 });

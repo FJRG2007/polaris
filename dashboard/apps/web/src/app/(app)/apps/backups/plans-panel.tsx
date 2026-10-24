@@ -35,7 +35,8 @@ import {
     Select,
     Skeleton,
     Switch,
-    isDirty
+    isDirty,
+    Checkbox
 } from "@polaris/ui";
 
 export function PlansPanel({
@@ -381,8 +382,7 @@ function PlanDialog({
                         <p className="text-xs text-muted-foreground">{t("plans.goToHint")}</p>
                         {destinations.map((destination) => (
                             <label key={destination.id} className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={chosen.includes(destination.id)}
                                     onChange={(event) =>
                                         setChosen((current) =>

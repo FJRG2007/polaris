@@ -22,7 +22,8 @@ import {
     Select,
     Switch,
     Textarea,
-    useToast
+    useToast,
+    DateInput
 } from "@polaris/ui";
 import { unwrap, useStatusT } from "./i18n";
 import {
@@ -972,9 +973,9 @@ export function MaintenanceDialog({
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Field label={t("maintenance.starts")} required>
                             {(id) => (
-                                <Input
+                                <DateInput
                                     id={id}
-                                    type="datetime-local"
+                                    mode="datetime"
                                     value={values.startsAt}
                                     onChange={(event) =>
                                         setValues((current) => ({
@@ -991,9 +992,9 @@ export function MaintenanceDialog({
                             error={errors.endsAt ? t("errors.endsBeforeStart") : null}
                         >
                             {(id) => (
-                                <Input
+                                <DateInput
                                     id={id}
-                                    type="datetime-local"
+                                    mode="datetime"
                                     value={values.endsAt}
                                     onChange={(event) =>
                                         setValues((current) => ({

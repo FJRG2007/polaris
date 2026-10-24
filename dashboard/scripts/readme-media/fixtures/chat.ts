@@ -179,6 +179,33 @@ export function chatSpaces(ctx: SceneContext): ChatSpaceView[] {
     ];
 }
 
+/**
+ * One soundboard sound's clip (`/api/chat/sounds/:id`), fetched ahead when a
+ * call opens so the first press plays at once. A tenth of a second of silence:
+ * the picture only needs the fetch answered, and nothing in it plays.
+ */
+export function soundClip(): Response {
+    const rate = 8_000;
+    const samples = rate / 10;
+    const bytes = new DataView(new ArrayBuffer(44 + samples * 2));
+    const text = (at: number, word: string) =>
+        [...word].forEach((char, index) => bytes.setUint8(at + index, char.charCodeAt(0)));
+    text(0, "RIFF");
+    bytes.setUint32(4, 36 + samples * 2, true);
+    text(8, "WAVE");
+    text(12, "fmt ");
+    bytes.setUint32(16, 16, true);
+    bytes.setUint16(20, 1, true);
+    bytes.setUint16(22, 1, true);
+    bytes.setUint32(24, rate, true);
+    bytes.setUint32(28, rate * 2, true);
+    bytes.setUint16(32, 2, true);
+    bytes.setUint16(34, 16, true);
+    text(36, "data");
+    bytes.setUint32(40, samples * 2, true);
+    return new Response(bytes.buffer, { headers: { "content-type": "audio/wav" } });
+}
+
 /** The soundboard a call offers: Polaris's own sounds and the team space's.
  *  Every call screen asks for it when the call opens. */
 export function callSoundboard(ctx: SceneContext): CallSoundboard {

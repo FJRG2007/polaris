@@ -30,7 +30,8 @@ import {
     Input,
     MenuSearch,
     menuSearchMatches,
-    Select
+    Select,
+    DateInput
 } from "@polaris/ui";
 import { fieldsOf, fieldOf, type CrmObject, type FieldDef, type Ref } from "../model/objects";
 import * as filters from "../model/filters";
@@ -449,8 +450,8 @@ function ValueEditor({
             );
         case "day":
             return (
-                <Input
-                    type="date"
+                <DateInput
+                    mode="date"
                     value={typeof rule.value === "string" ? rule.value : ""}
                     aria-label={label}
                     className="h-8"

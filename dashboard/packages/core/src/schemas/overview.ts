@@ -123,7 +123,12 @@ export const overviewPreferencesSchema = z.object({
     shortcuts: z.array(overviewShortcutSchema).max(MAX_OVERVIEW_SHORTCUTS).default([]),
     /** The line above the grid. Off for somebody who would rather not be greeted
      *  by their own software every morning. */
-    greeting: z.boolean().default(true)
+    greeting: z.boolean().default(true),
+    /** Whether the reader has put the cards in an order of their own. Until they
+     *  have, cards with nothing to show sink below the ones that do (see
+     *  `rankOverviewLayout`). Absent from layouts saved before this was recorded,
+     *  where it is read off the stored order instead (`overviewArranged`). */
+    arranged: z.boolean().optional()
 });
 
 export type OverviewPreferences = z.infer<typeof overviewPreferencesSchema>;
@@ -244,6 +249,50 @@ export function resolveOverviewLayout(
         ordered.splice(index, 0, { ...fallback });
     }
     return ordered;
+}
+
+/**
+ * Whether the stored order is one the reader chose.
+ *
+ * Recorded since cards started sinking when empty. A layout saved before that
+ * says nothing, so its order is the evidence: a list that still follows the
+ * catalogue's order was only ever saved because something else changed (a size,
+ * a hidden card), while one that breaks it was rearranged by hand.
+ */
+export function overviewArranged(preferences: OverviewPreferences): boolean {
+    if (preferences.arranged !== undefined) return preferences.arranged;
+    const rank = new Map(DEFAULT_OVERVIEW_LAYOUT.map((widget, at) => [widget.id, at]));
+    let last = -1;
+    for (const widget of preferences.widgets) {
+        const at = rank.get(widget.id);
+        if (at === undefined) continue;
+        if (at < last) return true;
+        last = at;
+    }
+    return false;
+}
+
+/**
+ * The resolved layout with the cards that have nothing to show moved after the
+ * ones that do, keeping each group in its own order.
+ *
+ * The reader's own order always wins: once they have arranged the grid, only a
+ * card they never placed (one added to Polaris since) is moved, and only when it
+ * is empty. A card whose emptiness is not known yet is not in `empty`, so it
+ * keeps its place.
+ */
+export function rankOverviewLayout(
+    layout: readonly OverviewWidgetPreference[],
+    options: {
+        arranged: boolean;
+        /** The cards the stored layout names. */
+        placed: ReadonlySet<OverviewWidgetId>;
+        empty: ReadonlySet<OverviewWidgetId>;
+    }
+): OverviewWidgetPreference[] {
+    const sinks = (widget: OverviewWidgetPreference): boolean =>
+        options.empty.has(widget.id) && (!options.arranged || !options.placed.has(widget.id));
+    return [...layout.filter((widget) => !sinks(widget)), ...layout.filter(sinks)];
 }
 
 /** A page somebody opened, as the browser remembers it. */

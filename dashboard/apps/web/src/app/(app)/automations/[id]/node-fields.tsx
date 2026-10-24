@@ -18,7 +18,8 @@ import {
     Input,
     Select,
     useToast,
-    type SelectOption
+    type SelectOption,
+    DateInput
 } from "@polaris/ui";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -457,8 +458,8 @@ export function NodeFields({
                     ) : (
                         <>
                             <Field label={t("fields.time")}>
-                                <Input
-                                    type="time"
+                                <DateInput
+                                    mode="time"
                                     value={config.time ?? ""}
                                     onChange={(event) => set({ time: event.target.value })}
                                 />

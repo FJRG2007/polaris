@@ -45,7 +45,8 @@ import { CallRosterList } from "./call-roster";
 import type { PollDraft } from "./poll-dialog";
 import { draftMessage } from "./draft-message";
 import { ScheduledBar } from "./scheduled-bar";
-import { ChannelHeader } from "./channel-header";
+import { ChannelHeader, PanelSearch } from "./channel-header";
+import { useWideScreen } from "./use-wide-screen";
 import { DirectProfile } from "./direct-profile";
 import { ForwardDialog } from "./forward-dialog";
 import { CALL_CHAT_PANE } from "./use-chat-pane";
@@ -236,6 +237,10 @@ export function ChannelView({
     const [error, setError] = useState("");
     const [thread, setThread] = useState<ChatMessageView | null>(null);
     const [searching, setSearching] = useState(false);
+    // Whether the profile or the roster opens as a column beside the
+    // conversation, the same question they ask themselves: when it does, the
+    // search box sits at its top, as in Discord, instead of among the buttons.
+    const wide = useWideScreen();
     /** What the header's search box sent, and a count so the same words typed
      *  twice still open a fresh search. */
     const [searchSeed, setSearchSeed] = useState({ term: "", token: 0 });
@@ -2339,6 +2344,32 @@ export function ChannelView({
         checkCall();
     }
 
+    /** Words typed into a search box open the search with them in it; the bare
+     *  icon (a phone's) is a switch. */
+    function searchFor(term: string) {
+        if (!term) {
+            setSearchSeed((current) => ({ term: "", token: current.token }));
+            setSearching((current) => !current);
+            return;
+        }
+        setSearchSeed((current) => ({ term, token: current.token + 1 }));
+        setSearching(true);
+    }
+
+    /** The profile or the roster is a column on the right, so the box goes on
+     *  top of it. A voice room has neither, and a thread or a search takes
+     *  that column's place. */
+    const panelSearch =
+        wide &&
+        members.open &&
+        !voiceRoom &&
+        !thread &&
+        !searching &&
+        (channel.kind !== "dm" || channel.others[0] != null);
+    const besideSearch = panelSearch ? (
+        <PanelSearch channelName={channel.name} onSearch={searchFor} />
+    ) : undefined;
+
     const view = (
         <div
             className={cn(
@@ -2364,17 +2395,8 @@ export function ChannelView({
                     onChanged={refresh}
                     call={live}
                     onStartCall={startCall}
-                    // Words typed into the header's box open the search with
-                    // them in it; the bare icon (a phone's) is a switch.
-                    onSearch={(term) => {
-                        if (!term) {
-                            setSearchSeed((current) => ({ term: "", token: current.token }));
-                            setSearching((current) => !current);
-                            return;
-                        }
-                        setSearchSeed((current) => ({ term, token: current.token + 1 }));
-                        setSearching(true);
-                    }}
+                    onSearch={searchFor}
+                    searchInPanel={panelSearch}
                     onPins={() => setPinsOpen(true)}
                     // In a conversation with a roster this opens it; in a
                     // one-to-one it opens the other person, which is what the
@@ -2585,6 +2607,7 @@ export function ChannelView({
                     onMention={(text) =>
                         setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
                     }
+                    search={besideSearch}
                 />
             )}
 
@@ -2596,6 +2619,7 @@ export function ChannelView({
                     onMention={(text) =>
                         setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
                     }
+                    search={besideSearch}
                 />
             )}
 

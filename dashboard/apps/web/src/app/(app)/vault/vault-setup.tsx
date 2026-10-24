@@ -29,7 +29,7 @@ import { useState, type FormEvent } from "react";
 import { createAccountVaultAction } from "./vault-actions";
 import { createVaultKeys } from "@/lib/vault/crypto";
 import type { SymmetricKey } from "@/lib/vault/crypto";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Checkbox } from "@polaris/ui";
 import { KeyRound, Loader2, ShieldAlert } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -130,10 +130,10 @@ export function VaultSetup({
     return (
         <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("setup.title")}</h1>
-                <p className="text-sm text-muted-foreground">
-                    {t("setup.intro")}
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("setup.title")}
+                </h1>
+                <p className="text-sm text-muted-foreground">{t("setup.intro")}</p>
             </div>
             <Card>
                 <CardBody>
@@ -160,7 +160,9 @@ export function VaultSetup({
                             </span>
                         </label>
                         {tooShort || weak ? (
-                            <p className="text-sm text-danger">{weak ? vaultSchemaText(t, tv, weak) : null}</p>
+                            <p className="text-sm text-danger">
+                                {weak ? vaultSchemaText(t, tv, weak) : null}
+                            </p>
                         ) : null}
                         {unsafe ? <p className="text-sm text-danger">{unsafe}</p> : null}
 
@@ -203,9 +205,7 @@ export function VaultSetup({
                             </span>
                         </label>
                         {sameAsAccount ? (
-                            <p className="text-sm text-danger">
-                                {t("setup.samePassword")}
-                            </p>
+                            <p className="text-sm text-danger">{t("setup.samePassword")}</p>
                         ) : null}
 
                         <label className="flex flex-col gap-1 text-sm">
@@ -220,17 +220,14 @@ export function VaultSetup({
                             </span>
                         </label>
                         {hintLeaks ? (
-                            <p className="text-sm text-danger">
-                                {t("setup.hintLeaks")}
-                            </p>
+                            <p className="text-sm text-danger">{t("setup.hintLeaks")}</p>
                         ) : null}
 
                         <div className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft p-3">
                             <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
                             <label className="flex items-start gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="mt-0.5 size-4"
+                                <Checkbox
+                                    className="mt-0.5"
                                     checked={understood}
                                     onChange={(event) => setUnderstood(event.target.checked)}
                                 />

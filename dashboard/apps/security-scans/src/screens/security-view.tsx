@@ -28,7 +28,8 @@ import {
     EmptyState,
     Select,
     Skeleton,
-    Switch
+    Switch,
+    Checkbox
 } from "@polaris/ui";
 
 function useSecurityT(): SecurityTranslator {
@@ -335,8 +336,7 @@ function MalwarePanel({
                                     key={volume.id}
                                     className="flex min-w-0 items-center gap-2 text-sm"
                                 >
-                                    <input
-                                        type="checkbox"
+                                    <Checkbox
                                         checked={chosen.has(volume.id)}
                                         onChange={(event) => {
                                             const next = new Set(chosen);

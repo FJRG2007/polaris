@@ -172,6 +172,25 @@ export async function getCamera(installedAppId: string, id: string): Promise<Cam
     return row ? toView(row) : null;
 }
 
+/** These cameras of this house at a place (or placed nowhere yet), in one
+ *  read, in the order asked. */
+export async function getCamerasAt(
+    installedAppId: string,
+    placeId: string,
+    ids: readonly string[]
+): Promise<CameraView[]> {
+    if (ids.length === 0) return [];
+    const rows = await prisma.camera.findMany({
+        where: {
+            installedAppId,
+            id: { in: [...ids] },
+            OR: [{ placeId }, { placeId: null }]
+        }
+    });
+    const byId = new Map(rows.map((row) => [row.id, toView(row)]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
 /**
  * Where this camera's detection runs.
  *

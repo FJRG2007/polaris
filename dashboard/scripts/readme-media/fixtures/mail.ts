@@ -28,6 +28,8 @@ function account(
         service,
         serviceName,
         auth: "password",
+        // Your own mailbox: nobody lent it, so there is no one to send as.
+        delegateSendAs: false,
         connectionId: null,
         username: address,
         imapHost: "imap.example.com",

@@ -10,7 +10,7 @@ import { GroupHeading } from "../ui";
 import { useCalendarT } from "../i18n";
 import { Plus, Trash2 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
-import { Button, Input, Switch } from "@polaris/ui";
+import { Button, Switch, DateInput } from "@polaris/ui";
 import { addDays, formatDay, isDayString } from "../time";
 import { SUNDAY, WEEKDAYS, type BookingDraft } from "./model";
 
@@ -34,8 +34,8 @@ function Ranges({
         <div className="flex flex-col gap-1.5">
             {ranges.map((range, index) => (
                 <div key={index} className="flex flex-wrap items-center gap-1.5">
-                    <Input
-                        type="time"
+                    <DateInput
+                        mode="time"
                         value={range.from}
                         onChange={(event) =>
                             onChange(
@@ -50,8 +50,8 @@ function Ranges({
                     <span className="text-foreground-subtle" aria-hidden>
                         -
                     </span>
-                    <Input
-                        type="time"
+                    <DateInput
+                        mode="time"
                         value={range.to === "24:00" ? "23:59" : range.to}
                         onChange={(event) =>
                             onChange(
@@ -222,8 +222,8 @@ export function AvailabilityEditor({
                     </ul>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                        type="date"
+                    <DateInput
+                        mode="date"
                         value={date}
                         onChange={(event) => setDate(event.target.value)}
                         aria-label={t("bookingPage.overrideDate")}

@@ -13,6 +13,8 @@ export interface DocHeading {
 
 export interface DocPage {
     readonly slug: string;
+    /** The file it was rendered from, as a path in the repository. */
+    readonly source: string;
     readonly title: string;
     /** The first paragraph, for the index and the page's description. */
     readonly summary: string;
@@ -74,7 +76,18 @@ export function plainText(html: string): string {
  */
 export function rewriteDocLinks(
     html: string,
-    { slugs, repo, dir }: { slugs: ReadonlySet<string>; repo: string; dir: string }
+    {
+        slugs,
+        repo,
+        dir,
+        paths
+    }: {
+        slugs: ReadonlySet<string>;
+        repo: string;
+        dir: string;
+        /** Guides outside `docs/features` that have a page, by their repository path. */
+        paths?: ReadonlyMap<string, string>;
+    }
 ): { html: string; media: string[] } {
     const media = new Set<string>();
     const target = (url: string): string => {
@@ -87,6 +100,8 @@ export function rewriteDocLinks(
             media.add(picture[1]!);
             return `../../../media/${picture[1]}`;
         }
+        const logo = /(?:^|\/)assets\/logos\/([^/]+)$/.exec(path);
+        if (logo) return `../../../logos/${logo[1]}`;
         if (!path.includes("/") && /\.md$/.test(name) && slugs.has(docSlug(name)))
             return `../${docSlug(name)}/${anchor}`;
         if (!path) return anchor;
@@ -97,6 +112,8 @@ export function rewriteDocLinks(
             if (part === "..") resolved.pop();
             else if (part && part !== ".") resolved.push(part);
         }
+        const page = paths?.get(resolved.join("/"));
+        if (page) return `../${page}/${anchor}`;
         return `https://github.com/${repo}/blob/main/${resolved.join("/")}${anchor}`;
     };
     const out = html
@@ -116,6 +133,122 @@ export function rewriteDocLinks(
                     .join(", ")}"`
         );
     return { html: out, media: [...media] };
+}
+
+/** A group of guides in the sidebar, in the order they are read. */
+export interface DocSection {
+    readonly label: string;
+    readonly slugs: readonly string[];
+}
+
+/**
+ * The README's own grouping of the feature guides: every `###` heading that
+ * links at least one `docs/features` guide, with those guides in the order the
+ * README links them. A guide linked twice stays in the first group.
+ */
+export function readmeSections(readme: string): DocSection[] {
+    const sections: { label: string; slugs: string[] }[] = [];
+    const seen = new Set<string>();
+    let current: { label: string; slugs: string[] } | null = null;
+    for (const line of readme.replace(/\r\n/g, "\n").split("\n")) {
+        const heading = /^(#{2,3}) (.+)$/.exec(line);
+        if (heading) {
+            current = heading[1] === "###" ? { label: heading[2]!.trim(), slugs: [] } : null;
+            if (current) sections.push(current);
+            continue;
+        }
+        if (!current) continue;
+        for (const match of line.matchAll(/docs\/features\/([a-z0-9-]+)(?:\.es)?\.md/g)) {
+            const slug = match[1]!;
+            if (seen.has(slug)) continue;
+            seen.add(slug);
+            current.slugs.push(slug);
+        }
+    }
+    return sections.filter((section) => section.slugs.length > 0);
+}
+
+/**
+ * Every page in the order the sidebar lists it: the given sections first, then
+ * a last one with any page none of them names, so a new guide always shows up.
+ */
+export function arrangeSections(
+    sections: readonly DocSection[],
+    slugs: readonly string[],
+    moreLabel: string
+): DocSection[] {
+    const known = new Set(slugs);
+    const placed = new Set<string>();
+    const out: DocSection[] = [];
+    for (const section of sections) {
+        const kept = section.slugs.filter((slug) => known.has(slug) && !placed.has(slug));
+        kept.forEach((slug) => placed.add(slug));
+        if (kept.length) out.push({ label: section.label, slugs: kept });
+    }
+    const rest = slugs.filter((slug) => !placed.has(slug));
+    if (rest.length) out.push({ label: moreLabel, slugs: rest });
+    return out;
+}
+
+/** The pages before and after one, across section boundaries. */
+export function docNeighbors(
+    sections: readonly DocSection[],
+    slug: string
+): { previous: string | null; next: string | null; section: string | null } {
+    const order = sections.flatMap((section) => section.slugs);
+    const at = order.indexOf(slug);
+    const section = sections.find((one) => one.slugs.includes(slug))?.label ?? null;
+    if (at < 0) return { previous: null, next: null, section };
+    return { previous: order[at - 1] ?? null, next: order[at + 1] ?? null, section };
+}
+
+/**
+ * The README's list of connected services as a guide of its own: the section
+ * whose table carries the logos, each row a heading named after its services
+ * so a search for one lands on it. Nothing is added that the README does not say.
+ */
+export function integrationsGuide(readme: string): { title: string; markdown: string } | null {
+    const lines = readme.replace(/\r\n/g, "\n").split("\n");
+    for (let at = 0; at < lines.length; at++) {
+        const heading = /^## (.+)$/.exec(lines[at]!);
+        if (!heading) continue;
+        let end = lines.findIndex((line, n) => n > at && /^## /.test(line));
+        if (end < 0) end = lines.length;
+        const body = lines.slice(at + 1, end);
+        if (!body.some((line) => /^\|.*docs\/assets\/logos\//.test(line))) continue;
+        const out: string[] = [];
+        for (const line of body) {
+            if (!line.startsWith("|")) {
+                out.push(line);
+                continue;
+            }
+            const cells = line
+                .split("|")
+                .slice(1, -1)
+                .map((cell) => cell.trim());
+            const logos = cells[0] ?? "";
+            const names = [...logos.matchAll(/alt="([^"]+)"/g)].map((match) => match[1]!);
+            if (!names.length) continue;
+            const pictures = [...logos.matchAll(/<img [^>]*>/g)].map((match) => match[0]).join(" ");
+            out.push(
+                "",
+                `## ${names.join(", ")}`,
+                "",
+                `<p class="doc-logos">${pictures}</p>`,
+                "",
+                cells.slice(1).join(" "),
+                ""
+            );
+        }
+        return {
+            title: heading[1]!.trim(),
+            markdown: out
+                .join("\n")
+                .replace(/\n{3,}/g, "\n\n")
+                .trim()
+        };
+    }
+    return null;
 }
 
 type Schema = Record<string, unknown>;

@@ -33,7 +33,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Checkbox
 } from "@polaris/ui";
 import {
     revealShareLinkAction,
@@ -471,14 +472,12 @@ function EditShareForm({
             <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
                 {SHARE_POWERS.map(([key, label]) => (
                     <label key={key} className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
+                        <Checkbox
                             name={key}
                             checked={powers[key]}
                             onChange={(event) =>
                                 setPowers({ ...powers, [key]: event.target.checked })
                             }
-                            className="size-4"
                         />
                         {t(label)}
                     </label>

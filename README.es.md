@@ -30,6 +30,18 @@ Capturas de la interfaz real con datos de ejemplo. Casi todas enlazan a una
 página con todas sus funciones. Las versiones para móvil están en
 [docs/assets/media](docs/assets/media).
 
+[Agentes](docs/features/agents.es.md) y [CRM](docs/features/crm.es.md) tienen
+también su propia página.
+
+### En todas partes
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/ecosystem-light-es-desktop.webp">
+    <img src="docs/assets/media/ecosystem-dark-es-desktop.webp" alt="Polaris en la app de escritorio, un móvil, tus servidores y la extensión del navegador">
+  </picture>
+</p>
+
 ### Hablar
 
 <table>
@@ -46,31 +58,11 @@ página con todas sus funciones. Las versiones para móvil están en
     <td width="50%" valign="top">
       <a href="docs/features/calls.es.md">
       <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-es-desktop.webp">
-        <img src="docs/assets/media/in-call-dark-es-desktop.webp" alt="Llamadas: canales de voz, reuniones y llamadas en cualquier chat">
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/talk-light-es-desktop.webp">
+        <img src="docs/assets/media/talk-dark-es-desktop.webp" alt="Llamadas: salas de voz, videollamadas, pantallas compartidas y reuniones">
       </picture>
       </a>
-      <br><sub><a href="docs/features/calls.es.md"><b>Llamadas</b></a>: canales de voz, reuniones y llamadas en cualquier chat</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <a href="docs/features/calls.es.md">
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-direct-light-es-desktop.webp">
-        <img src="docs/assets/media/call-direct-dark-es-desktop.webp" alt="Una videollamada en un mensaje directo">
-      </picture>
-      </a>
-      <br><sub><a href="docs/features/calls.es.md"><b>Llamada directa</b></a>: cara a cara desde cualquier mensaje directo</sub>
-    </td>
-    <td width="50%" valign="top">
-      <a href="docs/features/calls.es.md">
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-group-light-es-desktop.webp">
-        <img src="docs/assets/media/call-group-dark-es-desktop.webp" alt="Una llamada de grupo con una pantalla compartida, grabándose">
-      </picture>
-      </a>
-      <br><sub><a href="docs/features/calls.es.md"><b>Llamada de grupo</b></a>: cámaras, una pantalla compartida y una grabación</sub>
+      <br><sub><a href="docs/features/calls.es.md"><b>Llamadas</b></a>: salas de voz, videollamadas, pantallas compartidas y reuniones</sub>
     </td>
   </tr>
   <tr>
@@ -143,10 +135,10 @@ página con todas sus funciones. Las versiones para móvil están en
       <a href="docs/features/polar.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/polar-light-es-desktop.webp">
-        <img src="docs/assets/media/polar-dark-es-desktop.webp" alt="Polar: pregunta por cualquier página y haz cosas">
+        <img src="docs/assets/media/polar-dark-es-desktop.webp" alt="Polar respondiendo una pregunta en el navegador">
       </picture>
       </a>
-      <br><sub><a href="docs/features/polar.es.md"><b>Polar</b></a>: pregunta por cualquier página y haz cosas</sub>
+      <br><sub><a href="docs/features/polar.es.md"><b>Polar</b></a>: pregunta lo que sea y haz cosas</sub>
     </td>
   </tr>
 </table>
@@ -167,11 +159,36 @@ página con todas sus funciones. Las versiones para móvil están en
     <td width="50%" valign="top">
       <a href="docs/features/vault.es.md">
       <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-es-desktop.webp">
-        <img src="docs/assets/media/vault-dark-es-desktop.webp" alt="Bóveda: contraseñas y códigos de un solo uso, compatible con Bitwarden">
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-browser-light-es-desktop.webp">
+        <img src="docs/assets/media/vault-browser-dark-es-desktop.webp" alt="Bóveda: contraseñas y códigos de un solo uso en el navegador">
       </picture>
       </a>
-      <br><sub><a href="docs/features/vault.es.md"><b>Bóveda</b></a>: contraseñas y códigos de un solo uso, compatible con Bitwarden</sub>
+      <br><sub><a href="docs/features/vault.es.md"><b>Bóveda</b></a>: contraseñas y códigos de un solo uso, compartidos con tu equipo</sub>
+    </td>
+  </tr>
+</table>
+
+### En el navegador
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/polar.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/polar-side-panel-light-es-desktop.webp">
+        <img src="docs/assets/media/polar-side-panel-dark-es-desktop.webp" alt="Polar en el panel lateral, respondiendo sobre una página y usándola">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/polar.es.md"><b>Panel lateral de Polar</b></a>: pregunta por la página en la que estás y que lo haga ahí</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/vault.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/extension-autofill-light-es-desktop.webp">
+        <img src="docs/assets/media/extension-autofill-dark-es-desktop.webp" alt="La extensión rellenando un formulario de acceso desde la bóveda">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/vault.es.md"><b>Autocompletar</b></a>: tus accesos rellenados en cualquier sitio desde la bóveda</sub>
     </td>
   </tr>
 </table>
@@ -210,11 +227,13 @@ página con todas sus funciones. Las versiones para móvil están en
       <br><sub><a href="docs/features/game-servers.es.md"><b>Servidores de juegos</b></a>: Minecraft, ARK y FiveM en tus propias máquinas</sub>
     </td>
     <td width="50%" valign="top">
+      <a href="docs/features/places.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/places-light-es-desktop.webp">
         <img src="docs/assets/media/places-dark-es-desktop.webp" alt="Lugares: las cámaras de un lugar junto a las cerraduras, luces y clima de cada estancia">
       </picture>
-      <br><sub><b>Lugares</b>: cámaras y control de dispositivos de cada lugar</sub>
+      </a>
+      <br><sub><a href="docs/features/places.es.md"><b>Lugares</b></a>: cámaras y control de dispositivos de cada lugar</sub>
     </td>
   </tr>
   <tr>

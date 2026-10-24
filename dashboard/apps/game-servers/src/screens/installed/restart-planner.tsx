@@ -25,7 +25,7 @@
 import * as actions from "./restart-actions";
 import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Button, Card, CardBody, DateInput } from "@polaris/ui";
 import type { PendingRestart } from "../../lib/games-restart";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CalendarClock, Loader2, RotateCcw, Users, X } from "lucide-react";
@@ -294,8 +294,8 @@ export function RestartPlanner({
 
                 {at !== null && !pending && (
                     <div className="flex flex-wrap items-center gap-2">
-                        <Input
-                            type="datetime-local"
+                        <DateInput
+                            mode="datetime"
                             className="w-56"
                             aria-label={t("restartPlanner.whenToRestart")}
                             value={at}

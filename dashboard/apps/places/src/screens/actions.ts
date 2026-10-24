@@ -16,6 +16,7 @@
  */
 
 import type { z } from "zod";
+import { z as zod } from "zod";
 import * as ptz from "../lib/ptz";
 import * as live from "../lib/live";
 import { cookies } from "next/headers";
@@ -34,6 +35,8 @@ import * as devices from "../lib/devices";
 import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
 import * as privacy from "../lib/privacy";
+import * as tapoControls from "../lib/tapo-controls";
+import { tapoCommandSchema, type TapoControls } from "../lib/camera-control-kinds";
 import * as cameraSets from "../lib/camera-sets";
 import {
     cameraIdsSchema,
@@ -105,6 +108,33 @@ async function say(key: PlacesKey, params?: MessageParams): Promise<string> {
 async function schemaSay(message: string | undefined, fallback: PlacesKey): Promise<string> {
     const t = await placesT();
     return message ? placesRefusalText(t, message) : t(fallback);
+}
+
+const cameraIdSchema = zod.string().uuid();
+const ptzMoveSchema = zod.object({
+    cameraId: cameraIdSchema,
+    direction: zod.enum(["up", "down", "left", "right", "in", "out"])
+});
+const ptzPresetSchema = zod.object({
+    cameraId: cameraIdSchema,
+    preset: zod.string().trim().min(1).max(200)
+});
+
+/** Presses per minute, per person and camera. A siren is a few presses a
+ *  minute at most; arrows are held and tapped, so they get room. */
+const CONTROL_LIMITS = { siren: 6, ptz: 120, setting: 30 } as const;
+
+async function withinControlLimit(
+    kind: keyof typeof CONTROL_LIMITS,
+    userId: string,
+    cameraId: string
+): Promise<boolean> {
+    const limited = await host.rateLimitService.rateLimit(
+        `places-camera-${kind}:${userId}:${cameraId}`,
+        CONTROL_LIMITS[kind],
+        60_000
+    );
+    return limited.ok;
 }
 
 export async function listCamerasAction(): Promise<{
@@ -1037,9 +1067,23 @@ export async function ptzMoveAction(
     cameraId: string,
     direction: ptz.PtzDirection
 ): Promise<{ error?: string }> {
-    const { install } = await requireHome("home.control");
-    const result = await guard(() => ptz.move(install.id, cameraId, direction));
-    return result.error ? { error: result.error } : {};
+    const { user, install } = await requireHome("home.control");
+    const parsed = ptzMoveSchema.safeParse({ cameraId, direction });
+    if (!parsed.success) return { error: await say("actions.someWrong") };
+    if (!(await withinControlLimit("ptz", user.id, parsed.data.cameraId)))
+        return { error: await say("refusals.linkTooMany") };
+    const result = await guard(() =>
+        ptz.move(install.id, parsed.data.cameraId, parsed.data.direction)
+    );
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.camera.move",
+        targetType: "camera",
+        targetId: parsed.data.cameraId,
+        metadata: { direction: parsed.data.direction }
+    });
+    return {};
 }
 
 export async function ptzStopAction(cameraId: string): Promise<{ error?: string }> {
@@ -1058,9 +1102,69 @@ export async function ptzPresetsAction(cameraId: string): Promise<{
 }
 
 export async function ptzGoToAction(cameraId: string, preset: string): Promise<{ error?: string }> {
+    const { user, install } = await requireHome("home.control");
+    const parsed = ptzPresetSchema.safeParse({ cameraId, preset });
+    if (!parsed.success) return { error: await say("actions.someWrong") };
+    if (!(await withinControlLimit("ptz", user.id, parsed.data.cameraId)))
+        return { error: await say("refusals.linkTooMany") };
+    const result = await guard(() =>
+        ptz.goTo(install.id, parsed.data.cameraId, parsed.data.preset)
+    );
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.camera.preset",
+        targetType: "camera",
+        targetId: parsed.data.cameraId
+    });
+    return {};
+}
+
+/**
+ * A Tapo camera's own controls: what it answered for and is set to now, and
+ * one command at a time.
+ *
+ * `home.control`, the same as pointing a camera: sounding its siren, switching
+ * its light or restarting it is using the house, not arranging it. The siren
+ * and every move are rate limited per person and camera, so a held key or a
+ * script cannot sound it over and over. Every command is audited.
+ */
+export async function tapoControlsAction(
+    cameraId: string
+): Promise<{ controls?: TapoControls; error?: string }> {
     const { install } = await requireHome("home.control");
-    const result = await guard(() => ptz.goTo(install.id, cameraId, preset));
-    return result.error ? { error: result.error } : {};
+    const id = cameraIdSchema.safeParse(cameraId);
+    if (!id.success) return { error: await say("actions.someWrong") };
+    const result = await guard(() => tapoControls.tapoControls(install.id, id.data));
+    return result.error ? { error: result.error } : { controls: result.value };
+}
+
+export async function tapoCommandAction(
+    cameraId: string,
+    input: unknown
+): Promise<{ controls?: TapoControls; error?: string }> {
+    const { user, install } = await requireHome("home.control");
+    const id = cameraIdSchema.safeParse(cameraId);
+    const command = tapoCommandSchema.safeParse(input);
+    if (!id.success || !command.success) return { error: await say("actions.someWrong") };
+    const limit =
+        command.data.kind === "siren"
+            ? "siren"
+            : command.data.kind === "preset"
+              ? "ptz"
+              : "setting";
+    if (!(await withinControlLimit(limit, user.id, id.data)))
+        return { error: await say("refusals.linkTooMany") };
+    const result = await guard(() => tapoControls.tapoCommand(install.id, id.data, command.data));
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: `places.camera.${command.data.kind}`,
+        targetType: "camera",
+        targetId: id.data,
+        metadata: { ...command.data }
+    });
+    return { controls: result.value };
 }
 
 /** Where the camera points now becomes where it turns when it goes private.

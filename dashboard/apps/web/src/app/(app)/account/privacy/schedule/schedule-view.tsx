@@ -45,9 +45,9 @@ import {
     DialogHeader,
     DialogTitle,
     EmptyState,
-    Input,
     Select,
-    Switch
+    Switch,
+    DateInput
 } from "@polaris/ui";
 
 /** What a new window starts as: hidden overnight, every day. The most common
@@ -414,8 +414,8 @@ function ScheduleDialog({
                             <span className="text-xs text-muted-foreground">
                                 {t("schedule.from")}
                             </span>
-                            <Input
-                                type="time"
+                            <DateInput
+                                mode="time"
                                 value={core.clockTime(draft.startMinute)}
                                 onChange={(event) => {
                                     const minute = core.clockMinute(event.target.value);
@@ -427,8 +427,8 @@ function ScheduleDialog({
                             <span className="text-xs text-muted-foreground">
                                 {t("schedule.until")}
                             </span>
-                            <Input
-                                type="time"
+                            <DateInput
+                                mode="time"
                                 value={core.clockTime(draft.endMinute)}
                                 onChange={(event) => {
                                     const minute = core.clockMinute(event.target.value);

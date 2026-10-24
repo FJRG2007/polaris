@@ -21,7 +21,8 @@ import {
     DialogHeader,
     DialogTitle,
     Switch,
-    cn
+    cn,
+    Checkbox
 } from "@polaris/ui";
 
 const DEFAULT_ACCESS: PrivateAccess = { members: true, allow: [], deny: [] };
@@ -118,8 +119,7 @@ export function DomainPrivateButton({
                         {enabled ? (
                             <div className="flex min-w-0 flex-col gap-3">
                                 <label className="flex items-start gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
+                                    <Checkbox
                                         className="mt-0.5"
                                         checked={draft.members}
                                         disabled={pending || !canManage}

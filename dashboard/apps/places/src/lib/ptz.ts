@@ -13,6 +13,10 @@
  * keeps moving, so every start is paired with a stop, and the stop is sent on
  * release, on leaving the button, and when the page goes away.
  *
+ * A Tapo camera with no ONVIF account is moved over its own API instead
+ * (`tapo-controls.ts`), which has steps rather than a continuous move: one
+ * press is one step, and a stop has nothing to stop.
+ *
  * Server-only.
  */
 
@@ -20,6 +24,7 @@ import { prisma } from "@polaris/db";
 import { cameraTarget } from "./cameras";
 import { HomeError } from "./home-error";
 import { hasNativePrivacy } from "./vendors";
+import * as tapo from "./tapo-controls";
 import {
     getPresets,
     getProfiles,
@@ -60,6 +65,15 @@ const PROFILE_TTL_MS = 5 * 60_000;
 interface Controls {
     endpoint: OnvifEndpoint;
     profileToken: string;
+}
+
+/** Whether a camera with no ONVIF is moved over the Tapo API instead. */
+async function movesNatively(installedAppId: string, cameraId: string): Promise<boolean> {
+    const row = await prisma.camera.findFirst({
+        where: { id: cameraId, installedAppId },
+        select: { vendor: true }
+    });
+    return row !== null && hasNativePrivacy(row.vendor);
 }
 
 /** What is needed to command one camera, or null when it does not speak ONVIF. */
@@ -128,7 +142,15 @@ export async function move(
     const press = presses;
     lastAsked.set(cameraId, { press, stopped: false });
     const controls = await controlsFor(installedAppId, cameraId);
-    if (!controls) throw new HomeError("This camera does not move");
+    if (!controls) {
+        if (
+            direction !== "in" &&
+            direction !== "out" &&
+            (await movesNatively(installedAppId, cameraId))
+        )
+            return tapo.tapoStep(installedAppId, cameraId, direction);
+        throw new HomeError("This camera does not move");
+    }
     try {
         await ptzMove(controls.endpoint, controls.profileToken, VECTORS[direction]);
     } catch (error) {
@@ -163,7 +185,11 @@ export async function presets(
     cameraId: string
 ): Promise<{ token: string; name: string }[]> {
     const controls = await controlsFor(installedAppId, cameraId);
-    if (!controls) return [];
+    if (!controls) {
+        if (!(await movesNatively(installedAppId, cameraId))) return [];
+        const found = await tapo.tapoControls(installedAppId, cameraId).catch(() => null);
+        return (found?.presets ?? []).map((preset) => ({ token: preset.id, name: preset.name }));
+    }
     return getPresets(controls.endpoint, controls.profileToken).catch(() => []);
 }
 
@@ -173,7 +199,12 @@ export async function goTo(
     preset: string
 ): Promise<void> {
     const controls = await controlsFor(installedAppId, cameraId);
-    if (!controls) throw new HomeError("This camera does not move");
+    if (!controls) {
+        if (!(await movesNatively(installedAppId, cameraId)))
+            throw new HomeError("This camera does not move");
+        await tapo.tapoCommand(installedAppId, cameraId, { kind: "preset", id: preset });
+        return;
+    }
     await gotoPreset(controls.endpoint, controls.profileToken, preset);
 }
 

@@ -11,9 +11,10 @@
  * that was missing data.
  */
 
-import { SCENES } from "../scenes";
+import { INNER_SCENES, SCENES } from "../scenes";
 import { chromeActions, chromeApi } from "../fixtures/chrome";
 import { scenePath } from "./route";
+import { pollAnswer } from "./poll-routes";
 import { SceneEventSource, scriptStream } from "./stream";
 import enUS from "@/../messages/en-US";
 import esES from "@/../messages/es-ES";
@@ -39,7 +40,11 @@ declare global {
 const params = new URLSearchParams(location.search);
 const locale = (params.get("locale") === "es-ES" ? "es-ES" : "en-US") satisfies SceneLocale;
 const theme = (params.get("theme") === "light" ? "light" : "dark") satisfies SceneTheme;
-const scene = SCENES.find((candidate) => candidate.id === params.get("scene"));
+// A scene drawn only inside another's frame (`SceneWindow`) is found here too,
+// but is never listed, so it is never taken as a picture of its own.
+const scene = [...SCENES, ...INNER_SCENES].find(
+    (candidate) => candidate.id === params.get("scene")
+);
 
 const ctx: SceneContext = {
     locale,
@@ -83,6 +88,10 @@ function patchFetch(
         const method = (init?.method ?? "GET").toUpperCase();
         const route = table.find((row) => row.method === method && row.match.test(address));
         if (!route) {
+            // A timed read that was an action is answered by the scene's
+            // handler for that action (`poll-routes.ts`).
+            const polled = local && method === "GET" ? await pollAnswer(url) : null;
+            if (polled) return Response.json(polled);
             missing(`${method} ${address}`);
             return new Response(JSON.stringify({ error: "not in this scene" }), { status: 404 });
         }

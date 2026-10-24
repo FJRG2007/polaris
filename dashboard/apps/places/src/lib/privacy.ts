@@ -19,9 +19,10 @@ import * as relay from "./relay";
 import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { hasNativePrivacy } from "./vendors";
-import { cameraTarget, controlCredentials } from "./cameras";
+import { askTapo } from "./tapo-controls";
+import { cameraTarget } from "./cameras";
 import type { CameraPrivacy, PrivacyFailure, PrivacyTarget } from "./privacy-kinds";
-import { lensMask, TapoError, type TapoTransport } from "./integrations/tapo-camera";
+import { lensMaskOn, type TapoTransport } from "./integrations/tapo-camera";
 
 const FIELDS = {
     id: true,
@@ -85,41 +86,16 @@ export async function storedCamerasFor(
     });
 }
 
-/** Ask the camera itself, trying each sign-in the house holds once. A wrong
- *  password moves to the next; anything else is the answer. */
+/** Ask the camera itself for its lens mask, through the sign-in loop every
+ *  Tapo control shares. */
 async function askCamera(
     installedAppId: string,
     row: Row,
     wanted: boolean | null,
     send?: TapoTransport
 ): Promise<{ private: boolean } | { failure: PrivacyFailure; waitSeconds?: number }> {
-    const credentials = await controlCredentials(installedAppId, row.id);
-    if (credentials.length === 0) return { failure: "password" };
-    let last: PrivacyFailure = "password";
-    for (const credential of credentials) {
-        try {
-            const answer = await lensMask(
-                { address: row.address, ...credential, pin: row.controlPin },
-                wanted,
-                send
-            );
-            if (answer.pin && answer.pin !== row.controlPin)
-                await prisma.camera.update({
-                    where: { id: row.id },
-                    data: { controlPin: answer.pin }
-                });
-            return { private: answer.private };
-        } catch (caught) {
-            if (!(caught instanceof TapoError)) throw caught;
-            if (caught.failure === "locked")
-                return { failure: "locked", waitSeconds: caught.waitSeconds };
-            if (caught.failure !== "password" && caught.failure !== "account")
-                return { failure: caught.failure };
-            // "account" outranks "password": it is the more useful sentence.
-            if (last !== "account") last = caught.failure;
-        }
-    }
-    return { failure: last };
+    const asked = await askTapo(installedAppId, row, (link) => lensMaskOn(link, wanted), send);
+    return "failure" in asked ? asked : { private: asked.value };
 }
 
 /** The relay stops holding a private camera and picks a public one up again.

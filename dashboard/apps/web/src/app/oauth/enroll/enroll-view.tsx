@@ -40,9 +40,13 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { Button, Card, CardBody, Input, PolarisMark } from "@polaris/ui";
+import { Button, Card, CardBody, Input, PolarisMark, Checkbox } from "@polaris/ui";
 import type { SecondFactorEnrollment } from "@polaris/core";
-import { armByEmailAction, noteAuthenticatorArmedAction, sendEnrollmentCodeAction } from "./actions";
+import {
+    armByEmailAction,
+    noteAuthenticatorArmedAction,
+    sendEnrollmentCodeAction
+} from "./actions";
 import { CodeInput, isWholeCode } from "@/components/code-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -114,8 +118,12 @@ export function EnrollView({
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
             <header className="flex flex-col gap-3">
                 <PolarisMark />
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("enroll.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("enroll.intro", { name, account })}</p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("enroll.title")}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                    {t("enroll.intro", { name, account })}
+                </p>
             </header>
 
             {factor === null ? (
@@ -133,12 +141,16 @@ export function EnrollView({
                                     <Icon className="size-5" />
                                 </span>
                                 <span className="flex min-w-0 flex-col">
-                                    <span className="text-sm font-medium">{t(`enroll.factors.${option.factor}.label`)}</span>
+                                    <span className="text-sm font-medium">
+                                        {t(`enroll.factors.${option.factor}.label`)}
+                                    </span>
                                     <span className="text-xs text-muted-foreground">
                                         {t(`enroll.factors.${option.factor}.description`)}
                                     </span>
                                     {option.target ? (
-                                        <span className="mt-1 text-xs text-muted-foreground">{option.target}</span>
+                                        <span className="mt-1 text-xs text-muted-foreground">
+                                            {option.target}
+                                        </span>
                                     ) : null}
                                 </span>
                             </button>
@@ -203,10 +215,7 @@ function EmailFactor({
         const form = new FormData(event.currentTarget);
         setBusy(true);
         setError(null);
-        const result = await armByEmailAction(
-            password ?? String(form.get("password") ?? ""),
-            code
-        );
+        const result = await armByEmailAction(password ?? String(form.get("password") ?? ""), code);
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -220,7 +229,9 @@ function EmailFactor({
             <CardBody className="flex flex-col gap-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("enroll.email.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("enroll.email.hint", { target })}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("enroll.email.hint", { target })}
+                    </p>
                 </div>
 
                 {!sent ? (
@@ -237,16 +248,28 @@ function EmailFactor({
                             <>
                                 <label className="flex flex-col gap-1 text-sm">
                                     {t("enroll.yourPassword")}
-                                    <Input name="password" type="password" autoComplete="current-password" required />
+                                    <Input
+                                        name="password"
+                                        type="password"
+                                        autoComplete="current-password"
+                                        required
+                                    />
                                 </label>
-                                <p className="text-xs text-muted-foreground">{t("enroll.passwordReason")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("enroll.passwordReason")}
+                                </p>
                             </>
                         ) : null}
                         <div className="flex items-center gap-2">
                             <Button type="submit" disabled={busy || !isWholeCode(code)}>
                                 {busy ? t("enroll.turningOn") : t("enroll.turnOn")}
                             </Button>
-                            <Button type="button" variant="ghost" onClick={() => void send()} disabled={busy}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => void send()}
+                                disabled={busy}
+                            >
                                 {t("enroll.email.sendAnother")}
                             </Button>
                         </div>
@@ -255,7 +278,11 @@ function EmailFactor({
 
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 {onBack ? (
-                    <button type="button" className="self-start text-xs text-muted-foreground underline" onClick={onBack}>
+                    <button
+                        type="button"
+                        className="self-start text-xs text-muted-foreground underline"
+                        onClick={onBack}
+                    >
                         {t("enroll.somethingElse")}
                     </button>
                 ) : null}
@@ -334,29 +361,44 @@ function AuthenticatorFactor({
             <CardBody className="flex flex-col gap-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("enroll.authenticator.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("enroll.authenticator.hint")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("enroll.authenticator.hint")}
+                    </p>
                 </div>
 
                 {!totpUri ? (
                     password !== undefined ? (
                         <p className="text-xs text-muted-foreground">
-                            {busy || error === null ? t("enroll.authenticator.settingUp") : t("enroll.authenticator.notStarted")}
+                            {busy || error === null
+                                ? t("enroll.authenticator.settingUp")
+                                : t("enroll.authenticator.notStarted")}
                         </p>
                     ) : (
                         <form
                             className="flex flex-col gap-3"
                             onSubmit={(event) => {
                                 event.preventDefault();
-                                void start(String(new FormData(event.currentTarget).get("password") ?? ""));
+                                void start(
+                                    String(new FormData(event.currentTarget).get("password") ?? "")
+                                );
                             }}
                         >
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("enroll.yourPassword")}
-                                <Input name="password" type="password" autoComplete="current-password" required />
+                                <Input
+                                    name="password"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    required
+                                />
                             </label>
-                            <p className="text-xs text-muted-foreground">{t("enroll.passwordReason")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("enroll.passwordReason")}
+                            </p>
                             <Button type="submit" disabled={busy}>
-                                {busy ? t("enroll.authenticator.starting") : t("enroll.authenticator.continue")}
+                                {busy
+                                    ? t("enroll.authenticator.starting")
+                                    : t("enroll.authenticator.continue")}
                             </Button>
                         </form>
                     )
@@ -387,7 +429,11 @@ function AuthenticatorFactor({
 
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 {onBack ? (
-                    <button type="button" className="self-start text-xs text-muted-foreground underline" onClick={onBack}>
+                    <button
+                        type="button"
+                        className="self-start text-xs text-muted-foreground underline"
+                        onClick={onBack}
+                    >
                         {t("enroll.somethingElse")}
                     </button>
                 ) : null}
@@ -404,7 +450,15 @@ function AuthenticatorFactor({
  * working has these and nothing else, and the moment this screen closes nobody -
  * including an administrator - can read them back.
  */
-function BackupCodes({ codes, account, onDone }: { codes: string[]; account: string; onDone: () => void }) {
+function BackupCodes({
+    codes,
+    account,
+    onDone
+}: {
+    codes: string[];
+    account: string;
+    onDone: () => void;
+}) {
     const t = useTranslations("auth");
     const [kept, setKept] = useState(false);
     const text = codes.join("\n");
@@ -413,8 +467,12 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
             <header className="flex flex-col gap-3">
                 <ShieldCheck className="size-8 text-primary" />
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("enroll.backup.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("enroll.backup.intro", { account })}</p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("enroll.backup.title")}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                    {t("enroll.backup.intro", { account })}
+                </p>
             </header>
 
             <Card>
@@ -425,7 +483,10 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
                         ))}
                     </ul>
                     <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" onClick={() => void navigator.clipboard.writeText(text)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => void navigator.clipboard.writeText(text)}
+                        >
                             {t("enroll.backup.copy")}
                         </Button>
                         <Button
@@ -447,8 +508,7 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
             </Card>
 
             <label className="flex items-start gap-2 text-sm">
-                <input
-                    type="checkbox"
+                <Checkbox
                     className="mt-1"
                     checked={kept}
                     onChange={(event) => setKept(event.target.checked)}

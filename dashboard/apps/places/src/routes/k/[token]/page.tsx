@@ -32,6 +32,8 @@ export default async function GuestKeyPage({
                 cards={panel.panel.cards}
                 devices={panel.devices}
                 rooms={panel.rooms}
+                guestCameras={panel.cameras}
+                automations={panel.automations}
                 access={{ kind: "link", token, allowed: panel.allowed }}
             />
         );

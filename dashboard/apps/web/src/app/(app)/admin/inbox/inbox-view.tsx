@@ -40,7 +40,8 @@ import {
     DialogTitle,
     DialogHeader,
     DialogContent,
-    DialogDescription
+    DialogDescription,
+    Checkbox
 } from "@polaris/ui";
 import {
     assignConversationAction,
@@ -806,8 +807,7 @@ function NewChatDialog({
                     </label>
                     {!selectedContact && (
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
                                 checked={save}
                                 onChange={(event) => setSave(event.target.checked)}
                             />

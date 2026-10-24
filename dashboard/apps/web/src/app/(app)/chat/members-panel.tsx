@@ -53,7 +53,15 @@ import { rosterItems, type ChatRosterMember, type RosterItem } from "@/lib/chat/
 import { useChatPane } from "./use-chat-pane";
 import { resetPaneLayout } from "./pane-preferences";
 import { PersonName, platedRow, usePersonNameplate } from "@/components/person-name";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+    type ReactNode
+} from "react";
 import {
     Dialog,
     DialogContent,
@@ -513,7 +521,8 @@ export function ChannelMembers({
     channel,
     open,
     onOpenChange,
-    onMention
+    onMention,
+    search
 }: {
     channel: ChatChannelView;
     open: boolean;
@@ -521,6 +530,9 @@ export function ChannelMembers({
     /** Put somebody into what is being written. The composer owns the box, so
      *  this only says what to drop in it - see `MemberMenu`. */
     onMention: (text: string) => void;
+    /** The search box Discord keeps at the top of this column, drawn there
+     *  only while the panel is a column - not in the phone's dialog. */
+    search?: ReactNode;
 }) {
     const t = useTranslations("chat");
     const { viewerId, refresh } = useChat();
@@ -583,8 +595,27 @@ export function ChannelMembers({
                 style={{ "--members-pane": `${drawn}px` } as CSSProperties}
                 className="flex shrink-0 flex-col border-l border-border w-[var(--members-pane)]"
             >
-                <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
-                    <span className="text-sm font-semibold">{heading}</span>
+                {search ? (
+                    <div className="flex h-header shrink-0 items-center border-b border-border px-3">
+                        {search}
+                    </div>
+                ) : null}
+                <div
+                    className={cn(
+                        "flex shrink-0 items-center justify-between gap-2 px-3",
+                        search ? "pt-3 pb-1" : "h-header border-b border-border"
+                    )}
+                >
+                    <span
+                        className={cn(
+                            "min-w-0 truncate",
+                            search
+                                ? "text-xs font-semibold uppercase text-muted-foreground"
+                                : "text-sm font-semibold"
+                        )}
+                    >
+                        {heading}
+                    </span>
                     <button
                         type="button"
                         aria-label={t("members.hideTheMembers")}

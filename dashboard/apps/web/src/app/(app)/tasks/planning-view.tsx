@@ -19,7 +19,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { optionLabel } from "./option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CalendarRange, Plus, Target, Trash2, Users } from "lucide-react";
-import { Button, Card, CardBody, EmptyState, Input, Select, cn } from "@polaris/ui";
+import { Button, Card, CardBody, EmptyState, Input, Select, cn, DateInput } from "@polaris/ui";
 import type { GoalView, SprintView } from "@/lib/tasks/planning-service";
 import { AccessDialog, type AccessTarget } from "./access-dialog";
 
@@ -58,7 +58,9 @@ export function SprintsView({
             <AccessDialog target={access} onClose={() => setAccess(null)} />
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("sprints.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("sprints.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">{t("sprints.subtitle")}</p>
                 </div>
                 <span className="flex-1" />
@@ -70,7 +72,10 @@ export function SprintsView({
             </header>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -83,7 +88,10 @@ export function SprintsView({
                             <Select
                                 value={spaceId}
                                 onValueChange={setSpaceId}
-                                options={spaces.map((space) => ({ value: space.id, label: space.name }))}
+                                options={spaces.map((space) => ({
+                                    value: space.id,
+                                    label: space.name
+                                }))}
                                 aria-label={t("trackers.space")}
                                 className="h-8 w-40 text-xs"
                             />
@@ -99,20 +107,18 @@ export function SprintsView({
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("create.sprint.starts")}
-                            <input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={start}
                                 onChange={(event) => setStart(event.target.value)}
-                                className="h-8 rounded-md border border-border bg-field px-2 text-xs"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("create.sprint.ends")}
-                            <input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={end}
                                 onChange={(event) => setEnd(event.target.value)}
-                                className="h-8 rounded-md border border-border bg-field px-2 text-xs"
                             />
                         </label>
                         <Button
@@ -147,17 +153,21 @@ export function SprintsView({
             )}
 
             {sprints.length === 0 && !creating && (
-                <EmptyState title={t("sprints.emptyTitle")} description={t("sprints.emptyDescription")} />
+                <EmptyState
+                    title={t("sprints.emptyTitle")}
+                    description={t("sprints.emptyDescription")}
+                />
             )}
 
             <ul className="flex flex-col gap-3">
                 {sprints.map((sprint) => {
                     const points = burndowns[sprint.id] ?? [];
-                    const percent = sprint.points > 0
-                        ? Math.round((sprint.donePoints / sprint.points) * 100)
-                        : sprint.taskCount > 0
-                          ? Math.round((sprint.doneCount / sprint.taskCount) * 100)
-                          : 0;
+                    const percent =
+                        sprint.points > 0
+                            ? Math.round((sprint.donePoints / sprint.points) * 100)
+                            : sprint.taskCount > 0
+                              ? Math.round((sprint.doneCount / sprint.taskCount) * 100)
+                              : 0;
                     return (
                         <li key={sprint.id}>
                             <Card>
@@ -179,7 +189,10 @@ export function SprintsView({
                                                     total: sprint.taskCount
                                                 })}
                                                 {sprint.points > 0
-                                                    ? t("sprints.points", { done: sprint.donePoints, total: sprint.points })
+                                                    ? t("sprints.points", {
+                                                          done: sprint.donePoints,
+                                                          total: sprint.points
+                                                      })
                                                     : ""}
                                             </p>
                                         </div>
@@ -199,22 +212,38 @@ export function SprintsView({
                                                 if (result?.error) setError(result.error);
                                             }}
                                             options={[
-                                                { value: "planned", label: t("sprints.status.planned") },
-                                                { value: "active", label: t("sprints.status.active") },
-                                                { value: "completed", label: t("sprints.status.completed") }
+                                                {
+                                                    value: "planned",
+                                                    label: t("sprints.status.planned")
+                                                },
+                                                {
+                                                    value: "active",
+                                                    label: t("sprints.status.active")
+                                                },
+                                                {
+                                                    value: "completed",
+                                                    label: t("sprints.status.completed")
+                                                }
                                             ]}
-                                            aria-label={t("sprints.statusOf", { name: sprint.name })}
+                                            aria-label={t("sprints.statusOf", {
+                                                name: sprint.name
+                                            })}
                                             className="h-8 w-32 text-xs"
                                         />
                                         {canEdit && (
                                             <button
                                                 type="button"
-                                                aria-label={t("sprints.accessOf", { name: sprint.name })}
+                                                aria-label={t("sprints.accessOf", {
+                                                    name: sprint.name
+                                                })}
                                                 title={t("tree.access")}
                                                 onClick={() =>
                                                     setAccess({
                                                         scope: sprint.folderId
-                                                            ? { kind: "folder", id: sprint.folderId }
+                                                            ? {
+                                                                  kind: "folder",
+                                                                  id: sprint.folderId
+                                                              }
                                                             : { kind: "space", id: sprint.spaceId },
                                                         asked: { kind: "sprint", name: sprint.name }
                                                     })
@@ -224,21 +253,29 @@ export function SprintsView({
                                                 <Users className="size-3.5" />
                                             </button>
                                         )}
-                                        {canEdit && <button
-                                            type="button"
-                                            aria-label={t("automations.deleteNamed", { name: sprint.name })}
-                                            title={t("sprints.delete")}
-                                            onClick={async () => {
-                                                const result = await runAction(
-                                                    () => actions.deleteSprintAction(sprint.spaceId, sprint.id),
-                                                    setError
-                                                );
-                                                if (result?.error) setError(result.error);
-                                            }}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                        >
-                                            <Trash2 className="size-3.5" />
-                                        </button>}
+                                        {canEdit && (
+                                            <button
+                                                type="button"
+                                                aria-label={t("automations.deleteNamed", {
+                                                    name: sprint.name
+                                                })}
+                                                title={t("sprints.delete")}
+                                                onClick={async () => {
+                                                    const result = await runAction(
+                                                        () =>
+                                                            actions.deleteSprintAction(
+                                                                sprint.spaceId,
+                                                                sprint.id
+                                                            ),
+                                                        setError
+                                                    );
+                                                    if (result?.error) setError(result.error);
+                                                }}
+                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                            >
+                                                <Trash2 className="size-3.5" />
+                                            </button>
+                                        )}
                                     </div>
 
                                     <ProgressBar percent={percent} />
@@ -270,9 +307,27 @@ function Burndown({ points }: { points: readonly core.BurndownPoint[] }) {
         .join(" ");
 
     return (
-        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-16 w-full" role="img" aria-label={t("sprints.burndown")}>
-            <polyline points={ideal} fill="none" stroke="currentColor" strokeWidth="0.5" className="text-muted-foreground/40" />
-            <polyline points={actual} fill="none" stroke="currentColor" strokeWidth="1" className="text-primary" />
+        <svg
+            viewBox={`0 0 ${width} ${height}`}
+            preserveAspectRatio="none"
+            className="h-16 w-full"
+            role="img"
+            aria-label={t("sprints.burndown")}
+        >
+            <polyline
+                points={ideal}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="0.5"
+                className="text-muted-foreground/40"
+            />
+            <polyline
+                points={actual}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
+                className="text-primary"
+            />
         </svg>
     );
 }
@@ -306,7 +361,9 @@ export function GoalsView({
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("goals.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("goals.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">{t("goals.subtitle")}</p>
                 </div>
                 <span className="flex-1" />
@@ -318,7 +375,10 @@ export function GoalsView({
             </header>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -349,7 +409,11 @@ export function GoalsView({
                             onClick={async () => {
                                 setError("");
                                 const result = await runAction(
-                                    () => actions.createGoalAction({ name: name.trim(), spaceId: spaceId || null }),
+                                    () =>
+                                        actions.createGoalAction({
+                                            name: name.trim(),
+                                            spaceId: spaceId || null
+                                        }),
                                     setError
                                 );
                                 if (result?.error) setError(result.error);
@@ -369,7 +433,10 @@ export function GoalsView({
             )}
 
             {goals.length === 0 && !creating && (
-                <EmptyState title={t("goals.emptyTitle")} description={t("goals.emptyDescription")} />
+                <EmptyState
+                    title={t("goals.emptyTitle")}
+                    description={t("goals.emptyDescription")}
+                />
             )}
 
             <ul className="grid gap-3 md:grid-cols-2">
@@ -378,37 +445,61 @@ export function GoalsView({
                         <Card>
                             <CardBody className="flex flex-col gap-3 p-4">
                                 <div className="flex items-start gap-3">
-                                    <Target className="mt-0.5 size-4" style={{ color: goal.color }} />
+                                    <Target
+                                        className="mt-0.5 size-4"
+                                        style={{ color: goal.color }}
+                                    />
                                     <div className="min-w-0 flex-1">
-                                        <p className={cn("truncate font-medium", goal.completedAt && "text-muted-foreground")}>
+                                        <p
+                                            className={cn(
+                                                "truncate font-medium",
+                                                goal.completedAt && "text-muted-foreground"
+                                            )}
+                                        >
                                             {goal.name}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
                                             {goal.ownerName}
-                                            {goal.dueDate ? t("goals.due", { date: format.date(goal.dueDate) }) : ""}
+                                            {goal.dueDate
+                                                ? t("goals.due", {
+                                                      date: format.date(goal.dueDate)
+                                                  })
+                                                : ""}
                                         </p>
                                     </div>
                                     <span className="text-sm font-semibold">{goal.percent}%</span>
-                                    {canEdit && <button
-                                        type="button"
-                                        aria-label={t("automations.deleteNamed", { name: goal.name })}
-                                        title={t("goals.delete")}
-                                        onClick={async () => {
-                                            const result = await runAction(() => actions.deleteGoalAction(goal.id), setError);
-                                            if (result?.error) setError(result.error);
-                                        }}
-                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                    >
-                                        <Trash2 className="size-3.5" />
-                                    </button>}
+                                    {canEdit && (
+                                        <button
+                                            type="button"
+                                            aria-label={t("automations.deleteNamed", {
+                                                name: goal.name
+                                            })}
+                                            title={t("goals.delete")}
+                                            onClick={async () => {
+                                                const result = await runAction(
+                                                    () => actions.deleteGoalAction(goal.id),
+                                                    setError
+                                                );
+                                                if (result?.error) setError(result.error);
+                                            }}
+                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                        >
+                                            <Trash2 className="size-3.5" />
+                                        </button>
+                                    )}
                                 </div>
 
                                 <ProgressBar percent={goal.percent} />
 
                                 <ul className="flex flex-col gap-2">
                                     {goal.targets.map((target) => (
-                                        <li key={target.id} className="flex items-center gap-2 text-xs">
-                                            <span className="min-w-0 flex-1 truncate">{target.name}</span>
+                                        <li
+                                            key={target.id}
+                                            className="flex items-center gap-2 text-xs"
+                                        >
+                                            <span className="min-w-0 flex-1 truncate">
+                                                {target.name}
+                                            </span>
                                             {target.type === "tasks" ? (
                                                 <span className="text-muted-foreground">
                                                     {t("goals.taskProgress", {
@@ -421,12 +512,18 @@ export function GoalsView({
                                                     type="number"
                                                     disabled={!canEdit}
                                                     defaultValue={target.currentValue}
-                                                    aria-label={t("goals.valueFor", { name: target.name })}
+                                                    aria-label={t("goals.valueFor", {
+                                                        name: target.name
+                                                    })}
                                                     onBlur={async (event) => {
                                                         const value = Number(event.target.value);
                                                         if (value === target.currentValue) return;
                                                         const result = await runAction(
-                                                            () => actions.setGoalTargetValueAction(target.id, value),
+                                                            () =>
+                                                                actions.setGoalTargetValueAction(
+                                                                    target.id,
+                                                                    value
+                                                                ),
                                                             setError
                                                         );
                                                         if (result?.error) setError(result.error);
@@ -434,22 +531,31 @@ export function GoalsView({
                                                     className="h-7 w-20 rounded-md border border-border bg-field px-2 text-xs"
                                                 />
                                             )}
-                                            <span className="w-10 text-right text-muted-foreground">{target.percent}%</span>
-                                            {canEdit && <button
-                                                type="button"
-                                                aria-label={t("pickers.remove", { name: target.name })}
-                                                title={t("goals.removeTarget")}
-                                                onClick={async () => {
-                                                    const result = await runAction(
-                                                        () => actions.deleteGoalTargetAction(target.id),
-                                                        setError
-                                                    );
-                                                    if (result?.error) setError(result.error);
-                                                }}
-                                                className="rounded p-0.5 text-muted-foreground transition-colors hover:text-danger"
-                                            >
-                                                <Trash2 className="size-3" />
-                                            </button>}
+                                            <span className="w-10 text-right text-muted-foreground">
+                                                {target.percent}%
+                                            </span>
+                                            {canEdit && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={t("pickers.remove", {
+                                                        name: target.name
+                                                    })}
+                                                    title={t("goals.removeTarget")}
+                                                    onClick={async () => {
+                                                        const result = await runAction(
+                                                            () =>
+                                                                actions.deleteGoalTargetAction(
+                                                                    target.id
+                                                                ),
+                                                            setError
+                                                        );
+                                                        if (result?.error) setError(result.error);
+                                                    }}
+                                                    className="rounded p-0.5 text-muted-foreground transition-colors hover:text-danger"
+                                                >
+                                                    <Trash2 className="size-3" />
+                                                </button>
+                                            )}
                                         </li>
                                     ))}
                                     {goal.targets.length === 0 && (
@@ -473,7 +579,11 @@ export function GoalsView({
                                         }}
                                     />
                                 ) : (
-                                    <Button size="sm" variant="ghost" onClick={() => setTargetFor(goal.id)}>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => setTargetFor(goal.id)}
+                                    >
                                         <Plus className="size-3.5" /> {t("goals.target")}
                                     </Button>
                                 )}

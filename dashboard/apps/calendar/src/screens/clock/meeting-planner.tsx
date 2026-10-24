@@ -17,7 +17,7 @@ import * as words from "./words";
 import { useCalendarT } from "../i18n";
 import * as engine from "../../engine";
 import { useRouter } from "next/navigation";
-import { Button, cn, Input } from "@polaris/ui";
+import { Button, cn, DateInput } from "@polaris/ui";
 import * as cities from "../../lib/clock/cities";
 import { hostUi } from "@polaris/app-host/client";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -115,8 +115,8 @@ export function MeetingPlanner({
                     >
                         <ChevronLeft />
                     </Button>
-                    <Input
-                        type="date"
+                    <DateInput
+                        mode="date"
                         value={day}
                         aria-label={t("time.planner.day")}
                         onChange={(event) => event.target.value && setDay(event.target.value)}

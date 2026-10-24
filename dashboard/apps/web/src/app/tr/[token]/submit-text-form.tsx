@@ -19,7 +19,16 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, Copy, Loader2, Send } from "lucide-react";
 import { generateSealKey, seal } from "@/lib/browser-seal";
 import { submitTextAction } from "@/app/(app)/drive/drop-points/text-request-actions";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Textarea } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Input,
+    Textarea,
+    Checkbox
+} from "@polaris/ui";
 
 export function SubmitTextForm({
     token,
@@ -77,14 +86,10 @@ export function SubmitTextForm({
                         <CardTitle>{t("textDrop.sent")}</CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-3">
-                        <p className="text-sm text-muted-foreground">
-                            {t("textDrop.reached")}
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("textDrop.reached")}</p>
                         {sentKey ? (
                             <>
-                                <p className="text-sm">
-                                    {t("textDrop.sealedKey")}
-                                </p>
+                                <p className="text-sm">{t("textDrop.sealedKey")}</p>
                                 <div className="flex items-center gap-2">
                                     <Input
                                         readOnly
@@ -177,9 +182,8 @@ export function SubmitTextForm({
                         </label>
                         {allowSealed ? (
                             <label className="flex items-start gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="mt-0.5 size-4"
+                                <Checkbox
+                                    className="mt-0.5"
                                     checked={sealed}
                                     onChange={(event) => setSealed(event.target.checked)}
                                 />

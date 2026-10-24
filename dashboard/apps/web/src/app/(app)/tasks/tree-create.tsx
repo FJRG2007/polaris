@@ -32,7 +32,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    DateInput
 } from "@polaris/ui";
 import * as polls from "./tasks-polls";
 
@@ -177,20 +178,18 @@ function SprintDialog({
                     <div className="flex gap-2">
                         <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
                             {t("create.sprint.starts")}
-                            <input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={start}
                                 onChange={(event) => setStart(event.target.value)}
-                                className="h-9 rounded-md border border-border bg-field px-2 text-sm"
                             />
                         </label>
                         <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
                             {t("create.sprint.ends")}
-                            <input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={end}
                                 onChange={(event) => setEnd(event.target.value)}
-                                className="h-9 rounded-md border border-border bg-field px-2 text-sm"
                             />
                         </label>
                     </div>

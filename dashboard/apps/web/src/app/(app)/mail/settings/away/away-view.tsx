@@ -17,7 +17,7 @@ import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { setVacationAction } from "@/app/(app)/mail/actions";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, Input, Switch, Textarea, useToast } from "@polaris/ui";
+import { Button, Input, Switch, Textarea, useToast, DateInput } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 interface Vacation {
@@ -76,7 +76,10 @@ export function AwayView({
                     <span className="mb-1 block text-[12px] text-muted-foreground">
                         {t("away.subject")}
                     </span>
-                    <Input value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} />
+                    <Input
+                        value={form.subject}
+                        onChange={(event) => setForm({ ...form, subject: event.target.value })}
+                    />
                 </label>
 
                 <label className="block">
@@ -93,17 +96,21 @@ export function AwayView({
 
                 <div className="flex flex-wrap gap-3">
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("away.from")}</span>
-                        <Input
-                            type="date"
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            {t("away.from")}
+                        </span>
+                        <DateInput
+                            mode="date"
                             value={form.startsAt}
                             onChange={(event) => setForm({ ...form, startsAt: event.target.value })}
                         />
                     </label>
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("away.until")}</span>
-                        <Input
-                            type="date"
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            {t("away.until")}
+                        </span>
+                        <DateInput
+                            mode="date"
                             value={form.endsAt}
                             onChange={(event) => setForm({ ...form, endsAt: event.target.value })}
                         />
@@ -118,14 +125,14 @@ export function AwayView({
                             max={90}
                             className="w-24"
                             value={String(form.repeatDays)}
-                            onChange={(event) => setForm({ ...form, repeatDays: Number(event.target.value) })}
+                            onChange={(event) =>
+                                setForm({ ...form, repeatDays: Number(event.target.value) })
+                            }
                         />
                     </label>
                 </div>
 
-                <p className="text-[12px] text-foreground-subtle">
-                    {t("away.never")}
-                </p>
+                <p className="text-[12px] text-foreground-subtle">{t("away.never")}</p>
 
                 {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
 

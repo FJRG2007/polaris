@@ -90,7 +90,8 @@ import {
     Skeleton,
     ShortcutHint,
     cn,
-    shortcutPressed
+    shortcutPressed,
+    DateInput
 } from "@polaris/ui";
 
 type SortKey = "name" | "created" | "modified" | "size";
@@ -1005,18 +1006,18 @@ export function ShareExplorer({
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {td("filesView.filters.after")}
-                            <Input
+                            <DateInput
+                                mode="date"
                                 value={dateFrom}
                                 onChange={(e) => setDateFrom(e.target.value)}
-                                type="date"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {td("filesView.filters.before")}
-                            <Input
+                            <DateInput
+                                mode="date"
                                 value={dateTo}
                                 onChange={(e) => setDateTo(e.target.value)}
-                                type="date"
                             />
                         </label>
                     </div>

@@ -1,5 +1,7 @@
 # Connecting AI assistants (MCP)
 
+[Leer en español](connecting-ai-assistants.es.md) - [Back to the README](../README.md)
+
 Polaris is an MCP server. Claude, ChatGPT, Cursor, VS Code and any other client
 that speaks remote MCP (Streamable HTTP or SSE, or stdio through mcp-remote) can
 connect to it, sign in as you, and work with your tasks, deployments, notes, chat,

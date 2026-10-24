@@ -24,7 +24,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    Checkbox
 } from "@polaris/ui";
 import { promoteEnvironmentAction } from "../project-actions";
 
@@ -170,15 +171,14 @@ export function PromoteDialog({
                         />
                     </label>
                     <label className="flex items-start gap-2 text-sm">
-                        <input
-                            type="checkbox"
+                        <Checkbox
                             checked={includeData}
                             disabled={!canCopyData || (preview !== null && !preview.canCopyData)}
                             onChange={(event) => {
                                 setIncludeData(event.target.checked);
                                 setTyped("");
                             }}
-                            className="mt-0.5 size-4 accent-primary"
+                            className="mt-0.5"
                         />
                         <span className="min-w-0">
                             {t("promotion.includeData")}

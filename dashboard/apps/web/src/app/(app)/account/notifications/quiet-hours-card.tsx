@@ -11,7 +11,7 @@ import { useState, useTransition } from "react";
 import { quietHoursSchema, type QuietHours } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { saveQuietHoursAction } from "./actions";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Switch, DateInput } from "@polaris/ui";
 
 export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; timeZone: string }) {
     const t = useTranslations("accountNotifications");
@@ -57,8 +57,8 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
                 <div className="flex flex-wrap gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("quiet.from")}</span>
-                        <Input
-                            type="time"
+                        <DateInput
+                            mode="time"
                             value={draft.start}
                             disabled={!draft.enabled}
                             onChange={(event) => setDraft({ ...draft, start: event.target.value })}
@@ -66,8 +66,8 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("quiet.until")}</span>
-                        <Input
-                            type="time"
+                        <DateInput
+                            mode="time"
                             value={draft.end}
                             disabled={!draft.enabled}
                             onChange={(event) => setDraft({ ...draft, end: event.target.value })}

@@ -25,7 +25,7 @@ import { DefaultReminders } from "./calendar-dialog";
 import * as calendarActions from "../actions/calendars";
 import * as preferenceActions from "../actions/preferences";
 import { cacheKey, unwrap, useCachedRead } from "./cached-read";
-import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
     Button,
     Card,
@@ -33,12 +33,12 @@ import {
     CardHeader,
     CardTitle,
     cn,
-    Input,
     Select,
     Skeleton,
     Switch,
     isDirty,
-    useToast
+    useToast,
+    DateInput
 } from "@polaris/ui";
 import {
     SLOT_MINUTES,
@@ -100,6 +100,8 @@ export function SettingsView() {
     const locale = hostUi.i18nProvider.useLocale();
     const format = hostUi.displayFormat.useDisplayFormat();
     const ids = useId();
+    // The day start the reader typed, saved once they leave the field.
+    const dayStart = useRef("");
     const preferencesRead = useCachedRead<CalendarPreferences>(
         cacheKey("preferences"),
         async () =>
@@ -271,14 +273,15 @@ export function SettingsView() {
                     />
                 </Row>
                 <Row label={t("settingsPage.dayStart")} htmlFor={`${ids}-day-start`}>
-                    <Input
+                    <DateInput
                         id={`${ids}-day-start`}
-                        type="time"
+                        mode="time"
                         className="w-28 tabular-nums"
                         defaultValue={preferences.dayStart}
-                        onBlur={(event) =>
-                            /^([01]\d|2[0-3]):[0-5]\d$/.test(event.target.value) &&
-                            void save({ dayStart: event.target.value })
+                        onValueChange={(value) => (dayStart.current = value)}
+                        onBlur={() =>
+                            /^([01]\d|2[0-3]):[0-5]\d$/.test(dayStart.current) &&
+                            void save({ dayStart: dayStart.current })
                         }
                     />
                 </Row>
@@ -605,8 +608,8 @@ function WorkingHoursEditor({
                                 const bad = span.from >= span.to;
                                 return (
                                     <div key={index} className="flex flex-wrap items-center gap-2">
-                                        <Input
-                                            type="time"
+                                        <DateInput
+                                            mode="time"
                                             aria-label={t("settingsPage.from")}
                                             className={cn(
                                                 "w-28 tabular-nums",
@@ -625,8 +628,8 @@ function WorkingHoursEditor({
                                             }
                                         />
                                         <span className="text-xs text-foreground-subtle">-</span>
-                                        <Input
-                                            type="time"
+                                        <DateInput
+                                            mode="time"
                                             aria-label={t("settingsPage.to")}
                                             className={cn(
                                                 "w-28 tabular-nums",

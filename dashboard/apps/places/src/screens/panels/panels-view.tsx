@@ -12,9 +12,23 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, ExternalLink, LayoutGrid, Pencil, Plus, Share2, Trash2 } from "lucide-react";
+import {
+    Camera,
+    Clock,
+    ExternalLink,
+    Gauge,
+    LayoutGrid,
+    Pencil,
+    Play,
+    Plus,
+    Share2,
+    Trash2
+} from "lucide-react";
+import type { CameraView } from "../../lib/cameras";
+import type { PanelAutomation } from "../../lib/panels";
 import {
     Button,
+    Checkbox,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -137,21 +151,28 @@ function NameDialog({
     );
 }
 
-/** What can be put on a panel: a clock, a device, a room. */
+/** What can be put on a panel: a clock, a device, a room, a camera, an
+ *  automation button, a sensor's reading. */
 function AddCardDialog({
     open,
     devices,
     rooms,
+    cameras,
+    automations,
     onClose,
     onPick
 }: {
     open: boolean;
     devices: readonly DeviceView[];
     rooms: readonly BoardRoom[];
+    cameras: readonly CameraView[];
+    automations: readonly PanelAutomation[];
     onClose: () => void;
     onPick: (card: NewCard) => void;
 }) {
     const t = usePlacesT();
+    const [askFirst, setAskFirst] = useState(false);
+    const sensors = devices.filter((device) => Boolean(device.reading?.value));
     const row =
         "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted";
     return (
@@ -192,6 +213,89 @@ function AddCardDialog({
                     </section>
                     <section className="flex flex-col gap-1">
                         <h3 className="px-3 text-xs font-medium text-muted-foreground">
+                            {t("panels.pickCamera")}
+                        </h3>
+                        {cameras.length === 0 ? (
+                            <p className="px-3 text-sm text-muted-foreground">
+                                {t("panels.noCameras")}
+                            </p>
+                        ) : (
+                            cameras.map((camera) => (
+                                <button
+                                    key={camera.id}
+                                    type="button"
+                                    className={row}
+                                    onClick={() => onPick({ type: "camera", cameraId: camera.id })}
+                                >
+                                    <Camera className="size-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate" title={camera.name}>
+                                        {camera.name}
+                                    </span>
+                                </button>
+                            ))
+                        )}
+                    </section>
+                    <section className="flex flex-col gap-1">
+                        <h3 className="px-3 text-xs font-medium text-muted-foreground">
+                            {t("panels.pickAction")}
+                        </h3>
+                        {automations.length === 0 ? (
+                            <p className="px-3 text-sm text-muted-foreground">
+                                {t("panels.noAutomations")}
+                            </p>
+                        ) : (
+                            <>
+                                <label className="flex min-h-11 items-center gap-2 px-3 text-sm">
+                                    <Checkbox
+                                        checked={askFirst}
+                                        onChange={(event) => setAskFirst(event.target.checked)}
+                                    />
+                                    {t("panels.askFirstPick")}
+                                </label>
+                                {automations.map((automation) => (
+                                    <button
+                                        key={automation.id}
+                                        type="button"
+                                        className={row}
+                                        onClick={() =>
+                                            onPick({
+                                                type: "action",
+                                                automationId: automation.id,
+                                                confirm: askFirst
+                                            })
+                                        }
+                                    >
+                                        <Play className="size-4 shrink-0 text-muted-foreground" />
+                                        <span className="truncate" title={automation.name}>
+                                            {automation.name}
+                                        </span>
+                                    </button>
+                                ))}
+                            </>
+                        )}
+                    </section>
+                    {sensors.length > 0 ? (
+                        <section className="flex flex-col gap-1">
+                            <h3 className="px-3 text-xs font-medium text-muted-foreground">
+                                {t("panels.pickSensor")}
+                            </h3>
+                            {sensors.map((device) => (
+                                <button
+                                    key={device.id}
+                                    type="button"
+                                    className={row}
+                                    onClick={() => onPick({ type: "sensor", deviceId: device.id })}
+                                >
+                                    <Gauge className="size-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate" title={device.name}>
+                                        {device.name}
+                                    </span>
+                                </button>
+                            ))}
+                        </section>
+                    ) : null}
+                    <section className="flex flex-col gap-1">
+                        <h3 className="px-3 text-xs font-medium text-muted-foreground">
                             {t("panels.pickDevice")}
                         </h3>
                         {devices.length === 0 ? (
@@ -228,6 +332,8 @@ export function PanelsView({
     panels: initial,
     devices,
     rooms,
+    cameras,
+    automations,
     canControl,
     canManage
 }: {
@@ -235,6 +341,8 @@ export function PanelsView({
     panels: readonly PanelView[];
     devices: readonly DeviceView[];
     rooms: readonly BoardRoom[];
+    cameras: readonly CameraView[];
+    automations: readonly PanelAutomation[];
     canControl: boolean;
     canManage: boolean;
 }) {
@@ -304,7 +412,10 @@ export function PanelsView({
         }
     };
 
-    const access = useMemo(() => ({ kind: "session" as const, canControl }), [canControl]);
+    const access = useMemo(
+        () => ({ kind: "session" as const, canControl, canRun: canManage }),
+        [canControl, canManage]
+    );
 
     return (
         <div className="flex flex-col gap-4">
@@ -460,6 +571,8 @@ export function PanelsView({
                                 cards={selected.cards}
                                 devices={devices}
                                 rooms={rooms}
+                                cameras={cameras}
+                                automations={automations}
                                 access={access}
                                 editing={editing}
                                 onCardsChange={(cards) => void saveCards(cards)}
@@ -484,6 +597,8 @@ export function PanelsView({
                 open={adding}
                 devices={devices}
                 rooms={rooms}
+                cameras={cameras}
+                automations={automations}
                 onClose={() => setAdding(false)}
                 onPick={(card) => {
                     setAdding(false);

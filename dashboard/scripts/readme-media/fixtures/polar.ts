@@ -140,8 +140,25 @@ const SHOP_ANSWER = {
 pulgadas no cabe. Llévalo en el compartimento principal o mira un modelo de 30 L.`
 };
 
-/** How far a chat has got in the animation: asked, answering, answered. */
-export type PolarStage = "asked" | "answering" | "answered";
+/** Asked once the reviews are read: Polar then works the page itself. */
+const SHOP_ACT = {
+    en: "Pick the 30 L size and add it to my basket.",
+    es: "Elige la talla de 30 L y añádela a la cesta."
+};
+
+const SHOP_ACTED = {
+    en: "Done: the **30 L** size is picked and in your basket, which now shows 1 item.",
+    es: "Hecho: la talla de **30 L** está elegida y en tu cesta, que ya muestra 1 artículo."
+};
+
+/** The size the side panel picks on the page, and the button it presses. */
+export const SHOP_SIZES = ["28 L", "30 L"] as const;
+
+/**
+ * How far a chat has got in the animation: asked, answering, answered - and,
+ * in the side panel only, acting on the page and done with it.
+ */
+export type PolarStage = "asked" | "answering" | "answered" | "acting" | "acted";
 
 /** The first lines of an answer, the way it reads while it is still arriving. */
 function partOf(text: string): string {
@@ -183,7 +200,45 @@ export function polarThread(ctx: SceneContext, stage: PolarStage = "answered", s
                               }
                           ]
                       }
-                  ])
+                  ]),
+            ...(shop && (stage === "acting" || stage === "acted")
+                ? actOnPage(ctx, stage === "acted")
+                : [])
         ]
     };
+}
+
+/** Polar's browser tool, as a stored step: one press on the page beside the panel. */
+function press(n: number, element: string, done: boolean) {
+    return {
+        type: "tool-browser",
+        toolCallId: id("polar-call", n),
+        state: done ? "output-available" : "input-available",
+        input: { action: "click", site: new URL(SHOP.url).host, element },
+        ...(done ? { output: { ok: true } } : {})
+    };
+}
+
+/** The side panel asked to work the page: the size picked, then the basket. */
+function actOnPage(ctx: SceneContext, done: boolean) {
+    const ask = id("polar-message", 5);
+    const basket = ctx.say("Add to basket", "Añadir a la cesta");
+    return [
+        {
+            id: ask,
+            role: "user",
+            parentId: id("polar-message", 4),
+            parts: [{ type: "text", text: ctx.say(SHOP_ACT.en, SHOP_ACT.es) }]
+        },
+        {
+            id: id("polar-message", 6),
+            role: "assistant",
+            parentId: ask,
+            parts: [
+                press(1, SHOP_SIZES[1], true),
+                press(2, basket, done),
+                ...(done ? [{ type: "text", text: ctx.say(SHOP_ACTED.en, SHOP_ACTED.es) }] : [])
+            ]
+        }
+    ];
 }

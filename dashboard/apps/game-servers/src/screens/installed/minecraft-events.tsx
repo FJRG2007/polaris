@@ -1683,8 +1683,8 @@ export function MinecraftEvents({
                                                         <span className="font-medium">
                                                             {t("events.from")}
                                                         </span>
-                                                        <ui.Input
-                                                            type="time"
+                                                        <ui.DateInput
+                                                            mode="time"
                                                             value={settings.random.from}
                                                             disabled={locked}
                                                             onChange={(event) =>
@@ -1698,8 +1698,8 @@ export function MinecraftEvents({
                                                         <span className="font-medium">
                                                             {t("events.until")}
                                                         </span>
-                                                        <ui.Input
-                                                            type="time"
+                                                        <ui.DateInput
+                                                            mode="time"
                                                             value={settings.random.to}
                                                             disabled={locked}
                                                             onChange={(event) =>
@@ -1971,9 +1971,9 @@ export function MinecraftEvents({
                                                         days={entry.days}
                                                         onChange={(days) => update({ days })}
                                                     />
-                                                    <ui.Input
+                                                    <ui.DateInput
                                                         className="w-28"
-                                                        type="time"
+                                                        mode="time"
                                                         aria-label={t("events.at")}
                                                         disabled={locked}
                                                         value={entry.at}

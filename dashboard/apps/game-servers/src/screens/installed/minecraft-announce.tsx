@@ -75,7 +75,8 @@ import {
     Select,
     Switch,
     cn,
-    isDirty
+    isDirty,
+    DateInput
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -682,8 +683,8 @@ export function MinecraftAnnounce({
                                     aria-label={t("announce.howLongItStaysOn")}
                                 />
                                 {draft.hold === "until" && (
-                                    <Input
-                                        type="datetime-local"
+                                    <DateInput
+                                        mode="datetime"
                                         value={toLocalInput(draft.until)}
                                         onChange={(event) => {
                                             const moment = Date.parse(event.target.value);

@@ -83,7 +83,8 @@ import {
     Input,
     Select,
     cn,
-    useToast
+    useToast,
+    DateInput
 } from "@polaris/ui";
 
 /** How long typing settles before a draft is written. */
@@ -1024,8 +1025,8 @@ function SendLaterMenu({
                         <DialogHeader>
                             <DialogTitle>{t("compose.when")}</DialogTitle>
                         </DialogHeader>
-                        <Input
-                            type="datetime-local"
+                        <DateInput
+                            mode="datetime"
                             value={custom}
                             aria-label={t("compose.timeLabel")}
                             onChange={(event) => setCustom(event.target.value)}

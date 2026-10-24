@@ -6,7 +6,8 @@
  * sources and the tests feed them fixtures. Nothing here fetches or reads files.
  */
 import type { InventoryRoute } from "@/data/api-inventory";
-import type { DocPage } from "@/data/docs";
+import type { DocPage, DocSection } from "@/data/docs";
+import type { SearchRecord } from "@/lib/search-index";
 import type { AppDownload } from "@polaris/ui/account-downloads/app-releases";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 
@@ -449,6 +450,8 @@ export interface SiteData {
     readonly locales: Readonly<Record<SiteLocale, LocaleData>>;
     /** The feature guides from `docs/features`, rendered per locale. */
     readonly docs: Readonly<Record<SiteLocale, readonly DocPage[]>>;
+    /** The sidebar's groups of those guides, per locale, in reading order. */
+    readonly docSections: Readonly<Record<SiteLocale, readonly DocSection[]>>;
     readonly downloadsPage: DownloadsData;
     readonly api: {
         title: string;
@@ -461,4 +464,36 @@ export interface SiteData {
         /** Route files read. */
         scanned: number;
     };
+}
+
+/**
+ * What the docs search looks through in one locale: every guide, each of its
+ * sections, and every API operation, listed under the page they belong to.
+ */
+export function searchRecords(
+    data: Pick<SiteData, "docs" | "api">,
+    locale: SiteLocale,
+    apiTitle: string
+): SearchRecord[] {
+    const records: SearchRecord[] = [];
+    for (const page of data.docs[locale]) {
+        const at = `${locale}/docs/${page.slug}/`;
+        records.push({ title: page.title, page: page.title, href: at, text: page.text[""] ?? "" });
+        for (const heading of page.headings)
+            records.push({
+                title: heading.text,
+                page: page.title,
+                href: `${at}#${heading.id}`,
+                text: page.text[heading.id] ?? ""
+            });
+    }
+    for (const group of data.api.groups)
+        for (const op of group.operations)
+            records.push({
+                title: op.summary || op.path,
+                page: apiTitle,
+                href: `${locale}/docs/api/#${op.id}`,
+                text: `${op.method} ${op.path} ${group.tag} ${op.description}`
+            });
+    return records;
 }

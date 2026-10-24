@@ -36,7 +36,9 @@ import {
     DialogTitle,
     DialogHeader,
     DialogContent,
-    DialogDescription
+    DialogDescription,
+    Checkbox,
+    DateInput
 } from "@polaris/ui";
 
 export interface RequestTarget {
@@ -351,8 +353,8 @@ export function RequestDialog({
                         <Section title={t("create.schedule")} defaultOpen={scheduleFocus}>
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("create.starts")}
-                                <Input
-                                    type="datetime-local"
+                                <DateInput
+                                    mode="datetime"
                                     name="startsAt"
                                     defaultValue={initial?.startsAt}
                                 />
@@ -446,30 +448,24 @@ export function RequestDialog({
 
                         <Section title={t("create.security")}>
                             <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     name="requireLogin"
                                     defaultChecked={initial?.requireLogin}
-                                    className="size-4"
                                 />
                                 {t("form.requireLogin")}
                             </label>
                             <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     name="allowOverwrite"
                                     defaultChecked={initial?.allowOverwrite}
-                                    className="size-4"
                                 />
                                 {t("form.overwrite")}
                             </label>
                             <div className="flex flex-col gap-1.5 text-sm">
                                 <label className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
+                                    <Checkbox
                                         name="allowUploaderDelete"
                                         defaultChecked={initial?.allowUploaderDelete}
-                                        className="size-4"
                                     />
                                     {t("form.uploaderDelete")}
                                 </label>

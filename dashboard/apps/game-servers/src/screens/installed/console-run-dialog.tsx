@@ -21,7 +21,8 @@ import {
     DialogTitle,
     Input,
     SegmentedControl,
-    Select
+    Select,
+    DateInput
 } from "@polaris/ui";
 import * as vars from "../../lib/console-vars";
 import * as plan from "../../lib/console-schedule";
@@ -397,8 +398,8 @@ export function RunCommandDialog({
                                         </div>
                                     )}
                                     {startKind === "at" && (
-                                        <Input
-                                            type="datetime-local"
+                                        <DateInput
+                                            mode="datetime"
                                             value={firstAt}
                                             aria-label={t("consoleSchedule.atTime")}
                                             onChange={(event) => setFirstAt(event.target.value)}

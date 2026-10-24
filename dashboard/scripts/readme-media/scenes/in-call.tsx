@@ -6,7 +6,7 @@
 
 import { TEAM, VIEWER } from "../fixtures/people";
 import { label } from "../runtime/interact";
-import { defineScene } from "../runtime/scene";
+import { defineScene, type SceneContext } from "../runtime/scene";
 import { ChatScreen, chatActions, chatApi } from "./chat";
 import { MeetingRoom } from "@/app/(app)/chat/meetings/[meetingId]/meeting-room";
 import { ANA_DM_ID, GROUP_ID } from "../fixtures/chat";
@@ -50,6 +50,18 @@ export const callMeeting = defineScene({
     )
 });
 
+/** Opens the screen Lena is sharing in the group call, once its card is drawn. */
+export async function watchSharedScreen(ctx: SceneContext): Promise<void> {
+    const screen = label(ctx.locale, "chat.callRoom.theirScreen").replace("{name}", TEAM.lena.name);
+    const title = label(ctx.locale, "chat.callRoom.watchNamed").replace("{name}", screen);
+    for (let tries = 0; ; tries++) {
+        const card = document.querySelector<HTMLElement>(`button[title="${title}"]`);
+        if (card) return card.click();
+        if (tries > 50) throw new Error(`no card titled "${title}"`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+}
+
 export const callGroup = defineScene({
     id: "call-group",
     path: `/chat/c/${GROUP_ID}`,
@@ -59,16 +71,7 @@ export const callGroup = defineScene({
     render: (ctx) => <ChatScreen channelId={GROUP_ID} hold={callHold(ctx, groupShape(ctx))} />,
     // A screen arriving in a group call is offered rather than taken; the
     // picture is of one being watched, among the people.
-    prepare: (ctx) => {
-        const screen = label(ctx.locale, "chat.callRoom.theirScreen").replace(
-            "{name}",
-            TEAM.lena.name
-        );
-        const title = label(ctx.locale, "chat.callRoom.watchNamed").replace("{name}", screen);
-        const card = document.querySelector<HTMLElement>(`button[title="${title}"]`);
-        if (!card) throw new Error(`no card titled "${title}"`);
-        card.click();
-    }
+    prepare: watchSharedScreen
 });
 
 export const callDirect = defineScene({

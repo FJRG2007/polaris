@@ -125,7 +125,21 @@
         "guides": "Guides",
         "onThisPage": "On this page",
         "apiHint": "Every route an API key can call, with examples in curl, JavaScript and Python.",
-        "source": "Edit this page on GitHub"
+        "source": "Edit this page on GitHub",
+        "integrations": "Integrations",
+        "more": "More",
+        "recent": "Recent",
+        "clear": "Clear",
+        "forget": "Forget",
+        "forgetNamed": "Forget {label}",
+        "hintMove": "Arrows to move, Enter to open",
+        "hintClose": "Esc to close",
+        "open": "Search the docs",
+        "results": "Results",
+        "previous": "Previous",
+        "next": "Next",
+        "breadcrumb": "Breadcrumb",
+        "emptyRecent": "Search the guides, their sections and the API reference."
     },
     "notFound": {
         "title": "Page not found",

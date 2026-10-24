@@ -25,7 +25,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Input, Select, Skeleton } from "@polaris/ui";
+import { Select, Skeleton, DateInput } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { findWafPeopleAction, listWafPrincipalsAction, type WafPrincipalOption } from "./actions";
@@ -497,9 +497,9 @@ function GrantWindow({
         <div className="flex flex-wrap items-end gap-2 pl-5">
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                 {t("principals.starts")}
-                <Input
-                    type="datetime-local"
-                    className="h-8 w-auto text-xs"
+                <DateInput
+                    mode="datetime"
+                    className="w-auto"
                     value={from}
                     disabled={disabled}
                     onChange={(event) => setFrom(event.target.value)}
@@ -508,9 +508,9 @@ function GrantWindow({
             </label>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                 {t("principals.expires")}
-                <Input
-                    type="datetime-local"
-                    className="h-8 w-auto text-xs"
+                <DateInput
+                    mode="datetime"
+                    className="w-auto"
                     value={until}
                     disabled={disabled}
                     onChange={(event) => setUntil(event.target.value)}

@@ -16,7 +16,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { submitFormAction } from "./actions";
 import { signInHref } from "@/lib/safe-redirect";
 import type { FormField } from "@polaris/core";
-import { Card, Input, Button, Select, CardBody, Textarea } from "@polaris/ui";
+import { Card, Input, Button, Select, CardBody, Textarea, Checkbox } from "@polaris/ui";
 
 export function PublicForm({
     token,
@@ -131,11 +131,10 @@ export function PublicForm({
                                     aria-label={field.label}
                                 />
                             ) : field.type === "checkbox" ? (
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={value === "true"}
                                     onChange={(event) => set(event.target.checked ? "true" : "")}
-                                    className="size-4 self-start"
+                                    className="self-start"
                                 />
                             ) : (
                                 <Input

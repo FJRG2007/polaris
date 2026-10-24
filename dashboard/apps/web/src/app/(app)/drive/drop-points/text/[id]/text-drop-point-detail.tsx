@@ -33,7 +33,17 @@ import {
     revealTextRequestLinkAction,
     updateTextRequestAction
 } from "@/app/(app)/drive/drop-points/text-request-actions";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Textarea } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Input,
+    Textarea,
+    Checkbox
+} from "@polaris/ui";
 
 export interface CollectedRow {
     id: string;
@@ -73,7 +83,7 @@ function entries(value: string): string[] {
         .filter(Boolean);
 }
 
-/** An ISO timestamp as the value a <input type="date"> wants. */
+/** An ISO timestamp as the value a date field (`YYYY-MM-DD`) wants. */
 function asDateValue(iso: string | null): string {
     return iso ? iso.slice(0, 10) : "";
 }
@@ -325,14 +335,12 @@ export function TextDropPointDetail({
                         </div>
                         {request.hasPassword ? (
                             <label className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" name="clearPassword" className="size-4" />
+                                <Checkbox name="clearPassword" />
                                 {t("text.removePassword")}
                             </label>
                         ) : null}
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
-                                className="size-4"
+                            <Checkbox
                                 checked={requireLogin}
                                 onChange={(event) => setRequireLogin(event.target.checked)}
                             />
@@ -349,9 +357,8 @@ export function TextDropPointDetail({
                             />
                         </label>
                         <label className="flex items-start gap-2 text-sm">
-                            <input
-                                type="checkbox"
-                                className="mt-0.5 size-4"
+                            <Checkbox
+                                className="mt-0.5"
                                 checked={allowSealed}
                                 onChange={(event) => setAllowSealed(event.target.checked)}
                             />

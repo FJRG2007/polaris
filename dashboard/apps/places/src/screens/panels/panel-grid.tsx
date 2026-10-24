@@ -39,13 +39,17 @@ export function PanelGrid({
     editing,
     onChange,
     render,
-    labelOf
+    labelOf,
+    extra
 }: {
     cards: readonly PanelCard[];
     editing: boolean;
     onChange: (cards: PanelCard[]) => void;
     render: (card: PanelCard) => ReactNode;
     labelOf: (card: PanelCard) => string;
+    /** A card's own setting while arranging (an automation button's "ask
+     *  first"), drawn bottom left over the card. */
+    extra?: (card: PanelCard) => ReactNode;
 }) {
     const t = usePlacesT();
     const grid = useRef<HTMLDivElement>(null);
@@ -184,6 +188,11 @@ export function PanelGrid({
                                     >
                                         <MoveDiagonal2 className="size-4" />
                                     </button>
+                                    {extra ? (
+                                        <div className="absolute bottom-2 left-2">
+                                            {extra(card)}
+                                        </div>
+                                    ) : null}
                                 </>
                             ) : null}
                         </div>

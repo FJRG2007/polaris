@@ -47,7 +47,8 @@ import {
     DialogTitle,
     Input,
     isDirty,
-    Switch
+    Switch,
+    DateInput
 } from "@polaris/ui";
 
 /** The four writes, as the screen that owns them exposes them. Each one is a
@@ -932,8 +933,8 @@ function KeyDialog({
 
                     <label className="flex flex-col gap-1 text-sm">
                         {t("modelKeys.expires")}
-                        <Input
-                            type="date"
+                        <DateInput
+                            mode="date"
                             value={expiry}
                             min={earliestExpiry()}
                             onChange={(event) => setExpiry(event.target.value)}

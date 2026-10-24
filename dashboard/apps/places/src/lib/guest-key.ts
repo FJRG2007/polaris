@@ -20,7 +20,15 @@ import { homeInstall } from "./access";
 import { requireNearby } from "./nearby";
 import { countDeviceUse, isThingId, roomContents } from "./sharing";
 import { getCamera } from "./cameras";
-import { panelContents, panelHolds, type PanelContents } from "./panels";
+import { randomUUID } from "node:crypto";
+import { runAutomationNow } from "./automations";
+import {
+    panelContents,
+    panelHolds,
+    panelHoldsAutomation,
+    panelPlaceId,
+    type PanelContents
+} from "./panels";
 import {
     actionsFor,
     grantActionFor,
@@ -146,6 +154,14 @@ export async function guestRoom(token: string): Promise<GuestRoom | null> {
     };
 }
 
+/** A camera as a link sees it: its name and whether it is private. Never its
+ *  address, paths or account - those stay on the server. */
+export interface GuestPanelCamera {
+    readonly id: string;
+    readonly name: string;
+    readonly private: boolean;
+}
+
 /** What a wall panel's link shows: the panel and every device on it now. */
 export type GuestPanel =
     | ({
@@ -153,7 +169,12 @@ export type GuestPanel =
           readonly allowed: readonly string[];
           readonly nearbyMeters: number | null;
           readonly until: string | null;
-      } & PanelContents)
+          /** Empty unless the panel was lent with `watch`. */
+          readonly cameras: readonly GuestPanelCamera[];
+          /** Empty unless the panel was lent to control: a link that may only
+           *  look starts nothing. */
+          readonly automations: PanelContents["automations"];
+      } & Omit<PanelContents, "cameras" | "automations">)
     | { readonly standing: Exclude<core.GrantStanding, "live"> };
 
 /** A wall panel handed out as a link, read now, or null when it names none. */
@@ -165,9 +186,21 @@ export async function guestPanel(token: string): Promise<GuestPanel | null> {
     if (!install) return null;
     const contents = await panelContents(install.id, reached.subjectId).catch(() => null);
     if (!contents) return null;
+    const watches = reached.grant.actions.includes("watch");
+    const runs =
+        core.atLeast("place.panel", reached.grant.capability, "control") &&
+        reached.grant.actions.includes("operate");
     return {
         standing: "live",
         ...contents,
+        cameras: watches
+            ? contents.cameras.map((camera) => ({
+                  id: camera.id,
+                  name: camera.name,
+                  private: camera.privacy
+              }))
+            : [],
+        automations: runs ? contents.automations : [],
         allowed: reached.grant.actions,
         nearbyMeters: reached.grant.nearbyMeters ?? null,
         until: reached.grant.until?.toISOString() ?? null
@@ -272,4 +305,83 @@ export async function pressGuestKey(
 async function panelHeld(panelId: string, deviceId: string): Promise<boolean> {
     const install = await homeInstall();
     return install ? panelHolds(install.id, panelId, deviceId) : false;
+}
+
+/**
+ * Run one of a wall panel's automation buttons through its link. Only an
+ * automation the panel has a button for, only on a link lent to control with
+ * `operate`, inside its fence and rate limit, recorded with no actor. The run
+ * is the automation's own: its conditions still apply and it acts with its
+ * owner's rights, as Run now does on the automations screen.
+ */
+export async function runGuestAutomation(
+    token: string,
+    automationId: string,
+    where: core.ReportedLocation | null,
+    ip: string
+): Promise<void> {
+    const reached = await host.accessGrants.linkReach(token);
+    if (!reached || reached.subjectType !== "place.panel") {
+        throw new HomeError("This link does not open anything right now");
+    }
+    const log = (outcome: "done" | "refused", reason = "") =>
+        host.accessGrants.recordGrantUse({
+            grantId: reached.standing === "live" ? reached.grant.id : null,
+            subjectType: reached.subjectType,
+            subjectId: reached.subjectId,
+            targetType: "automation",
+            targetId: automationId,
+            userId: null,
+            linkNote: reached.note,
+            action: "operate",
+            outcome,
+            reason
+        });
+    const limited = await host.rateLimitService.rateLimit(
+        `guest-key:${reached.standing === "live" ? reached.grant.id : reached.subjectId}:${ip}`,
+        PRESSES_PER_MINUTE,
+        60_000
+    );
+    if (!limited.ok) throw new HomeError("Too many presses. Wait a minute and try again");
+    const install = await homeInstall();
+    const held =
+        !!install &&
+        isThingId(automationId) &&
+        (await panelHoldsAutomation(install.id, reached.subjectId, automationId));
+    if (reached.standing !== "live") {
+        if (held) await log("refused", reached.standing);
+        throw new HomeError("This link does not open anything right now");
+    }
+    if (!held || !install) throw new HomeError("This link does not allow that");
+    const grant = reached.grant;
+    if (
+        !core.atLeast("place.panel", grant.capability, "control") ||
+        !grant.actions.includes("operate")
+    ) {
+        await log("refused", "notThat");
+        throw new HomeError("This link does not allow that");
+    }
+    await requireNearby(
+        grant.nearbyMeters,
+        await panelPlaceId(install.id, reached.subjectId),
+        where
+    ).catch(async (caught: unknown) => {
+        await log("refused", "notNearby");
+        throw caught;
+    });
+    try {
+        await runAutomationNow(install.id, automationId, "Guest link", randomUUID());
+    } catch (caught) {
+        await log("refused", "failed");
+        throw caught;
+    }
+    await countDeviceUse(grant);
+    await log("done");
+    await host.auditService.recordAudit({
+        actorId: null,
+        action: "places.automation.run",
+        targetType: "placeAutomation",
+        targetId: automationId,
+        metadata: { lent: true, link: true }
+    });
 }

@@ -33,7 +33,7 @@ export const statusPages = defineScene({
     // The page `/status-pages` draws: the screen the app serves at its root.
     render: () => (
         <Chrome>
-            <StatusPagesScreen pageId={null} />
+            <StatusPagesScreen pageId={null} manager />
         </Chrome>
     )
 });

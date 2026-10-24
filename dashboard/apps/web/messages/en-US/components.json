@@ -1648,5 +1648,14 @@
             "people": "sign-in and people",
             "places": "IPs and countries"
         }
+    },
+    "dateInput": {
+        "pickDate": "Pick a date",
+        "pickDateTime": "Pick a date and time",
+        "time": "Time",
+        "today": "Today",
+        "clear": "Clear",
+        "previousMonth": "Previous month",
+        "nextMonth": "Next month"
     }
 }

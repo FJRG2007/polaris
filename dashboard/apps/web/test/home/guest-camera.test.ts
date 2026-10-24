@@ -37,6 +37,7 @@ vi.mock("@polaris-app/places/src/lib/sharing", () => ({
     isThingId: (value: string) =>
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }));
+vi.mock("@polaris-app/places/src/lib/panels", () => ({ panelHoldsCamera: async () => false }));
 vi.mock("@polaris-app/places/src/lib/cameras", () => ({
     getCamera: async (_install: string, id: string) =>
         id === YARD

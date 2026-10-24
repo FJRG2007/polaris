@@ -52,6 +52,11 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Choose who to tell", "refusals.chooseWho"],
     ["Alert not found", "refusals.alertGone"],
     ["Camera not found", "refusals.cameraGone"],
+    ["The camera would not take the password Polaris has for it", "refusals.tapoPassword"],
+    ["The camera has paused sign-ins for a while. Try again later", "refusals.tapoLocked"],
+    ["Could not reach the camera", "refusals.tapoUnreachable"],
+    ["The camera would not do that", "refusals.tapoRefused"],
+    ["This camera does not offer that", "refusals.tapoNotOffered"],
     ["An area on this camera is already called that.", "refusals.areaTaken"],
     ["Area not found", "refusals.areaGone"],
     [

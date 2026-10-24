@@ -23,8 +23,12 @@ type Opened = { watch?: string; error?: string; code?: string };
  *  does that in development) never spends two uses. */
 const opened = new Map<string, Promise<Opened>>();
 
+function watchKey(token: string, cameraId?: string): string {
+    return `${token}:${cameraId ?? ""}`;
+}
+
 function openWatch(token: string, cameraId?: string): Promise<Opened> {
-    const key = `${token}:${cameraId ?? ""}`;
+    const key = watchKey(token, cameraId);
     let pending = opened.get(key);
     if (!pending) {
         const query = cameraId ? `?camera=${encodeURIComponent(cameraId)}` : "";
@@ -43,8 +47,12 @@ export function GuestCameraView({
     note,
     cameraId,
     onPress = false,
-    initiallyPrivate = false
+    initiallyPrivate = false,
+    bare = false
 }: {
+    /** Drawn inside a card of its own (a wall panel's tile): no frame of its
+     *  own and no page heading. */
+    bare?: boolean;
     /** In privacy mode when the page was drawn: nothing is opened. */
     initiallyPrivate?: boolean;
     token: string;
@@ -97,6 +105,14 @@ export function GuestCameraView({
                 return;
             }
             if (answer.state === "gone") {
+                if (onPress) {
+                    opened.delete(watchKey(token, cameraId));
+                    setWatch(null);
+                    setHls(false);
+                    setFailed(false);
+                    setStarted(false);
+                    return;
+                }
                 setError("closed");
                 return;
             }
@@ -106,14 +122,28 @@ export function GuestCameraView({
         else setFailed(true);
     }
 
+    const Heading = bare ? "h2" : "h1";
     const base = watch ? `/api/home/keys/${token}/watch/${watch}` : null;
     const src = base ? (hls ? `${base}/hls/stream.m3u8?q=main` : `${base}/stream?q=main`) : null;
 
     return (
-        <section className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5">
-            <h1 className="min-w-0 truncate text-base font-medium" title={name}>
+        <section
+            className={
+                bare
+                    ? "flex flex-col gap-3 p-3"
+                    : "flex flex-col gap-4 rounded-lg border border-border bg-card p-5"
+            }
+        >
+            <Heading
+                className={
+                    bare
+                        ? "min-w-0 truncate pr-12 text-base font-medium"
+                        : "min-w-0 truncate text-base font-medium"
+                }
+                title={name}
+            >
                 {name}
-            </h1>
+            </Heading>
             {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
             <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
                 {isPrivate ? (

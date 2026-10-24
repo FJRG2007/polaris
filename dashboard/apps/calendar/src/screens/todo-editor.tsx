@@ -28,7 +28,8 @@ import {
     Select,
     Skeleton,
     isDirty,
-    useToast
+    useToast,
+    DateInput
 } from "@polaris/ui";
 
 interface TodoForm {
@@ -221,8 +222,8 @@ export function TodoEditor({
                                     }))}
                                 />
                                 {form.dueKind !== "none" ? (
-                                    <Input
-                                        type="date"
+                                    <DateInput
+                                        mode="date"
                                         aria-label={t("todo.dueDate")}
                                         className="w-40 tabular-nums"
                                         disabled={!writable}
@@ -231,8 +232,8 @@ export function TodoEditor({
                                     />
                                 ) : null}
                                 {form.dueKind === "time" ? (
-                                    <Input
-                                        type="time"
+                                    <DateInput
+                                        mode="time"
                                         aria-label={t("todo.dueTime")}
                                         className="w-28 tabular-nums"
                                         disabled={!writable}

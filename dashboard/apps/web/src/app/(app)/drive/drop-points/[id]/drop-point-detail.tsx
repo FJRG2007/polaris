@@ -57,7 +57,9 @@ import {
     DialogTitle,
     DialogHeader,
     DialogContent,
-    DialogDescription
+    DialogDescription,
+    Checkbox,
+    DateInput
 } from "@polaris/ui";
 import {
     deleteFileRequestAction,
@@ -980,9 +982,9 @@ function EditDropPointDialog({
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             {t("detail.fields.starts")}
-                            <Input
+                            <DateInput
+                                mode="datetime"
                                 name="startsAt"
-                                type="datetime-local"
                                 defaultValue={toLocalInput(config.startsAt)}
                             />
                         </label>
@@ -999,35 +1001,23 @@ function EditDropPointDialog({
                     />
                     {config.hasPassword ? (
                         <label className="flex items-center gap-2 text-sm">
-                            <input type="checkbox" name="removePin" className="size-4" />
+                            <Checkbox name="removePin" />
                             {t("form.removePin")}
                         </label>
                     ) : null}
                     <label className="flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
-                            name="requireLogin"
-                            defaultChecked={config.requireLogin}
-                            className="size-4"
-                        />
+                        <Checkbox name="requireLogin" defaultChecked={config.requireLogin} />
                         {t("form.requireLogin")}
                     </label>
                     <label className="flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
-                            name="allowOverwrite"
-                            defaultChecked={config.allowOverwrite}
-                            className="size-4"
-                        />
+                        <Checkbox name="allowOverwrite" defaultChecked={config.allowOverwrite} />
                         {t("form.overwrite")}
                     </label>
                     <div className="flex flex-col gap-1.5 text-sm">
                         <label className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
+                            <Checkbox
                                 name="allowUploaderDelete"
                                 defaultChecked={config.allowUploaderDelete}
-                                className="size-4"
                             />
                             {t("form.uploaderDelete")}
                         </label>

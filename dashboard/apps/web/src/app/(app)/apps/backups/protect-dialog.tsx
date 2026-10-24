@@ -29,7 +29,8 @@ import {
     DialogHeader,
     DialogTitle,
     Select,
-    Skeleton
+    Skeleton,
+    Checkbox
 } from "@polaris/ui";
 
 export function ProtectDialog({
@@ -81,7 +82,9 @@ export function ProtectDialog({
                 planId: planId || null
             });
             if (result.error) {
-                setError(t("destinations.testFailed", { name: candidate.name, reason: result.error }));
+                setError(
+                    t("destinations.testFailed", { name: candidate.name, reason: result.error })
+                );
                 setPending(false);
                 return;
             }
@@ -125,8 +128,7 @@ export function ProtectDialog({
                                 {candidates.map((candidate) => (
                                     <li key={candidate.selector}>
                                         <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-muted/40">
-                                            <input
-                                                type="checkbox"
+                                            <Checkbox
                                                 className="mt-1"
                                                 checked={chosen.includes(candidate.selector)}
                                                 onChange={(event) =>
@@ -144,11 +146,20 @@ export function ProtectDialog({
                                                 <span className="flex items-center gap-2 text-sm font-medium">
                                                     {candidate.name}
                                                     <span className="text-xs font-normal text-muted-foreground">
-                                                        {kindLabel(t, candidate.kind, candidate.kindLabel)}
+                                                        {kindLabel(
+                                                            t,
+                                                            candidate.kind,
+                                                            candidate.kindLabel
+                                                        )}
                                                     </span>
                                                 </span>
                                                 <span className="block truncate text-xs text-muted-foreground">
-                                                    {candidate.context ?? kindSummary(t, candidate.kind, candidate.summary)}
+                                                    {candidate.context ??
+                                                        kindSummary(
+                                                            t,
+                                                            candidate.kind,
+                                                            candidate.summary
+                                                        )}
                                                 </span>
                                             </span>
                                         </label>
@@ -185,7 +196,9 @@ export function ProtectDialog({
                             disabled={pending || chosen.length === 0}
                         >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                            {chosen.length > 1 ? t("protect.many", { count: chosen.length }) : t("protect.one")}
+                            {chosen.length > 1
+                                ? t("protect.many", { count: chosen.length })
+                                : t("protect.one")}
                         </Button>
                     </div>
                 </div>

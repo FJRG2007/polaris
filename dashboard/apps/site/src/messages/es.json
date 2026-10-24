@@ -125,7 +125,21 @@
         "guides": "Guías",
         "onThisPage": "En esta página",
         "apiHint": "Cada ruta que puede llamar una clave de API, con ejemplos en curl, JavaScript y Python.",
-        "source": "Editar esta página en GitHub"
+        "source": "Editar esta página en GitHub",
+        "integrations": "Integraciones",
+        "more": "Más",
+        "recent": "Recientes",
+        "clear": "Borrar",
+        "forget": "Olvidar",
+        "forgetNamed": "Olvidar {label}",
+        "hintMove": "Flechas para moverte, Intro para abrir",
+        "hintClose": "Esc para cerrar",
+        "open": "Buscar en la documentación",
+        "results": "Resultados",
+        "previous": "Anterior",
+        "next": "Siguiente",
+        "breadcrumb": "Ruta de navegación",
+        "emptyRecent": "Busca en las guías, sus apartados y la referencia de la API."
     },
     "notFound": {
         "title": "Página no encontrada",
