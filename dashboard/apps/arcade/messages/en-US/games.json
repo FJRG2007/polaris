@@ -11,18 +11,6 @@
     "retry": "Try again",
     "noGpu": "This browser cannot draw 3D. Try a recent Chrome, Edge, Firefox or Safari.",
     "empty": "No games yet.",
-    "inCall": {
-        "button": "Games",
-        "pick": "Play a game together",
-        "pickHint": "Everyone in the call can join.",
-        "started": "{name} started {game}",
-        "join": "Join",
-        "leave": "Leave game",
-        "end": "End for everyone",
-        "playing": "{count, plural, one {# playing} other {# playing}}",
-        "notAllowed": "An admin has turned off games in calls for your account.",
-        "notInstalled": "Games is not installed on this Polaris."
-    },
     "games": {
         "new-york": {
             "name": "New York",
