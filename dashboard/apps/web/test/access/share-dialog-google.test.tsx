@@ -33,6 +33,7 @@ const row = (id: string, name: string, capability = "member") => ({
     note: "",
     createdAt: "2026-01-01T00:00:00.000Z",
     audience: "anyone",
+    password: false,
     contact: `@${name.toLowerCase()}`
 });
 

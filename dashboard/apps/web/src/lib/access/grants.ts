@@ -23,7 +23,14 @@ import * as core from "@polaris/core";
 import { createHash, randomBytes } from "node:crypto";
 import { teamIdsFor } from "@/lib/orgs/org-service";
 import { clientIp } from "@/lib/request-context";
-import { linkAddressDenial, storedAddressRules } from "@/lib/link-guards";
+import { hashLinkPassword } from "@polaris/core/link-password";
+import {
+    linkAddressDenial,
+    signUnlock,
+    storedAddressRules,
+    unlockCookieName,
+    verifyUnlock
+} from "@/lib/link-guards";
 
 /** Every group one account counts as, for the purpose of matching a grant. */
 export interface GrantPrincipals {
@@ -535,6 +542,8 @@ export interface GrantView {
     readonly createdAt: string;
     /** A link only: who it opens for. "anyone" for every other row. */
     readonly audience: core.LinkAudience;
+    /** A link only: whether it asks for a password. Never the password. */
+    readonly password: boolean;
     /** What a row prints under the name: an address when that person lets the
      *  viewer see it, else their handle; empty for a group. */
     readonly contact: string;
@@ -698,6 +707,7 @@ async function viewsOf(
             note: row.note,
             createdAt: row.createdAt.toISOString(),
             audience: core.linkAudienceOf(row.linkAudience),
+            password: Boolean(row.linkPasswordHash),
             contact: who.contact ?? ""
         });
     }
@@ -927,6 +937,7 @@ export async function writeGrantLink(
             ...storedAddressRules(input),
             linkAudience: audience,
             linkOrgId: audience === "org" ? orgId : null,
+            linkPasswordHash: input.password ? await hashLinkPassword(input.password) : null,
             grantedById
         },
         select: { id: true }
@@ -979,7 +990,8 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
             allowedCountries: true,
             allowedContinents: true,
             linkAudience: true,
-            linkOrgId: true
+            linkOrgId: true,
+            linkPasswordHash: true
         }
     });
     if (!found) return null;
@@ -998,9 +1010,68 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
         const refused = await audienceRefusal(audience, row, now);
         if (refused) return { standing: refused, ...base };
     }
+    // Last, so a link that is off, or not for this account, says that rather
+    // than asking for a password that would not help.
+    if (row.linkPasswordHash && !(await grantLinkUnlocked(row.id, row.linkPasswordHash))) {
+        return { standing: "password", ...base };
+    }
     const [grant] = live([row], zone, now);
     return grant ? { standing: "live", grant, ...base } : { standing: "spent", ...base };
 }
+/** The unlock-cookie namespace grant links are signed under. */
+const GRANT_LINK_SCOPE = "grant_link";
+
+/** The cookie that records a solved password for one grant link. */
+export function grantLinkUnlockCookie(grantId: string): string {
+    return unlockCookieName(GRANT_LINK_SCOPE, grantId);
+}
+
+/** Sign the "password solved" marker for one grant link. Bound to the stored
+ *  hash, so a new password ends every unlock handed out before it. */
+export function signGrantLinkUnlock(grantId: string, passwordHash: string, secret: string): string {
+    return signUnlock(GRANT_LINK_SCOPE, grantId, { passwordHash }, secret);
+}
+
+/**
+ * Whether this request carries a valid unlock for this link. Read here, in the
+ * one check every press goes through, so the password guards the presses and
+ * the camera's stream as well as the page. Outside a request there is no
+ * cookie to read, which is refused.
+ */
+async function grantLinkUnlocked(grantId: string, passwordHash: string): Promise<boolean> {
+    try {
+        const [{ cookies }, { loadEnv }] = await Promise.all([
+            import("next/headers"),
+            import("@polaris/config")
+        ]);
+        const value = (await cookies()).get(grantLinkUnlockCookie(grantId))?.value;
+        return verifyUnlock(
+            GRANT_LINK_SCOPE,
+            grantId,
+            value,
+            { passwordHash },
+            loadEnv().POLARIS_AUTH_SECRET
+        );
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The link behind a token as its password gate needs it: the row and its hash,
+ * or null when there is no such link or it asks for no password.
+ */
+export async function grantLinkPassword(
+    token: string
+): Promise<{ id: string; passwordHash: string } | null> {
+    if (!LINK_TOKEN.test(token)) return null;
+    const row = await prisma.accessGrant.findFirst({
+        where: { principalType: core.LINK_PRINCIPAL, principalId: linkPrincipalId(token) },
+        select: { id: true, linkPasswordHash: true }
+    });
+    return row?.linkPasswordHash ? { id: row.id, passwordHash: row.linkPasswordHash } : null;
+}
+
 /**
  * Whether the person signed in is somebody an account-only link opens for.
  *

@@ -94,7 +94,8 @@ const STANDING_TONE: Record<core.GrantStanding, "success" | "warning" | "neutral
     spent: "neutral",
     elsewhere: "warning",
     signin: "neutral",
-    denied: "warning"
+    denied: "warning",
+    password: "neutral"
 };
 
 /** One row of "People with access", in pixels, for the virtualizer. */
@@ -447,6 +448,9 @@ export function ShareDialog({
             audience: draftAudience,
             ...(linkRules.expiresAt ? { endsAt: new Date(linkRules.expiresAt).toISOString() } : {}),
             ...(linkRules.maxUses ? { maxUses: Number(linkRules.maxUses) } : {}),
+            ...(linkRules.password && draftAudience !== "restricted"
+                ? { password: linkRules.password }
+                : {}),
             ...linkAddressRules(linkRules)
         });
         setBusy(false);
@@ -882,10 +886,20 @@ export function ShareDialog({
                                                                 {t(`share.audiences.${grant.audience}.hint`, { org: setup?.org?.name ?? "" })}
                                                                 {line ? ` - ${line}` : ""}
                                                             </p>
-                                                            {grant.standing !== "live" ? (
-                                                                <Badge className="self-start" variant={STANDING_TONE[grant.standing]}>
-                                                                    {t(`share.standings.${grant.standing}`)}
-                                                                </Badge>
+                                                            {grant.standing !== "live" || grant.password ? (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {grant.standing !== "live" ? (
+                                                                        <Badge variant={STANDING_TONE[grant.standing]}>
+                                                                            {t(`share.standings.${grant.standing}`)}
+                                                                        </Badge>
+                                                                    ) : null}
+                                                                    {grant.password ? (
+                                                                        <Badge variant="neutral">
+                                                                            <Lock className="size-3 shrink-0" aria-hidden />
+                                                                            {t("share.hasPassword")}
+                                                                        </Badge>
+                                                                    ) : null}
+                                                                </div>
                                                             ) : null}
                                                         </div>
                                                         {roleMenu(grant)}
@@ -957,7 +971,7 @@ export function ShareDialog({
                                                     <LinkAdvancedFields
                                                         value={linkRules}
                                                         onChange={setLinkRules}
-                                                        omit={["password"]}
+                                                        omit={draftAudience === "restricted" ? ["password"] : []}
                                                         idPrefix="share-link"
                                                     />
                                                     <div className="flex justify-end gap-2">

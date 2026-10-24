@@ -309,7 +309,8 @@
             "spent": "Este enlace ya se ha usado todas las veces que permitía.",
             "elsewhere": "Este enlace no se abre desde donde estás.",
             "signin": "Este enlace es para quien ha iniciado sesión. Entra y vuelve a abrirlo.",
-            "denied": "Este enlace no es para la cuenta con la que has entrado."
+            "denied": "Este enlace no es para la cuenta con la que has entrado.",
+            "password": "Este enlace pide una contraseña."
         },
         "until": "Funciona hasta el {when}.",
         "nearby": "Solo funciona a menos de {meters} m del lugar. El navegador te pedirá la ubicación al pulsar.",

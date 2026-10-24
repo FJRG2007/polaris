@@ -605,7 +605,8 @@
             "spent": "Used up",
             "elsewhere": "Not from here",
             "signin": "Needs sign-in",
-            "denied": "Not for this account"
+            "denied": "Not for this account",
+            "password": "Needs the password"
         },
         "stopTitle": "Stop sharing with {name}?",
         "stopBody": "{who} loses access to {what} at once. You can share it again afterward.",
@@ -720,6 +721,7 @@
         "searchAccess": "Search people with access",
         "you": "{name} (you)",
         "youCan": "Can share",
+        "hasPassword": "Password",
         "owner": "Owner",
         "limits": "Limits",
         "limitsOf": "Limits for {name}",

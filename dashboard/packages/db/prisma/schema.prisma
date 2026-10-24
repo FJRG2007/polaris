@@ -7261,6 +7261,10 @@ model AccessGrant {
     linkAudience      String  @default("anyone")
     /// The organization an `org` link opens for, fixed when it is written.
     linkOrgId         String? @db.Uuid
+    /// A link only: the password it asks for before it opens anything, stretched
+    /// with the same KDF as every other link password (core `link-password`).
+    /// Null is no password, which is what every link written before this had.
+    linkPasswordHash  String?
 
     /// Why it exists, in the words of whoever wrote it ("Cleaner, Tuesdays").
     note        String  @default("")

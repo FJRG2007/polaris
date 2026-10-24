@@ -62,7 +62,28 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/orgs/org-service", () => ({ teamIdsFor: async () => [] }));
-vi.mock("@/lib/request-context", () => ({ clientIp: async () => "198.51.100.7" }));
+vi.mock("@/lib/request-context", () => ({
+    clientIp: async () => "198.51.100.7",
+    hashForLog: (value: string | undefined) => value
+}));
+const jar = new Map<string, string>();
+vi.mock("next/headers", () => ({
+    cookies: async () => ({
+        get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
+        set: (name: string, value: string) => void jar.set(name, value)
+    })
+}));
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => ({ POLARIS_AUTH_SECRET: "test-secret-test-secret-test-secret", POLARIS_SECURE_COOKIES: false })
+}));
+let attempts = 0;
+vi.mock("@/lib/rate-limit-service", () => ({
+    rateLimit: async () => ({ ok: ++attempts <= 10 }),
+    resetRateLimit: async () => {
+        attempts = 0;
+    }
+}));
+vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/lib/geo-service", () => ({ geoAllowedForIp: async () => true }));
 vi.mock("@/lib/session", () => ({ guardedUser: async () => viewer }));
 vi.mock("@/lib/access/sharing-service", () => ({
@@ -77,6 +98,7 @@ vi.mock("@/lib/privacy-service", () => ({
 
 const core = await import("@polaris/core");
 const { linkReach, listSubjectGrantPage, writeGrantLink } = await import("@/lib/access/grants");
+const { unlockGrantLinkAction } = await import("@/app/k/[[...path]]/actions");
 
 const DOOR = "00000000-0000-4000-8000-000000000001";
 const ORG = "00000000-0000-4000-8000-0000000000f1";
@@ -88,6 +110,65 @@ beforeEach(() => {
     members = [];
     viewer = null;
     mayShare = false;
+    jar.clear();
+    attempts = 0;
+});
+
+describe("link password", () => {
+    const locked = () =>
+        core.grantLinkSchema.parse({ capability: "view", audience: "anyone", password: "open sesame" });
+
+    it("stores only a stretched hash, and leaves a link without one open", async () => {
+        const { token } = await writeGrantLink("place.device", DOOR, locked(), "u1");
+        const stored = String(grants[0]!.linkPasswordHash);
+        expect(stored.startsWith("scrypt$")).toBe(true);
+        expect(stored).not.toContain("open sesame");
+        expect((await linkReach(token))?.standing).toBe("password");
+        const open = await writeGrantLink("place.device", DOOR, link("anyone"), "u1");
+        expect(grants[1]!.linkPasswordHash).toBeNull();
+        expect((await linkReach(open.token))?.standing).toBe("live");
+    });
+
+    it("opens once the right password is given, and never for a wrong one", async () => {
+        const { token } = await writeGrantLink("place.device", DOOR, locked(), "u1");
+        expect(await unlockGrantLinkAction(token, "nope")).toEqual({ error: "errors.wrongPassword" });
+        expect((await linkReach(token))?.standing).toBe("password");
+        expect(await unlockGrantLinkAction(token, "open sesame")).toEqual({});
+        expect((await linkReach(token))?.standing).toBe("live");
+    });
+
+    it("ends every unlock when the password changes", async () => {
+        const { token } = await writeGrantLink("place.device", DOOR, locked(), "u1");
+        await unlockGrantLinkAction(token, "open sesame");
+        const { hashLinkPassword } = await import("@polaris/core/link-password");
+        grants[0]!.linkPasswordHash = await hashLinkPassword("open sesame");
+        expect((await linkReach(token))?.standing).toBe("password");
+    });
+
+    it("stops answering guesses after the limit, even the right one", async () => {
+        const { token } = await writeGrantLink("place.device", DOOR, locked(), "u1");
+        for (let i = 0; i < 10; i++) await unlockGrantLinkAction(token, `guess ${i}`);
+        expect(await unlockGrantLinkAction(token, "open sesame")).toEqual({
+            error: "errors.tooManyAttempts"
+        });
+        expect((await linkReach(token))?.standing).toBe("password");
+    });
+
+    it("asks for the sign-in before the password on a restricted link", async () => {
+        const { token } = await writeGrantLink(
+            "place.device",
+            DOOR,
+            core.grantLinkSchema.parse({ capability: "view", audience: "restricted", password: "x" }),
+            "u1"
+        );
+        expect((await linkReach(token))?.standing).toBe("signin");
+    });
+
+    it("refuses an unknown token without asking for a password", async () => {
+        expect(await unlockGrantLinkAction("A".repeat(43), "x")).toEqual({
+            error: "errors.linkUnavailable"
+        });
+    });
 });
 
 describe("link audience", () => {

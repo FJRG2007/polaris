@@ -17,6 +17,8 @@ import { ConnectivityGuest } from "./connectivity-guest";
 import { connectivityReport } from "@/lib/connectivity/outage-tracker";
 import { sharedConnectivityReport } from "@/lib/connectivity/access";
 import { notFound } from "next/navigation";
+import { LinkPasswordForm } from "@/components/link-password-form";
+import { unlockGrantLinkAction } from "./actions";
 import { linkReach } from "@/lib/access/grants";
 import { upsGuestView } from "@/lib/ups/ups-guest";
 import { guestStatusView } from "@/lib/access/guest-status";
@@ -36,6 +38,9 @@ export default async function GuestLinkPage(props: AppPageProps) {
     const token = String(path[0]);
     const [reached, words] = await Promise.all([linkReach(token), getTranslations("publicPages")]);
     if (!reached) return <LinkUnavailable message={words("guestLink.gone")} />;
+    if (reached.standing === "password") {
+        return <LinkPasswordForm token={token} unlock={unlockGrantLinkAction} />;
+    }
     if (reached.standing !== "live") {
         return <LinkUnavailable message={words(`guestLink.standing.${reached.standing}`)} />;
     }

@@ -407,7 +407,9 @@ export type GrantStanding =
     /** A link only: it opens for an account, and nobody is signed in. */
     | "signin"
     /** A link only: signed in, but not as somebody it opens for. */
-    | "denied";
+    | "denied"
+    /** A link only: it asks for a password that has not been given. */
+    | "password";
 
 /** A grant, judged. `until` is when the open window shuts, for a screen that
  *  wants to say how long is left rather than that it is fine. */
@@ -489,7 +491,8 @@ export const GRANT_STANDING_LABELS: Record<GrantStanding, string> = {
     spent: "Used up",
     elsewhere: "Not from here",
     signin: "Needs sign-in",
-    denied: "Not for this account"
+    denied: "Not for this account",
+    password: "Needs the password"
 };
 
 /**
@@ -705,7 +708,9 @@ export const grantLinkSchema = withGrantRules(
         // Absent is "anyone": every link written before audiences existed was
         // a link for somebody with no account, and a caller that names none
         // still means that.
-        audience: z.enum(["restricted", "org", "anyone"]).default("anyone")
+        audience: z.enum(["restricted", "org", "anyone"]).default("anyone"),
+        /** Asked before it opens anything. Stored stretched, never in the clear. */
+        password: z.string().min(1).max(256).optional()
     })
 );
 
