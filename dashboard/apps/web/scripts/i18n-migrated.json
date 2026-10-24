@@ -1794,6 +1794,7 @@
         "game-servers/src/screens/installed/console-keep-dialog.tsx",
         "game-servers/src/screens/installed/console-kept-menu.tsx",
         "game-servers/src/screens/installed/console-run-dialog.tsx",
+        "game-servers/src/screens/installed/console-repeats.tsx",
         "game-servers/src/screens/installed/console-schedules.tsx",
         "game-servers/src/screens/installed/game-console.tsx",
         "game-servers/src/screens/installed/player-picker.tsx",

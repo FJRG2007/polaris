@@ -1232,6 +1232,40 @@
         "everyDays": "Every {count} {count, plural, one {day} other {days}}",
         "precision": "Runs within a minute of the time set."
     },
+    "consoleRepeat": {
+        "errors": {
+            "times": "Between {min} and {max} times",
+            "every": "At least 1 second apart",
+            "tooLong": "A repeat can last {hours} hours at most",
+            "offline": "Start the server first",
+            "busy": "Too many repeats are running. Stop one first.",
+            "slowDown": "Too many repeats started. Try again in a minute."
+        },
+        "repeat": "Repeat",
+        "times": "Times",
+        "every": "Every",
+        "unit": "Unit",
+        "unitSeconds": "seconds",
+        "unitMinutes": "minutes",
+        "note": "Runs on the server, so closing this page does not stop it.",
+        "title": "Repeat command",
+        "start": "Start",
+        "repeatIt": "Repeat...",
+        "button": "Run it several times",
+        "running": "Repeating",
+        "progress": "{done}/{total}",
+        "nextIn": "next in {seconds}s",
+        "sendingNow": "sending",
+        "by": "by {name}",
+        "stop": "Stop {name}",
+        "stopFailed": "That repeat could not be stopped",
+        "ended": {
+            "finished": "Finished",
+            "stopped": "Stopped",
+            "serverStopped": "Ended: the server stopped or restarted",
+            "noAccess": "Ended: console access was removed"
+        }
+    },
     "playerPicker": {
         "choose": "Choose a player",
         "search": "Search players",

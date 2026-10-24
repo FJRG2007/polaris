@@ -1232,6 +1232,40 @@
         "everyDays": "Cada {count} {count, plural, one {día} other {días}}",
         "precision": "Se ejecuta como mucho un minuto después de la hora fijada."
     },
+    "consoleRepeat": {
+        "errors": {
+            "times": "Entre {min} y {max} veces",
+            "every": "Al menos 1 segundo entre ejecuciones",
+            "tooLong": "Una repetición dura como máximo {hours} horas",
+            "offline": "Inicia el servidor primero",
+            "busy": "Hay demasiadas repeticiones en curso. Detén una primero.",
+            "slowDown": "Demasiadas repeticiones iniciadas. Vuelve a intentarlo en un minuto."
+        },
+        "repeat": "Repetir",
+        "times": "Veces",
+        "every": "Cada",
+        "unit": "Unidad",
+        "unitSeconds": "segundos",
+        "unitMinutes": "minutos",
+        "note": "Se ejecuta en el servidor: cerrar esta página no lo detiene.",
+        "title": "Repetir comando",
+        "start": "Iniciar",
+        "repeatIt": "Repetir...",
+        "button": "Ejecutarlo varias veces",
+        "running": "Repitiendo",
+        "progress": "{done}/{total}",
+        "nextIn": "siguiente en {seconds} s",
+        "sendingNow": "enviando",
+        "by": "por {name}",
+        "stop": "Detener {name}",
+        "stopFailed": "No se pudo detener esa repetición",
+        "ended": {
+            "finished": "Terminado",
+            "stopped": "Detenido",
+            "serverStopped": "Terminado: el servidor se detuvo o reinició",
+            "noAccess": "Terminado: ya no tiene acceso a la consola"
+        }
+    },
     "playerPicker": {
         "choose": "Elige un jugador",
         "search": "Buscar jugadores",

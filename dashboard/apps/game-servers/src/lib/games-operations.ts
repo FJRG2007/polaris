@@ -21,6 +21,7 @@ import { clearCrashLoop } from "./games-health";
 import { runArkCommand } from "./ark/service";
 import { runFivemCommand } from "./fivem/service";
 import { runRestartNow } from "./games-restart-service";
+import { endRepeatsOn } from "./console-repeat-jobs";
 import { runConsoleLine } from "./minecraft/service";
 
 /** Who is acting, as far as the record needs. */
@@ -55,6 +56,8 @@ export async function setServerRunning(
     // with, or at least worth another try. If it was not, the health sweep
     // writes the loop back within the minute.
     if (running) await clearCrashLoop(access.install.id);
+    // A repeat belongs to the run of the server it started on.
+    if (!running) endRepeatsOn(access.install.id);
     await host.deployService.setApplicationRunning(applicationId, access.ownerId, running, user.id);
     await host.auditService.recordAudit({
         actorId: user.id,
@@ -66,6 +69,7 @@ export async function setServerRunning(
 
 /** Save the world and restart the server now. */
 export async function restartServerNow(user: Actor, access: ServerStanding): Promise<void> {
+    endRepeatsOn(access.install.id);
     await runRestartNow(access.ownerId, access.install.id, user.id);
     await host.auditService.recordAudit({
         actorId: user.id,

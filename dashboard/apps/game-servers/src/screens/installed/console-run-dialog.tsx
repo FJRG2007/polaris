@@ -30,11 +30,15 @@ import { useGameText, useSchemaText } from "../game-text";
 import { commandPreview, type SavedCommand } from "../../lib/console-commands";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import { PlayerPicker } from "./player-picker";
+import { REPEAT_DRAFT, RepeatFields, readRepeatDraft, type RepeatDraft } from "./console-repeats";
+import type { RepeatPlan } from "../../lib/console-repeat";
 
 /** What one run is given. */
 export interface RunChoice {
     readonly values: Record<string, string>;
     readonly target: vars.RunTarget | null;
+    /** Run it this many times, so far apart; absent for once. */
+    readonly repeat?: RepeatPlan;
 }
 
 /** What scheduling it is given on top. */
@@ -75,6 +79,7 @@ function wholeNumber(raw: string): number {
 export function RunCommandDialog({
     entry,
     mode,
+    repeatOn = false,
     edition,
     players,
     pending,
@@ -85,6 +90,8 @@ export function RunCommandDialog({
 }: {
     entry: SavedCommand;
     mode: "run" | "schedule";
+    /** Open with Repeat already switched on. */
+    repeatOn?: boolean;
     edition: MinecraftEdition | null;
     /** Who is on, to pick from. */
     players: readonly string[];
@@ -117,6 +124,14 @@ export function RunCommandDialog({
     const [gap, setGap] = useState("10");
     const [unit, setUnit] = useState<plan.SpanUnit>("minutes");
     const [times, setTimes] = useState("3");
+    const [repeatDraft, setRepeatDraft] = useState<RepeatDraft>(() => ({
+        ...REPEAT_DRAFT,
+        on: repeatOn
+    }));
+    const repeatRead =
+        mode === "run"
+            ? readRepeatDraft(repeatDraft)
+            : { plan: null, missing: false, problem: null };
 
     // Each field against the schema the server uses. Empty is "not yet", shown
     // by the asterisk and the waiting button, never as an error under the field.
@@ -178,6 +193,8 @@ export function RunCommandDialog({
         !gapMissing &&
         !startMissing &&
         !scheduleProblem &&
+        !repeatRead.missing &&
+        !repeatRead.problem &&
         Object.values(problems).every((problem) => problem === null);
 
     const unitOptions = plan.SPAN_UNITS.map((value) => ({
@@ -202,7 +219,8 @@ export function RunCommandDialog({
 
     function submit(): void {
         if (!ready) return;
-        if (mode === "run") onRun(choice());
+        if (mode === "run")
+            onRun(repeatRead.plan ? { ...choice(), repeat: repeatRead.plan } : choice());
         else
             onSchedule({
                 ...choice(),
@@ -489,6 +507,10 @@ export function RunCommandDialog({
                         </div>
                     )}
 
+                    {mode === "run" && (
+                        <RepeatFields draft={repeatDraft} onChange={setRepeatDraft} />
+                    )}
+
                     {error && (
                         <p role="alert" className="text-sm text-danger">
                             {error}
@@ -504,7 +526,11 @@ export function RunCommandDialog({
                             disabled={pending}
                             className="aria-disabled:opacity-50"
                         >
-                            {mode === "run" ? t("console.run") : t("consoleSchedule.schedule")}
+                            {mode === "schedule"
+                                ? t("consoleSchedule.schedule")
+                                : repeatRead.plan
+                                  ? t("consoleRepeat.start")
+                                  : t("console.run")}
                         </Button>
                     </DialogFooter>
                 </form>
