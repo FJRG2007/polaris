@@ -26,14 +26,13 @@ import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import { Badge } from "@polaris/ui";
 import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
+import { linkDenialMessage } from "@/lib/link-denial";
 import {
+    checkShare,
     logShareAccess,
     resolveShareByToken,
     resolveWithinShare,
-    shareGeoAllowed,
-    shareIpAllowed,
     shareUnlockCookie,
-    shareUsability,
     verifyShareUnlock
 } from "@/lib/share-service";
 
@@ -69,35 +68,16 @@ export default async function SharePage({
             />
         );
 
-    const usable = shareUsability(share);
-    if (!usable.ok) {
-        const message =
-            usable.reason === "expired"
-                ? t("denied.expired")
-                : usable.reason === "exhausted"
-                  ? t("denied.downloadLimit")
-                  : t("denied.revoked");
-        return <LinkUnavailable signedIn={signedIn} message={message} />;
-    }
-
-    // Same gate order as the token routes so the landing never shows a listing the
-    // download endpoints would refuse: IP allowlist, geo, then the fraud check.
+    // Same check as the token routes so the landing never shows a listing the
+    // download endpoints would refuse, then the fraud check.
     const ip = await clientIp();
-    if (!shareIpAllowed(share.allowedCidrs, ip)) {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("denied.network")}
-            />
-        );
-    }
-    if (!(await shareGeoAllowed(share.allowedCountries, share.allowedContinents, ip))) {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("denied.location")}
-            />
-        );
+    const checked = await checkShare(share, ip);
+    if (!checked.ok) {
+        const message =
+            checked.reason === "exhausted"
+                ? t("denied.downloadLimit")
+                : await linkDenialMessage(checked.reason);
+        return <LinkUnavailable signedIn={signedIn} message={message} />;
     }
     if (!(await dymoIpAllowed(ip)).allowed) {
         return (

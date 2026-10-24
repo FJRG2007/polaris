@@ -17,6 +17,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
+    linkHoursIncomplete,
+    linkPeopleLimits,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { createShareAction } from "./share-actions";
@@ -98,7 +100,8 @@ export function ShareDialog({
             allowPreview: form.get("allowPreview") === "on",
             allowedCidrs: advanced.allowedCidrs,
             allowedCountries: advanced.allowedCountries,
-            allowedContinents: advanced.allowedContinents
+            allowedContinents: advanced.allowedContinents,
+            ...linkPeopleLimits(advanced)
         };
 
         // One at a time: each link is its own row, and a target that fails should
@@ -292,7 +295,7 @@ export function ShareDialog({
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="mt-1 flex justify-end gap-2">
-                            <Button type="submit" disabled={pending}>
+                            <Button type="submit" disabled={pending || linkHoursIncomplete(advanced)}>
                                 <Link2 className="size-4" />
                                 {pending
                                     ? t("share.creating")

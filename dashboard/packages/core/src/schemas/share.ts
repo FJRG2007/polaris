@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { addressRuleFields } from "./link-rules.js";
+import { addressRuleFields, linkPeopleFields } from "./link-rules.js";
 
 export const SHARE_KINDS = ["public", "invite"] as const;
 export type ShareKind = (typeof SHARE_KINDS)[number];
@@ -41,6 +41,8 @@ export const createShareSchema = z
         /** Allow recipients to preview the file inline in the browser. */
         allowPreview: z.boolean().default(true),
         ...addressRuleFields,
+        /** Start, weekly hours, and who must be signed in to open it. */
+        ...linkPeopleFields,
         /** For invite shares: the users granted access. */
         inviteUserIds: z.array(z.string().min(1)).default([])
     })
