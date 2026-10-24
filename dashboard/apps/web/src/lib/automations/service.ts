@@ -322,7 +322,7 @@ export async function createAutomation(
         template?: core.AutomationTemplate;
     },
     timeZone: string,
-    templateWords?: { title: string; body: string }
+    templateWords?: core.TemplateWords
 ): Promise<string> {
     const shelf: Shelf = { orgId: input.orgId, userId: input.orgId ? null : actor.id };
     if (!(await mayEditShelf(actor, shelf))) throw new AutomationAccessError("forbidden");
@@ -330,7 +330,7 @@ export async function createAutomation(
         throw new AutomationAccessError("limit");
     const graph =
         input.template && templateWords
-            ? core.internetBackGraph(timeZone, templateWords)
+            ? core.templateGraph(input.template, timeZone, templateWords)
             : core.emptyGraph(timeZone);
     if (graph.nodes.length === 0)
         graph.nodes.push({

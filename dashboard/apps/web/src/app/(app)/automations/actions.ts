@@ -117,14 +117,31 @@ export async function getAutomationAction(
     }
 }
 
-/** The shelves this account may create an automation on: its own, and the organizations it administers. */
+/** The ready-made automations that fit here: those whose apps are installed and usable. */
+async function availableTemplates(): Promise<core.AutomationTemplate[]> {
+    const user = await requirePermission("automations.use");
+    return core.availableTemplates(await appEvents.eventApps(user).catch(() => []));
+}
+
+/**
+ * The shelves this account may create an automation on (its own, and the
+ * organizations it administers), and the templates it may start from.
+ */
 export async function creatableShelvesAction(): Promise<
-    Result<{ orgs: { id: string; name: string }[]; openOrgId: string | null }>
+    Result<{
+        orgs: { id: string; name: string }[];
+        openOrgId: string | null;
+        templates: core.AutomationTemplate[];
+    }>
 > {
     try {
         const who = await actor();
-        const orgs = await listAdministeredOrgs(who);
-        return { ok: true, orgs, openOrgId: await scopeOrgIdFor(who.id) };
+        const [orgs, openOrgId, templates] = await Promise.all([
+            listAdministeredOrgs(who),
+            scopeOrgIdFor(who.id),
+            availableTemplates()
+        ]);
+        return { ok: true, orgs, openOrgId, templates };
     } catch (caught) {
         return failure(caught);
     }
@@ -145,17 +162,19 @@ export async function createAutomationAction(
         };
     }
     try {
-        const t = parsed.data.template ? await getTranslations("automations") : null;
+        const template = parsed.data.template;
+        // A template whose app is not here would start an automation nothing ever runs.
+        if (template && !(await availableTemplates()).includes(template)) return invalid();
+        const t = template ? await getTranslations("automations") : null;
+        const params = template ? core.AUTOMATION_TEMPLATE_SPECS[template].params : {};
         const newId = await service.createAutomation(
             await actor(),
             parsed.data,
             zone.success ? zone.data : "UTC",
-            t && parsed.data.template
+            t && template
                 ? {
-                      title: t(`templates.${parsed.data.template}.noticeTitle`),
-                      body: t(`templates.${parsed.data.template}.noticeBody`, {
-                          duration: "{{trigger.duration}}"
-                      })
+                      title: t(`templates.${template}.noticeTitle`, params),
+                      body: t(`templates.${template}.noticeBody`, params)
                   }
                 : undefined
         );

@@ -53,7 +53,11 @@
         "personal": "Just me",
         "submit": "Create",
         "cancel": "Cancel",
-        "untitled": "Untitled automation"
+        "untitled": "Untitled automation",
+        "hint": "Start blank or from a template. You can change everything later.",
+        "blank": "Start blank",
+        "blankHint": "Pick the trigger and steps yourself.",
+        "templates": "Templates"
     },
     "editor": {
         "back": "Automations",
@@ -903,7 +907,32 @@
             "name": "Tell me when the internet comes back",
             "action": "Tell me when it comes back",
             "noticeTitle": "The internet is back",
-            "noticeBody": "It was down for {duration}."
+            "noticeBody": "It was down for {duration}.",
+            "description": "Get a notice when the line is back, with how long it was down."
+        },
+        "gameServerCrashed": {
+            "name": "Post in chat when a game server crashes",
+            "description": "When a game server stops after crashing again and again, post a message to a chat channel.",
+            "noticeTitle": "{server} crashed",
+            "noticeBody": "It stopped after crashing again and again. {cause}"
+        },
+        "playerJoined": {
+            "name": "Notify me when a player joins",
+            "description": "Get a notice when somebody joins one of your game servers.",
+            "noticeTitle": "{player} joined",
+            "noticeBody": "On {server}."
+        },
+        "deployFailed": {
+            "name": "Notify me when a deploy fails",
+            "description": "Get a notice with the error when a service fails to deploy.",
+            "noticeTitle": "{service} failed to deploy",
+            "noticeBody": "{error}"
+        },
+        "calendarStarting": {
+            "name": "Notify me before an event starts",
+            "description": "Get a notice when a calendar event's reminder goes off.",
+            "noticeTitle": "{event} starts soon",
+            "noticeBody": "In {calendar}."
         }
     },
     "picker": {

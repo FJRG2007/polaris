@@ -53,7 +53,11 @@
         "personal": "Solo yo",
         "submit": "Crear",
         "cancel": "Cancelar",
-        "untitled": "Nueva automatización"
+        "untitled": "Nueva automatización",
+        "hint": "Empieza desde cero o desde una plantilla. Podrás cambiarlo todo después.",
+        "blank": "Desde cero",
+        "blankHint": "Elige tú el disparador y los pasos.",
+        "templates": "Plantillas"
     },
     "editor": {
         "back": "Automatizaciones",
@@ -903,7 +907,32 @@
             "name": "Avísame cuando vuelva internet",
             "action": "Avísame cuando vuelva",
             "noticeTitle": "Internet ha vuelto",
-            "noticeBody": "Estuvo caído {duration}."
+            "noticeBody": "Estuvo caído {duration}.",
+            "description": "Recibe un aviso cuando vuelva la conexión, con cuánto tiempo estuvo caída."
+        },
+        "gameServerCrashed": {
+            "name": "Avisar en el chat si cae un servidor",
+            "description": "Cuando un servidor de Hosting juegos se detiene tras fallar una y otra vez, publica un mensaje en un canal del chat.",
+            "noticeTitle": "{server} ha caído",
+            "noticeBody": "Se detuvo tras fallar una y otra vez. {cause}"
+        },
+        "playerJoined": {
+            "name": "Avisarme cuando entre un jugador",
+            "description": "Recibe un aviso cuando alguien entra en uno de tus servidores de Hosting juegos.",
+            "noticeTitle": "{player} ha entrado",
+            "noticeBody": "En {server}."
+        },
+        "deployFailed": {
+            "name": "Avisarme si falla un despliegue",
+            "description": "Recibe un aviso con el error cuando un servicio no se despliega.",
+            "noticeTitle": "{service} no se ha desplegado",
+            "noticeBody": "{error}"
+        },
+        "calendarStarting": {
+            "name": "Avisarme antes de un evento",
+            "description": "Recibe un aviso cuando salta el recordatorio de un evento del calendario.",
+            "noticeTitle": "{event} empieza pronto",
+            "noticeBody": "En {calendar}."
         }
     },
     "picker": {
