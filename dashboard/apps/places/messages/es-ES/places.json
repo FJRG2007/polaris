@@ -704,16 +704,16 @@
         "floorTaken": "Ya hay una planta con ese nombre",
         "notOnEarth": "Eso no es un lugar de la Tierra.",
         "batteryLine": "Entre 1 y 99",
-        "panelGone": "Ese panel ya no está.",
-        "panelsFull": "Un lugar admite hasta 20 paneles.",
-        "panelElsewhere": "Una tarjeta de ese panel no está en este lugar.",
-        "panelName": "Ponle un nombre al panel.",
-        "panelNameLong": "Ese nombre es demasiado largo.",
-        "panelCards": "Un panel admite hasta 48 tarjetas.",
-        "panelSame": "Dos tarjetas de ese panel son la misma.",
-        "panelOverlap": "Dos tarjetas de ese panel se solapan.",
-        "panelEdge": "Una tarjeta se sale del borde del panel.",
-        "panelSmall": "Esa tarjeta es más pequeña de lo que se puede dibujar."
+        "panelGone": "Ese panel ya no está",
+        "panelsFull": "Un lugar admite hasta 20 paneles",
+        "panelElsewhere": "Una tarjeta de ese panel no está en este lugar",
+        "panelName": "Ponle un nombre al panel",
+        "panelNameLong": "Nombre demasiado largo",
+        "panelCards": "Un panel admite hasta 48 tarjetas",
+        "panelSame": "Dos tarjetas de ese panel son la misma",
+        "panelOverlap": "Dos tarjetas de ese panel se solapan",
+        "panelEdge": "Una tarjeta se sale del borde del panel",
+        "panelSmall": "Esa tarjeta es más pequeña de lo que se puede dibujar"
     },
     "connections": {
         "nuki-web": {

@@ -704,16 +704,16 @@
         "floorTaken": "A floor with that name is already here",
         "notOnEarth": "That is not a place on the Earth",
         "batteryLine": "Between 1 and 99",
-        "panelGone": "That panel is no longer here.",
-        "panelsFull": "A place holds up to 20 panels.",
-        "panelElsewhere": "A card on that panel is not at this place.",
-        "panelName": "Give the panel a name.",
-        "panelNameLong": "That name is too long.",
-        "panelCards": "A panel holds up to 48 cards.",
-        "panelSame": "Two cards on that panel are the same card.",
-        "panelOverlap": "Two cards on that panel overlap.",
-        "panelEdge": "A card runs past the panel's edge.",
-        "panelSmall": "That card is smaller than it can be drawn."
+        "panelGone": "That panel is not here",
+        "panelsFull": "A place holds up to 20 panels",
+        "panelElsewhere": "A card on that panel is not at this place",
+        "panelName": "Give the panel a name",
+        "panelNameLong": "That name is too long",
+        "panelCards": "A panel holds up to 48 cards",
+        "panelSame": "Two cards on that panel are the same card",
+        "panelOverlap": "Two cards on that panel overlap",
+        "panelEdge": "A card runs past the panel's edge",
+        "panelSmall": "That card is smaller than it can be drawn"
     },
     "connections": {
         "nuki-web": {
