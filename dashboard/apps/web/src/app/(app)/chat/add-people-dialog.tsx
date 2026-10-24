@@ -6,16 +6,22 @@
  * The people already in it are excluded rather than shown greyed out: offering
  * somebody who is already here, and then doing nothing when they are picked,
  * reads as a broken button rather than as a no-op.
+ *
+ * In a one-to-one conversation it does what Discord's does: the people picked
+ * and the two already talking become a new group, and the conversation it was
+ * opened from stays exactly as it was - see `groupFromDirect`.
  */
 
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import type { PickedPerson } from "@/components/people-picker";
 import { ChatPeoplePicker } from "./chat-people-picker";
-import { addChannelMembersAction } from "./actions";
+import { addChannelMembersAction, groupFromDirectAction } from "./actions";
 import {
     Button,
     Dialog,
@@ -39,6 +45,8 @@ export function AddPeopleDialog({
     onAdded: () => void;
 }) {
     const t = useTranslations("chat");
+    const router = useRouter();
+    const direct = channel.kind === "dm";
     const [already, setAlready] = useState<readonly string[]>([]);
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
@@ -46,12 +54,46 @@ export function AddPeopleDialog({
 
     useEffect(() => {
         if (!open) return;
+        // A one-to-one conversation's two people are already on screen: the
+        // other one is the conversation, and the reader is the reader.
+        if (direct) {
+            setAlready(channel.others.map((person) => person.id));
+            return;
+        }
         void polls
             .chatMembers(channel.id)
             .then((result) => setAlready((result.members ?? []).map((member) => member.userId)));
-    }, [open, channel.id]);
+    }, [open, channel.id, channel.others, direct]);
+
+    /** Two seats of a group made from here are the pair already talking. */
+    const room = direct ? core.MAX_GROUP_MEMBERS - 2 : core.MAX_GROUP_MEMBERS;
+    const tooMany = picked.length > room;
+
+    const startGroup = async () => {
+        setBusy(true);
+        setError("");
+        const result = await runAction(
+            () =>
+                groupFromDirectAction({
+                    channelId: channel.id,
+                    userIds: picked.map((person) => person.id)
+                }),
+            setError
+        );
+        setBusy(false);
+        if (!result) return;
+        if (result.error || !result.id) {
+            if (result.error) setError(result.error);
+            return;
+        }
+        setPicked([]);
+        onOpenChange(false);
+        onAdded();
+        router.push(`/chat/c/${result.id}`);
+    };
 
     const add = async () => {
+        if (direct) return startGroup();
         setBusy(true);
         setError("");
         const result = await runAction(
@@ -75,20 +117,28 @@ export function AddPeopleDialog({
                 <DialogHeader>
                     <DialogTitle>{t("addPeople.addPeople")}</DialogTitle>
                     <DialogDescription>
-                        {channel.kind === "group"
-                            ? t("addPeople.theyJoinTheGroupAnd")
-                            : channel.private
-                              ? t("addPeople.theyWillSeeThisChannel")
-                              : t("addPeople.anybodyInTheSpaceCan")}
+                        {direct
+                            ? t("addPeople.startsANewGroup", { name: channel.name })
+                            : channel.kind === "group"
+                              ? t("addPeople.theyJoinTheGroupAnd")
+                              : channel.private
+                                ? t("addPeople.theyWillSeeThisChannel")
+                                : t("addPeople.anybodyInTheSpaceCan")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <ChatPeoplePicker
-                    forGroup={channel.kind === "group"}
+                    forGroup={direct || channel.kind === "group"}
                     picked={picked}
                     onChange={setPicked}
                     exclude={already}
                 />
+
+                {tooMany && (
+                    <p className="text-sm text-danger">
+                        {t("errors.groupFull", { count: core.MAX_GROUP_MEMBERS })}
+                    </p>
+                )}
 
                 {error && (
                     <p role="alert" className="text-sm text-danger">
@@ -102,11 +152,11 @@ export function AddPeopleDialog({
                     </Button>
                     <Button
                         size="sm"
-                        disabled={busy || picked.length === 0}
+                        disabled={busy || picked.length === 0 || tooMany}
                         onClick={() => void add()}
                     >
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        {t("addPeople.add")}
+                        {direct ? t("addPeople.createGroup") : t("addPeople.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

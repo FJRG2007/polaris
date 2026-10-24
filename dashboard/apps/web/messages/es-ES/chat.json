@@ -727,7 +727,10 @@
         "everyMessageInItGoes": "Todos sus mensajes se van con él. Si lo archivas, se pueden seguir leyendo.",
         "pinnedMessages": "Mensajes fijados",
         "starredMessages": "Mensajes destacados",
-        "channelSettings": "Ajustes del canal"
+        "channelSettings": "Ajustes del canal",
+        "searchIn": "Buscar en {name}",
+        "groupsNotAllowed": "Tu cuenta no puede crear grupos",
+        "cannotReachThem": "No puedes añadir gente a esta conversación"
     },
     "meetingNotice": {
         "invitedTitle": "{name} te ha invitado a {meeting}",
@@ -1421,7 +1424,10 @@
         "profile": "Perfil",
         "profileWidth": "Ancho",
         "closeTheProfile": "Cerrar el perfil",
-        "close": "Cerrar"
+        "close": "Cerrar",
+        "addFriend": "Enviar solicitud de amistad a {name}",
+        "addFriendShort": "Añadir",
+        "requestPending": "Solicitud pendiente"
     },
     "hands": {
         "you": "Tú",
@@ -1523,7 +1529,9 @@
         "theyWillSeeThisChannel": "Verán este canal y todo lo que ya se ha dicho en él.",
         "anybodyInTheSpaceCan": "Cualquiera del espacio ya puede leer este canal. Añadirle lo pone en su lista.",
         "cancel": "Cancelar",
-        "add": "Añadir"
+        "add": "Añadir",
+        "startsANewGroup": "Crea un grupo nuevo con {name} y la gente que elijas. Esta conversación queda como está.",
+        "createGroup": "Crear grupo"
     },
     "picture": {
         "spacePicture": "Imagen de espacio",
@@ -1611,7 +1619,13 @@
     },
     "profileDetails": {
         "restricted": "Este perfil es privado.",
-        "about": "Sobre mí"
+        "about": "Sobre mí",
+        "memberSince": "Miembro desde",
+        "viewFullBio": "Ver biografía",
+        "showLess": "Ver menos",
+        "mutualFriends": "{count, plural, one {# amistad en común} other {# amistades en común}}",
+        "mutualServers": "{count, plural, one {# espacio en común} other {# espacios en común}}",
+        "andMore": "y {count} más"
     },
     "notifyMenu": {
         "notifications": "Avisos",

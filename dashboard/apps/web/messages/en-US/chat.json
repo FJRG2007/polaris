@@ -727,7 +727,10 @@
         "everyMessageInItGoes": "Every message in it goes with it. Archiving keeps them readable instead.",
         "pinnedMessages": "Pinned messages",
         "starredMessages": "Starred messages",
-        "channelSettings": "Channel settings"
+        "channelSettings": "Channel settings",
+        "searchIn": "Search {name}",
+        "groupsNotAllowed": "Your account cannot start groups",
+        "cannotReachThem": "You cannot add people to this conversation"
     },
     "meetingNotice": {
         "invitedTitle": "{name} invited you to {meeting}",
@@ -1421,7 +1424,10 @@
         "profile": "Profile",
         "profileWidth": "Profile width",
         "closeTheProfile": "Close the profile",
-        "close": "Close"
+        "close": "Close",
+        "addFriend": "Send {name} a friend request",
+        "addFriendShort": "Add friend",
+        "requestPending": "Friend request pending"
     },
     "hands": {
         "you": "You",
@@ -1523,7 +1529,9 @@
         "theyWillSeeThisChannel": "They will see this channel and everything already said in it.",
         "anybodyInTheSpaceCan": "Anybody in the space can already read this channel. Adding them puts it in their list.",
         "cancel": "Cancel",
-        "add": "Add"
+        "add": "Add",
+        "startsANewGroup": "Starts a new group with {name} and the people you pick. This conversation stays as it is.",
+        "createGroup": "Create group"
     },
     "picture": {
         "spacePicture": "Space picture",
@@ -1611,7 +1619,13 @@
     },
     "profileDetails": {
         "restricted": "This profile is private.",
-        "about": "About"
+        "about": "About",
+        "memberSince": "Member since",
+        "viewFullBio": "View full bio",
+        "showLess": "Show less",
+        "mutualFriends": "{count, plural, one {# friend in common} other {# friends in common}}",
+        "mutualServers": "{count, plural, one {# space in common} other {# spaces in common}}",
+        "andMore": "and {count} more"
     },
     "notifyMenu": {
         "notifications": "Notifications",

@@ -25,7 +25,8 @@ const ACCOUNTS = [
         lastName: "Hopper",
         username: "grace",
         description: "Compilers.",
-        bannedAt: null
+        bannedAt: null,
+        createdAt: new Date("2021-03-04T00:00:00Z")
     },
     {
         id: "alan",
@@ -34,7 +35,8 @@ const ACCOUNTS = [
         lastName: null,
         username: "alan",
         description: "",
-        bannedAt: null
+        bannedAt: null,
+        createdAt: new Date("2022-01-01T00:00:00Z")
     },
     {
         id: "banned",
@@ -43,7 +45,8 @@ const ACCOUNTS = [
         lastName: null,
         username: "somebody",
         description: "",
-        bannedAt: new Date()
+        bannedAt: new Date(),
+        createdAt: new Date("2023-01-01T00:00:00Z")
     }
 ];
 
@@ -54,6 +57,8 @@ let blocked = new Set<string>();
 /** Whose name on the account may be read by the person asking. Nobody's, until
  *  a test says otherwise - which is the default every account is on. */
 let namesOpen = new Set<string>();
+/** Whether the reader and grace are friends already. */
+let friendsWithGrace = false;
 
 vi.mock("@/lib/privacy-service", () => ({
     // The profile itself is open, as it is for every account that never chose.
@@ -110,6 +115,10 @@ vi.mock("@polaris/db", () => ({
         chatSpace: {
             findUnique: async () => ({ ownerId: spaceOwner })
         },
+        // Whether the two are friends, which decides the panel's request button.
+        friendship: {
+            findFirst: async () => (friendsWithGrace ? { status: "accepted" } : null)
+        },
         chatSpaceMember: {
             findUnique: async ({ where }: { where: { spaceId_userId: { userId: string } } }) => ({
                 role: spaceAdmins.has(where.spaceId_userId.userId) ? "admin" : "member"
@@ -126,6 +135,22 @@ beforeEach(() => {
     namesOpen = new Set();
     spaceOwner = "grace";
     spaceAdmins = new Set();
+    friendsWithGrace = false;
+});
+
+describe("what the panel needs beside the profile", () => {
+    it("carries when they joined and where the reader stands with them", async () => {
+        const profile = await chatProfile({ id: "ada" }, "d1", "grace");
+        expect(profile?.memberSince).toBe("2021-03-04T00:00:00.000Z");
+        expect(profile?.friendship).toBe("none");
+
+        friendsWithGrace = true;
+        expect((await chatProfile({ id: "ada" }, "d1", "grace"))?.friendship).toBe("friends");
+    });
+
+    it("is yourself, with nobody to ask", async () => {
+        expect((await chatProfile({ id: "grace" }, "d1", "grace"))?.friendship).toBe("self");
+    });
 });
 
 describe("somebody in the conversation", () => {
