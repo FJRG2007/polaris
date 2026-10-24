@@ -19,6 +19,10 @@ import {
     Send,
     Server,
     Workflow,
+    Gamepad2,
+    ListChecks,
+    MessagesSquare,
+    Rocket,
     LayoutGrid,
     Maximize,
     PanelRight,
@@ -713,7 +717,7 @@ export function CanvasEditor({
             <Palette
                 open={palette}
                 stepsOnly={insertOn !== null}
-                apps={Object.keys(detail.appNodes ?? {})}
+                apps={[...Object.keys(detail.appNodes ?? {}), ...(detail.eventApps ?? [])]}
                 onOpenChange={(open) => {
                     setPalette(open);
                     if (!open) setInsertOn(null);
@@ -788,6 +792,10 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
     polaris: Server,
     automations: Workflow,
     places: House,
+    "game-servers": Gamepad2,
+    deploy: Rocket,
+    chat: MessagesSquare,
+    tasks: ListChecks,
     logic: GitBranch,
     timing: Hourglass,
     data: Database,

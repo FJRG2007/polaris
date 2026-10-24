@@ -724,7 +724,7 @@
         "recheckEvery": "Comprobar cada",
         "recheckRange": "Comprueba entre cada minuto y una vez al día.",
         "builtInEvent": "Polaris también anuncia {name} cuando termina una automatización.",
-        "eventNameReserved": "Los nombres que empiezan por {prefix} son de Polaris.",
+        "eventNameReserved": "Este nombre es de los eventos que envía Polaris (los que empiezan por {prefix}, los del NAS y los de las apps).",
         "useFinished": "Usarlo",
         "outcomes": "Solo si termina como",
         "outcomesAny": "Sin marcar vale cualquier final. Léelo como {example}.",
@@ -907,7 +907,11 @@
             "logic": "Lógica",
             "timing": "Tiempo",
             "data": "Datos",
-            "send": "Enviar"
+            "send": "Enviar",
+            "game-servers": "Servidores de juegos",
+            "deploy": "Deploy",
+            "chat": "Chat",
+            "tasks": "Tareas"
         },
         "presets": {
             "publicIpChanged": "Cambió la IP pública",
@@ -918,7 +922,14 @@
             "nasPoolUnprotected": "Volumen NAS sin protección",
             "nasBackupFailed": "Falló la copia del NAS",
             "nasBackupOverdue": "Copia del NAS atrasada",
-            "automationFinished": "Terminó otra automatización"
+            "automationFinished": "Terminó otra automatización",
+            "gameServerStarted": "Servidor de juego iniciado",
+            "gameServerStopped": "Servidor de juego detenido",
+            "deploySucceeded": "Deploy completado",
+            "deployFailed": "Deploy fallido",
+            "taskCreated": "Tarea creada",
+            "taskCompleted": "Tarea completada",
+            "chatMessage": "Nuevo mensaje de chat"
         }
     }
 }

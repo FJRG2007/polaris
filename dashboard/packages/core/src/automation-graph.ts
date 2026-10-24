@@ -17,6 +17,7 @@ import { z } from "zod";
 import { nextCronRun, parseCron } from "./cron.js";
 import { durationSchema, durationSeconds } from "./automation-schema.js";
 import { automationNodeId } from "./automation-nodes.js";
+import { isAppEventName } from "./automation-app-events.js";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -106,6 +107,19 @@ export const NAS_EVENT_NAMES = [
     "nas.backup-failed",
     "nas.backup-overdue"
 ] as const;
+
+/**
+ * Whether only Polaris may send an event of this name: its own prefix, and every
+ * event a watcher or an app sends, so an Announce step cannot pass for them.
+ */
+export function isReservedEventName(name: string): boolean {
+    return (
+        name.startsWith(RESERVED_EVENT_PREFIX) ||
+        name === PUBLIC_IP_CHANGED_EVENT ||
+        (NAS_EVENT_NAMES as readonly string[]).includes(name) ||
+        isAppEventName(name)
+    );
+}
 
 // ---------------------------------------------------------------------------
 // Statuses and modes
@@ -827,7 +841,7 @@ export const CORE_NODE_CONFIGS = {
     }),
     "core.announce": z.object({
         name: eventName.refine(
-            (value) => !value.startsWith(RESERVED_EVENT_PREFIX),
+            (value) => !isReservedEventName(value),
             "eventNameReserved"
         ),
         payload: valuePairs

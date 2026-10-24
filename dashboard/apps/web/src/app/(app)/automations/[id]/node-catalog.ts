@@ -15,7 +15,15 @@ import * as core from "@polaris/core";
 export const PLACES_APP = "home";
 
 export type CatalogGroupId =
-    "basics" | "polaris" | "automations" | "places" | "logic" | "timing" | "data" | "send";
+    | "basics"
+    | "polaris"
+    | "automations"
+    | "places"
+    | core.AppEventApp
+    | "logic"
+    | "timing"
+    | "data"
+    | "send";
 
 export interface CatalogItem {
     /** What the picker hands back: the node type, or `<type>#<preset>`. */
@@ -40,7 +48,14 @@ export const EVENT_PRESETS = {
     nasPoolUnprotected: { name: "nas.pool-unprotected", outcomes: [] },
     nasBackupFailed: { name: "nas.backup-failed", outcomes: [] },
     nasBackupOverdue: { name: "nas.backup-overdue", outcomes: [] },
-    automationFinished: { name: core.AUTOMATION_FINISHED_EVENT, outcomes: [] }
+    automationFinished: { name: core.AUTOMATION_FINISHED_EVENT, outcomes: [] },
+    gameServerStarted: { name: "game-server.started", outcomes: [] },
+    gameServerStopped: { name: "game-server.stopped", outcomes: [] },
+    deploySucceeded: { name: "deploy.succeeded", outcomes: [] },
+    deployFailed: { name: "deploy.failed", outcomes: [] },
+    taskCreated: { name: "task.created", outcomes: [] },
+    taskCompleted: { name: "task.completed", outcomes: [] },
+    chatMessage: { name: "chat.message", outcomes: [] }
 } as const satisfies Record<string, { name: string; outcomes: readonly never[] }>;
 export type PresetKey = keyof typeof EVENT_PRESETS;
 
@@ -50,6 +65,14 @@ const preset = (key: PresetKey): CatalogItem => ({
     type: "core.onEvent",
     preset: key
 });
+
+/** Each app's events, in the order its group lists them. */
+const APP_EVENT_PRESETS: Readonly<Record<core.AppEventApp, readonly PresetKey[]>> = {
+    "game-servers": ["gameServerStarted", "gameServerStopped"],
+    deploy: ["deploySucceeded", "deployFailed"],
+    chat: ["chatMessage"],
+    tasks: ["taskCreated", "taskCompleted"]
+};
 
 const PLACES_TRIGGERS = ["time", "interval", "change", "stays", "threshold", "sun"].map(
     (kind) => `${PLACES_APP}.trigger.${kind}`
@@ -61,7 +84,8 @@ const PLACES_STEPS = [
 
 /**
  * The groups the picker shows. `triggers` is false where only a step fits
- * (inserting on a connection); `apps` are the installed apps that bring nodes.
+ * (inserting on a connection); `apps` are the installed apps that bring nodes
+ * or send events.
  */
 export function catalogGroups(options: {
     readonly triggers: boolean;
@@ -98,6 +122,10 @@ export function catalogGroups(options: {
             }
         );
         if (places) groups.push({ id: "places", items: PLACES_TRIGGERS.map(plain) });
+        // An app's events only where the app is here to send them.
+        for (const app of core.APP_EVENT_APPS)
+            if (options.apps.includes(app))
+                groups.push({ id: app, items: APP_EVENT_PRESETS[app].map(preset) });
     }
     groups.push(
         {

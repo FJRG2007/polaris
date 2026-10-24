@@ -78,6 +78,7 @@ export * from "./automation-schema.js";
 export * from "./solar.js";
 export * from "./automation-graph.js";
 export * from "./automation-canvas.js";
+export * from "./automation-app-events.js";
 export * from "./sign-in-methods.js";
 export * from "./request-origin.js";
 export * from "./user-agent.js";

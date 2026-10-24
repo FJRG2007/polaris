@@ -17,6 +17,7 @@ import * as service from "@/lib/automations/service";
 import * as history from "@/lib/automations/history";
 import * as secrets from "@/lib/automations/secrets";
 import * as organize from "@/lib/automations/organize";
+import * as appEvents from "@/lib/automations/app-events";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { LegacyRunRow } from "@/lib/app-extensions/types";
 import type { RunActor } from "@/lib/automations/types";
@@ -96,14 +97,15 @@ export async function getAutomationAction(
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        const [found, appNodes] = await Promise.all([
+        const [found, appNodes, eventApps] = await Promise.all([
             service.getAutomation(who, parsed.data),
-            appAutomationNodeSlots().catch(() => ({}))
+            appAutomationNodeSlots().catch(() => ({})),
+            requirePermission("automations.use").then((user) => appEvents.eventApps(user))
         ]);
         const unnamed = core.LOCALES.some(
             (locale) => translate(locale, "automations.create.untitled") === found.name
         );
-        const automation = { ...found, appNodes, unnamed };
+        const automation = { ...found, appNodes, eventApps, unnamed };
         const shelf = await service.shelfOf(parsed.data);
         return {
             ok: true,

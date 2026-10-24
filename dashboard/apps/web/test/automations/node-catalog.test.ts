@@ -55,7 +55,7 @@ describe("the node catalog", () => {
 
     it("hands back presets with settings the On event trigger accepts", () => {
         const presets = catalog
-            .catalogGroups({ triggers: true, apps: [] })
+            .catalogGroups({ triggers: true, apps: [...core.APP_EVENT_APPS] })
             .flatMap((group) => group.items)
             .filter((item) => item.preset);
         expect(presets.length).toBe(Object.keys(catalog.EVENT_PRESETS).length);
@@ -72,7 +72,8 @@ describe("the node catalog", () => {
         const sent = new Set<string>([
             ...core.NAS_EVENT_NAMES,
             core.PUBLIC_IP_CHANGED_EVENT,
-            core.AUTOMATION_FINISHED_EVENT
+            core.AUTOMATION_FINISHED_EVENT,
+            ...core.APP_EVENT_NAMES
         ]);
         for (const preset of Object.values(catalog.EVENT_PRESETS))
             expect(sent).toContain(preset.name);

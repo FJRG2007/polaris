@@ -724,7 +724,7 @@
         "recheckEvery": "Check again every",
         "recheckRange": "Check again between every minute and once a day.",
         "builtInEvent": "Polaris also announces {name} whenever an automation here ends.",
-        "eventNameReserved": "Names starting with {prefix} are kept for Polaris.",
+        "eventNameReserved": "This name is kept for events Polaris sends itself (anything starting with {prefix}, NAS and app events).",
         "useFinished": "Use it",
         "outcomes": "Only when it ends as",
         "outcomesAny": "None ticked takes any ending. Read it as {example}.",
@@ -907,7 +907,11 @@
             "logic": "Logic",
             "timing": "Timing",
             "data": "Data",
-            "send": "Send"
+            "send": "Send",
+            "game-servers": "Game servers",
+            "deploy": "Deploy",
+            "chat": "Chat",
+            "tasks": "Tasks"
         },
         "presets": {
             "publicIpChanged": "Public IP changed",
@@ -918,7 +922,14 @@
             "nasPoolUnprotected": "NAS storage unprotected",
             "nasBackupFailed": "NAS backup failed",
             "nasBackupOverdue": "NAS backup overdue",
-            "automationFinished": "Another automation finished"
+            "automationFinished": "Another automation finished",
+            "gameServerStarted": "Game server started",
+            "gameServerStopped": "Game server stopped",
+            "deploySucceeded": "Deploy succeeded",
+            "deployFailed": "Deploy failed",
+            "taskCreated": "Task created",
+            "taskCompleted": "Task completed",
+            "chatMessage": "New chat message"
         }
     }
 }

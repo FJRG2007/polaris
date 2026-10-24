@@ -23,6 +23,20 @@ const CLAIM_MS = 60_000;
 export const INTAKE_LEASE = "automations-intake";
 const INTAKE_LEASE_MS = 2 * 60_000;
 
+/**
+ * The payload key that limits an event to the automations it names: an app's
+ * event lists the ones whose runner may see what it is about (app-events.ts).
+ */
+export const AUDIENCE_KEY = "audience";
+
+/** The automations an event is limited to, or null when it names none. */
+export function eventAudience(payload: Record<string, unknown>): readonly string[] | null {
+    const list = payload[AUDIENCE_KEY];
+    return Array.isArray(list)
+        ? list.filter((entry): entry is string => typeof entry === "string")
+        : null;
+}
+
 export interface EmitInput {
     readonly orgId?: string | null;
     readonly userId?: string | null;
@@ -180,8 +194,11 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
             event.type === "core.connectivity" && triggers.length > 0
                 ? new Set(await usersWithPermission("system.manage"))
                 : null;
+        const audience = eventAudience(payload);
+        const { [AUDIENCE_KEY]: _audience, ...cause } = payload;
         for (const trigger of triggers) {
             const automation = trigger.automation;
+            if (audience && !audience.includes(automation.id)) continue;
             if (managers) {
                 const runner = automation.runAsId ?? automation.userId;
                 if (!runner || !managers.has(runner)) continue;
@@ -199,7 +216,7 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
                 triggerNodeId: trigger.nodeId,
                 firingKey: `${event.id}:${trigger.nodeId}`,
                 cause: {
-                    ...((event.payload ?? {}) as Record<string, unknown>),
+                    ...cause,
                     id: trigger.nodeId,
                     at: now.toISOString()
                 },

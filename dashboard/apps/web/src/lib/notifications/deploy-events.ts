@@ -13,6 +13,7 @@
  */
 
 import { notify } from "./dispatch";
+import { emitAppEvent } from "../automations/app-events";
 import { prisma } from "@polaris/db";
 import * as follow from "../follow/follow";
 import { dispatchProjectWebhooks } from "../deploy-project-service";
@@ -155,6 +156,25 @@ export async function notifyDeployFinished(input: {
                 }
             });
         }
+
+        // Automations listening for deploys, run as somebody this alert was for:
+        // the owner, whoever triggered it, a follower, or an administrator.
+        await emitAppEvent(
+            event,
+            {
+                deploymentId: input.deploymentId,
+                deployableType: deployment.deployableType,
+                deployableId: deployment.deployableId,
+                name: deployable.label.slice(0, 200),
+                commitSha: deployment.commitSha?.slice(0, 64) ?? null,
+                trigger: deployment.trigger?.slice(0, 32) ?? null,
+                error: input.ok ? null : summarize(deployment.error)
+            },
+            {
+                key: input.deploymentId,
+                mayReceive: async (runner) => runner.isAdmin || recipients.has(runner.id)
+            }
+        );
 
         // The project's own endpoints, alongside the people. These belong to the
         // project rather than to anyone's account, so they keep reporting when
