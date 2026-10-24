@@ -1,0 +1,125 @@
+{
+    "source": "Request bodies as pytapo sends them (github.com/JurajNyiri/pytapo, pytapo/__init__.py). Replies are fixture data in the shape pytapo and Home Assistant tapo_control read.",
+    "requests": {
+        "startManualAlarm": {
+            "method": "do",
+            "msg_alarm": { "manual_msg_alarm": { "action": "start" } }
+        },
+        "stopManualAlarm": {
+            "method": "do",
+            "msg_alarm": { "manual_msg_alarm": { "action": "stop" } }
+        },
+        "setSirenStatus": {
+            "method": "setSirenStatus",
+            "params": { "msg_alarm": { "status": "on" } }
+        },
+        "setLedStatus": {
+            "method": "setLedStatus",
+            "params": { "led": { "config": { "enabled": "off" } } }
+        },
+        "setFlip": {
+            "method": "setLdc",
+            "params": { "image": { "switch": { "flip_type": "center" } } }
+        },
+        "setDayNightModeConfig": {
+            "method": "setDayNightModeConfig",
+            "params": { "image": { "common": { "inf_type": "auto" } } }
+        },
+        "setNightVisionModeConfig": {
+            "method": "setNightVisionModeConfig",
+            "params": { "image": { "switch": { "night_vision_mode": "wtl_night_vision" } } }
+        },
+        "setMotionDetectionHigh": {
+            "method": "setDetectionConfig",
+            "params": {
+                "motion_detection": {
+                    "motion_det": {
+                        "enabled": "on",
+                        "digital_sensitivity": "80",
+                        "sensitivity": "high"
+                    }
+                }
+            }
+        },
+        "rebootDevice": { "method": "rebootDevice", "params": { "system": { "reboot": "null" } } },
+        "motorMoveToPreset": {
+            "method": "motorMoveToPreset",
+            "params": { "preset": { "goto_preset": { "id": "2" } } }
+        },
+        "getMotorCapability": { "method": "get", "motor": { "name": ["capability"] } }
+    },
+    "replies": {
+        "full": [
+            {
+                "method": "getDeviceInfo",
+                "error_code": 0,
+                "result": { "device_info": { "basic_info": { "device_model": "FIXTURE-MODEL" } } }
+            },
+            {
+                "method": "getLensMaskConfig",
+                "error_code": 0,
+                "result": { "lens_mask": { "lens_mask_info": { "enabled": "off" } } }
+            },
+            {
+                "method": "getLedStatus",
+                "error_code": 0,
+                "result": { "led": { "config": { "enabled": "on" } } }
+            },
+            {
+                "method": "getPresetConfig",
+                "error_code": 0,
+                "result": {
+                    "preset": {
+                        "preset": { "id": ["1", "2"], "name": ["Fixture door", "Fixture yard"] }
+                    }
+                }
+            },
+            { "method": "getSirenStatus", "error_code": -40106 },
+            {
+                "method": "getLastAlarmInfo",
+                "error_code": 0,
+                "result": {
+                    "msg_alarm": { "chn1_msg_alarm_info": { "enabled": "off", "alarm_type": "0" } }
+                }
+            },
+            {
+                "method": "getDetectionConfig",
+                "error_code": 0,
+                "result": {
+                    "motion_detection": {
+                        "motion_det": { "enabled": "on", "digital_sensitivity": "50" }
+                    }
+                }
+            },
+            {
+                "method": "getLdc",
+                "error_code": 0,
+                "result": { "image": { "switch": { "flip_type": "off", "ldc": "off" } } }
+            },
+            { "method": "getNightVisionModeConfig", "error_code": -40106 },
+            {
+                "method": "getLightFrequencyInfo",
+                "error_code": 0,
+                "result": { "image": { "common": { "inf_type": "auto" } } }
+            }
+        ],
+        "bare": [
+            {
+                "method": "getDeviceInfo",
+                "error_code": 0,
+                "result": { "device_info": { "basic_info": {} } }
+            },
+            { "method": "getLensMaskConfig", "error_code": -40106 },
+            { "method": "getLedStatus", "error_code": -40106 },
+            { "method": "getPresetConfig", "error_code": -40106 },
+            { "method": "getSirenStatus", "error_code": -40106 },
+            { "method": "getLastAlarmInfo", "error_code": -40106 },
+            { "method": "getDetectionConfig", "error_code": -40106 },
+            { "method": "getLdc", "error_code": -40106 },
+            { "method": "getNightVisionModeConfig", "error_code": -40106 },
+            { "method": "getLightFrequencyInfo", "error_code": -40106 }
+        ],
+        "motor": { "error_code": 0, "motor": { "capability": { "absolute_move_supported": "1" } } },
+        "noMotor": { "error_code": -40106 }
+    }
+}

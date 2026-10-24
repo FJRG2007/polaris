@@ -4,7 +4,8 @@
  * The arrows for a camera that moves.
  *
  * Drawn over the picture while it is playing, and only for a camera that
- * answered ONVIF: an arrow that does nothing is worse than no arrow.
+ * answered ONVIF, or a Tapo whose motor answered: an arrow that does nothing is
+ * worse than no arrow.
  *
  * Movement is continuous, so every press is a start and every release is a stop.
  * The stop is sent on release, on the pointer leaving the button, and when the
@@ -48,7 +49,8 @@ const ARROWS: {
 export function PtzPad({
     cameraId,
     privacyPreset = null,
-    onPrivacyPreset
+    onPrivacyPreset,
+    zoom = true
 }: {
     cameraId: string;
     /** The stored privacy position ("" for none), or null on a camera whose own
@@ -56,6 +58,8 @@ export function PtzPad({
     privacyPreset?: string | null;
     /** Told the stored position once the camera took it ("" once cleared). */
     onPrivacyPreset?: (preset: string) => void;
+    /** False on a camera with no zoom (a Tapo moved over its own API). */
+    zoom?: boolean;
 }) {
     const [preset, setPreset] = useState(privacyPreset);
     const [saving, setSaving] = useState(false);
@@ -139,7 +143,9 @@ export function PtzPad({
             // not that.
             onClick={(event) => event.stopPropagation()}
         >
-            {ARROWS.map((arrow) => (
+            {ARROWS.filter(
+                (arrow) => zoom || (arrow.direction !== "in" && arrow.direction !== "out")
+            ).map((arrow) => (
                 <button
                     key={arrow.direction}
                     type="button"

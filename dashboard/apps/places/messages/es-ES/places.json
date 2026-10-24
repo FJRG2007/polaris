@@ -713,7 +713,12 @@
         "panelSame": "Dos tarjetas de ese panel son la misma",
         "panelOverlap": "Dos tarjetas de ese panel se solapan",
         "panelEdge": "Una tarjeta se sale del borde del panel",
-        "panelSmall": "Esa tarjeta es más pequeña de lo que se puede dibujar"
+        "panelSmall": "Esa tarjeta es más pequeña de lo que se puede dibujar",
+        "tapoPassword": "La cámara no acepta la contraseña que Polaris tiene guardada",
+        "tapoLocked": "La cámara ha pausado los inicios de sesión un rato. Vuelve a probar más tarde",
+        "tapoUnreachable": "No se pudo contactar con la cámara",
+        "tapoRefused": "La cámara no ha hecho eso",
+        "tapoNotOffered": "Esta cámara no ofrece eso"
     },
     "connections": {
         "nuki-web": {
@@ -2853,5 +2858,38 @@
         "level": "Batería {percent}%",
         "low": "Batería baja",
         "unknown": "Nivel de batería desconocido"
+    },
+    "tapo": {
+        "cameraKind": "cámara",
+        "failed": "No se pudieron leer los controles de la cámara",
+        "flip": "Imagen invertida",
+        "led": "Luz de estado",
+        "motion": "Detección de movimiento",
+        "night": "Visión nocturna",
+        "nightModes": {
+            "auto": "Auto",
+            "color": "Color",
+            "infrared": "Infrarrojos",
+            "off": "Apagada",
+            "on": "Encendida",
+            "smart": "Inteligente"
+        },
+        "none": "Esta cámara no tiene más controles",
+        "open": "Controles de la cámara",
+        "positions": "Posiciones",
+        "reading": "Consultando la cámara",
+        "restart": "Reiniciar",
+        "restartQuestion": "¿Reiniciar {name}? La imagen se detiene un minuto aproximadamente.",
+        "restartTitle": "Reiniciar la cámara",
+        "restarting": "Reiniciando la cámara",
+        "retry": "Reintentar",
+        "sensitivity": {
+            "high": "Alta",
+            "low": "Baja",
+            "medium": "Media"
+        },
+        "siren": "Sirena",
+        "sirenStart": "Activar",
+        "sirenStop": "Detener"
     }
 }

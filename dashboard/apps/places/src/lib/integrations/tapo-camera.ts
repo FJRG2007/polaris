@@ -1,6 +1,7 @@
 /**
- * A Tapo camera's own local API, for the one thing ONVIF does not carry:
- * privacy mode ("lens mask").
+ * A Tapo camera's own local API, for what ONVIF does not carry: privacy mode
+ * ("lens mask") and the controls the Tapo app offers (`withCamera`, with the
+ * requests in tapo-camera-controls.ts).
  *
  * HTTPS on port 443 of the camera, JSON, the API the Tapo app uses on the LAN.
  * Each call signs in, does its work and is done - nothing is held between
@@ -378,21 +379,16 @@ async function tpapRoundTrip(
     }
 }
 
-/** One method inside `multipleRequest`, wrapped when the session is secure.
- *  Answers that method's own `result`. */
-async function call(
+/** One request on a signed-in session, wrapped when the session is secure.
+ *  Answers the camera's whole reply, opened. */
+async function exchange(
     session: Session,
-    method: string,
-    params: Json,
+    request: Json,
     send: TapoTransport,
     headers: Record<string, string>
 ): Promise<Json> {
-    const inner = JSON.stringify({
-        method: "multipleRequest",
-        params: { requests: [{ method, params }] }
-    });
-    if (session.tpap)
-        return firstResult(await tpapRoundTrip(session, session.tpap, inner, send, headers));
+    const inner = JSON.stringify(request);
+    if (session.tpap) return tpapRoundTrip(session, session.tpap, inner, send, headers);
     let body = inner;
     const extra: Record<string, string> = {};
     if (session.secure) {
@@ -424,7 +420,44 @@ async function call(
             throw new TapoError("failed");
         }
     }
-    return firstResult(json);
+    return json;
+}
+
+/** Several methods in one `multipleRequest`. Answers each method's own reply,
+ *  error code and all, for the caller to read one by one. */
+async function multiple(
+    session: Session,
+    requests: readonly { method: string; params: Json }[],
+    send: TapoTransport,
+    headers: Record<string, string>
+): Promise<unknown[]> {
+    const json = await exchange(
+        session,
+        { method: "multipleRequest", params: { requests } },
+        send,
+        headers
+    );
+    if (errorCode(json) !== 0) throw new TapoError("failed");
+    const responses = record(json.result).responses;
+    return Array.isArray(responses) ? responses : [];
+}
+
+/** One method inside `multipleRequest`. Answers that method's own `result`. */
+async function call(
+    session: Session,
+    method: string,
+    params: Json,
+    send: TapoTransport,
+    headers: Record<string, string>
+): Promise<Json> {
+    return firstResult(
+        await exchange(
+            session,
+            { method: "multipleRequest", params: { requests: [{ method, params }] } },
+            send,
+            headers
+        )
+    );
 }
 
 /** The single method's own answer inside a `multipleRequest` reply. */
@@ -446,6 +479,15 @@ function maskOf(result: Json): boolean {
 
 const READ = { lens_mask: { name: ["lens_mask_info"] } };
 
+/** Set the lens mask when asked, then read it back, on a signed-in link. */
+export async function lensMaskOn(link: TapoLink, wanted: boolean | null): Promise<boolean> {
+    if (wanted !== null)
+        await link.call("setLensMaskConfig", {
+            lens_mask: { lens_mask_info: { enabled: wanted ? "on" : "off" } }
+        });
+    return maskOf(await link.call("getLensMaskConfig", READ));
+}
+
 /**
  * Read privacy, or set it and read it back. The answer is the camera's own,
  * not the one asked for, and the certificate pin to store.
@@ -457,18 +499,42 @@ export async function lensMask(
     cnonce?: string,
     bytes?: (size: number) => Buffer
 ): Promise<{ private: boolean; pin: string | null }> {
+    const { value, pin } = await withCamera(
+        camera,
+        (link) => lensMaskOn(link, wanted),
+        send,
+        cnonce,
+        bytes
+    );
+    return { private: value, pin };
+}
+
+/** A signed-in camera, for one piece of work: its methods, several at once,
+ *  and a top-level request for the few pytapo sends outside `multipleRequest`. */
+export interface TapoLink {
+    call(method: string, params: Json): Promise<Json>;
+    multiple(requests: readonly { method: string; params: Json }[]): Promise<unknown[]>;
+    raw(body: Json): Promise<Json>;
+}
+
+/**
+ * Sign in once, do the work, and answer it with the certificate pin to store.
+ * The same one-sign-in-per-call rule as privacy: nothing is held afterwards.
+ */
+export async function withCamera<T>(
+    camera: TapoCamera,
+    work: (link: TapoLink) => Promise<T>,
+    send: TapoTransport = lanTransport,
+    cnonce?: string,
+    bytes?: (size: number) => Buffer
+): Promise<{ value: T; pin: string | null }> {
     const { session, pin } = await signIn(camera, send, cnonce, bytes);
     const origin = `https://${camera.address}:${camera.port ?? 443}`;
     const headers = { ...HEADERS, Referer: origin };
-    if (wanted !== null) {
-        await call(
-            session,
-            "setLensMaskConfig",
-            { lens_mask: { lens_mask_info: { enabled: wanted ? "on" : "off" } } },
-            send,
-            headers
-        );
-    }
-    const state = maskOf(await call(session, "getLensMaskConfig", READ, send, headers));
-    return { private: state, pin };
+    const value = await work({
+        call: (method, params) => call(session, method, params, send, headers),
+        multiple: (requests) => multiple(session, requests, send, headers),
+        raw: (body) => exchange(session, body, send, headers)
+    });
+    return { value, pin };
 }

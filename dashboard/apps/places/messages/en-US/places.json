@@ -713,7 +713,12 @@
         "panelSame": "Two cards on that panel are the same card",
         "panelOverlap": "Two cards on that panel overlap",
         "panelEdge": "A card runs past the panel's edge",
-        "panelSmall": "That card is smaller than it can be drawn"
+        "panelSmall": "That card is smaller than it can be drawn",
+        "tapoPassword": "The camera would not take the password Polaris has for it",
+        "tapoLocked": "The camera has paused sign-ins for a while. Try again later",
+        "tapoUnreachable": "Could not reach the camera",
+        "tapoRefused": "The camera would not do that",
+        "tapoNotOffered": "This camera does not offer that"
     },
     "connections": {
         "nuki-web": {
@@ -2853,5 +2858,38 @@
         "level": "Battery {percent}%",
         "low": "Battery low",
         "unknown": "Battery level not known"
+    },
+    "tapo": {
+        "cameraKind": "camera",
+        "failed": "Could not read the camera's controls",
+        "flip": "Upside down",
+        "led": "Status light",
+        "motion": "Motion detection",
+        "night": "Night vision",
+        "nightModes": {
+            "auto": "Auto",
+            "color": "Color",
+            "infrared": "Infrared",
+            "off": "Off",
+            "on": "On",
+            "smart": "Smart"
+        },
+        "none": "This camera has no other controls",
+        "open": "Camera controls",
+        "positions": "Positions",
+        "reading": "Asking the camera",
+        "restart": "Restart",
+        "restartQuestion": "Restart {name}? The picture stops for about a minute.",
+        "restartTitle": "Restart the camera",
+        "restarting": "Restarting the camera",
+        "retry": "Try again",
+        "sensitivity": {
+            "high": "High",
+            "low": "Low",
+            "medium": "Medium"
+        },
+        "siren": "Siren",
+        "sirenStart": "Sound",
+        "sirenStop": "Stop"
     }
 }
