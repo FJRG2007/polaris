@@ -255,7 +255,7 @@ export function CallRoom({
     const muted = !call.micOn && call.audioRole !== "companion";
     const talkingMuted = useMutedSpeech(call.localStream?.getAudioTracks()[0] ?? null, muted);
     const micHint: ControlHintText | null = talkingMuted
-        ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
+        ? { text: t("callRoom.hints.talkingMuted"), tone: "speaking" }
         : null;
     // A deck key asked to share: the button is pointed at, and kept on the bar
     // even where it would fold into the menu - see `call-share-ask`.

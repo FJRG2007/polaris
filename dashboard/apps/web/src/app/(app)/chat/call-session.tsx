@@ -357,7 +357,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                     anchor={micButton}
                     hint={
                         talkingMuted
-                            ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
+                            ? { text: t("callRoom.hints.talkingMuted"), tone: "speaking" }
                             : null
                     }
                 />
