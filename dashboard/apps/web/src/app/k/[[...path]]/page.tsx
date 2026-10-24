@@ -5,7 +5,7 @@
  * bound on it - dates, hours, uses, which actions, only near the place - is
  * judged on the server for each press (`lib/access/grants` `linkReach`). A
  * door and a camera are Places' to draw, so their page comes from the app's
- * bundle; a UPS, a NAS, a server and a domain are core's and drawn here. A link that opens nothing says why in one sentence
+ * bundle, and so does a wall panel, drawn full screen; a UPS, a NAS, a server and a domain are core's and drawn here. A link that opens nothing says why in one sentence
  * and nothing about what it was.
  */
 
@@ -51,6 +51,15 @@ export default async function GuestLinkPage(props: AppPageProps) {
                 message={words(`guestLink.standing.${reached.standing}`)}
                 signIn={signIn}
             />
+        );
+    }
+    // A wall panel is the whole screen of a tablet on a wall: no header, no
+    // way into the app, nothing around the cards.
+    if (reached.subjectType === "place.panel") {
+        return (
+            <Messages namespaces={["publicPages"]}>
+                {await renderAppPage("/k", "home", props, { public: true })}
+            </Messages>
         );
     }
     if (

@@ -43,7 +43,12 @@ export const EMPTY_LIMITS: LimitsValue = {
 
 /** Where a fence means anything: an act that happens at a place. */
 export function isFenceable(subject: core.GrantSubject): boolean {
-    return subject === "place.device" || subject === "place.ups" || subject === "place.room";
+    return (
+        subject === "place.device" ||
+        subject === "place.ups" ||
+        subject === "place.room" ||
+        subject === "place.panel"
+    );
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");

@@ -1601,6 +1601,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
+            // Full-screen boards of cards for a tablet on the wall: the devices
+            // and rooms somebody picked, with a link for a screen nobody signs in on.
+            label: "Wall panels", // i18n-ignore
+            group: DEVICES_GROUP,
+            href: "/places/panels",
+            icon: LayoutGrid,
+            keywords: ["wallpanel", "kiosk", "tablet", "dashboard", "wall", "board", "fullscreen"]
+        },
+        {
             // A UPS is a physical thing in a place, like a door (it was under
             // Servers until 2026-10-20; the old address redirects here). The
             // machines it protects link to it from their own page.

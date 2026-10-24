@@ -60,6 +60,7 @@
             "place.server": "un servidor",
             "place.domain": "una web",
             "place.room": "una sala",
+            "place.panel": "un panel",
             "watch.connectivity": "el registro de conexión",
             "watch.alarm": "una alarma",
             "status.page": "una página de estado",

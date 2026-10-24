@@ -60,6 +60,7 @@
             "place.server": "a server",
             "place.domain": "a website",
             "place.room": "a room",
+            "place.panel": "a wall panel",
             "watch.connectivity": "the connectivity record",
             "watch.alarm": "an alarm",
             "status.page": "a public status page",

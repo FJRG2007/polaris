@@ -96,7 +96,8 @@ export const GRANT_SUBJECTS = [
     "polar.project",
     "task.task",
     "place.place",
-    "mail.mailbox"
+    "mail.mailbox",
+    "place.panel"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -254,7 +255,12 @@ export const GRANT_CAPABILITIES = {
     // chose "send as"; `manage` also marks, archives, files as junk and deletes.
     // Its settings, rules, password and who else it is shared with stay with
     // the person who linked it.
-    "mail.mailbox": ["view", "respond", "manage"]
+    "mail.mailbox": ["view", "respond", "manage"],
+    // A wall panel: the devices on its cards, as one key, for the tablet on
+    // the wall that nobody signs in on. Only what the panel shows - a device
+    // taken off it, or out of a room card's room, stops being reached.
+    // Arranging the panel stays with the people who run the house.
+    "place.panel": ["view", "control"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -311,7 +317,8 @@ export const GRANT_ACTIONS = {
     "polar.project": [],
     "task.task": [],
     "place.place": ["watch", "open", "close", "operate"],
-    "mail.mailbox": []
+    "mail.mailbox": [],
+    "place.panel": ["watch", "open", "close", "operate"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**
@@ -742,6 +749,7 @@ export const GRANT_LINK_SUBJECTS = [
     "place.server",
     "place.domain",
     "place.room",
+    "place.panel",
     "watch.connectivity"
 ] as const satisfies readonly GrantSubject[];
 

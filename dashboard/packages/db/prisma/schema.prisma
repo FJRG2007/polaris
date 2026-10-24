@@ -11125,8 +11125,33 @@ model Place {
     rooms       PlaceRoom[]
     floors      PlaceFloor[]
     cameraSets  CameraSet[]
+    panels      PlacePanel[]
 
     @@index([installedAppId])
+}
+
+// A wall panel at a place: a grid of cards (a device, a room, a clock) drawn
+// full screen on a tablet on the wall, or any screen, at /wall/<id>.
+//
+// The cards and where each sits are one document (`cards`), validated by
+// `panelCardsSchema` in Places on every read and write, because they are only
+// ever read and saved together. A device or room removed later is skipped when
+// the panel is drawn, so nothing has to follow a deletion.
+model PlacePanel {
+    id             String @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to, per the InstalledApp precedent of not
+    // linking installs by foreign key.
+    installedAppId String @db.Uuid
+    placeId        String @db.Uuid
+    name           String
+    cards          Json   @default("[]")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+    @@index([installedAppId, placeId])
 }
 
 // A floor at a place, which rooms are on.
