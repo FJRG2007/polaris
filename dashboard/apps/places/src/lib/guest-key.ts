@@ -35,6 +35,10 @@ type LiveGrant = AppHostTypes["LiveGrant"];
  *  presses twice; nowhere near enough to hammer it. */
 const PRESSES_PER_MINUTE = 10;
 
+/** A wall panel's link: one tablet a whole household shares, every device on
+ *  it, and each slider let go is a press of its own. */
+const PANEL_PRESSES_PER_MINUTE = 60;
+
 /** What the guest page draws. */
 export type GuestKey =
     | {
@@ -208,7 +212,7 @@ export async function pressGuestKey(
         });
     const limited = await host.rateLimitService.rateLimit(
         `guest-key:${reached.standing === "live" ? reached.grant.id : reached.subjectId}:${ip}`,
-        PRESSES_PER_MINUTE,
+        panel ? PANEL_PRESSES_PER_MINUTE : PRESSES_PER_MINUTE,
         60_000
     );
     if (!limited.ok) throw new HomeError("Too many presses. Wait a minute and try again");

@@ -13,6 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import * as devices from "./devices";
+import { host } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import type { DeviceView } from "./device-kinds";
 import {
@@ -122,6 +123,7 @@ export async function savePanelCards(
 export async function deletePanel(installedAppId: string, id: string): Promise<void> {
     const { count } = await prisma.placePanel.deleteMany({ where: { id, installedAppId } });
     if (count === 0) throw new HomeError("That panel is not here");
+    await host.accessGrants.dropGrantsFor("place.panel", id);
 }
 
 /** Which devices each of these rooms holds now, at the panel's place. */
@@ -181,11 +183,19 @@ export async function panelContents(installedAppId: string, id: string): Promise
 
 /** The devices a panel reaches right now - what its link may see and press. */
 export async function panelReach(installedAppId: string, id: string): Promise<Set<string>> {
+    return (await panelPlaceReach(installedAppId, id))?.devices ?? new Set();
+}
+
+/** A panel's place and the devices it reaches now, or null when it is gone. */
+export async function panelPlaceReach(
+    installedAppId: string,
+    id: string
+): Promise<{ placeId: string; devices: Set<string> } | null> {
     const row = await prisma.placePanel.findFirst({
         where: { id, installedAppId },
         select: { placeId: true, cards: true }
     });
-    if (!row) return new Set();
+    if (!row) return null;
     const cards = storedCards(row.cards);
     const byRoom = await devicesInRooms(installedAppId, row.placeId, panelRoomIds(cards));
     const ids = panelDeviceIds(cards, byRoom);
@@ -207,7 +217,7 @@ export async function panelReach(installedAppId: string, id: string): Promise<Se
                 ids.delete(deviceId);
         }
     }
-    return ids;
+    return { placeId: row.placeId, devices: ids };
 }
 
 /** Whether a device is on this panel now. */

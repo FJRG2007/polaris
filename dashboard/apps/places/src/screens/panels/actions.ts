@@ -29,14 +29,6 @@ async function schemaSay(message: string | undefined): Promise<string> {
     return message ? placesRefusalText(t, message) : t("actions.someWrong");
 }
 
-export async function listPanelsAction(): Promise<{ panels?: PanelView[]; error?: string }> {
-    const { install } = await requireHome("home.read");
-    const result = await guard(async () =>
-        panels.listPanels(install.id, (await currentPlace(install.id)).current.id)
-    );
-    return result.error ? { error: result.error } : { panels: result.value };
-}
-
 /** A new, empty panel at the place being looked at. */
 export async function createPanelAction(
     name: unknown

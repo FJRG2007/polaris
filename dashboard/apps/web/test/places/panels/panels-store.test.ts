@@ -70,6 +70,8 @@ vi.mock("@polaris/db", () => ({
         }
     }
 }));
+const dropGrantsFor = vi.fn(async () => undefined);
+vi.mock("@polaris/app-host", () => ({ host: { accessGrants: { dropGrantsFor } } }));
 vi.mock("@polaris-app/places/src/lib/devices", () => ({
     listDevices: async () => devices.map((device) => ({ ...device, name: String(device.id) }))
 }));
@@ -115,6 +117,10 @@ describe("panel persistence", () => {
             { id: "b", type: "room", roomId: ROOM, x: 0, y: 0, w: 4, h: 3 }
         ]);
         expect([...(await store.panelReach("i1", panel.id))]).toEqual([PLUG]);
+        expect(await store.panelPlaceReach("i1", panel.id)).toEqual({
+            placeId: PLACE,
+            devices: new Set([PLUG])
+        });
         expect(await store.panelHolds("i1", panel.id, LAMP)).toBe(false);
         expect(await store.panelHolds("i1", panel.id, FAR_DOOR)).toBe(false);
     });
@@ -132,9 +138,10 @@ describe("panel persistence", () => {
         }
     });
 
-    it("removes a panel, and refuses one that is already gone", async () => {
+    it("removes a panel with its links, and refuses one that is already gone", async () => {
         const panel = await store.createPanel("i1", PLACE, "Hall");
         await store.deletePanel("i1", panel.id);
+        expect(dropGrantsFor).toHaveBeenCalledWith("place.panel", panel.id);
         await expect(store.deletePanel("i1", panel.id)).rejects.toThrow();
     });
 });
