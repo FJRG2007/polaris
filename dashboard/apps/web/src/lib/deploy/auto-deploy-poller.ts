@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { dataSaverActive } from "@/lib/backup-access";
 import { trackedBranch } from "./branches";
 import { parseGithubRepo } from "../repo-reference";
 import { githubTokenForOwner } from "../github-access";
@@ -118,7 +119,9 @@ export function startAutoDeployPoller(): void {
         // Both halves ask GitHub. Offline, the breaker's own probe says when it is
         // back, and the next tick after that catches up.
         if (internetOffline()) return;
-        void pollAutoDeploys()
+        // On backup access the data saver holds builds and pulls until it is over.
+        void dataSaverActive()
+            .then((saver) => (saver ? undefined : pollAutoDeploys()))
             .catch((error) => console.error("polaris: auto-deploy poll failed:", error))
             // Pushes held for CI whose check events never arrived - every LAN
             // install, and any delivery GitHub dropped.

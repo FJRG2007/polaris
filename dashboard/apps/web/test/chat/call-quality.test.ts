@@ -202,6 +202,13 @@ describe("which rung is in force", () => {
     it("is the connection's answer under automatic", () => {
         expect(levelOf("auto", "medium")).toBe("medium");
     });
+
+    it("is held to the saver ceiling while the server is on backup access", () => {
+        expect(levelOf("max", "low", true)).toBe("medium");
+        expect(levelOf("auto", "high", true)).toBe("medium");
+        expect(levelOf("low", "high", true)).toBe("low");
+        expect(levelOf("max", "low", false)).toBe("max");
+    });
 });
 
 describe("the automatic walk", () => {

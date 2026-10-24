@@ -97,6 +97,9 @@ describe("the work Polaris runs on a schedule", () => {
             // chain and has no reason to do that twice at once.
             "audit-seal",
             "audit-verify",
+            // Two passes would each flip the base domain's DNS to the backup path
+            // (or back) and announce it twice.
+            "backup-access",
             "backups",
             // A budget crossing its threshold is told to the people running
             // the organization once; two passes would each tell them.

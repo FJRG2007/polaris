@@ -14,6 +14,7 @@
 
 import { NextResponse } from "next/server";
 import { buildStamp } from "@/lib/build-stamp";
+import { dataSaverActive } from "@/lib/backup-access";
 import { internetOffline } from "@/lib/offline/outbound-lookup";
 
 export const runtime = "nodejs";
@@ -22,9 +23,11 @@ export const dynamic = "force-dynamic";
 /** During a no-downtime rollover the old and the new container both serve for a
  *  few seconds, so this answers with whichever one took the request - which is
  *  what lets a tab learn about the update at all. */
-export function GET(): Response {
+export async function GET(): Promise<Response> {
+    // `dataSaver`: the domain is on backup access, so tabs keep calls light.
+    const dataSaver = await dataSaverActive().catch(() => false);
     return NextResponse.json(
-        { build: buildStamp(), internet: !internetOffline() },
+        { build: buildStamp(), internet: !internetOffline(), dataSaver },
         { headers: { "cache-control": "no-store" } }
     );
 }

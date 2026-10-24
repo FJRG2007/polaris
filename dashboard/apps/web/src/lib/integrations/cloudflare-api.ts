@@ -759,3 +759,57 @@ export async function enableZoneDnssec(token: string, zoneId: string): Promise<C
         })
     );
 }
+
+/** Every address record (A, AAAA, CNAME) one name holds, whatever its type. */
+export async function findNameRecords(
+    token: string,
+    zoneId: string,
+    name: string
+): Promise<CfEditableRecord[]> {
+    const rows = await cf<unknown[]>(
+        token,
+        "GET",
+        `/zones/${zoneId}/dns_records?name=${encodeURIComponent(name)}&per_page=${RECORDS_PER_PAGE}`
+    );
+    if (!Array.isArray(rows)) throw new Error("Unexpected DNS records response from Cloudflare");
+    return rows
+        .map(editableOf)
+        .filter(
+            (record): record is CfEditableRecord =>
+                record !== null && ["A", "AAAA", "CNAME"].includes(record.type)
+        );
+}
+
+/** Change one record's TTL and nothing else. */
+export async function setRecordTtl(
+    token: string,
+    zoneId: string,
+    recordId: string,
+    ttl: number
+): Promise<void> {
+    await cf(token, "PATCH", `/zones/${zoneId}/dns_records/${recordId}`, { ttl });
+}
+
+/** Replace a tunnel's ingress so each hostname routes to `originUrl`, everything else 404s.
+ *  TLS to the origin is not verified: the origin is this machine's own edge, reached
+ *  by its container name, which no certificate names. */
+export async function putTunnelHosts(
+    token: string,
+    accountId: string,
+    tunnelId: string,
+    hostnames: readonly string[],
+    originUrl: string
+): Promise<void> {
+    await cf(token, "PUT", `/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`, {
+        config: {
+            ingress: [
+                ...hostnames.map((hostname) => ({
+                    hostname,
+                    service: originUrl,
+                    originRequest: { noTLSVerify: true }
+                })),
+                { service: "http_status:404" }
+            ]
+        }
+    });
+}

@@ -13,12 +13,25 @@ const EVERY_MS = 60_000;
 const OFFLINE_EVERY_MS = 15_000;
 
 let offline = false;
+let saver = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let asking = false;
 const listeners = new Set<() => void>();
 
 export function hostOffline(): boolean {
     return offline;
+}
+
+/** Whether the server is on backup access with the data saver on, as last heard. */
+export function hostDataSaver(): boolean {
+    return saver;
+}
+
+/** Read the data-saver flag of one answer of `/api/version`. Exported for the test. */
+export function dataSaverFrom(data: unknown): boolean {
+    return Boolean(
+        data && typeof data === "object" && (data as { dataSaver?: unknown }).dataSaver === true
+    );
 }
 
 /** Read one answer of `/api/version`. Exported for the test. */
@@ -34,7 +47,9 @@ async function ask(): Promise<void> {
     if (typeof document !== "undefined" && document.visibilityState === "visible") {
         try {
             const response = await fetch("/api/version", { cache: "no-store" });
-            const next = response.ok ? offlineFrom(await response.json()) : null;
+            const data: unknown = response.ok ? await response.json() : null;
+            const next = offlineFrom(data);
+            if (data) saver = dataSaverFrom(data);
             if (next !== null && next !== offline) {
                 offline = next;
                 for (const listener of listeners) listener();

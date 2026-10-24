@@ -29,6 +29,7 @@
  */
 
 import { withCameraDevice } from "./camera-device";
+import { hostDataSaver } from "@/lib/host-internet";
 import { useCallback, useEffect, useState } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
@@ -398,9 +399,17 @@ export function startAuto(ladder: QualityLadder): AutoState {
     return { level: ladder.ceiling, healthy: 0 };
 }
 
-/** The rung actually in force: the one somebody picked, or the one auto is on. */
-export function levelOf(setting: CallQuality, auto: CallLevel): CallLevel {
-    return setting === "auto" ? auto : setting;
+/** The highest rung while the server's data saver is on (backup access). */
+export const SAVER_CEILING: CallLevel = "medium";
+
+/**
+ * The rung actually in force: the one somebody picked, or the one auto is on -
+ * held to `SAVER_CEILING` while the server is on backup access with the data
+ * saver on, since every call's media then crosses the backup line.
+ */
+export function levelOf(setting: CallQuality, auto: CallLevel, saver = hostDataSaver()): CallLevel {
+    const level = setting === "auto" ? auto : setting;
+    return saver && LEVELS.indexOf(level) > LEVELS.indexOf(SAVER_CEILING) ? SAVER_CEILING : level;
 }
 
 /**

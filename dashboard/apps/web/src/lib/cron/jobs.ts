@@ -105,7 +105,16 @@ const MAIL_SYNC_PARALLEL = 4;
  * command holds its connection for minutes, and in a single line every mailbox
  * behind it waited that long too. `syncAccount` keeps one pass per mailbox.
  */
-async function syncMailboxes(): Promise<number> {
+async function syncMailboxes(): Promise<number | { skipped: string }> {
+    // On backup access the data saver spaces the passes out rather than stopping
+    // them: mail keeps arriving, a quarter-hour late at most, instead of every
+    // minute over the backup line.
+    if (
+        (await (await import("@/lib/backup-access")).dataSaverActive()) &&
+        Date.now() - lastMailSync < MAIL_SAVER_GAP_MS
+    )
+        return { skipped: "Data saver: on backup access" };
+    lastMailSync = Date.now();
     const ids = await accountsToSync();
     const queue = [...ids];
     const lane = async () => {
@@ -116,6 +125,10 @@ async function syncMailboxes(): Promise<number> {
     await Promise.all(Array.from({ length: Math.min(MAIL_SYNC_PARALLEL, queue.length) }, lane));
     return ids.length;
 }
+
+/** How far apart mail passes are while the data saver holds them. */
+const MAIL_SAVER_GAP_MS = 15 * 60 * 1000;
+let lastMailSync = 0;
 
 /**
  * Both disks Polaris is responsible for: its own box, and every server it
@@ -354,7 +367,12 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // dumps databases. A pass bounds itself, so twice that bound leaves room
         // for the copy in flight when the budget ran out.
         leaseMs: 20 * MINUTE,
-        run: sweepDueBackups
+        // Held by the data saver while the domain is on backup access: a world
+        // archive or database dump copied off-site would fill the backup line.
+        run: async () =>
+            (await (await import("@/lib/backup-access")).dataSaverActive())
+                ? { skipped: "Data saver: on backup access" }
+                : sweepDueBackups()
     },
     {
         key: "connection-health",
@@ -764,6 +782,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // records and both announce it.
         leaseMs: 5 * MINUTE,
         run: async () => (await import("@/lib/domain-address-sync")).syncZoneAddress()
+    },
+    {
+        key: "backup-access",
+        // Every minute: three failed checks in a row move the domain to the backup
+        // path, so this is what sets how long visitors wait. A quiet pass is two
+        // connection attempts and one echo request; DNS is only read when it moves.
+        everyMs: MINUTE,
+        // Leased: two web containers during an update must not flip twice.
+        leaseMs: 3 * MINUTE,
+        run: async () => (await import("@/lib/backup-access/service")).runBackupAccess()
     },
     {
         key: "domain-security",

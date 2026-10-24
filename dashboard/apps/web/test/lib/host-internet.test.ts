@@ -66,3 +66,13 @@ describe("host-internet", () => {
         expect(fetch).toHaveBeenCalledTimes(2);
     });
 });
+
+describe("the data-saver flag", () => {
+    it("is on only when the server says so", async () => {
+        const { dataSaverFrom } = await import("@/lib/host-internet");
+        expect(dataSaverFrom({ build: "b", internet: true, dataSaver: true })).toBe(true);
+        expect(dataSaverFrom({ build: "b", internet: true, dataSaver: false })).toBe(false);
+        expect(dataSaverFrom({ build: "b", internet: true })).toBe(false);
+        expect(dataSaverFrom(null)).toBe(false);
+    });
+});

@@ -21,6 +21,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { dataSaverActive } from "@/lib/backup-access";
 import { usersWithPermission } from "@polaris/auth";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
@@ -396,9 +397,10 @@ export function startUpdateWatcher(): void {
         // else asks the internet, and offline would only log the same miss again.
         void sweepExpiringModelKeys().catch(() => undefined);
         if (internetOffline()) return;
-        void checkForUpdate().catch((error) =>
-            console.error("polaris: update watcher tick failed:", error)
-        );
+        // On backup access the data saver holds the check (it may pull an image).
+        void dataSaverActive()
+            .then((saver) => (saver ? undefined : checkForUpdate()))
+            .catch((error) => console.error("polaris: update watcher tick failed:", error));
         // Rides along rather than starting a timer of its own: both ask "is this
         // deployment waiting on somebody", both are cheap when the answer is no,
         // and one interval is one thing to reason about. An update that widened
