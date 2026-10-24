@@ -1376,6 +1376,26 @@ export function ChannelView({
         if (catchUpMark(firstPass.current)) firstPass.current = false;
     }, [messages, catchUpMark]);
 
+    /**
+     * Leaving before the opening pass could mark anything.
+     *
+     * That pass waits for the messages, and opening a conversation and going
+     * straight back - to see who it was, or because the preview said it all - is
+     * over before they land. The rail kept it bold, and "I opened it and it did
+     * not go read" is how that was reported. Opening it was the reader deciding to
+     * read it, so leaving still catches the whole conversation up - unless the
+     * page was hidden the whole time, which nobody reads.
+     */
+    useEffect(
+        () => () => {
+            if (!firstPass.current) return;
+            if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+            void actions.markChannelsReadAction({ channelIds: [channelId] });
+            closeDesktopNotice(`message:${channelId}`);
+        },
+        [channelId]
+    );
+
     /** The room's pins, the message being given a length, and the list. */
     const pins = usePins(channelId);
     /** The channel whose age gate was answered in this tab - see `gated`. */

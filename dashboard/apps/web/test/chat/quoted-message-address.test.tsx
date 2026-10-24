@@ -75,6 +75,7 @@ vi.mock("@/app/(app)/chat/actions", () => ({
     }),
     readSinceAction: async () => ({ page: { messages: [] } }),
     markReadAction: async () => ({}),
+    markChannelsReadAction: async () => ({}),
     receiptsAction: async () => ({ receipts: {} }),
     readThreadAction: async () => ({ messages: [] }),
     profileAction: async () => ({}),
