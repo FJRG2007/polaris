@@ -40,6 +40,15 @@ Screenshots of the real interface with sample data. Most link to a page with
 the full feature list. Mobile versions are in
 [docs/assets/media](docs/assets/media).
 
+### Everywhere
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/ecosystem-light-en-desktop.webp">
+    <img src="docs/assets/media/ecosystem-dark-en-desktop.webp" alt="Polaris on the desktop app, a phone, your servers and the browser extension">
+  </picture>
+</p>
+
 ### Talk
 
 <table>
@@ -56,31 +65,11 @@ the full feature list. Mobile versions are in
     <td width="50%" valign="top">
       <a href="docs/features/calls.md">
       <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-en-desktop.webp">
-        <img src="docs/assets/media/in-call-dark-en-desktop.webp" alt="Calls: voice channels, meetings and calls in any chat">
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/talk-light-en-desktop.webp">
+        <img src="docs/assets/media/talk-dark-en-desktop.webp" alt="Calls: voice rooms, video calls, shared screens and meetings">
       </picture>
       </a>
-      <br><sub><a href="docs/features/calls.md"><b>Calls</b></a>: voice channels, meetings and calls in any chat</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <a href="docs/features/calls.md">
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-direct-light-en-desktop.webp">
-        <img src="docs/assets/media/call-direct-dark-en-desktop.webp" alt="A video call in a direct message">
-      </picture>
-      </a>
-      <br><sub><a href="docs/features/calls.md"><b>Direct call</b></a>: face to face from any direct message</sub>
-    </td>
-    <td width="50%" valign="top">
-      <a href="docs/features/calls.md">
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-group-light-en-desktop.webp">
-        <img src="docs/assets/media/call-group-dark-en-desktop.webp" alt="A group call with a shared screen, being recorded">
-      </picture>
-      </a>
-      <br><sub><a href="docs/features/calls.md"><b>Group call</b></a>: cameras, a shared screen and a recording</sub>
+      <br><sub><a href="docs/features/calls.md"><b>Calls</b></a>: voice rooms, video calls, shared screens and meetings</sub>
     </td>
   </tr>
   <tr>
@@ -153,10 +142,10 @@ the full feature list. Mobile versions are in
       <a href="docs/features/polar.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/polar-light-en-desktop.webp">
-        <img src="docs/assets/media/polar-dark-en-desktop.webp" alt="Polar: ask about any page and have things done">
+        <img src="docs/assets/media/polar-dark-en-desktop.webp" alt="Polar answering a question in the browser">
       </picture>
       </a>
-      <br><sub><a href="docs/features/polar.md"><b>Polar</b></a>: ask about any page and have things done</sub>
+      <br><sub><a href="docs/features/polar.md"><b>Polar</b></a>: ask anything and have things done</sub>
     </td>
   </tr>
 </table>
@@ -177,11 +166,36 @@ the full feature list. Mobile versions are in
     <td width="50%" valign="top">
       <a href="docs/features/vault.md">
       <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-en-desktop.webp">
-        <img src="docs/assets/media/vault-dark-en-desktop.webp" alt="Vault: passwords and one-time codes, Bitwarden compatible">
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-browser-light-en-desktop.webp">
+        <img src="docs/assets/media/vault-browser-dark-en-desktop.webp" alt="Vault: passwords and one-time codes in the browser">
       </picture>
       </a>
-      <br><sub><a href="docs/features/vault.md"><b>Vault</b></a>: passwords and one-time codes, Bitwarden compatible</sub>
+      <br><sub><a href="docs/features/vault.md"><b>Vault</b></a>: passwords and one-time codes, shared with your team</sub>
+    </td>
+  </tr>
+</table>
+
+### In the browser
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/polar.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/polar-side-panel-light-en-desktop.webp">
+        <img src="docs/assets/media/polar-side-panel-dark-en-desktop.webp" alt="Polar in the side panel, answering about a page and working it">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/polar.md"><b>Polar side panel</b></a>: ask about the page you are on and have it done there</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/vault.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/extension-autofill-light-en-desktop.webp">
+        <img src="docs/assets/media/extension-autofill-dark-en-desktop.webp" alt="The extension filling a sign-in form from the vault">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/vault.md"><b>Autofill</b></a>: your logins filled on any site from the vault</sub>
     </td>
   </tr>
 </table>

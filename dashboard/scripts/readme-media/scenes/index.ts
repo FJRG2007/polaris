@@ -25,7 +25,10 @@ import { vault, vaultSends } from "./vault";
 import { deploy, deployLogs, deployProject } from "./deploy";
 import { taskPanel, tasks } from "./tasks";
 import { notes } from "./notes";
-import { polar } from "./polar";
+import { polar, polarPage, polarSidePanel } from "./polar";
+import { talk } from "./talk";
+import { ecosystem } from "./ecosystem";
+import { extensionAutofill, vaultBrowser } from "./browser";
 import { watch } from "./watch";
 import { automations } from "./automations";
 import { tools } from "./tools";
@@ -67,8 +70,11 @@ export const SCENES: readonly SceneDefinition[] = [
     officeDoc,
     vault,
     vaultSends,
+    vaultBrowser,
+    extensionAutofill,
     notes,
     polar,
+    polarSidePanel,
     automations,
     watch,
     placesOverview,
@@ -82,14 +88,20 @@ export const SCENES: readonly SceneDefinition[] = [
     marketplace,
     marketplaceInstall,
     launcher,
+    ecosystem,
     settings,
     settingsRoles,
     settingsUsers,
     accountSecurity,
     call,
+    talk,
     inCall,
     callMeeting,
     callGroup,
     callDirect,
     soundboard
 ];
+
+/** Scenes drawn only inside another scene's frame (`SceneWindow`): found by the
+ *  page, never taken as pictures of their own. */
+export const INNER_SCENES: readonly SceneDefinition[] = [polarPage];
