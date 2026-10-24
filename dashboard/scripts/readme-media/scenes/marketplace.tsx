@@ -12,6 +12,8 @@ function Marketplace({ ctx }: { ctx: SceneContext }) {
     return (
         <Chrome>
             <MarketplaceView
+                // The viewer runs this Polaris, so every app offers its install.
+                canInstall
                 installed={[
                     {
                         id: id("app-install", 1),
