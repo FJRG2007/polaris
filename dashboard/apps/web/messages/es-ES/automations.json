@@ -52,7 +52,8 @@
         "shelf": "Pertenece a",
         "personal": "Solo yo",
         "submit": "Crear",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "untitled": "Automatización sin nombre"
     },
     "editor": {
         "back": "Automatizaciones",
@@ -106,7 +107,9 @@
         "onErrorContinue": "Seguir",
         "references": "Usa {example} para insertar un valor del disparo o de un paso anterior.",
         "onErrorPort": "Camino de error",
-        "tryThen": "Los pasos tras el Intentar siguen cuando los de dentro salen bien."
+        "tryThen": "Los pasos tras el Intentar siguen cuando los de dentro salen bien.",
+        "rename": "Cambiar nombre de la automatización",
+        "renameSave": "Guardar nombre"
     },
     "nodes": {
         "manual": "A mano",
@@ -883,6 +886,39 @@
             "action": "Avísame cuando vuelva",
             "noticeTitle": "Internet ha vuelto",
             "noticeBody": "Estuvo caído {duration}."
+        }
+    },
+    "picker": {
+        "firstTitle": "Empieza con un disparador",
+        "firstHint": "Elige qué pone en marcha esta automatización: una hora, un webhook, algo de Polaris o un dispositivo de Lugares.",
+        "firstAction": "Añadir el primer paso",
+        "byTarget": "Por elemento",
+        "byType": "Por app",
+        "blocks": "Bloques",
+        "back": "Atrás",
+        "noMatch": "Nada coincide con \"{term}\"",
+        "more": "{count} más - sigue escribiendo para acotar",
+        "presetHint": "Empieza cuando Polaris envía {name}",
+        "groups": {
+            "basics": "Básicos",
+            "polaris": "Polaris",
+            "automations": "Automatizaciones",
+            "places": "Lugares",
+            "logic": "Lógica",
+            "timing": "Tiempo",
+            "data": "Datos",
+            "send": "Enviar"
+        },
+        "presets": {
+            "publicIpChanged": "Cambió la IP pública",
+            "nasOffline": "El NAS se desconectó",
+            "nasDiskUnhealthy": "Disco del NAS con problemas",
+            "nasDiskTemperature": "Disco del NAS demasiado caliente",
+            "nasPoolUsage": "El almacenamiento del NAS se llena",
+            "nasPoolUnprotected": "Almacenamiento del NAS sin protección",
+            "nasBackupFailed": "Falló la copia del NAS",
+            "nasBackupOverdue": "Copia del NAS atrasada",
+            "automationFinished": "Terminó otra automatización"
         }
     }
 }

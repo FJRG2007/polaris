@@ -40,7 +40,6 @@ import {
     Input,
     Select,
     Switch,
-    Textarea,
     isDirty,
     useToast
 } from "@polaris/ui";
@@ -100,6 +99,18 @@ export function AutomationsList({
     );
     const mayCreate = Boolean(data?.canEdit) && !origin;
     const [creating, setCreating] = useState(false);
+    const router = useRouter();
+    const [opening, startOpening] = useTransition();
+    // Nothing is asked up front: the editor names it from its first trigger. Only
+    // somebody who can also add to an organization is asked where it belongs.
+    const createNew = () =>
+        startOpening(async () => {
+            const shelves = await creatableShelvesAction().catch(() => null);
+            if (shelves?.ok && shelves.orgs.length > 0) return setCreating(true);
+            const answer = await createUnnamed(t("create.untitled"), null);
+            if (!answer.ok) return void toast.show({ title: answer.error });
+            router.push(`/automations/${answer.id}`);
+        });
     const [folder, setFolder] = useState<string>(ALL);
     const [tag, setTag] = useState<string | null>(null);
     const [managing, setManaging] = useState(false);
@@ -225,7 +236,7 @@ export function AutomationsList({
                 <div className="ml-auto flex items-center gap-2">
                     {actions}
                     {mayCreate ? (
-                        <Button onClick={() => setCreating(true)}>
+                        <Button onClick={createNew} disabled={opening} aria-busy={opening}>
                             <Plus aria-hidden="true" />
                             {t("newAutomation")}
                         </Button>
@@ -273,7 +284,7 @@ export function AutomationsList({
                     }
                     action={
                         mayCreate ? (
-                            <Button onClick={() => setCreating(true)}>
+                            <Button onClick={createNew} disabled={opening} aria-busy={opening}>
                                 <Plus aria-hidden="true" />
                                 {t("newAutomation")}
                             </Button>
@@ -849,23 +860,26 @@ function TagsDialog({
     );
 }
 
+/** A new automation with the placeholder name, on a person's own shelf or an organization's. */
+function createUnnamed(name: string, orgId: string | null) {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    return createAutomationAction({ name, description: "", orgId }, zone);
+}
+
+/** Asked only of somebody who can add automations to an organization: where the new one belongs. */
 function CreateDialog({ onClose }: { onClose: () => void }) {
     const t = useTranslations("automations");
     const router = useRouter();
-    const [name, setName] = useState("");
-    const [description, setDescription] = useState("");
     const [orgId, setOrgId] = useState<string>("personal");
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
     const shelves = useCachedAction("polaris.automations.shelves", creatableShelvesAction);
-    const parsed = core.automationCreateSchema.safeParse({ name, description });
 
     const submit = () =>
         start(async () => {
-            const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-            const answer = await createAutomationAction(
-                { name, description, orgId: orgId === "personal" ? null : orgId },
-                zone
+            const answer = await createUnnamed(
+                t("create.untitled"),
+                orgId === "personal" ? null : orgId
             );
             if (!answer.ok) return setError(answer.error);
             router.push(`/automations/${answer.id}`);
@@ -888,39 +902,18 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
                     className="space-y-3"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        if (parsed.success) submit();
+                        submit();
                     }}
                 >
                     <label className="block space-y-1 text-sm">
-                        <span>{t("create.name")} *</span>
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder={t("create.namePlaceholder")}
-                            maxLength={core.AUTOMATION_LIMITS.nameLength}
-                            autoFocus
+                        <span>{t("create.shelf")}</span>
+                        <Select
+                            value={orgId}
+                            onValueChange={setOrgId}
+                            options={options}
+                            aria-label={t("create.shelf")}
                         />
                     </label>
-                    <label className="block space-y-1 text-sm">
-                        <span>{t("create.descriptionLabel")}</span>
-                        <Textarea
-                            value={description}
-                            onChange={(event) => setDescription(event.target.value)}
-                            maxLength={core.AUTOMATION_LIMITS.descriptionLength}
-                            rows={2}
-                        />
-                    </label>
-                    {options.length > 1 ? (
-                        <label className="block space-y-1 text-sm">
-                            <span>{t("create.shelf")}</span>
-                            <Select
-                                value={orgId}
-                                onValueChange={setOrgId}
-                                options={options}
-                                aria-label={t("create.shelf")}
-                            />
-                        </label>
-                    ) : null}
                     {error ? (
                         <p role="alert" className="text-sm text-danger">
                             {error}
@@ -930,11 +923,7 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {t("create.cancel")}
                         </Button>
-                        <Button
-                            type="submit"
-                            disabled={!parsed.success || pending}
-                            aria-disabled={!parsed.success}
-                        >
+                        <Button type="submit" disabled={pending}>
                             {t("create.submit")}
                         </Button>
                     </DialogFooter>

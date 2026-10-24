@@ -52,7 +52,8 @@
         "shelf": "Belongs to",
         "personal": "Just me",
         "submit": "Create",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "untitled": "Untitled automation"
     },
     "editor": {
         "back": "Automations",
@@ -106,7 +107,9 @@
         "onErrorContinue": "Carry on",
         "references": "Use {example} to insert a value from the trigger or an earlier step.",
         "onErrorPort": "Take the error path",
-        "tryThen": "The steps after the Try run when the steps inside it succeed."
+        "tryThen": "The steps after the Try run when the steps inside it succeed.",
+        "rename": "Rename automation",
+        "renameSave": "Save name"
     },
     "nodes": {
         "manual": "Run by hand",
@@ -883,6 +886,39 @@
             "action": "Tell me when it comes back",
             "noticeTitle": "The internet is back",
             "noticeBody": "It was down for {duration}."
+        }
+    },
+    "picker": {
+        "firstTitle": "Start with a trigger",
+        "firstHint": "Pick what starts this automation: a time, a webhook, something in Polaris or a Places device.",
+        "firstAction": "Add first step",
+        "byTarget": "By thing",
+        "byType": "By app",
+        "blocks": "Blocks",
+        "back": "Back",
+        "noMatch": "Nothing matches \"{term}\"",
+        "more": "{count} more - keep typing to narrow it down",
+        "presetHint": "Starts when Polaris sends {name}",
+        "groups": {
+            "basics": "Basics",
+            "polaris": "Polaris",
+            "automations": "Automations",
+            "places": "Places",
+            "logic": "Logic",
+            "timing": "Timing",
+            "data": "Data",
+            "send": "Send"
+        },
+        "presets": {
+            "publicIpChanged": "Public IP changed",
+            "nasOffline": "NAS went offline",
+            "nasDiskUnhealthy": "NAS disk unhealthy",
+            "nasDiskTemperature": "NAS disk running hot",
+            "nasPoolUsage": "NAS storage filling up",
+            "nasPoolUnprotected": "NAS storage unprotected",
+            "nasBackupFailed": "NAS backup failed",
+            "nasBackupOverdue": "NAS backup overdue",
+            "automationFinished": "Another automation finished"
         }
     }
 }
