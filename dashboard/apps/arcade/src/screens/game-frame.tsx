@@ -7,7 +7,9 @@
  * Polaris where nobody plays never loads it.
  *
  * The frame and its page talk over `postMessage`, same origin only; the
- * messages are listed in the app's README ("Embed contract").
+ * messages are listed in the app's README ("Embed contract"). Inside a call,
+ * the call is the host: it is told where the reader goes and hands back the
+ * other players.
  */
 
 import { z } from "zod";
@@ -16,6 +18,9 @@ import { Button } from "@polaris/ui";
 import { gameFrameSrc } from "../games/registry";
 import { useEffect, useRef, useState } from "react";
 import type { GameDefinition } from "../games/types";
+import type { AppHostTypes } from "@polaris/app-host";
+
+type CallActivityHost = AppHostTypes["CallActivityHost"];
 
 const fromGame = z.discriminatedUnion("type", [
     z.object({
@@ -27,7 +32,9 @@ const fromGame = z.discriminatedUnion("type", [
     z.object({
         type: z.literal("polaris-game:failed"),
         reason: z.enum(["graphics", "data", "error"])
-    })
+    }),
+    // Checked by the call before it goes anywhere.
+    z.object({ type: z.literal("polaris-game:state") }).passthrough()
 ]);
 
 /** Where each stage sits on the one bar: the download, the city, the shaders. */
@@ -43,7 +50,7 @@ type Load =
 
 const STARTING: Load = { phase: "loading", stage: null, progress: 0 };
 
-export function GameFrame({ game }: { game: GameDefinition }) {
+export function GameFrame({ game, call }: { game: GameDefinition; call?: CallActivityHost }) {
     const t = useArcadeT();
     const frame = useRef<HTMLIFrameElement>(null);
     const [attempt, setAttempt] = useState(0);
@@ -51,6 +58,8 @@ export function GameFrame({ game }: { game: GameDefinition }) {
     const heard = useRef(false);
     const silence = useRef<number | undefined>(undefined);
     const name = t(`games.${game.id}.name` as never);
+    const host = useRef(call);
+    host.current = call;
 
     useEffect(() => {
         heard.current = false;
@@ -61,14 +70,20 @@ export function GameFrame({ game }: { game: GameDefinition }) {
             if (!message.success) return;
             heard.current = true;
             const data = message.data;
-            if (data.type === "polaris-game:ready") setLoad({ phase: "ready" });
-            else if (data.type === "polaris-game:failed") setLoad({ phase: "failed", reason: data.reason });
+            if (data.type === "polaris-game:state") host.current?.onState(data);
+            else if (data.type === "polaris-game:ready") setLoad({ phase: "ready" });
+            else if (data.type === "polaris-game:failed")
+                setLoad({ phase: "failed", reason: data.reason });
             else {
                 const [from, to] = STAGES[data.stage];
                 const progress = from + (to - from) * data.done;
                 setLoad((now) =>
                     now.phase === "loading"
-                        ? { phase: "loading", stage: data.stage, progress: Math.max(now.progress, progress) }
+                        ? {
+                              phase: "loading",
+                              stage: data.stage,
+                              progress: Math.max(now.progress, progress)
+                          }
                         : now
                 );
             }
@@ -80,10 +95,32 @@ export function GameFrame({ game }: { game: GameDefinition }) {
         };
     }, [attempt]);
 
+    // In a call, once the city is up: join, then draw the others wherever the
+    // call says they are.
+    const ready = load.phase === "ready";
+    const seat = call?.self.id;
+    useEffect(() => {
+        const session = host.current;
+        if (!ready || !seat || !session) return;
+        const post = (message: unknown) =>
+            frame.current?.contentWindow?.postMessage(message, window.location.origin);
+        post({ type: "polaris-game:join", self: session.self });
+        const stop = session.onPlayers((players) =>
+            post({ type: "polaris-game:players", players })
+        );
+        return () => {
+            stop();
+            post({ type: "polaris-game:leave" });
+        };
+    }, [ready, seat, attempt]);
+
     const onFrameLoad = () => {
         window.clearTimeout(silence.current);
         silence.current = window.setTimeout(() => {
-            if (!heard.current) setLoad((now) => (now.phase === "loading" ? { phase: "failed", reason: "error" } : now));
+            if (!heard.current)
+                setLoad((now) =>
+                    now.phase === "loading" ? { phase: "failed", reason: "error" } : now
+                );
         }, SILENT_MS);
     };
 
@@ -127,8 +164,13 @@ export function GameFrame({ game }: { game: GameDefinition }) {
                             </div>
                         </div>
                     ) : (
-                        <div role="alert" className="flex max-w-sm flex-col items-center gap-3 text-center">
-                            <p className="text-sm">{load.reason === "graphics" ? t("noGpu") : t("failed")}</p>
+                        <div
+                            role="alert"
+                            className="flex max-w-sm flex-col items-center gap-3 text-center"
+                        >
+                            <p className="text-sm">
+                                {load.reason === "graphics" ? t("noGpu") : t("failed")}
+                            </p>
                             <Button size="sm" onClick={retry}>
                                 {t("retry")}
                             </Button>

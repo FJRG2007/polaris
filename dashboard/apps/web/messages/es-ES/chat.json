@@ -1953,9 +1953,6 @@
         "someone": "Alguien",
         "someGame": "un juego",
         "playing": "{count, plural, one {# jugando} other {# jugando}}",
-        "loading": "Cargando {game}",
-        "failed": "El juego no pudo arrancar. Sal y vuelve a unirte.",
-        "noGraphics": "Este navegador no puede dibujar 3D. Prueba un Chrome, Edge, Firefox o Safari reciente.",
         "denied": "Un administrador ha desactivado los juegos en llamadas para tu cuenta.",
         "missing": "Juegos no está instalado en este Polaris. Un administrador puede añadirlo desde la tienda.",
         "seat": "Únete a la llamada para jugar."

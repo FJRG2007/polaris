@@ -1953,9 +1953,6 @@
         "someone": "Someone",
         "someGame": "a game",
         "playing": "{count, plural, one {# playing} other {# playing}}",
-        "loading": "Loading {game}",
-        "failed": "The game could not start. Leave it and join again.",
-        "noGraphics": "This browser cannot draw 3D. Try a recent Chrome, Edge, Firefox or Safari.",
         "denied": "An admin has turned off games in calls for your account.",
         "missing": "Games is not installed on this Polaris. An admin can add it from the app store.",
         "seat": "Join the call to play."

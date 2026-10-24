@@ -27,7 +27,7 @@ import type {
     AppRecordHit,
     AppSlot,
     AppWidgetDefinition,
-    CallActivityGame,
+    CallActivityOffer,
     ConnectionsViewer,
     ChatCommandSpec,
     ChatGameLink,
@@ -548,11 +548,18 @@ export async function appDeckActions(): Promise<AppDeckAction[]> {
  */
 /** The games installed apps offer inside a call, in the reader's language. An
  *  app that cannot answer offers none rather than taking the others down. */
-export async function callActivityGames(locale: Locale): Promise<CallActivityGame[]> {
-    const games: CallActivityGame[] = [];
+export async function callActivityGames(locale: Locale): Promise<CallActivityOffer[]> {
+    const games: CallActivityOffer[] = [];
     for (const extension of await installedWith("callActivities")) {
         try {
-            games.push(...(await extension.callActivities!(locale)));
+            for (const game of await extension.callActivities!(locale)) {
+                const slot: AppSlot = {
+                    app: extension.id,
+                    kind: "call-activity",
+                    props: { gameId: game.id }
+                };
+                games.push({ ...game, slot: withBundleSlot(slot) });
+            }
         } catch (caught) {
             console.error(`polaris: ${extension.id} could not list its call games:`, caught);
         }

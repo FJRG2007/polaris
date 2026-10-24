@@ -58,12 +58,19 @@ export const VEHICLES = ["person", "car", "cyclist", "helicopter"] as const;
 
 export type Vehicle = (typeof VEHICLES)[number];
 
+/** The same direction, as an angle between -pi and pi. A game adds to its
+ *  heading as a player turns and never wraps it, so an unwrapped one grows
+ *  without end. */
+export function wrapHeading(heading: number): number {
+    return Math.atan2(Math.sin(heading), Math.cos(heading));
+}
+
 export const poseSchema = z
     .object({
         x: coordinate,
         y: coordinate,
         z: coordinate,
-        heading: z.number().finite().min(-1e3).max(1e3),
+        heading: z.number().finite().min(-Math.PI).max(Math.PI),
         mode: z.enum(VEHICLES)
     })
     .strict();
@@ -164,32 +171,20 @@ export function readActivityMessage(payload: unknown): ActivityMessage | null {
     return parsed.success ? parsed.data : null;
 }
 
-/** What the game's frame tells the call. Matches the embed contract in
- *  `apps/arcade/game/<game>/engine/embed.js`. */
-export const frameMessageSchema = z.discriminatedUnion("type", [
-    z.object({
-        type: z.literal("polaris-game:progress"),
-        stage: z.enum(["data", "build", "compile"]),
-        done: z.number().finite().min(0).max(1)
-    }),
-    z.object({ type: z.literal("polaris-game:ready") }),
-    z.object({
-        type: z.literal("polaris-game:failed"),
-        reason: z.enum(["graphics", "data", "error"])
-    }),
-    z.object({
-        type: z.literal("polaris-game:state"),
-        ...poseSchema.shape,
-        speed: z.number().finite().optional()
-    })
-]);
-
-export type FrameMessage = z.infer<typeof frameMessageSchema>;
-
-/** Parse a frame message, or null for anything that does not fit. */
-export function readFrameMessage(payload: unknown): FrameMessage | null {
-    const parsed = frameMessageSchema.safeParse(payload);
-    return parsed.success ? parsed.data : null;
+/** The reader's own position as the game's frame reports it
+ *  (`polaris-game:state`, see `apps/arcade/game/<game>/engine/embed.js`), or
+ *  null for anything that does not fit. The heading is wrapped first. */
+export function readFramePose(payload: unknown): Pose | null {
+    if (!payload || typeof payload !== "object") return null;
+    const { x, y, z, heading, mode } = payload as Record<string, unknown>;
+    const pose = poseSchema.safeParse({
+        x,
+        y,
+        z,
+        heading: typeof heading === "number" ? wrapHeading(heading) : heading,
+        mode
+    });
+    return pose.success ? pose.data : null;
 }
 
 /** What the call hands the frame: everybody else in the game, where they are. */

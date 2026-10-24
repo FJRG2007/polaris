@@ -44,6 +44,9 @@ vi.mock("@/lib/app-extensions/registry", () => ({ callActivityGames: async () =>
 const actions = await import("@/app/(app)/chat/call-activity-actions");
 const passes = await import("@/lib/chat/activity-pass");
 
+const vouched = async (meetingId: unknown, claims: unknown) =>
+    (await actions.vouchCallGames(meetingId, claims)).seats;
+
 beforeEach(() => {
     state.can = new Set(["arcade.calls"]);
     state.installed = true;
@@ -83,7 +86,7 @@ describe("arcade.calls on the server", () => {
         expect(await actions.callGames("not-a-uuid")).toEqual({ ok: false, reason: "seat" });
         expect(await actions.claimCallGame(MEETING, "../../etc")).toEqual({ reason: "missing" });
         expect(await actions.claimCallGame(MEETING, "chess")).toEqual({ reason: "missing" });
-        expect(await actions.vouchCallGames(MEETING, "nope")).toEqual([]);
+        expect(await vouched(MEETING, "nope")).toEqual([]);
     });
 });
 
@@ -99,9 +102,9 @@ describe("renewing a pass", () => {
         const renewed = await actions.renewCallGame(MEETING, claim);
         if (!("claim" in renewed)) throw new Error("expected a claim");
         expect(renewed.claim).toMatchObject({ game: claim.game, at: claim.at });
-        expect(
-            await actions.vouchCallGames(MEETING, [{ seat: "seat-1", claim: renewed.claim }])
-        ).toEqual(["seat-1"]);
+        expect(await vouched(MEETING, [{ seat: "seat-1", claim: renewed.claim }])).toEqual([
+            "seat-1"
+        ]);
     });
 
     it("is refused once arcade.calls is taken away, the app removed or the seat lost", async () => {
@@ -150,25 +153,21 @@ describe("a pass", () => {
         if (!("claim" in result)) throw new Error("expected a claim");
         state.seat = { meetingId: MEETING, participantId: "seat-2", admission: "admitted" };
         state.can = new Set();
-        expect(
-            await actions.vouchCallGames(MEETING, [{ seat: "seat-1", claim: result.claim }])
-        ).toEqual(["seat-1"]);
+        expect(await vouched(MEETING, [{ seat: "seat-1", claim: result.claim }])).toEqual([
+            "seat-1"
+        ]);
     });
 
     it("opens nothing for another seat, game, moment or call, or once expired", async () => {
         const result = await actions.claimCallGame(MEETING, "new-york");
         if (!("claim" in result)) throw new Error("expected a claim");
         const { claim } = result;
-        expect(await actions.vouchCallGames(MEETING, [{ seat: "seat-9", claim }])).toEqual([]);
+        expect(await vouched(MEETING, [{ seat: "seat-9", claim }])).toEqual([]);
         expect(
-            await actions.vouchCallGames(MEETING, [
-                { seat: "seat-1", claim: { ...claim, at: claim.at + 1 } }
-            ])
+            await vouched(MEETING, [{ seat: "seat-1", claim: { ...claim, at: claim.at + 1 } }])
         ).toEqual([]);
         expect(
-            await actions.vouchCallGames(MEETING, [
-                { seat: "seat-1", claim: { ...claim, game: "other" } }
-            ])
+            await vouched(MEETING, [{ seat: "seat-1", claim: { ...claim, game: "other" } }])
         ).toEqual([]);
         expect(
             passes.readActivityPass(claim.pass, {
@@ -189,8 +188,17 @@ describe("a pass", () => {
         const result = await actions.claimCallGame(MEETING, "new-york");
         if (!("claim" in result)) throw new Error("expected a claim");
         state.seat = null;
-        expect(
-            await actions.vouchCallGames(MEETING, [{ seat: "seat-1", claim: result.claim }])
-        ).toEqual([]);
+        expect(await vouched(MEETING, [{ seat: "seat-1", claim: result.claim }])).toEqual([]);
+    });
+});
+
+describe("the server's clock", () => {
+    it("comes back with every vouch, so a browser whose own is off judges passes by it", async () => {
+        const before = Date.now();
+        const answer = await actions.vouchCallGames(MEETING, []);
+        expect(answer.seats).toEqual([]);
+        expect(answer.now).toBeGreaterThanOrEqual(before);
+        expect(answer.now).toBeLessThanOrEqual(Date.now());
+        expect((await actions.vouchCallGames(MEETING, "nope")).now).toBeGreaterThanOrEqual(before);
     });
 });

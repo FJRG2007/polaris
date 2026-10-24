@@ -18,6 +18,7 @@ import { resolveSeat } from "@/lib/chat/meeting-seat";
 import { sessionCan, requireUser } from "@/lib/session";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { isAppInstalled } from "@/lib/apps/install-presence";
+import type { AppSlot } from "@/lib/app-extensions/types";
 import { callActivityGames } from "@/lib/app-extensions/registry";
 import { activityPass, readActivityPass } from "@/lib/chat/activity-pass";
 import { activityClaimSchema, MAX_PLAYERS, type ActivityClaim } from "@/lib/chat/call-activity";
@@ -29,6 +30,8 @@ export interface CallGame {
     readonly id: string;
     readonly name: string;
     readonly src: string;
+    /** What draws it inside the call. */
+    readonly slot: AppSlot;
 }
 
 export type CallGamesAnswer =
@@ -110,26 +113,39 @@ const vouchSchema = z
     .array(z.object({ seat: z.string().min(1).max(128), claim: activityClaimSchema }).strict())
     .max(MAX_PLAYERS * 2);
 
+export interface CallGamesVouch {
+    readonly seats: string[];
+    /** The server's clock, so a browser whose own runs early or late judges
+     *  when a pass runs out by this one instead. */
+    readonly now: number;
+}
+
 /**
  * Which of these claims the server minted: the seats whose pass is real for
  * this call, this seat, this game and this moment. Asked by anybody holding a
  * seat in the call - a guest included, who sees who is playing without being
  * able to join.
  */
-export async function vouchCallGames(meetingId: unknown, claims: unknown): Promise<string[]> {
+export async function vouchCallGames(meetingId: unknown, claims: unknown): Promise<CallGamesVouch> {
+    const now = Date.now();
     const id = meetingIdSchema.safeParse(meetingId);
     const parsed = vouchSchema.safeParse(claims);
-    if (!id.success || !parsed.success) return [];
+    if (!id.success || !parsed.success) return { seats: [], now };
     const seat = await resolveSeat(id.data);
-    if (!seat || seat.admission !== "admitted") return [];
-    return parsed.data
+    if (!seat || seat.admission !== "admitted") return { seats: [], now };
+    const seats = parsed.data
         .filter(({ seat: claimant, claim }) =>
-            readActivityPass(claim.pass, {
-                meetingId: id.data,
-                seat: claimant,
-                game: claim.game,
-                at: claim.at
-            })
+            readActivityPass(
+                claim.pass,
+                {
+                    meetingId: id.data,
+                    seat: claimant,
+                    game: claim.game,
+                    at: claim.at
+                },
+                now
+            )
         )
         .map(({ seat: claimant }) => claimant);
+    return { seats, now };
 }

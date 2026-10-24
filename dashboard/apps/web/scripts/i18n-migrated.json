@@ -1,6 +1,8 @@
 {
     "$comment": "Files whose every user-facing string comes from a catalog. test/i18n/scan.test.ts holds each to zero findings of scripts/i18n-scan.mjs, so a migrated screen cannot drift back to English. Add a file here in the same change that migrates it. Paths are relative to dashboard/apps.",
     "files": [
+        "arcade/src/screens/extension-slot.tsx",
+        "arcade/src/screens/game-frame.tsx",
         "calendar/src/actions/events.ts",
         "calendar/src/actions/sources.ts",
         "calendar/src/actions/tasks.ts",
@@ -796,6 +798,7 @@
         "web/src/app/(app)/chat/audio-download.ts",
         "web/src/app/(app)/chat/bans-dialog.tsx",
         "web/src/app/(app)/chat/call-activity-panel.tsx",
+        "web/src/components/app-extensions/installed-client.tsx",
         "web/src/app/(app)/chat/call-audio.tsx",
         "web/src/app/(app)/chat/call-combine-panel.tsx",
         "web/src/app/(app)/chat/call-elsewhere.tsx",

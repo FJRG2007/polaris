@@ -172,32 +172,41 @@ describe("a message on the data channel", () => {
     });
 });
 
-describe("a message from the game's frame", () => {
-    it("is read in the contract's shapes", () => {
-        expect(activity.readFrameMessage({ type: "polaris-game:ready" })).toEqual({
-            type: "polaris-game:ready"
-        });
-        expect(
-            activity.readFrameMessage({ type: "polaris-game:progress", stage: "data", done: 0.5 })
-        ).toEqual({ type: "polaris-game:progress", stage: "data", done: 0.5 });
-        expect(
-            activity.readFrameMessage({ type: "polaris-game:failed", reason: "graphics" })?.type
-        ).toBe("polaris-game:failed");
-        expect(
-            activity.readFrameMessage({ type: "polaris-game:state", ...pose, speed: 3 })?.type
-        ).toBe("polaris-game:state");
+describe("a position from the game's frame", () => {
+    it("is read as a pose, extra fields dropped", () => {
+        expect(activity.readFramePose({ type: "polaris-game:state", ...pose, speed: 3 })).toEqual(
+            pose
+        );
+    });
+
+    it("keeps syncing after a player turned many times the same way", () => {
+        const turned = activity.readFramePose({ ...pose, heading: 0.5 + 2 * Math.PI * 400 });
+        expect(turned?.heading).toBeCloseTo(0.5, 6);
+        expect(activity.readFramePose({ ...pose, heading: -1e9 })).not.toBeNull();
     });
 
     it("drops anything else", () => {
         for (const bad of [
             undefined,
-            { type: "polaris-game:progress", stage: "data", done: 2 },
-            { type: "polaris-game:failed", reason: "boom" },
-            { type: "polaris-game:state", ...pose, y: Infinity },
-            { type: "polaris-game:state", ...pose, mode: "boat" },
+            "pose",
+            { ...pose, y: Infinity },
+            { ...pose, heading: Number.NaN },
+            { ...pose, mode: "boat" },
             { type: "polaris-game:join", self: { id: "a", name: "b" } }
         ]) {
-            expect(activity.readFrameMessage(bad)).toBeNull();
+            expect(activity.readFramePose(bad)).toBeNull();
+        }
+    });
+});
+
+describe("a heading", () => {
+    it("is wrapped between -pi and pi", () => {
+        for (const heading of [0, 3, -3, 7, -7, 1e6]) {
+            const wrapped = activity.wrapHeading(heading);
+            expect(wrapped).toBeGreaterThanOrEqual(-Math.PI);
+            expect(wrapped).toBeLessThanOrEqual(Math.PI);
+            expect(Math.cos(wrapped)).toBeCloseTo(Math.cos(heading), 9);
+            expect(Math.sin(wrapped)).toBeCloseTo(Math.sin(heading), 9);
         }
     });
 });

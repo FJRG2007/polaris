@@ -2,22 +2,26 @@
 
 /**
  * Games in a call: the button that starts one, the line that offers it to
- * everybody else, and the game itself, framed inside the call.
+ * everybody else, and the game itself, drawn inside the call by the app that
+ * offers it (its `call-activity` slot).
  *
  * What is synced, and nothing more: who is playing (each player's own claim,
  * vouched for by the server) and each player's position, heading and vehicle,
  * passed only between the players. Every browser runs its own city; traffic,
  * people on the street and everything else in it are not shared.
  *
- * Nothing here loads until somebody presses the button or somebody in the call
- * is playing: a call where nobody plays asks the server nothing.
+ * The game's code loads only once somebody plays. The server is asked once as
+ * the reader takes their seat whether they may play, so the button is drawn
+ * only for whoever may use it.
  */
 
 import type { CallState } from "./call-state";
 import { Joystick, LogOut } from "lucide-react";
 import * as actions from "./call-activity-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { CallActivityHost } from "@/lib/app-extensions/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
     Button,
     Dialog,
@@ -28,11 +32,6 @@ import {
     cn
 } from "@polaris/ui";
 import * as callGame from "@/lib/chat/call-activity";
-
-type Loading =
-    | { readonly kind: "loading"; readonly done: number }
-    | { readonly kind: "ready" }
-    | { readonly kind: "failed"; readonly graphics: boolean };
 
 export interface CallActivity {
     readonly session: callGame.ActivitySession | null;
@@ -45,8 +44,14 @@ export interface CallActivity {
     readonly ask: () => void;
     readonly play: (game: string) => void;
     readonly leave: () => void;
-    readonly frame: React.RefObject<HTMLIFrameElement | null>;
-    readonly loading: Loading;
+    /** What the game is handed while the reader plays. */
+    readonly host: CallActivityHost | null;
+}
+
+/** How far the server's clock is ahead of this browser's, read off a pass it
+ *  has just minted. */
+function skewFrom(claim: callGame.ActivityClaim): number {
+    return callGame.passExpiresAt(claim.pass) - callGame.PASS_TTL_MS - Date.now();
 }
 
 /** Everything a call needs to play together, for the button, the line and the
@@ -62,17 +67,18 @@ export function useCallActivity(
     const [vouched, setVouched] = useState<ReadonlySet<string>>(new Set());
     const [answer, setAnswer] = useState<actions.CallGamesAnswer | null>(null);
     const [busy, setBusy] = useState(false);
-    const [loading, setLoading] = useState<Loading>({ kind: "loading", done: 0 });
-    const frame = useRef<HTMLIFrameElement | null>(null);
-    const asked = useRef(false);
+    const asking = useRef(false);
     const { setActivity } = call;
     // The moment claims are judged against, so a pass that ran out stops
-    // counting without anybody having to say so.
-    const [clock, setClock] = useState(() => Date.now());
+    // counting without anybody having to say so. On the server's clock: a
+    // pass runs out by its time, not by this browser's.
+    const [skew, setSkew] = useState(0);
+    const [tick, setTick] = useState(() => Date.now());
+    const clock = tick + skew;
     const anyClaims = call.states.size > 0 && enabled;
     useEffect(() => {
         if (!anyClaims) return;
-        const timer = window.setInterval(() => setClock(Date.now()), 30_000);
+        const timer = window.setInterval(() => setTick(Date.now()), 30_000);
         return () => window.clearInterval(timer);
     }, [anyClaims]);
 
@@ -105,10 +111,12 @@ export function useCallActivity(
                 meetingId,
                 unasked.map(([seat, claim]) => ({ seat, claim }))
             )
-            .then((good) => {
+            .then(({ seats, now }) => {
                 for (const [seat, claim] of unasked)
-                    checked.current.set(claimKey(seat, claim), good.includes(seat));
-                if (live) setVouched((was) => settleVouched(was, claims, checked.current));
+                    checked.current.set(claimKey(seat, claim), seats.includes(seat));
+                if (!live) return;
+                setSkew(now - Date.now());
+                setVouched((was) => settleVouched(was, claims, checked.current));
             })
             .catch(() => {
                 // Asked again the next time anything changes, rather than never.
@@ -134,13 +142,15 @@ export function useCallActivity(
     // player whose permission was taken away is refused here and leaves.
     useEffect(() => {
         if (!mine) return;
-        const due = callGame.passExpiresAt(mine.pass) - callGame.RENEW_BEFORE_MS - Date.now();
+        const due =
+            callGame.passExpiresAt(mine.pass) - callGame.RENEW_BEFORE_MS - (Date.now() + skew);
         const timer = window.setTimeout(
             () => {
                 void actions
                     .renewCallGame(meetingId, mine)
                     .then((result) => {
                         if ("claim" in result) {
+                            setSkew(skewFrom(result.claim));
                             setMine(result.claim);
                             setActivity(callGame.encodeClaim(result.claim));
                         } else {
@@ -156,23 +166,30 @@ export function useCallActivity(
             Math.max(0, due)
         );
         return () => window.clearTimeout(timer);
-    }, [mine, meetingId, clock, setActivity]);
+    }, [mine, meetingId, clock, skew, setActivity]);
 
+    // Asked afresh every time, so a permission given back or a seat admitted
+    // since shows the next time anybody looks.
     const ask = useCallback(() => {
-        if (asked.current) return;
-        asked.current = true;
+        if (!enabled || asking.current) return;
+        asking.current = true;
         void actions
             .callGames(meetingId)
             .then(setAnswer)
-            .catch(() => {
-                asked.current = false;
+            .catch(() => undefined)
+            .finally(() => {
+                asking.current = false;
             });
-    }, [meetingId]);
-    // Somebody is playing: find out whether the reader may join, and what the
-    // game is called.
+    }, [meetingId, enabled]);
+    // As the reader takes their seat, so the button shows only to whoever may
+    // use it, and when somebody starts a game, so the line can offer it.
+    const running = session !== null;
     useEffect(() => {
-        if (session) ask();
-    }, [session, ask]);
+        if (self) ask();
+    }, [self, ask]);
+    useEffect(() => {
+        if (running) ask();
+    }, [running, ask]);
 
     const leave = useCallback(() => {
         setMine(null);
@@ -186,7 +203,7 @@ export function useCallActivity(
                 .claimCallGame(meetingId, game)
                 .then((result) => {
                     if ("claim" in result) {
-                        setLoading({ kind: "loading", done: 0 });
+                        setSkew(skewFrom(result.claim));
                         setMine(result.claim);
                         setActivity(callGame.encodeClaim(result.claim));
                     } else {
@@ -219,7 +236,7 @@ export function useCallActivity(
         [answer]
     );
 
-    usePoseSync({ call, self, session, playing, frame, nameOf, setLoading });
+    const host = usePoseSync({ call, self, session, playing, nameOf });
 
     return {
         session,
@@ -232,8 +249,7 @@ export function useCallActivity(
         ask,
         play,
         leave,
-        frame,
-        loading
+        host
     };
 }
 
@@ -251,46 +267,40 @@ function settleVouched(
     return next.size === was.size && [...next].every((seat) => was.has(seat)) ? was : next;
 }
 
-/** Positions between the frame and the other players. */
+type PlayersListener = (players: readonly callGame.FramePlayer[]) => void;
+
+/** Positions between the game and the other players: what the game is handed
+ *  while the reader plays. */
 function usePoseSync({
     call,
     self,
     session,
     playing,
-    frame,
-    nameOf,
-    setLoading
+    nameOf
 }: {
     call: CallState;
     self: string;
     session: callGame.ActivitySession | null;
     playing: boolean;
-    frame: React.RefObject<HTMLIFrameElement | null>;
     nameOf: (seat: string) => string;
-    setLoading: (loading: Loading) => void;
-}): void {
+}): CallActivityHost | null {
     const poses = useRef(new Map<string, callGame.Pose>());
     const heardAt = useRef(new Map<string, number>());
+    const listeners = useRef(new Set<PlayersListener>());
     const live = useRef({ session, self, playing, nameOf });
     live.current = { session, self, playing, nameOf };
     const timer = useRef<number | null>(null);
 
-    const post = useCallback(
-        (message: unknown) => frame.current?.contentWindow?.postMessage(message, location.origin),
-        [frame]
-    );
     const pushPlayers = useCallback(() => {
-        if (timer.current !== null) return;
+        if (timer.current !== null || listeners.current.size === 0) return;
         timer.current = window.setTimeout(() => {
             timer.current = null;
             const { session: now, self: me, playing: inGame, nameOf: name } = live.current;
             if (!now || !inGame) return;
-            post({
-                type: "polaris-game:players",
-                players: callGame.framePlayers(now, me, poses.current, name)
-            });
+            const players = callGame.framePlayers(now, me, poses.current, name);
+            for (const listener of listeners.current) listener(players);
         }, callGame.POSE_EVERY_MS);
-    }, [post]);
+    }, []);
     useEffect(
         () => () => {
             if (timer.current !== null) window.clearTimeout(timer.current);
@@ -328,45 +338,47 @@ function usePoseSync({
         if (playing) pushPlayers();
     }, [session, playing, pushPlayers]);
 
-    // From the frame: the same origin, the frame itself, and the contract's
-    // shapes only.
-    useEffect(() => {
-        if (!playing) return;
-        function onMessage(event: MessageEvent): void {
-            if (event.origin !== location.origin || event.source !== frame.current?.contentWindow)
-                return;
-            const message = callGame.readFrameMessage(event.data);
-            if (!message) return;
-            const { session: now, self: me, nameOf: name } = live.current;
-            if (message.type === "polaris-game:progress") {
-                setLoading({ kind: "loading", done: message.done });
-            } else if (message.type === "polaris-game:ready") {
-                setLoading({ kind: "ready" });
-                post({
-                    type: "polaris-game:join",
-                    self: { id: me, name: name(me).trim().slice(0, 64) || "?" }
-                });
-                pushPlayers();
-            } else if (message.type === "polaris-game:failed") {
-                setLoading({ kind: "failed", graphics: message.reason === "graphics" });
-            } else if (now) {
-                const { x, y, z, heading, mode } = message;
-                sendActivity(
-                    now.players.filter((seat) => seat !== me),
-                    { kind: "pose", game: now.game, pose: { x, y, z, heading, mode } }
-                );
-            }
-        }
-        window.addEventListener("message", onMessage);
-        return () => window.removeEventListener("message", onMessage);
-    }, [playing, frame, post, pushPlayers, sendActivity, setLoading]);
+    const onPlayers = useCallback(
+        (listener: PlayersListener) => {
+            listeners.current.add(listener);
+            pushPlayers();
+            return () => {
+                listeners.current.delete(listener);
+            };
+        },
+        [pushPlayers]
+    );
+
+    // To the other players: only a position that fits, and only while playing.
+    const onState = useCallback(
+        (state: unknown) => {
+            const pose = callGame.readFramePose(state);
+            const { session: now, self: me, playing: inGame } = live.current;
+            if (!pose || !now || !inGame) return;
+            sendActivity(
+                now.players.filter((seat) => seat !== me),
+                { kind: "pose", game: now.game, pose }
+            );
+        },
+        [sendActivity]
+    );
+
+    const name = nameOf(self).trim().slice(0, 64) || "?";
+    return useMemo(
+        () => (playing && self ? { self: { id: self, name }, onPlayers, onState } : null),
+        [playing, self, name, onPlayers, onState]
+    );
 }
 
-/** The games button, beside the hand. Drawn for anybody with an account. */
+/** The games button, beside the hand. Drawn for whoever may play here, and
+ *  muted with the reason for whoever may not yet; not drawn where there is no
+ *  game to offer. */
 export function CallGamesButton({ activity }: { activity: CallActivity }) {
     const t = useTranslations("chat");
     const [open, setOpen] = useState(false);
     const { answer, session, playing } = activity;
+    if (!answer || (!answer.ok && answer.reason === "missing")) return null;
+    const refused = answer.ok ? null : refusal(t, answer.reason);
     return (
         <>
             <button
@@ -376,13 +388,14 @@ export function CallGamesButton({ activity }: { activity: CallActivity }) {
                     setOpen(true);
                 }}
                 aria-label={t("callGames.button")}
-                title={t("callGames.button")}
+                title={refused ?? t("callGames.button")}
                 aria-pressed={playing}
                 className={cn(
                     "flex items-center gap-1 rounded p-1.5 transition-colors",
                     playing
                         ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    refused && "opacity-50"
                 )}
             >
                 <Joystick className="size-4 shrink-0" />
@@ -474,14 +487,12 @@ function refusal(
  */
 export function CallGamesPanel({ activity }: { activity: CallActivity }) {
     const t = useTranslations("chat");
-    const { session, playing, answer, loading } = activity;
+    const { session, playing, answer, host } = activity;
     if (!session) return null;
     const game = activity.gameName(session.game) ?? t("callGames.someGame");
-    const src = answer?.ok
-        ? answer.games.find((entry) => entry.id === session.game)?.src
-        : undefined;
+    const offer = answer?.ok ? answer.games.find((entry) => entry.id === session.game) : undefined;
 
-    if (!playing || !src) {
+    if (!playing || !host || !offer?.slot.bundle) {
         const starter = activity.nameOf(session.startedBy) || t("callGames.someone");
         return (
             <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
@@ -532,40 +543,9 @@ export function CallGamesPanel({ activity }: { activity: CallActivity }) {
                 </Button>
             </div>
             <div className="relative min-h-0 flex-1 bg-black">
-                <iframe
-                    ref={activity.frame}
-                    src={src}
-                    title={game}
-                    allow="fullscreen; gamepad"
-                    className="absolute inset-0 size-full border-0"
-                />
-                {loading.kind !== "ready" && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/90 p-4 text-center text-sm">
-                        {loading.kind === "failed" ? (
-                            <p>
-                                {loading.graphics
-                                    ? t("callGames.noGraphics")
-                                    : t("callGames.failed")}
-                            </p>
-                        ) : (
-                            <>
-                                <p>{t("callGames.loading", { game })}</p>
-                                <div
-                                    role="progressbar"
-                                    aria-valuemin={0}
-                                    aria-valuemax={100}
-                                    aria-valuenow={Math.round(loading.done * 100)}
-                                    className="h-1.5 w-48 max-w-full overflow-hidden rounded-full bg-muted"
-                                >
-                                    <div
-                                        className="h-full bg-primary transition-[width]"
-                                        style={{ width: `${Math.round(loading.done * 100)}%` }}
-                                    />
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
+                <div className="absolute inset-0">
+                    <AppSlotView slot={offer.slot} host={host} />
+                </div>
             </div>
         </section>
     );

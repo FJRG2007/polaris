@@ -29,7 +29,7 @@ From the game to the host:
 | `polaris-game:progress` | `stage`: `"data"`, `"build"` or `"compile"`; `done`: 0 to 1 | While loading, in stage order           |
 | `polaris-game:ready`    |                                                     | Once, when the first frame is on screen      |
 | `polaris-game:failed`   | `reason`: `"graphics"` (no WebGPU or WebGL2), `"data"`, `"error"` | Once, instead of `ready`       |
-| `polaris-game:state`    | `x`, `y`, `z`, `heading` (radians), `mode`, `speed` (m/s) | Up to ten times a second, while joined |
+| `polaris-game:state`    | `x`, `y`, `z`, `heading` (radians, -pi to pi), `mode`, `speed` (m/s) | Up to ten times a second, while joined |
 
 From the host to the game:
 

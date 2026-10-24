@@ -11,12 +11,13 @@ import { findGame } from "../games/registry";
 import type { AppHostTypes } from "@polaris/app-host";
 
 type AppSlot = AppHostTypes["AppSlot"];
+type CallActivityHost = AppHostTypes["CallActivityHost"];
 
-export function ArcadeSlot({ slot }: { slot: AppSlot }) {
+export function ArcadeSlot({ slot, host }: { slot: AppSlot; host?: CallActivityHost }) {
     switch (slot.kind) {
         case "call-activity": {
             const game = findGame((slot.props as { gameId: string }).gameId);
-            return game ? <GameFrame game={game} /> : null;
+            return game ? <GameFrame game={game} call={host} /> : null;
         }
         default:
             return null;

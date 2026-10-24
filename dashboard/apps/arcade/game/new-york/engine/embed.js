@@ -88,5 +88,6 @@ export function shareState(now, entity, mode) {
   if (!joined || now < nextState) return;
   nextState = now + 100;
   const { x, y, z } = entity.position;
-  tellHost({ type: 'polaris-game:state', x, y, z, heading: entity.heading, mode, speed: entity.speed || 0 });
+  const heading = Math.atan2(Math.sin(entity.heading), Math.cos(entity.heading));
+  tellHost({ type: 'polaris-game:state', x, y, z, heading, mode, speed: entity.speed || 0 });
 }

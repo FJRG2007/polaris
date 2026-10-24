@@ -21,6 +21,10 @@ vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
     playSoundAction: async () => ({})
 }));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
+vi.mock("@/app/(app)/chat/call-activity-actions", () => ({
+    callGames: async () => ({ ok: false, reason: "missing" }),
+    vouchCallGames: async () => ({ seats: [], now: Date.now() })
+}));
 // The panels around the room, which are not what this is about.
 vi.mock("@/app/(app)/chat/call-notice-strip", () => ({
     CallNoticeStrip: () => null,
@@ -86,7 +90,7 @@ function callWith(screens: ReadonlyMap<string, MediaStream>): CallState {
         get: (target, key) => {
             if (typeof key !== "string" || key in target) return target[key as string];
             // The controls: pressed by nobody here.
-            return /^(set|toggle|choose|refresh|pick|flip|combine|ask|answer|leave|lower|react)/.test(
+            return /^(set|toggle|choose|refresh|pick|flip|combine|ask|answer|leave|lower|react|listen|send)/.test(
                 key
             )
                 ? () => undefined

@@ -18,6 +18,7 @@ import type { McpSearchProvider } from "@/lib/mcp/search";
 import type { BusyEvent, Locale, PendingAppLink } from "@polaris/core";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
+import type { FramePlayer } from "@/lib/chat/call-activity";
 
 /** A scheduled job an app runs. Keyed like core's own; the key names the lease. */
 export interface AppJob {
@@ -126,6 +127,24 @@ export interface CallActivityGame {
     readonly name: string;
     /** The game's page, same origin, framed inside the call. */
     readonly src: string;
+}
+
+/** A call game as a call offers it: with the slot that draws it. */
+export interface CallActivityOffer extends CallActivityGame {
+    /** Kind `call-activity`, props `{ gameId }`, drawn with a `CallActivityHost`. */
+    readonly slot: AppSlot;
+}
+
+/** What a call hands the game it draws in its `call-activity` slot. */
+export interface CallActivityHost {
+    /** The reader, as the other players see them. */
+    readonly self: { readonly id: string; readonly name: string };
+    /** Called with every list of the other players and where they are, the
+     *  first one soon after subscribing; returns how to stop. */
+    readonly onPlayers: (listener: (players: readonly FramePlayer[]) => void) => () => void;
+    /** Where the reader is, as the game's frame said it (`polaris-game:state`).
+     *  Checked by the call before it is passed on. */
+    readonly onState: (state: unknown) => void;
 }
 
 export interface AppExtension {

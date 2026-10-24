@@ -18,6 +18,10 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 const recording = { supported: true, seconds: 0, start: () => undefined, stop: () => undefined };
 vi.mock("@/app/(app)/chat/call-session", () => ({ useHeldCall: () => ({ recording }) }));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
+vi.mock("@/app/(app)/chat/call-activity-actions", () => ({
+    callGames: async () => ({ ok: false, reason: "missing" }),
+    vouchCallGames: async () => ({ seats: [], now: Date.now() })
+}));
 vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
     favoriteSoundAction: async () => ({}),
     playSoundAction: async () => ({})
@@ -83,7 +87,7 @@ function callWith(over: Record<string, unknown> = {}): CallState {
     return new Proxy(base, {
         get: (target, key) => {
             if (typeof key !== "string" || key in target) return target[key as string];
-            return /^(set|toggle|choose|refresh|pick|flip|combine|ask|answer|leave|lower|react)/.test(
+            return /^(set|toggle|choose|refresh|pick|flip|combine|ask|answer|leave|lower|react|listen|send)/.test(
                 key
             )
                 ? () => undefined
