@@ -119,6 +119,20 @@ describe("days", () => {
         expect(judgeGrant({ ...OPEN, days: dayBit(4) }, AFTERNOON).standing).toBe("closed");
     });
 
+    it("covers the whole of each named day, its last minute included", () => {
+        const wednesdays = { ...OPEN, days: WEDNESDAY };
+        expect(judgeGrant(wednesdays, at(0, 0)).standing).toBe("live");
+        expect(judgeGrant(wednesdays, new Date("2026-09-09T23:59:30Z")).standing).toBe("live");
+        // Midnight is Thursday, which it does not name.
+        expect(judgeGrant(wednesdays, new Date("2026-09-10T00:00:00Z")).standing).toBe("closed");
+        expect(judgeGrant(wednesdays, new Date("2026-09-08T23:59:59Z")).standing).toBe("closed");
+    });
+
+    it("hands over a whole day ending at the next midnight", () => {
+        const verdict = judgeGrant({ ...OPEN, days: WEDNESDAY }, AFTERNOON);
+        expect(verdict.until?.toISOString()).toBe("2026-09-10T00:00:00.000Z");
+    });
+
     it("narrows the hours to those days when both are given", () => {
         const tuesdays: GrantSchedule = {
             ...OPEN,

@@ -449,10 +449,15 @@ export function judgeGrant(schedule: GrantSchedule, now: Date, fallbackZone = "U
     return judgeWindow(schedule, now, fallbackZone);
 }
 
-/** Days named but no hours: the window is the whole of each of those days. */
+/**
+ * Days named but no hours: the window is the whole of each of those days, from
+ * midnight to the next midnight. An end at the start is the window that crosses
+ * midnight back to itself, so the last minute of the day is in it too; ending at
+ * 23:59 would shut every such grant for the final minute of each day.
+ */
 function judgeDays(schedule: GrantSchedule, now: Date, fallbackZone: string): GrantVerdict {
     return judgeWindow(
-        { ...schedule, startMinute: 0, endMinute: MINUTES_IN_DAY - 1 },
+        { ...schedule, startMinute: 0, endMinute: 0 },
         now,
         fallbackZone
     );
@@ -463,7 +468,7 @@ function judgeWindow(schedule: GrantSchedule, now: Date, fallbackZone: string): 
     const rule = {
         days: schedule.days,
         startMinute: schedule.startMinute ?? 0,
-        endMinute: schedule.endMinute ?? MINUTES_IN_DAY - 1
+        endMinute: schedule.endMinute ?? 0
     };
     // Yesterday as well as today, and that is not an edge case: a window written
     // as 23:00 to 07:00 is open at one in the morning because of the day before.
