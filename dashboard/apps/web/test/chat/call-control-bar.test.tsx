@@ -149,8 +149,8 @@ describe("the call's control bar", () => {
         const media = group(/bar\.media/);
         expect(within(media).getByRole("button", { name: /callRoom\.mute$/ })).toBeTruthy();
         expect(within(media).getByRole("button", { name: /startVideo/ })).toBeTruthy();
-        // Each of the two is a split button: the control and its menu.
-        expect(within(media).getAllByRole("button", { name: /deviceSettings/ })).toHaveLength(2);
+        // Microphone, deafen and camera are split buttons: the control and its menu.
+        expect(within(media).getAllByRole("button", { name: /deviceSettings/ })).toHaveLength(3);
 
         const sharing = group(/bar\.sharing/);
         expect(within(sharing).getByRole("button", { name: /stopSharing/ })).toBeTruthy();
@@ -185,7 +185,20 @@ describe("the call's control bar", () => {
             name: /callRoom\.undeafen$/
         }) as HTMLButtonElement;
         expect(locked.disabled).toBe(true);
-        expect(locked.parentElement?.getAttribute("title")).toMatch(/aModeratorDeafenedYou/);
+        expect(locked.closest("span[title]")?.getAttribute("title")).toMatch(
+            /aModeratorDeafenedYou/
+        );
+    });
+
+    it("opens deafen's own menu on the outputs", () => {
+        room();
+        const [, outputMenu] = within(group(/bar\.media/)).getAllByRole("button", {
+            name: /deviceSettings/
+        });
+        open(outputMenu!);
+        const menu = screen.getByRole("menu");
+        expect(menu.textContent ?? "").toContain("outputDevice");
+        expect(menu.textContent ?? "").toContain("Fixture headphones");
     });
 
     // One outline per group: the buttons inside draw none of their own (a

@@ -1259,27 +1259,31 @@ export function CallRoom({
 
                     {/* Deafening, beside the microphone where voice clients put
                         it, rather than only in the microphone's menu and on a
-                        key nobody can find. A moderator's deafen is drawn locked,
-                        with who did it; the title is on a wrapper because a
-                        disabled button gets no hover. */}
+                        key nobody can find - with its own menu of the outputs,
+                        the way the microphone's lists the inputs. A moderator's
+                        deafen is drawn locked, with who did it; the title is on
+                        a wrapper because a disabled button gets no hover. */}
                     <span title={deafenTitle} className="inline-flex">
-                        <Button
-                            size="icon"
-                            variant="secondary"
+                        <Split
+                            label={call.deafened ? t("callRoom.undeafen") : t("callRoom.deafen")}
+                            title={deafenTitle}
+                            icon={
+                                call.deafened ? (
+                                    <HeadphoneOff className="size-4" />
+                                ) : (
+                                    <Headphones className="size-4" />
+                                )
+                            }
+                            variant={call.deafened ? "danger" : "secondary"}
+                            pressed={call.deafened}
                             onClick={call.toggleDeafen}
                             disabled={call.moderation.serverDeafened}
-                            aria-pressed={call.deafened}
-                            aria-label={
-                                call.deafened ? t("callRoom.undeafen") : t("callRoom.deafen")
-                            }
-                            className={cn(call.deafened && TINTS.danger)}
-                        >
-                            {call.deafened ? (
-                                <HeadphoneOff className="size-4" />
-                            ) : (
-                                <Headphones className="size-4" />
-                            )}
-                        </Button>
+                            devices={speakers.devices}
+                            chosenId={speakers.chosenId}
+                            devicesLabel={t("callRoom.outputDevice")}
+                            onChoose={speakers.choose}
+                            listOne
+                        />
                     </span>
 
                     <Split
@@ -1567,9 +1571,17 @@ function Split({
     voiceSettings,
     title,
     hint,
-    alert
+    alert,
+    disabled = false,
+    listOne = false
 }: {
     label: string;
+    /** The control itself can't be pressed - a moderator's deafen. Its menu
+     *  still opens: the device is the reader's to choose either way. */
+    disabled?: boolean;
+    /** Offer the menu for a single device too: the outputs, where seeing which
+     *  one the call comes out of is the point even when there is only one. */
+    listOne?: boolean;
     /** Something wrong with what this control sends, marked on it as a dot and
      *  said in its name - the microphone not being sent, picking nothing up,
      *  arriving too quiet. The sentence itself is in the call notices. */
@@ -1670,6 +1682,7 @@ function Split({
     // choice to make about how much of it to send.
     const hasMenu =
         devices.length > 1 ||
+        (listOne && devices.length > 0) ||
         outputs !== undefined ||
         onCleanMic !== undefined ||
         onQuality !== undefined ||
@@ -1692,6 +1705,7 @@ function Split({
                 size="icon"
                 variant={variant === "primary" ? "primary" : "secondary"}
                 onClick={onClick}
+                disabled={disabled}
                 aria-pressed={pressed}
                 aria-label={label}
                 aria-describedby={alert ? alertId : undefined}
