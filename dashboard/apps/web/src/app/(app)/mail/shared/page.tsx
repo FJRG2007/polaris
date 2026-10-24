@@ -49,7 +49,9 @@ export default async function SharedMailboxesPage() {
                                 >
                                     {mailbox.label || mailbox.address}
                                 </span>
-                                <Badge variant="neutral">{t(`delegate.level.${mailbox.level}`)}</Badge>
+                                <Badge variant="neutral">
+                                    {t(`delegate.level.${mailbox.level}`)}
+                                </Badge>
                             </Link>
                         </li>
                     ))}

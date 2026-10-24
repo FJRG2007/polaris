@@ -286,7 +286,9 @@ export async function delegatedMessage(
         seen: row.seen,
         flagged: row.flagged,
         replyAddress:
-            addressesFrom(row.replyToJson)[0]?.address ?? addressesFrom(row.fromJson)[0]?.address ?? "",
+            addressesFrom(row.replyToJson)[0]?.address ??
+            addressesFrom(row.fromJson)[0]?.address ??
+            "",
         bodyText: row.bodyText
     };
 }

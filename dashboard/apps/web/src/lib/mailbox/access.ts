@@ -171,10 +171,7 @@ export async function everyAccountId(userId: string): Promise<string[]> {
  * one mailbox has to open it whatever that switch says, or taking a mailbox out
  * of the merged views would make it unreachable.
  */
-export async function unifiedAccountIds(
-    userId: string,
-    shelfOrgId: MailShelf
-): Promise<string[]> {
+export async function unifiedAccountIds(userId: string, shelfOrgId: MailShelf): Promise<string[]> {
     const rows = await prisma.mailAccount.findMany({
         where: { ...onShelf(userId, shelfOrgId), unified: true },
         select: { id: true }
