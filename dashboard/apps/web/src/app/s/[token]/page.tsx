@@ -26,14 +26,13 @@ import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import { Badge } from "@polaris/ui";
 import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
+import { linkDenialMessage } from "@/lib/link-denial";
 import {
+    checkShare,
     logShareAccess,
     resolveShareByToken,
     resolveWithinShare,
-    shareGeoAllowed,
-    shareIpAllowed,
     shareUnlockCookie,
-    shareUsability,
     verifyShareUnlock
 } from "@/lib/share-service";
 
@@ -61,51 +60,21 @@ export default async function SharePage({
     await noteActivity(session?.session?.id);
 
     const share = await resolveShareByToken(token);
-    if (!share)
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("denied.notFound")}
-            />
-        );
+    if (!share) return <LinkUnavailable signedIn={signedIn} message={t("denied.notFound")} />;
 
-    const usable = shareUsability(share);
-    if (!usable.ok) {
+    // Same check as the token routes so the landing never shows a listing the
+    // download endpoints would refuse, then the fraud check.
+    const ip = await clientIp();
+    const checked = await checkShare(share, ip);
+    if (!checked.ok) {
         const message =
-            usable.reason === "expired"
-                ? t("denied.expired")
-                : usable.reason === "exhausted"
-                  ? t("denied.downloadLimit")
-                  : t("denied.revoked");
+            checked.reason === "exhausted"
+                ? t("denied.downloadLimit")
+                : await linkDenialMessage(checked.reason);
         return <LinkUnavailable signedIn={signedIn} message={message} />;
     }
-
-    // Same gate order as the token routes so the landing never shows a listing the
-    // download endpoints would refuse: IP allowlist, geo, then the fraud check.
-    const ip = await clientIp();
-    if (!shareIpAllowed(share.allowedCidrs, ip)) {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("denied.network")}
-            />
-        );
-    }
-    if (!(await shareGeoAllowed(share.allowedCountries, share.allowedContinents, ip))) {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("denied.location")}
-            />
-        );
-    }
     if (!(await dymoIpAllowed(ip)).allowed) {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("denied.network")}
-            />
-        );
+        return <LinkUnavailable signedIn={signedIn} message={t("denied.network")} />;
     }
 
     if (share.passwordHash) {
@@ -144,12 +113,7 @@ export default async function SharePage({
         isFile = stat.kind === "file";
         if (isFile) fileSize = stat.size.toString();
     } catch {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("share.unreadable")}
-            />
-        );
+        return <LinkUnavailable signedIn={signedIn} message={t("share.unreadable")} />;
     } finally {
         await driver.dispose();
     }
@@ -157,7 +121,9 @@ export default async function SharePage({
     return (
         <PublicShell signedIn={signedIn} className="max-w-6xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("share.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("share.title")}
+                </h1>
                 {share.maxDownloads !== null ? (
                     <Badge variant="neutral">
                         {t("share.downloadsLeft", {

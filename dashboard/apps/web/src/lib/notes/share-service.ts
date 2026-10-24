@@ -28,7 +28,11 @@ import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import {
     linkUsability,
+    readLinkGuards,
     signUnlock,
+    storedPeopleRules,
+    LINK_GUARD_FIELDS,
+    type LinkGuardsView,
     unlockCookieName,
     verifyUnlock,
     type LinkUsability
@@ -49,6 +53,8 @@ export interface NoteShareView {
     readonly allowedContinents: readonly string[];
     readonly expiresAt: string | null;
     readonly createdAt: string;
+    /** Its start, weekly hours and account rules. */
+    readonly guards: LinkGuardsView;
     /** Why it cannot be opened right now, when that is the case. */
     readonly usable: LinkUsability;
 }
@@ -64,7 +70,8 @@ const VIEW_SELECT = {
     allowedContinents: true,
     expiresAt: true,
     revokedAt: true,
-    createdAt: true
+    createdAt: true,
+    ...LINK_GUARD_FIELDS
 } as const;
 
 type ShareRow = {
@@ -78,6 +85,10 @@ type ShareRow = {
     expiresAt: Date | null;
     revokedAt: Date | null;
     createdAt: Date;
+    startsAt: Date | null;
+    requireLogin: boolean;
+    allowedUsers: string;
+    linkSchedule: string;
 };
 
 function list(json: string): string[] {
@@ -102,8 +113,10 @@ function toView(share: ShareRow): NoteShareView {
         allowedContinents: list(share.allowedContinents),
         expiresAt: share.expiresAt?.toISOString() ?? null,
         createdAt: share.createdAt.toISOString(),
+        guards: readLinkGuards(share),
         usable: linkUsability({
             revokedAt: share.revokedAt,
+            startsAt: share.startsAt,
             expiresAt: share.expiresAt,
             maxUses: share.maxViews,
             useCount: share.viewCount
@@ -163,7 +176,9 @@ export async function publishNote(
             ? await hashLinkPassword(input.password)
             : input.clearPassword
               ? null
-              : undefined
+              : undefined,
+        startsAt: input.startsAt,
+        ...storedPeopleRules(input)
     };
 
     if (existing) {
@@ -191,7 +206,11 @@ export async function publishNote(
             allowedContinents: limits.allowedContinents,
             maxViews: limits.maxViews ?? null,
             expiresAt: limits.expiresAt ?? null,
-            passwordHash: limits.passwordHash ?? null
+            passwordHash: limits.passwordHash ?? null,
+            startsAt: limits.startsAt,
+            requireLogin: limits.requireLogin,
+            allowedUsers: limits.allowedUsers,
+            linkSchedule: limits.linkSchedule
         },
         select: VIEW_SELECT
     });
@@ -252,7 +271,8 @@ export async function resolveNoteShareByToken(token: string) {
             allowedCountries: true,
             allowedContinents: true,
             expiresAt: true,
-            revokedAt: true
+            revokedAt: true,
+            ...LINK_GUARD_FIELDS
         }
     });
 }
@@ -262,12 +282,14 @@ export type NoteShareRecord = NonNullable<Awaited<ReturnType<typeof resolveNoteS
 /** Whether the link is live at all. */
 export function noteShareUsability(share: {
     revokedAt: Date | null;
+    startsAt?: Date | null;
     expiresAt: Date | null;
     maxViews: number | null;
     viewCount: number;
 }): LinkUsability {
     return linkUsability({
         revokedAt: share.revokedAt,
+        startsAt: share.startsAt,
         expiresAt: share.expiresAt,
         maxUses: share.maxViews,
         useCount: share.viewCount

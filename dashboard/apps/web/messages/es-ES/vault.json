@@ -611,10 +611,11 @@
         "untitled": "Sin título",
         "off": "Parado",
         "expiresAfterDeletion": "No puede caducar después de borrarse. Elige más duración o un día antes.",
-        "whereItOpens": "Dónde se abre",
-        "whereItOpensNamed": "Dónde se abre \"{name}\"",
+        "whereItOpens": "Límites",
+        "whereItOpensNamed": "Límites de \"{name}\"",
         "whereItOpensHint": "Se comprueba al abrirlo, desde Polaris y desde cualquier app Bitwarden.",
         "saveRules": "Guardar",
+        "browserOnly": "Si pide cuenta o personas concretas, solo se abre en su página web. Las apps de Bitwarden se rechazan.",
         "cancel": "Cancelar"
     },
     "port": {

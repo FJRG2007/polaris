@@ -14,7 +14,6 @@ import { clientIp } from "@/lib/request-context";
 import { noteActivity } from "@/lib/session-guard";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { SubmitTextForm } from "./submit-text-form";
-import { linkAddressDenial } from "@/lib/link-guards";
 import * as textRequests from "@/lib/text-request-service";
 import { LinkUnavailable } from "@/components/public-shell";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
@@ -38,52 +37,54 @@ export default async function TextDropPointPage({
         return <LinkUnavailable message={t("dropPoint.notFound")} />;
     }
 
-    const usable = textRequests.textRequestUsability(request);
-    if (!usable.ok) {
-        if (usable.reason === "scheduled" && request.startsAt) {
-            const format = await getDisplayFormat();
-            return (
-                <LinkUnavailable
-                    title={t("dropPoint.notOpenTitle")}
-                    message={t("dropPoint.opensOn", { date: format.date(request.startsAt) })}
-                />
-            );
-        }
-        return (
-            <LinkUnavailable
-                title={t("textDrop.closedTitle")}
-                message={t("textDrop.closed")}
-            />
-        );
-    }
-
     const ip = await clientIp();
-    if ((await linkAddressDenial(request, ip)) || !(await dymoIpAllowed(ip)).allowed) {
+    const session = await getSession();
+    const signedIn = Boolean(session?.user);
+    // One check for everything but the password and the cap: open, started,
+    // unexpired, inside its hours, from an allowed address and region, and for
+    // the account it needs.
+    const gate = await textRequests.textRequestGate(request, ip);
+    if (!gate.ok) {
+        switch (gate.reason) {
+            case "scheduled": {
+                if (!request.startsAt) break;
+                const format = await getDisplayFormat();
+                return (
+                    <LinkUnavailable
+                        title={t("dropPoint.notOpenTitle")}
+                        message={t("dropPoint.opensOn", { date: format.date(request.startsAt) })}
+                    />
+                );
+            }
+            case "outside_hours":
+                return (
+                    <LinkUnavailable
+                        title={t("dropPoint.outsideHoursTitle")}
+                        message={t("textDrop.outsideHours")}
+                    />
+                );
+            case "ip_not_allowed":
+            case "not_allowed":
+                return <LinkUnavailable message={t("dropPoint.network")} />;
+            case "country_not_allowed":
+                return <LinkUnavailable message={t("dropPoint.location")} />;
+            case "sign_in_required":
+                return (
+                    <LinkUnavailable
+                        signedIn={false}
+                        title={t("textDrop.signInTitle")}
+                        message={t("textDrop.signIn")}
+                    />
+                );
+            case "not_invited":
+                return <LinkUnavailable signedIn={signedIn} message={t("textDrop.account")} />;
+        }
+        return <LinkUnavailable title={t("textDrop.closedTitle")} message={t("textDrop.closed")} />;
+    }
+    if (!(await dymoIpAllowed(ip)).allowed) {
         return <LinkUnavailable message={t("dropPoint.network")} />;
     }
-
-    const session = await getSession();
-    const userId = session?.user?.id ?? null;
-    const signedIn = Boolean(session?.user);
     await noteActivity(session?.session?.id);
-
-    if (request.requireLogin && !userId) {
-        return (
-            <LinkUnavailable
-                signedIn={false}
-                title={t("textDrop.signInTitle")}
-                message={t("textDrop.signIn")}
-            />
-        );
-    }
-    if (!(await textRequests.textRequestUserAllowed(request.allowedUsers, userId))) {
-        return (
-            <LinkUnavailable
-                signedIn={signedIn}
-                message={t("textDrop.account")}
-            />
-        );
-    }
 
     if (request.passwordHash) {
         const cookieValue = (await cookies()).get(

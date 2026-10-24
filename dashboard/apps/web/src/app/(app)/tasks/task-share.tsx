@@ -23,6 +23,9 @@ import {
     EMPTY_LINK_ADVANCED,
     linkLimits,
     linkExpiryDay,
+    linkGuardFields,
+    NO_LINK_GUARDS,
+    linkHoursIncomplete,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { runAction } from "@/lib/run-action";
@@ -181,7 +184,8 @@ export function ShareDialog({
                           maxViews: null,
                           allowedCidrs: [],
                           allowedCountries: [],
-                          allowedContinents: []
+                          allowedContinents: [],
+                          guards: NO_LINK_GUARDS
                       }),
                       showComments
                   }
@@ -456,7 +460,11 @@ export function ShareDialog({
                                     <div className="flex justify-end">
                                         <Button
                                             size="sm"
-                                            disabled={savingLimits || !limitsChanged}
+                                            disabled={
+                                                savingLimits ||
+                                                !limitsChanged ||
+                                                linkHoursIncomplete(advanced)
+                                            }
                                             onClick={() => void saveLimits()}
                                         >
                                             {savingLimits && (
@@ -505,6 +513,7 @@ function advancedOf(share: TaskShareView | null): LinkAdvancedValue {
         maxUses: share.maxViews === null ? "" : String(share.maxViews),
         allowedCidrs: share.allowedCidrs,
         allowedCountries: share.allowedCountries,
-        allowedContinents: share.allowedContinents
+        allowedContinents: share.allowedContinents,
+        ...linkGuardFields(share.guards)
     };
 }

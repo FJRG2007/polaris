@@ -20,6 +20,9 @@ import {
     EMPTY_LINK_ADVANCED,
     linkAddressRules,
     linkPasswordLimits,
+    linkGuardFields,
+    linkPeopleLimits,
+    linkHoursIncomplete,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 
@@ -29,7 +32,8 @@ function valueOf(limits: MeetingLinkLimitsView | null): LinkAdvancedValue {
         ...EMPTY_LINK_ADVANCED,
         allowedCidrs: limits.allowedCidrs,
         allowedCountries: limits.allowedCountries,
-        allowedContinents: limits.allowedContinents
+        allowedContinents: limits.allowedContinents,
+        ...linkGuardFields(limits.guards)
     };
 }
 
@@ -69,7 +73,8 @@ export function MeetingLinkLimits({ meetingId }: { meetingId: string }) {
             () =>
                 setGuestLinkLimitsAction(meetingId, {
                     ...linkPasswordLimits(value),
-                    ...linkAddressRules(value)
+                    ...linkAddressRules(value),
+                    ...linkPeopleLimits(value)
                 }),
             setError
         );
@@ -91,7 +96,9 @@ export function MeetingLinkLimits({ meetingId }: { meetingId: string }) {
                     setValue(next);
                     setDone(false);
                 }}
-                omit={["expiry", "uses"]}
+                // The call decides when the link ends and how often it is used, and
+                // its own "require an account" switch is the sign-in rule.
+                omit={["expiry", "uses", "signin"]}
                 passwordSet={saved?.hasPassword ?? false}
                 clearablePassword
                 idPrefix={`meeting-${meetingId}`}
@@ -108,7 +115,7 @@ export function MeetingLinkLimits({ meetingId }: { meetingId: string }) {
                 <Button
                     size="sm"
                     variant="secondary"
-                    disabled={saving || !changed}
+                    disabled={saving || !changed || linkHoursIncomplete(value)}
                     onClick={() => void save()}
                 >
                     {saving && <Loader2 className="size-4 animate-spin" />}

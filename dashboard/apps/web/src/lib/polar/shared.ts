@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import type { PolarVisual } from "@/lib/polar/visuals";
+import type { LinkGuardsView } from "@/lib/link-guards";
 import { parseRepoAddress, repoLabel } from "@/lib/polar/code-host";
 
 /** How hard the model thinks. Mapped to the AI SDK's provider-neutral
@@ -654,6 +655,7 @@ export interface PolarShareLink {
     allowedCidrs: string[];
     allowedCountries: string[];
     allowedContinents: string[];
+    guards: LinkGuardsView;
 }
 
 export interface SharedPolarFile {

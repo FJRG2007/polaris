@@ -16,14 +16,13 @@ import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
 import { dymoIpAllowed } from "@/lib/dymo-service";
-import { linkAddressDenial } from "@/lib/link-guards";
+import { checkLink } from "@/lib/link-guards";
 import { linkDenialMessage } from "@/lib/link-denial";
 import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import {
     logSnippetAccess,
     resolveSnippetByToken,
     snippetUnlockCookie,
-    snippetUsability,
     verifySnippetUnlock,
     type SnippetRecord
 } from "@/lib/snippet-service";
@@ -67,17 +66,31 @@ export async function gateSnippetRequest(token: string, action: string): Promise
     // presented, it is not something to serve.
     if (snippet.visibility === "private") return deny(410, "revoked");
 
-    const usable = snippetUsability(snippet);
-    if (!usable.ok) return deny(410, usable.reason);
-
-    const address = await linkAddressDenial(snippet, ip);
-    if (address) return deny(403, address);
+    const session = await getSession();
+    const userId = session?.user?.id ?? null;
+    const checked = await checkLink(
+        {
+            limits: {
+                revokedAt: snippet.revokedAt,
+                startsAt: snippet.startsAt,
+                expiresAt: snippet.expiresAt,
+                maxUses: snippet.maxViews,
+                useCount: snippet.viewCount
+            },
+            rules: snippet,
+            // The owner is never turned away from their own snippet by its
+            // account rules, for the same reason as the invite list below.
+            guards: snippet.ownerId === userId ? undefined : snippet
+        },
+        ip
+    );
+    if (!checked.ok) {
+        const gone = ["revoked", "expired", "exhausted"].includes(checked.reason);
+        return deny(gone ? 410 : checked.reason === "sign_in_required" ? 401 : 403, checked.reason);
+    }
 
     // Fraud check. A no-op unless the integration is on, and it fails open.
     if (!(await dymoIpAllowed(ip)).allowed) return deny(403, "ip_flagged");
-
-    const session = await getSession();
-    const userId = session?.user?.id ?? null;
     if (snippet.visibility === "invite") {
         if (!userId) return deny(401, "sign_in_required");
         // The owner always reaches their own, whether or not they invited

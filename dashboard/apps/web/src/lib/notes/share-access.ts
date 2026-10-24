@@ -18,10 +18,9 @@ import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { clientIp } from "@/lib/request-context";
 import { dymoIpAllowed } from "@/lib/dymo-service";
-import { linkAddressDenial } from "@/lib/link-guards";
+import { checkLink } from "@/lib/link-guards";
 import { linkDenialMessage } from "@/lib/link-denial";
 import {
-    noteShareUsability,
     noteUnlockCookie,
     resolveNoteShareByToken,
     verifyNoteUnlock,
@@ -29,8 +28,7 @@ import {
 } from "@/lib/notes/share-service";
 
 export type NoteShareGate =
-    | { ok: true; share: NoteShareRecord }
-    | { ok: false; status: number; reason: string };
+    { ok: true; share: NoteShareRecord } | { ok: false; status: number; reason: string };
 
 /** Why a gate refused, in words the visitor can act on and in their language. */
 export async function noteDenialMessage(reason: string): Promise<string> {
@@ -41,12 +39,26 @@ export async function gateNoteShareRequest(token: string): Promise<NoteShareGate
     const share = await resolveNoteShareByToken(token);
     if (!share) return { ok: false, status: 404, reason: "not_found" };
 
-    const usable = noteShareUsability(share);
-    if (!usable.ok) return { ok: false, status: 410, reason: usable.reason };
-
     const ip = await clientIp();
-    const address = await linkAddressDenial(share, ip);
-    if (address) return { ok: false, status: 403, reason: address };
+    const checked = await checkLink(
+        {
+            limits: {
+                revokedAt: share.revokedAt,
+                startsAt: share.startsAt,
+                expiresAt: share.expiresAt,
+                maxUses: share.maxViews,
+                useCount: share.viewCount
+            },
+            rules: share,
+            guards: share
+        },
+        ip
+    );
+    if (!checked.ok) {
+        const gone = ["revoked", "expired", "exhausted"].includes(checked.reason);
+        const status = gone ? 410 : checked.reason === "sign_in_required" ? 401 : 403;
+        return { ok: false, status, reason: checked.reason };
+    }
 
     // Fraud check. A no-op unless the integration is on, and it fails open.
     if (!(await dymoIpAllowed(ip)).allowed) return { ok: false, status: 403, reason: "ip_flagged" };

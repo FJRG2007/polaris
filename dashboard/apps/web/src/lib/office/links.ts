@@ -33,7 +33,12 @@ import {
     linkUsability,
     passwordVersion,
     readAddressRules,
+    readLinkGuards,
     storedAddressRules,
+    storedPeopleRules,
+    LINK_GUARD_FIELDS,
+    type LinkGuardsView,
+    type LinkSchedule,
     type LinkAddressRules,
     signMarker,
     signUnlock,
@@ -67,6 +72,8 @@ export interface OfficeLinkView {
     readonly allowedCidrs: string[];
     readonly allowedCountries: string[];
     readonly allowedContinents: string[];
+    /** Its start, weekly hours and account rules. */
+    readonly guards: LinkGuardsView;
     /** Why it cannot be used, when it cannot. Said on the row rather than worked
      *  out on the screen, so the reason is the same one the visitor meets. */
     readonly standing: "live" | "revoked" | "expired" | "exhausted" | "scheduled";
@@ -85,7 +92,8 @@ const LINK_FIELDS = {
     createdAt: true,
     allowedCidrs: true,
     allowedCountries: true,
-    allowedContinents: true
+    allowedContinents: true,
+    ...LINK_GUARD_FIELDS
 } as const;
 
 type LinkRow = {
@@ -102,6 +110,10 @@ type LinkRow = {
     allowedCidrs: string;
     allowedCountries: string;
     allowedContinents: string;
+    startsAt: Date | null;
+    requireLogin: boolean;
+    allowedUsers: string;
+    linkSchedule: string;
 };
 
 /** A row's address rules. A row read without them (an older select) has none. */
@@ -116,7 +128,7 @@ function rulesOf(row: Partial<LinkAddressRules>): LinkAddressRules {
 function viewOf(row: LinkRow): OfficeLinkView {
     const usable = linkUsability({
         revokedAt: row.revokedAt,
-        startsAt: null,
+        startsAt: row.startsAt,
         expiresAt: row.expiresAt,
         maxUses: row.maxUses,
         useCount: row.useCount
@@ -133,6 +145,7 @@ function viewOf(row: LinkRow): OfficeLinkView {
         note: row.note,
         createdAt: row.createdAt.toISOString(),
         ...readAddressRules(rulesOf(row)),
+        guards: readLinkGuards(row),
         standing: usable.ok ? "live" : (usable.reason as OfficeLinkView["standing"])
     };
 }
@@ -157,6 +170,10 @@ export interface NewLink {
     readonly allowedCidrs?: readonly string[];
     readonly allowedCountries?: readonly string[];
     readonly allowedContinents?: readonly string[];
+    readonly startsAt?: Date | null;
+    readonly schedule?: LinkSchedule | null;
+    readonly requireLogin?: boolean;
+    readonly allowedUsers?: readonly string[];
 }
 
 /**
@@ -188,7 +205,9 @@ export async function createLink(
             expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
             maxUses: input.maxUses,
             note: input.note,
-            ...storedAddressRules(input)
+            ...storedAddressRules(input),
+            startsAt: input.startsAt ?? null,
+            ...storedPeopleRules(input)
         },
         select: LINK_FIELDS
     });
@@ -247,7 +266,10 @@ export interface LinkVisit {
         | "exhausted"
         | "scheduled"
         | "ip_not_allowed"
-        | "country_not_allowed";
+        | "country_not_allowed"
+        | "outside_hours"
+        | "sign_in_required"
+        | "not_invited";
 }
 
 /**
@@ -270,12 +292,13 @@ export async function resolveLink(
         {
             limits: {
                 revokedAt: row.revokedAt,
-                startsAt: null,
+                startsAt: row.startsAt,
                 expiresAt: row.expiresAt,
                 maxUses: row.maxUses,
                 useCount: row.useCount
             },
-            rules: rulesOf(row)
+            rules: rulesOf(row),
+            guards: row
         },
         ip
     );
@@ -470,7 +493,8 @@ export async function linkPassStanding(
             passwordHash: true,
             allowedCidrs: true,
             allowedCountries: true,
-            allowedContinents: true
+            allowedContinents: true,
+            ...LINK_GUARD_FIELDS
         }
     });
     if (!row) return null;
@@ -482,12 +506,13 @@ export async function linkPassStanding(
         {
             limits: {
                 revokedAt: row.revokedAt,
-                startsAt: null,
+                startsAt: row.startsAt,
                 expiresAt: row.expiresAt,
                 maxUses: null,
                 useCount: 0
             },
-            rules: rulesOf(row)
+            rules: rulesOf(row),
+            guards: row
         },
         ip
     );

@@ -24,7 +24,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { DEFAULT_LOCALE } from "@polaris/core";
 import { translatorFor } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
-import { linkAddressDenial } from "@/lib/link-guards";
+import type { LinkCheck } from "@/lib/link-guards";
 import * as textRequests from "@/lib/text-request-service";
 import { ensureShareReachability } from "@/lib/public-reach";
 import { clientIp, hashForLog } from "@/lib/request-context";
@@ -39,6 +39,20 @@ const UNLOCK_WINDOW_MS = 15 * 60 * 1000;
  *  The per-drop-point cap is the owner's rule; this one is the instance's. */
 const SUBMIT_LIMIT = 30;
 const SUBMIT_WINDOW_MS = 60 * 60 * 1000;
+
+/** What a refused submission says, by the shared link check's reason. */
+const SUBMIT_REFUSALS = {
+    scheduled: "errors.notOpenYet",
+    outside_hours: "errors.outsideHours",
+    revoked: "errors.closed",
+    expired: "errors.closed",
+    exhausted: "errors.closed",
+    ip_not_allowed: "errors.networkDenied",
+    not_allowed: "errors.networkDenied",
+    country_not_allowed: "errors.locationDenied",
+    sign_in_required: "errors.signInToSend",
+    not_invited: "errors.accountDenied"
+} as const satisfies Record<Exclude<LinkCheck, { ok: true }>["reason"], string>;
 
 function revalidateDropPoints(requestId?: string): void {
     revalidatePath("/drive/drop-points");
@@ -242,20 +256,12 @@ export async function submitTextAction(
     const request = await textRequests.resolveTextRequestByToken(token);
     if (!request) return { error: (await getTranslations("drive"))("errors.linkUnavailable") };
 
-    const usable = textRequests.textRequestUsability(request);
-    if (!usable.ok) {
-        return {
-            error:
-                usable.reason === "scheduled"
-                    ? (await getTranslations("drive"))("errors.notOpenYet")
-                    : (await getTranslations("drive"))("errors.closed")
-        };
-    }
-
     const ip = await clientIp();
     const ipHash = hashForLog(ip);
-    if (await linkAddressDenial(request, ip)) {
-        return { error: (await getTranslations("drive"))("errors.networkDenied") };
+    const gate = await textRequests.textRequestGate(request, ip);
+    if (!gate.ok) {
+        const t = await getTranslations("drive");
+        return { error: t(SUBMIT_REFUSALS[gate.reason]) };
     }
     if (!(await dymoIpAllowed(ip)).allowed) {
         return { error: (await getTranslations("drive"))("errors.networkDenied") };
@@ -263,11 +269,6 @@ export async function submitTextAction(
 
     const session = await getSession();
     const userId = session?.user?.id ?? null;
-    if (request.requireLogin && !userId)
-        return { error: (await getTranslations("drive"))("errors.signInToSend") };
-    if (!(await textRequests.textRequestUserAllowed(request.allowedUsers, userId))) {
-        return { error: (await getTranslations("drive"))("errors.accountDenied") };
-    }
     if (request.passwordHash) {
         const cookieValue = (await cookies()).get(
             textRequests.textRequestUnlockCookie(request.id)

@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { addressRuleFields } from "./link-rules.js";
+import { addressRuleFields, linkLimitsSchema, linkPeopleFields } from "./link-rules.js";
 
 export const SHARE_KINDS = ["public", "invite"] as const;
 export type ShareKind = (typeof SHARE_KINDS)[number];
@@ -41,6 +41,8 @@ export const createShareSchema = z
         /** Allow recipients to preview the file inline in the browser. */
         allowPreview: z.boolean().default(true),
         ...addressRuleFields,
+        /** Start, weekly hours, and who must be signed in to open it. */
+        ...linkPeopleFields,
         /** For invite shares: the users granted access. */
         inviteUserIds: z.array(z.string().min(1)).default([])
     })
@@ -50,3 +52,27 @@ export const createShareSchema = z
     });
 
 export type CreateShareInput = z.infer<typeof createShareSchema>;
+
+/**
+ * An edit to an existing share, from the shared-links list. The same limits every
+ * link saves (`linkLimitsSchema`), named the way a share stores its cap, plus the
+ * powers it hands its holder. Every field is optional: an absent one keeps what
+ * is stored, `null` clears a cap, an expiry, a start or a window, and
+ * `clearPassword` takes the password off.
+ */
+export const updateShareSchema = linkLimitsSchema
+    .omit({ maxViews: true })
+    .extend({
+        /** Stop serving after this many downloads; null removes the cap. */
+        maxDownloads: z.number().int().positive().max(1_000_000).nullable(),
+        allowDownload: z.boolean(),
+        allowPreview: z.boolean(),
+        allowUpload: z.boolean(),
+        allowRename: z.boolean(),
+        allowDelete: z.boolean(),
+        allowCreateFolder: z.boolean(),
+        allowOverwrite: z.boolean()
+    })
+    .partial();
+
+export type UpdateShareInput = z.infer<typeof updateShareSchema>;

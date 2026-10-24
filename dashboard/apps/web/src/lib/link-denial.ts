@@ -16,6 +16,7 @@ const DENIALS: Readonly<Record<string, NamespaceKey<"publicPages">>> = {
     expired: "denied.expired",
     exhausted: "denied.exhausted",
     scheduled: "denied.scheduled",
+    outside_hours: "denied.closed",
     ip_not_allowed: "denied.network",
     country_not_allowed: "denied.location",
     ip_flagged: "denied.network",

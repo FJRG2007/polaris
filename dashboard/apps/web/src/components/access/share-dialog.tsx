@@ -39,6 +39,9 @@ import {
     EMPTY_LINK_ADVANCED,
     LinkAdvancedFields,
     linkAddressRules,
+    linkExpiry,
+    linkHoursIncomplete,
+    linkPeopleLimits,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import {
@@ -500,15 +503,24 @@ export function ShareDialog({
     const makeLink = async (): Promise<void> => {
         if (!draftAudience) return;
         setBusy(true);
+        // A grant keeps its window in its own columns, the same ones a person's
+        // grant uses, so the link's start and hours land there.
+        const people = linkPeopleLimits(linkRules);
         const answer = await shareLinkAction(subject, subjectId, {
             capability: linkCapability,
             actions: core.grantActions(subject, linkCapability, []),
             audience: draftAudience,
-            ...(linkRules.expiresAt ? { endsAt: new Date(linkRules.expiresAt).toISOString() } : {}),
+            ...(linkRules.expiresAt
+                ? { endsAt: linkExpiry(linkRules.expiresAt)?.toISOString() }
+                : {}),
             ...(linkRules.maxUses ? { maxUses: Number(linkRules.maxUses) } : {}),
+            ...(people.startsAt ? { startsAt: people.startsAt } : {}),
+            ...(people.schedule ? people.schedule : {}),
             ...(linkRules.password && draftAudience !== "restricted"
                 ? { password: linkRules.password }
                 : {}),
+            ...(draftAudience === "anyone" ? { requireLogin: people.requireLogin } : {}),
+            allowedUsers: people.allowedUsers,
             ...linkAddressRules(linkRules)
         });
         setBusy(false);
@@ -1190,10 +1202,16 @@ export function ShareDialog({
                                                     <LinkAdvancedFields
                                                         value={linkRules}
                                                         onChange={setLinkRules}
+                                                        // A restricted link already needs an account
+                                                        // and a grant, so a password adds nothing;
+                                                        // a restricted or organization link already
+                                                        // asks everyone to sign in.
                                                         omit={
                                                             draftAudience === "restricted"
-                                                                ? ["password"]
-                                                                : []
+                                                                ? ["password", "signin"]
+                                                                : draftAudience === "org"
+                                                                  ? ["signin"]
+                                                                  : []
                                                         }
                                                         idPrefix="share-link"
                                                     />
@@ -1205,7 +1223,10 @@ export function ShareDialog({
                                                             {t("share.cancel")}
                                                         </Button>
                                                         <Button
-                                                            disabled={busy}
+                                                            disabled={
+                                                                busy ||
+                                                                linkHoursIncomplete(linkRules)
+                                                            }
                                                             onClick={() => void makeLink()}
                                                         >
                                                             {busy ? (

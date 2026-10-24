@@ -26,6 +26,7 @@ import { clientIp } from "@/lib/request-context";
 import { hashLinkPassword } from "@polaris/core/link-password";
 import {
     linkAddressDenial,
+    linkPeopleDenial,
     signUnlock,
     storedAddressRules,
     unlockCookieName,
@@ -993,6 +994,8 @@ export async function writeGrantLink(
             linkAudience: audience,
             linkOrgId: audience === "org" ? orgId : null,
             linkPasswordHash: input.password ? await hashLinkPassword(input.password) : null,
+            linkRequireLogin: input.requireLogin || input.allowedUsers.length > 0,
+            linkAllowedUsers: JSON.stringify(input.allowedUsers),
             grantedById
         },
         select: { id: true }
@@ -1046,7 +1049,9 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
             allowedContinents: true,
             linkAudience: true,
             linkOrgId: true,
-            linkPasswordHash: true
+            linkPasswordHash: true,
+            linkRequireLogin: true,
+            linkAllowedUsers: true
         }
     });
     if (!found) return null;
@@ -1065,6 +1070,14 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
         const refused = await audienceRefusal(audience, row, now);
         if (refused) return { standing: refused, ...base };
     }
+    // The account rules every public link offers, judged by the same check:
+    // "anyone with an account" asks a stranger to sign in, and a named list
+    // turns away an account it does not name.
+    const people = await linkPeopleDenial({
+        requireLogin: row.linkRequireLogin,
+        allowedUsers: row.linkAllowedUsers
+    });
+    if (people) return { standing: people === "sign_in_required" ? "signin" : "denied", ...base };
     // Last, so a link that is off, or not for this account, says that rather
     // than asking for a password that would not help.
     if (row.linkPasswordHash && !(await grantLinkUnlocked(row.id, row.linkPasswordHash))) {

@@ -8,7 +8,7 @@
 
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
-import { parseStringList } from "@/lib/link-guards";
+import { parseLinkSchedule, parseStringList } from "@/lib/link-guards";
 import { listSnippetsForRequest } from "@/lib/snippet-service";
 import { getTextRequestForOwner } from "@/lib/text-request-service";
 import { TextDropPointDetail, type CollectedRow } from "./text-drop-point-detail";
@@ -51,6 +51,7 @@ export default async function TextDropPointPage({ params }: { params: Promise<{ 
                 maxSubmissions: request.maxSubmissions,
                 hasPassword: request.passwordHash !== null,
                 startsAt: request.startsAt ? request.startsAt.toISOString() : null,
+                schedule: parseLinkSchedule(request.linkSchedule),
                 expiresAt: request.expiresAt ? request.expiresAt.toISOString() : null,
                 revokedAt: request.revokedAt ? request.revokedAt.toISOString() : null,
                 submissionCount: request._count.submissions

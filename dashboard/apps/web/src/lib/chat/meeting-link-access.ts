@@ -20,7 +20,9 @@ import { linkLimitColumns } from "@/lib/link-limits";
 import { verifyLinkPassword } from "@polaris/core/link-password";
 import {
     checkLink,
+    readLinkGuards,
     readAddressRules,
+    type LinkGuardsView,
     signUnlock,
     unlockCookieName,
     verifyUnlock
@@ -33,7 +35,8 @@ const MEETING_LINK_SCOPE = "meeting";
  *  and the cap, which the call already decides. */
 export const meetingLinkLimitsSchema = core.linkLimitsSchema.omit({
     maxViews: true,
-    expiresAt: true
+    expiresAt: true,
+    requireLogin: true
 });
 
 export type MeetingLinkLimitsInput = z.infer<typeof meetingLinkLimitsSchema>;
@@ -43,6 +46,7 @@ export interface MeetingLinkLimitsView {
     readonly allowedCidrs: string[];
     readonly allowedCountries: string[];
     readonly allowedContinents: string[];
+    readonly guards: LinkGuardsView;
 }
 
 export type MeetingLinkGate =
@@ -74,7 +78,10 @@ export async function gateMeetingLink(token: string): Promise<MeetingLinkGate> {
             linkPasswordHash: true,
             allowedCidrs: true,
             allowedCountries: true,
-            allowedContinents: true
+            allowedContinents: true,
+            startsAt: true,
+            allowedUsers: true,
+            linkSchedule: true
         }
     });
     if (!meeting || meeting.endedAt) return { ok: false, reason: "not_found" };
@@ -82,8 +89,17 @@ export async function gateMeetingLink(token: string): Promise<MeetingLinkGate> {
     const ip = await clientIp();
     const checked = await checkLink(
         {
-            limits: { revokedAt: null, expiresAt: null, maxUses: null, useCount: 0 },
-            rules: meeting
+            limits: {
+                revokedAt: null,
+                startsAt: meeting.startsAt,
+                expiresAt: null,
+                maxUses: null,
+                useCount: 0
+            },
+            rules: meeting,
+            // The call's own "require an account" switch is enforced where a
+            // guest joins; this adds the window and the named accounts.
+            guards: { allowedUsers: meeting.allowedUsers, linkSchedule: meeting.linkSchedule }
         },
         ip
     );
@@ -143,7 +159,10 @@ async function hostedMeeting(actorId: string, meetingId: string) {
             linkPasswordHash: true,
             allowedCidrs: true,
             allowedCountries: true,
-            allowedContinents: true
+            allowedContinents: true,
+            startsAt: true,
+            allowedUsers: true,
+            linkSchedule: true
         }
     });
     if (!meeting || meeting.hostId !== actorId) {
@@ -157,8 +176,15 @@ function toView(meeting: {
     allowedCidrs: string;
     allowedCountries: string;
     allowedContinents: string;
+    startsAt: Date | null;
+    allowedUsers: string;
+    linkSchedule: string;
 }): MeetingLinkLimitsView {
-    return { hasPassword: Boolean(meeting.linkPasswordHash), ...readAddressRules(meeting) };
+    return {
+        hasPassword: Boolean(meeting.linkPasswordHash),
+        ...readAddressRules(meeting),
+        guards: readLinkGuards(meeting)
+    };
 }
 
 export async function getMeetingLinkLimits(
@@ -174,20 +200,31 @@ export async function setMeetingLinkLimits(
     input: MeetingLinkLimitsInput
 ): Promise<MeetingLinkLimitsView> {
     await hostedMeeting(actorId, meetingId);
-    const columns = await linkLimitColumns({ ...input, expiresAt: null, maxViews: null });
+    const columns = await linkLimitColumns({
+        ...input,
+        expiresAt: null,
+        maxViews: null,
+        requireLogin: false
+    });
     const saved = await prisma.meeting.update({
         where: { id: meetingId },
         data: {
             allowedCidrs: columns.allowedCidrs,
             allowedCountries: columns.allowedCountries,
             allowedContinents: columns.allowedContinents,
+            startsAt: columns.startsAt,
+            allowedUsers: columns.allowedUsers,
+            linkSchedule: columns.linkSchedule,
             ...("passwordHash" in columns ? { linkPasswordHash: columns.passwordHash } : {})
         },
         select: {
             linkPasswordHash: true,
             allowedCidrs: true,
             allowedCountries: true,
-            allowedContinents: true
+            allowedContinents: true,
+            startsAt: true,
+            allowedUsers: true,
+            linkSchedule: true
         }
     });
     return toView(saved);

@@ -16,6 +16,9 @@ import { useState, type FormEvent } from "react";
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
+    linkHoursIncomplete,
+    linkSchedule,
+    linkStart,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { AccountInput } from "@/components/account-input";
@@ -84,6 +87,8 @@ export function NewTextDropPointButton() {
             allowedCidrs: advanced.allowedCidrs,
             allowedCountries: advanced.allowedCountries,
             allowedContinents: advanced.allowedContinents,
+            startsAt: linkStart(advanced.startsAt)?.toISOString(),
+            schedule: linkSchedule(advanced),
             expiresAt: expiresAt || undefined
         });
         setPending(false);
@@ -222,15 +227,20 @@ export function NewTextDropPointButton() {
                                     </span>
                                 </span>
                             </label>
+                            {/* The cap is its own field above; sign-in and the
+                                account list have theirs. */}
                             <LinkAdvancedFields
                                 value={advanced}
                                 onChange={setAdvanced}
-                                omit={["uses"]}
+                                omit={["uses", "signin", "people"]}
                                 idPrefix="text-drop-point"
                             />
                             {error ? <p className="text-sm text-danger">{error}</p> : null}
                             <div className="mt-1 flex justify-end">
-                                <Button type="submit" disabled={pending}>
+                                <Button
+                                    type="submit"
+                                    disabled={pending || linkHoursIncomplete(advanced)}
+                                >
                                     {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                                     {t("newText.createTheLink")}
                                 </Button>

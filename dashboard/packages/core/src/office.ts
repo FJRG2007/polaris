@@ -24,7 +24,7 @@
  */
 
 import { z } from "zod";
-import { addressRuleFields } from "./schemas/link-rules.js";
+import { addressRuleFields, linkPeopleFields } from "./schemas/link-rules.js";
 
 /**
  * The kinds, in the order a "new document" menu offers them.
@@ -263,7 +263,9 @@ export const officeLinkSchema = z.object({
     maxUses: z.coerce.number().int().min(1).max(10_000).nullable().default(null),
     /** Who it was made for, in the maker's own words. Shown only to them. */
     note: z.string().trim().max(200).default(""),
-    ...addressRuleFields
+    ...addressRuleFields,
+    /** Start, weekly hours, and who must be signed in to open it. */
+    ...linkPeopleFields
 });
 
 export type OfficeLinkInput = z.infer<typeof officeLinkSchema>;

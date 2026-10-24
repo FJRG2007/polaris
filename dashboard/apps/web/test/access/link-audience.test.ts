@@ -60,7 +60,7 @@ vi.mock("@polaris/db", () => ({
         team: { findMany: async () => [] },
         user: {
             findUnique: async ({ where }: { where: { id: string } }) =>
-                where.id === ANA ? { id: ANA } : null,
+                where.id === ANA ? { id: ANA, username: "ana" } : null,
             findMany: async ({ where }: { where: Row }) => {
                 if (!("OR" in where)) {
                     return [{ id: ANA, name: "Ana", username: "ana", email: "ana@example.test" }];
@@ -364,5 +364,60 @@ describe("writeGrants", () => {
         expect(grants).toHaveLength(0);
         await expect(writeGrants("task.space", DOOR, [to(ANA)], "me", [])).resolves.toBe(1);
         expect(grants).toHaveLength(1);
+    });
+});
+
+describe("account rules on a link anyone may open", () => {
+    const BEA = "00000000-0000-4000-8000-0000000000b2";
+
+    it("asks a stranger to sign in when it needs an account, and opens for one", async () => {
+        const input = core.grantLinkSchema.parse({
+            capability: "view",
+            audience: "anyone",
+            requireLogin: true
+        });
+        const { token } = await writeGrantLink("place.device", DOOR, input, "u1");
+        expect(grants[0]!.linkRequireLogin).toBe(true);
+        expect((await linkReach(token))?.standing).toBe("signin");
+        viewer = { id: BEA, isAdmin: false };
+        expect((await linkReach(token))?.standing).toBe("live");
+    });
+
+    it("opens only for the people it names, and naming them implies sign-in", async () => {
+        const input = core.grantLinkSchema.parse({
+            capability: "view",
+            audience: "anyone",
+            allowedUsers: ["  Ana "]
+        });
+        const { token } = await writeGrantLink("place.device", DOOR, input, "u1");
+        expect(grants[0]!.linkRequireLogin).toBe(true);
+        expect(JSON.parse(String(grants[0]!.linkAllowedUsers))).toEqual(["ana"]);
+        expect((await linkReach(token))?.standing).toBe("signin");
+        viewer = { id: BEA, isAdmin: false };
+        expect((await linkReach(token))?.standing).toBe("denied");
+        viewer = { id: ANA, isAdmin: false };
+        expect((await linkReach(token))?.standing).toBe("live");
+    });
+
+    it("leaves a link written before these rules open to anyone", async () => {
+        const { token } = await writeGrantLink("place.device", DOOR, link("anyone"), "u1");
+        delete grants[0]!.linkRequireLogin;
+        delete grants[0]!.linkAllowedUsers;
+        expect((await linkReach(token))?.standing).toBe("live");
+    });
+
+    it("keeps its start and weekly hours in the grant's own columns", async () => {
+        const input = core.grantLinkSchema.parse({
+            capability: "view",
+            audience: "anyone",
+            startsAt: "2999-01-01T00:00:00.000Z",
+            days: 1 << 3,
+            startMinute: 540,
+            endMinute: 1020,
+            timeZone: "UTC"
+        });
+        const { token } = await writeGrantLink("place.device", DOOR, input, "u1");
+        expect(grants[0]).toMatchObject({ days: 8, startMinute: 540, endMinute: 1020 });
+        expect((await linkReach(token))?.standing).toBe("waiting");
     });
 });

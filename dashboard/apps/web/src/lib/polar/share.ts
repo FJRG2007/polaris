@@ -15,7 +15,12 @@
  * Server-only.
  */
 
-import { readAddressRules, storedAddressRules } from "@/lib/link-guards";
+import {
+    readLinkGuards,
+    readAddressRules,
+    LINK_GUARD_FIELDS,
+    storedAddressRules
+} from "@/lib/link-guards";
 import { linkLimitColumns } from "@/lib/link-limits";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
@@ -104,7 +109,8 @@ export async function polarShareLink(
             maxViews: true,
             allowedCidrs: true,
             allowedCountries: true,
-            allowedContinents: true
+            allowedContinents: true,
+            ...LINK_GUARD_FIELDS
         }
     });
     if (!share || share.linkEnabled === false) return null;
@@ -119,7 +125,8 @@ export async function polarShareLink(
             allowedCidrs: share.allowedCidrs ?? "[]",
             allowedCountries: share.allowedCountries ?? "[]",
             allowedContinents: share.allowedContinents ?? "[]"
-        })
+        }),
+        guards: readLinkGuards(share)
     };
 }
 

@@ -19,6 +19,8 @@ import {
     EMPTY_LINK_ADVANCED,
     linkLimits,
     linkExpiryDay,
+    linkGuardFields,
+    linkHoursIncomplete,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { Link2, MessageSquareShare, Share2, Trash2, X } from "lucide-react";
@@ -297,7 +299,7 @@ export function PolarShareDialog({
                                         <Button
                                             type="button"
                                             size="sm"
-                                            disabled={working}
+                                            disabled={working || linkHoursIncomplete(advanced)}
                                             onClick={() => void saveLimits()}
                                         >
                                             {t("sharing.saveLimits")}
@@ -628,6 +630,7 @@ function advancedOf(link: PolarShareLink | null): LinkAdvancedValue {
         maxUses: link.maxViews === null ? "" : String(link.maxViews),
         allowedCidrs: link.allowedCidrs,
         allowedCountries: link.allowedCountries,
-        allowedContinents: link.allowedContinents
+        allowedContinents: link.allowedContinents,
+        ...linkGuardFields(link.guards)
     };
 }

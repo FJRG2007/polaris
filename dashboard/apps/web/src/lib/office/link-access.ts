@@ -15,6 +15,7 @@ import { cookies } from "next/headers";
 import { clientIp } from "@/lib/request-context";
 import * as links from "@/lib/office/links";
 import { getTranslations } from "@/lib/i18n/request";
+import { linkDenialMessage } from "@/lib/link-denial";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 
 /** Why a link would not open, in the words the screen turns into a sentence. */
@@ -24,6 +25,9 @@ export type OfficeLinkDenial =
     | "expired"
     | "exhausted"
     | "scheduled"
+    | "outside_hours"
+    | "sign_in_required"
+    | "not_invited"
     | "ip_flagged"
     | "password_required";
 
@@ -50,6 +54,12 @@ export async function gateOfficeLink(token: string): Promise<OfficeLinkGate> {
     // reason. It means the same thing here as every other refusal does from
     // outside - the link does not work - and is folded in rather than leaking a
     // word nobody wrote a sentence for.
+    if (visit.refusal === "outside_hours" || visit.refusal === "not_invited") {
+        return { ok: false, status: 403, reason: visit.refusal };
+    }
+    if (visit.refusal === "sign_in_required") {
+        return { ok: false, status: 401, reason: visit.refusal };
+    }
     if (visit.refusal) {
         return {
             ok: false,
@@ -89,6 +99,10 @@ export async function officeLinkDenial(reason: OfficeLinkDenial): Promise<string
             return t("office.denied.scheduled");
         case "ip_flagged":
             return t("office.denied.flagged");
+        case "outside_hours":
+        case "sign_in_required":
+        case "not_invited":
+            return linkDenialMessage(reason);
         default:
             return t("office.denied.other");
     }

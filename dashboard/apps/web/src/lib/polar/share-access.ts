@@ -14,7 +14,13 @@ import { hashToken } from "@polaris/core/tokens";
 import { clientIp } from "@/lib/request-context";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { verifyLinkPassword } from "@polaris/core/link-password";
-import { checkLink, signUnlock, unlockCookieName, verifyUnlock } from "@/lib/link-guards";
+import {
+    LINK_GUARD_FIELDS,
+    checkLink,
+    signUnlock,
+    unlockCookieName,
+    verifyUnlock
+} from "@/lib/link-guards";
 
 /** Its own unlock namespace, so a cookie solved for a note opens no chat. */
 const POLAR_LINK_SCOPE = "polar";
@@ -34,7 +40,8 @@ const GATE_FIELDS = {
     views: true,
     allowedCidrs: true,
     allowedCountries: true,
-    allowedContinents: true
+    allowedContinents: true,
+    ...LINK_GUARD_FIELDS
 } as const;
 
 export function polarUnlockCookie(shareId: string): string {
@@ -66,11 +73,13 @@ export async function gatePolarShare(
         {
             limits: {
                 revokedAt: null,
+                startsAt: share.startsAt,
                 expiresAt: share.expiresAt,
                 maxUses: withinCap ? share.maxViews : null,
                 useCount: share.views
             },
-            rules: share
+            rules: share,
+            guards: share
         },
         ip
     );

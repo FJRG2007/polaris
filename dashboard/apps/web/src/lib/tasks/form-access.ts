@@ -13,7 +13,13 @@ import { loadEnv } from "@polaris/config";
 import { clientIp } from "@/lib/request-context";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { verifyLinkPassword } from "@polaris/core/link-password";
-import { checkLink, signUnlock, unlockCookieName, verifyUnlock } from "@/lib/link-guards";
+import {
+    LINK_GUARD_FIELDS,
+    checkLink,
+    signUnlock,
+    unlockCookieName,
+    verifyUnlock
+} from "@/lib/link-guards";
 
 /** The unlock-cookie namespace form links are signed under. Its own, so a
  *  cookie solved for a task link is not a cookie that opens a form. */
@@ -32,6 +38,7 @@ const GATE_FIELDS = {
     allowedCidrs: true,
     allowedCountries: true,
     allowedContinents: true,
+    ...LINK_GUARD_FIELDS,
     _count: { select: { submissions: true } }
 } as const;
 
@@ -54,11 +61,15 @@ export async function gateTaskForm(token: string): Promise<TaskFormGate> {
         {
             limits: {
                 revokedAt: null,
+                startsAt: form.startsAt,
                 expiresAt: form.expiresAt,
                 maxUses: form.maxSubmissions,
                 useCount: form._count.submissions
             },
-            rules: form
+            rules: form,
+            // The form's own "require sign-in" switch keeps the check it has
+            // where the form is drawn; this adds the window and named accounts.
+            guards: { allowedUsers: form.allowedUsers, linkSchedule: form.linkSchedule }
         },
         ip
     );

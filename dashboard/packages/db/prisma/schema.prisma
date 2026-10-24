@@ -701,6 +701,13 @@ model NoteShare {
     allowedCidrs      String    @default("[]")
     allowedCountries  String    @default("[]")
     allowedContinents String    @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    requireLogin      Boolean   @default(false)
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
     expiresAt DateTime?
     revokedAt DateTime?
     createdAt DateTime  @default(now())
@@ -2715,6 +2722,13 @@ model Share {
     // geo restriction. Enforced server-side per access after resolving the IP.
     allowedCountries  String @default("[]")
     allowedContinents String @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    requireLogin      Boolean   @default(false)
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
     createdAt     DateTime  @default(now())
     revokedAt     DateTime?
 
@@ -2797,6 +2811,10 @@ model FileRequest {
     // geo restriction. Enforced server-side per upload after resolving the IP.
     allowedCountries        String    @default("[]")
     allowedContinents       String    @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    linkSchedule      String    @default("")
     // When set, the drop point only starts accepting uploads at this time.
     startsAt                DateTime?
     // Whether an uploader may delete files they submitted, and (optionally) only
@@ -2938,6 +2956,13 @@ model Snippet {
     allowedCidrs      String @default("[]")
     allowedCountries  String @default("[]")
     allowedContinents String @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    requireLogin      Boolean   @default(false)
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
 
     // Set when a text drop point produced this rather than its owner writing it.
     requestId         String? @db.Uuid
@@ -3043,6 +3068,10 @@ model TextRequest {
     allowedCidrs      String @default("[]")
     allowedCountries  String @default("[]")
     allowedContinents String @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    linkSchedule      String    @default("")
 
     startsAt  DateTime?
     expiresAt DateTime?
@@ -3379,6 +3408,13 @@ model VaultSend {
     allowedCidrs      String @default("[]")
     allowedCountries  String @default("[]")
     allowedContinents String @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    requireLogin      Boolean   @default(false)
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
     // The id in the public link, separate from the primary key so the URL does
     // not hand out a database identifier.
     accessId       String    @unique
@@ -7084,6 +7120,13 @@ model OfficeLink {
     allowedCidrs      String @default("[]")
     allowedCountries  String @default("[]")
     allowedContinents String @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    requireLogin      Boolean   @default(false)
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
 
     /// Who made it. Not a relation: a link outlives the account that made it,
     /// and the document's owner is who answers for it either way.
@@ -7255,6 +7298,11 @@ model AccessGrant {
     allowedCidrs      String @default("[]")
     allowedCountries  String @default("[]")
     allowedContinents String @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    linkRequireLogin  Boolean   @default(false)
+    linkAllowedUsers  String    @default("[]")
     /// A link only: who it opens for besides being held - restricted (signed
     /// in and already given access), org (signed in to linkOrgId) or anyone (no
     /// account). Every link written before this was a no-account link, so the
@@ -7952,6 +8000,12 @@ model TaskForm {
     allowedCidrs      String    @default("[]")
     allowedCountries  String    @default("[]")
     allowedContinents String    @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
     createdById     String?  @db.Uuid
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
@@ -8114,6 +8168,13 @@ model TaskShare {
     allowedCidrs      String    @default("[]")
     allowedCountries  String    @default("[]")
     allowedContinents String    @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    requireLogin      Boolean   @default(false)
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
     // No FK: the link outlives the account that created it.
     createdById  String?  @db.Uuid
     createdAt    DateTime @default(now())
@@ -10771,6 +10832,12 @@ model Meeting {
     allowedCidrs      String   @default("[]")
     allowedCountries  String   @default("[]")
     allowedContinents String   @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
     // When it is meant to happen, for a meeting somebody put in the diary rather
     // than started on the spot. Null for a call that began the moment a button
     // was pressed, which is every call started from a conversation.
@@ -15603,6 +15670,13 @@ model PolarThreadShare {
     allowedCidrs      String    @default("[]")
     allowedCountries  String    @default("[]")
     allowedContinents String    @default("[]")
+    // Who may open the link and when, beyond the address rules (lib/link-guards
+    // checkLink). Defaults are no restriction, so links made before these existed
+    // open exactly as they did.
+    startsAt          DateTime?
+    requireLogin      Boolean   @default(false)
+    allowedUsers      String    @default("[]")
+    linkSchedule      String    @default("")
     recipients     PolarShareRecipient[]
 }
 

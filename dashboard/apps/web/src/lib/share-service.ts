@@ -10,15 +10,20 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { normalizeRelPath } from "@polaris/core";
-import type { CreateShareInput } from "@polaris/core";
+import type { CreateShareInput, LinkSchedule } from "@polaris/core";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import {
+    checkLink,
     linkGeoAllowed,
     linkIpAllowed,
     linkUsability,
+    peopleRuleChanges,
+    storedPeopleRules,
+    LINK_GUARD_FIELDS,
+    type LinkCheck,
     signUnlock,
     unlockCookieName,
     verifyUnlock,
@@ -32,8 +37,7 @@ const SHARE_LINK_SCOPE = "share";
 /** A share as needed by the public access path. */
 export type ShareRecord = Awaited<ReturnType<typeof resolveShareByToken>>;
 
-/** Why a share cannot currently be used, or `ok`. Shares carry no start date, so
- *  the `scheduled` verdict a drop point can return never comes back from one. */
+/** Why a share cannot currently be used, or `ok`. */
 export type ShareUsability = LinkUsability;
 
 /** Create a share and return the one-time raw token to embed in the link. */
@@ -68,6 +72,8 @@ export async function createShare(
             allowedCidrs: JSON.stringify(input.allowedCidrs),
             allowedCountries: JSON.stringify(input.allowedCountries),
             allowedContinents: JSON.stringify(input.allowedContinents),
+            startsAt: input.startsAt,
+            ...storedPeopleRules(input),
             invites:
                 input.kind === "invite"
                     ? { create: input.inviteUserIds.map((userId) => ({ userId })) }
@@ -96,12 +102,16 @@ export async function listSharesForOwner(ownerId: string) {
             allowPreview: true,
             allowOverwrite: true,
             allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true,
+            passwordHash: true,
             maxDownloads: true,
             downloadCount: true,
             expiresAt: true,
             revokedAt: true,
             createdAt: true,
             encryptedToken: true,
+            ...LINK_GUARD_FIELDS,
             connection: { select: { name: true } }
         }
     });
@@ -141,6 +151,12 @@ export async function updateShare(
         allowCreateFolder?: boolean;
         allowOverwrite?: boolean;
         allowedCidrs?: string[];
+        allowedCountries?: string[];
+        allowedContinents?: string[];
+        startsAt?: Date | null;
+        schedule?: LinkSchedule | null;
+        requireLogin?: boolean;
+        allowedUsers?: string[];
     }
 ): Promise<void> {
     const data: Record<string, unknown> = {};
@@ -157,6 +173,13 @@ export async function updateShare(
     if (input.allowCreateFolder !== undefined) data.allowCreateFolder = input.allowCreateFolder;
     if (input.allowOverwrite !== undefined) data.allowOverwrite = input.allowOverwrite;
     if (input.allowedCidrs !== undefined) data.allowedCidrs = JSON.stringify(input.allowedCidrs);
+    if (input.allowedCountries !== undefined) {
+        data.allowedCountries = JSON.stringify(input.allowedCountries);
+    }
+    if (input.allowedContinents !== undefined) {
+        data.allowedContinents = JSON.stringify(input.allowedContinents);
+    }
+    Object.assign(data, peopleRuleChanges(input));
     await prisma.share.updateMany({ where: { id: shareId, ownerId }, data });
 }
 
@@ -219,9 +242,37 @@ export async function resolveShareByToken(token: string) {
             allowedCountries: true,
             allowedContinents: true,
             revokedAt: true,
+            ...LINK_GUARD_FIELDS,
             connection: { select: { name: true } }
         }
     });
+}
+
+/**
+ * Every rule a share's link carries, judged by the check every public link runs:
+ * live (start, expiry, download cap), inside its hours, from an accepted address,
+ * and opened by an account it accepts. The page and every token route ask this.
+ */
+export async function checkShare(
+    share: NonNullable<ShareRecord>,
+    ip: string | undefined,
+    now: Date = new Date()
+): Promise<LinkCheck> {
+    return checkLink(
+        {
+            limits: {
+                revokedAt: share.revokedAt,
+                startsAt: share.startsAt,
+                expiresAt: share.expiresAt,
+                maxUses: share.maxDownloads,
+                useCount: share.downloadCount
+            },
+            rules: share,
+            guards: share
+        },
+        ip,
+        now
+    );
 }
 
 /**
@@ -245,6 +296,7 @@ export async function shareGeoAllowed(
 /** Whether a share is currently serveable (not revoked, expired, or exhausted). */
 export function shareUsability(share: {
     revokedAt: Date | null;
+    startsAt?: Date | null;
     expiresAt: Date | null;
     maxDownloads: number | null;
     downloadCount: number;
@@ -253,6 +305,7 @@ export function shareUsability(share: {
     return linkUsability(
         {
             revokedAt: share.revokedAt,
+            startsAt: share.startsAt,
             expiresAt: share.expiresAt,
             maxUses: share.maxDownloads,
             useCount: share.downloadCount

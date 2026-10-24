@@ -26,7 +26,7 @@
  */
 
 import { z } from "zod";
-import { addressRuleFields } from "./link-rules.js";
+import { addressRuleFields, linkPeopleFields } from "./link-rules.js";
 import { FOLDER_DEPTH_LIMIT, hexColor, SPACE_ROLES, SPACE_VISIBILITIES } from "./tasks.js";
 
 export const noteTitle = z.string().trim().min(1, "Give it a title").max(200);
@@ -160,7 +160,10 @@ export const noteFolderName = z
     .max(120)
     // The characters a folder cannot be named because a vault on disk cannot
     // name one that either, so a folder made here can always be written back out.
-    .refine((name) => !/[\\/:*?"<>|]/.test(name), "A folder name cannot contain \\ / : * ? \" < > |");
+    .refine(
+        (name) => !/[\\/:*?"<>|]/.test(name),
+        'A folder name cannot contain \\ / : * ? " < > |'
+    );
 
 export const noteFolderCreateSchema = z.object({
     name: noteFolderName,
@@ -237,7 +240,9 @@ export const noteShareSchema = z.object({
     clearMaxViews: z.boolean().default(false),
     expiresAt: z.coerce.date().optional(),
     clearExpiry: z.boolean().default(false),
-    ...addressRuleFields
+    ...addressRuleFields,
+    /** Start, weekly hours, and who must be signed in to open it. */
+    ...linkPeopleFields
 });
 
 export type NoteShareInput = z.infer<typeof noteShareSchema>;

@@ -11,12 +11,10 @@
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import {
+    checkShare,
     logShareAccess,
     resolveShareByToken,
-    shareGeoAllowed,
-    shareIpAllowed,
     shareUnlockCookie,
-    shareUsability,
     verifyShareUnlock,
     type ShareRecord
 } from "@/lib/share-service";
@@ -33,6 +31,14 @@ export type ShareGate =
           userAgentHash: string | undefined;
       }
     | { ok: false; status: number; reason: string };
+
+/** The status a refusal answers with: gone for a link that is off, unauthorized
+ *  for one that wants an account, forbidden for the rest. */
+function denialStatus(reason: string): number {
+    if (["revoked", "expired", "exhausted"].includes(reason)) return 410;
+    if (reason === "sign_in_required") return 401;
+    return 403;
+}
 
 /**
  * Resolve a share by token and run every access gate in the same order as the
@@ -52,14 +58,8 @@ export async function gateShareRequest(token: string, action: string): Promise<S
         return { ok: false, status, reason };
     };
 
-    const usable = shareUsability(share);
-    if (!usable.ok) return deny(410, usable.reason);
-
-    if (!shareIpAllowed(share.allowedCidrs, ip)) return deny(403, "ip_not_allowed");
-
-    if (!(await shareGeoAllowed(share.allowedCountries, share.allowedContinents, ip))) {
-        return deny(403, "country_not_allowed");
-    }
+    const checked = await checkShare(share, ip);
+    if (!checked.ok) return deny(denialStatus(checked.reason), checked.reason);
 
     // Dymo IP-fraud gate (no-op unless the integration is enabled). Fails open.
     if (!(await dymoIpAllowed(ip)).allowed) return deny(403, "ip_flagged");

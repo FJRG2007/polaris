@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { accountIdentityList, addressRuleFields } from "./link-rules.js";
+import { accountIdentityList, addressRuleFields, linkScheduleSchema } from "./link-rules.js";
 
 /** One gibibyte, the default per-upload ceiling. */
 const DEFAULT_MAX_SIZE = 1024 * 1024 * 1024;
@@ -60,6 +60,8 @@ export const createFileRequestSchema = z
         ...addressRuleFields,
         /** ISO timestamp before which the request does not yet accept uploads. */
         startsAt: z.coerce.date().optional(),
+        /** The weekdays and hours it accepts uploads in; null is any time. */
+        schedule: linkScheduleSchema.nullable().default(null),
         /** Whether an uploader may delete files they submitted. */
         allowUploaderDelete: z.boolean().default(false),
         /**

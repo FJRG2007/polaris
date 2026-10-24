@@ -13,6 +13,8 @@
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
+    linkHoursIncomplete,
+    linkPeopleLimits,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -112,7 +114,9 @@ export function ShareSnippetDialog({
             inviteUsers: invited,
             allowedCidrs: advanced.allowedCidrs,
             allowedCountries: advanced.allowedCountries,
-            allowedContinents: advanced.allowedContinents
+            allowedContinents: advanced.allowedContinents,
+            ...linkPeopleLimits(advanced),
+            ...(visibility === "invite" ? { requireLogin: false, allowedUsers: [] } : {})
         });
         setPending(false);
         if (result.error) {
@@ -213,7 +217,14 @@ export function ShareSnippetDialog({
                                 <LinkAdvancedFields
                                     value={advanced}
                                     onChange={setAdvanced}
-                                    omit={burn ? ["uses"] : []}
+                                    // A burned snippet is one view by definition; an
+                                    // invite snippet already names its accounts.
+                                    omit={[
+                                        ...(burn ? (["uses"] as const) : []),
+                                        ...(visibility === "invite"
+                                            ? (["signin", "people"] as const)
+                                            : [])
+                                    ]}
                                     usesLabel={t("snippetShare.maxViews")}
                                     idPrefix="snippet-share"
                                 />
@@ -222,7 +233,10 @@ export function ShareSnippetDialog({
 
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="mt-1 flex justify-end">
-                            <Button type="submit" disabled={pending}>
+                            <Button
+                                type="submit"
+                                disabled={pending || linkHoursIncomplete(advanced)}
+                            >
                                 {pending ? (
                                     <Loader2 className="size-4 animate-spin" />
                                 ) : (

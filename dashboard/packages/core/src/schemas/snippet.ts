@@ -11,7 +11,14 @@
  */
 
 import { z } from "zod";
-import { accountIdentityList, addressRuleFields, addressRuleUpdateFields } from "./link-rules.js";
+import {
+    accountIdentityList,
+    addressRuleFields,
+    addressRuleUpdateFields,
+    linkPeopleFields,
+    linkPeopleUpdateFields,
+    linkScheduleSchema
+} from "./link-rules.js";
 
 /** Who can open a snippet. */
 export const SNIPPET_VISIBILITIES = ["private", "link", "invite"] as const;
@@ -89,7 +96,8 @@ const snippetLinkFields = {
      * and unlike a view cap it leaves nothing behind in a later backup.
      */
     burnAfterRead: z.boolean().default(false),
-    ...addressRuleFields
+    ...addressRuleFields,
+    ...linkPeopleFields
 } as const;
 
 export const createSnippetSchema = z
@@ -143,7 +151,8 @@ export const shareSnippetSchema = z.object({
     expiresAt: z.coerce.date().nullable().optional(),
     burnAfterRead: z.boolean().optional(),
     inviteUsers: accountIdentityList.optional(),
-    ...addressRuleUpdateFields
+    ...addressRuleUpdateFields,
+    ...linkPeopleUpdateFields
 });
 
 export type ShareSnippetInput = z.infer<typeof shareSnippetSchema>;
@@ -177,6 +186,8 @@ export const createTextRequestSchema = z.object({
     allowedUsers: accountIdentityList.default([]),
     startsAt: z.coerce.date().optional(),
     expiresAt: z.coerce.date().optional(),
+    /** The weekdays and hours it accepts text in; null is any time. */
+    schedule: linkScheduleSchema.nullable().default(null),
     ...addressRuleFields
 });
 
@@ -193,6 +204,8 @@ export const updateTextRequestSchema = z.object({
     allowedUsers: z.array(z.string().trim().toLowerCase()).optional(),
     startsAt: z.coerce.date().nullable().optional(),
     expiresAt: z.coerce.date().nullable().optional(),
+    /** The weekly window, `null` for any time, absent to keep it. */
+    schedule: linkScheduleSchema.nullable().optional(),
     ...addressRuleUpdateFields
 });
 

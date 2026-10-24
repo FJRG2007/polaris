@@ -12,7 +12,13 @@ import { loadEnv } from "@polaris/config";
 import { clientIp } from "@/lib/request-context";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { verifyLinkPassword } from "@polaris/core/link-password";
-import { checkLink, signUnlock, unlockCookieName, verifyUnlock } from "@/lib/link-guards";
+import {
+    checkLink,
+    signUnlock,
+    verifyUnlock,
+    unlockCookieName,
+    LINK_GUARD_FIELDS
+} from "@/lib/link-guards";
 
 /** The unlock-cookie namespace task links are signed under. Its own, so a
  *  cookie solved for a note is not a cookie that opens a task. */
@@ -30,7 +36,8 @@ const GATE_FIELDS = {
     views: true,
     allowedCidrs: true,
     allowedCountries: true,
-    allowedContinents: true
+    allowedContinents: true,
+    ...LINK_GUARD_FIELDS
 } as const;
 
 export function taskUnlockCookie(shareId: string): string {
@@ -51,11 +58,13 @@ export async function gateTaskShare(token: string): Promise<TaskShareGate> {
         {
             limits: {
                 revokedAt: null,
+                startsAt: share.startsAt,
                 expiresAt: share.expiresAt,
                 maxUses: share.maxViews,
                 useCount: share.views
             },
-            rules: share
+            rules: share,
+            guards: share
         },
         ip
     );

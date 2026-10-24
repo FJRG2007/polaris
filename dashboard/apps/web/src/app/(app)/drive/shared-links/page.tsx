@@ -8,6 +8,7 @@
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { listSharesForOwner } from "@/lib/share-service";
+import { parseStringList, readLinkGuards } from "@/lib/link-guards";
 import { SharedView, type ShareRow } from "./shared-links-view";
 
 export const dynamic = "force-dynamic";
@@ -17,13 +18,6 @@ export default async function SharedPage() {
     const user = await requirePermission("drive.read");
     const shares = await listSharesForOwner(user.id);
     const rows: ShareRow[] = shares.map((share) => {
-        let allowedCidrs: string[] = [];
-        try {
-            const parsed = JSON.parse(share.allowedCidrs);
-            if (Array.isArray(parsed)) allowedCidrs = parsed.filter((value): value is string => typeof value === "string");
-        } catch {
-            allowedCidrs = [];
-        }
         return {
             id: share.id,
             path: share.path,
@@ -37,7 +31,11 @@ export default async function SharedPage() {
             allowOverwrite: share.allowOverwrite,
             allowDownload: share.allowDownload,
             allowPreview: share.allowPreview,
-            allowedCidrs,
+            allowedCidrs: parseStringList(share.allowedCidrs),
+            allowedCountries: parseStringList(share.allowedCountries),
+            allowedContinents: parseStringList(share.allowedContinents),
+            hasPassword: share.passwordHash !== null,
+            guards: readLinkGuards(share),
             maxDownloads: share.maxDownloads,
             downloadCount: share.downloadCount,
             expiresAt: share.expiresAt ? share.expiresAt.toISOString() : null,
@@ -50,8 +48,12 @@ export default async function SharedPage() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("pages.sharedLinks.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("pages.sharedLinks.description")}</p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("pages.sharedLinks.title")}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                    {t("pages.sharedLinks.description")}
+                </p>
             </div>
             <SharedView shares={rows} />
         </div>

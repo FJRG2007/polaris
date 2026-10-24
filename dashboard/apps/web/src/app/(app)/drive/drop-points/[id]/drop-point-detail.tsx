@@ -11,19 +11,24 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import * as core from "@polaris/core";
 import { formatBytes } from "@polaris/core";
 import { tokenList } from "@/lib/token-field";
 import { useNow } from "@/components/presence";
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
+    NO_LINK_GUARDS,
+    linkGuardFields,
+    linkHoursIncomplete,
+    linkSchedule,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { useConfirm } from "@/components/confirm-dialog";
 import { AccountInput } from "@/components/account-input";
 import { useDisplayFormat } from "@/components/display-format";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { RequestDialog } from "@/app/(app)/drive/request-dialog";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { DeleteDropPointDialog } from "@/app/(app)/drive/drop-points/delete-drop-point-dialog";
@@ -82,6 +87,8 @@ export interface DropPointConfig {
     allowedContinents: string[];
     allowedUsers: string[];
     startsAt: string | null;
+    /** The weekdays and hours it accepts uploads in, or null for any time. */
+    schedule: core.LinkSchedule | null;
     allowUploaderDelete: boolean;
     allowOverwrite: boolean;
     uploaderDeleteWindowSeconds: number | null;
@@ -460,6 +467,9 @@ function OverviewTab({ config }: { config: DropPointConfig }) {
                             ? format.dateTime(config.startsAt)
                             : t("detail.values.immediately")}
                     </Field>
+                    <Field label={t("detail.fields.hours")}>
+                        <ScheduleText schedule={config.schedule} />
+                    </Field>
                     <Field label={t("detail.fields.expires")}>
                         {config.expiresAt
                             ? format.date(config.expiresAt)
@@ -789,8 +799,18 @@ function EditDropPointDialog({
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const initialExpiry = config.expiresAt ? config.expiresAt.slice(0, 10) : "";
+    // Only the days and hours come from the shared fields here: the start, the
+    // sign-in switch and the account list have their own fields in this form.
+    const { days, hoursFrom, hoursTo, timeZone } = linkGuardFields({
+        ...NO_LINK_GUARDS,
+        schedule: config.schedule
+    });
     const [advanced, setAdvanced] = useState<LinkAdvancedValue>({
         ...EMPTY_LINK_ADVANCED,
+        days,
+        hoursFrom,
+        hoursTo,
+        timeZone,
         expiresAt: initialExpiry,
         allowedCidrs: config.allowedCidrs,
         allowedCountries: config.allowedCountries,
@@ -807,6 +827,9 @@ function EditDropPointDialog({
         fieldsChanged ||
         advanced.password !== "" ||
         expiryChanged ||
+        advanced.days !== days ||
+        advanced.hoursFrom !== hoursFrom ||
+        advanced.hoursTo !== hoursTo ||
         !sameList(advanced.allowedCidrs, config.allowedCidrs) ||
         !sameList(advanced.allowedCountries, config.allowedCountries) ||
         !sameList(advanced.allowedContinents, config.allowedContinents);
@@ -843,6 +866,7 @@ function EditDropPointDialog({
             allowedContinents: advanced.allowedContinents,
             allowedUsers,
             startsAt: startsRaw ? new Date(startsRaw).toISOString() : null,
+            schedule: linkSchedule(advanced),
             allowUploaderDelete: form.get("allowUploaderDelete") === "on",
             allowOverwrite: form.get("allowOverwrite") === "on",
             uploaderDeleteWindowSeconds:
@@ -963,10 +987,13 @@ function EditDropPointDialog({
                             />
                         </label>
                     </div>
+                    {/* No cap on uses: the file cap above is the drop point's own.
+                        Start, sign-in and people have their own fields in this
+                        form, so the shared section leaves them out. */}
                     <LinkAdvancedFields
                         value={advanced}
                         onChange={setAdvanced}
-                        omit={["uses"]}
+                        omit={["uses", "starts", "signin", "people"]}
                         passwordSet={config.hasPassword}
                         idPrefix="drop-point-edit"
                     />
@@ -1039,12 +1066,36 @@ function EditDropPointDialog({
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end">
-                        <Button type="submit" disabled={pending || !changed}>
+                        <Button
+                            type="submit"
+                            disabled={pending || !changed || linkHoursIncomplete(advanced)}
+                        >
                             {pending ? t("form.saving") : t("form.save")}
                         </Button>
                     </div>
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** A drop point's weekly hours in words, or "any time". */
+function ScheduleText({ schedule }: { schedule: core.LinkSchedule | null }) {
+    const t = useTranslations("drivePoints");
+    const locale = useLocale();
+    if (!schedule) return <>{t("detail.values.anyTime")}</>;
+    const names = core.weekdayNames(locale, "short");
+    const days = names.filter((_, day) => (schedule.days & (1 << day)) !== 0).join(", ");
+    const clock = (minute: number) =>
+        `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+    const hours =
+        schedule.startMinute !== null && schedule.endMinute !== null
+            ? ` ${clock(schedule.startMinute)}-${clock(schedule.endMinute)}`
+            : "";
+    return (
+        <span title={schedule.timeZone}>
+            {days}
+            {hours}
+        </span>
     );
 }

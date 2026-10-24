@@ -219,7 +219,7 @@ export async function vaultContentsAction(): Promise<{
     sends: Record<string, unknown>[];
     /** Polaris's own address rules per Send, which the Send protocol has no
      *  field for. */
-    sendRules: Record<string, sends.SendAddressRules>;
+    sendRules: Record<string, sends.SendRulesView>;
 }> {
     const user = await requirePermission("vault.use");
     const [items, folderRows, sendRows, sendRules] = await Promise.all([
@@ -395,8 +395,9 @@ export async function passwordOpensVaultAction(clientHash: string): Promise<{ op
 }
 
 /** Create a Send and hand back the link to give somebody. */
-/** A Send's address rules as the Sends screen sends them. */
-const sendRulesSchema = z.object({ ...core.addressRuleFields });
+/** A Send's rules as the Sends screen sends them: where, from when, in which
+ *  hours and for whom it opens. Absent is no restriction. */
+const sendRulesSchema = z.object({ ...core.addressRuleFields, ...core.linkPeopleFields });
 
 export async function createSendAction(
     input: unknown,
@@ -442,7 +443,7 @@ export async function itemUsesAction(itemId: string): Promise<ItemUseEntry[]> {
     return accessLog.listItemUses(user.id, itemId);
 }
 
-/** Replace the address rules of one of this account's Sends. */
+/** Replace the rules of one of this account's Sends. */
 export async function setSendRulesAction(
     sendId: string,
     rules: unknown

@@ -44,7 +44,17 @@ import {
 import { useConfirm } from "@/components/confirm-dialog";
 import { LinkVisitorCell, signedInVisitors } from "../link-visitor-cell";
 import { useDisplayFormat } from "@/components/display-format";
-import { useFormChanged } from "@/lib/use-form-changed";
+import type { LinkGuardsView } from "@/lib/link-guards";
+import {
+    LinkAdvancedFields,
+    linkExpiry,
+    linkExpiryDay,
+    linkGuardFields,
+    linkHoursIncomplete,
+    linkLimits,
+    linkPeopleLimits,
+    type LinkAdvancedValue
+} from "@/components/link-advanced-fields";
 import * as polls from "../drive-reads";
 
 export interface ShareRow {
@@ -61,6 +71,11 @@ export interface ShareRow {
     allowDownload: boolean;
     allowPreview: boolean;
     allowedCidrs: string[];
+    allowedCountries: string[];
+    allowedContinents: string[];
+    hasPassword: boolean;
+    /** Start, weekly hours and account rules, as the edit dialog shows them. */
+    guards: LinkGuardsView;
     maxDownloads: number | null;
     downloadCount: number;
     expiresAt: string | null;
@@ -127,6 +142,25 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
         });
     }
 
+    /** Show an edit at once; put the row back and say why if it is refused. */
+    async function onSaveEdit(updated: ShareRow, edit: Record<string, unknown>) {
+        const previous = rows.find((row) => row.id === updated.id);
+        setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+        setEditing(null);
+        const result = await updateShareAction(updated.id, edit).catch(() => ({
+            error: t("sharedLinks.saveFailedBody")
+        }));
+        if (!result.error) return;
+        if (previous) {
+            setRows((prev) => prev.map((row) => (row.id === previous.id ? previous : row)));
+        }
+        await confirm({
+            title: t("sharedLinks.saveFailed"),
+            description: result.error,
+            alert: true
+        });
+    }
+
     async function onReveal(row: ShareRow) {
         setBusy(row.id);
         const result = await revealShareLinkAction(row.id);
@@ -187,7 +221,9 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                 {share.expiresAt
                                                     ? ` - ${t("sharedLinks.expires", { date: format.date(share.expiresAt) })}`
                                                     : ""}
-                                                {share.allowedCidrs.length > 0
+                                                {share.allowedCidrs.length > 0 ||
+                                                share.allowedCountries.length > 0 ||
+                                                share.allowedContinents.length > 0
                                                     ? ` - ${t("sharedLinks.ipRestricted")}`
                                                     : ""}
                                             </p>
@@ -287,10 +323,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
             <EditShareDialog
                 share={editing}
                 onOpenChange={(open) => !open && setEditing(null)}
-                onSaved={(updated) => {
-                    setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
-                    setEditing(null);
-                }}
+                onSave={(updated, edit) => void onSaveEdit(updated, edit)}
             />
             <ShareLogsDialog share={logsFor} onOpenChange={(open) => !open && setLogsFor(null)} />
             {confirmDialog}
@@ -298,198 +331,165 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
     );
 }
 
-function EditShareDialog({
+/** The powers a link hands its holder, in the order the dialog lists them. */
+const SHARE_POWERS = [
+    ["allowDownload", "sharedLinks.allowDownload"],
+    ["allowPreview", "sharedLinks.allowPreview"],
+    ["allowUpload", "sharedLinks.allowUpload"],
+    ["allowCreateFolder", "sharedLinks.allowMkdir"],
+    ["allowOverwrite", "sharedLinks.allowOverwrite"],
+    ["allowRename", "sharedLinks.allowRename"],
+    ["allowDelete", "sharedLinks.allowDelete"]
+] as const satisfies readonly (readonly [keyof SharePowers, NamespaceKey<"drive">])[];
+
+type SharePowers = Pick<
+    ShareRow,
+    | "allowDownload"
+    | "allowPreview"
+    | "allowUpload"
+    | "allowCreateFolder"
+    | "allowOverwrite"
+    | "allowRename"
+    | "allowDelete"
+>;
+
+function powersOf(share: ShareRow): SharePowers {
+    return {
+        allowDownload: share.allowDownload,
+        allowPreview: share.allowPreview,
+        allowUpload: share.allowUpload,
+        allowCreateFolder: share.allowCreateFolder,
+        allowOverwrite: share.allowOverwrite,
+        allowRename: share.allowRename,
+        allowDelete: share.allowDelete
+    };
+}
+
+/** A saved link's limits as the Advanced section edits them. */
+export function shareAdvancedOf(share: ShareRow): LinkAdvancedValue {
+    return {
+        password: "",
+        expiresAt: linkExpiryDay(share.expiresAt),
+        maxUses: share.maxDownloads === null ? "" : String(share.maxDownloads),
+        allowedCidrs: share.allowedCidrs,
+        allowedCountries: share.allowedCountries,
+        allowedContinents: share.allowedContinents,
+        ...linkGuardFields(share.guards)
+    };
+}
+
+/** An edit as the row it leaves behind, for the list to show before the save lands. */
+function editedRow(share: ShareRow, advanced: LinkAdvancedValue, powers: SharePowers): ShareRow {
+    const people = linkPeopleLimits(advanced);
+    return {
+        ...share,
+        ...powers,
+        hasPassword: advanced.password ? true : advanced.clearPassword ? false : share.hasPassword,
+        maxDownloads: advanced.maxUses ? Number(advanced.maxUses) : null,
+        expiresAt: linkExpiry(advanced.expiresAt)?.toISOString() ?? null,
+        allowedCidrs: advanced.allowedCidrs,
+        allowedCountries: advanced.allowedCountries,
+        allowedContinents: advanced.allowedContinents,
+        guards: {
+            startsAt: people.startsAt,
+            schedule: people.schedule,
+            requireLogin: people.requireLogin,
+            allowedUsers: people.allowedUsers
+        }
+    };
+}
+
+/**
+ * Edit a link's guardrails with the same Advanced section the create dialog
+ * draws, every current value filled in. Save stays off until something differs
+ * from what is stored; a typed password always counts, since the stored one
+ * cannot be read back to compare. Saving hands the edit to the list, which
+ * shows it at once and puts the row back if the server refuses it.
+ */
+export function EditShareDialog({
     share,
     onOpenChange,
-    onSaved
+    onSave
 }: {
     share: ShareRow | null;
     onOpenChange: (open: boolean) => void;
-    onSaved: (row: ShareRow) => void;
+    onSave: (row: ShareRow, edit: Record<string, unknown>) => void;
 }) {
     const t = useTranslations("drive");
-    const [pending, setPending] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const { formProps, changed } = useFormChanged();
-
-    async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        if (!share) return;
-        setPending(true);
-        setError(null);
-        const form = new FormData(event.currentTarget);
-        const password = String(form.get("password") ?? "");
-        const removePassword = form.get("removePassword") === "on";
-        const maxDownloads = form.get("maxDownloads");
-        const expiresAt = String(form.get("expiresAt") ?? "");
-        const allowedCidrs = String(form.get("allowedCidrs") ?? "")
-            .split(/[\s,]+/)
-            .map((value) => value.trim())
-            .filter(Boolean);
-
-        const result = await updateShareAction(share.id, {
-            password: removePassword ? null : password ? password : undefined,
-            maxDownloads: maxDownloads ? Number(maxDownloads) : null,
-            expiresAt: expiresAt || null,
-            allowDownload: form.get("allowDownload") === "on",
-            allowPreview: form.get("allowPreview") === "on",
-            allowUpload: form.get("allowUpload") === "on",
-            allowRename: form.get("allowRename") === "on",
-            allowDelete: form.get("allowDelete") === "on",
-            allowCreateFolder: form.get("allowCreateFolder") === "on",
-            allowOverwrite: form.get("allowOverwrite") === "on",
-            allowedCidrs
-        });
-        setPending(false);
-        if (result.error) {
-            setError(result.error);
-            return;
-        }
-        onSaved({
-            ...share,
-            maxDownloads: maxDownloads ? Number(maxDownloads) : null,
-            expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
-            allowDownload: form.get("allowDownload") === "on",
-            allowPreview: form.get("allowPreview") === "on",
-            allowUpload: form.get("allowUpload") === "on",
-            allowRename: form.get("allowRename") === "on",
-            allowDelete: form.get("allowDelete") === "on",
-            allowCreateFolder: form.get("allowCreateFolder") === "on",
-            allowOverwrite: form.get("allowOverwrite") === "on",
-            allowedCidrs
-        });
-    }
-
     return (
         <Dialog open={share !== null} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>{t("sharedLinks.editTitle")}</DialogTitle>
                     <DialogDescription className="truncate">
                         {share?.path || t("sharedLinks.root")}
                     </DialogDescription>
                 </DialogHeader>
-                {share ? (
-                    <form onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
-                        <label className="flex flex-col gap-1 text-sm">
-                            {t("sharedLinks.password")}
-                            <Input
-                                name="password"
-                                type="password"
-                                placeholder={t("sharedLinks.keepPassword")}
-                                autoComplete="off"
-                            />
-                        </label>
-                        <label className="flex items-center gap-2 text-sm">
-                            <input type="checkbox" name="removePassword" className="size-4" />
-                            {t("sharedLinks.removePassword")}
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("sharedLinks.maxDownloads")}
-                                <Input
-                                    name="maxDownloads"
-                                    type="number"
-                                    min="1"
-                                    defaultValue={share.maxDownloads ?? ""}
-                                    placeholder={t("sharedLinks.unlimited")}
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("sharedLinks.expiresField")}
-                                <Input
-                                    name="expiresAt"
-                                    type="date"
-                                    defaultValue={
-                                        share.expiresAt ? share.expiresAt.slice(0, 10) : ""
-                                    }
-                                />
-                            </label>
-                        </div>
-                        <label className="flex flex-col gap-1 text-sm">
-                            {t("sharedLinks.cidrs")}
-                            <Input
-                                name="allowedCidrs"
-                                defaultValue={share.allowedCidrs.join(", ")}
-                                placeholder={t("sharedLinks.cidrsPlaceholder")}
-                                autoComplete="off"
-                            />
-                        </label>
-                        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowDownload"
-                                    defaultChecked={share.allowDownload}
-                                    className="size-4"
-                                />
-                                {t("sharedLinks.allowDownload")}
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowPreview"
-                                    defaultChecked={share.allowPreview}
-                                    className="size-4"
-                                />
-                                {t("sharedLinks.allowPreview")}
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowUpload"
-                                    defaultChecked={share.allowUpload}
-                                    className="size-4"
-                                />
-                                {t("sharedLinks.allowUpload")}
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowCreateFolder"
-                                    defaultChecked={share.allowCreateFolder}
-                                    className="size-4"
-                                />
-                                {t("sharedLinks.allowMkdir")}
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowOverwrite"
-                                    defaultChecked={share.allowOverwrite}
-                                    className="size-4"
-                                />
-                                {t("sharedLinks.allowOverwrite")}
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowRename"
-                                    defaultChecked={share.allowRename}
-                                    className="size-4"
-                                />
-                                {t("sharedLinks.allowRename")}
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowDelete"
-                                    defaultChecked={share.allowDelete}
-                                    className="size-4"
-                                />
-                                {t("sharedLinks.allowDelete")}
-                            </label>
-                        </div>
-                        {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <div className="flex justify-end">
-                            <Button type="submit" disabled={pending || !changed}>
-                                {pending ? t("sharedLinks.saving") : t("sharedLinks.save")}
-                            </Button>
-                        </div>
-                    </form>
-                ) : null}
+                {share ? <EditShareForm key={share.id} share={share} onSave={onSave} /> : null}
             </DialogContent>
         </Dialog>
+    );
+}
+
+function EditShareForm({
+    share,
+    onSave
+}: {
+    share: ShareRow;
+    onSave: (row: ShareRow, edit: Record<string, unknown>) => void;
+}) {
+    const t = useTranslations("drive");
+    const [advanced, setAdvanced] = useState<LinkAdvancedValue>(() => shareAdvancedOf(share));
+    const [powers, setPowers] = useState<SharePowers>(() => powersOf(share));
+    const changed =
+        advanced.password !== "" ||
+        JSON.stringify(advanced) !== JSON.stringify(shareAdvancedOf(share)) ||
+        JSON.stringify(powers) !== JSON.stringify(powersOf(share));
+    const blocked = !changed || linkHoursIncomplete(advanced);
+
+    function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (blocked) return;
+        const { maxViews, ...limits } = linkLimits(advanced);
+        onSave(editedRow(share, advanced, powers), {
+            ...limits,
+            maxDownloads: maxViews,
+            ...powers
+        });
+    }
+
+    return (
+        <form onSubmit={onSubmit} className="flex flex-col gap-3">
+            <LinkAdvancedFields
+                value={advanced}
+                onChange={setAdvanced}
+                usesLabel={t("sharedLinks.maxDownloads")}
+                passwordSet={share.hasPassword}
+                clearablePassword
+                idPrefix="drive-share-edit"
+            />
+            <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
+                {SHARE_POWERS.map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            name={key}
+                            checked={powers[key]}
+                            onChange={(event) =>
+                                setPowers({ ...powers, [key]: event.target.checked })
+                            }
+                            className="size-4"
+                        />
+                        {t(label)}
+                    </label>
+                ))}
+            </div>
+            <div className="flex justify-end">
+                <Button type="submit" disabled={blocked}>
+                    {t("sharedLinks.save")}
+                </Button>
+            </div>
+        </form>
     );
 }
 

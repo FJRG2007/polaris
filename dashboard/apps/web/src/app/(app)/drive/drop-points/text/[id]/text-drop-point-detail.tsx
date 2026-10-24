@@ -9,12 +9,18 @@
  */
 
 import Link from "next/link";
+import * as core from "@polaris/core";
 import { formatBytes } from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
+    NO_LINK_GUARDS,
+    linkGuardFields,
+    linkHoursIncomplete,
+    linkSchedule,
+    linkStart,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -52,6 +58,8 @@ export interface TextDropPointSettings {
     maxSubmissions: number | null;
     hasPassword: boolean;
     startsAt: string | null;
+    /** The weekdays and hours it accepts text in, or null for any time. */
+    schedule: core.LinkSchedule | null;
     expiresAt: string | null;
     revokedAt: string | null;
     submissionCount: number;
@@ -80,8 +88,20 @@ export function TextDropPointDetail({
     const router = useRouter();
     const t = useTranslations("drivePoints");
     const format = useDisplayFormat();
+    // The start and the weekly hours come from the shared section; sign-in and
+    // the account list have their own fields in this form.
+    const { startsAt, days, hoursFrom, hoursTo, timeZone } = linkGuardFields({
+        ...NO_LINK_GUARDS,
+        startsAt: request.startsAt,
+        schedule: request.schedule
+    });
     const [advanced, setAdvanced] = useState<LinkAdvancedValue>({
         ...EMPTY_LINK_ADVANCED,
+        startsAt,
+        days,
+        hoursFrom,
+        hoursTo,
+        timeZone,
         expiresAt: asDateValue(request.expiresAt),
         allowedCidrs: request.allowedCidrs,
         allowedCountries: request.allowedCountries,
@@ -101,12 +121,17 @@ export function TextDropPointDetail({
     // the form snapshot cannot see them: without this, turning one off and saving
     // would be refused as "nothing changed".
     const expiryChanged = advanced.expiresAt !== asDateValue(request.expiresAt);
+    const startChanged = advanced.startsAt !== startsAt;
+    const hoursChanged =
+        advanced.days !== days || advanced.hoursFrom !== hoursFrom || advanced.hoursTo !== hoursTo;
     const dirty =
         changed ||
         requireLogin !== request.requireLogin ||
         allowSealed !== request.allowSealed ||
         advanced.password !== "" ||
         expiryChanged ||
+        startChanged ||
+        hoursChanged ||
         advanced.allowedCidrs.join() !== request.allowedCidrs.join() ||
         advanced.allowedCountries.join() !== request.allowedCountries.join() ||
         advanced.allowedContinents.join() !== request.allowedContinents.join();
@@ -152,7 +177,12 @@ export function TextDropPointDetail({
             allowedCountries: advanced.allowedCountries,
             allowedContinents: advanced.allowedContinents,
             // An untouched expiry keeps its exact time; the field shows only the day.
-            ...(expiryChanged ? { expiresAt: advanced.expiresAt || null } : {})
+            ...(expiryChanged ? { expiresAt: advanced.expiresAt || null } : {}),
+            // Likewise an untouched start keeps its exact time.
+            ...(startChanged
+                ? { startsAt: linkStart(advanced.startsAt)?.toISOString() ?? null }
+                : {}),
+            ...(hoursChanged ? { schedule: linkSchedule(advanced) } : {})
         });
         setPending(false);
         if (result.error) {
@@ -332,10 +362,13 @@ export function TextDropPointDetail({
                                 </span>
                             </span>
                         </label>
+                        {/* The cap on submissions is its own field above, and
+                            sign-in and the account list have theirs, so the
+                            shared section leaves them out. */}
                         <LinkAdvancedFields
                             value={advanced}
                             onChange={setAdvanced}
-                            omit={["uses"]}
+                            omit={["uses", "signin", "people"]}
                             passwordSet={request.hasPassword}
                             idPrefix="text-drop-point-edit"
                         />
@@ -346,7 +379,10 @@ export function TextDropPointDetail({
                                     {t("text.saved")}
                                 </span>
                             ) : null}
-                            <Button type="submit" disabled={pending || !dirty}>
+                            <Button
+                                type="submit"
+                                disabled={pending || !dirty || linkHoursIncomplete(advanced)}
+                            >
                                 {pending ? (
                                     <Loader2 className="size-4 animate-spin" />
                                 ) : (

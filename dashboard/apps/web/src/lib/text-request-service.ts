@@ -17,7 +17,7 @@ import { loadEnv } from "@polaris/config";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { randomDropPointName, userAllowedForRequest } from "@polaris/core";
+import { randomDropPointName } from "@polaris/core";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import type {
     CreateTextRequestInput,
@@ -25,12 +25,15 @@ import type {
     UpdateTextRequestInput
 } from "@polaris/core";
 import {
+    checkLink,
     linkUsability,
-    parseStringList,
+    sessionLinkViewer,
     signUnlock,
     unlockCookieName,
     verifyUnlock,
-    type LinkUsability
+    type LinkCheck,
+    type LinkUsability,
+    type LinkViewerSource
 } from "@/lib/link-guards";
 
 /** The unlock-cookie namespace text drop points are signed under. */
@@ -70,6 +73,7 @@ export async function createTextRequest(
             allowedCountries: JSON.stringify(input.allowedCountries),
             allowedContinents: JSON.stringify(input.allowedContinents),
             startsAt: input.startsAt ?? null,
+            linkSchedule: input.schedule ? JSON.stringify(input.schedule) : "",
             expiresAt: input.expiresAt ?? null
         },
         select: { id: true }
@@ -117,6 +121,7 @@ export async function getTextRequestForOwner(ownerId: string, requestId: string)
             allowedCountries: true,
             allowedContinents: true,
             startsAt: true,
+            linkSchedule: true,
             expiresAt: true,
             revokedAt: true,
             createdAt: true,
@@ -161,6 +166,9 @@ export async function updateTextRequest(
         data.allowedContinents = JSON.stringify(input.allowedContinents);
     }
     if (input.startsAt !== undefined) data.startsAt = input.startsAt;
+    if (input.schedule !== undefined) {
+        data.linkSchedule = input.schedule ? JSON.stringify(input.schedule) : "";
+    }
     if (input.expiresAt !== undefined) data.expiresAt = input.expiresAt;
     await prisma.textRequest.updateMany({ where: { id: requestId, ownerId }, data });
 }
@@ -240,6 +248,7 @@ export async function resolveTextRequestByToken(token: string) {
             allowedCountries: true,
             allowedContinents: true,
             startsAt: true,
+            linkSchedule: true,
             expiresAt: true,
             revokedAt: true
         }
@@ -273,22 +282,41 @@ export async function countTextSubmissions(requestId: string): Promise<number> {
 }
 
 /**
- * Whether a signed-in sender passes a drop point's per-user allowlist. An empty
- * list is open to anyone; otherwise the caller must be signed in and named.
+ * The one link check a text drop point's page and submit action run: open,
+ * started, unexpired, inside its weekly hours, from an accepted address and
+ * region, and for the account it needs. The password is its own gate, and the
+ * submission cap is counted in `submitText`.
  */
-export async function textRequestUserAllowed(
-    allowedUsersJson: string,
-    userId: string | null
-): Promise<boolean> {
-    const allowed = parseStringList(allowedUsersJson);
-    if (allowed.length === 0) return true;
-    if (!userId) return false;
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { email: true, username: true }
-    });
-    if (!user) return false;
-    return userAllowedForRequest(user, allowed);
+export async function textRequestGate(
+    request: NonNullable<TextRequestRecord>,
+    ip: string | undefined,
+    now: Date = new Date(),
+    viewer: LinkViewerSource = sessionLinkViewer
+): Promise<LinkCheck> {
+    return checkLink(
+        {
+            limits: {
+                revokedAt: request.revokedAt,
+                expiresAt: request.expiresAt,
+                startsAt: request.startsAt,
+                maxUses: null,
+                useCount: 0
+            },
+            rules: {
+                allowedCidrs: request.allowedCidrs,
+                allowedCountries: request.allowedCountries,
+                allowedContinents: request.allowedContinents
+            },
+            guards: {
+                requireLogin: request.requireLogin,
+                allowedUsers: request.allowedUsers,
+                linkSchedule: request.linkSchedule
+            }
+        },
+        ip,
+        now,
+        viewer
+    );
 }
 
 /** Why a submission was refused, or the snippet it became. */
