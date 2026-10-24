@@ -9,7 +9,11 @@ import {
     EMPTY_LINK_ADVANCED,
     linkExpiry,
     linkExpiryDay,
-    linkLimits
+    linkGuardFields,
+    linkHoursIncomplete,
+    linkLimits,
+    linkSchedule,
+    NO_LINK_GUARDS
 } from "@/components/link-advanced-fields";
 
 describe("the Advanced section's limits", () => {
@@ -46,5 +50,32 @@ describe("the Advanced section's limits", () => {
             expiresAt: null
         });
         expect(linkLimits(EMPTY_LINK_ADVANCED)).toMatchObject({ maxViews: null, expiresAt: null });
+    });
+
+    it("keeps a stored window in its own time zone when the link is edited", () => {
+        const stored = {
+            days: 0b0111110,
+            startMinute: 9 * 60,
+            endMinute: 17 * 60,
+            timeZone: "Pacific/Chatham"
+        };
+        const value = {
+            ...EMPTY_LINK_ADVANCED,
+            ...linkGuardFields({ ...NO_LINK_GUARDS, schedule: stored })
+        };
+        expect(value.timeZone).toBe("Pacific/Chatham");
+        expect(linkSchedule({ ...value, password: "pw" })).toEqual(stored);
+    });
+
+    it("reads a new window on the reader's own clock", () => {
+        const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        expect(
+            linkSchedule({ ...EMPTY_LINK_ADVANCED, hoursFrom: "09:00", hoursTo: "17:00" })
+        ).toMatchObject({ startMinute: 540, endMinute: 1020, timeZone: zone });
+    });
+
+    it("calls half-filled hours incomplete", () => {
+        expect(linkHoursIncomplete({ ...EMPTY_LINK_ADVANCED, hoursFrom: "09:00" })).toBe(true);
+        expect(linkHoursIncomplete(EMPTY_LINK_ADVANCED)).toBe(false);
     });
 });

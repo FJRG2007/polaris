@@ -25,6 +25,7 @@ import {
     linkExpiryDay,
     linkGuardFields,
     NO_LINK_GUARDS,
+    linkHoursIncomplete,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { runAction } from "@/lib/run-action";
@@ -459,7 +460,11 @@ export function ShareDialog({
                                     <div className="flex justify-end">
                                         <Button
                                             size="sm"
-                                            disabled={savingLimits || !limitsChanged}
+                                            disabled={
+                                                savingLimits ||
+                                                !limitsChanged ||
+                                                linkHoursIncomplete(advanced)
+                                            }
                                             onClick={() => void saveLimits()}
                                         >
                                             {savingLimits && (

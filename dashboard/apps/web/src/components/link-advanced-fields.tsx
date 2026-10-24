@@ -25,14 +25,7 @@ import { AccessRulesEditor, type AccessRulesValue } from "@/components/access-ru
 
 /** The parts a surface can leave out. */
 export type LinkAdvancedPart =
-    | "password"
-    | "starts"
-    | "expiry"
-    | "uses"
-    | "schedule"
-    | "signin"
-    | "people"
-    | "places";
+    "password" | "starts" | "expiry" | "uses" | "schedule" | "signin" | "people" | "places";
 
 export interface LinkAdvancedValue {
     password: string;
@@ -52,6 +45,8 @@ export interface LinkAdvancedValue {
     /** `hh:mm` it opens and closes each of those days; both empty is all day. */
     hoursFrom: string;
     hoursTo: string;
+    /** The time zone the hours are read in, or empty for the reader's own. */
+    timeZone: string;
     /** Only somebody signed in to an account here may open it. */
     requireLogin: boolean;
     /** Only these accounts (username or address) may open it. */
@@ -69,6 +64,7 @@ export const EMPTY_LINK_ADVANCED: LinkAdvancedValue = {
     days: core.EVERY_DAY,
     hoursFrom: "",
     hoursTo: "",
+    timeZone: "",
     requireLogin: false,
     allowedUsers: []
 };
@@ -137,7 +133,7 @@ export function linkSchedule(value: LinkAdvancedValue): core.LinkSchedule | null
         days: value.days || core.EVERY_DAY,
         startMinute: hours ? startMinute : null,
         endMinute: hours ? endMinute : null,
-        timeZone: readerZone()
+        timeZone: value.timeZone || readerZone()
     };
 }
 
@@ -156,13 +152,14 @@ export function linkGuardFields(
     view: LinkGuardsView | null | undefined
 ): Pick<
     LinkAdvancedValue,
-    "startsAt" | "days" | "hoursFrom" | "hoursTo" | "requireLogin" | "allowedUsers"
+    "startsAt" | "days" | "hoursFrom" | "hoursTo" | "timeZone" | "requireLogin" | "allowedUsers"
 > {
     return {
         startsAt: linkExpiryDay(view?.startsAt ?? null),
         days: view?.schedule?.days ?? core.EVERY_DAY,
         hoursFrom: minuteClock(view?.schedule?.startMinute ?? null),
         hoursTo: minuteClock(view?.schedule?.endMinute ?? null),
+        timeZone: view?.schedule?.timeZone ?? "",
         requireLogin: view?.requireLogin ?? false,
         allowedUsers: view?.allowedUsers ?? []
     };
@@ -424,7 +421,7 @@ export function LinkAdvancedFields({
                                             if (days !== 0) onChange({ ...value, days });
                                         }}
                                         className={cn(
-                                            "rounded-md border px-2 py-1 text-xs",
+                                            "min-h-11 rounded-md border px-3 text-xs sm:min-h-0 sm:px-2 sm:py-1",
                                             on
                                                 ? "border-primary bg-primary/10 text-foreground"
                                                 : "border-border text-muted-foreground"
@@ -479,7 +476,9 @@ export function LinkAdvancedFields({
                         >
                             {hoursBad
                                 ? t("linkAdvanced.hoursIncomplete")
-                                : t("linkAdvanced.hoursHint", { zone: readerZone() })}
+                                : t("linkAdvanced.hoursHint", {
+                                      zone: value.timeZone || readerZone()
+                                  })}
                         </p>
                     </fieldset>
                 ) : null}

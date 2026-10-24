@@ -39,6 +39,7 @@ import {
     EMPTY_LINK_ADVANCED,
     LinkAdvancedFields,
     linkAddressRules,
+    linkExpiry,
     linkHoursIncomplete,
     linkPeopleLimits,
     type LinkAdvancedValue
@@ -509,7 +510,9 @@ export function ShareDialog({
             capability: linkCapability,
             actions: core.grantActions(subject, linkCapability, []),
             audience: draftAudience,
-            ...(linkRules.expiresAt ? { endsAt: new Date(linkRules.expiresAt).toISOString() } : {}),
+            ...(linkRules.expiresAt
+                ? { endsAt: linkExpiry(linkRules.expiresAt)?.toISOString() }
+                : {}),
             ...(linkRules.maxUses ? { maxUses: Number(linkRules.maxUses) } : {}),
             ...(people.startsAt ? { startsAt: people.startsAt } : {}),
             ...(people.schedule ? people.schedule : {}),
@@ -1220,7 +1223,10 @@ export function ShareDialog({
                                                             {t("share.cancel")}
                                                         </Button>
                                                         <Button
-                                                            disabled={busy || linkHoursIncomplete(linkRules)}
+                                                            disabled={
+                                                                busy ||
+                                                                linkHoursIncomplete(linkRules)
+                                                            }
                                                             onClick={() => void makeLink()}
                                                         >
                                                             {busy ? (

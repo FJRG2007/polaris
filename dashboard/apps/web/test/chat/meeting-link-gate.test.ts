@@ -132,13 +132,17 @@ describe("a meeting's guest link", () => {
         expect(update.mock.calls[0][0].data).toEqual({
             allowedCidrs: "[]",
             allowedCountries: '["ES"]',
-            allowedContinents: "[]"
+            allowedContinents: "[]",
+            startsAt: null,
+            allowedUsers: "[]",
+            linkSchedule: ""
         });
         expect(saved).toEqual({
             hasPassword: true,
             allowedCidrs: [],
             allowedCountries: ["ES"],
-            allowedContinents: []
+            allowedContinents: [],
+            guards: { startsAt: null, schedule: null, requireLogin: false, allowedUsers: [] }
         });
 
         findUnique.mockResolvedValueOnce({ ...row(), hostId: HOST });

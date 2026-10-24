@@ -418,7 +418,7 @@ export function EditShareDialog({
     const t = useTranslations("drive");
     return (
         <Dialog open={share !== null} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>{t("sharedLinks.editTitle")}</DialogTitle>
                     <DialogDescription className="truncate">

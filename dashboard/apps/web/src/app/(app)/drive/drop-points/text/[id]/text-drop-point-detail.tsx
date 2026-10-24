@@ -90,7 +90,7 @@ export function TextDropPointDetail({
     const format = useDisplayFormat();
     // The start and the weekly hours come from the shared section; sign-in and
     // the account list have their own fields in this form.
-    const { startsAt, days, hoursFrom, hoursTo } = linkGuardFields({
+    const { startsAt, days, hoursFrom, hoursTo, timeZone } = linkGuardFields({
         ...NO_LINK_GUARDS,
         startsAt: request.startsAt,
         schedule: request.schedule
@@ -101,6 +101,7 @@ export function TextDropPointDetail({
         days,
         hoursFrom,
         hoursTo,
+        timeZone,
         expiresAt: asDateValue(request.expiresAt),
         allowedCidrs: request.allowedCidrs,
         allowedCountries: request.allowedCountries,

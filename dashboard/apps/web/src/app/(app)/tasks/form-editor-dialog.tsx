@@ -21,6 +21,7 @@ import {
     linkLimits,
     linkExpiryDay,
     linkGuardFields,
+    linkHoursIncomplete,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import {
@@ -139,6 +140,7 @@ export function FormEditorDialog({
         draft.name.trim() !== "" &&
         draft.listId !== "" &&
         draft.fields.length > 0 &&
+        !linkHoursIncomplete(draft.advanced) &&
         draft.fields.every(
             (field) =>
                 field.label.trim() !== "" && (field.type !== "dropdown" || field.options.length > 0)

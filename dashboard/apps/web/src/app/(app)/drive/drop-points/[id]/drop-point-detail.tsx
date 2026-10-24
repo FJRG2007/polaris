@@ -801,7 +801,7 @@ function EditDropPointDialog({
     const initialExpiry = config.expiresAt ? config.expiresAt.slice(0, 10) : "";
     // Only the days and hours come from the shared fields here: the start, the
     // sign-in switch and the account list have their own fields in this form.
-    const { days, hoursFrom, hoursTo } = linkGuardFields({
+    const { days, hoursFrom, hoursTo, timeZone } = linkGuardFields({
         ...NO_LINK_GUARDS,
         schedule: config.schedule
     });
@@ -810,6 +810,7 @@ function EditDropPointDialog({
         days,
         hoursFrom,
         hoursTo,
+        timeZone,
         expiresAt: initialExpiry,
         allowedCidrs: config.allowedCidrs,
         allowedCountries: config.allowedCountries,

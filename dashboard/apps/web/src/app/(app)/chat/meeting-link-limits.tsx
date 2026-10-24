@@ -22,6 +22,7 @@ import {
     linkPasswordLimits,
     linkGuardFields,
     linkPeopleLimits,
+    linkHoursIncomplete,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 
@@ -114,7 +115,7 @@ export function MeetingLinkLimits({ meetingId }: { meetingId: string }) {
                 <Button
                     size="sm"
                     variant="secondary"
-                    disabled={saving || !changed}
+                    disabled={saving || !changed || linkHoursIncomplete(value)}
                     onClick={() => void save()}
                 >
                     {saving && <Loader2 className="size-4 animate-spin" />}
