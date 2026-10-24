@@ -13,6 +13,7 @@
  * listener.
  */
 
+import { keepOwnScroll } from "@/lib/keep-own-scroll";
 import * as refs from "./references";
 import { AtSign } from "lucide-react";
 import { REFERENCE } from "./markdown";
@@ -74,6 +75,16 @@ export const POPUP_CLASS =
  * everything outside itself, and the list is outside it.
  */
 export const POPUP_LAYER_CLASS = "z-[60] pointer-events-auto";
+
+/** Mount a popup's element where the plugin puts it, with its own scrolling
+ *  kept over a modal dialog - see `keepOwnScroll`. */
+export function mountPopup(
+    mount: (element: HTMLElement) => () => void,
+    element: HTMLElement
+): () => void {
+    keepOwnScroll(element);
+    return mount(element);
+}
 
 /** One row of either popup. */
 export const POPUP_ITEM_CLASS =
@@ -384,7 +395,7 @@ function mentionSuggestion(
                         editor: props.editor,
                         className: POPUP_LAYER_CLASS
                     });
-                    unmount = props.mount(renderer.element as HTMLElement);
+                    unmount = mountPopup(props.mount, renderer.element as HTMLElement);
                 },
                 onUpdate: (props) => renderer?.updateProps({ ...props, searching }),
                 onKeyDown: (props) => {

@@ -48,6 +48,7 @@ import {
 } from "@/lib/generator";
 import { emptyProfile, PROFILE_PARTS, readForm, type PageFields } from "@/lib/fields";
 import { wholeName } from "@/lib/identity";
+import { fieldVisible } from "@/lib/field-visible";
 import { enterSendsLogin } from "@/lib/enter-submit";
 import {
     changeNeeds,
@@ -283,7 +284,9 @@ async function start(): Promise<void> {
             // the mark behind on the page.
             host.style.top = `${shift.y + box.top + (box.height - MARK) / 2}px`;
             host.style.left = `${shift.x + box.right - MARK - 6}px`;
-            host.style.display = box.width < 60 || box.height < 16 ? "none" : "block";
+            host.style.display = fieldVisible(field, box, (node) => drawn.has(node))
+                ? "block"
+                : "none";
         }
     };
 

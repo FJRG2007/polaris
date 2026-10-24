@@ -1446,7 +1446,7 @@ const CASES: Case[] = [
                 )
             ).domainSecurityPlan({ kind: "sample" }, "domain-1", { kind: "sample" }),
         action: "planDomainSecurityAction",
-        args: [{ kind: "sample" }, "domain-1", { kind: "sample" }]
+        args: [{ kind: "sample" }, "domain-1", { kind: "sample" }, null]
     },
     {
         name: "every domain's mail security",

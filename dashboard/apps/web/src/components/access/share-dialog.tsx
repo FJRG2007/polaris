@@ -21,6 +21,7 @@ import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
 import { createPortal } from "react-dom";
+import { keepOwnScroll } from "@/lib/keep-own-scroll";
 import {
     useCallback,
     useEffect,
@@ -693,6 +694,7 @@ export function ShareDialog({
                                 listAt ? (
                                     createPortal(
                                         <ul
+                                            ref={keepOwnScroll}
                                             id="share-add-list"
                                             role="listbox"
                                             style={listAt}

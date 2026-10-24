@@ -64,11 +64,17 @@ export const domainSecurityPlan = (
     ref: Parameters<typeof securityActionsModule.planDomainSecurityAction>[0],
     domain: string,
     policy: Parameters<typeof securityActionsModule.planDomainSecurityAction>[2],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    reportTo?: string | null
 ) =>
     readPoll<Answer<typeof securityActionsModule.planDomainSecurityAction>>(
         "/api/domains/security/plan",
-        { ref: JSON.stringify(ref), domain, policy: JSON.stringify(policy) },
+        {
+            ref: JSON.stringify(ref),
+            domain,
+            policy: JSON.stringify(policy),
+            ...(reportTo ? { reportTo } : {})
+        },
         signal
     );
 

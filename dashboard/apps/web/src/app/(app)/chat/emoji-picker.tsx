@@ -28,6 +28,7 @@
 import { cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createPortal } from "react-dom";
+import { keepOwnScroll } from "@/lib/keep-own-scroll";
 import type { TenorResult } from "@/lib/chat/tenor";
 import Link from "next/link";
 import * as core from "@polaris/core";
@@ -540,7 +541,10 @@ export function EmojiPicker({
             {button}
             {createPortal(
                 <div
-                    ref={panel}
+                    ref={(node) => {
+                        panel.current = node;
+                        keepOwnScroll(node);
+                    }}
                     role="dialog"
                     data-state="open"
                     // Pointer events back on, for a composer inside a dialog: a

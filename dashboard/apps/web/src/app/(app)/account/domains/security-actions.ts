@@ -17,6 +17,7 @@ import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import * as security from "@/lib/domain-security/service";
+import { reportToSchema } from "@/lib/domain-security/report-to";
 import { domainCallerFor } from "@/lib/owner-domain-caller";
 import { fingerprint, type PlannedChange } from "@/lib/domain-security/plan";
 
@@ -87,13 +88,15 @@ export type PreviewChange = PlannedChange & { readonly fingerprint: string };
 export async function planDomainSecurityAction(
     ref: SecurityRef,
     domain: string,
-    policy: "quarantine" | "reject" | null
+    policy: "quarantine" | "reject" | null,
+    reportTo: string | null = null
 ): Promise<{ changes?: PreviewChange[]; error?: string }> {
     try {
         const changes = await security.planFor(
             await actorFor(ref),
             domainSchema.parse(domain),
-            policySchema.parse(policy)
+            policySchema.parse(policy),
+            reportToSchema.parse(reportTo) ?? null
         );
         return {
             changes: changes.map((change) => ({ ...change, fingerprint: fingerprint(change) }))
@@ -107,7 +110,8 @@ export async function applyDomainSecurityAction(
     ref: SecurityRef,
     domain: string,
     approved: string[],
-    policy: "quarantine" | "reject" | null
+    policy: "quarantine" | "reject" | null,
+    reportTo: string | null = null
 ): Promise<{
     results?: security.ChangeResult[];
     view?: security.DomainSecurityView;
@@ -117,7 +121,13 @@ export async function applyDomainSecurityAction(
         const actor = await actorFor(ref);
         const name = domainSchema.parse(domain);
         const chosen = z.array(z.string().max(4096)).min(1).max(50).parse(approved);
-        const outcome = await security.applyFor(actor, name, chosen, policySchema.parse(policy));
+        const outcome = await security.applyFor(
+            actor,
+            name,
+            chosen,
+            policySchema.parse(policy),
+            reportToSchema.parse(reportTo) ?? null
+        );
         await recordAudit({
             actorId: actor.userId,
             orgId: actor.owner?.kind === "org" ? actor.owner.id : undefined,

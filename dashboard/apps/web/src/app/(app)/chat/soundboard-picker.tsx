@@ -22,6 +22,7 @@
 
 import Link from "next/link";
 import { createPortal } from "react-dom";
+import { keepOwnScroll } from "@/lib/keep-own-scroll";
 import { Button, cn } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import type { CallState } from "./call-state";
@@ -283,7 +284,10 @@ export function SoundboardButton({ meetingId, call }: { meetingId: string; call:
                 at &&
                 createPortal(
                     <div
-                        ref={panel}
+                        ref={(node) => {
+                            panel.current = node;
+                            keepOwnScroll(node);
+                        }}
                         role="dialog"
                         aria-label={t("soundboard.button")}
                         style={{

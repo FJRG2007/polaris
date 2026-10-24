@@ -32,7 +32,11 @@ import { Search } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useMenuSurface } from "../lib/menu-surface";
 import { useDeferredFocus } from "../lib/use-deferred-focus";
-import { MENU_SEARCH_ATTRIBUTE } from "../lib/menu-search-focus";
+import {
+    MENU_OPTION_SELECTOR,
+    MENU_SEARCH_ATTRIBUTE,
+    MENU_SEARCH_FIELD_ATTRIBUTE
+} from "../lib/menu-search-focus";
 
 /** Keys the menu around the field still answers for. */
 const MENU_KEYS = new Set(["Escape", "Tab", "ArrowLeft", "ArrowRight"]);
@@ -53,7 +57,7 @@ export function menuSearchMatches(name: string, query: string): boolean {
 function optionsAround(field: HTMLElement): HTMLElement[] {
     const surface = field.closest("[data-radix-menu-content]");
     if (!surface) return [];
-    return [...surface.querySelectorAll<HTMLElement>("[role='menuitem']:not([data-disabled])")];
+    return [...surface.querySelectorAll<HTMLElement>(MENU_OPTION_SELECTOR)];
 }
 
 export function MenuSearch({
@@ -131,6 +135,7 @@ export function MenuSearch({
                 // What the menu around this looks for on the way open, so it can
                 // hand over the focus instead of taking it.
                 {...(focusOnOpen ? { [MENU_SEARCH_ATTRIBUTE]: "" } : {})}
+                {...{ [MENU_SEARCH_FIELD_ATTRIBUTE]: "" }}
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 onKeyDown={onKeyDown}
