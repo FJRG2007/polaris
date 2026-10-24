@@ -23,6 +23,7 @@ import {
     History,
     Pencil,
     Play,
+    Plus,
     Trash2,
     X
 } from "lucide-react";
@@ -73,7 +74,7 @@ import type {
     VersionComparison,
     VersionRow
 } from "@/lib/automations/history";
-import { CanvasEditor, nodeLabel } from "./canvas-editor";
+import { CanvasEditor, Palette, nodeLabel } from "./canvas-editor";
 import { EditorGraphProvider, ReferenceScope } from "./references";
 import {
     LoadFailed,
@@ -87,9 +88,9 @@ import {
     useCachedAction,
     when
 } from "../shared";
-import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode } from "./node-fields";
+import { NodeFields, configValid, newNode } from "./node-fields";
 import { FailureFields, WhenFields } from "./flow-fields";
-import { isTriggerType } from "./node-catalog";
+import { isTriggerType, pickedNode } from "./node-catalog";
 
 /** The list it belongs in: narrowed to the app and the thing of it that made it. */
 function listHref(detail: Pick<AutomationDetail, "origin" | "originRef"> | undefined): string {
@@ -603,8 +604,9 @@ function Loaded({
                             onChange={(steps) =>
                                 update({ triggers: steps.map((step) => step.node) })
                             }
-                            types={TRIGGER_TYPES}
+                            only="triggers"
                             addLabel={t("editor.addTrigger")}
+                            onAdded={onAdded}
                             detail={detail}
                             secrets={secrets}
                             readOnly={readOnly}
@@ -615,7 +617,7 @@ function Loaded({
                         <NodeList
                             nodes={flow.steps}
                             onChange={(steps) => update({ steps })}
-                            types={STEP_TYPES}
+                            only="steps"
                             addLabel={t("editor.addStep")}
                             detail={detail}
                             secrets={secrets}
@@ -627,7 +629,7 @@ function Loaded({
                         <NodeList
                             nodes={flow.finally}
                             onChange={(steps) => update({ finally: steps })}
-                            types={STEP_TYPES}
+                            only="steps"
                             addLabel={t("editor.addStep")}
                             detail={detail}
                             secrets={secrets}
@@ -1185,23 +1187,34 @@ function NumberField({
 interface ListProps {
     nodes: core.ListStep[];
     onChange: (steps: core.ListStep[]) => void;
-    types: readonly string[];
+    /** What the add picker offers: the list's triggers, or the steps after them. */
+    only: "triggers" | "steps";
     addLabel: string;
+    /** Told the type of each node added, so the first trigger can name the automation. */
+    onAdded?: (type: string) => void;
     detail: AutomationDetail;
     secrets: SecretSummary[];
     readOnly: boolean;
     onChanged: () => void;
 }
 
-function NodeList({ nodes, onChange, types, addLabel, ...rest }: ListProps) {
-    const t = useTranslations("automations");
-    const options = types.map((type) => ({ value: type, label: nodeTitle(t, type) }));
+export function NodeList({ nodes, onChange, only, addLabel, onAdded, ...rest }: ListProps) {
+    const [picking, setPicking] = useState(false);
     const replaceAt = (index: number, step: core.ListStep | null) =>
         onChange(
             step
                 ? nodes.map((entry, at) => (at === index ? step : entry))
                 : nodes.filter((_, at) => at !== index)
         );
+    // The same picker as the canvas: grouped by app, with presets and app nodes.
+    const add = (value: string) => {
+        const picked = pickedNode(value);
+        if (!picked) return;
+        const node = newNode(picked.type);
+        const fresh = picked.config === undefined ? node : { ...node, config: picked.config };
+        onChange([...nodes, core.listStepFor(fresh)]);
+        onAdded?.(picked.type);
+    };
     return (
         <div className="space-y-2">
             {nodes.map((step, index) => (
@@ -1216,17 +1229,32 @@ function NodeList({ nodes, onChange, types, addLabel, ...rest }: ListProps) {
                 />
             ))}
             {rest.readOnly ? null : (
-                <Select
-                    value=""
-                    placeholder={addLabel}
-                    options={options}
-                    aria-label={addLabel}
-                    className="w-full sm:w-56"
-                    onValueChange={(type) => {
-                        const node = newNode(type);
-                        onChange([...nodes, core.listStepFor(node)]);
-                    }}
-                />
+                <>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full sm:w-auto"
+                        onClick={() => setPicking(true)}
+                    >
+                        <Plus aria-hidden="true" />
+                        {addLabel}
+                    </Button>
+                    <Palette
+                        open={picking}
+                        stepsOnly={only === "steps"}
+                        triggersOnly={only === "triggers"}
+                        title={addLabel}
+                        apps={[
+                            ...Object.keys(rest.detail.appNodes ?? {}),
+                            ...(rest.detail.eventApps ?? [])
+                        ]}
+                        onOpenChange={setPicking}
+                        onPick={(value) => {
+                            setPicking(false);
+                            add(value);
+                        }}
+                    />
+                </>
             )}
         </div>
     );
@@ -1242,7 +1270,7 @@ function NodeCard({
     secrets,
     readOnly,
     onChanged
-}: Omit<ListProps, "nodes" | "onChange" | "types" | "addLabel"> & {
+}: Omit<ListProps, "nodes" | "onChange" | "only" | "addLabel" | "onAdded"> & {
     step: core.ListStep;
     onChange: (step: core.ListStep | null) => void;
     onMove: (by: number) => void;
@@ -1358,7 +1386,7 @@ function NodeCard({
                                             )
                                     })
                                 }
-                                types={STEP_TYPES}
+                                only="steps"
                                 addLabel={t("editor.addStep")}
                                 detail={detail}
                                 secrets={secrets}
@@ -1377,7 +1405,7 @@ function NodeCard({
                     <NodeList
                         nodes={step.body}
                         onChange={(body) => onChange({ ...step, body })}
-                        types={STEP_TYPES}
+                        only="steps"
                         addLabel={t("editor.addStep")}
                         detail={detail}
                         secrets={secrets}
@@ -1394,7 +1422,7 @@ function NodeCard({
                     <NodeList
                         nodes={step.onError ?? []}
                         onChange={(onError) => onChange({ ...step, onError })}
-                        types={STEP_TYPES}
+                        only="steps"
                         addLabel={t("editor.addStep")}
                         detail={detail}
                         secrets={secrets}
@@ -1407,7 +1435,7 @@ function NodeCard({
                     <NodeList
                         nodes={step.always ?? []}
                         onChange={(always) => onChange({ ...step, always })}
-                        types={STEP_TYPES}
+                        only="steps"
                         addLabel={t("editor.addStep")}
                         detail={detail}
                         secrets={secrets}
@@ -1425,7 +1453,7 @@ function NodeCard({
                     <NodeList
                         nodes={step.then ?? []}
                         onChange={(then) => onChange({ ...step, then })}
-                        types={STEP_TYPES}
+                        only="steps"
                         addLabel={t("editor.addStep")}
                         detail={detail}
                         secrets={secrets}
@@ -1438,7 +1466,7 @@ function NodeCard({
                     <NodeList
                         nodes={step.else ?? []}
                         onChange={(otherwise) => onChange({ ...step, else: otherwise })}
-                        types={STEP_TYPES}
+                        only="steps"
                         addLabel={t("editor.addStep")}
                         detail={detail}
                         secrets={secrets}

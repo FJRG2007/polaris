@@ -98,11 +98,12 @@ const PLACES_STEPS = [
 
 /**
  * The groups the picker shows. `triggers` is false where only a step fits
- * (inserting on a connection); `apps` are the installed apps that bring nodes
- * or send events.
+ * (inserting on a connection), `steps` false where only a trigger does (the
+ * list's triggers); `apps` are the installed apps that bring nodes or send events.
  */
 export function catalogGroups(options: {
     readonly triggers: boolean;
+    readonly steps?: boolean;
     readonly apps: readonly string[];
 }): CatalogGroup[] {
     const places = options.apps.includes(PLACES_APP);
@@ -141,6 +142,7 @@ export function catalogGroups(options: {
             if (options.apps.includes(app))
                 groups.push({ id: app, items: APP_EVENT_PRESETS[app].map(preset) });
     }
+    if (options.steps === false) return mergeSame(groups);
     groups.push(
         {
             id: "logic",

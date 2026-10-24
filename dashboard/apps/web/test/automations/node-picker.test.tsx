@@ -16,12 +16,13 @@ import { Palette } from "@/app/(app)/automations/[id]/canvas-editor";
 
 afterEach(cleanup);
 
-function open(props: { stepsOnly?: boolean; apps?: string[] } = {}) {
+function open(props: { stepsOnly?: boolean; triggersOnly?: boolean; apps?: string[] } = {}) {
     const onPick = vi.fn();
     render(
         <Palette
             open
             stepsOnly={props.stepsOnly ?? false}
+            triggersOnly={props.triggersOnly}
             apps={props.apps ?? []}
             onOpenChange={vi.fn()}
             onPick={onPick}
@@ -45,6 +46,12 @@ describe("the node picker", () => {
         });
         fireEvent.click(screen.getByText("NAS went offline"));
         expect(onPick).toHaveBeenCalledWith("core.onEvent#nasOffline");
+    });
+
+    it("offers no step groups where only a trigger fits", () => {
+        open({ triggersOnly: true });
+        expect(screen.getAllByText("Basics").length).toBeGreaterThan(0);
+        expect(screen.queryByText("Logic")).toBeNull();
     });
 
     it("offers no trigger groups where only a step fits", () => {

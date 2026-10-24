@@ -28,6 +28,18 @@ describe("the node catalog", () => {
             expect(core.isCoreNodeType(type) || nodes.PLACES_NODE_TYPES.includes(type)).toBe(true);
     });
 
+    it("leaves steps out where only a trigger fits", () => {
+        const triggers = types(
+            catalog.catalogGroups({
+                triggers: true,
+                steps: false,
+                apps: [catalog.PLACES_APP, ...core.APP_EVENT_APPS]
+            })
+        );
+        expect(triggers.length).toBeGreaterThan(0);
+        expect(triggers.every((type) => catalog.isTriggerType(type))).toBe(true);
+    });
+
     it("leaves triggers out where only a step fits", () => {
         const steps = types(catalog.catalogGroups({ triggers: false, apps: [catalog.PLACES_APP] }));
         expect(steps.some((type) => catalog.isTriggerType(type))).toBe(false);
