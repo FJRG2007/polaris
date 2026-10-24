@@ -11,7 +11,13 @@
  */
 
 import { z } from "zod";
-import { accountIdentityList, addressRuleFields, addressRuleUpdateFields } from "./link-rules.js";
+import {
+    accountIdentityList,
+    addressRuleFields,
+    addressRuleUpdateFields,
+    linkPeopleFields,
+    linkPeopleUpdateFields
+} from "./link-rules.js";
 
 /** Who can open a snippet. */
 export const SNIPPET_VISIBILITIES = ["private", "link", "invite"] as const;
@@ -89,7 +95,8 @@ const snippetLinkFields = {
      * and unlike a view cap it leaves nothing behind in a later backup.
      */
     burnAfterRead: z.boolean().default(false),
-    ...addressRuleFields
+    ...addressRuleFields,
+    ...linkPeopleFields
 } as const;
 
 export const createSnippetSchema = z
@@ -143,7 +150,8 @@ export const shareSnippetSchema = z.object({
     expiresAt: z.coerce.date().nullable().optional(),
     burnAfterRead: z.boolean().optional(),
     inviteUsers: accountIdentityList.optional(),
-    ...addressRuleUpdateFields
+    ...addressRuleUpdateFields,
+    ...linkPeopleUpdateFields
 });
 
 export type ShareSnippetInput = z.infer<typeof shareSnippetSchema>;

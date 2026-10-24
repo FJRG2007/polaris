@@ -138,6 +138,17 @@ export const linkLimitsSchema = z.object({
 
 export type LinkLimitsInput = z.infer<typeof linkLimitsSchema>;
 
+/**
+ * The start, weekly window and account rules, all optional, for an update that
+ * only sends what changed. `null` clears the start or the window.
+ */
+export const linkPeopleUpdateFields = {
+    startsAt: z.coerce.date().nullable().optional(),
+    schedule: linkScheduleSchema.nullable().optional(),
+    requireLogin: z.boolean().optional(),
+    allowedUsers: accountIdentityList.pipe(z.array(z.string().min(1).max(320)).max(200)).optional()
+} as const;
+
 /** The same three, all optional, for an update that only sends what changed. */
 export const addressRuleUpdateFields = {
     allowedCidrs: z.array(cidrOrIp).optional(),

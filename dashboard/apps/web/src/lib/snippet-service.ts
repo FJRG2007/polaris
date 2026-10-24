@@ -22,7 +22,10 @@ import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-passwor
 import type { CreateSnippetInput, ShareSnippetInput, UpdateSnippetInput } from "@polaris/core";
 import {
     linkUsability,
+    peopleRuleChanges,
     signUnlock,
+    storedPeopleRules,
+    LINK_GUARD_FIELDS,
     unlockCookieName,
     verifyUnlock,
     type LinkUsability
@@ -114,6 +117,8 @@ export async function createSnippet(
             allowedCidrs: JSON.stringify(input.allowedCidrs),
             allowedCountries: JSON.stringify(input.allowedCountries),
             allowedContinents: JSON.stringify(input.allowedContinents),
+            startsAt: input.startsAt,
+            ...storedPeopleRules(input),
             files: {
                 create: input.files.map((file, index) => ({
                     name: file.name,
@@ -353,6 +358,7 @@ export async function shareSnippet(
     if (input.allowedContinents !== undefined) {
         data.allowedContinents = JSON.stringify(input.allowedContinents);
     }
+    Object.assign(data, peopleRuleChanges(input));
 
     // Resolved before the transaction opens: it is a read, and holding one open
     // across it would keep a write lock for the length of a lookup.
@@ -430,6 +436,7 @@ export async function resolveSnippetByToken(token: string) {
             allowedCidrs: true,
             allowedCountries: true,
             allowedContinents: true,
+            ...LINK_GUARD_FIELDS,
             createdAt: true,
             invites: { select: { userId: true } }
         }
@@ -457,6 +464,7 @@ export async function readSnippetFiles(snippetId: string): Promise<SnippetFileBo
 /** Whether a snippet link is currently serveable. */
 export function snippetUsability(snippet: {
     revokedAt: Date | null;
+    startsAt?: Date | null;
     expiresAt: Date | null;
     maxViews: number | null;
     viewCount: number;
@@ -465,6 +473,7 @@ export function snippetUsability(snippet: {
     return linkUsability(
         {
             revokedAt: snippet.revokedAt,
+            startsAt: snippet.startsAt,
             expiresAt: snippet.expiresAt,
             maxUses: snippet.maxViews,
             useCount: snippet.viewCount

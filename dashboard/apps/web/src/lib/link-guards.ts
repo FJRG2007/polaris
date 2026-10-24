@@ -233,6 +233,28 @@ export function storedPeopleRules(rules: {
     };
 }
 
+/**
+ * Only the start, window and account columns an update names, for a partial
+ * write: an absent field keeps what is stored, `null` clears it.
+ */
+export function peopleRuleChanges(rules: {
+    startsAt?: Date | null;
+    schedule?: LinkSchedule | null;
+    requireLogin?: boolean;
+    allowedUsers?: readonly string[];
+}): { startsAt?: Date | null; linkSchedule?: string; requireLogin?: boolean; allowedUsers?: string } {
+    return {
+        ...(rules.startsAt !== undefined ? { startsAt: rules.startsAt } : {}),
+        ...(rules.schedule !== undefined
+            ? { linkSchedule: rules.schedule ? JSON.stringify(rules.schedule) : "" }
+            : {}),
+        ...(rules.requireLogin !== undefined ? { requireLogin: rules.requireLogin } : {}),
+        ...(rules.allowedUsers !== undefined
+            ? { allowedUsers: JSON.stringify(rules.allowedUsers) }
+            : {})
+    };
+}
+
 /** The columns a link's start, window and account rules live in, for a select. */
 export const LINK_GUARD_FIELDS = {
     startsAt: true,

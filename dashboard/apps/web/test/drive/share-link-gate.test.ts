@@ -6,6 +6,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LINK_GUARD_SELECT, linkGuardCases } from "../helpers/link-guard-cases";
 
 vi.mock("@polaris/config", () => ({
     loadEnv: () => ({ POLARIS_AUTH_SECRET: "one-secret-for-every-signature-here" })
@@ -65,42 +66,10 @@ describe("a Drive share's link", () => {
     it("reads the start, hours and people columns with the share", async () => {
         findUnique.mockResolvedValueOnce(row());
         await gateShareRequest("token", "list");
-        expect(findUnique.mock.calls[0]![0].select).toMatchObject({
-            startsAt: true,
-            requireLogin: true,
-            allowedUsers: true,
-            linkSchedule: true
-        });
+        expect(findUnique.mock.calls[0]![0].select).toMatchObject(LINK_GUARD_SELECT);
     });
 
-    it("opens as before when it has none of them", async () => {
-        expect(await reason({})).toBe("ok");
-    });
-
-    it("is not open before its start", async () => {
-        expect(await reason({ startsAt: new Date(Date.now() + 86_400_000) })).toBe("scheduled");
-    });
-
-    it("is closed outside its weekly hours", async () => {
-        // Open on no day but the one that is not today, in UTC.
-        const today = new Date().getUTCDay();
-        const other = 1 << ((today + 3) % 7);
-        const schedule = JSON.stringify({
-            days: other,
-            startMinute: null,
-            endMinute: null,
-            timeZone: "UTC"
-        });
-        expect(await reason({ linkSchedule: schedule })).toBe("outside_hours");
-    });
-
-    it("asks for an account, then opens only for the people it names", async () => {
-        expect(await reason({ requireLogin: true })).toBe("sign_in_required");
-        viewer = { id: "u-bea" };
-        expect(await reason({ requireLogin: true })).toBe("ok");
-        expect(await reason({ requireLogin: true, allowedUsers: '["someone-else"]' })).toBe(
-            "not_invited"
-        );
-        expect(await reason({ requireLogin: true, allowedUsers: '["ana"]' })).toBe("ok");
+    linkGuardCases(reason, (who) => {
+        viewer = who;
     });
 });
