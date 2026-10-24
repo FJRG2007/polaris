@@ -54,7 +54,8 @@ vi.mock("../../src/lib/notifications/preferences", () => ({
         "deploy.succeeded": { inapp: true, email: false, destinations: ["d1"] },
         "account.security": { inapp: true, email: false, destinations: ["d1"] }
     }),
-    getQuietHours: async () => quiet
+    getQuietHours: async () => quiet,
+    getNotificationHolds: async () => ({ mutes: {}, schedules: {} })
 }));
 vi.mock("../../src/lib/notifications/destinations", () => ({
     destinationSummary: async () => ({ kind: "webhook", targetHint: "discord.com/api/..." }),

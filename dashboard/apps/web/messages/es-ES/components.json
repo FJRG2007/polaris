@@ -1481,7 +1481,10 @@
         "markedRead": "Marcada como leída: tenías abierta la página a la que apunta.",
         "eventOff": "Desactivada para este evento.",
         "belowSeverity": "Por debajo de la gravedad mínima de este destino.",
-        "quietHours": "Retenida: llegó durante tus horas de silencio."
+        "quietHours": "Retenida: llegó durante tus horas de silencio.",
+        "muted": "Retenida: la silenciaste.",
+        "outsideSchedule": "Retenida: fuera del horario que le pusiste.",
+        "recordedQuietly": "Guardada sin sonido ni contador: está silenciada o fuera de su horario."
     },
     "runtimeLogs": {
         "live": "Directo",

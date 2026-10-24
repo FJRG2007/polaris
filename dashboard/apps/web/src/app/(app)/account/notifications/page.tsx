@@ -9,7 +9,11 @@ import { doNotDisturbOf } from "@/lib/presence-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { listDeliveries } from "@/lib/notification-service";
-import { describeNotificationRules, getQuietHours } from "@/lib/notifications/preferences";
+import {
+    describeNotificationRules,
+    getNotificationHolds,
+    getQuietHours
+} from "@/lib/notifications/preferences";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { listDestinations } from "@/lib/notifications/destinations";
 import { listSmsSenders } from "@/lib/notifications/sms-service";
@@ -34,7 +38,8 @@ export default async function NotificationsPage() {
         account,
         quietHours,
         display,
-        paused
+        paused,
+        holds
     ] = await Promise.all([
         describeNotificationRules(user.id),
         listDestinations(user.id),
@@ -52,7 +57,9 @@ export default async function NotificationsPage() {
         resolveDisplayPreferencesFor(user.id),
         // Said at the top of the page, because "why did nothing ring" is the
         // question somebody in do not disturb opens it with.
-        doNotDisturbOf(user.id).catch(() => null)
+        doNotDisturbOf(user.id).catch(() => null),
+        // Optional on the page: unreadable, it only means none are drawn.
+        getNotificationHolds(user.id).catch(() => undefined)
     ]);
 
     return (
@@ -72,6 +79,8 @@ export default async function NotificationsPage() {
                 inGameReady={inGameReady}
                 quiet={{ hours: quietHours, timeZone: display.timeZone }}
                 paused={paused?.on ? paused : null}
+                holds={holds}
+                timeZone={display.timeZone}
                 // Only an administrator has a badge a visit can clear: the
                 // Management queue. Chat and Mail clear by being read.
                 badgesClearOnVisit={

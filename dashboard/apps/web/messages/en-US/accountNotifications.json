@@ -141,6 +141,34 @@
         "email": "Email",
         "destinationOff": "This destination is switched off"
     },
+    "holds": {
+        "summary": "{on} of {total} on",
+        "options": "Options for {name}",
+        "muteFor": "Mute for",
+        "durations": {
+            "1h": "For 1 hour",
+            "8h": "For 8 hours",
+            "24h": "For 24 hours",
+            "1w": "For 1 week",
+            "off": "Until I turn it back on"
+        },
+        "muted": "Muted",
+        "mutedUntil": "Muted until {time}",
+        "unmute": "Unmute",
+        "setSchedule": "Set hours",
+        "editSchedule": "Change hours",
+        "scheduleTitle": "When {name} can notify you",
+        "scheduleHint": "Outside these hours it stays in your inbox, without a sound, badge, mail or webhook. Times are in {zone}.",
+        "days": "Days",
+        "needDays": "Pick at least one day.",
+        "removeSchedule": "Any time",
+        "cancel": "Cancel",
+        "everyDay": "Every day",
+        "weekdays": "Mon-Fri",
+        "weekends": "Weekends",
+        "allDay": "all day",
+        "hours": "{from}-{to}"
+    },
     "destinations": {
         "title": "Destinations",
         "description": "Webhooks and phone numbers you can route the events above to.",

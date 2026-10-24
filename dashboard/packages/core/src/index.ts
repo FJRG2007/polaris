@@ -196,6 +196,7 @@ export * from "./schemas/presence-auto.js";
 export * from "./schemas/comments.js";
 export * from "./schemas/notifications.js";
 export * from "./schemas/alert-filters.js";
+export * from "./schemas/notification-holds.js";
 export * from "./schemas/legal.js";
 export * from "./schemas/sms.js";
 export * from "./schemas/updates.js";

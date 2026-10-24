@@ -21,7 +21,7 @@ import { queueOutboundHooks } from "./outbound-hooks";
 import { sendAuthEmail } from "@/lib/auth-mail";
 import { appBaseUrl } from "@/lib/domain-service";
 import { wordsFor } from "./notice-words";
-import { getNotificationPreferences, getQuietHours } from "./preferences";
+import { getNotificationHolds, getNotificationPreferences, getQuietHours } from "./preferences";
 import {
     createNotification,
     raiseCondition,
@@ -31,6 +31,7 @@ import { destinationSummary, recordDestinationResult, resolveDestination } from 
 import {
     clearsMinLevel,
     heldByQuietHours,
+    holdReason,
     notificationEvent,
     resolveRule,
     type NotificationLevel,
@@ -281,23 +282,38 @@ async function deliverDestination(
 export const QUIET_SEVERITY = "Below the lowest severity set for this destination.";
 export const QUIET_HOURS = "Held back: it arrived during your quiet hours.";
 
+export const MUTED = "Held back: you muted it.";
+export const OUTSIDE_SCHEDULE = "Held back: outside the hours you set for it.";
+/** The bell's line for a held alert: kept, without a sound or a badge. */
+export const RECORDED_QUIETLY =
+    "Recorded without a sound or badge: it is muted or outside its hours.";
+
 /**
- * Whether the account's quiet hours hold this alert back now, read on its own
- * clock. Unreadable settings never hold anything back: a missed alert costs
- * more than an untimely one.
+ * Why this alert is held back now, as the delivery log's reason, or null to send
+ * it. The one place every channel asks: a mute or the event's schedule first,
+ * then quiet hours, all read on the account's own clock. Unreadable settings
+ * never hold anything back: a missed alert costs more than an untimely one.
  */
-async function quietNow(userId: string, critical: boolean): Promise<boolean> {
+async function heldNow(userId: string, eventId: string, critical: boolean): Promise<string | null> {
     try {
         // Loaded here rather than at the top: it reads the deployment's settings
         // on import, and most alerts never need a clock at all.
         const { resolveDisplayPreferencesFor } = await import("@/lib/display-prefs-service");
-        const [quiet, display] = await Promise.all([
+        const [holds, quiet, display] = await Promise.all([
+            // A mute that cannot be read must not switch quiet hours off too.
+            Promise.resolve()
+                .then(() => getNotificationHolds(userId))
+                .catch(() => null),
             getQuietHours(userId),
             resolveDisplayPreferencesFor(userId)
         ]);
-        return heldByQuietHours(quiet, new Date(), display.timeZone, critical);
+        const now = new Date();
+        const reason = holds ? holdReason(holds, eventId, now, display.timeZone) : null;
+        if (reason === "muted") return MUTED;
+        if (reason === "schedule") return OUTSIDE_SCHEDULE;
+        return heldByQuietHours(quiet, now, display.timeZone, critical) ? QUIET_HOURS : null;
     } catch {
-        return false;
+        return null;
     }
 }
 
@@ -306,23 +322,24 @@ async function fanOut(
     input: NotifyInput,
     level: NotificationLevel,
     rule: NotificationRule,
-    critical: boolean
+    critical: boolean,
+    held: string | null
 ): Promise<void> {
-    if ((rule.email || rule.destinations.length > 0) && (await quietNow(input.userId, critical))) {
-        const held: Array<Promise<void>> = [];
+    if (held && (rule.email || rule.destinations.length > 0)) {
+        const skipped: Array<Promise<void>> = [];
         if (rule.email) {
-            held.push(
+            skipped.push(
                 record({
                     userId: input.userId,
                     event: input.event,
                     kind: "email",
                     status: "skipped",
-                    detail: QUIET_HOURS
+                    detail: held
                 })
             );
         }
         for (const destinationId of rule.destinations) {
-            held.push(
+            skipped.push(
                 destinationSummary(input.userId, destinationId).then((summary) =>
                     record({
                         userId: input.userId,
@@ -331,12 +348,12 @@ async function fanOut(
                         destinationId,
                         destinationHint: summary?.targetHint ?? null,
                         status: "skipped",
-                        detail: QUIET_HOURS
+                        detail: held
                     })
                 )
             );
         }
-        await Promise.allSettled(held);
+        await Promise.allSettled(skipped);
         return;
     }
     const work: Array<Promise<unknown>> = [];
@@ -371,6 +388,12 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
         rule = { inapp: event.offBell !== true, email: false, destinations: [] };
     }
 
+    // Asked once, before the bell is written: a muted or out-of-hours alert is
+    // still recorded, read, so it rings nothing and badges nothing - Slack's
+    // behaviour. Quiet hours leave the bell alone, as they always have.
+    const held = await heldNow(input.userId, input.event, event.critical === true);
+    const silenced = held === MUTED || held === OUTSIDE_SCHEDULE;
+
     let watching = false;
     if (rule.inapp) {
         // Somebody with the page open has already been told by the page. The
@@ -400,7 +423,7 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
             actionRequired: input.actionRequired,
             metadata: input.metadata,
             shelf: await recipientShelf(input.userId, input.shelf).catch(() => null),
-            read: watching
+            read: watching || silenced
         };
         if (input.condition) {
             // Still the same condition: the open notice now says the latest, and
@@ -417,7 +440,11 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
             event: input.event,
             kind: "inapp",
             status: "sent",
-            detail: watching ? "Marked read: you had the page it points at open." : null
+            detail: watching
+                ? "Marked read: you had the page it points at open."
+                : silenced
+                  ? RECORDED_QUIETLY
+                  : null
         });
     } else {
         await record({
@@ -430,7 +457,7 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
     }
 
     const extras = input.bellOnly ? { ...rule, email: false, destinations: [] } : rule;
-    void fanOut(input, level, extras, event.critical === true).catch((error) => {
+    void fanOut(input, level, extras, event.critical === true, held).catch((error) => {
         console.error("polaris: notification fan-out failed:", error);
     });
 
@@ -451,20 +478,21 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
     const handedOff: Array<"email" | "destination"> = [];
     if (extras.email) handedOff.push("email");
     if (extras.destinations.length > 0) handedOff.push("destination");
-    const inapp = !rule.inapp ? "off" : watching ? "read" : "sent";
+    const inapp = !rule.inapp ? "off" : watching || silenced ? "read" : "sent";
     return handedOff.length > 0 ? { inapp, handedOff } : { inapp };
 }
 
 /**
  * Email one alert to the account's confirmed address now, recorded in the
- * delivery log like the rule's own email, and held back during quiet hours as
- * that one is. For a caller that names its channels (see `bellOnly`).
+ * delivery log like the rule's own email, and held back by a mute, a schedule or
+ * quiet hours as that one is. For a caller that names its channels (see `bellOnly`).
  */
 export async function emailNotice(input: NotifyInput): Promise<DeliveryOutcome> {
     const event = notificationEvent(input.event);
     if (!event) return { status: "skipped", detail: "Undeclared event." };
-    if (await quietNow(input.userId, event.critical === true)) {
-        const outcome: DeliveryOutcome = { status: "skipped", detail: QUIET_HOURS };
+    const held = await heldNow(input.userId, input.event, event.critical === true);
+    if (held) {
+        const outcome: DeliveryOutcome = { status: "skipped", detail: held };
         await record({ userId: input.userId, event: input.event, kind: "email", ...outcome });
         return outcome;
     }
@@ -474,7 +502,7 @@ export async function emailNotice(input: NotifyInput): Promise<DeliveryOutcome> 
 /**
  * Send one alert to one of the account's own destinations now. The caller
  * chose it by name, so its lowest-severity setting does not hold it back;
- * quiet hours still do.
+ * a mute, a schedule and quiet hours still do.
  */
 export async function deliverToDestination(
     input: NotifyInput,
@@ -482,9 +510,10 @@ export async function deliverToDestination(
 ): Promise<DeliveryOutcome> {
     const event = notificationEvent(input.event);
     if (!event) return { status: "skipped", detail: "Undeclared event." };
-    if (await quietNow(input.userId, event.critical === true)) {
+    const held = await heldNow(input.userId, input.event, event.critical === true);
+    if (held) {
         const summary = await destinationSummary(input.userId, destinationId);
-        const outcome: DeliveryOutcome = { status: "skipped", detail: QUIET_HOURS };
+        const outcome: DeliveryOutcome = { status: "skipped", detail: held };
         await record({
             userId: input.userId,
             event: input.event,
