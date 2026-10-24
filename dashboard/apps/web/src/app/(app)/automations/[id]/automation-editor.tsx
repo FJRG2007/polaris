@@ -247,12 +247,11 @@ function Loaded({
 
     // A new automation is created unnamed; its first trigger names it until somebody does.
     const onAdded = (type: string) => {
-        if (!readOnly && name === t("create.untitled") && isTriggerType(type))
+        if (!readOnly && detail.unnamed && name === detail.name && isTriggerType(type))
             void rename(nodeTitle(t, type));
     };
-    const nameDraft = naming === null ? null : naming;
     const nameValid =
-        nameDraft !== null && core.automationSettingsSchema.shape.name.safeParse(nameDraft).success;
+        naming !== null && core.automationSettingsSchema.shape.name.safeParse(naming).success;
 
     useEffect(() => setChosen(readView()), []);
     const view: View = !flow ? "canvas" : (chosen ?? (wide ? "canvas" : "list"));
@@ -337,20 +336,20 @@ function Loaded({
 
     return (
         <EditorGraphProvider value={editorGraph}>
-            {nameDraft !== null ? (
+            {naming !== null ? (
                 <form
                     className="mb-5 flex min-w-0 flex-wrap items-center gap-2"
                     onSubmit={(event) => {
                         event.preventDefault();
                         if (!nameValid) return;
                         setNaming(null);
-                        void rename(nameDraft);
+                        void rename(naming);
                     }}
                 >
                     <Input
                         autoFocus
                         className="min-w-0 flex-1 sm:max-w-md"
-                        value={nameDraft}
+                        value={naming}
                         maxLength={core.AUTOMATION_LIMITS.nameLength}
                         aria-label={t("create.name")}
                         onChange={(event) => setNaming(event.target.value)}
@@ -358,7 +357,12 @@ function Loaded({
                             if (event.key === "Escape") setNaming(null);
                         }}
                     />
-                    <Button type="submit" size="sm" disabled={!nameValid} aria-disabled={!nameValid}>
+                    <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!nameValid}
+                        aria-disabled={!nameValid}
+                    >
                         <Check aria-hidden="true" />
                         {t("editor.renameSave")}
                     </Button>
@@ -373,7 +377,7 @@ function Loaded({
                 actions={
                     readOnly ? undefined : (
                         <div className="flex flex-wrap gap-2">
-                            {nameDraft === null ? (
+                            {naming === null ? (
                                 <Button
                                     variant="ghost"
                                     size="icon-sm"
@@ -645,7 +649,9 @@ function Loaded({
             ) : null}
 
             <div className="mx-auto w-full max-w-4xl space-y-6">
-                {readOnly ? null : <Settings detail={detail} onSaved={onChanged} />}
+                {readOnly ? null : (
+                    <Settings key={detail.name} detail={detail} onSaved={onChanged} />
+                )}
                 <section className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-4">
                     <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{t("editor.localNetwork")}</p>

@@ -68,6 +68,16 @@ describe("the node catalog", () => {
         }
     });
 
+    it("names only events Polaris sends", () => {
+        const sent = new Set<string>([
+            ...core.NAS_EVENT_NAMES,
+            core.PUBLIC_IP_CHANGED_EVENT,
+            core.AUTOMATION_FINISHED_EVENT
+        ]);
+        for (const preset of Object.values(catalog.EVENT_PRESETS))
+            expect(sent).toContain(preset.name);
+    });
+
     it("refuses a preset it does not know, and passes a plain type through", () => {
         expect(catalog.pickedNode("core.onEvent#nope")).toBeNull();
         expect(catalog.pickedNode("core.http#publicIpChanged")).toBeNull();

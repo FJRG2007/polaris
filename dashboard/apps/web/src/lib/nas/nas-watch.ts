@@ -15,6 +15,7 @@
  * reading it would watch, and `nas.disk-temperature` stays for the fixed line.
  */
 
+import { NAS_EVENT_NAMES } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import type { UnasMetrics } from "@/lib/unifi-unas";
 import {
@@ -38,15 +39,7 @@ export const OFFLINE_AFTER_MISSES = 2;
 /** Polls missed in a row, per connection. In this process only: a restart counts again. */
 const misses = new Map<string, number>();
 
-export const NAS_EVENT_NAMES = [
-    "nas.offline",
-    "nas.pool-unprotected",
-    "nas.pool-usage",
-    "nas.disk-unhealthy",
-    "nas.disk-temperature",
-    "nas.backup-failed",
-    "nas.backup-overdue"
-] as const;
+export { NAS_EVENT_NAMES };
 
 export interface NasEvent {
     readonly name: string;

@@ -29,7 +29,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { isPublicIpv4 } from "@polaris/core";
+import { isPublicIpv4, PUBLIC_IP_CHANGED_EVENT } from "@polaris/core";
 import { backupAccessActive } from "@/lib/backup-access";
 import { publicA } from "@/lib/dns/authoritative";
 import { getSetting, setSetting } from "@/lib/setting-store";
@@ -66,8 +66,7 @@ const UNREACHED_CONDITION = "domain.address-unreached";
 /** What the last run found, for Admin -> Domains. */
 export const STATUS_KEY = "network.dnsFollowStatus";
 
-/** The event automations see when the address changes. */
-export const PUBLIC_IP_CHANGED_EVENT = "network.public-ip-changed";
+export { PUBLIC_IP_CHANGED_EVENT };
 
 /** How long past the record's TTL the outside answer may still be old before it is told. */
 const REACH_GRACE_MS = 2 * 60 * 1000;

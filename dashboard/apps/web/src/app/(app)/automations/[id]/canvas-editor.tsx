@@ -10,13 +10,12 @@ import * as core from "@polaris/core";
 import { ReferenceScope } from "./references";
 import {
     ClipboardPaste,
-    Bot,
-    Clock3,
     Copy,
     CopyPlus,
     Database,
     GitBranch,
     House,
+    Hourglass,
     Send,
     Server,
     Workflow,
@@ -37,6 +36,7 @@ import {
     Trash2,
     Undo2,
     X,
+    Zap,
     ZoomIn,
     ZoomOut,
     type LucideIcon
@@ -784,12 +784,12 @@ function RenameDialog({
 }
 
 const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
-    basics: Clock3,
+    basics: Zap,
     polaris: Server,
     automations: Workflow,
     places: House,
     logic: GitBranch,
-    timing: Bot,
+    timing: Hourglass,
     data: Database,
     send: Send
 };
