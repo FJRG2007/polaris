@@ -19,9 +19,14 @@ import { LightingSystem } from './lighting.js';
 import { NYCMapSystem } from './nyc-map.js';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
+import { createRemotePlayers } from './remote-players.js';
+import { reportFailure, reportProgress, reportReady, shareState } from './embed.js';
 
 // js/main.js
 // Main entry point for New York City (Midtown Manhattan) in Three.js WebGPURenderer & TSL (three.js, bundled by the app build)
+
+// The start-up phases the host's progress bar counts while the city is built (`markInit` labels)
+const BUILD_STEPS = ['renderer', 'lighting', 'cityGrid', 'boroughs', 'landmarks', 'blocks', 'streetDetails', 'traffic', 'roadPaint', 'controllers', 'culling', 'ui', 'postFX'];
 
 async function initApp() {
   const container = document.getElementById('canvas-container');
@@ -59,9 +64,16 @@ async function initApp() {
     const now = performance.now();
     initTimings.push(`${label} ${Math.round(now - initMark)}ms`);
     initMark = now;
+    const step = BUILD_STEPS.indexOf(label);
+    if (step >= 0) reportProgress('build', (step + 1) / BUILD_STEPS.length);
   };
 
-  await renderer.init();
+  try {
+    await renderer.init();
+  } catch (e) {
+    reportFailure('graphics');
+    throw e;
+  }
   markInit('renderer');
 
   // 2. Build Scene & Physical Atmospheric Sky / PMREM IBL / 4096x4096 Shadow Lighting
@@ -125,6 +137,7 @@ async function initApp() {
   }
 
   const cameraSystem = new CameraSystem(renderer.domElement, controllerManager);
+  const remotePlayers = createRemotePlayers(scene);
   const touchControls = new TouchControls(controllerManager);
   const soundButton = document.getElementById('btn-sound');
   const audioSystem = new CityAudioSystem({ controllerManager, trafficSystem, highwayTraffic, streetDetails }, {
@@ -631,6 +644,7 @@ async function initApp() {
           loadingStatus.textContent = `Compiling Shaders & Render Pipelines... ${Math.round((done / jobs.length) * 100)}%`;
         }
         setLoadingProgress(done / jobs.length);
+        reportProgress('compile', done / jobs.length);
       }
     };
     await Promise.all(Array.from({ length: COMPILE_POOL }, worker));
@@ -684,6 +698,8 @@ async function initApp() {
     mapSystem.update();
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk
+    remotePlayers.update(dt, cameraSystem.camera);
+    shareState(now, controllerManager.getActiveEntity(), controllerManager.activeMode);
 
     // Render frame via TSL RenderPipeline (SSR + Bloom)
     if (!warmedUp) {
@@ -719,6 +735,7 @@ async function initApp() {
         if (loadingOverlay) loadingOverlay.classList.add('hidden');
         audioSystem.ready = true;
         setLoadingProgress(1);
+        reportReady();
       });
     }
 
@@ -751,4 +768,7 @@ async function initApp() {
   });
 }
 
-initApp();
+initApp().catch((e) => {
+  reportFailure('error');
+  console.error(e);
+});

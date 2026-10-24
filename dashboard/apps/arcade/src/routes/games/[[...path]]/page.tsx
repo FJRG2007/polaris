@@ -9,6 +9,7 @@ import { host } from "@polaris/app-host";
 import { notFound } from "next/navigation";
 import { findGame } from "../../../games/registry";
 import { GamesScreen } from "../../../screens/library";
+import { GamePlayer } from "../../../screens/game-player";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,13 @@ export default async function GamesPage({
     const path = Array.isArray(raw) ? raw : raw ? [raw] : [];
     if (path.length > 1) notFound();
     const [id] = path;
-    if (id !== undefined && !findGame(id)) notFound();
+    if (id !== undefined) {
+        if (!findGame(id)) notFound();
+        return <GamePlayer gameId={id} />;
+    }
     return (
         <div className={PAGE_FILL}>
-            <GamesScreen gameId={id ?? null} />
+            <GamesScreen />
         </div>
     );
 }

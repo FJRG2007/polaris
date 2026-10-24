@@ -1,17 +1,16 @@
 "use client";
 
-/**
- * The Games library. Opening a game is not built yet: its page (the frame the
- * game runs in) is produced by `scripts/build-games.mjs`, which is pending.
- */
+/** The Games library: every game, and the way into each. */
 
+import Link from "next/link";
+import { Play } from "lucide-react";
 import { useArcadeT } from "./i18n";
 import { GAMES } from "../games/registry";
-import { Card, CardBody } from "@polaris/ui";
+import { Button, Card, CardBody } from "@polaris/ui";
 
-export function GamesScreen({ gameId }: { gameId: string | null }) {
+export function GamesScreen() {
     const t = useArcadeT();
-    const shown = gameId ? GAMES.filter((game) => game.id === gameId) : GAMES;
+    const shown = GAMES;
     return (
         <div className="mx-auto w-full max-w-5xl px-4 py-6">
             <h1 className="text-xl font-semibold">{t("title")}</h1>
@@ -40,6 +39,12 @@ export function GamesScreen({ gameId }: { gameId: string | null }) {
                                         <p className="text-sm text-muted-foreground">
                                             {t(`games.${game.id}.summary` as never)}
                                         </p>
+                                        <Button asChild size="sm" className="self-start">
+                                            <Link href={`/games/${game.id}`}>
+                                                <Play className="h-4 w-4" aria-hidden />
+                                                {t("play")}
+                                            </Link>
+                                        </Button>
                                     </CardBody>
                                 </Card>
                             </li>
