@@ -33,7 +33,8 @@ export default defineConfig({
             "./test/setup/app-host.ts",
             "./test/setup/chat-polls.ts",
             "./test/setup/app-polls.ts",
-            "./test/setup/layout-box.ts"
+            "./test/setup/layout-box.ts",
+            "./test/setup/mention-actions.ts"
         ],
         testTimeout: 30_000,
         hookTimeout: 30_000
