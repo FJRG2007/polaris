@@ -125,7 +125,10 @@ export async function mutualSpaces(
 }
 
 /** Both answers at once, which is how both screens ask for them. */
-export async function mutualsBetween(viewerId: string, personId: string): Promise<{
+export async function mutualsBetween(
+    viewerId: string,
+    personId: string
+): Promise<{
     friends: { people: MutualPerson[]; total: number };
     spaces: { spaces: MutualSpace[]; total: number };
 }> {

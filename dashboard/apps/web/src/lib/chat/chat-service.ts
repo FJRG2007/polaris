@@ -871,7 +871,7 @@ export async function listChannels(
         const membership = mine.get(channel.id);
         const mayAdminister = Boolean(
             channel.spaceId &&
-                (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
+            (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
         );
         const mayModerate =
             mayAdminister || (channel.kind === "group" && groupOwnerId(channel) === actor.id);
