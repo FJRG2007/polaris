@@ -36,6 +36,7 @@ import {
     Rocket,
     Search,
     Settings,
+    Share2,
     KeyRound,
     SquareArrowOutUpRight,
     Tag,
@@ -456,6 +457,11 @@ function ProjectMenu({
                     </ContextMenuItem>
                     {canManage && (
                         <>
+                            <ContextMenuItem
+                                onSelect={() => router.push(`${href}/settings/members`)}
+                            >
+                                <Share2 className="size-4" /> {t("projects.share")}
+                            </ContextMenuItem>
                             <ContextMenuSeparator />
                             <ContextMenuItem variant="danger" onSelect={() => setConfirming(true)}>
                                 <Trash2 className="size-4" /> {t("projects.delete")}

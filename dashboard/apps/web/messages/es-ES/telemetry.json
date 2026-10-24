@@ -18,6 +18,8 @@
         }
     },
     "view": {
+        "share": "Dar acceso",
+        "sharedWithYou": "Compartido contigo",
         "statuses": {
             "unresolved": "Sin resolver",
             "resolved": "Resueltos",

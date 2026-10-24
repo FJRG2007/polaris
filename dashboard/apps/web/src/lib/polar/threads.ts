@@ -139,6 +139,20 @@ export async function polarSidebar(userId: string): Promise<{
             orderBy: [{ updatedAt: "desc" }, { id: "desc" }]
         })
     ]);
+    // Projects somebody shared with this person, after their own: the name and
+    // the instructions, nothing filed under them.
+    const { grantedSubjects } = await import("@/lib/access/grants");
+    const lent = [...(await grantedSubjects(userId, "polar.project")).keys()];
+    const shared =
+        lent.length === 0
+            ? []
+            : await prisma.polarProject.findMany({
+                  where: { id: { in: lent }, ownerId: { not: userId } },
+                  select: { id: true, name: true, instructions: true },
+                  orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+                  take: lent.length
+              });
+    projects.push(...shared.map((project) => ({ ...project, shared: true })));
     return {
         threads: recent.threads,
         more: recent.more,

@@ -341,6 +341,25 @@ export async function getSession(sessionId: string, ownerId: string): Promise<Se
     return record ? toView(record as unknown as SessionRecord) : null;
 }
 
+/**
+ * One session shared with this account (`agents.session`), read the way its
+ * owner sees it, or null without a grant. Only for reading: every control goes
+ * through `getSession`, which a grant does not reach.
+ */
+export async function sharedSession(
+    sessionId: string,
+    userId: string
+): Promise<SessionView | null> {
+    const { grantedCapability } = await import("@/lib/access/grants");
+    const held = await grantedCapability(userId, "agents.session", sessionId);
+    if (!core.atLeast("agents.session", held, "view")) return null;
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: VIEW_SELECT
+    });
+    return record ? toView(record as unknown as SessionRecord) : null;
+}
+
 export interface SessionCreateInput {
     /** The repository, or null for a workspace with nothing checked out. */
     readonly repoId: string | null;

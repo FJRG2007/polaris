@@ -33,7 +33,8 @@ import type { PersonRef } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
 import type { TaskShareView } from "@/lib/tasks/share-service";
 import { PersonName, PersonRow } from "@/components/person-name";
-import { Globe, Link2, Loader2, Mail, UserPlus, X } from "lucide-react";
+import { Globe, Link2, Loader2, Mail, UserPlus, Users, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import {
     Button,
     Checkbox,
@@ -48,6 +49,12 @@ import {
     cn
 } from "@polaris/ui";
 import * as polls from "./tasks-polls";
+
+/** The person picker, loaded when somebody asks for it (`task.task`). */
+const PeopleShareDialog = dynamic(
+    () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
+    { ssr: false }
+);
 
 /** A link in a box with the copy control, the same shape in both blocks. */
 function LinkRow({ url, label }: { url: string; label: string }) {
@@ -109,6 +116,7 @@ export function ShareDialog({
     const [error, setError] = useState("");
     const [privateUrl, setPrivateUrl] = useState("");
     const [canShare, setCanShare] = useState(false);
+    const [sharingPeople, setSharingPeople] = useState(false);
     const [share, setShare] = useState<TaskShareView | null>(null);
     const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
     const [savingLimits, setSavingLimits] = useState(false);
@@ -460,9 +468,30 @@ export function ShareDialog({
                                 </div>
                             </Section>
                         )}
+                        {canShare ? (
+                            <div className="flex justify-end">
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setSharingPeople(true)}
+                                >
+                                    <Users className="size-4" />
+                                    {t("share.people.open")}
+                                </Button>
+                            </div>
+                        ) : null}
                     </div>
                 )}
             </DialogContent>
+            {sharingPeople ? (
+                <PeopleShareDialog
+                    open
+                    onOpenChange={setSharingPeople}
+                    subject="task.task"
+                    subjectId={taskId}
+                    name={taskName}
+                />
+            ) : null}
         </Dialog>
     );
 }

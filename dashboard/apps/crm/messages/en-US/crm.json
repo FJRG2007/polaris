@@ -404,6 +404,8 @@
         "failed": "The export failed"
     },
     "record": {
+        "share": "Share record",
+        "sharedWithYou": "Shared with you",
         "open": "Open record",
         "openPage": "Open full page",
         "untitled": "Untitled",
@@ -685,6 +687,8 @@
     },
     "dashboards": {
         "title": "Dashboards",
+        "share": "Share dashboard",
+        "sharedWithYou": "Shared with you",
         "picker": "Choose a dashboard",
         "create": "New dashboard",
         "rename": "Rename dashboard",

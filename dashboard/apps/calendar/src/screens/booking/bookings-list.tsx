@@ -41,7 +41,15 @@ function StatusChip({ status }: { status: BookingView["status"] }) {
     );
 }
 
-export function BookingsList({ pageId }: { pageId: string }) {
+export function BookingsList({
+    pageId,
+    shared
+}: {
+    pageId: string;
+    /** The reader co-hosts the page: its events live in the owner's calendar,
+     *  and at "view" its bookings are only read. */
+    shared?: "view" | "edit";
+}) {
     const t = useCalendarT();
     const locale = hostUi.i18nProvider.useLocale();
     const zone = browserZone();
@@ -136,7 +144,9 @@ export function BookingsList({ pageId }: { pageId: string }) {
                                 </span>
                                 <StatusChip status={booking.status} />
                                 <span className="ml-auto flex items-center gap-1">
-                                    {booking.objectId && booking.status === "confirmed" ? (
+                                    {!shared &&
+                                    booking.objectId &&
+                                    booking.status === "confirmed" ? (
                                         <Link
                                             href={`/calendar/e/${booking.objectId}`}
                                             aria-label={t("booking.openEvent")}
@@ -149,7 +159,8 @@ export function BookingsList({ pageId }: { pageId: string }) {
                                             <ExternalLink />
                                         </Link>
                                     ) : null}
-                                    {booking.status !== "cancelled" &&
+                                    {shared !== "view" &&
+                                    booking.status !== "cancelled" &&
                                     Date.parse(booking.end) >= now ? (
                                         <Button
                                             size="icon-sm"

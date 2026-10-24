@@ -21,12 +21,18 @@ import * as core from "@polaris/core";
 import { sessionCan } from "@/lib/session";
 import type { SessionUser } from "@/lib/session";
 import { GrantError } from "@/lib/access/grants";
-import { memberOrgIds } from "@/lib/orgs/org-service";
-import { requireSpace as requireNoteSpace } from "@/lib/notes/access";
+import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import { mayEditShelf as mayEditAutomationShelf } from "@/lib/automations/runner";
+import { memberOrgIds, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
+import {
+    requireNote as requireNoteOnShelf,
+    requireSpace as requireNoteSpace
+} from "@/lib/notes/access";
 import { requireShareable as requireOfficeShareable } from "@/lib/office/documents";
 import { requireSpace as requireChatSpace, requireChannel } from "@/lib/chat/access";
-import { requireSpace as requireTaskSpace, requireFolder } from "@/lib/tasks/access";
+import { requireSpace as requireTaskSpace, requireFolder, requireTask } from "@/lib/tasks/access";
 import { domainOwner, lendableServer } from "@/lib/machines/machine-access";
+import { MailAccessError, ownedAccount as ownedMailbox } from "@/lib/mailbox/access";
 
 /**
  * Refuse unless this account may hand this thing to somebody else.
@@ -60,6 +66,10 @@ export async function requireMayShare(
         case "note.space":
             await requireNoteSpace(actor, subjectId, "admin");
             return;
+        case "note.note":
+            // Whoever runs the shelf it sits on: its owner on a personal one.
+            await requireNoteOnShelf(actor, subjectId, "admin");
+            return;
         case "office.document":
             // Editing is not enough to hand it on, exactly as opening a door is
             // not enough to lend it: sharing takes the standing of the people it
@@ -69,6 +79,7 @@ export async function requireMayShare(
         case "place.device":
         case "place.camera":
         case "place.room":
+        case "place.place":
             // Deciding who gets a key to the house is the same standing as
             // deciding what Polaris is connected to. Being able to open a door
             // is deliberately not enough: a visitor must not be able to lend it
@@ -110,6 +121,203 @@ export async function requireMayShare(
                 throw new GrantError("You cannot share that");
             return;
         }
+        case "watch.alarm": {
+            // An alarm is shared by whoever made it, as every change to it is.
+            const alarm = await prisma.alarm.findFirst({
+                where: { id: subjectId, ownerId: user.id },
+                select: { id: true }
+            });
+            if (!alarm) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "calendar.calendar": {
+            // A calendar's owner hands it to a role; the people and teams it
+            // is shared with are kept, and shared, by the Calendar itself.
+            const calendar = await prisma.calendar.findFirst({
+                where: { id: subjectId, ownerId: user.id, trashedAt: null },
+                select: { id: true }
+            });
+            if (!calendar) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "calendar.booking": {
+            // A booking page's owner chooses its co-hosts.
+            const page = await prisma.calendarBookingPage.findFirst({
+                where: { id: subjectId, ownerId: user.id },
+                select: { id: true }
+            });
+            if (!page) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "crm.record": {
+            // Whoever may change a record where it lives may show it to
+            // somebody else: its owner on a personal shelf, a role that edits
+            // that kind of record on an organization's.
+            const [kind, id] = subjectId.split(":");
+            const delegate =
+                kind === "companies"
+                    ? prisma.crmCompany
+                    : kind === "people"
+                      ? prisma.crmPerson
+                      : kind === "opportunities"
+                        ? prisma.crmOpportunity
+                        : null;
+            const row =
+                delegate && id && /^[0-9a-f-]{36}$/i.test(id)
+                    ? await (
+                          delegate as unknown as {
+                              findFirst(args: unknown): Promise<{
+                                  orgId: string | null;
+                                  userId: string | null;
+                              } | null>;
+                          }
+                      ).findFirst({
+                          where: { id, deletedAt: null },
+                          select: { orgId: true, userId: true }
+                      })
+                    : null;
+            if (!row) throw new GrantError("You cannot share that");
+            if (row.orgId) {
+                const access = await resolveOrgAccess(user, row.orgId);
+                if (!orgCan(access, `crm.${kind}.edit` as core.OrgPermission)) {
+                    throw new GrantError("You cannot share that");
+                }
+            } else if (row.userId !== user.id) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
+        }
+        case "automation.automation": {
+            // Whoever may change automations on its shelf decides who else
+            // may look at one.
+            const row = /^[0-9a-f-]{36}$/i.test(subjectId)
+                ? await prisma.automation.findUnique({
+                      where: { id: subjectId },
+                      select: { orgId: true, userId: true }
+                  })
+                : null;
+            if (!row || !(await mayEditAutomationShelf(user, row))) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
+        }
+        case "dns.filter":
+            // The network filter is the house's: whoever runs the house shares it.
+            if (!user.isAdmin || subjectId !== core.DNS_FILTER_ID) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
+        case "agents.session": {
+            // Whoever reaches it as its owner - the repository's, or whoever
+            // started a workspace - lets somebody else read it.
+            const { getSession } = await import("@/lib/agents/session-service");
+            if (!(await getSession(subjectId, user.id)))
+                throw new GrantError("You cannot share that");
+            return;
+        }
+        case "mail.mailbox":
+            // Only the person who linked a mailbox lends it, as only they read
+            // it. Whoever runs the organization it is part of cannot: they can
+            // take it back, never open it.
+            try {
+                await ownedMailbox(user.id, subjectId);
+            } catch (caught) {
+                if (caught instanceof MailAccessError)
+                    throw new GrantError("You cannot share that");
+                throw caught;
+            }
+            return;
+        case "polar.project": {
+            // Only its owner shows a project to somebody else.
+            const project = await prisma.polarProject.findUnique({
+                where: { id: subjectId },
+                select: { ownerId: true }
+            });
+            if (!project || project.ownerId !== user.id)
+                throw new GrantError("You cannot share that");
+            return;
+        }
+        case "task.task":
+            // Whoever may make it a public link may show it to a person.
+            await requireTask(actor, subjectId, "member");
+            return;
+        case "backup.plan": {
+            // Only its owner shows a plan to somebody else.
+            const plan = await prisma.backupPlan.findUnique({
+                where: { id: subjectId },
+                select: { ownerId: true }
+            });
+            if (!plan || plan.ownerId !== user.id) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "telemetry.project": {
+            // Whoever may open the project as its owner (or an administrator)
+            // decides who else reads its issues.
+            const { requireProject } = await import("@/lib/telemetry/project-service");
+            const owns = await requireProject(
+                { id: user.id, isAdmin: user.isAdmin },
+                subjectId
+            ).then(
+                () => true,
+                () => false
+            );
+            if (!owns) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "analytics.site": {
+            // Whoever may configure a service decides who else reads its numbers.
+            const configurable = await requireApplicationAccess(
+                subjectId,
+                user.id,
+                "service.configure"
+            ).then(
+                () => true,
+                () => false
+            );
+            if (!configurable) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "crm.dashboard": {
+            // Whoever may change dashboards where it lives may show one to
+            // somebody else: its owner on a personal shelf, a role that edits
+            // some kind of record on an organization's.
+            const row = /^[0-9a-f-]{36}$/i.test(subjectId)
+                ? await prisma.crmDashboard.findFirst({
+                      where: { id: subjectId },
+                      select: { orgId: true, userId: true }
+                  })
+                : null;
+            if (!row) throw new GrantError("You cannot share that");
+            if (row.orgId) {
+                const access = await resolveOrgAccess(user, row.orgId);
+                const edits = ["companies", "people", "opportunities"].some((kind) =>
+                    orgCan(access, `crm.${kind}.edit` as core.OrgPermission)
+                );
+                if (!edits) throw new GrantError("You cannot share that");
+            } else if (row.userId !== user.id) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
+        }
+        case "status.page": {
+            // Whoever runs status pages decides who else keeps one up to date.
+            if (!(await sessionCan(user, "status.manage"))) {
+                throw new GrantError("You cannot share that");
+            }
+            const page = await prisma.statusPage.findUnique({
+                where: { id: subjectId },
+                select: { id: true }
+            });
+            if (!page) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "watch.connectivity":
+            // The record the internet alert writes, which only administrators
+            // receive and read; one of them decides who else may.
+            if (subjectId !== core.WATCH_CONNECTIVITY_ID || !user.isAdmin) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
     }
 }
 
@@ -306,7 +514,9 @@ export function shareIsBounded(subject: core.GrantSubject): boolean {
         subject === "place.nas" ||
         subject === "place.server" ||
         subject === "place.domain" ||
-        subject === "place.room"
+        subject === "place.room" ||
+        subject === "place.place" ||
+        subject === "watch.connectivity"
     );
 }
 
@@ -323,5 +533,59 @@ export const CAPABILITY_LABELS: Record<string, { label: string; hint: string }> 
     // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
     view: { label: "Can see", hint: "Watch it and see its state. Nothing else." },
     // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
-    control: { label: "Can operate", hint: "Open, close and switch it, as well as see it." }
+    control: { label: "Can operate", hint: "Open, close and switch it, as well as see it." },
+    // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
+    edit: { label: "Can change", hint: "Change it and keep it up to date. Not delete it." }
 };
+
+/**
+ * Where the person something was shared with finds it, for the bell. Only the
+ * subjects whose screen does not need more than the id; null leaves the notice
+ * without a link rather than guessing one.
+ */
+export function subjectHref(subject: core.GrantSubject, subjectId: string): string | null {
+    switch (subject) {
+        case "watch.connectivity":
+            return "/watch/connectivity";
+        case "watch.alarm":
+            return "/watch/alarms";
+        case "status.page":
+            return `/status-pages/${subjectId}`;
+        case "calendar.calendar":
+            return "/calendar";
+        case "calendar.booking":
+            return `/calendar/booking/${subjectId}`;
+        case "crm.record": {
+            const [kind, id] = subjectId.split(":");
+            return `/crm/${kind}/${encodeURIComponent(id ?? "")}`;
+        }
+        case "crm.dashboard":
+            return "/crm/dashboards";
+        case "note.note":
+            return `/notes?note=${encodeURIComponent(subjectId)}`;
+        case "backup.plan":
+            return "/apps/backups";
+        case "task.task":
+            return `/tasks/t/${subjectId}`;
+        case "polar.project":
+            return "/polar";
+        case "mail.mailbox":
+            return `/mail/shared/${subjectId}`;
+        case "agents.session":
+            return `/apps/agents/sessions/${subjectId}`;
+        case "dns.filter":
+            return "/apps/network-filter";
+        case "telemetry.project":
+            return `/apps/telemetry?project=${encodeURIComponent(subjectId)}`;
+        case "analytics.site":
+            return `/apps/analytics?scope=application&id=${encodeURIComponent(subjectId)}`;
+        case "automation.automation":
+            return `/automations/${subjectId}`;
+        case "office.document":
+            return "/office/shared";
+        case "place.ups":
+            return `/places/ups/${encodeURIComponent(subjectId)}`;
+        default:
+            return subject.startsWith("place.") ? "/places" : null;
+    }
+}

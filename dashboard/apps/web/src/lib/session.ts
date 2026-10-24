@@ -221,7 +221,18 @@ export function accessFor(user: SessionUser): AppAccessInput {
         // rather than in the app registry because that one is read in the
         // browser.
         alsoReaches: async (appId) =>
-            (await import("@/lib/app-extensions/registry")).appReaches(appId, user.id),
+            // Watch is reached by a person its connectivity record or a server
+            // was shared with; every other app that lends single things is an
+            // extension.
+            appId === "watch"
+                ? (await import("@/lib/access/grants")).reachesAnySubject(user.id, [
+                      "watch.connectivity",
+                      "place.server"
+                  ])
+                : (await import("@/lib/app-extensions/registry")).appReaches(appId, user.id),
+        reachesSubject: async (subject) =>
+            user.viewingAs?.mode !== "role" &&
+            (await import("@/lib/access/grants")).reachesAnySubject(user.id, [subject]),
         // Polar's own audience, the same answer every Polar route checks.
         closes: async (appId) =>
             appId === "polar" &&

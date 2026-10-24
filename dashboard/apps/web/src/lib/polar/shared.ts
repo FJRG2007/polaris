@@ -411,6 +411,9 @@ export interface PolarProjectRow {
     id: string;
     name: string;
     instructions: string;
+    /** Somebody else's, shared with this person (`polar.project`): read and
+     *  copied, never filed into, changed or deleted. */
+    shared?: boolean;
 }
 
 /** Where a conversation is listed in the sidebar. A pinned chat is listed under

@@ -11,6 +11,8 @@
         "r12m": "Last 12 months"
     },
     "view": {
+        "share": "Share access",
+        "sharedWithYou": "Shared with you",
         "title": "Analytics",
         "online": "{count} online",
         "noServices": "No services yet. Deploy one and its visitors appear here on their own - no script to add.",

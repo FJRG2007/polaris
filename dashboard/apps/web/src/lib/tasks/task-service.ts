@@ -20,6 +20,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import * as activity from "@/lib/activity/activity";
 import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
+import { dropGrantsFor } from "@/lib/access/grants";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
@@ -426,7 +427,10 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
                   select: { id: true, name: true, mime: true, size: true, commentId: true }
               })
             : [];
-    const filesByComment = new Map<string, { id: string; name: string; mime: string; size: number }[]>();
+    const filesByComment = new Map<
+        string,
+        { id: string; name: string; mime: string; size: number }[]
+    >();
     for (const file of commentFiles) {
         if (!file.commentId) continue;
         const bucket = filesByComment.get(file.commentId) ?? [];
@@ -1409,7 +1413,8 @@ async function announceHandover(
     for (const [userId, taskIds] of perPerson) {
         const first = taskIds[0] as string;
         if (taskIds.length === 1) {
-            const name = names.get(first) ?? translate(await getUserLocale(userId), "tasks.notify.aTask");
+            const name =
+                names.get(first) ?? translate(await getUserLocale(userId), "tasks.notify.aTask");
             await announceAssignment(first, name, [userId], actorId);
             continue;
         }
@@ -1439,9 +1444,9 @@ export async function deleteTask(taskId: string): Promise<void> {
  *  may write, so this is one statement rather than a loop of them; tracked time,
  *  checklists and the subtasks themselves follow through the schema's cascades.
  *
- *  The history, the discussion and the followers do not: all three live in a
- *  table shared by every app and none has a foreign key to cascade along, so
- *  they are dropped here - for the subtasks as well as for what was asked for,
+ *  The history, the discussion, the followers and the grants do not: all four
+ *  live in a table shared by every app and none has a foreign key to cascade
+ *  along, so they are dropped here - for the subtasks as well as for what was asked for,
  *  since those are going too. */
 export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
     if (taskIds.length === 0) return 0;
@@ -1451,6 +1456,7 @@ export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
         await activity.forget("task", going, tx);
         await comments.forget("task", going, tx);
         await follow.forget("task", going, tx);
+        await dropGrantsFor("task.task", going, tx);
         return count;
     });
 }
@@ -1618,11 +1624,18 @@ export async function copyTasks(
     // A subtask whose parent is being pasted travels with the parent; pasting it
     // again at the top level would put the same work on the board twice.
     const roots = sources.filter((task) => !task.parentId || !given.has(task.parentId));
-    if (roots.length === 0) return { created: 0, droppedTags: 0, droppedAssignees: 0, droppedStatuses: 0 };
+    if (roots.length === 0)
+        return { created: 0, droppedTags: 0, droppedAssignees: 0, droppedStatuses: 0 };
 
     const [statuses, tags, people] = await Promise.all([
-        prisma.taskStatus.findMany({ where: { spaceId: list.spaceId }, select: { id: true, name: true } }),
-        prisma.taskTag.findMany({ where: { spaceId: list.spaceId }, select: { id: true, name: true } }),
+        prisma.taskStatus.findMany({
+            where: { spaceId: list.spaceId },
+            select: { id: true, name: true }
+        }),
+        prisma.taskTag.findMany({
+            where: { spaceId: list.spaceId },
+            select: { id: true, name: true }
+        }),
         spacePeople(list.spaceId)
     ]);
     const statusByName = new Map(statuses.map((status) => [nameKey(status.name), status.id]));
@@ -1654,14 +1667,20 @@ export async function copyTasks(
                 assignees: { select: { userId: true } },
                 tags: { select: { tag: { select: { name: true } } } },
                 checklists: {
-                    select: { name: true, order: true, items: { select: { name: true, order: true } } }
+                    select: {
+                        name: true,
+                        order: true,
+                        items: { select: { name: true, order: true } }
+                    }
                 },
                 subtasks: { select: { id: true } }
             }
         });
         if (!source) return null;
 
-        const statusId = source.status ? statusByName.get(nameKey(source.status.name)) ?? null : null;
+        const statusId = source.status
+            ? (statusByName.get(nameKey(source.status.name)) ?? null)
+            : null;
         if (source.status && !statusId) report.droppedStatuses += 1;
 
         const tagIds: string[] = [];
@@ -1709,7 +1728,10 @@ export async function copyTasks(
                     name: checklist.name,
                     order: checklist.order,
                     items: {
-                        create: checklist.items.map((item) => ({ name: item.name, order: item.order }))
+                        create: checklist.items.map((item) => ({
+                            name: item.name,
+                            order: item.order
+                        }))
                     }
                 }
             });

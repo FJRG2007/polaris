@@ -33,6 +33,9 @@
         "sleeping": "Polar, dormido"
     },
     "history": {
+        "projectShare": "Compartir proyecto",
+        "projectShared": "Compartido contigo",
+        "projectCopy": "Hacer una copia propia",
         "running": "Respondiendo",
         "waiting": "Espera tu aprobación",
         "unread": "Respuesta nueva",

@@ -34,6 +34,10 @@ export interface BookingPageView {
     readonly enabled: boolean;
     /** Confirmed bookings still ahead. */
     readonly upcoming: number;
+    /** Somebody else's page this reader co-hosts: "view" sees it and its
+     *  bookings, "edit" also changes it and cancels bookings. Absent on the
+     *  reader's own pages. */
+    readonly shared?: "view" | "edit";
 }
 
 /** One booking, as the page's owner sees it. */

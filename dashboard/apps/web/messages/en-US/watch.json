@@ -21,7 +21,8 @@
     },
     "servers": {
         "description": "Load on every server Polaris can reach, read from the machine itself.",
-        "listLabel": "servers"
+        "listLabel": "servers",
+        "sharedWithYou": "Shared with you"
     },
     "services": {
         "description": "Every deployed service, with the last hour of its consumption.",
@@ -94,7 +95,9 @@
         "routeInApp": "In-app",
         "routeEmail": "Email",
         "carried": "Moved to Automations, which tells you now.",
-        "carriedOpen": "Open it"
+        "carriedOpen": "Open it",
+        "share": "Share access",
+        "sharedWithYou": "Shared with you"
     },
     "notices": {
         "alarm": "Alarm: {name}",
@@ -224,6 +227,8 @@
         "description": "Every time Polaris lost its connection or could not be reached from outside, and for how long.",
         "checkNow": "Check now",
         "checking": "Checking",
+        "share": "Share access",
+        "sharedWithYou": "Shared with you",
         "kinds": {
             "line": "Internet line",
             "dns": "DNS",

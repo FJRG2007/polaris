@@ -607,6 +607,7 @@ export async function destroyRecords(
         deletedAt: { not: null }
     };
     const cleared: { object: CrmObject; events: NewEvent[] }[] = [];
+    const destroyed: string[] = [];
     const count = await prisma.$transaction(async (tx) => {
         const found = (await table(object, tx).findMany({
             where,
@@ -615,6 +616,7 @@ export async function destroyRecords(
         if (found.length === 0) return 0;
         const doomed = found.map((row) => toRecord(object, row));
         const gone = doomed.map((record) => record.id);
+        destroyed.push(...gone);
         const names = new Map(doomed.map((record) => [record.id, recordName(object, record)]));
         for (const list of relatedLists(object)) {
             const pointing = { ...shelfWhere(actor.shelf), [list.column]: { in: gone } };
@@ -694,6 +696,9 @@ export async function destroyRecords(
         return result.count as number;
     });
     for (const one of cleared) await logEvents(actor, one.object, one.events);
+    // Nobody keeps reading a record that no longer exists.
+    for (const id of destroyed)
+        await host.accessGrants.dropGrantsFor("crm.record", `${object}:${id}`);
     return count;
 }
 

@@ -35,6 +35,8 @@ export interface PlanSummary {
     destinationIds: string[];
     destinationNames: string[];
     usedBy: number;
+    /** Shared with this administrator by its owner: read, never changed or used. */
+    shared: boolean;
 }
 
 export interface DestinationSummary {

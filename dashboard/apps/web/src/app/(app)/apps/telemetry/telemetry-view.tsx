@@ -34,9 +34,12 @@ import {
     Plus,
     RotateCcw,
     Search,
+    Share2,
     Trash2
 } from "lucide-react";
+import { ShareDialog } from "@/components/access/share-dialog";
 import {
+    Badge,
     Button,
     cn,
     ConfirmDeleteDialog,
@@ -86,6 +89,7 @@ export function TelemetryView({
     const on = useShelfScope();
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const [sharing, setSharing] = useState(false);
 
     // Through `runAction` rather than awaited bare. An action that rejects rather
     // than returning `{ error }` - the server threw, or this tab is holding action
@@ -252,6 +256,31 @@ export function TelemetryView({
                 ) : (
                     <Skeleton className="h-4 w-32" />
                 )}
+                {project?.shared ? (
+                    <Badge variant="neutral">{t("view.sharedWithYou")}</Badge>
+                ) : null}
+                {project && !project.shared ? (
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("view.share")}
+                        title={t("view.share")}
+                        onClick={() => setSharing(true)}
+                    >
+                        <Share2 aria-hidden="true" />
+                    </Button>
+                ) : null}
+                {sharing && project ? (
+                    <ShareDialog
+                        open
+                        onOpenChange={(next) => {
+                            if (!next) setSharing(false);
+                        }}
+                        subject="telemetry.project"
+                        subjectId={project.id}
+                        name={project.name}
+                    />
+                ) : null}
                 {open === "issues" && (
                     <div className="relative ml-auto">
                         <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -269,7 +298,11 @@ export function TelemetryView({
             {failure}
 
             <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-                <SectionNav open={open} onOpen={(key) => go({ section: key, issue: null })} />
+                <SectionNav
+                    open={project?.shared ? "issues" : open}
+                    only={project?.shared ? "issues" : null}
+                    onOpen={(key) => go({ section: key, issue: null })}
+                />
                 <div className="min-w-0 flex-1">
                     {!data || !project ? (
                         <div className="flex flex-col gap-3">
@@ -278,20 +311,21 @@ export function TelemetryView({
                         </div>
                     ) : (
                         <>
-                            {open === "client" && (
+                            {open === "client" && !project.shared && (
                                 <ProjectAddress project={project} onDone={load} />
                             )}
-                            {open === "reporters" && (
+                            {open === "reporters" && !project.shared && (
                                 <ReporterRules project={project} onDone={load} />
                             )}
-                            {open === "settings" && (
+                            {open === "settings" && !project.shared && (
                                 <ProjectSettings project={project} onDone={load} />
                             )}
-                            {open === "issues" &&
+                            {(open === "issues" || project.shared) &&
                                 (issue ? (
                                     <IssuePanel
                                         issue={issue}
                                         busy={busy}
+                                        readOnly={project.shared}
                                         onBack={() => go({ issue: null })}
                                         onStatus={(next) =>
                                             act(() =>
@@ -349,7 +383,16 @@ export function TelemetryView({
  * narrow one, which is the shape Deploy uses for the same thing - a vertical
  * rail on a phone costs more height than the content it introduces.
  */
-function SectionNav({ open, onOpen }: { open: string; onOpen: (key: string) => void }) {
+function SectionNav({
+    open,
+    only,
+    onOpen
+}: {
+    open: string;
+    /** The one section a project shared with the reader shows; null for all. */
+    only: string | null;
+    onOpen: (key: string) => void;
+}) {
     const t = useTranslations("telemetry");
     return (
         <nav className="lg:w-48 lg:shrink-0">
@@ -357,31 +400,35 @@ function SectionNav({ open, onOpen }: { open: string; onOpen: (key: string) => v
                 as="ul"
                 className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
             >
-                {SECTIONS.map((section) => {
-                    const active = section.key === open;
-                    const Icon = section.icon;
-                    return (
-                        <li key={section.key} className="shrink-0 lg:shrink">
-                            <button
-                                type="button"
-                                title={t(
-                                    `sections.${section.key}.hint` as NamespaceKey<"telemetry">
-                                )}
-                                aria-current={active ? "page" : undefined}
-                                onClick={() => onOpen(section.key)}
-                                className={cn(
-                                    "flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
-                                    active
-                                        ? "bg-muted font-medium text-foreground"
-                                        : "text-muted-foreground"
-                                )}
-                            >
-                                <Icon className="size-3.5 shrink-0" />
-                                {t(`sections.${section.key}.label` as NamespaceKey<"telemetry">)}
-                            </button>
-                        </li>
-                    );
-                })}
+                {SECTIONS.filter((section) => only === null || section.key === only).map(
+                    (section) => {
+                        const active = section.key === open;
+                        const Icon = section.icon;
+                        return (
+                            <li key={section.key} className="shrink-0 lg:shrink">
+                                <button
+                                    type="button"
+                                    title={t(
+                                        `sections.${section.key}.hint` as NamespaceKey<"telemetry">
+                                    )}
+                                    aria-current={active ? "page" : undefined}
+                                    onClick={() => onOpen(section.key)}
+                                    className={cn(
+                                        "flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
+                                        active
+                                            ? "bg-muted font-medium text-foreground"
+                                            : "text-muted-foreground"
+                                    )}
+                                >
+                                    <Icon className="size-3.5 shrink-0" />
+                                    {t(
+                                        `sections.${section.key}.label` as NamespaceKey<"telemetry">
+                                    )}
+                                </button>
+                            </li>
+                        );
+                    }
+                )}
             </ScrollRow>
         </nav>
     );
@@ -675,10 +722,13 @@ function IssuePanel({
     busy,
     onBack,
     onStatus,
-    onDelete
+    onDelete,
+    readOnly
 }: {
     issue: IssueDetail;
     busy: boolean;
+    /** Shared with the reader: nothing here is theirs to change. */
+    readOnly: boolean;
     onBack: () => void;
     onStatus: (status: string) => void;
     onDelete: () => void;
@@ -702,39 +752,41 @@ function IssuePanel({
                     </h2>
                     <p className="truncate text-xs text-muted-foreground">{issue.culprit}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        size="sm"
-                        variant={issue.status === "resolved" ? "secondary" : "primary"}
-                        disabled={busy}
-                        onClick={() =>
-                            onStatus(issue.status === "resolved" ? "unresolved" : "resolved")
-                        }
-                    >
-                        <CircleCheck className="size-4" />
-                        {issue.status === "resolved" ? t("issue.resolved") : t("issue.resolve")}
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() =>
-                            onStatus(issue.status === "ignored" ? "unresolved" : "ignored")
-                        }
-                    >
-                        <CircleSlash className="size-4" />
-                        {issue.status === "ignored" ? t("issue.ignored") : t("issue.ignore")}
-                    </Button>
-                    <button
-                        type="button"
-                        title={t("issue.delete")}
-                        aria-label={t("issue.delete")}
-                        onClick={() => setRemoving(true)}
-                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                    >
-                        <Trash2 className="size-4" />
-                    </button>
-                </div>
+                {!readOnly && (
+                    <div className="flex items-center gap-2">
+                        <Button
+                            size="sm"
+                            variant={issue.status === "resolved" ? "secondary" : "primary"}
+                            disabled={busy}
+                            onClick={() =>
+                                onStatus(issue.status === "resolved" ? "unresolved" : "resolved")
+                            }
+                        >
+                            <CircleCheck className="size-4" />
+                            {issue.status === "resolved" ? t("issue.resolved") : t("issue.resolve")}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() =>
+                                onStatus(issue.status === "ignored" ? "unresolved" : "ignored")
+                            }
+                        >
+                            <CircleSlash className="size-4" />
+                            {issue.status === "ignored" ? t("issue.ignored") : t("issue.ignore")}
+                        </Button>
+                        <button
+                            type="button"
+                            title={t("issue.delete")}
+                            aria-label={t("issue.delete")}
+                            onClick={() => setRemoving(true)}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                        >
+                            <Trash2 className="size-4" />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">

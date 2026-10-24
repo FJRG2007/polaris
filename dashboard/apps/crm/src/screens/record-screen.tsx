@@ -21,15 +21,17 @@ import { messageOf, unwrap } from "./call";
 import { fieldLabel } from "./custom-fields";
 import { RunWorkflowMenu } from "./run-workflow-menu";
 import * as actions from "../actions/records";
-import { recordHref } from "../model/related";
 import { useCallback, useState } from "react";
 import { hostUi } from "@polaris/app-host/client";
 import type { InputValue } from "../model/values";
 import { CellDisplay, RefChip } from "./cell-display";
+import { recordHref, recordSubjectId } from "../model/related";
 import type { RecordOpening } from "../lib/record-page";
+
+const { ShareDialog } = hostUi.accessShareDialog;
 import { useFavorite } from "./use-favorite";
-import { ArrowLeft, Link2, Maximize2, RotateCcw, ShieldOff, Star } from "lucide-react";
-import { Button, cn, DialogTitle, EmptyState, useToast } from "@polaris/ui";
+import { ArrowLeft, Link2, Maximize2, RotateCcw, Share2, ShieldOff, Star } from "lucide-react";
+import { Badge, Button, cn, DialogTitle, EmptyState, useToast } from "@polaris/ui";
 import {
     fieldsOf,
     recordName,
@@ -67,6 +69,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
         load
     });
     const [editing, setEditing] = useState<string | null>(null);
+    const [sharing, setSharing] = useState(false);
     const data = opening.data;
     const record = data?.record ?? null;
     const canEdit = Boolean(data?.can[object].edit) && !record?.deletedAt;
@@ -178,7 +181,19 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
             {record && canEdit ? (
                 <RunWorkflowMenu object={object} id={id} onRan={opening.refresh} />
             ) : null}
-            {record && !record.deletedAt ? (
+            {data?.shared ? <Badge variant="neutral">{t("record.sharedWithYou")}</Badge> : null}
+            {record && canEdit && !data?.shared ? (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSharing(true)}
+                    aria-label={t("record.share")}
+                    title={t("record.share")}
+                >
+                    <Share2 className="size-4" />
+                </Button>
+            ) : null}
+            {record && !record.deletedAt && !data?.shared ? (
                 <Button
                     variant="ghost"
                     size="sm"
@@ -202,6 +217,17 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                 >
                     <Link2 className="size-4" />
                 </Button>
+            ) : null}
+            {sharing && record && name ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(next) => {
+                        if (!next) setSharing(false);
+                    }}
+                    subject="crm.record"
+                    subjectId={recordSubjectId(object, id)}
+                    name={name}
+                />
             ) : null}
         </div>
     );

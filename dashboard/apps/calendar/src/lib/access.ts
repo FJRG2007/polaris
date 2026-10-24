@@ -41,6 +41,22 @@ function stronger(left: Reach | null, right: Reach): Reach {
     return left && RANK[left] >= RANK[right] ? left : right;
 }
 
+/**
+ * The calendars handed to a role this person holds (`calendar.calendar`, an
+ * AccessGrant to an organization role), as share levels: `view` reads every
+ * detail, `edit` also changes events. People and teams are in CalendarShare;
+ * a grant is only ever a role, so the two never overlap.
+ */
+export async function roleShares(userId: string): Promise<Map<string, ShareLevel>> {
+    const held = await host.accessGrants.grantedSubjects(userId, "calendar.calendar");
+    const levels = new Map<string, ShareLevel>();
+    for (const [id, capability] of held) {
+        if (capability === "edit") levels.set(id, "write");
+        else if (capability === "view") levels.set(id, "read");
+    }
+    return levels;
+}
+
 /** The signed-in person, refusing anybody without the Calendar. */
 export async function requireCalendarUser(): Promise<SessionUser> {
     return host.session.requirePermission("calendar.use");
@@ -79,7 +95,10 @@ export async function reachOf(
         else if (calendar.trashedAt === null) others.push(calendar.id);
     }
     if (others.length === 0) return found;
-    const teams = await host.calendarHost.teamIdsOf(userId);
+    const [teams, byRole] = await Promise.all([
+        host.calendarHost.teamIdsOf(userId),
+        roleShares(userId)
+    ]);
     const shares = await prisma.calendarShare.findMany({
         where: {
             calendarId: { in: others },
@@ -92,6 +111,10 @@ export async function reachOf(
             ? (share.access as ShareLevel)
             : "read";
         found.set(share.calendarId, stronger(found.get(share.calendarId) ?? null, level));
+    }
+    for (const id of others) {
+        const level = byRole.get(id);
+        if (level) found.set(id, stronger(found.get(id) ?? null, level));
     }
     // A room is seen as taken or free by everybody who books rooms.
     for (const calendar of calendars) {
@@ -110,7 +133,11 @@ export async function reachOf(
  *  every one shared with them or a team they are on; never a trashed one that
  *  is not theirs. */
 export async function reachableCalendars(userId: string): Promise<Map<string, Reach>> {
-    const teams = await host.calendarHost.teamIdsOf(userId);
+    const [teams, byRole] = await Promise.all([
+        host.calendarHost.teamIdsOf(userId),
+        roleShares(userId)
+    ]);
+    const roleIds = [...byRole.keys()];
     const rows = await prisma.calendar.findMany({
         where: {
             OR: [
@@ -125,7 +152,8 @@ export async function reachableCalendars(userId: string): Promise<Map<string, Re
                             ]
                         }
                     }
-                }
+                },
+                ...(roleIds.length > 0 ? [{ trashedAt: null, id: { in: roleIds } }] : [])
             ]
         },
         select: { id: true, ownerId: true, kind: true, trashedAt: true }

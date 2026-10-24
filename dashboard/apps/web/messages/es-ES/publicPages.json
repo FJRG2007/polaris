@@ -340,5 +340,26 @@
             "hours": "{n} h",
             "minutes": "{n} min"
         }
+    },
+    "guestConnectivity": {
+        "title": "Conexión",
+        "kind": {
+            "line": "Línea de internet",
+            "dns": "DNS",
+            "address": "Dirección pública"
+        },
+        "periods": {
+            "24h": "Últimas 24 horas",
+            "7d": "Últimos 7 días",
+            "30d": "Últimos 30 días",
+            "90d": "Últimos 90 días"
+        },
+        "uptime": "{period}: {share} en línea",
+        "recent": "Cortes recientes",
+        "none": "Ningún corte registrado.",
+        "started": "Desde {when}",
+        "lasted": "Duró {span}",
+        "ongoing": "Sigue caída",
+        "seeOnly": "Este enlace solo muestra el registro de la conexión."
     }
 }

@@ -19,20 +19,40 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { NoteMoveDialog } from "./note-move-dialog";
 import { NoteShareDialog } from "./note-share-dialog";
+import { ShareDialog } from "@/components/access/share-dialog";
 import { NoteTree, type ShelfData } from "./note-tree";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
-import { Archive, ChevronRight, Download, Move, Pin, PinOff, Plus, Share2, Trash2 } from "lucide-react";
+import { Badge, Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
+import {
+    Archive,
+    ChevronRight,
+    Download,
+    Move,
+    Pin,
+    PinOff,
+    Plus,
+    Share2,
+    Trash2
+} from "lucide-react";
 import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./notebook-dialogs";
 
 /** How long a note sits untouched before it is written. Long enough not to
  *  write on every keystroke, short enough that closing the tab is safe. */
 const SAVE_AFTER = 800;
 
-export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; note: NoteView | null }) {
+export function NotesView({
+    shelves,
+    note,
+    shared = null
+}: {
+    shelves: readonly ShelfData[];
+    note: NoteView | null;
+    /** Opened through a share of this one note rather than its shelf. */
+    shared?: "view" | "edit" | null;
+}) {
     const t = useTranslations("notes");
     const router = useRouter();
     const [title, setTitle] = useState(note?.title ?? "");
@@ -42,6 +62,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [moving, setMoving] = useState<string | null>(null);
     const [sharing, setSharing] = useState<string | null>(null);
+    const [sharingPeople, setSharingPeople] = useState<string | null>(null);
     const [newNotebook, setNewNotebook] = useState(false);
     const [people, setPeople] = useState<string | null>(null);
     const [importing, setImporting] = useState<{
@@ -96,8 +117,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
     const ancestors = useMemo(() => trail(everything, note?.id ?? null), [everything, note?.id]);
     const childCount = everything.filter((entry) => entry.parentId === note?.id).length;
     const shelfName =
-        shelves.find((shelf) => (shelf.space?.id ?? null) === (note?.spaceId ?? null))?.space?.name ??
-        "My notes";
+        shelves.find((shelf) => (shelf.space?.id ?? null) === (note?.spaceId ?? null))?.space
+            ?.name ?? "My notes";
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
@@ -110,8 +131,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                     setImporting({
                         ...where,
                         name:
-                            shelves.find((shelf) => (shelf.space?.id ?? null) === where.spaceId)?.space
-                                ?.name ?? "My notes"
+                            shelves.find((shelf) => (shelf.space?.id ?? null) === where.spaceId)
+                                ?.space?.name ?? "My notes"
                     })
                 }
                 onMoveNote={setMoving}
@@ -153,40 +174,61 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                                 aria-label={t("view.titleLabel")}
                                 placeholder={t("tree.untitled")}
                                 onChange={(event) => setTitle(event.target.value)}
+                                readOnly={shared === "view"}
                                 bare
                                 className="h-auto flex-1 text-2xl font-semibold"
                             />
-                            <button
-                                type="button"
-                                aria-label={note.pinned ? t("view.unpinNote") : t("view.pinNote")}
-                                title={note.pinned ? t("tree.unpin") : t("tree.pin")}
-                                onClick={() =>
-                                    void act(() =>
-                                        actions.updateNoteAction({ noteId: note.id, pinned: !note.pinned })
-                                    )
-                                }
-                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                {note.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
-                            </button>
-                            <button
-                                type="button"
-                                aria-label={t("view.moveNote")}
-                                title={t("view.move")}
-                                onClick={() => setMoving(note.id)}
-                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                <Move className="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                aria-label={t("view.shareNote")}
-                                title={t("view.share")}
-                                onClick={() => setSharing(note.id)}
-                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                <Share2 className="size-4" />
-                            </button>
+                            {!shared && (
+                                <button
+                                    type="button"
+                                    aria-label={
+                                        note.pinned ? t("view.unpinNote") : t("view.pinNote")
+                                    }
+                                    title={note.pinned ? t("tree.unpin") : t("tree.pin")}
+                                    onClick={() =>
+                                        void act(() =>
+                                            actions.updateNoteAction({
+                                                noteId: note.id,
+                                                pinned: !note.pinned
+                                            })
+                                        )
+                                    }
+                                    className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    {note.pinned ? (
+                                        <PinOff className="size-4" />
+                                    ) : (
+                                        <Pin className="size-4" />
+                                    )}
+                                </button>
+                            )}
+                            {!shared && (
+                                <button
+                                    type="button"
+                                    aria-label={t("view.moveNote")}
+                                    title={t("view.move")}
+                                    onClick={() => setMoving(note.id)}
+                                    className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <Move className="size-4" />
+                                </button>
+                            )}
+                            {shared ? (
+                                <Badge variant="neutral" className="mt-1.5 shrink-0">
+                                    {t("view.sharedWithYou")}
+                                </Badge>
+                            ) : null}
+                            {!shared && (
+                                <button
+                                    type="button"
+                                    aria-label={t("view.shareNote")}
+                                    title={t("view.share")}
+                                    onClick={() => setSharingPeople(note.id)}
+                                    className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <Share2 className="size-4" />
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 aria-label={t("view.exportNote")}
@@ -201,33 +243,37 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             >
                                 <Download className="size-4" />
                             </button>
-                            <button
-                                type="button"
-                                aria-label={t("view.archiveNote")}
-                                title={t("tree.archive")}
-                                onClick={() =>
-                                    void act(async () => {
-                                        const result = await actions.updateNoteAction({
-                                            noteId: note.id,
-                                            archived: true
-                                        });
-                                        if (!result.error) router.push("/notes");
-                                        return result;
-                                    })
-                                }
-                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                <Archive className="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                aria-label={t("view.deleteNote")}
-                                title={t("tree.delete")}
-                                onClick={() => setConfirmDelete(true)}
-                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                            >
-                                <Trash2 className="size-4" />
-                            </button>
+                            {!shared && (
+                                <button
+                                    type="button"
+                                    aria-label={t("view.archiveNote")}
+                                    title={t("tree.archive")}
+                                    onClick={() =>
+                                        void act(async () => {
+                                            const result = await actions.updateNoteAction({
+                                                noteId: note.id,
+                                                archived: true
+                                            });
+                                            if (!result.error) router.push("/notes");
+                                            return result;
+                                        })
+                                    }
+                                    className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <Archive className="size-4" />
+                                </button>
+                            )}
+                            {!shared && (
+                                <button
+                                    type="button"
+                                    aria-label={t("view.deleteNote")}
+                                    title={t("tree.delete")}
+                                    onClick={() => setConfirmDelete(true)}
+                                    className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                >
+                                    <Trash2 className="size-4" />
+                                </button>
+                            )}
                         </div>
 
                         <p className="text-xs text-muted-foreground" aria-live="polite">
@@ -241,7 +287,10 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                         </p>
 
                         {error && (
-                            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                            <p
+                                role="alert"
+                                className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                            >
                                 {error}
                             </p>
                         )}
@@ -250,6 +299,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             key={note.id}
                             value={body}
                             onChange={setBody}
+                            disabled={shared === "view"}
                             placeholder={t("view.editorPlaceholder")}
                             className="min-h-[24rem] flex-1"
                         />
@@ -299,6 +349,29 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                     }}
                 />
             )}
+            {sharingPeople && (
+                <ShareDialog
+                    open
+                    onOpenChange={(next) => {
+                        if (!next) setSharingPeople(null);
+                    }}
+                    subject="note.note"
+                    subjectId={sharingPeople}
+                    name={titleOf(shelves, sharingPeople) ?? note?.title ?? ""}
+                    extra={
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                                setSharing(sharingPeople);
+                                setSharingPeople(null);
+                            }}
+                        >
+                            {t("view.publicLink")}
+                        </Button>
+                    }
+                />
+            )}
             {sharing && (
                 <NoteShareDialog
                     noteId={sharing}
@@ -340,7 +413,10 @@ function placeOf(shelves: readonly ShelfData[], noteId: string) {
 }
 
 /** The notes above this one, outermost first. Empty at the top level. */
-function trail(notes: readonly NoteSummary[], noteId: string | null): { id: string; title: string }[] {
+function trail(
+    notes: readonly NoteSummary[],
+    noteId: string | null
+): { id: string; title: string }[] {
     if (!noteId) return [];
     const byId = new Map(notes.map((entry) => [entry.id, entry]));
     const steps: { id: string; title: string }[] = [];

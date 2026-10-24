@@ -3,6 +3,11 @@
         "title": "Filtro de red",
         "description": "Bloquea anuncios, rastreadores y malware en todos los dispositivos de tu red."
     },
+    "shared": {
+        "share": "Compartir datos",
+        "sharedWithYou": "Compartido contigo",
+        "denied": "No te han compartido el filtro de red"
+    },
     "install": {
         "title": "Filtro de red no está instalado",
         "body": "Instálalo para bloquear anuncios, rastreadores y malware en cada dispositivo de tu red. Instalarlo no arranca nada; enciendes el filtro después.",

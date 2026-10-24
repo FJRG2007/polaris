@@ -2,22 +2,27 @@
  * Watch > Connectivity (/watch/connectivity): how often this deployment lost its
  * connection or stopped being reachable from outside, and for how long.
  *
- * Administrators only - the same people the "cannot reach the internet" alert
- * goes to. The page awaits nothing but that check; the record is read by the view
- * after it has painted (`/api/watch/connectivity`), so a navigation here never
- * waits on the database.
+ * Administrators - the same people the "cannot reach the internet" alert goes
+ * to - and anybody one of them shared it with, who read it and nothing more
+ * (`lib/connectivity/access`). The page awaits nothing but that check; the
+ * record is read by the view after it has painted (`/api/watch/connectivity`),
+ * so a navigation here never waits on the database.
  */
 
-import { requireAdmin } from "@/lib/session";
+import { redirect } from "next/navigation";
+import { homePathForUser, requireUser } from "@/lib/session";
+import { connectivityReach } from "@/lib/connectivity/access";
 import { ConnectivityView } from "./connectivity-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConnectivityPage() {
-    await requireAdmin();
+    const user = await requireUser();
+    const reach = await connectivityReach(user);
+    if (!reach) redirect(`${await homePathForUser(user)}?denied=1`);
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col">
-            <ConnectivityView />
+            <ConnectivityView admin={reach === "admin"} />
         </div>
     );
 }

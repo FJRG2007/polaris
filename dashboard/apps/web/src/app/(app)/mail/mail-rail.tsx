@@ -119,7 +119,7 @@ const MERGED: readonly { id: string; href: string; icon: LucideIcon; role?: stri
 ];
 
 export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
-    const { accounts, folders, labels, unread, patchFolder, fileMail } = useMail();
+    const { accounts, folders, labels, unread, lent, patchFolder, fileMail } = useMail();
     const pathname = usePathname();
     const search = useSearchParams();
     const router = useRouter();
@@ -405,6 +405,21 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                     );
                 })}
             </ul>
+
+            {lent ? (
+                <ul className="mt-1 space-y-0.5">
+                    <li>
+                        <RailLink
+                            href="/mail/shared"
+                            label={t("delegate.sharedWithYou")}
+                            icon={Inbox}
+                            count={0}
+                            active={pathname.startsWith("/mail/shared")}
+                            onNavigate={onNavigate}
+                        />
+                    </li>
+                </ul>
+            ) : null}
 
             {labels.length > 0 ? (
                 <>

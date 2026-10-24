@@ -71,6 +71,10 @@
         "showEmpty": "Mostrar {count} {count, plural, one {campo vacío} other {campos vacíos}}"
     },
     "share": {
+        "people": {
+            "open": "Dar acceso a personas",
+            "sharedWithYou": "Compartida contigo"
+        },
         "validEmail": "Escribe un correo válido",
         "title": "Compartir tarea",
         "send": {

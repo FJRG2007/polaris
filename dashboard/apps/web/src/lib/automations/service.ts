@@ -22,6 +22,7 @@ import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./
 import { AutomationAccessError } from "./access-error";
 import { checkChatWebhooks } from "./chat-webhooks";
 import { checkNoticeTargets } from "./notice-targets";
+import { dropGrantsFor, grantedSubjects } from "@/lib/access/grants";
 
 export { AutomationAccessError };
 
@@ -47,6 +48,8 @@ export interface AutomationRow {
     /** Whether Run now would start it: switched on, published, with a Run by
      *  hand trigger in what is published. Absent on a list cached before. */
     readonly runnable?: boolean;
+    /** Somebody else's automation, shared with this reader to look at. */
+    readonly shared?: boolean;
 }
 
 /** The app an automation came from, and the thing of that app it belongs to - a place. */
@@ -61,9 +64,16 @@ export async function listAutomations(
     from?: OriginFilter
 ): Promise<{ rows: AutomationRow[]; canEdit: boolean }> {
     if (!(await mayReadShelf(actor, shelf))) return { rows: [], canEdit: false };
+    // Automations shared with this reader are listed on their personal shelf.
+    const lent =
+        !shelf.orgId && !from
+            ? [...(await grantedSubjects(actor.id, "automation.automation")).keys()]
+            : [];
     const rows = await prisma.automation.findMany({
         where: {
-            ...shelfWhere(shelf),
+            ...(lent.length
+                ? { OR: [shelfWhere(shelf), { id: { in: lent } }] }
+                : shelfWhere(shelf)),
             ...(from
                 ? { origin: from.origin, ...(from.originRef ? { originRef: from.originRef } : {}) }
                 : {})
@@ -81,9 +91,13 @@ export async function listAutomations(
             lastStatus: true,
             updatedAt: true,
             folderId: true,
-            tags: true
+            tags: true,
+            orgId: true,
+            userId: true
         }
     });
+    const own = (row: { orgId: string | null; userId: string | null }) =>
+        shelf.orgId ? row.orgId === shelf.orgId : !row.orgId && row.userId === shelf.userId;
     const live = rows.flatMap((row) =>
         row.enabled && row.publishedVersionId ? [row.publishedVersionId] : []
     );
@@ -110,8 +124,10 @@ export async function listAutomations(
             lastRunAt: row.lastRunAt?.toISOString() ?? null,
             lastStatus: row.lastStatus,
             updatedAt: row.updatedAt.toISOString(),
-            folderId: row.folderId,
+            // A shared one is not filed in this reader's folders.
+            folderId: own(row) ? row.folderId : null,
             tags: row.tags ?? [],
+            ...(own(row) ? {} : { shared: true }),
             runnable:
                 row.enabled &&
                 row.publishedVersionId !== null &&
@@ -142,7 +158,14 @@ export async function load(actor: RunActor, id: string, write: boolean) {
             updatedAt: true
         }
     });
-    if (!row || !(await mayReadShelf(actor, row))) throw new AutomationAccessError("notFound");
+    if (!row) throw new AutomationAccessError("notFound");
+    if (!(await mayReadShelf(actor, row))) {
+        // Shared with this reader: looked at, never changed.
+        const held = await grantedSubjects(actor.id, "automation.automation");
+        if (!held.has(row.id)) throw new AutomationAccessError("notFound");
+        if (write) throw new AutomationAccessError("forbidden");
+        return row;
+    }
     if (write && !(await mayEditShelf(actor, row))) throw new AutomationAccessError("forbidden");
     return row;
 }
@@ -202,6 +225,8 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
     const lanAllowed = await mayAllowLocalNetwork(actor, row);
     const named = namedAutomations(draft).filter((other) => other !== row.id);
     const shelf = row.orgId ? { orgId: row.orgId } : { orgId: null, userId: row.userId };
+    // Somebody it was shared with sees the names its own steps use, not the shelf's list.
+    const onShelf = await mayReadShelf(actor, row);
     const [live, lastTest, listed, kept] = await Promise.all([
         row.publishedVersionId
             ? prisma.automationVersion.findUnique({
@@ -217,7 +242,7 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
               })
             : null,
         prisma.automation.findMany({
-            where: { ...shelf, id: { not: row.id } },
+            where: onShelf ? { ...shelf, id: { not: row.id } } : { id: { in: [] } },
             orderBy: { name: "asc" },
             take: OTHERS_LISTED,
             select: { id: true, name: true }
@@ -475,6 +500,8 @@ export async function deleteAutomation(actor: RunActor, id: string): Promise<voi
         }),
         prisma.automation.delete({ where: { id } })
     ]);
+    // Nobody keeps looking at an automation that no longer exists.
+    await dropGrantsFor("automation.automation", id);
 }
 
 /** Run the published version by hand, through its first "Run by hand" trigger. */

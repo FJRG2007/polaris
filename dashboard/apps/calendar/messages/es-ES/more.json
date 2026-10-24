@@ -310,6 +310,10 @@
         "sectionMeeting": "Reunión",
         "sectionQuestions": "Preguntas",
         "sectionTiming": "Tiempos",
+        "share": "Compartir",
+        "sharedEdit": "Coorganizas esta página. Las reservas siguen yendo al calendario de su propietario, que solo él puede cambiar.",
+        "sharedView": "Esta página se ha compartido contigo para ver la página y sus reservas. Solo su propietario puede cambiarla.",
+        "sharedWithYou": "Compartida contigo",
         "sidebarTitle": "Reservas",
         "slotEvery": "Inicio cada (min)",
         "slug": "Dirección",
@@ -539,6 +543,7 @@
         "wholeSeries": "Todas las fechas de la serie"
     },
     "shareDialog": {
+        "roles": "Dar a un rol",
         "add": "Añadir",
         "close": "Cerrar",
         "emailLabel": "Enviar el enlace",

@@ -7,7 +7,7 @@
  * join the switcher once somebody installs them (`requiresApp`).
  */
 
-import type { OrgPermission, Permission } from "@polaris/core";
+import type { GrantSubject, OrgPermission, Permission } from "@polaris/core";
 import {
     BatteryCharging,
     Activity,
@@ -537,6 +537,13 @@ export interface AppSection {
      *  is not itself admin-only - or inside one reached through its guest
      *  subject, where the whole rail would otherwise be offered. */
     adminOnly?: boolean;
+    /**
+     * A grant subject that opens this screen to somebody who holds a live grant
+     * over it, past `adminOnly` and `needs` - Watch's connectivity record, shared
+     * by an administrator with somebody who runs nothing else here. Resolved on
+     * the server into `SectionGate.held`, beside the permissions.
+     */
+    reachedBy?: GrantSubject;
     /** Shown as well to somebody who may end the organization without running it -
      *  the successor its owner named. Deleting is deliberately not a permission,
      *  so it cannot be expressed as one above. */
@@ -559,7 +566,8 @@ export interface AppSection {
  */
 export interface SectionGate {
     readonly isAdmin: boolean;
-    /** The instance permissions held, of the ones any section names. */
+    /** The instance permissions held, of the ones any section names, and the
+     *  grant subjects (`reachedBy`) this viewer holds a live grant over. */
     readonly held: readonly string[];
     /** The marketplace apps installed, of the ones any section requires. */
     readonly installed: readonly string[];
@@ -575,6 +583,7 @@ export interface SectionGate {
  */
 export function sectionOffered(section: AppSection, gate: SectionGate): boolean {
     if (section.requiresApp && !gate.installed.includes(section.requiresApp)) return false;
+    if (section.reachedBy && gate.held.includes(section.reachedBy)) return true;
     if (section.adminOnly && !gate.isAdmin) return false;
     return !section.needs || gate.isAdmin || gate.held.includes(section.needs);
 }
@@ -1432,27 +1441,38 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Overview", // i18n-ignore
             href: "/watch",
+            needs: "deploy.read",
             icon: LayoutDashboard,
             keywords: ["monitoring", "health"]
         },
         {
             label: "Servers", // i18n-ignore
             href: "/watch/servers",
+            needs: "deploy.read",
+            reachedBy: "place.server",
             icon: Server,
             keywords: ["hosts", "machines", "load"]
         },
         {
             label: "Services", // i18n-ignore
             href: "/watch/services",
+            needs: "deploy.read",
             icon: Rocket,
             keywords: ["apps", "deploys", "cpu", "memory"]
         },
-        { label: "Containers", href: "/watch/containers", icon: Container, keywords: ["docker"] }, // i18n-ignore
+        {
+            label: "Containers", // i18n-ignore
+            href: "/watch/containers",
+            icon: Container,
+            needs: "deploy.read",
+            keywords: ["docker"]
+        },
         {
             label: "Connectivity", // i18n-ignore
             href: "/watch/connectivity",
             icon: Wifi,
             adminOnly: true,
+            reachedBy: "watch.connectivity",
             keywords: [
                 "internet",
                 "outages",
@@ -1468,12 +1488,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Alarms", // i18n-ignore
             href: "/watch/alarms",
+            needs: "deploy.read",
             icon: Bell,
             keywords: ["thresholds", "alerts", "events"]
         },
         {
             label: "Webhooks", // i18n-ignore
             href: "/watch/webhooks",
+            needs: "deploy.read",
             icon: Webhook,
             keywords: ["discord", "slack", "endpoints"]
         }

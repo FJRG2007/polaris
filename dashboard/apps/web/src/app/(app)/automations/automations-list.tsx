@@ -13,6 +13,7 @@ import {
     Play,
     Plus,
     Tags,
+    Share2,
     Trash2,
     Workflow,
     X
@@ -44,6 +45,7 @@ import {
     useToast
 } from "@polaris/ui";
 import * as core from "@polaris/core";
+import { ShareDialog } from "@/components/access/share-dialog";
 import type { FolderRow } from "@/lib/automations/organize";
 import type { AutomationRow } from "@/lib/automations/service";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -103,6 +105,7 @@ export function AutomationsList({
     const [managing, setManaging] = useState(false);
     const [tagging, setTagging] = useState<AutomationRow | null>(null);
     const [deleting, setDeleting] = useState<AutomationRow | null>(null);
+    const [sharing, setSharing] = useState<AutomationRow | null>(null);
 
     const folders = data?.folders ?? [];
     const folderName = useMemo(
@@ -352,6 +355,9 @@ export function AutomationsList({
                                 ) : null}
                             </div>
                             {row.lastStatus ? <StatusChip status={row.lastStatus} /> : null}
+                            {row.shared ? (
+                                <Badge variant="neutral">{t("list.sharedWithYou")}</Badge>
+                            ) : null}
                             {!row.published ? (
                                 <span className="text-xs text-muted-foreground">
                                     {t("list.draft")}
@@ -360,7 +366,7 @@ export function AutomationsList({
                             <span title={row.published ? undefined : t("list.notPublished")}>
                                 <Switch
                                     checked={row.enabled}
-                                    disabled={!data.canEdit || !row.published}
+                                    disabled={!(data.canEdit && !row.shared) || !row.published}
                                     onChange={(next: boolean) => toggle(row, next)}
                                     aria-label={t("list.switchLabel", { name: row.name })}
                                 />
@@ -377,7 +383,7 @@ export function AutomationsList({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    {data.canEdit ? (
+                                    {data.canEdit && !row.shared ? (
                                         <DropdownMenuItem
                                             disabled={!row.runnable}
                                             title={
@@ -401,8 +407,8 @@ export function AutomationsList({
                                             {t("list.runs")}
                                         </Link>
                                     </DropdownMenuItem>
-                                    {data.canEdit ? <DropdownMenuSeparator /> : null}
-                                    {data.canEdit ? (
+                                    {data.canEdit && !row.shared ? <DropdownMenuSeparator /> : null}
+                                    {data.canEdit && !row.shared ? (
                                         <DropdownMenuSub>
                                             <DropdownMenuSubTrigger>
                                                 <FolderInput aria-hidden="true" />
@@ -436,14 +442,20 @@ export function AutomationsList({
                                             </DropdownMenuSubContent>
                                         </DropdownMenuSub>
                                     ) : null}
-                                    {data.canEdit ? (
+                                    {data.canEdit && !row.shared ? (
                                         <DropdownMenuItem onSelect={() => setTagging(row)}>
                                             <Tags aria-hidden="true" />
                                             {t("tags.edit")}
                                         </DropdownMenuItem>
                                     ) : null}
-                                    {data.canEdit ? <DropdownMenuSeparator /> : null}
-                                    {data.canEdit ? (
+                                    {data.canEdit && !row.shared ? (
+                                        <DropdownMenuItem onSelect={() => setSharing(row)}>
+                                            <Share2 aria-hidden="true" />
+                                            {t("list.share")}
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    {data.canEdit && !row.shared ? <DropdownMenuSeparator /> : null}
+                                    {data.canEdit && !row.shared ? (
                                         <DropdownMenuItem
                                             className="text-danger focus:text-danger"
                                             onSelect={() => setDeleting(row)}
@@ -460,6 +472,15 @@ export function AutomationsList({
             )}
             {after}
             {creating ? <CreateDialog onClose={() => setCreating(false)} /> : null}
+            {sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(open) => !open && setSharing(null)}
+                    subject="automation.automation"
+                    subjectId={sharing.id}
+                    name={sharing.name}
+                />
+            ) : null}
             {deleting ? (
                 <ConfirmDeleteDialog
                     open

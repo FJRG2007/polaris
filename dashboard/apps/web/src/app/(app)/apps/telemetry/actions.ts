@@ -19,6 +19,8 @@ import { revalidatePath } from "next/cache";
 import { slugify } from "@polaris/deploy";
 import { appBaseUrl } from "@/lib/domain-service";
 import { requirePermission } from "@/lib/session";
+import { dropGrantsFor } from "@/lib/access/grants";
+import { requireTelemetryReader } from "@/lib/telemetry/reader";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as report from "@/lib/telemetry/report-service";
 import * as projects from "@/lib/telemetry/project-service";
@@ -78,23 +80,33 @@ export async function telemetryOverviewAction(input: {
     status?: string;
     query?: string;
 }): Promise<{ data?: TelemetryOverview; error?: string }> {
-    const caller = await actor();
+    const { actor: caller, lent } = await requireTelemetryReader();
     try {
         const orgId = await scopeOrgIdFor(caller.id);
         const [rows, origin] = await Promise.all([
-            projects.listProjects(caller, orgId),
+            projects.listProjects(caller, orgId, lent),
             appBaseUrl()
         ]);
         const withDsn = rows.map((row) => ({ ...row, dsn: projects.dsnFor(row, origin) }));
 
         const chosen = withDsn.find((row) => row.id === input.projectId) ?? withDsn[0];
         if (!chosen) {
-            return { data: { projects: withDsn, issues: [], counts: {}, windowDays: report.TELEMETRY_WINDOW_DAYS } };
+            return {
+                data: {
+                    projects: withDsn,
+                    issues: [],
+                    counts: {},
+                    windowDays: report.TELEMETRY_WINDOW_DAYS
+                }
+            };
         }
-        await projects.requireProject(caller, chosen.id);
+        await projects.requireProject(caller, chosen.id, lent);
 
         const [issues, counts] = await Promise.all([
-            report.listIssues(chosen.id, { status: input.status ?? "unresolved", query: input.query }),
+            report.listIssues(chosen.id, {
+                status: input.status ?? "unresolved",
+                query: input.query
+            }),
             report.issueCounts(chosen.id)
         ]);
         return {
@@ -109,9 +121,9 @@ export async function openIssueAction(
     projectId: string,
     issueId: string
 ): Promise<{ issue?: report.IssueDetail; error?: string }> {
-    const caller = await actor();
+    const { actor: caller, lent } = await requireTelemetryReader();
     try {
-        await projects.requireProject(caller, projectId);
+        await projects.requireProject(caller, projectId, lent);
         const issue = await report.getIssue(projectId, issueId);
         if (!issue) return { error: await say("errors.issueGone") };
         return { issue };
@@ -139,7 +151,10 @@ export async function setIssueStatusAction(
     }
 }
 
-export async function deleteIssueAction(projectId: string, issueId: string): Promise<{ error?: string }> {
+export async function deleteIssueAction(
+    projectId: string,
+    issueId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await projects.requireProject(caller, projectId);
@@ -151,7 +166,9 @@ export async function deleteIssueAction(projectId: string, issueId: string): Pro
     }
 }
 
-export async function createTelemetryProjectAction(name: unknown): Promise<{ id?: string; error?: string }> {
+export async function createTelemetryProjectAction(
+    name: unknown
+): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const said = String(name ?? "").trim();
     if (!said || said.length > 80) return { error: await say("errors.name") };
@@ -212,6 +229,7 @@ export async function deleteTelemetryProjectAction(projectId: string): Promise<{
         if (!(await projects.deleteProject(projectId))) {
             return { error: await say("errors.ownProject") };
         }
+        await dropGrantsFor("telemetry.project", projectId);
         revalidatePath(PATH);
         return {};
     } catch (caught) {
@@ -230,7 +248,7 @@ export async function deleteTelemetryProjectAction(projectId: string): Promise<{
 export async function setReporterRulesAction(
     projectId: string,
     input: unknown
-): Promise<{ error?: string; }> {
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.reporterRulesSchema.safeParse(input);
     if (!parsed.success) {
@@ -257,7 +275,7 @@ export async function setReporterRulesAction(
  */
 export async function mintTelemetrySecretAction(
     projectId: string
-): Promise<{ secret?: string; error?: string; }> {
+): Promise<{ secret?: string; error?: string }> {
     const caller = await actor();
     try {
         await projects.requireProject(caller, projectId);
@@ -270,7 +288,7 @@ export async function mintTelemetrySecretAction(
 }
 
 /** Stop asking for a key, and forget the one there was. */
-export async function clearTelemetrySecretAction(projectId: string): Promise<{ error?: string; }> {
+export async function clearTelemetrySecretAction(projectId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await projects.requireProject(caller, projectId);
@@ -283,7 +301,7 @@ export async function clearTelemetrySecretAction(projectId: string): Promise<{ e
 }
 
 /** Forget what was turned away, once somebody has read it and acted on it. */
-export async function clearTelemetryRefusalsAction(projectId: string): Promise<{ error?: string; }> {
+export async function clearTelemetryRefusalsAction(projectId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await projects.requireProject(caller, projectId);

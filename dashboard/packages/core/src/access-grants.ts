@@ -78,7 +78,25 @@ export const GRANT_SUBJECTS = [
     "place.nas",
     "place.server",
     "place.domain",
-    "place.room"
+    "place.room",
+    "watch.connectivity",
+    "watch.alarm",
+    "status.page",
+    "calendar.calendar",
+    "calendar.booking",
+    "crm.record",
+    "crm.dashboard",
+    "automation.automation",
+    "analytics.site",
+    "telemetry.project",
+    "backup.plan",
+    "note.note",
+    "dns.filter",
+    "agents.session",
+    "polar.project",
+    "task.task",
+    "place.place",
+    "mail.mailbox"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -100,6 +118,26 @@ export function isGrantSubject(value: unknown): value is GrantSubject {
 export const GRANT_PRINCIPALS = ["user", "team", "role"] as const;
 
 export type GrantPrincipal = (typeof GRANT_PRINCIPALS)[number];
+
+/**
+ * Who a grant on a subject may be to, where that is not everybody. A subject
+ * whose app already keeps people and teams in a table of its own takes only
+ * what that table cannot hold, so the same person is never handed one thing
+ * twice in two places. A subject no screen lists for its reader, opened only
+ * from the notice its grantee is sent, goes to a person alone: a team or a role
+ * is not told one by one, so its members would hold something they cannot find.
+ */
+export const GRANT_SUBJECT_PRINCIPALS: Partial<Record<GrantSubject, readonly GrantPrincipal[]>> = {
+    "calendar.calendar": ["role"],
+    "note.note": ["user"],
+    "task.task": ["user"],
+    "agents.session": ["user"]
+};
+
+/** The principals a grant on this subject may be to. */
+export function subjectPrincipals(subject: GrantSubject): readonly GrantPrincipal[] {
+    return GRANT_SUBJECT_PRINCIPALS[subject] ?? GRANT_PRINCIPALS;
+}
 
 /**
  * What a grant may hand over, per subject, weakest first.
@@ -148,7 +186,71 @@ export const GRANT_CAPABILITIES = {
     // (https://saltosystems.com/en/solutions/hospitality/,
     // https://docs.getkisi.com/docs/groups). Devices put in the room later are
     // covered; ones taken out are not.
-    "place.room": ["view", "control"]
+    "place.room": ["view", "control"],
+    // This deployment's connectivity record: its state, its outages and their
+    // history. Reading is all there is - checking now and the merge window stay
+    // with the administrators the internet alert goes to.
+    "watch.connectivity": ["view"],
+    // One alarm: its rule, its state and whether it is firing. Changing,
+    // pausing and deleting it stay with whoever made it.
+    "watch.alarm": ["view"],
+    // One status page: its components, checks, incidents and maintenance, and
+    // its title and address. Deleting it and its custom domain stay with the
+    // people who run status pages.
+    "status.page": ["edit"],
+    // A calendar, handed to an organization's role: seeing every detail, or
+    // also changing its events. People and teams keep their own table
+    // (CalendarShare, with its four levels); a grant here is only ever a role.
+    "calendar.calendar": ["view", "edit"],
+    // A booking page, handed to a co-host: seeing it and every booking made
+    // through it, or also changing how it books and cancelling bookings. The
+    // calendars it books into, duplicating and deleting stay with its owner.
+    "calendar.booking": ["view", "edit"],
+    // One CRM record - a company, a person or an opportunity - named
+    // "<kind>:<id>", handed to somebody outside its shelf: its fields, read.
+    // Its timeline, the records around it and every change stay on the shelf.
+    "crm.record": ["view"],
+    // One CRM dashboard: its charts, counted over its shelf as somebody who
+    // may read only the kinds of record they count. Changing it stays on the shelf.
+    "crm.dashboard": ["view"],
+    // One automation: its steps, its versions and its runs. Changing, publishing,
+    // switching and running it stay on its shelf, as it runs as whoever published it.
+    "automation.automation": ["view"],
+    // One service's visitor numbers: its traffic, pages, sources and recent visits.
+    // Switching its tracker and rotating its key stay with whoever configures it.
+    "analytics.site": ["view"],
+    // One telemetry project: its issues and their events. Resolving, ignoring and
+    // deleting them, its address, reporters and settings stay with its owner.
+    "telemetry.project": ["view"],
+    // One backup plan: its schedule, what it keeps and where. Changing, deleting
+    // and putting things on it stay with its owner.
+    "backup.plan": ["view"],
+    // One note on its own: open it, or also change its title and text. Moving,
+    // archiving, deleting and sharing it stay with whoever reaches its shelf.
+    "note.note": ["view", "edit"],
+    // The network filter's long-term statistics: lookups, the blocked share and the
+    // domains most asked for. Which device asked, the live log, the rules and the
+    // settings stay with administrators.
+    "dns.filter": ["view"],
+    // One agent session: what was said, what it reported and where it got to.
+    // Typing to it, stopping it, its terminal and its changes stay with whoever
+    // steers it.
+    "agents.session": ["view"],
+    // One Polar project: its name and its instructions, to read and to copy into a
+    // project of one's own. Its chats stay private; a chat is shared on its own.
+    "polar.project": ["view"],
+    // One task, read on its own: its status, dates, people, subtasks, checklists and
+    // discussion. Not the list it sits in, and nothing is changed by the reader.
+    "task.task": ["view"],
+    // A whole place: every door, switch and camera at it, as one key - what a
+    // room key is, for the building. Devices brought to the place later are
+    // covered; ones moved to another place are not. Its settings, its people
+    // and connecting things to it stay with the people who run the house.
+    "place.place": ["view", "control"],
+    // A mailbox, lent by the person who linked it: its inbox and its messages,
+    // read as Polaris already holds them. Never sending, replying, moving or
+    // marking anything - sending on somebody's behalf is another trust entirely.
+    "mail.mailbox": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -187,7 +289,25 @@ export const GRANT_ACTIONS = {
     "place.nas": ["watch", "fan", "backup"],
     "place.server": ["watch"],
     "place.domain": ["watch"],
-    "place.room": ["watch", "open", "close", "operate"]
+    "place.room": ["watch", "open", "close", "operate"],
+    "watch.connectivity": [],
+    "watch.alarm": [],
+    "status.page": [],
+    "calendar.calendar": [],
+    "calendar.booking": [],
+    "crm.record": [],
+    "crm.dashboard": [],
+    "automation.automation": [],
+    "analytics.site": [],
+    "telemetry.project": [],
+    "backup.plan": [],
+    "note.note": [],
+    "dns.filter": [],
+    "agents.session": [],
+    "polar.project": [],
+    "task.task": [],
+    "place.place": ["watch", "open", "close", "operate"],
+    "mail.mailbox": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**
@@ -568,9 +688,10 @@ export const grantLinkSchema = withGrantRules(grantBounds.extend(addressRuleFiel
 export type GrantLinkInput = z.infer<typeof grantLinkSchema>;
 
 /**
- * What may be handed out as a link: everything in Places. A door and a UPS may
- * be driven through one; a camera is only watched (no PTZ, no recordings); the
- * rest only seen - see `LINK_WATCH_ONLY_SUBJECTS`.
+ * What may be handed out as a link: everything in Places, and the
+ * connectivity record in Watch. A door and a UPS may be driven through one; a
+ * camera is only watched (no PTZ, no recordings); the rest only seen - see
+ * `LINK_WATCH_ONLY_SUBJECTS`.
  */
 export const GRANT_LINK_SUBJECTS = [
     "place.device",
@@ -579,7 +700,8 @@ export const GRANT_LINK_SUBJECTS = [
     "place.nas",
     "place.server",
     "place.domain",
-    "place.room"
+    "place.room",
+    "watch.connectivity"
 ] as const satisfies readonly GrantSubject[];
 
 export type GrantLinkSubject = (typeof GRANT_LINK_SUBJECTS)[number];
@@ -597,8 +719,22 @@ export function isGrantLinkSubject(value: unknown): value is GrantLinkSubject {
 export const LINK_WATCH_ONLY_SUBJECTS = [
     "place.nas",
     "place.server",
-    "place.domain"
+    "place.domain",
+    "watch.connectivity"
 ] as const satisfies readonly GrantLinkSubject[];
+
+/**
+ * The one connectivity record a deployment keeps, as a grant's subject id.
+ * There is nothing to choose between, so the id is a constant rather than a
+ * row: a grant over it reads the whole record.
+ */
+export const WATCH_CONNECTIVITY_ID = "deployment";
+
+/**
+ * The one network filter a deployment runs (`dns.filter`): like the
+ * connectivity record it has no row of its own, so a grant names this id.
+ */
+export const DNS_FILTER_ID = "network";
 
 /** The capabilities a link to this subject may carry, weakest first. */
 export function linkCapabilities(subject: GrantLinkSubject): readonly string[] {

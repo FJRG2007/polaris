@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import { PLACE_KINDS, placeLocationSchema, type PlaceView } from "./place-kinds";
 import type { Coordinate } from "@polaris/core";
@@ -295,4 +296,5 @@ export async function deletePlace(installedAppId: string, id: string): Promise<v
     const remaining = await prisma.place.count({ where: { installedAppId } });
     if (remaining <= 1) throw new HomeError("There has to be somewhere for cameras to be");
     await prisma.place.delete({ where: { id } });
+    await host.accessGrants.dropGrantsFor("place.place", id);
 }

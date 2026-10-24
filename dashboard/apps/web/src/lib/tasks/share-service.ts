@@ -178,75 +178,55 @@ function finishedStatus(type: string | undefined): boolean {
     return type ? core.isFinishedStatus(type as core.TaskStatusType) : false;
 }
 
-/**
- * Resolve a public link. Counts the view before returning, so an owner can tell
- * whether the link they sent was ever opened. An unknown token and a link that
- * was turned off are the same answer: null, which the page renders identically
- * so the URL cannot be used to test which tokens exist.
- */
-export async function getPublicTask(token: string): Promise<PublicTaskView | null> {
-    const share = await prisma.taskShare.findUnique({
-        where: { token },
+const TASK_VIEW_SELECT = {
+    id: true,
+    number: true,
+    name: true,
+    description: true,
+    priority: true,
+    startDate: true,
+    dueDate: true,
+    timed: true,
+    points: true,
+    createdAt: true,
+    updatedAt: true,
+    space: { select: { prefix: true } },
+    status: PUBLIC_STATUS,
+    assignees: { select: { user: { select: { name: true } } } },
+    tags: { select: { tag: { select: { name: true, color: true } } } },
+    subtasks: {
+        where: { archived: false },
+        orderBy: { order: "asc" },
+        select: { name: true, status: PUBLIC_STATUS }
+    },
+    checklists: {
+        orderBy: { order: "asc" },
         select: {
-            id: true,
-            showComments: true,
-            maxViews: true,
-            task: {
-                select: {
-                    id: true,
-                    number: true,
-                    name: true,
-                    description: true,
-                    priority: true,
-                    startDate: true,
-                    dueDate: true,
-                    timed: true,
-                    points: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    space: { select: { prefix: true } },
-                    status: PUBLIC_STATUS,
-                    assignees: { select: { user: { select: { name: true } } } },
-                    tags: { select: { tag: { select: { name: true, color: true } } } },
-                    subtasks: {
-                        where: { archived: false },
-                        orderBy: { order: "asc" },
-                        select: { name: true, status: PUBLIC_STATUS }
-                    },
-                    checklists: {
-                        orderBy: { order: "asc" },
-                        select: {
-                            name: true,
-                            items: { orderBy: { order: "asc" }, select: { name: true, done: true } }
-                        }
-                    }
-                }
-            }
+            name: true,
+            items: { orderBy: { order: "asc" }, select: { name: true, done: true } }
         }
+    }
+} as const;
+
+type TaskViewRecord = NonNullable<Awaited<ReturnType<typeof readTaskView>>>;
+
+function readTaskView(taskId: string) {
+    return prisma.task.findUnique({ where: { id: taskId }, select: TASK_VIEW_SELECT });
+}
+
+function taskComments(taskId: string) {
+    return prisma.comment.findMany({
+        where: { subjectType: "task", subjectId: taskId },
+        orderBy: { createdAt: "asc" },
+        take: 200,
+        select: { body: true, createdAt: true, user: { select: { name: true } } }
     });
-    if (!share) return null;
+}
 
-    const task = share.task;
-    const comments = share.showComments
-        ? await prisma.comment.findMany({
-              where: { subjectType: "task", subjectId: task.id },
-              orderBy: { createdAt: "asc" },
-              take: 200,
-              select: { body: true, createdAt: true, user: { select: { name: true } } }
-          })
-        : null;
-
-    // Counted conditionally: two people opening the last permitted view at the
-    // same moment must not both get it.
-    const counted = await prisma.taskShare.updateMany({
-        where: {
-            id: share.id,
-            ...(share.maxViews === null ? {} : { views: { lt: share.maxViews } })
-        },
-        data: { views: { increment: 1 } }
-    });
-    if (counted.count === 0) return null;
-
+function toPublicView(
+    task: TaskViewRecord,
+    comments: Awaited<ReturnType<typeof taskComments>> | null
+): PublicTaskView {
     return {
         reference: core.taskReference(task.space.prefix, task.number),
         name: task.name,
@@ -277,6 +257,57 @@ export async function getPublicTask(token: string): Promise<PublicTaskView | nul
         createdAt: task.createdAt.toISOString(),
         updatedAt: task.updatedAt.toISOString()
     };
+}
+
+/**
+ * One task shared with this account (`task.task`), or null without a grant: the
+ * same names-only view a link shows, with its discussion. Read where its list
+ * is out of reach, so nothing of the list comes with it.
+ */
+export async function sharedTaskView(
+    taskId: string,
+    userId: string
+): Promise<PublicTaskView | null> {
+    const { grantedCapability } = await import("@/lib/access/grants");
+    const held = await grantedCapability(userId, "task.task", taskId);
+    if (!core.atLeast("task.task", held, "view")) return null;
+    const task = await readTaskView(taskId);
+    return task ? toPublicView(task, await taskComments(taskId)) : null;
+}
+
+/**
+ * Resolve a public link. Counts the view before returning, so an owner can tell
+ * whether the link they sent was ever opened. An unknown token and a link that
+ * was turned off are the same answer: null, which the page renders identically
+ * so the URL cannot be used to test which tokens exist.
+ */
+export async function getPublicTask(token: string): Promise<PublicTaskView | null> {
+    const share = await prisma.taskShare.findUnique({
+        where: { token },
+        select: {
+            id: true,
+            showComments: true,
+            maxViews: true,
+            task: { select: TASK_VIEW_SELECT }
+        }
+    });
+    if (!share) return null;
+
+    const task = share.task;
+    const comments = share.showComments ? await taskComments(task.id) : null;
+
+    // Counted conditionally: two people opening the last permitted view at the
+    // same moment must not both get it.
+    const counted = await prisma.taskShare.updateMany({
+        where: {
+            id: share.id,
+            ...(share.maxViews === null ? {} : { views: { lt: share.maxViews } })
+        },
+        data: { views: { increment: 1 } }
+    });
+    if (counted.count === 0) return null;
+
+    return toPublicView(task, comments);
 }
 
 // ---------------------------------------------------------------------------

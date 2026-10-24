@@ -15,14 +15,17 @@
  * mean fetching another building's cameras in order not to show them.
  */
 
-import { Select } from "@polaris/ui";
+import { Button, Select } from "@polaris/ui";
+import { hostUi } from "@polaris/app-host/client";
 import { useRouter } from "next/navigation";
 import { PlaceDialog } from "./place-dialog";
 import { usePlacesT } from "./use-places-t";
 import { choosePlaceAction } from "./actions";
 import { useState, useTransition } from "react";
 import type { PlaceView } from "../lib/place-kinds";
-import { Building2, Factory, House, MapPin, Plus } from "lucide-react";
+import { Building2, Factory, House, MapPin, Plus, Share2 } from "lucide-react";
+
+const { ShareDialog } = hostUi.accessShareDialog;
 
 /** The symbol beside each kind. Only ever decoration - nothing behaves
  *  differently - but "Warehouse" and "Mum's" read better with the right one. */
@@ -46,6 +49,7 @@ export function PlaceSwitcher({
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [adding, setAdding] = useState(false);
+    const [sharing, setSharing] = useState(false);
 
     const choose = (id: string) => {
         if (id === "new") {
@@ -88,6 +92,30 @@ export function PlaceSwitcher({
                         : options
                 }
             />
+            {canManage ? (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("switcher.share", { name: current.name })}
+                    title={t("switcher.share", { name: current.name })}
+                    onClick={() => setSharing(true)}
+                >
+                    <Share2 className="size-4 shrink-0" />
+                </Button>
+            ) : null}
+            {sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(next: boolean) => (next ? undefined : setSharing(false))}
+                    subject="place.place"
+                    subjectId={current.id}
+                    name={current.name}
+                    // The whole building as one key: dates, check-in and
+                    // check-out, hours and uses, as for a room.
+                    bounded
+                />
+            ) : null}
             {adding ? (
                 <PlaceDialog
                     place={null}

@@ -310,6 +310,10 @@
         "sectionMeeting": "Meeting",
         "sectionQuestions": "Questions",
         "sectionTiming": "Timing",
+        "share": "Share page",
+        "sharedEdit": "You co-host this page. Bookings still go into its owner's calendar, which only they can change.",
+        "sharedView": "This page is shared with you to see it and its bookings. Only its owner can change it.",
+        "sharedWithYou": "Shared with you",
         "sidebarTitle": "Booking pages",
         "slotEvery": "Start times every (minutes)",
         "slug": "Address",
@@ -539,6 +543,7 @@
         "wholeSeries": "Every date in the series"
     },
     "shareDialog": {
+        "roles": "Share with a role",
         "add": "Share",
         "close": "Close",
         "emailLabel": "Email the link",

@@ -15,7 +15,9 @@
         "switchLabel": "Ejecutar {name} al dispararse",
         "notPublished": "Publícala antes de activarla",
         "runs": "Historial",
-        "runOff": "Actívala primero"
+        "runOff": "Actívala primero",
+        "share": "Dar acceso",
+        "sharedWithYou": "Compartida contigo"
     },
     "modes": {
         "single": "De uno en uno",

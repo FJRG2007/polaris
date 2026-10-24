@@ -3,7 +3,10 @@ import { Bell } from "lucide-react";
 import { WatchCardGrid } from "./watch-cards";
 import { sortByConsumption } from "@/lib/watch/card-order";
 import { Button, PageHeader } from "@polaris/ui";
-import { requirePermission } from "@/lib/session";
+import { redirect } from "next/navigation";
+import { connectivityReach } from "@/lib/connectivity/access";
+import { reachesAnySubject } from "@/lib/access/grants";
+import { requirePermission, requireUser, sessionCan } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { WatchContainersSection } from "./watch-containers";
 import { getWatchOverview } from "@/lib/watch-overview-service";
@@ -24,6 +27,14 @@ const GROUP_LIMIT = 6;
  * after it rather than holding it up.
  */
 export default async function WatchPage() {
+    // Somebody given only the connectivity record or a server reaches Watch
+    // through it, so the app's own address lands them there rather than on a
+    // refusal.
+    const viewer = await requireUser();
+    if (!(await sessionCan(viewer, "deploy.read"))) {
+        if (await connectivityReach(viewer)) redirect("/watch/connectivity");
+        if (await reachesAnySubject(viewer.id, ["place.server"])) redirect("/watch/servers");
+    }
     const user = await requirePermission("deploy.read");
     const overview = await getWatchOverview(user.id);
     const t = await getTranslations("watch");
@@ -31,14 +42,13 @@ export default async function WatchPage() {
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
-                <PageHeader
-                    title={t("overview.title")}
-                    description={t("overview.description")}
-                />
+                <PageHeader title={t("overview.title")} description={t("overview.description")} />
                 <Button asChild variant={overview.firing > 0 ? "danger" : "ghost"} size="sm">
                     <Link href="/watch/alarms">
                         <Bell className="size-4" />
-                        {overview.firing > 0 ? t("overview.firing", { count: overview.firing }) : t("overview.alarms")}
+                        {overview.firing > 0
+                            ? t("overview.firing", { count: overview.firing })
+                            : t("overview.alarms")}
                     </Link>
                 </Button>
             </div>

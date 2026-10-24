@@ -11,6 +11,7 @@
 
 import { calendarT } from "./i18n";
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { CalendarRefusal } from "./errors";
 import type { TrashItemView } from "./wire";
 import { tryItemOf, writeItem, type StoredObject } from "./objects";
@@ -153,6 +154,9 @@ export async function purgeTrash(
     if (kind === "calendar") {
         const calendar = await trashedCalendar(user, id);
         await prisma.calendar.delete({ where: { id: calendar.id } });
+        // Its role grants go with it. One left behind by a bulk purge reaches
+        // nothing: every read starts from a calendar that exists.
+        await host.accessGrants.dropGrantsFor("calendar.calendar", calendar.id);
         return;
     }
     const row = await trashedObject(user, id);

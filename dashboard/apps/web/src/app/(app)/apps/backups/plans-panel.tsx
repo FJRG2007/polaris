@@ -14,7 +14,8 @@ import { readReasonText, reasonFor } from "@/lib/read-json";
 import { everyLabel } from "@/lib/backups/words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Share2, Trash2 } from "lucide-react";
+import { ShareDialog } from "@/components/access/share-dialog";
 import { deletePlanAction, savePlanAction } from "./actions";
 import type { DestinationSummary, PlanSummary } from "./types";
 import { BACKUP_EVERY_OPTIONS, MAX_KEEP_DAYS, MAX_KEEP_LAST } from "@/lib/backups/policy";
@@ -52,6 +53,7 @@ export function PlansPanel({
     const tc = useTranslations("components");
     const [editing, setEditing] = useState<PlanSummary | "new" | null>(null);
     const [removing, setRemoving] = useState<PlanSummary | null>(null);
+    const [sharing, setSharing] = useState<PlanSummary | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     // Catches its own failure: an error thrown out of a Server Action is rethrown
@@ -112,24 +114,39 @@ export function PlansPanel({
                                             {everyLabel(t, plan.every)}
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => setEditing(plan)}
-                                        >
-                                            {t("plans.edit")}
-                                        </Button>
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            aria-label={t("plans.deleteNamed", { name: plan.name })}
-                                            title={t("plans.delete")}
-                                            onClick={() => setRemoving(plan)}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </Button>
-                                    </div>
+                                    {plan.shared ? (
+                                        <Badge variant="neutral">{t("plans.sharedWithYou")}</Badge>
+                                    ) : (
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                aria-label={t("plans.share")}
+                                                title={t("plans.share")}
+                                                onClick={() => setSharing(plan)}
+                                            >
+                                                <Share2 className="size-4" />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => setEditing(plan)}
+                                            >
+                                                {t("plans.edit")}
+                                            </Button>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                aria-label={t("plans.deleteNamed", {
+                                                    name: plan.name
+                                                })}
+                                                title={t("plans.delete")}
+                                                onClick={() => setRemoving(plan)}
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                     {t("plans.keeps", {
@@ -164,6 +181,18 @@ export function PlansPanel({
                     destinations={destinations}
                     onClose={() => setEditing(null)}
                     onSaved={onChanged}
+                />
+            ) : null}
+
+            {sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) setSharing(null);
+                    }}
+                    subject="backup.plan"
+                    subjectId={sharing.id}
+                    name={sharing.name}
                 />
             ) : null}
 

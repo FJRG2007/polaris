@@ -281,3 +281,17 @@ export async function requirePlacement(
         throw new NoteAccessError("That folder is on a different notebook");
     }
 }
+
+/**
+ * A note shared with this actor on its own (`note.note`), and what the grant
+ * allows: "view" opens it, "edit" also changes its title and text. Null when
+ * nothing is. Never consulted by moving, archiving, deleting or sharing a note,
+ * which stay with whoever reaches it on its shelf.
+ */
+export async function sharedNote(
+    actor: NoteActor,
+    noteId: string
+): Promise<"view" | "edit" | null> {
+    const held = await grantedCapability(actor.id, "note.note", noteId);
+    return held === "edit" || held === "view" ? held : null;
+}

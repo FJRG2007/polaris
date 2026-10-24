@@ -75,6 +75,8 @@
         "bringIn": "Bring them in"
     },
     "view": {
+        "sharedWithYou": "Shared with you",
+        "publicLink": "Public link",
         "emptyTitle": "Pick a note, or write a new one.",
         "emptyDescription": "Your own notes are yours alone. A notebook is shared with the people on it.",
         "breadcrumb": "Where this note sits",

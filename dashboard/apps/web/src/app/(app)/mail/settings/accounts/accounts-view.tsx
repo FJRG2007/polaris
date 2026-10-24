@@ -25,6 +25,7 @@
  */
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { SendCheck } from "./send-check";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -38,7 +39,23 @@ import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { Button, ConfirmDeleteDialog, Select, Switch, cn, useToast } from "@polaris/ui";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
-import { AlertTriangle, CheckCircle2, Mail, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+    AlertTriangle,
+    CheckCircle2,
+    Mail,
+    Pencil,
+    Plus,
+    RefreshCw,
+    Share2,
+    Trash2
+} from "lucide-react";
+
+// Loaded on demand: the dialog reads the session's environment, which a test
+// that renders this screen does not have.
+const ShareDialog = dynamic(
+    () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
+    { ssr: false }
+);
 import {
     editAccountAction,
     removeAccountAction,
@@ -131,7 +148,9 @@ export function AccountsView({
     const shown = accounts
         .filter((account) => !removed.includes(account.id))
         .map((account) => ({ ...account, ...pending[account.id] }));
-    const editedAccount = editing ? accounts.find((account) => account.id === editing.id) : undefined;
+    const editedAccount = editing
+        ? accounts.find((account) => account.id === editing.id)
+        : undefined;
 
     function closeEditor(): void {
         setEditing(null);
@@ -144,12 +163,16 @@ export function AccountsView({
         <div className="space-y-4">
             {outcome === "linked" ? (
                 <p className="rounded-md border border-border bg-card px-3 py-2 text-[13px] text-muted-foreground">
-                    {t("accounts.linked", { provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google" })}
+                    {t("accounts.linked", {
+                        provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google"
+                    })}
                 </p>
             ) : null}
             {outcome === "not_public" ? (
                 <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
-                    {t("accounts.notPublic", { provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google" })}{" "}
+                    {t("accounts.notPublic", {
+                        provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google"
+                    })}{" "}
                     {canSetDomain ? (
                         <Link href="/admin/domains" className="underline">
                             {t("accounts.givePublic")}
@@ -160,7 +183,9 @@ export function AccountsView({
                 </p>
             ) : outcome === "wrong_account" ? (
                 <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-[13px]">
-                    {t("accounts.wrongAccount", { provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google" })}
+                    {t("accounts.wrongAccount", {
+                        provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google"
+                    })}
                 </p>
             ) : outcome && outcome !== "linked" ? (
                 <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
@@ -170,7 +195,9 @@ export function AccountsView({
 
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-[15px] font-semibold tracking-tight">{t("accounts.title")}</h2>
+                    <h2 className="text-[15px] font-semibold tracking-tight">
+                        {t("accounts.title")}
+                    </h2>
                     <p className="text-[13px] text-muted-foreground">{t("accounts.lead")}</p>
                 </div>
                 <Button onClick={() => setAdding(true)}>
@@ -183,7 +210,9 @@ export function AccountsView({
                 <div className="rounded-md border border-dashed border-border px-4 py-8 text-center">
                     <Mail className="mx-auto size-5 shrink-0 text-foreground-subtle" aria-hidden />
                     <p className="mt-2 text-[13px] font-medium">{t("noMailboxes.title")}</p>
-                    <p className="mt-1 text-[13px] text-muted-foreground">{t("accounts.emptyBody")}</p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                        {t("accounts.emptyBody")}
+                    </p>
                 </div>
             ) : (
                 <ul className="space-y-2">
@@ -191,7 +220,9 @@ export function AccountsView({
                         <AccountRow
                             key={account.id}
                             account={account}
-                            onEdit={(focusPassword) => setEditing({ id: account.id, focusPassword })}
+                            onEdit={(focusPassword) =>
+                                setEditing({ id: account.id, focusPassword })
+                            }
                             onRemoved={(gone) =>
                                 setRemoved((held) =>
                                     gone
@@ -265,6 +296,7 @@ function AccountRow({
     const tm = useTranslations("mail");
     const [busy, startBusy] = useBusy();
     const [removing, setRemoving] = useState(false);
+    const [sharing, setSharing] = useState(false);
     const [unified, setUnified] = useState(account.unified);
     const [notify, setNotify] = useState(account.notify);
     const [trashDays, setTrashDays] = useState(account.trashKeepDays);
@@ -323,7 +355,9 @@ function AccountRow({
 
                 {refused ? (
                     <Button size="sm" variant="outline" onClick={() => onEdit(true)}>
-                        {account.auth === "oauth" ? tm("refused.reconnect") : tm("refused.updatePassword")}
+                        {account.auth === "oauth"
+                            ? tm("refused.reconnect")
+                            : tm("refused.updatePassword")}
                     </Button>
                 ) : null}
 
@@ -361,7 +395,9 @@ function AccountRow({
                         onChange={(next) => {
                             setNotify(next);
                             startBusy(async () => {
-                                const answer = await editAccountAction(account.id, { notify: next });
+                                const answer = await editAccountAction(account.id, {
+                                    notify: next
+                                });
                                 const said = refusalOf(answer);
                                 if (said) {
                                     setNotify(!next);
@@ -445,6 +481,15 @@ function AccountRow({
                 <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={t("accounts.share")}
+                    title={t("accounts.share")}
+                    onClick={() => setSharing(true)}
+                >
+                    <Share2 className="size-4 shrink-0" aria-hidden />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
                     aria-label={t("accounts.remove")}
                     title={t("accounts.remove")}
                     onClick={() => setRemoving(true)}
@@ -457,6 +502,15 @@ function AccountRow({
                 send a message that cannot be sent and report the refusal the
                 line above already states. */}
             {refused ? null : <SendCheck accountId={account.id} />}
+            {sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(next: boolean) => (next ? undefined : setSharing(false))}
+                    subject="mail.mailbox"
+                    subjectId={account.id}
+                    name={account.address}
+                />
+            ) : null}
 
             {removing ? (
                 <ConfirmDeleteDialog
@@ -477,9 +531,15 @@ function AccountRow({
                     // go with it.
                     question={t.rich("accounts.removeQuestion", {
                         address: account.address,
-                        strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                        strong: (chunks) => (
+                            <span key="name" className="font-medium text-foreground">
+                                {chunks}
+                            </span>
+                        )
                     })}
-                    description={t("accounts.removeBody", { oauth: account.auth === "oauth" ? "yes" : "no" })}
+                    description={t("accounts.removeBody", {
+                        oauth: account.auth === "oauth" ? "yes" : "no"
+                    })}
                     confirmLabel={t("accounts.removeConfirm")}
                     onConfirm={() => {
                         setRemoving(false);
@@ -492,7 +552,9 @@ function AccountRow({
                                 toast.show({ title: said });
                                 return;
                             }
-                            toast.show({ title: t("accounts.removed", { address: account.address }) });
+                            toast.show({
+                                title: t("accounts.removed", { address: account.address })
+                            });
                             router.refresh();
                         })();
                     }}
@@ -514,10 +576,14 @@ function stateSentence(
         // server's.
         return account.auth === "oauth"
             ? t("accounts.state.oauthRefused", {
-                  detail: account.stateDetail ? mailRefusalText(tm, account.stateDetail) : t("accounts.state.oauthDefault")
+                  detail: account.stateDetail
+                      ? mailRefusalText(tm, account.stateDetail)
+                      : t("accounts.state.oauthDefault")
               })
             : t("accounts.state.passwordRefused", {
-                  detail: account.stateDetail ? mailRefusalText(tm, account.stateDetail) : t("accounts.state.passwordDefault")
+                  detail: account.stateDetail
+                      ? mailRefusalText(tm, account.stateDetail)
+                      : t("accounts.state.passwordDefault")
               });
     }
     if (account.state === "unreachable") return tm("rail.unreachable");

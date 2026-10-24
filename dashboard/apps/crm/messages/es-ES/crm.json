@@ -404,6 +404,8 @@
         "failed": "No se pudo exportar"
     },
     "record": {
+        "share": "Compartir",
+        "sharedWithYou": "Compartido contigo",
         "open": "Abrir registro",
         "openPage": "Abrir en página",
         "untitled": "Sin nombre",
@@ -685,6 +687,8 @@
     },
     "dashboards": {
         "title": "Paneles",
+        "share": "Compartir panel",
+        "sharedWithYou": "Compartido contigo",
         "picker": "Elegir un panel",
         "create": "Nuevo panel",
         "rename": "Renombrar panel",

@@ -33,6 +33,9 @@
         "sleeping": "Polar, asleep"
     },
     "history": {
+        "projectShare": "Share this project",
+        "projectShared": "Shared with you",
+        "projectCopy": "Make a copy of your own",
         "running": "Answering now",
         "waiting": "Needs your approval",
         "unread": "Unread answer",

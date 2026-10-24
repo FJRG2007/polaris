@@ -37,6 +37,11 @@ vi.mock("@polaris/db", () => {
     };
 });
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
+// Who the alarm was shared with is dropped after it; not what is under test.
+vi.mock("@/lib/access/grants", () => ({
+    dropGrantsFor: async () => undefined,
+    grantedSubjects: async () => new Map()
+}));
 vi.mock("@/lib/automations/runner", () => ({
     mayReadShelf: async () => true,
     mayEditShelf: async () => true,

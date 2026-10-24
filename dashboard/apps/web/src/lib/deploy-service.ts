@@ -43,7 +43,7 @@ import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { projectEntryWhere } from "./deploy-project-access";
 import { releaseEnvFor, releaseImageFor } from "./app-extensions/registry";
 import { findApp } from "@/lib/apps/catalog";
-import { dropGrantsOfGoneDomains } from "@/lib/access/grants";
+import { dropGrantsFor, dropGrantsOfGoneDomains } from "@/lib/access/grants";
 import { speaksHttp } from "@/lib/deploy/portless";
 import { removeHostVolume } from "@/lib/deploy/host-volumes";
 import { appDataVolumeNames, noteAppDeleted } from "@/lib/deploy/host-resources";
@@ -2764,6 +2764,7 @@ export async function deleteApplication(
         });
     }
     await prisma.application.delete({ where: { id: applicationId } });
+    await dropGrantsFor("analytics.site", applicationId).catch(() => undefined);
     await dropGrantsOfGoneDomains().catch(() => undefined);
     // The folder it was built from, when it was uploaded rather than cloned.
     await sourceUpload.forgetUploadedSources(applicationId).catch(() => undefined);

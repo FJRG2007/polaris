@@ -13,6 +13,9 @@ import "@/lib/app-host/server";
 import type { Metadata } from "next";
 import { UpsGuest } from "./ups-guest";
 import { StatusGuest } from "./status-guest";
+import { ConnectivityGuest } from "./connectivity-guest";
+import { connectivityReport } from "@/lib/connectivity/outage-tracker";
+import { sharedConnectivityReport } from "@/lib/connectivity/access";
 import { notFound } from "next/navigation";
 import { linkReach } from "@/lib/access/grants";
 import { upsGuestView } from "@/lib/ups/ups-guest";
@@ -70,6 +73,17 @@ export default async function GuestLinkPage(props: AppPageProps) {
         return (
             <PublicShell>
                 <StatusGuest view={view} />
+            </PublicShell>
+        );
+    }
+    if (reached.subjectType === "watch.connectivity") {
+        const report = sharedConnectivityReport(await connectivityReport());
+        return (
+            <PublicShell>
+                <ConnectivityGuest
+                    report={report}
+                    until={reached.grant.until?.toISOString() ?? null}
+                />
             </PublicShell>
         );
     }

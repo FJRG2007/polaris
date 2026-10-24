@@ -21,7 +21,8 @@
     },
     "servers": {
         "description": "La carga de cada servidor al que llega Polaris, leída de la propia máquina.",
-        "listLabel": "servidores"
+        "listLabel": "servidores",
+        "sharedWithYou": "Compartido contigo"
     },
     "services": {
         "description": "Todos los servicios desplegados, con su consumo de la última hora.",
@@ -94,7 +95,9 @@
         "routeInApp": "En la app",
         "routeEmail": "Correo",
         "carried": "Movida a Automatizaciones, que te avisa ahora.",
-        "carriedOpen": "Abrirla"
+        "carriedOpen": "Abrirla",
+        "share": "Dar acceso",
+        "sharedWithYou": "Compartida contigo"
     },
     "notices": {
         "alarm": "Alarma: {name}",
@@ -224,6 +227,8 @@
         "description": "Cada vez que Polaris perdió la conexión o no se podía llegar a él desde fuera, y cuánto duró.",
         "checkNow": "Comprobar",
         "checking": "Comprobando",
+        "share": "Dar acceso",
+        "sharedWithYou": "Compartido contigo",
         "kinds": {
             "line": "Línea",
             "dns": "DNS",

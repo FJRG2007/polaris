@@ -68,7 +68,7 @@ import {
 } from "@polaris/ui";
 
 /** The capabilities this dialog has words for, as `share.capabilities.<id>`. */
-const CAPABILITIES = new Set(["guest", "member", "admin", "view", "control"]);
+const CAPABILITIES = new Set(["guest", "member", "admin", "view", "control", "edit"]);
 
 /** What a standing looks like beside a row. Only `live` is quiet: the other four
  *  are the reason somebody is looking. */
@@ -88,6 +88,7 @@ export function ShareDialog({
     subjectId,
     name,
     bounded = false,
+    principals = core.subjectPrincipals(subject),
     extra
 }: {
     open: boolean;
@@ -99,6 +100,9 @@ export function ShareDialog({
     /** Whether hours, dates and a number of uses mean anything here. They do for
      *  a door and a camera; they do not for a conversation. */
     bounded?: boolean;
+    /** Who it may be shared with, where the app keeps the others itself - a
+     *  calendar's people and teams live in the Calendar's own share list. */
+    principals?: readonly core.GrantPrincipal[];
     /**
      * Anything the thing being shared has of its own, under the grants.
      *
@@ -147,7 +151,7 @@ export function ShareDialog({
     const actionLabel = (one: string) => t(`share.actions.${one}` as NamespaceKey<"components">);
     // Who it goes to: a person, a team, a role - or, for what may be handed out
     // that way, a link anybody can open with no account.
-    const [kind, setKind] = useState<core.GrantPrincipal | "link">("user");
+    const [kind, setKind] = useState<core.GrantPrincipal | "link">(principals[0] ?? "user");
     const [principalId, setPrincipalId] = useState("");
     const [query, setQuery] = useState("");
     const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
@@ -493,19 +497,21 @@ export function ShareDialog({
                             }
                         }}
                         options={[
-                            { value: "user", label: t("share.person") },
-                            {
-                                value: "team",
-                                label: t("share.team"),
-                                disabled: !candidates.some((one) => one.type === "team"),
-                                title: t("share.teamHint")
-                            },
-                            {
-                                value: "role",
-                                label: t("share.role"),
-                                disabled: !candidates.some((one) => one.type === "role"),
-                                title: t("share.roleHint")
-                            },
+                            ...[
+                                { value: "user" as const, label: t("share.person") },
+                                {
+                                    value: "team" as const,
+                                    label: t("share.team"),
+                                    disabled: !candidates.some((one) => one.type === "team"),
+                                    title: t("share.teamHint")
+                                },
+                                {
+                                    value: "role" as const,
+                                    label: t("share.role"),
+                                    disabled: !candidates.some((one) => one.type === "role"),
+                                    title: t("share.roleHint")
+                                }
+                            ].filter((option) => principals.includes(option.value)),
                             ...(linkable
                                 ? [
                                       {

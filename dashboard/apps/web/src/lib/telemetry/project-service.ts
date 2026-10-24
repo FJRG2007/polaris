@@ -60,6 +60,8 @@ export interface ProjectSummary {
     readonly retentionDays: number;
     readonly deployProjectId: string | null;
     readonly orgId: string | null;
+    /** Read through a share rather than owned: its issues only, nothing to change. */
+    readonly shared: boolean;
     /** Unresolved issues, which is the only number the list needs. */
     readonly openIssues: number;
     readonly lastSeen: string | null;
@@ -161,16 +163,21 @@ export function dsnFor(project: { number: number; publicKey: string }, origin: s
 }
 
 /** Which projects this account may read. An instance administrator sees them
- *  all, which is what makes Polaris' own project reachable at all. */
+ *  all, which is what makes Polaris' own project reachable at all. `lent` are
+ *  the projects shared with this account (`telemetry.project`), listed beside
+ *  its own whatever shelf they sit on. */
 export async function listProjects(
     actor: TelemetryActor,
-    orgId: string | null
+    orgId: string | null,
+    lent: ReadonlySet<string> = new Set()
 ): Promise<ProjectSummary[]> {
+    const own = actor.isAdmin ? { orgId } : { ownerId: actor.id, orgId };
     const rows = await prisma.telemetryProject.findMany({
-        where: actor.isAdmin ? { orgId } : { ownerId: actor.id, orgId },
+        where: lent.size > 0 ? { OR: [own, { id: { in: [...lent] } }] } : own,
         orderBy: [{ system: "desc" }, { name: "asc" }],
         select: {
             id: true,
+            ownerId: true,
             number: true,
             name: true,
             slug: true,
@@ -200,29 +207,43 @@ export async function listProjects(
             }
         }
     });
-    return rows.map((row) => ({
-        id: row.id,
-        number: row.number,
-        name: row.name,
-        slug: row.slug,
-        platform: row.platform,
-        publicKey: row.publicKey,
-        enabled: row.enabled,
-        system: row.system,
-        retentionDays: row.retentionDays,
-        deployProjectId: row.deployProjectId,
-        orgId: row.orgId,
-        openIssues: row.issues.length,
-        lastSeen: row.issues[0]?.lastSeen.toISOString() ?? null,
-        rules: rulesOf(row),
-        refused: {
-            count: row.refusedCount,
-            at: row.refusedAt?.toISOString() ?? null,
-            ip: row.refusedIp,
-            agent: row.refusedAgent,
-            reason: (row.refusedReason as core.IngestRefusal) ?? null
-        }
-    }));
+    return rows.map((row) => {
+        const shared = !actor.isAdmin && row.ownerId !== actor.id;
+        return {
+            id: row.id,
+            number: row.number,
+            name: row.name,
+            slug: row.slug,
+            platform: row.platform,
+            publicKey: row.publicKey,
+            enabled: row.enabled,
+            system: row.system,
+            retentionDays: row.retentionDays,
+            deployProjectId: row.deployProjectId,
+            orgId: row.orgId,
+            shared,
+            openIssues: row.issues.length,
+            lastSeen: row.issues[0]?.lastSeen.toISOString() ?? null,
+            // Who may report and who was turned away name addresses and agents:
+            // the owner's business, not a reader's.
+            rules: shared
+                ? rulesOf({
+                      ...row,
+                      allowedCidrs: "[]",
+                      allowedUserAgents: "[]",
+                      deniedUserAgents: "[]",
+                      secretTail: null
+                  })
+                : rulesOf(row),
+            refused: {
+                count: row.refusedCount,
+                at: row.refusedAt?.toISOString() ?? null,
+                ip: shared ? null : row.refusedIp,
+                agent: shared ? null : row.refusedAgent,
+                reason: (row.refusedReason as core.IngestRefusal) ?? null
+            }
+        };
+    });
 }
 
 /**
@@ -328,7 +349,10 @@ export interface IngestProject {
  * What comes back with it is the rules, so admission is decided from one read
  * rather than two.
  */
-export async function projectForIngest(number: number, publicKey: string): Promise<IngestProject | null> {
+export async function projectForIngest(
+    number: number,
+    publicKey: string
+): Promise<IngestProject | null> {
     const project = await prisma.telemetryProject.findUnique({
         where: { number },
         select: {
@@ -398,7 +422,13 @@ export async function recordRefusal(
 export async function clearRefusals(projectId: string): Promise<void> {
     await prisma.telemetryProject.update({
         where: { id: projectId },
-        data: { refusedCount: 0, refusedAt: null, refusedIp: null, refusedAgent: null, refusedReason: null }
+        data: {
+            refusedCount: 0,
+            refusedAt: null,
+            refusedIp: null,
+            refusedAgent: null,
+            refusedReason: null
+        }
     });
 }
 
@@ -507,11 +537,22 @@ export class TelemetryAccessError extends Error {
  * Ownership, plus every instance administrator - which is how Polaris' own
  * project is reachable at all, since it belongs to whoever installed the box and
  * the failures in it are the operator's business rather than that person's.
+ * `lent` lets a project shared with this account through, which only the
+ * reads pass: everything that changes a project asks without it.
  */
 export async function requireProject(
     actor: TelemetryActor,
-    projectId: string
-): Promise<{ id: string; name: string; number: number; publicKey: string; system: boolean; retentionDays: number; enabled: boolean }> {
+    projectId: string,
+    lent: ReadonlySet<string> = new Set()
+): Promise<{
+    id: string;
+    name: string;
+    number: number;
+    publicKey: string;
+    system: boolean;
+    retentionDays: number;
+    enabled: boolean;
+}> {
     const project = await prisma.telemetryProject.findUnique({
         where: { id: projectId },
         select: {
@@ -526,7 +567,9 @@ export async function requireProject(
         }
     });
     if (!project) throw new TelemetryAccessError("That project no longer exists");
-    if (!actor.isAdmin && project.ownerId !== actor.id) throw new TelemetryAccessError();
+    if (!actor.isAdmin && project.ownerId !== actor.id && !lent.has(project.id)) {
+        throw new TelemetryAccessError();
+    }
     const { ownerId, ...rest } = project;
     void ownerId;
     return rest;

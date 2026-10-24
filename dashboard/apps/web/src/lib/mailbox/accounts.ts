@@ -529,6 +529,9 @@ export async function removeAccount(userId: string, accountId: string): Promise<
     await removeAccountUploads(accountId).catch(() => undefined);
     await prisma.mailAccount.delete({ where: { id: accountId } });
     await settleRefusalNotices(account.userId, accountId);
+    // Whoever it was lent to stops reading it with it.
+    const { dropGrantsFor } = await import("@/lib/access/grants");
+    await dropGrantsFor("mail.mailbox", accountId);
     await recordAudit({
         actorId: userId,
         action: "mail.account.remove",

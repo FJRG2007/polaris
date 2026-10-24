@@ -15,7 +15,8 @@ import { alarmInputSchema } from "@/lib/watch/watch-schema";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { alarmStateWord, metricWord, thresholdWords, watchText } from "@/lib/watch/words";
-import { Activity, Bell, BellOff, Loader2, Plus, Trash2 } from "lucide-react";
+import { Activity, Bell, BellOff, Loader2, Plus, Share2, Trash2 } from "lucide-react";
+import { ShareDialog } from "@/components/access/share-dialog";
 import type { AlarmEventView, AlarmTargets, AlarmView } from "@/lib/watch-service";
 import { createAlarmAction, deleteAlarmAction, setAlarmEnabledAction } from "./actions";
 import {
@@ -65,6 +66,7 @@ export function WatchView({
     const format = useDisplayFormat();
     const t = useTranslations("watch");
     const [creating, setCreating] = useState(false);
+    const [sharing, setSharing] = useState<AlarmView | null>(null);
 
     const targetName = useMemo(() => {
         const map = new Map<string, string>();
@@ -136,6 +138,7 @@ export function WatchView({
                                                 {t("alarms.line", {
                                                     target:
                                                         targetName.get(alarm.targetId) ??
+                                                        alarm.targetLabel ??
                                                         t("alarms.unknownTarget"),
                                                     summary: describe(alarm)
                                                 })}
@@ -159,7 +162,12 @@ export function WatchView({
                                                 {alarmStateWord(t, alarm.state)}
                                             </Badge>
                                         )}
-                                        {!alarm.carriedToId && (
+                                        {alarm.shared && (
+                                            <Badge variant="neutral">
+                                                {t("alarms.sharedWithYou")}
+                                            </Badge>
+                                        )}
+                                        {!alarm.carriedToId && !alarm.shared && (
                                             <Switch
                                                 checked={alarm.enabled}
                                                 onChange={(next) =>
@@ -174,24 +182,48 @@ export function WatchView({
                                                 }
                                             />
                                         )}
-                                        <button
-                                            type="button"
-                                            aria-label={t("alarms.delete")}
-                                            className="text-muted-foreground hover:text-danger"
-                                            onClick={() =>
-                                                void deleteAlarmAction(alarm.id).then(() =>
-                                                    router.refresh()
-                                                )
-                                            }
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </button>
+                                        {!alarm.shared && (
+                                            <button
+                                                type="button"
+                                                aria-label={t("alarms.share")}
+                                                title={t("alarms.share")}
+                                                className="text-muted-foreground hover:text-foreground"
+                                                onClick={() => setSharing(alarm)}
+                                            >
+                                                <Share2 className="size-4" />
+                                            </button>
+                                        )}
+                                        {!alarm.shared && (
+                                            <button
+                                                type="button"
+                                                aria-label={t("alarms.delete")}
+                                                className="text-muted-foreground hover:text-danger"
+                                                onClick={() =>
+                                                    void deleteAlarmAction(alarm.id).then(() =>
+                                                        router.refresh()
+                                                    )
+                                                }
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </CardBody>
                             </Card>
                         ))}
                     </div>
                 )}
+                {sharing ? (
+                    <ShareDialog
+                        open
+                        onOpenChange={(open) => {
+                            if (!open) setSharing(null);
+                        }}
+                        subject="watch.alarm"
+                        subjectId={sharing.id}
+                        name={sharing.name}
+                    />
+                ) : null}
             </section>
 
             <section className="flex flex-col gap-3">

@@ -591,6 +591,10 @@
             "control": {
                 "label": "Puede manejar",
                 "hint": "Abrirlo, cerrarlo y accionarlo, además de verlo."
+            },
+            "edit": {
+                "label": "Puede editar",
+                "hint": "Cambiarlo y mantenerlo al día. No borrarlo."
             }
         },
         "standings": {

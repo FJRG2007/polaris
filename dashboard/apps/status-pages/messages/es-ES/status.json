@@ -8,6 +8,7 @@
     },
     "errors": {
         "generic": "No ha funcionado. Vuelve a intentarlo en un momento.",
+        "notAllowed": "No tienes acceso a esta página de estado.",
         "checkInput": "Algunos campos no son válidos. Revísalos y vuelve a intentarlo.",
         "pageGone": "Esta página de estado ya no existe.",
         "incidentGone": "Esta incidencia ya no existe.",
@@ -30,9 +31,11 @@
         "emptyTitle": "Sin páginas de estado",
         "emptyBody": "Crea una página, añade los servicios que muestra y publícala cuando esté lista.",
         "components": "{count} servicios",
-        "openIncidents": "{count} abiertas"
+        "openIncidents": "{count} abiertas",
+        "sharedWithYou": "Compartida contigo"
     },
     "page": {
+        "share": "Dar acceso",
         "headline": {
             "operational": "Todos los sistemas funcionan",
             "degraded": "Algunos sistemas van degradados",

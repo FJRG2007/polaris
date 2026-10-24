@@ -69,6 +69,8 @@ export interface MailContextValue {
      *  every client-side cache key, so one shelf's list is never drawn on the
      *  other's. */
     readonly shelf: string;
+    /** Whether somebody has let this person read a mailbox of theirs. */
+    readonly lent: boolean;
     /** Pull everything the server drew again. The answer to every live frame:
      *  one small query, against teaching the client to apply every kind of
      *  change to a shape the server already knows how to build. */
@@ -264,6 +266,7 @@ export function MailShell({
     viewerName,
     viewerId,
     shelf,
+    lent,
     children
 }: {
     accounts: MailAccountView[];
@@ -276,6 +279,7 @@ export function MailShell({
      *  see `mail-cache`. */
     viewerId: string;
     shelf: string;
+    lent: boolean;
     children: ReactNode;
 }) {
     // During render rather than in an effect, and on purpose: the screens inside
@@ -686,6 +690,7 @@ export function MailShell({
             unread: shownUnread,
             viewerName,
             shelf,
+            lent,
             refresh,
             reloadLists,
             refreshMailbox,
@@ -707,6 +712,7 @@ export function MailShell({
             shownUnread,
             viewerName,
             shelf,
+            lent,
             refresh,
             reloadLists,
             refreshMailbox,

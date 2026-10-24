@@ -28,7 +28,9 @@ import {
     points
 } from "./dns-insights";
 
-export function DnsHistoryCard() {
+/** `shared`: read by somebody an administrator shared the statistics with -
+ *  no devices, and the rows do not open the log. */
+export function DnsHistoryCard({ shared = false }: { shared?: boolean }) {
     const t = useTranslations("dnsBlocker");
     const router = useRouter();
     const [range, setRange] = useState<DnsHistoryRange>("30d");
@@ -120,27 +122,42 @@ export function DnsHistoryCard() {
                                 items={shown?.topPermitted}
                                 empty={t("insights.none")}
                                 hint={t("insights.filterDomain")}
-                                onPick={(search) => router.push(logHref({ search, range: "30d" }))}
+                                onPick={
+                                    shared
+                                        ? undefined
+                                        : (search) => router.push(logHref({ search, range: "30d" }))
+                                }
                             />
                             <TopList
                                 title={t("insights.topBlocked")}
                                 items={shown?.topBlocked}
                                 empty={t("insights.none")}
                                 hint={t("insights.filterDomain")}
-                                onPick={(search) =>
-                                    router.push(
-                                        logHref({ search, outcome: "blocked", range: "30d" })
-                                    )
+                                onPick={
+                                    shared
+                                        ? undefined
+                                        : (search) =>
+                                              router.push(
+                                                  logHref({
+                                                      search,
+                                                      outcome: "blocked",
+                                                      range: "30d"
+                                                  })
+                                              )
                                 }
                             />
-                            <TopList
-                                title={t("insights.topClients")}
-                                items={shown?.topClients}
-                                names={shown?.clientNames}
-                                empty={t("insights.none")}
-                                hint={t("insights.filterClient")}
-                                onPick={(client) => router.push(logHref({ client, range: "30d" }))}
-                            />
+                            {shared ? null : (
+                                <TopList
+                                    title={t("insights.topClients")}
+                                    items={shown?.topClients}
+                                    names={shown?.clientNames}
+                                    empty={t("insights.none")}
+                                    hint={t("insights.filterClient")}
+                                    onPick={(client) =>
+                                        router.push(logHref({ client, range: "30d" }))
+                                    }
+                                />
+                            )}
                             <ShareList
                                 title={t("insights.blockedBy")}
                                 items={shown?.blockedBy}

@@ -591,6 +591,10 @@
             "control": {
                 "label": "Can operate",
                 "hint": "Open, close and switch it, as well as see it."
+            },
+            "edit": {
+                "label": "Can change",
+                "hint": "Change it and keep it up to date. Not delete it."
             }
         },
         "standings": {

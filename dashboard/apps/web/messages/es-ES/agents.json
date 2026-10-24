@@ -234,6 +234,8 @@
         "start": "Iniciando el agente"
     },
     "session": {
+        "share": "Compartir sesión",
+        "sharedWithYou": "Compartida contigo",
         "events": {
             "sessionStart": "Iniciada",
             "prompt": "Pregunta",
