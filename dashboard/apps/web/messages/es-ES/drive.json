@@ -30,11 +30,13 @@
                 "name": "Nombre",
                 "created": "Creado el",
                 "modified": "Modificado",
-                "size": "Tamaño"
+                "size": "Tamaño",
+                "location": "Ubicación original",
+                "deleted": "Borrado el"
             },
-            "sortedReverse": "Ordenado por {column, select, name {nombre} created {fecha de creación} modified {última modificación} other {tamaño}}, {dir, select, asc {ascendente} other {descendente}}. Invertir.",
-            "sortBy": "Ordenar por {column, select, name {nombre} created {fecha de creación} modified {última modificación} other {tamaño}}",
-            "sorted": "Ordenado por {column, select, name {nombre} created {fecha de creación} modified {última modificación} other {tamaño}}, {dir, select, asc {ascendente} other {descendente}}",
+            "sortedReverse": "Ordenado por {column, select, name {nombre} created {fecha de creación} modified {última modificación} location {ubicación original} deleted {fecha de borrado} other {tamaño}}, {dir, select, asc {ascendente} other {descendente}}. Invertir.",
+            "sortBy": "Ordenar por {column, select, name {nombre} created {fecha de creación} modified {última modificación} location {ubicación original} deleted {fecha de borrado} other {tamaño}}",
+            "sorted": "Ordenado por {column, select, name {nombre} created {fecha de creación} modified {última modificación} location {ubicación original} deleted {fecha de borrado} other {tamaño}}, {dir, select, asc {ascendente} other {descendente}}",
             "title": "Ordenar",
             "ascending": "A-Z",
             "descending": "Z-A"
@@ -991,7 +993,11 @@
         "restore": "Restaurar",
         "deleteForever": "Borrar del todo",
         "root": "(raíz)",
-        "deletedAt": "- borrado <time></time>"
+        "openOriginalFolder": "Abrir carpeta original",
+        "selectionHint": "Selecciona elementos para restaurarlos o borrarlos del todo.",
+        "restoreItem": "Restaurar {name}",
+        "permanentlyDeleteItems": "¿Borrar para siempre {count, plural, one {# elemento} other {# elementos}}?",
+        "somethingWentWrong": "Algo ha fallado. Inténtalo de nuevo."
     },
     "send": {
         "searchForAPerson": "Buscar una persona",
