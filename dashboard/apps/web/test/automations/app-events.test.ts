@@ -132,7 +132,9 @@ describe("picker", () => {
                 "core.onEvent#gameServerStarted",
                 "core.onEvent#gameServerStopped",
                 "core.onEvent#gameServerCrashed",
-                "core.onEvent#playerJoined"
+                "core.onEvent#playerJoined",
+                "game-servers.action.power",
+                "game-servers.action.command"
             ]
         );
         for (const group of all)
@@ -143,8 +145,14 @@ describe("picker", () => {
                         core.CORE_NODE_CONFIGS["core.onEvent"].safeParse(picked?.config).success
                     ).toBe(true);
                 }
+        // Steps: an app's actions, and none of its events, where only a step fits.
         const steps = catalog.catalogGroups({ triggers: false, apps: ["deploy"] });
-        expect(steps.map((group) => group.id)).not.toContain("deploy");
+        expect(steps.find((group) => group.id === "deploy")!.items.map((i) => i.value)).toEqual([
+            "core.redeploy"
+        ]);
+        const bare = catalog.catalogGroups({ triggers: false, apps: [] });
+        expect(bare.map((group) => group.id)).not.toContain("deploy");
+        expect(bare.map((group) => group.id)).not.toContain("game-servers");
     });
 
     it("lists an installable app only when installed, and each app only with its permission", async () => {

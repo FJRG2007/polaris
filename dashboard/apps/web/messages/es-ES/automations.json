@@ -139,7 +139,8 @@
         "set": "Fijar valores",
         "message": "Publicar en un canal",
         "threshold": "Una lectura cruza un umbral",
-        "connectivity": "Internet se cae o vuelve"
+        "connectivity": "Internet se cae o vuelve",
+        "redeploy": "Redesplegar servicio"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -208,7 +209,13 @@
         "webhookReset": "Este webhook tiene un secreto nuevo y el paso dejó de publicar.",
         "webhookUseNew": "Seguir publicando",
         "webhookPostsAs": "Publica como {name}, marcado como bot.",
-        "webhookManage": "Ver webhooks"
+        "webhookManage": "Ver webhooks",
+        "service": "Servicio",
+        "servicePick": "Elige un servicio",
+        "serviceLoading": "Cargando servicios...",
+        "serviceNone": "Aún no tienes servicios.",
+        "serviceOpenDeploy": "Abrir Deploy",
+        "serviceGone": "Ese servicio ya no existe o no está a tu alcance."
     },
     "operators": {
         "eq": "igual a",
@@ -306,7 +313,15 @@
         "webhookReset": "El webhook tiene un secreto nuevo",
         "webhookForbidden": "Su dueño ya no lleva ese canal",
         "webhookLimited": "El webhook publicó mucho este minuto",
-        "noticeNotDelivered": "Ningún canal entregó el mensaje"
+        "noticeNotDelivered": "Ningún canal entregó el mensaje",
+        "gameServerForbidden": "La cuenta con la que se ejecuta no puede hacer eso en ese servidor",
+        "gameServerFailed": "El servidor no lo hizo",
+        "commandEmpty": "El comando quedó vacío",
+        "commandInvalid": "El comando debe ser una línea sin caracteres de control",
+        "commandTooLong": "El comando es más largo de lo que admite la consola",
+        "deployForbidden": "La cuenta con la que se ejecuta no puede desplegar ese servicio",
+        "deployFailed": "El despliegue no empezó",
+        "serviceGone": "Ese servicio ya no existe o no está a su alcance"
     },
     "secrets": {
         "title": "Secretos",
@@ -633,7 +648,8 @@
         "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso.",
         "message": "Publica en un canal mediante su webhook, como bot.",
         "threshold": "Empieza cuando una lectura de un servidor, servicio o SAI se pasa de un valor.",
-        "connectivity": "Empieza cuando la línea cae, vuelve, cambia de IP o deja de verse desde fuera."
+        "connectivity": "Empieza cuando la línea cae, vuelve, cambia de IP o deja de verse desde fuera.",
+        "redeploy": "Despliega un servicio de nuevo, como Redesplegar en su página."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -804,7 +820,9 @@
         "homeRun": "Lugares: ejecutar otro",
         "homePrivacy": "Lugares: privacidad",
         "missing": "Necesita una app que aquí no está instalada: no se puede cambiar ni ejecutar.",
-        "install": "Instalar la app"
+        "install": "Instalar la app",
+        "gameServerPower": "Juegos: arrancar, parar o reiniciar",
+        "gameServerCommand": "Juegos: enviar comando"
     },
     "filter": {
         "label": "Filtros",

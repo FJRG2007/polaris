@@ -1367,5 +1367,19 @@
             "noVolumes": "Este servidor no guarda archivos propios.",
             "unexpected": "No se pudo guardar. Vuelve a intentarlo."
         }
+    },
+    "automation": {
+        "server": "Servidor",
+        "serverPick": "Elige un servidor",
+        "serverLoading": "Cargando servidores...",
+        "serverNone": "No hay servidores que puedas gestionar.",
+        "serverGone": "Ese servidor ya no existe o perdiste el acceso.",
+        "power": "Acción",
+        "start": "Arrancar",
+        "stop": "Parar",
+        "restart": "Reiniciar",
+        "command": "Comando",
+        "commandHint": "Una línea, como en la consola. Puede usar valores de pasos anteriores.",
+        "consoleNone": "No hay servidores cuya consola puedas usar."
     }
 }

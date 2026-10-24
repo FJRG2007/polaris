@@ -840,10 +840,7 @@ export const CORE_NODE_CONFIGS = {
         body: text(AUTOMATION_LIMITS.textLength).min(1)
     }),
     "core.announce": z.object({
-        name: eventName.refine(
-            (value) => !isReservedEventName(value),
-            "eventNameReserved"
-        ),
+        name: eventName.refine((value) => !isReservedEventName(value), "eventNameReserved"),
         payload: valuePairs
     }),
     "core.try": z.object({
@@ -852,7 +849,9 @@ export const CORE_NODE_CONFIGS = {
     }),
     "core.waitCondition": waitConditionConfigSchema,
     "core.threshold": thresholdConfigSchema,
-    "core.connectivity": connectivityTriggerConfigSchema
+    "core.connectivity": connectivityTriggerConfigSchema,
+    /** Deploy a service again, as Redeploy on its page does. */
+    "core.redeploy": z.object({ applicationId: z.string().uuid("serviceRequired") })
 } as const;
 export type CoreNodeType = keyof typeof CORE_NODE_CONFIGS;
 export const CORE_NODE_TYPES = Object.keys(CORE_NODE_CONFIGS) as CoreNodeType[];
@@ -897,6 +896,7 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.message": { role: "action", ports: [], idempotent: false },
     // The event's dedupe key is the step's idempotency key.
     "core.announce": { role: "action", ports: [], idempotent: true },
+    "core.redeploy": { role: "action", ports: [], idempotent: false },
     "core.try": {
         role: "flow",
         ports: ["body", "then", "catch", "always"],

@@ -82,6 +82,12 @@ const APP_EVENT_PRESETS: Readonly<Record<core.AppEventApp, readonly PresetKey[]>
     calendar: ["calendarEventStarting"]
 };
 
+/** Each app's steps, in the order its group lists them. */
+const APP_STEPS: Readonly<Partial<Record<core.AppEventApp, readonly string[]>>> = {
+    "game-servers": ["game-servers.action.power", "game-servers.action.command"],
+    deploy: ["core.redeploy"]
+};
+
 const PLACES_TRIGGERS = ["time", "interval", "change", "stays", "threshold", "sun"].map(
     (kind) => `${PLACES_APP}.trigger.${kind}`
 );
@@ -159,6 +165,11 @@ export function catalogGroups(options: {
         { id: "automations", items: ["core.run", "core.announce"].map(plain) }
     );
     if (places) groups.push({ id: "places", items: PLACES_STEPS.map(plain) });
+    // An app's steps only where the app is here to do them; merged into its events' group.
+    for (const app of core.APP_EVENT_APPS) {
+        const steps = APP_STEPS[app];
+        if (steps && options.apps.includes(app)) groups.push({ id: app, items: steps.map(plain) });
+    }
     return mergeSame(groups);
 }
 

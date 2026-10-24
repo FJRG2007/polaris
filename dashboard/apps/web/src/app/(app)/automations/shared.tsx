@@ -28,6 +28,8 @@ import {
     MessageSquare,
     PhoneIncoming,
     Power,
+    Rocket,
+    SquareTerminal,
     Puzzle,
     Radio,
     Repeat,
@@ -226,7 +228,15 @@ const RUN_ERRORS = [
     "announceLimited",
     "announceFailed",
     "privacyFailed",
-    "camerasGone"
+    "camerasGone",
+    "gameServerForbidden",
+    "gameServerFailed",
+    "commandEmpty",
+    "commandInvalid",
+    "commandTooLong",
+    "deployForbidden",
+    "deployFailed",
+    "serviceGone"
 ] as const;
 
 /** A stored error code in the reader's words. */
@@ -270,7 +280,8 @@ const NODE_KEYS = {
     "core.set": "set",
     "core.announce": "announce",
     "core.try": "try",
-    "core.waitCondition": "waitCondition"
+    "core.waitCondition": "waitCondition",
+    "core.redeploy": "redeploy"
 } as const;
 
 /**
@@ -289,7 +300,9 @@ const APP_NODE_KEYS = {
     "home.action.wait": "homeWait",
     "home.action.notify": "homeNotify",
     "home.action.run": "homeRun",
-    "home.action.privacy": "homePrivacy"
+    "home.action.privacy": "homePrivacy",
+    "game-servers.action.power": "gameServerPower",
+    "game-servers.action.command": "gameServerCommand"
 } as const;
 
 type AppNodeKey = (typeof APP_NODE_KEYS)[keyof typeof APP_NODE_KEYS];
@@ -307,6 +320,9 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "home.action.notify": Bell,
     "home.action.run": Workflow,
     "home.action.privacy": EyeOff,
+    "game-servers.action.power": Power,
+    "game-servers.action.command": SquareTerminal,
+    "core.redeploy": Rocket,
     "core.manual": Hand,
     "core.schedule": Clock,
     "core.webhook": Webhook,

@@ -143,6 +143,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.answer": () => ({ outputs: [] }),
     "core.set": () => ({ values: [] }),
     "core.announce": () => ({ name: "", payload: [] }),
+    "core.redeploy": () => ({ applicationId: "" }),
     "core.chat": () => ({
         preset: "slack",
         secretId: "",
@@ -494,6 +495,8 @@ export function NodeFields({
             );
         case "core.message":
             return <ChatMessageFields config={config} set={set} />;
+        case "core.redeploy":
+            return <RedeployFields config={config} set={set} />;
         case "core.connectivity":
             return (
                 <Field label={t("connectivity.when")}>
@@ -906,6 +909,59 @@ function ChatMessageFields({ config, set }: { config: Config; set: (change: Conf
                     onChange={(event) => set({ body: event.target.value })}
                 />
             </Field>
+        </div>
+    );
+}
+
+/**
+ * Which service "Redeploy a service" deploys: the services the person editing
+ * runs. The run asks again, as the run-as account, whether it may deploy it.
+ */
+function RedeployFields({ config, set }: { config: Config; set: (change: Config) => void }) {
+    const t = useTranslations("automations");
+    const [services, setServices] = useState<readonly { id: string; name: string }[] | null>(null);
+    const [error, setError] = useState("");
+    useEffect(() => {
+        let cancelled = false;
+        void polls.thresholdChoices().then((answer) => {
+            if (cancelled) return;
+            if (answer.ok)
+                setServices(answer.kinds.find((kind) => kind.kind === "app")?.subjects ?? []);
+            else setError(answer.error);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+    const chosenId = typeof config.applicationId === "string" ? config.applicationId : "";
+    const missing =
+        services !== null && chosenId !== "" && !services.some((entry) => entry.id === chosenId);
+    return (
+        <div className="space-y-3">
+            <Field label={`${t("fields.service")} *`}>
+                <Select
+                    value={chosenId}
+                    onValueChange={(applicationId) => set({ applicationId })}
+                    options={(services ?? []).map((entry) => ({
+                        value: entry.id,
+                        label: entry.name
+                    }))}
+                    placeholder={t(
+                        services === null ? "fields.serviceLoading" : "fields.servicePick"
+                    )}
+                    aria-label={t("fields.service")}
+                />
+            </Field>
+            {error && <p className="text-xs text-danger-ink">{error}</p>}
+            {services !== null && services.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                    {t("fields.serviceNone")}{" "}
+                    <Link className="underline" href="/apps/deploy">
+                        {t("fields.serviceOpenDeploy")}
+                    </Link>
+                </p>
+            )}
+            {missing && <p className="text-xs text-danger-ink">{t("fields.serviceGone")}</p>}
         </div>
     );
 }

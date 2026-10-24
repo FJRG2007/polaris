@@ -139,7 +139,8 @@
         "set": "Set values",
         "message": "Post to a chat channel",
         "threshold": "A reading crosses a threshold",
-        "connectivity": "The internet goes down or comes back"
+        "connectivity": "The internet goes down or comes back",
+        "redeploy": "Redeploy a service"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -208,7 +209,13 @@
         "webhookReset": "This webhook was given a new secret, so the step stopped posting.",
         "webhookUseNew": "Keep posting with it",
         "webhookPostsAs": "Posts as {name}, marked as a bot.",
-        "webhookManage": "Manage webhooks"
+        "webhookManage": "Manage webhooks",
+        "service": "Service",
+        "servicePick": "Pick a service",
+        "serviceLoading": "Loading services...",
+        "serviceNone": "No services of yours yet.",
+        "serviceOpenDeploy": "Open Deploy",
+        "serviceGone": "That service is gone or out of reach."
     },
     "operators": {
         "eq": "equals",
@@ -306,7 +313,15 @@
         "webhookReset": "The chat webhook got a new secret",
         "webhookForbidden": "Its owner no longer runs that channel",
         "webhookLimited": "The webhook posted too much this minute",
-        "noticeNotDelivered": "No channel delivered the message"
+        "noticeNotDelivered": "No channel delivered the message",
+        "gameServerForbidden": "The account it runs as cannot do that on that server",
+        "gameServerFailed": "The server did not do it",
+        "commandEmpty": "The command came out empty",
+        "commandInvalid": "The command must be one line with no control characters",
+        "commandTooLong": "The command is longer than the console takes",
+        "deployForbidden": "The account it runs as cannot deploy that service",
+        "deployFailed": "The deploy did not start",
+        "serviceGone": "That service is gone or out of reach"
     },
     "secrets": {
         "title": "Secrets",
@@ -633,7 +648,8 @@
         "set": "Work values out once. Later steps pick them from this step's values.",
         "message": "Post in a space channel through its webhook, as a bot.",
         "threshold": "Starts when a server, service or UPS reading stays past a value.",
-        "connectivity": "Starts when the line drops, returns, changes address or stops being reachable."
+        "connectivity": "Starts when the line drops, returns, changes address or stops being reachable.",
+        "redeploy": "Deploy a service again, as Redeploy on its page does."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -804,7 +820,9 @@
         "homeRun": "Places: run another",
         "homePrivacy": "Places: camera privacy",
         "missing": "Needs an app that is not installed here, so it cannot be changed or run.",
-        "install": "Install the app"
+        "install": "Install the app",
+        "gameServerPower": "Game servers: start, stop or restart",
+        "gameServerCommand": "Game servers: send a command"
     },
     "filter": {
         "label": "Filters",

@@ -1367,5 +1367,19 @@
             "noVolumes": "This server keeps no files of its own.",
             "unexpected": "That couldn't be saved. Try again."
         }
+    },
+    "automation": {
+        "server": "Server",
+        "serverPick": "Choose a server",
+        "serverLoading": "Loading servers...",
+        "serverNone": "No servers you can manage here.",
+        "serverGone": "That server is gone or you lost access to it.",
+        "power": "Action",
+        "start": "Start",
+        "stop": "Stop",
+        "restart": "Restart",
+        "command": "Command",
+        "commandHint": "One line, as typed in the console. It can use values from earlier steps.",
+        "consoleNone": "No servers whose console you can use."
     }
 }
