@@ -8,12 +8,20 @@ import { connections } from "../fixtures/drive";
 import type { SceneContext } from "../runtime/scene";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 
-function Marketplace({ ctx }: { ctx: SceneContext }) {
+function Marketplace({
+    ctx,
+    scope = "deployable"
+}: {
+    ctx: SceneContext;
+    /** Which marketplace: deployable apps, or Polaris's own (/admin/apps). */
+    scope?: "deployable" | "polaris";
+}) {
     return (
         <Chrome>
             <MarketplaceView
                 // The viewer runs this Polaris, so every app offers its install.
                 canInstall
+                scope={scope}
                 installed={[
                     {
                         id: id("app-install", 1),
@@ -54,7 +62,9 @@ export const marketplace = defineScene({
 /** Installing with a choice: which machine runs it, and where its data lives. */
 export const marketplaceInstall = defineScene({
     id: "marketplace-install",
-    path: "/apps/marketplace",
+    // Polaris's own apps: the ones that run something of their own, and so the
+    // ones with choices, are listed there.
+    path: "/admin/apps",
     actions: (ctx) => ({
         listInstallTargetsAction: () => [
             {
@@ -70,8 +80,7 @@ export const marketplaceInstall = defineScene({
                 .filter((connection) => connection.kind !== "personal")
                 .map((connection) => ({ id: connection.id, name: connection.name }))
     }),
-    render: (ctx) => <Marketplace ctx={ctx} />,
-    // The first app here that runs something of its own, so the one with choices.
+    render: (ctx) => <Marketplace ctx={ctx} scope="polaris" />,
     prepare: (ctx) => configureFirst(ctx)
 });
 
