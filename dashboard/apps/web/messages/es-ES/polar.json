@@ -813,8 +813,8 @@
             "active": "Trabajando en el objetivo",
             "idle": "Objetivo en pausa: sin avances en los últimos turnos",
             "unchecked": "Objetivo en pausa: la comprobación no respondió",
-            "met": "Objetivo cumplido",
-            "impossible": "El objetivo no se puede cumplir",
+            "met": "Cumplido",
+            "impossible": "Objetivo imposible",
             "limit": "Objetivo detenido en su límite"
         },
         "progress": "Turno {turns} de {max}, {minutes} de {limit} min, {tokens} tokens",
@@ -829,9 +829,9 @@
         "continued": "Siguió trabajando en el objetivo",
         "resumed": "Objetivo reanudado",
         "continue": "Seguir con el objetivo",
-        "clear": "Quitar objetivo",
+        "clear": "Quitar meta",
         "dismiss": "Descartar",
-        "cleared": "Objetivo quitado",
+        "cleared": "Meta quitada",
         "clearFailed": "No se pudo quitar el objetivo. Inténtalo de nuevo.",
         "none": "No hay objetivo. Escribe /goal y cuándo se da por terminado.",
         "tooLong": "Un objetivo puede tener hasta {max} caracteres."
