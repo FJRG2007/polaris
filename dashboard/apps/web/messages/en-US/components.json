@@ -97,6 +97,7 @@
     "publicShell": {
         "open": "Open Polaris",
         "signIn": "Sign in",
+        "anotherAccount": "Use another account",
         "unavailable": "Link unavailable"
     },
     "ui": {
@@ -603,7 +604,10 @@
             "expired": "Expired",
             "closed": "Outside its hours",
             "spent": "Used up",
-            "elsewhere": "Not from here"
+            "elsewhere": "Not from here",
+            "signin": "Needs sign-in",
+            "denied": "Not for this account",
+            "password": "Needs the password"
         },
         "stopTitle": "Stop sharing with {name}?",
         "stopBody": "{who} loses access to {what} at once. You can share it again afterward.",
@@ -698,7 +702,61 @@
             }
         },
         "checkIn": "Access from",
-        "checkOut": "Access until"
+        "checkOut": "Access until",
+        "addLabel": "Add people, teams or roles",
+        "addPlaceholder": "Add people, teams or roles",
+        "searching": "Searching",
+        "noMatch": "Nobody found",
+        "kinds": {
+            "user": "Person",
+            "team": "Team",
+            "role": "Role"
+        },
+        "unstage": "Remove {name}",
+        "notify": "Notify people",
+        "message": "Message",
+        "messagePlaceholder": "Add a message",
+        "cancel": "Cancel",
+        "peopleWithAccess": "People with access",
+        "peopleCount": "{count, plural, one {# with access} other {# with access}}",
+        "searchAccess": "Search people with access",
+        "you": "{name} (you)",
+        "youCan": "Can share",
+        "hasPassword": "Password",
+        "owner": "Owner",
+        "limits": "Limits",
+        "limitsOf": "Limits for {name}",
+        "removeAccess": "Remove access",
+        "save": "Save",
+        "nobodyMatches": "Nobody with access matches",
+        "loadFailed": "Could not load the rest.",
+        "retry": "Try again",
+        "tooMany": "Up to {count} at a time. Share these first.",
+        "roleOf": "Access for {name}",
+        "changed": "Access changed",
+        "general": "General access",
+        "audiences": {
+            "restricted": {
+                "label": "Restricted",
+                "hint": "Only people with access can open with the link"
+            },
+            "org": {
+                "label": "People in {org}",
+                "hint": "Anyone signed in to {org} with the link"
+            },
+            "anyone": {
+                "label": "Anyone with the link",
+                "hint": "No account needed to open it"
+            }
+        },
+        "audienceOf": "Who the link opens for",
+        "noLinks": "Only people with access can open it",
+        "anotherLink": "Add another link",
+        "linkRole": "Link access",
+        "copyHint": "Copies this page's address. It opens for people with access.",
+        "history": "History",
+        "back": "Back",
+        "done": "Done"
     },
     "environments": {
         "homeNat": {

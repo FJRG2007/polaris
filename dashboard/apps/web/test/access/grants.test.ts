@@ -26,15 +26,33 @@ let principalOrg = "org-a";
 const updateMany = vi.fn(async () => ({ count: 1 }));
 const update = vi.fn(async () => ({}));
 
+type GrantWhere = {
+    subjectType: string;
+    subjectId?: string;
+    OR?: { principalType: string; principalId: string | { in: string[] } }[];
+};
+
+/** The subject, and - when the read names them - only the caller's principals. */
+function grantMatches(grant: Record<string, unknown>, where: GrantWhere): boolean {
+    if (grant.subjectType !== where.subjectType) return false;
+    if (where.subjectId !== undefined && grant.subjectId !== where.subjectId) return false;
+    if (!where.OR) return true;
+    return where.OR.some(
+        (one) =>
+            grant.principalType === one.principalType &&
+            (typeof one.principalId === "string"
+                ? grant.principalId === one.principalId
+                : one.principalId.in.includes(String(grant.principalId)))
+    );
+}
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         accessGrant: {
-            findMany: async ({ where }: { where: { subjectType: string; subjectId?: string } }) =>
-                grants.filter(
-                    (grant) =>
-                        grant.subjectType === where.subjectType &&
-                        (where.subjectId === undefined || grant.subjectId === where.subjectId)
-                ),
+            findMany: async ({ where }: { where: GrantWhere }) =>
+                grants.filter((grant) => grantMatches(grant, where)),
+            findFirst: async ({ where }: { where: GrantWhere }) =>
+                grants.find((grant) => grantMatches(grant, where)) ?? null,
             findUnique: async ({ where }: { where: { id: string } }) =>
                 grants.find((grant) => grant.id === where.id) ?? null,
             updateMany,

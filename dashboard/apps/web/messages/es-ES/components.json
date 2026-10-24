@@ -97,6 +97,7 @@
     "publicShell": {
         "open": "Abrir Polaris",
         "signIn": "Entrar",
+        "anotherAccount": "Usar otra cuenta",
         "unavailable": "Enlace no disponible"
     },
     "ui": {
@@ -603,7 +604,10 @@
             "expired": "Caducado",
             "closed": "Fuera de horario",
             "spent": "Agotado",
-            "elsewhere": "No desde aquí"
+            "elsewhere": "No desde aquí",
+            "signin": "Sin sesión",
+            "denied": "No es para ti",
+            "password": "Pide contraseña"
         },
         "stopTitle": "¿Dejar de compartir con {name}?",
         "stopBody": "{who} pierde el acceso a {what} al momento. Puedes volver a compartirlo después.",
@@ -698,7 +702,61 @@
             }
         },
         "checkIn": "Acceso desde",
-        "checkOut": "Acceso hasta"
+        "checkOut": "Acceso hasta",
+        "addLabel": "Añadir personas, equipos o roles",
+        "addPlaceholder": "Personas, equipos o roles",
+        "searching": "Buscando",
+        "noMatch": "Sin resultados",
+        "kinds": {
+            "user": "Persona",
+            "team": "Equipo",
+            "role": "Rol"
+        },
+        "unstage": "Quitar a {name}",
+        "notify": "Avisarles",
+        "message": "Mensaje",
+        "messagePlaceholder": "Un mensaje",
+        "cancel": "Cancelar",
+        "peopleWithAccess": "Con acceso",
+        "peopleCount": "{count, plural, one {# con acceso} other {# con acceso}}",
+        "searchAccess": "Buscar entre quien tiene acceso",
+        "you": "{name} (tú)",
+        "youCan": "Comparte",
+        "hasPassword": "Contraseña",
+        "owner": "Dueño",
+        "limits": "Límites",
+        "limitsOf": "Límites de {name}",
+        "removeAccess": "Quitar acceso",
+        "save": "Guardar",
+        "nobodyMatches": "Nadie con acceso coincide",
+        "loadFailed": "No se pudo cargar el resto.",
+        "retry": "Reintentar",
+        "tooMany": "Hasta {count} a la vez. Comparte estos primero.",
+        "roleOf": "Acceso de {name}",
+        "changed": "Acceso cambiado",
+        "general": "Acceso general",
+        "audiences": {
+            "restricted": {
+                "label": "Restringido",
+                "hint": "Solo quien tiene acceso puede abrir el enlace"
+            },
+            "org": {
+                "label": "Personas de {org}",
+                "hint": "Quien entre en {org} y tenga el enlace"
+            },
+            "anyone": {
+                "label": "Quien tenga el enlace",
+                "hint": "No hace falta cuenta para abrirlo"
+            }
+        },
+        "audienceOf": "Para quién es el enlace",
+        "noLinks": "Solo abre quien tiene acceso",
+        "anotherLink": "Otro enlace",
+        "linkRole": "Rol del enlace",
+        "copyHint": "Copia la dirección de esta página. Abre para quien tiene acceso.",
+        "history": "Historial",
+        "back": "Volver",
+        "done": "Listo"
     },
     "environments": {
         "homeNat": {

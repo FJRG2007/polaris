@@ -26,18 +26,25 @@ import {
     requireMayShare,
     shareCandidates,
     subjectHref,
+    subjectOrg,
     subjectPlaceLocated,
     type GrantCandidate
 } from "@/lib/access/sharing-service";
-import { sharingBaseUrl } from "@/lib/domain-service";
+import { appBaseUrl, sharingBaseUrl } from "@/lib/domain-service";
 import { translatorFor } from "@/lib/i18n/translate";
 import { createNotification } from "@/lib/notification-service";
+import { subjectOwner, type SubjectOwner } from "@/lib/access/subject-owner";
 import {
     GrantError,
+    listSubjectGrantPage,
     listSubjectGrants,
     removeGrant,
+    setLinkAudience,
+    updateGrant,
     writeGrant,
+    writeGrants,
     writeGrantLink,
+    type GrantPage,
     type GrantView
 } from "@/lib/access/grants";
 
@@ -72,7 +79,9 @@ async function tellGrantee(
     sharer: { id: string; name?: string | null },
     subject: core.GrantSubject,
     subjectId: string,
-    userId: string
+    userId: string,
+    /** What the sharer wrote to go with it, shown under the notice. */
+    message = ""
 ): Promise<void> {
     if (userId === sharer.id) return;
     let words = translatorFor(core.DEFAULT_LOCALE, "common");
@@ -89,6 +98,7 @@ async function tellGrantee(
             name: sharer.name || words("share.somebody"),
             what: words(`share.subjects.${subject}`)
         }),
+        body: message || null,
         href: subjectHref(subject, subjectId),
         level: "info"
     });
@@ -107,7 +117,9 @@ function settled(subject: core.GrantSubject): void {
 
 export async function listGrantsAction(
     subject: string,
-    subjectId: string
+    subjectId: string,
+    /** Only grants to this kind of principal, every one of them. */
+    only?: string
 ): Promise<{
     grants?: GrantView[];
     candidates?: GrantCandidate[];
@@ -118,8 +130,14 @@ export async function listGrantsAction(
         const user = await requireUser();
         const kind = subjectOf(subject);
         await requireMayShare(user, kind, String(subjectId));
+        const principal = core.GRANT_PRINCIPALS.find((one) => one === only);
         const [grants, candidates, located] = await Promise.all([
-            listSubjectGrants(kind, String(subjectId)),
+            listSubjectGrants(
+                kind,
+                String(subjectId),
+                undefined,
+                principal ? [principal] : undefined
+            ),
             shareCandidates(user, kind, String(subjectId)),
             subjectPlaceLocated(kind, String(subjectId))
         ]);
@@ -216,7 +234,15 @@ export async function shareLinkAction(
                     (await getTranslations("common"))("share.notWritten")
             };
         }
-        const { token } = await writeGrantLink(kind, String(subjectId), parsed.data, user.id);
+        const org =
+            parsed.data.audience === "org" ? await subjectOrg(kind, String(subjectId)) : null;
+        const { token } = await writeGrantLink(
+            kind,
+            String(subjectId),
+            parsed.data,
+            user.id,
+            org?.id ?? null
+        );
         await recordAudit({
             actorId: user.id,
             action: "access.linked",
@@ -225,6 +251,7 @@ export async function shareLinkAction(
             metadata: {
                 capability: parsed.data.capability,
                 actions: parsed.data.actions,
+                audience: parsed.data.audience,
                 nearby: parsed.data.nearbyMeters !== null,
                 bounded: Boolean(
                     parsed.data.endsAt || parsed.data.startMinute || parsed.data.maxUses
@@ -292,5 +319,288 @@ export async function revokeShareAction(
         return { grants: await listSubjectGrants(kind, String(subjectId)) };
     } catch (caught) {
         return refusal(caught, "share.notTakenBack");
+    }
+}
+
+/** What the dialog needs once, beside the first page: who is asking, what they
+ *  may hand out to, and the address Copy link copies. */
+export interface ShareSetup {
+    readonly viewer: { id: string; name: string; email: string };
+    /** Whoever owns the thing, or null for something nobody owns (the house's
+     *  doors, the network filter) - then the first row is the viewer. */
+    readonly owner: SubjectOwner | null;
+    readonly candidates: GrantCandidate[];
+    readonly located: boolean | null;
+    /** The organization an "organization" link would open for, if any. */
+    readonly org: { id: string; name: string } | null;
+    /** The thing's own address on the Polaris domain, for people with access. */
+    readonly url: string | null;
+}
+
+export async function shareSetupAction(
+    subject: string,
+    subjectId: string
+): Promise<{ setup?: ShareSetup; error?: string }> {
+    try {
+        const user = await requireUser();
+        const kind = subjectOf(subject);
+        await requireMayShare(user, kind, String(subjectId));
+        const [owner, candidates, located, org, base] = await Promise.all([
+            subjectOwner({ id: user.id, isAdmin: user.isAdmin }, kind, String(subjectId)),
+            shareCandidates(user, kind, String(subjectId)),
+            subjectPlaceLocated(kind, String(subjectId)),
+            subjectOrg(kind, String(subjectId)),
+            appBaseUrl()
+        ]);
+        const href = subjectHref(kind, String(subjectId));
+        return {
+            setup: {
+                viewer: { id: user.id, name: user.name, email: user.email },
+                owner,
+                candidates,
+                located,
+                org,
+                url: href ? `${base.replace(/\/+$/, "")}${href}` : null
+            }
+        };
+    } catch (caught) {
+        return refusal(caught, "share.unreadable");
+    }
+}
+
+/**
+ * One page of who has this, or of its links, with the total. Paged and searched
+ * on the server: a thing shared with thousands is never sent whole.
+ */
+export async function grantPageAction(
+    subject: string,
+    subjectId: string,
+    query: { links?: unknown; search?: unknown; cursor?: unknown }
+): Promise<{ page?: GrantPage; error?: string }> {
+    try {
+        const user = await requireUser();
+        const kind = subjectOf(subject);
+        await requireMayShare(user, kind, String(subjectId));
+        const search = typeof query.search === "string" ? query.search.slice(0, 100) : "";
+        const cursor =
+            typeof query.cursor === "string" && /^[0-9a-f-]{36}$/i.test(query.cursor)
+                ? query.cursor
+                : null;
+        const page = await listSubjectGrantPage(
+            kind,
+            String(subjectId),
+            { links: query.links === true, search, cursor },
+            { id: user.id, isAdmin: user.isAdmin }
+        );
+        return { page };
+    } catch (caught) {
+        return refusal(caught, "share.unreadable");
+    }
+}
+
+/** One thing the "Add people" box found: a person, a team or a role. */
+export interface ShareTarget {
+    readonly type: core.GrantPrincipal;
+    readonly id: string;
+    readonly name: string;
+    /** The organization, a member count or a role's description. */
+    readonly detail: string;
+}
+
+/** How many of each kind the box shows at once. */
+const TARGETS_PER_KIND = 8;
+
+/**
+ * Everything this may be handed to whose name matches, in one ranked list:
+ * people through the same search every other people picker uses, and the
+ * owning organization's teams and roles. A name that starts with what was
+ * typed comes before one that only contains it. Bounded per kind.
+ */
+export async function findShareTargetsAction(
+    subject: string,
+    subjectId: string,
+    query: string
+): Promise<{ targets?: ShareTarget[]; error?: string }> {
+    try {
+        const user = await requireUser();
+        const kind = subjectOf(subject);
+        await requireMayShare(user, kind, String(subjectId));
+        const term = String(query).trim().slice(0, 100);
+        if (term.length < 2) return { targets: [] };
+        const allowed = core.subjectPrincipals(kind);
+        const [found, groups] = await Promise.all([
+            allowed.includes("user")
+                ? findPeople({ id: user.id }, term, {
+                      reachableOnly: false,
+                      limit: TARGETS_PER_KIND
+                  })
+                : Promise.resolve({ people: [] as { id: string; name: string }[] }),
+            allowed.includes("team") || allowed.includes("role")
+                ? shareCandidates(user, kind, String(subjectId))
+                : Promise.resolve([] as GrantCandidate[])
+        ]);
+        const lower = term.toLowerCase();
+        const matching = (name: string) => name.toLowerCase().includes(lower);
+        const rank = (name: string) => (name.toLowerCase().startsWith(lower) ? 0 : 1);
+        const targets: ShareTarget[] = [
+            ...found.people.map((person) => ({
+                type: "user" as const,
+                id: person.id,
+                name: person.name,
+                detail: ""
+            })),
+            ...(["team", "role"] as const).flatMap((type) =>
+                allowed.includes(type)
+                    ? groups
+                          .filter((one) => one.type === type && matching(one.name))
+                          .slice(0, TARGETS_PER_KIND)
+                          .map((one) => ({
+                              type,
+                              id: one.id,
+                              name: one.name,
+                              detail: one.orgName
+                          }))
+                    : []
+            )
+        ];
+        return {
+            targets: targets
+                .map((target, index) => ({ target, index }))
+                .sort((a, b) => rank(a.target.name) - rank(b.target.name) || a.index - b.index)
+                .map((one) => one.target)
+        };
+    } catch (caught) {
+        return refusal(caught, "share.nobodyFound");
+    }
+}
+
+/**
+ * Hand this to several people and groups at once, with the same capability and
+ * bounds, and - when asked - a notice in each person's bell carrying the
+ * message. Every one is checked as `shareAction` checks it, and either all are
+ * written or none is.
+ */
+export async function shareManyAction(
+    subject: string,
+    subjectId: string,
+    input: { targets?: unknown; grant?: unknown; notify?: unknown; message?: unknown }
+): Promise<{ added?: number; error?: string }> {
+    try {
+        const user = await requireUser();
+        const kind = subjectOf(subject);
+        await requireMayShare(user, kind, String(subjectId));
+        const targets = Array.isArray(input.targets) ? input.targets : [];
+        if (targets.length === 0) {
+            return { error: (await getTranslations("common"))("share.notWritten") };
+        }
+        if (targets.length > core.MAX_SHARE_TARGETS) {
+            return {
+                error: (await getTranslations("common"))("share.tooMany", {
+                    count: core.MAX_SHARE_TARGETS
+                })
+            };
+        }
+        const message = typeof input.message === "string" ? input.message.trim().slice(0, 500) : "";
+        const orgIds = await owningOrgIds(user, kind, String(subjectId));
+        const written: core.AccessGrantInput[] = [];
+        for (const target of targets) {
+            const parsed = core.accessGrantSchema.safeParse({
+                ...(typeof input.grant === "object" && input.grant ? input.grant : {}),
+                ...(typeof target === "object" && target ? target : {})
+            });
+            if (!parsed.success) {
+                return {
+                    error:
+                        parsed.error.issues[0]?.message ??
+                        (await getTranslations("common"))("share.notWritten")
+                };
+            }
+            written.push(parsed.data);
+        }
+        await writeGrants(kind, String(subjectId), written, user.id, orgIds);
+        await recordAudit({
+            actorId: user.id,
+            action: "access.shared",
+            targetType: kind,
+            targetId: String(subjectId),
+            metadata: { count: written.length, capability: written[0]?.capability }
+        });
+        settled(kind);
+        const people = written
+            .filter((one) => one.principalType === "user")
+            .map((one) => one.principalId);
+        if (input.notify !== false) {
+            for (const id of people) {
+                await tellGrantee(user, kind, String(subjectId), id, message);
+            }
+        }
+        publishAccessChange(people.length > 0 ? { userIds: people } : {});
+        return { added: written.length };
+    } catch (caught) {
+        return refusal(caught, "share.notWritten");
+    }
+}
+
+/** Change one grant's capability, actions or bounds - the role dropdown and the
+ *  Limits editor on a row of "People with access". */
+export async function updateShareAction(
+    subject: string,
+    subjectId: string,
+    grantId: string,
+    input: unknown
+): Promise<{ ok?: true; error?: string }> {
+    try {
+        const user = await requireUser();
+        const kind = subjectOf(subject);
+        await requireMayShare(user, kind, String(subjectId));
+        const parsed = core.grantUpdateSchema.safeParse(input);
+        if (!parsed.success) {
+            return {
+                error:
+                    parsed.error.issues[0]?.message ??
+                    (await getTranslations("common"))("share.notWritten")
+            };
+        }
+        await updateGrant(kind, String(subjectId), String(grantId), parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "access.changed",
+            targetType: kind,
+            targetId: String(subjectId),
+            metadata: { capability: parsed.data.capability }
+        });
+        settled(kind);
+        publishAccessChange();
+        return { ok: true };
+    } catch (caught) {
+        return refusal(caught, "share.notWritten");
+    }
+}
+
+/** Who one link opens for: restricted, the organization, or anyone. */
+export async function setLinkAudienceAction(
+    subject: string,
+    subjectId: string,
+    grantId: string,
+    audience: string
+): Promise<{ ok?: true; error?: string }> {
+    try {
+        const user = await requireUser();
+        const kind = subjectOf(subject);
+        await requireMayShare(user, kind, String(subjectId));
+        if (!core.isLinkAudience(audience)) throw new GrantError("That cannot be shared");
+        const org = audience === "org" ? await subjectOrg(kind, String(subjectId)) : null;
+        await setLinkAudience(kind, String(subjectId), String(grantId), audience, org?.id ?? null);
+        await recordAudit({
+            actorId: user.id,
+            action: "access.linkAudience",
+            targetType: kind,
+            targetId: String(subjectId),
+            metadata: { audience }
+        });
+        settled(kind);
+        return { ok: true };
+    } catch (caught) {
+        return refusal(caught, "share.notWritten");
     }
 }

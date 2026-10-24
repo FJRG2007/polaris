@@ -307,7 +307,10 @@
             "expired": "This link has run out.",
             "closed": "This link does not work at this hour. Try again later.",
             "spent": "This link has been used as many times as it allowed.",
-            "elsewhere": "This link does not open from where you are."
+            "elsewhere": "This link does not open from where you are.",
+            "signin": "This link opens for signed-in people. Sign in to open it.",
+            "denied": "This link is not for the account you are signed in with.",
+            "password": "This link asks for a password."
         },
         "until": "Works until {when}.",
         "nearby": "Only works within {meters} m of the place. Your browser will ask for your location when you press.",

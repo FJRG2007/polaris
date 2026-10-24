@@ -65,11 +65,15 @@ export function PublicShell({
 export function LinkUnavailable({
     message,
     signedIn,
-    title
+    title,
+    signIn
 }: {
     message: string;
     signedIn?: boolean;
     title?: string;
+    /** Offer a sign-in that comes back to `back`; `another` signs in a second
+     *  account, for a link that is not for the one already signed in. */
+    signIn?: { back: string; another?: boolean };
 }) {
     const t = useTranslations("components");
     return (
@@ -80,6 +84,18 @@ export function LinkUnavailable({
                 </CardHeader>
                 <CardBody>
                     <p className="text-sm text-muted-foreground">{message}</p>
+                    {signIn ? (
+                        <Button asChild className="mt-4">
+                            <Link
+                                href={`${signInHref(signIn.back)}${signIn.another ? "&add=1" : ""}`}
+                            >
+                                <LogIn className="size-4" />
+                                {signIn.another
+                                    ? t("publicShell.anotherAccount")
+                                    : t("publicShell.signIn")}
+                            </Link>
+                        </Button>
+                    ) : null}
                 </CardBody>
             </Card>
         </PublicShell>
