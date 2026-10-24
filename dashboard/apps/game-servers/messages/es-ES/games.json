@@ -1235,7 +1235,7 @@
     "consoleRepeat": {
         "errors": {
             "times": "Entre {min} y {max} veces",
-            "every": "Al menos 1 segundo entre ejecuciones",
+            "every": "Al menos 1 s de separación",
             "tooLong": "Una repetición dura como máximo {hours} horas",
             "offline": "Inicia el servidor primero",
             "busy": "Hay demasiadas repeticiones en curso. Detén una primero.",

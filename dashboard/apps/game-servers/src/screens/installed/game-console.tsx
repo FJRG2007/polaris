@@ -493,13 +493,18 @@ export function GameConsole({
     const runKept = useCallback(
         (entry: SavedCommand, choice: RunChoice, inDialog: boolean) => {
             setAskError("");
-            const { repeat, ...once } = choice;
-            if (repeat) {
+            const { repeatPlan, ...once } = choice;
+            if (repeatPlan) {
                 // Run by the server, timers and all: the dialog closes on it
                 // starting and the list below shows where it is.
                 startTransition(async () => {
                     const result = await consoleActions
-                        .repeatKeptCommandAction({ installedAppId, id: entry.id, ...once, repeat })
+                        .repeatKeptCommandAction({
+                            installedAppId,
+                            id: entry.id,
+                            ...once,
+                            repeat: repeatPlan
+                        })
                         .catch(() => ({
                             error: t("console.theServerDidNotAnswer"),
                             repeats: undefined

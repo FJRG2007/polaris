@@ -38,7 +38,7 @@ export interface RunChoice {
     readonly values: Record<string, string>;
     readonly target: vars.RunTarget | null;
     /** Run it this many times, so far apart; absent for once. */
-    readonly repeat?: RepeatPlan;
+    readonly repeatPlan?: RepeatPlan;
 }
 
 /** What scheduling it is given on top. */
@@ -220,7 +220,7 @@ export function RunCommandDialog({
     function submit(): void {
         if (!ready) return;
         if (mode === "run")
-            onRun(repeatRead.plan ? { ...choice(), repeat: repeatRead.plan } : choice());
+            onRun(repeatRead.plan ? { ...choice(), repeatPlan: repeatRead.plan } : choice());
         else
             onSchedule({
                 ...choice(),

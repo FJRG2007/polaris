@@ -26,8 +26,6 @@ import { mayStillRun, type RunServer } from "./console-run-service";
 import { pause, startRepeat, type RunOutcome } from "./console-repeat-jobs";
 import { repeatGapMs, type ConsoleRepeatView, type RepeatPlan } from "./console-repeat";
 
-const { readAppContainerRuntime } = host.appContainerMetrics;
-
 /** Which boot of the server a repeat runs on: the container's start time, or
  *  null where it cannot be read (a server on another machine). */
 interface Boot {
@@ -42,7 +40,8 @@ export async function serverBoot(server: RunServer): Promise<Boot | null> {
         .findFirst({ where: { id: applicationId }, select: { desiredState: true } })
         .catch(() => null);
     if (app?.desiredState !== "running") return null;
-    const state = await readAppContainerRuntime(applicationId, server.ownerId).catch(() => null);
+    const state = await host.appContainerMetrics
+        .readAppContainerRuntime(applicationId, server.ownerId).catch(() => null);
     if (state && state.status !== "running") return null;
     return { startedAt: state?.startedAt ?? null };
 }

@@ -63,7 +63,6 @@ import { gameMessage } from "../../lib/game-message";
 import { host } from "@polaris/app-host";
 
 const { recordAudit } = host.auditService;
-const { rateLimit } = host.rateLimitService;
 const { requireGameServer } = host.appsInstallAccess;
 
 const saveSchema = z.object({
@@ -449,7 +448,7 @@ export type RepeatKeptCommandInput = RunKeptCommandInput & { repeat: RepeatPlan 
 /** The carried refusal for a person starting repeats faster than anybody would
  *  by hand, or null. */
 async function tooFast(userId: string): Promise<string | null> {
-    const allowed = await rateLimit(
+    const allowed = await host.rateLimitService.rateLimit(
         `games-console-repeat:${userId}`,
         REPEAT_STARTS_PER_MINUTE,
         60_000
