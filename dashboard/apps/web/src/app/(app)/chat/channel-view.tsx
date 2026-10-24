@@ -1376,6 +1376,11 @@ export function ChannelView({
         if (catchUpMark(firstPass.current)) firstPass.current = false;
     }, [messages, catchUpMark]);
 
+    const messagesLoaded = useRef(false);
+    useEffect(() => {
+        messagesLoaded.current = messages !== null;
+    }, [messages]);
+
     /**
      * Leaving before the opening pass could mark anything.
      *
@@ -1388,7 +1393,7 @@ export function ChannelView({
      */
     useEffect(
         () => () => {
-            if (!firstPass.current) return;
+            if (messagesLoaded.current) return;
             if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
             void actions.markChannelsReadAction({ channelIds: [channelId] });
             closeDesktopNotice(`message:${channelId}`);

@@ -76,7 +76,8 @@ vi.mock("@/app/(app)/chat/actions", () => ({
     listScheduledAction: async () => ({ scheduled: [] }),
     readChannelAction: () =>
         new Promise((resolve) => {
-            landRead = () => resolve({ page: { messages: opened, olderThan: null, newerThan: null } });
+            landRead = () =>
+                resolve({ page: { messages: opened, olderThan: null, newerThan: null } });
         }),
     readSinceAction: async () => ({ page: { messages: [] } }),
     markReadAction: (input: unknown) => markRead(input),
@@ -183,11 +184,28 @@ describe("leaving a conversation at once", () => {
         expect(markChannelsRead).not.toHaveBeenCalled();
     });
 
+    it("marks nothing when the messages arrived and the opening pass left them unread", async () => {
+        Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+        const { unmount } = render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
+        await act(async () => landRead?.());
+        expect(await screen.findByText("m1")).toBeTruthy();
+        expect(markRead).not.toHaveBeenCalled();
+        Object.defineProperty(document, "visibilityState", {
+            value: "visible",
+            configurable: true
+        });
+        unmount();
+        expect(markChannelsRead).not.toHaveBeenCalled();
+    });
+
     it("marks nothing for a tab that was never shown", () => {
         Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
         const { unmount } = render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         unmount();
         expect(markChannelsRead).not.toHaveBeenCalled();
-        Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+        Object.defineProperty(document, "visibilityState", {
+            value: "visible",
+            configurable: true
+        });
     });
 });
