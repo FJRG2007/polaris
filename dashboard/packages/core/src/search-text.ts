@@ -258,7 +258,7 @@ function exactRank<T>(
 }
 
 /** How many mistakes a word of this length may carry and still be the word. */
-function allowedEdits(word: string): number {
+export function allowedEdits(word: string): number {
     if (word.length < MIN_FUZZY_WORD) return 0;
     return word.length >= TWO_EDIT_WORD ? 2 : 1;
 }

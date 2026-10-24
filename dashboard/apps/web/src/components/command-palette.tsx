@@ -31,10 +31,6 @@ import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { calculate, calculationDigits, calculationText } from "@/lib/search/calculate";
 import { OPEN_SEARCH_EVENT, requestedQuery, requestedScope } from "@/lib/search/open-search";
 import {
-    Dialog,
-    DialogContent,
-    DialogTitle,
-    Input,
     SegmentedControl,
     cn,
     shortcutPressed,
@@ -61,6 +57,8 @@ import {
     RecentRow
 } from "@/components/search-rows";
 import { useToast } from "@polaris/ui";
+import { groupRows, stepActive } from "@polaris/ui/search-match";
+import { SearchGroup, SearchPalette } from "@polaris/ui/search-palette";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     COMMAND_ENTRY_FIELDS,
@@ -127,26 +125,9 @@ type Row =
     | { kind: "hit"; id: string; group: string; hit: SearchHit }
     | { kind: "recent"; id: string; group: string; entry: core.RecentSearch };
 
-interface Group {
-    label: string;
-    /** Each row with its position in the flat list, which is what the arrow keys
-     *  move through - so the headings never disturb the ranking. */
-    rows: Array<{ row: Row; position: number }>;
-}
-
 /** The row's id in the document, for `aria-activedescendant` to point at. */
 function rowElementId(row: Row): string {
     return `polaris-search-${row.id.replace(/[^a-z0-9-]+/gi, "-")}`;
-}
-
-function groupRows(rows: readonly Row[]): Group[] {
-    const groups: Group[] = [];
-    rows.forEach((row, position) => {
-        const last = groups[groups.length - 1];
-        if (last?.label === row.group) last.rows.push({ row, position });
-        else groups.push({ label: row.group, rows: [{ row, position }] });
-    });
-    return groups;
 }
 
 /** A list the palette was handed, back from the joined key its memo is keyed
@@ -595,7 +576,7 @@ export function CommandPalette({
         clockCommand
     ]);
 
-    const groups = useMemo(() => groupRows(rows), [rows]);
+    const groups = useMemo(() => groupRows(rows, (row) => row.group), [rows]);
     /** Rows that are an answer rather than a memory or a command. */
     const answers = useMemo(
         () => rows.filter((row) => row.kind === "hit" || row.kind === "entry").length,
@@ -741,20 +722,10 @@ export function CommandPalette({
     }
 
     function onFieldKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-        if (event.key === "ArrowDown") {
+        const next = stepActive(event.key, active, rows.length);
+        if (next !== null) {
             event.preventDefault();
-            setActive((current) => (rows.length === 0 ? 0 : (current + 1) % rows.length));
-        } else if (event.key === "ArrowUp") {
-            event.preventDefault();
-            setActive((current) =>
-                rows.length === 0 ? 0 : (current - 1 + rows.length) % rows.length
-            );
-        } else if (event.key === "Home") {
-            event.preventDefault();
-            setActive(0);
-        } else if (event.key === "End") {
-            event.preventDefault();
-            setActive(Math.max(0, rows.length - 1));
+            setActive(next);
         } else if (event.key === "Enter") {
             event.preventDefault();
             go(rows[active]);
@@ -814,95 +785,68 @@ export function CommandPalette({
                 ) : null}
             </button>
 
-            <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent showClose={false} className="max-w-xl overflow-hidden p-0">
-                    <DialogTitle className="sr-only">{t("search.label")}</DialogTitle>
-                    <div className="flex items-center gap-2 border-b border-border px-3">
-                        <Search
-                            className="size-4 shrink-0 text-muted-foreground"
+            <SearchPalette
+                open={open}
+                onOpenChange={onOpenChange}
+                title={t("search.label")}
+                query={query}
+                onQueryChange={onFieldChange}
+                onFieldKeyDown={onFieldKeyDown}
+                placeholder={scope ? scopeWords(t, scope.id).placeholder : t("search.placeholder")}
+                fieldLabel={scope ? scopeWords(t, scope.id).placeholder : t("search.label")}
+                fieldRef={fieldRef}
+                fieldProps={{ enterKeyHint: "go" }}
+                activeId={rows[active] ? rowElementId(rows[active]!) : undefined}
+                listId="polaris-search-results"
+                listLabel={t("search.results")}
+                listRef={listRef}
+                lead={
+                    scope && ScopeIcon ? (
+                        <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted py-1 pl-2 pr-1 text-xs font-medium">
+                            <ScopeIcon className="size-3.5" aria-hidden="true" />
+                            {scopeWords(t, scope.id).label}
+                            <button
+                                type="button"
+                                onClick={clearScope}
+                                title={t("search.everything")}
+                                aria-label={t("search.stop", {
+                                    scope: scopeWords(t, scope.id).label
+                                })}
+                                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                            >
+                                <X className="size-3" aria-hidden="true" />
+                            </button>
+                        </span>
+                    ) : null
+                }
+                overlay={
+                    answer !== null ? (
+                        <div
+                            ref={ghostRef}
+                            aria-hidden="true"
+                            data-testid="search-calculation-ghost"
+                            className="pointer-events-none absolute inset-0 flex select-none items-center overflow-hidden whitespace-pre text-[0.8125rem]"
+                        >
+                            <span className="invisible">{query}</span>
+                            <span
+                                className={cn("text-muted-foreground", !ghostFits && "invisible")}
+                            >
+                                {` = ${answer}`}
+                            </span>
+                        </div>
+                    ) : null
+                }
+                trail={
+                    loading || searching ? (
+                        <Loader2
+                            className="size-4 shrink-0 animate-spin text-muted-foreground"
                             aria-hidden="true"
                         />
-                        {scope && ScopeIcon ? (
-                            <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted py-1 pl-2 pr-1 text-xs font-medium">
-                                <ScopeIcon className="size-3.5" aria-hidden="true" />
-                                {scopeWords(t, scope.id).label}
-                                <button
-                                    type="button"
-                                    onClick={clearScope}
-                                    title={t("search.everything")}
-                                    aria-label={t("search.stop", {
-                                        scope: scopeWords(t, scope.id).label
-                                    })}
-                                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                                >
-                                    <X className="size-3" aria-hidden="true" />
-                                </button>
-                            </span>
-                        ) : null}
-                        <div className="relative flex min-w-0 flex-1 items-center">
-                            <Input
-                                autoFocus
-                                ref={fieldRef}
-                                type="search"
-                                value={query}
-                                onChange={(event) => onFieldChange(event.target.value)}
-                                onKeyDown={onFieldKeyDown}
-                                placeholder={
-                                    scope
-                                        ? scopeWords(t, scope.id).placeholder
-                                        : t("search.placeholder")
-                                }
-                                enterKeyHint="go"
-                                autoCapitalize="none"
-                                autoCorrect="off"
-                                spellCheck={false}
-                                aria-label={
-                                    scope ? scopeWords(t, scope.id).placeholder : t("search.label")
-                                }
-                                // The arrow keys move a highlight through the list
-                                // while the caret stays here, so the field has to be
-                                // the thing that says which row is current: without
-                                // it a screen reader hears nothing move.
-                                role="combobox"
-                                aria-expanded
-                                aria-autocomplete="list"
-                                aria-activedescendant={
-                                    rows[active] ? rowElementId(rows[active]!) : undefined
-                                }
-                                aria-controls="polaris-search-results"
-                                bare
-                                className="h-12"
-                            />
-                            {answer !== null ? (
-                                <div
-                                    ref={ghostRef}
-                                    aria-hidden="true"
-                                    data-testid="search-calculation-ghost"
-                                    className="pointer-events-none absolute inset-0 flex select-none items-center overflow-hidden whitespace-pre text-[0.8125rem]"
-                                >
-                                    <span className="invisible">{query}</span>
-                                    <span
-                                        className={cn(
-                                            "text-muted-foreground",
-                                            !ghostFits && "invisible"
-                                        )}
-                                    >
-                                        {` = ${answer}`}
-                                    </span>
-                                </div>
-                            ) : null}
-                        </div>
-                        {loading || searching ? (
-                            <Loader2
-                                className="size-4 shrink-0 animate-spin text-muted-foreground"
-                                aria-hidden="true"
-                            />
-                        ) : null}
-                    </div>
-
-                    {/* Chat's filters, one kind or all of them, keeping what was
-                        typed - the way a chat app's quick switcher narrows. */}
-                    {scope && core.isChatSearchScope(scope.id) ? (
+                    ) : null
+                }
+                toolbar={
+                    // Chat's filters, one kind or all of them, keeping what was                         typed - the way a chat app's quick switcher narrows.
+                    scope && core.isChatSearchScope(scope.id) ? (
                         <div className="border-b border-border px-3 py-2">
                             <SegmentedControl
                                 size="sm"
@@ -922,174 +866,10 @@ export function CommandPalette({
                                 }))}
                             />
                         </div>
-                    ) : null}
-
-                    <div
-                        ref={listRef}
-                        id="polaris-search-results"
-                        role="listbox"
-                        aria-label={t("search.results")}
-                        className="max-h-[min(60vh,26rem)] overflow-y-auto overscroll-contain p-2"
-                    >
-                        {/* A column read by scanning it for one match, which is
-                            the surface `PlainNames` exists for: no ring around a
-                            face, no gradient across a name, and accounts under
-                            their own names - somebody searching for a person
-                            types the name that account is under. */}
-                        <PlainNames>
-                            {failure ? (
-                                <p className="px-2 py-10 text-center text-sm text-danger">
-                                    {failure}
-                                </p>
-                            ) : rows.length === 0 && searching ? (
-                                <HitSkeleton />
-                            ) : rows.length === 0 ? (
-                                <p className="px-2 py-10 text-center text-sm text-muted-foreground">
-                                    {scope
-                                        ? trimmed
-                                            ? t("search.noScopeMatch", {
-                                                  scope: scopeWords(
-                                                      t,
-                                                      scope.id
-                                                  ).label.toLowerCase(),
-                                                  query: trimmed
-                                              })
-                                            : t("search.nothingIn", {
-                                                  scope: scopeWords(t, scope.id).label.toLowerCase()
-                                              })
-                                        : t("search.noMatch", { query: trimmed })}
-                                </p>
-                            ) : (
-                                groups.map((group) => (
-                                    <div
-                                        key={`${group.label}-${group.rows[0]?.position}`}
-                                        role="group"
-                                        aria-label={group.label}
-                                        className="mb-1 last:mb-0"
-                                    >
-                                        <div className="flex items-center justify-between gap-2 px-2 py-1">
-                                            {/* The name is on the group, so announcing the
-                                            heading again would only repeat it. */}
-                                            <p
-                                                aria-hidden="true"
-                                                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                                            >
-                                                {group.label}
-                                            </p>
-                                            {group.label === t("search.recent") && !trimmed ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={forgetAll}
-                                                    className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-                                                >
-                                                    {t("search.clear")}
-                                                </button>
-                                            ) : null}
-                                        </div>
-                                        {group.rows.map(({ row, position }) => {
-                                            const selected = position === active;
-                                            const select = () => go(row);
-                                            const hover = () => setActive(position);
-                                            if (row.kind === "calculation") {
-                                                return (
-                                                    <CalculationRow
-                                                        key={row.id}
-                                                        id={rowElementId(row)}
-                                                        expression={trimmed}
-                                                        answer={answer ?? ""}
-                                                        label={t("search.calculationUse", {
-                                                            value: answer ?? ""
-                                                        })}
-                                                        copyLabel={t("search.calculationLabel", {
-                                                            value: answer ?? ""
-                                                        })}
-                                                        copyTitle={t("search.calculationCopy")}
-                                                        onCopy={() => copyCalculation(row.value)}
-                                                        selected={selected}
-                                                        onSelect={select}
-                                                        onHover={hover}
-                                                    />
-                                                );
-                                            }
-                                            if (row.kind === "clock") {
-                                                return (
-                                                    <ClockRow
-                                                        key={row.id}
-                                                        id={rowElementId(row)}
-                                                        command={row.command}
-                                                        text={clockCommandText(
-                                                            row.command,
-                                                            t,
-                                                            locale
-                                                        )}
-                                                        selected={selected}
-                                                        onSelect={select}
-                                                        onHover={hover}
-                                                    />
-                                                );
-                                            }
-                                            if (row.kind === "command") {
-                                                return (
-                                                    <CommandRow
-                                                        key={row.id}
-                                                        id={rowElementId(row)}
-                                                        scope={row.scope}
-                                                        selected={selected}
-                                                        onSelect={select}
-                                                        onHover={hover}
-                                                    />
-                                                );
-                                            }
-                                            if (row.kind === "hit") {
-                                                return (
-                                                    <HitRow
-                                                        key={row.id}
-                                                        id={rowElementId(row)}
-                                                        hit={row.hit}
-                                                        selected={selected}
-                                                        onSelect={select}
-                                                        onHover={hover}
-                                                    />
-                                                );
-                                            }
-                                            if (row.kind === "recent") {
-                                                return (
-                                                    <RecentRow
-                                                        key={row.id}
-                                                        id={rowElementId(row)}
-                                                        entry={row.entry}
-                                                        scopeLabel={
-                                                            row.entry.scope
-                                                                ? scopeWords(t, row.entry.scope)
-                                                                      .label
-                                                                : null
-                                                        }
-                                                        selected={selected}
-                                                        onSelect={select}
-                                                        onHover={hover}
-                                                        onForget={() => forget(row.entry)}
-                                                    />
-                                                );
-                                            }
-                                            return (
-                                                <EntryRow
-                                                    key={row.id}
-                                                    id={rowElementId(row)}
-                                                    entry={row.entry}
-                                                    selected={selected}
-                                                    onSelect={select}
-                                                    onHover={hover}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                ))
-                            )}
-                            {rows.length > 0 && searching ? <HitSkeleton /> : null}
-                        </PlainNames>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-xs text-muted-foreground">
+                    ) : null
+                }
+                footer={
+                    <>
                         <span className={cn(scope && "hidden sm:inline")}>
                             {t("search.hintMove")}
                         </span>
@@ -1100,9 +880,146 @@ export function CommandPalette({
                                   ? t("search.hintCalculation")
                                   : t("search.hintType")}
                         </span>
-                    </div>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+            >
+                {/* A column read by scanning it for one match, which is
+                    the surface `PlainNames` exists for: no ring around a
+                    face, no gradient across a name, and accounts under
+                    their own names - somebody searching for a person
+                    types the name that account is under. */}
+                <PlainNames>
+                    {failure ? (
+                        <p className="px-2 py-10 text-center text-sm text-danger">{failure}</p>
+                    ) : rows.length === 0 && searching ? (
+                        <HitSkeleton />
+                    ) : rows.length === 0 ? (
+                        <p className="px-2 py-10 text-center text-sm text-muted-foreground">
+                            {scope
+                                ? trimmed
+                                    ? t("search.noScopeMatch", {
+                                          scope: scopeWords(t, scope.id).label.toLowerCase(),
+                                          query: trimmed
+                                      })
+                                    : t("search.nothingIn", {
+                                          scope: scopeWords(t, scope.id).label.toLowerCase()
+                                      })
+                                : t("search.noMatch", { query: trimmed })}
+                        </p>
+                    ) : (
+                        groups.map((group) => (
+                            <SearchGroup
+                                key={`${group.label}-${group.rows[0]?.position}`}
+                                label={group.label}
+                                action={
+                                    group.label === t("search.recent") && !trimmed ? (
+                                        <button
+                                            type="button"
+                                            onClick={forgetAll}
+                                            className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                                        >
+                                            {t("search.clear")}
+                                        </button>
+                                    ) : null
+                                }
+                            >
+                                {group.rows.map(({ row, position }) => {
+                                    const selected = position === active;
+                                    const select = () => go(row);
+                                    const hover = () => setActive(position);
+                                    if (row.kind === "calculation") {
+                                        return (
+                                            <CalculationRow
+                                                key={row.id}
+                                                id={rowElementId(row)}
+                                                expression={trimmed}
+                                                answer={answer ?? ""}
+                                                label={t("search.calculationUse", {
+                                                    value: answer ?? ""
+                                                })}
+                                                copyLabel={t("search.calculationLabel", {
+                                                    value: answer ?? ""
+                                                })}
+                                                copyTitle={t("search.calculationCopy")}
+                                                onCopy={() => copyCalculation(row.value)}
+                                                selected={selected}
+                                                onSelect={select}
+                                                onHover={hover}
+                                            />
+                                        );
+                                    }
+                                    if (row.kind === "clock") {
+                                        return (
+                                            <ClockRow
+                                                key={row.id}
+                                                id={rowElementId(row)}
+                                                command={row.command}
+                                                text={clockCommandText(row.command, t, locale)}
+                                                selected={selected}
+                                                onSelect={select}
+                                                onHover={hover}
+                                            />
+                                        );
+                                    }
+                                    if (row.kind === "command") {
+                                        return (
+                                            <CommandRow
+                                                key={row.id}
+                                                id={rowElementId(row)}
+                                                scope={row.scope}
+                                                selected={selected}
+                                                onSelect={select}
+                                                onHover={hover}
+                                            />
+                                        );
+                                    }
+                                    if (row.kind === "hit") {
+                                        return (
+                                            <HitRow
+                                                key={row.id}
+                                                id={rowElementId(row)}
+                                                hit={row.hit}
+                                                selected={selected}
+                                                onSelect={select}
+                                                onHover={hover}
+                                            />
+                                        );
+                                    }
+                                    if (row.kind === "recent") {
+                                        return (
+                                            <RecentRow
+                                                key={row.id}
+                                                id={rowElementId(row)}
+                                                entry={row.entry}
+                                                scopeLabel={
+                                                    row.entry.scope
+                                                        ? scopeWords(t, row.entry.scope).label
+                                                        : null
+                                                }
+                                                selected={selected}
+                                                onSelect={select}
+                                                onHover={hover}
+                                                onForget={() => forget(row.entry)}
+                                            />
+                                        );
+                                    }
+                                    return (
+                                        <EntryRow
+                                            key={row.id}
+                                            id={rowElementId(row)}
+                                            entry={row.entry}
+                                            selected={selected}
+                                            onSelect={select}
+                                            onHover={hover}
+                                        />
+                                    );
+                                })}
+                            </SearchGroup>
+                        ))
+                    )}
+                    {rows.length > 0 && searching ? <HitSkeleton /> : null}
+                </PlainNames>
+            </SearchPalette>
         </>
     );
 }

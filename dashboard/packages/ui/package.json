@@ -167,6 +167,14 @@
             "types": "./src/i18n.tsx",
             "import": "./src/i18n.tsx"
         },
+        "./search-palette": {
+            "types": "./src/search/search-palette.tsx",
+            "import": "./src/search/search-palette.tsx"
+        },
+        "./search-match": {
+            "types": "./src/search/search-match.ts",
+            "import": "./src/search/search-match.ts"
+        },
         "./account-downloads/app-download-offers": {
             "types": "./src/downloads/account/app-download-offers.tsx",
             "import": "./src/downloads/account/app-download-offers.tsx"

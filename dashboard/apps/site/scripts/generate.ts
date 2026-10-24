@@ -41,10 +41,14 @@ import {
     mkdirSync,
     readdirSync,
     readFileSync,
+    rmSync,
     writeFileSync
 } from "node:fs";
 import * as site from "../src/data/builders";
 import * as docs from "../src/data/docs";
+import * as searchIndex from "../src/lib/search-index";
+import enWords from "../src/messages/en.json";
+import esWords from "../src/messages/es.json";
 import { marked } from "marked";
 import { highlight, type CodeLanguage } from "../src/lib/highlight";
 import { apiInventory, type ModuleSource, type RouteSource } from "../src/data/api-inventory";
@@ -412,12 +416,25 @@ const featuresDir = join(root, "docs", "features");
 const featureFiles = readdirSync(featuresDir)
     .filter((file) => file.endsWith(".md") && !file.endsWith(".es.md"))
     .sort();
-const docSlugs = new Set(featureFiles.map(docs.docSlug));
+// Guides that live outside `docs/features` but belong on the site: how to
+// connect an assistant, and what the MCP server offers it. English only; the
+// Spanish site shows the English text until a translation exists.
+const extraGuides = ["docs/connecting-ai-assistants.md", "docs/developers/mcp.md"].filter((file) =>
+    existsSync(join(root, file))
+);
+const extraPaths = new Map(extraGuides.map((file) => [file, docs.docSlug(file.split("/").pop()!)]));
+const INTEGRATIONS = "integrations";
+const docSlugs = new Set([...featureFiles.map(docs.docSlug), ...extraPaths.values(), INTEGRATIONS]);
 const docMedia = new Set<string>();
 const escapeHtml = (text: string) =>
     text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-async function renderDoc(slug: string, markdown: string): Promise<docs.DocPage> {
+async function renderDoc(
+    slug: string,
+    markdown: string,
+    dir = "docs/features",
+    source = `${dir}/${slug}.md`
+): Promise<docs.DocPage> {
     const { title, body } = docs.splitDoc(markdown);
     const tokens = marked.lexer(body);
     // Code is highlighted the way every other block on the site is.
@@ -450,7 +467,8 @@ async function renderDoc(slug: string, markdown: string): Promise<docs.DocPage> 
     const { html, media: pictures } = docs.rewriteDocLinks(rendered, {
         slugs: docSlugs,
         repo,
-        dir: "docs/features"
+        dir,
+        paths: extraPaths
     });
     for (const picture of pictures) docMedia.add(picture);
     // The text under each heading, so search can land on the section.
@@ -460,23 +478,67 @@ async function renderDoc(slug: string, markdown: string): Promise<docs.DocPage> 
     for (let at = 1; at < parts.length; at += 2)
         text[parts[at]!] = docs.plainText(parts[at + 1] ?? "");
     const summary = docs.plainText(/<p>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? "");
-    return { slug, title, summary, headings, html, text };
+    return { slug, source, title, summary, headings, html, text };
 }
 
 async function guides(spanish: boolean): Promise<docs.DocPage[]> {
+    const connected =
+        docs.integrationsGuide(spanish ? readmeEs : readmeEn) ?? docs.integrationsGuide(readmeEn);
+    const extra = await Promise.all([
+        ...extraGuides.map((file) =>
+            renderDoc(
+                extraPaths.get(file)!,
+                read(join(root, file)),
+                file.slice(0, file.lastIndexOf("/")),
+                file
+            )
+        ),
+        ...(connected
+            ? [
+                  renderDoc(
+                      INTEGRATIONS,
+                      `# ${connected.title}\n\n${connected.markdown}`,
+                      "",
+                      spanish ? "README.es.md" : "README.md"
+                  )
+              ]
+            : [])
+    ]);
     const pages = await Promise.all(
         featureFiles.map((file) => {
             const slug = docs.docSlug(file);
             const own = join(featuresDir, `${slug}.es.md`);
+            const spanishOwn = spanish && existsSync(own);
             return renderDoc(
                 slug,
-                read(spanish && existsSync(own) ? own : join(featuresDir, file))
+                read(spanishOwn ? own : join(featuresDir, file)),
+                "docs/features",
+                `docs/features/${spanishOwn ? `${slug}.es.md` : file}`
             );
         })
     );
-    return pages.sort((a, b) => a.title.localeCompare(b.title));
+    return [...pages.sort((a, b) => a.title.localeCompare(b.title)), ...extra];
 }
 const [docsEn, docsEs] = await Promise.all([guides(false), guides(true)]);
+
+/**
+ * The sidebar's groups: the README's own (Talk, Work, ...), then the services
+ * Polaris connects to and the assistant guides, then anything new no group names.
+ */
+function sections(spanish: boolean, pages: readonly docs.DocPage[]): docs.DocSection[] {
+    const words = (spanish ? esWords : enWords).docs;
+    const own = docs.readmeSections(spanish ? readmeEs : readmeEn);
+    return docs.arrangeSections(
+        [
+            ...(own.length ? own : docs.readmeSections(readmeEn)),
+            { label: words.integrations, slugs: [INTEGRATIONS, ...extraPaths.values()] }
+        ],
+        pages.map((page) => page.slug),
+        words.more
+    );
+}
+const sectionsEn = sections(false, docsEn);
+const sectionsEs = sections(true, docsEs);
 
 const showcaseEn = withPhones(localize(site.parseShowcase(readmeEn), "en"));
 const showcaseEsLocal = withPhones(
@@ -506,6 +568,7 @@ const data: site.SiteData = {
         }
     },
     docs: { en: docsEn, es: docsEs },
+    docSections: { en: sectionsEn, es: sectionsEs },
     downloadsPage: {
         files: { desktop, extension, streamdeck, companion },
         storeUrl: STREAMDECK_MARKETPLACE_URL,
@@ -527,6 +590,29 @@ mkdirSync(join(siteDir, "public", "logos"), { recursive: true });
 mkdirSync(join(siteDir, "public", "app-logos"), { recursive: true });
 writeFileSync(join(siteDir, "generated", "site-data.json"), JSON.stringify(data));
 writeFileSync(join(siteDir, "public", "openapi.json"), JSON.stringify(openapi, null, 2) + "\n");
+// The docs search index per locale: a manifest of titles fetched when search
+// first opens, and the section texts in chunks fetched after it.
+const indexSizes: string[] = [];
+for (const locale of site.SITE_LOCALES) {
+    const dir = join(siteDir, "public", "search", locale);
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const { manifest, chunks } = searchIndex.chunkIndex(
+        site.searchRecords(data, locale, (locale === "es" ? esWords : enWords).api.title)
+    );
+    const manifestJson = JSON.stringify(manifest);
+    writeFileSync(join(dir, "manifest.json"), manifestJson);
+    let total = manifestJson.length;
+    chunks.forEach((chunk, at) => {
+        const json = JSON.stringify(chunk);
+        total += json.length;
+        writeFileSync(join(dir, manifest.chunks[at]!), json);
+    });
+    const kb = (bytes: number) => `${(bytes / 1024).toFixed(0)} KB`;
+    indexSizes.push(
+        `${locale}: ${manifest.records.length} records, manifest ${kb(manifestJson.length)} + ${chunks.length} chunks, ${kb(total)} total`
+    );
+}
 
 // Only the pictures a page shows, not the whole media folder.
 const pictures = new Set<string>();
@@ -595,3 +681,4 @@ const operations = data.api.groups.reduce((sum, group) => sum + group.operations
 console.log(
     `[site] ${data.locales.en.apps.length} apps, ${pictures.size} pictures, ${operations} documented API operations, ${inventory.routes.length} key-reachable of ${routeSources.length} route files, ${docsEn.length} guides`
 );
+for (const line of indexSizes) console.log(`[site] search index ${line}`);
