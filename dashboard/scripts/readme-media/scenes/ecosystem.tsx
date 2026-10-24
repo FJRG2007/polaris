@@ -18,7 +18,13 @@ const PHONE = { width: 390, height: 844 };
 function tones(ctx: SceneContext) {
     return ctx.theme === "dark"
         ? { page: "#0d0e11", device: "#1c1d21", edge: "#34363c", text: "#e3e3e6", muted: "#9a9ca3" }
-        : { page: "#eef0f3", device: "#ffffff", edge: "#d3d6db", text: "#202124", muted: "#5f6368" };
+        : {
+              page: "#eef0f3",
+              device: "#ffffff",
+              edge: "#d3d6db",
+              text: "#202124",
+              muted: "#5f6368"
+          };
 }
 
 /** A device and the name under it. */
@@ -96,36 +102,50 @@ function AppWindow({ ctx, scene }: { ctx: SceneContext; scene: string }) {
 /** A phone: rounded glass, a camera, Polaris filling the screen. */
 function Phone({ ctx, scene }: { ctx: SceneContext; scene: string }) {
     const tone = tones(ctx);
+    const ratio = (PHONE.width + 24) / (PHONE.height + 24);
+    // Sized from whichever side of the tile runs out first. Height 100% with a
+    // max width broke the aspect ratio on a narrow tile, and the screen inside
+    // sat in a frame taller than itself with an empty band at the top.
     return (
         <div
             style={{
+                width: "100%",
                 height: "100%",
-                aspectRatio: `${PHONE.width + 24} / ${PHONE.height + 24}`,
-                maxWidth: "100%",
+                containerType: "size",
                 display: "flex",
-                padding: 8,
-                borderRadius: 34,
-                background: "#0b0b0d",
-                border: `2px solid ${tone.edge}`,
-                boxShadow: "0 18px 40px rgb(0 0 0 / 0.3)",
-                position: "relative"
+                alignItems: "center",
+                justifyContent: "center"
             }}
         >
-            <div style={{ flex: 1, display: "flex", borderRadius: 26, overflow: "hidden" }}>
-                <SceneWindow ctx={ctx} scene={scene} {...PHONE} title={scene} />
-            </div>
-            <i
+            <div
                 style={{
-                    position: "absolute",
-                    top: 14,
-                    left: "50%",
-                    width: 64,
-                    height: 16,
-                    marginLeft: -32,
-                    borderRadius: 99,
-                    background: "#0b0b0d"
+                    width: `min(100cqw, calc(100cqh * ${ratio}))`,
+                    aspectRatio: `${PHONE.width + 24} / ${PHONE.height + 24}`,
+                    display: "flex",
+                    padding: 8,
+                    borderRadius: 34,
+                    background: "#0b0b0d",
+                    border: `2px solid ${tone.edge}`,
+                    boxShadow: "0 18px 40px rgb(0 0 0 / 0.3)",
+                    position: "relative"
                 }}
-            />
+            >
+                <div style={{ flex: 1, display: "flex", borderRadius: 26, overflow: "hidden" }}>
+                    <SceneWindow ctx={ctx} scene={scene} {...PHONE} title={scene} />
+                </div>
+                <i
+                    style={{
+                        position: "absolute",
+                        top: 14,
+                        left: "50%",
+                        width: 64,
+                        height: 16,
+                        marginLeft: -32,
+                        borderRadius: 99,
+                        background: "#0b0b0d"
+                    }}
+                />
+            </div>
         </div>
     );
 }
@@ -150,13 +170,21 @@ function Server({ ctx, scene }: { ctx: SceneContext; scene: string }) {
                     }}
                 >
                     <i style={{ width: 6, height: 6, borderRadius: 9, background: "#22c55e" }} />
-                    <i style={{ width: 6, height: 6, borderRadius: 9, background: unit ? "#22c55e" : "#38bdf8" }} />
+                    <i
+                        style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 9,
+                            background: unit ? "#22c55e" : "#38bdf8"
+                        }}
+                    />
                     <span
                         style={{
                             flex: 1,
                             height: 6,
                             marginLeft: 8,
-                            background: "repeating-linear-gradient(90deg, #3a3d44 0 3px, transparent 3px 6px)"
+                            background:
+                                "repeating-linear-gradient(90deg, #3a3d44 0 3px, transparent 3px 6px)"
                         }}
                     />
                 </div>
@@ -223,7 +251,11 @@ function Ecosystem({ ctx }: { ctx: SceneContext }) {
             <Tile ctx={ctx} area="server" name={ctx.say("Your servers", "Tus servidores")}>
                 <Server ctx={ctx} scene="watch" />
             </Tile>
-            <Tile ctx={ctx} area="extension" name={ctx.say("Browser extension", "Extensión del navegador")}>
+            <Tile
+                ctx={ctx}
+                area="extension"
+                name={ctx.say("Browser extension", "Extensión del navegador")}
+            >
                 <Extension ctx={ctx} scene="extension-autofill" />
             </Tile>
         </div>
