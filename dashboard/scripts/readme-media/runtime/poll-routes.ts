@@ -35,6 +35,11 @@ const POLL_ROUTES: Record<string, { action: string; args: readonly string[] }> =
     "/api/drive/jobs": { action: "driveJobsAction", args: ["connectionId", "folder"] },
     "/api/drive/transfers/sent": { action: "sentTransfersAction", args: [] },
     "/api/drive/transfers/waiting": { action: "waitingTransfersAction", args: [] },
+    "/api/marketplace/install-targets": { action: "listInstallTargetsAction", args: [] },
+    "/api/marketplace/storage-connections": {
+        action: "listStorageConnectionsAction",
+        args: []
+    },
     "/api/office/google-link": { action: "officeGoogleLinkAction", args: ["documentId"] },
     "/api/tasks/detail": { action: "getTaskDetailAction", args: ["taskId"] },
     "/api/vault/item-uses": { action: "itemUsesAction", args: ["itemId"] }
