@@ -880,6 +880,7 @@
         "web/src/app/(app)/chat/search-panel.tsx",
         "web/src/app/(app)/chat/send-button.tsx",
         "web/src/app/(app)/chat/server-rail.tsx",
+        "web/src/app/(app)/chat/share-stream-menu.tsx",
         "web/src/app/(app)/chat/speaker-device.ts",
         "web/src/app/(app)/chat/spoiler.tsx",
         "web/src/app/(app)/chat/spoilers-card.tsx",

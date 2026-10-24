@@ -75,6 +75,10 @@ function callWith(over: Record<string, unknown> = {}): CallState {
         cameraOn: false,
         deafened: false,
         sharing: false,
+        shareAudio: { has: false, on: true },
+        changingShare: false,
+        screenQuality: "auto",
+        screenLevel: "high",
         microphones: [{ id: "m1", label: "Fixture desk mic" }],
         microphoneId: "m1",
         cameras: [],
@@ -157,7 +161,7 @@ describe("the call's control bar", () => {
         expect(within(media).getAllByRole("button", { name: /deviceSettings/ })).toHaveLength(3);
 
         const sharing = group(/bar\.sharing/);
-        expect(within(sharing).getByRole("button", { name: /stopSharing/ })).toBeTruthy();
+        expect(within(sharing).getByRole("button", { name: /shareMenu\.label/ })).toBeTruthy();
         expect(within(sharing).getByRole("button", { name: /callRoom\.react$/ })).toBeTruthy();
         expect(within(sharing).getByRole("button", { name: /moreForThisCall/ })).toBeTruthy();
 
@@ -276,13 +280,50 @@ describe("the call's control bar", () => {
         barWidth(360);
         room({ sharing: true });
         const sharing = group(/bar\.sharing/);
-        expect(within(sharing).queryByRole("button", { name: /stopSharing/ })).toBeNull();
+        expect(within(sharing).queryByRole("button", { name: /shareMenu\.label/ })).toBeNull();
         expect(within(sharing).queryByRole("button", { name: /callRoom\.react$/ })).toBeNull();
         open(within(sharing).getByRole("button", { name: /moreForThisCall/ }));
         const menu = screen.getByRole("menu");
-        expect(within(menu).getByRole("menuitem", { name: /stopSharing/ })).toBeTruthy();
+        expect(within(menu).getByRole("menuitem", { name: /shareMenu\.label/ })).toBeTruthy();
         expect(within(menu).getByRole("menuitem", { name: /callRoom\.react$/ })).toBeTruthy();
         expect(within(menu).getByRole("menuitem", { name: /voiceSettings/ })).toBeTruthy();
+    });
+
+    it("opens the stream menu from the share button while sharing", () => {
+        barWidth(900);
+        const toggleShare = vi.fn();
+        const setShareAudio = vi.fn();
+        room({ sharing: true, toggleShare, setShareAudio, shareAudio: { has: true, on: true } });
+        const button = within(group(/bar\.sharing/)).getByRole("button", {
+            name: /shareMenu\.label/
+        });
+        expect(button.getAttribute("aria-haspopup")).toBe("menu");
+        open(button);
+        // Opening the menu is all the press did.
+        expect(toggleShare).not.toHaveBeenCalled();
+        const menu = screen.getByRole("menu");
+        expect(within(menu).getByRole("menuitem", { name: /shareMenu\.change/ })).toBeTruthy();
+        expect(within(menu).getByRole("menuitem", { name: /shareMenu\.quality/ })).toBeTruthy();
+        const audio = within(menu).getByRole("menuitemcheckbox", { name: /shareMenu\.audio/ });
+        expect(audio.getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(audio);
+        expect(setShareAudio).toHaveBeenCalledWith(false);
+        const stop = within(menu).getByRole("menuitem", { name: /shareMenu\.stop/ });
+        expect(stop.className).toContain("text-danger");
+        fireEvent.click(stop);
+        expect(toggleShare).toHaveBeenCalledTimes(1);
+    });
+
+    it("locks the sound box, with the reason, on a share without sound", () => {
+        barWidth(900);
+        room({ sharing: true, shareAudio: { has: false, on: true } });
+        open(within(group(/bar\.sharing/)).getByRole("button", { name: /shareMenu\.label/ }));
+        const audio = within(screen.getByRole("menu")).getByRole("menuitemcheckbox", {
+            name: /shareMenu\.audio/
+        });
+        expect(audio.getAttribute("aria-disabled")).toBe("true");
+        expect(audio.getAttribute("aria-checked")).toBe("false");
+        expect(audio.textContent ?? "").toContain("shareMenu.noSound");
     });
 
     it("never offers a guest the way to the devices screen", () => {
@@ -305,7 +346,7 @@ describe("the call's control bar", () => {
         } as DOMRect);
         room({ sharing: true });
         const sharing = group(/bar\.sharing/);
-        expect(within(sharing).queryByRole("button", { name: /stopSharing/ })).toBeNull();
+        expect(within(sharing).queryByRole("button", { name: /shareMenu\.label/ })).toBeNull();
         vi.restoreAllMocks();
     });
 });

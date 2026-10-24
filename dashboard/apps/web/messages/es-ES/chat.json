@@ -394,6 +394,14 @@
         "startVideo": "Activar vídeo",
         "stopSharing": "No compartir",
         "shareScreen": "Compartir",
+        "shareMenu": {
+            "label": "Tu emisión",
+            "stop": "Dejar de emitir",
+            "change": "Cambiar emisión",
+            "quality": "Calidad de emisión",
+            "audio": "Compartir audio",
+            "noSound": "Esta emisión no tiene sonido. Cámbiala e incluye su audio para enviarlo."
+        },
         "undeafen": "Oír",
         "deafen": "No oír",
         "aModeratorDeafenedYou": "Un moderador te ensordeció",
