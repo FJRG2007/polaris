@@ -22,10 +22,18 @@
  * menu that cannot be walked with the keyboard.
  */
 
-import type { FocusEvent, PointerEvent } from "react";
+import type { FocusEvent, KeyboardEvent, PointerEvent } from "react";
 
 /** What a search field marks itself with so the menu around it can find it. */
 export const MENU_SEARCH_ATTRIBUTE = "data-menu-search";
+
+/** What every search field marks itself with, whether or not it takes the focus
+ *  as the menu opens, so tab can step back into it. */
+export const MENU_SEARCH_FIELD_ATTRIBUTE = "data-menu-search-field";
+
+/** The options a keyboard can land on, in the order they are drawn. */
+export const MENU_OPTION_SELECTOR =
+    "[role='menuitem']:not([data-disabled]), [role='menuitemcheckbox']:not([data-disabled]), [role='menuitemradio']:not([data-disabled])";
 
 /**
  * The handler a menu surface puts on its own focus.
@@ -93,4 +101,37 @@ export function keepSearchFocus(event: PointerEvent<HTMLElement>): void {
     // Read by the option's own handler, which is what focuses it. Prevented in
     // the capture phase, so it is already true by the time that runs.
     event.preventDefault();
+}
+
+/**
+ * Tab walking a menu's options, as the arrows do.
+ *
+ * A menu refuses tab out of the box, so in a list with a field at the top tab
+ * reached the first option and then stopped dead: whatever sat further down -
+ * "Create tag" under the matches, "Edit tags" under that - could only be reached
+ * by the arrows or the mouse, which reads as an option that is not really there.
+ * Here tab steps to the next option and shift-tab to the previous one, with the
+ * search field as one more stop, wrapping round at the ends as the arrows do.
+ *
+ * On the surface, so it answers for focus on any option; the field answers for
+ * its own tab first (see `MenuSearch`) and only what it leaves reaches here.
+ */
+export function tabThroughMenu(event: KeyboardEvent<HTMLElement>): void {
+    if (event.key !== "Tab" || event.defaultPrevented) return;
+    const surface = event.currentTarget;
+    const field = surface.querySelector<HTMLElement>(`[${MENU_SEARCH_FIELD_ATTRIBUTE}]`);
+    const stops = [
+        ...(field ? [field] : []),
+        ...surface.querySelectorAll<HTMLElement>(MENU_OPTION_SELECTOR)
+    ];
+    const at = stops.indexOf(document.activeElement as HTMLElement);
+    // Nothing to step to: left to the menu, as before.
+    if (stops.length === 0 || (stops.length === 1 && at === 0)) return;
+    const step = event.shiftKey ? -1 : 1;
+    const next =
+        at === -1
+            ? stops[event.shiftKey ? stops.length - 1 : 0]!
+            : stops[(at + step + stops.length) % stops.length]!;
+    event.preventDefault();
+    next.focus();
 }

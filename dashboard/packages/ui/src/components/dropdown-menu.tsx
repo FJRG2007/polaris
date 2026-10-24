@@ -8,7 +8,7 @@ import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
 import * as fit from "../lib/submenu-fit";
 import { ignoreOpeningPress } from "../lib/menu-press";
-import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
+import { keepSearchFocus, redirectMenuFocus, tabThroughMenu } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 
@@ -24,7 +24,7 @@ export const DropdownMenuSeparatorRoot = RadixMenu.Separator;
 export const DropdownMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
->(({ className, sideOffset = 6, collisionPadding = MENU_GUTTER, onFocus, ...props }, ref) => (
+>(({ className, sideOffset = 6, collisionPadding = MENU_GUTTER, onFocus, onKeyDown, ...props }, ref) => (
     <RadixMenu.Portal>
         <RadixMenu.Content
             ref={ref}
@@ -48,6 +48,11 @@ export const DropdownMenuContent = forwardRef<
             onFocus={(event) => {
                 onFocus?.(event);
                 redirectMenuFocus(event);
+            }}
+            // Tab walks the options instead of being refused - see `tabThroughMenu`.
+            onKeyDown={(event) => {
+                onKeyDown?.(event);
+                tabThroughMenu(event);
             }}
             // After the spread: the menu must never commit an option on the
             // release of the press that opened it.

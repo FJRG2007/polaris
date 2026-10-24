@@ -14,7 +14,7 @@ import * as fit from "../lib/submenu-fit";
 import { useKeyNames } from "../lib/key-names";
 import { applePlatform, formatShortcut } from "../lib/shortcut";
 import { ignoreOpeningPress } from "../lib/menu-press";
-import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
+import { keepSearchFocus, redirectMenuFocus, tabThroughMenu } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-context-menu";
 import { MENU_GUTTER } from "./dropdown-menu";
 import { useReopenElsewhere } from "../lib/menu-reopen";
@@ -81,7 +81,7 @@ export function ContextMenuSub({
 export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
->(({ className, onFocus, collisionPadding = MENU_GUTTER, children, ...props }, ref) => {
+>(({ className, onFocus, onKeyDown, collisionPadding = MENU_GUTTER, children, ...props }, ref) => {
     // The surface itself, in state rather than in a ref, and that is
     // load-bearing: this component sits in the tree whether or not its menu is
     // open - Radix gates on the open state inside the portal below - so a ref
@@ -114,6 +114,11 @@ export const ContextMenuContent = forwardRef<
                 onFocus={(event) => {
                     onFocus?.(event);
                     redirectMenuFocus(event);
+                }}
+                // Tab walks the options instead of being refused - see `tabThroughMenu`.
+                onKeyDown={(event) => {
+                    onKeyDown?.(event);
+                    tabThroughMenu(event);
                 }}
                 // After the spread: the menu must never commit an option on the
                 // release of the press that opened it.
