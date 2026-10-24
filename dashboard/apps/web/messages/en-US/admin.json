@@ -690,7 +690,7 @@
             "noAnswer": "No answer",
             "ms": "{ms} ms",
             "insideOnly": "Checked from inside only: this router does not loop back to its own public address, so a carrier-NAT line can go unnoticed. Add a cloud server to check from outside.",
-            "udpSkipped": "The relay carries TCP only. UDP ports {ports} are not reachable through it.",
+            "udpCarried": "The relay carries UDP {ports}.",
             "physics": "Both paths dial out from here. They help when the router fails over to a mobile line or inbound is blocked, not when nothing gets out at all.",
             "conflicts": "Left alone because someone changed them while on backup: {names}.",
             "problems": {

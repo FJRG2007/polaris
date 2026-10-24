@@ -189,11 +189,9 @@ export function BackupAccessCard() {
                             {t("domains.backup.tcpCarried", { ports: view.relay.tcp.join(", ") })}
                         </p>
                     ) : null}
-                    {view.relay && view.relay.skippedUdp.length > 0 ? (
+                    {view.relay && view.relay.udp.length > 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            {t("domains.backup.udpSkipped", {
-                                ports: view.relay.skippedUdp.join(", ")
-                            })}
+                            {t("domains.backup.udpCarried", { ports: view.relay.udp.join(", ") })}
                         </p>
                     ) : null}
                     <p className="text-xs text-muted-foreground">{t("domains.backup.physics")}</p>

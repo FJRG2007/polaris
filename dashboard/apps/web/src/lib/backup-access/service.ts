@@ -76,7 +76,7 @@ import {
     type LiveRecord,
     type RecordOp
 } from "./records";
-import { relayPorts, relayProject, relaySpec, renderHomeConfig, renderRelayConfig } from "./relay";
+import { relayConfigs, relayPorts, relayProject, relaySpec } from "./relay";
 import { combineVerdicts, outsideScript, readOutside, type OutsideAnswer } from "./outside-check";
 
 const TTL_KEY = "backupAccess.ttl";
@@ -130,9 +130,9 @@ const relaySchema = z.object({
     relayPrivate: z.string(),
     homePublic: z.string(),
     homePrivate: z.string(),
-    /** The TCP ports both ends were last brought up with. */
+    /** The ports both ends were last brought up with. */
     tcp: z.array(z.number()).default([]),
-    skippedUdp: z.array(z.number()).default([])
+    udp: z.array(z.number()).default([])
 });
 
 /** Why a path cannot be used right now, as a key the screen words. */
@@ -188,7 +188,7 @@ export interface BackupView {
     readonly state: FlipState;
     readonly probe: Probe | null;
     readonly tunnelReady: boolean;
-    readonly relay: { address: string; tcp: number[]; skippedUdp: number[] } | null;
+    readonly relay: { address: string; tcp: number[]; udp: number[] } | null;
     readonly servers: { id: string; name: string }[];
     readonly cloudflare: boolean;
 }
@@ -217,9 +217,7 @@ export async function backupView(): Promise<BackupView> {
         state,
         probe,
         tunnelReady: tunnel !== null,
-        relay: relay
-            ? { address: relay.address, tcp: relay.tcp, skippedUdp: relay.skippedUdp }
-            : null,
+        relay: relay ? { address: relay.address, tcp: relay.tcp, udp: relay.udp } : null,
         servers,
         cloudflare: Boolean(token)
     };
@@ -565,29 +563,31 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
             homePublic: home.publicKey,
             homePrivate: sealKey(home.privateKey),
             tcp: [],
-            skippedUdp: []
+            udp: []
         };
     }
     // The ports the installed game servers publish, as the router is asked to
     // forward them; a server added or removed changes what both ends carry.
     const games = await forwardedPorts().catch(() => []);
     const ports = relayPorts(games.flatMap((row) => row.ports));
-    // Fresh keys start with no ports, so they always bring both ends up again.
-    const changed = stored.tcp.join(",") !== ports.tcp.join(",");
+    // Fresh keys start with no ports, so they always bring both ends up again; a
+    // relay brought up before UDP was carried stored none, so one with UDP game
+    // ports comes up again with them.
+    const changed =
+        stored.tcp.join(",") !== ports.tcp.join(",") ||
+        stored.udp.join(",") !== ports.udp.join(",");
     // The keys are kept now and the ports only once both ends run with them, so a
     // bring-up that failed is tried again on the next pass.
-    stored = { ...stored, skippedUdp: ports.skippedUdp };
     await setSetting(RELAY_KEY, JSON.stringify(stored));
     const keys = {
         relay: { publicKey: stored.relayPublic, privateKey: openKey(stored.relayPrivate) },
         home: { publicKey: stored.homePublic, privateKey: openKey(stored.homePrivate) }
     };
-    const relayConfig = renderRelayConfig(keys, ports.tcp);
-    const homeConfig = renderHomeConfig(keys, address, ports.tcp);
+    const configs = relayConfigs(keys, address, ports);
     await keepUp(
         await getPorts(target, target.ownerId),
         relayProject("relay"),
-        () => relaySpec("relay", relayConfig, ports.tcp),
+        () => relaySpec("relay", configs.relay, ports),
         changed
     ).catch((caught: unknown) => {
         // The server already publishes one of the ports for something of its own.
@@ -598,10 +598,11 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
     await keepUp(
         new HostdPorts(),
         relayProject("home"),
-        () => relaySpec("home", homeConfig, ports.tcp),
+        () => relaySpec("home", configs.home, ports),
         changed
     );
-    if (changed) await setSetting(RELAY_KEY, JSON.stringify({ ...stored, tcp: ports.tcp }));
+    if (changed)
+        await setSetting(RELAY_KEY, JSON.stringify({ ...stored, tcp: ports.tcp, udp: ports.udp }));
     return { kind: "relay", address };
 }
 

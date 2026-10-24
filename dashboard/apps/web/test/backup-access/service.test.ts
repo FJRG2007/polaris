@@ -25,6 +25,9 @@ const zone = new Map<string, FakeRecord>();
 const containers = new Map<string, number>();
 let nextId = 1;
 let lineUp = true;
+let games: { ports: { port: number; protocol: "tcp" | "udp" }[] }[] = [];
+/** The last spec each fake runtime was brought up with, by `where/project`. */
+const brought = new Map<string, { services: { name: string; image: string }[] }>();
 
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async (key: string) => settings.get(key) ?? null,
@@ -83,7 +86,7 @@ vi.mock("@/lib/domain-dns", () => ({ ownedZoneNames: async () => NAMES }));
 vi.mock("@/lib/domain-address-sync", () => ({ PUBLISHED_KEY: "published" }));
 vi.mock("@/lib/network-service", () => ({ probePublicIp: async () => HOME }));
 vi.mock("@/lib/offline/outbound-lookup", () => ({ internetOffline: () => false }));
-vi.mock("@/lib/app-extensions/registry", () => ({ forwardedPorts: async () => [] }));
+vi.mock("@/lib/app-extensions/registry", () => ({ forwardedPorts: async () => games }));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key: string) => key }));
 vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
     sealKey: (value: string) => value,
@@ -102,8 +105,9 @@ class FakePorts {
     async listContainers(project: string) {
         return containers.has(`${this.where}/${project}`) ? [{}] : [];
     }
-    async composeUp(spec: { project: string }) {
+    async composeUp(spec: { project: string; services: { name: string; image: string }[] }) {
         containers.set(`${this.where}/${spec.project}`, 1);
+        brought.set(`${this.where}/${spec.project}`, spec);
     }
     async composeDown(project: string) {
         containers.delete(`${this.where}/${project}`);
@@ -186,6 +190,8 @@ beforeEach(() => {
     settings.clear();
     zone.clear();
     containers.clear();
+    brought.clear();
+    games = [];
     notified.length = 0;
     deletedTunnels.length = 0;
     nextId = 1;
@@ -318,5 +324,51 @@ describe("runBackupAccess", () => {
             [HOME, 60]
         ]);
         expect(JSON.parse(settings.get("backupAccess.probe") ?? "{}").conflicts).toEqual([]);
+    });
+
+    it("brings a relay from before UDP was carried up again with the UDP ports", async () => {
+        const relayConfig = {
+            mode: "automatic" as const,
+            path: "relay" as const,
+            relayTargetId: "11111111-1111-4111-8111-111111111111",
+            dataSaver: true,
+            manualOn: false
+        };
+        await service.saveConfig(relayConfig);
+        const images = (where: string) =>
+            [...brought.entries()]
+                .filter(([key]) => key.startsWith(`${where}/`))
+                .flatMap(([, spec]) => spec.services.map((s) => s.image));
+        expect(images("home").some((image) => image.includes("frp"))).toBe(false);
+
+        // What an install from before stored: TCP only, the UDP ports named as skipped.
+        const old = JSON.parse(settings.get("backupAccess.relay") ?? "{}");
+        delete old.udp;
+        settings.set("backupAccess.relay", JSON.stringify({ ...old, skippedUdp: [19132] }));
+        games = [
+            {
+                ports: [
+                    { port: 25565, protocol: "tcp" },
+                    { port: 19132, protocol: "udp" }
+                ]
+            }
+        ];
+        brought.clear();
+        await pass();
+        expect(images("home")).toContain("fatedier/frpc:v0.71.0");
+        expect(images("relay")).toContain("fatedier/frps:v0.71.0");
+        const stored = JSON.parse(settings.get("backupAccess.relay") ?? "{}");
+        expect(stored.tcp).toEqual([80, 443, 25565]);
+        expect(stored.udp).toEqual([19132]);
+        expect((await service.backupView()).relay).toEqual({
+            address: RELAY,
+            tcp: [80, 443, 25565],
+            udp: [19132]
+        });
+
+        // Nothing changed: nothing is brought up again.
+        brought.clear();
+        await pass();
+        expect(brought.size).toBe(0);
     });
 });

@@ -690,7 +690,7 @@
             "noAnswer": "No responde",
             "ms": "{ms} ms",
             "insideOnly": "Solo comprobado desde dentro: este router no vuelve a su propia IP pública, así que una línea con CGNAT puede pasar inadvertida. Añade un servidor en la nube para comprobar desde fuera.",
-            "udpSkipped": "El relé solo lleva TCP. Los puertos UDP {ports} no llegan por él.",
+            "udpCarried": "El relé lleva UDP {ports}.",
             "physics": "Las dos rutas salen desde aquí. Ayudan si el router pasa a una línea móvil o se bloquea la entrada, no si no sale nada.",
             "conflicts": "No se tocaron porque alguien los cambió durante el respaldo: {names}.",
             "problems": {
