@@ -100,12 +100,34 @@ export const EMPTY_NOTIFICATION_HOLDS: NotificationHolds = { mutes: {}, schedule
  *  column is no holds at all, which is how every account starts. */
 export function parseNotificationHolds(raw: string | null | undefined): NotificationHolds {
     if (!raw) return { mutes: {}, schedules: {} };
+    let stored: unknown;
     try {
-        const parsed = notificationHoldsSchema.safeParse(JSON.parse(raw));
-        return parsed.success ? parsed.data : { mutes: {}, schedules: {} };
+        stored = JSON.parse(raw);
     } catch {
         return { mutes: {}, schedules: {} };
     }
+    const record = z
+        .object({ mutes: z.unknown(), schedules: z.unknown() })
+        .partial()
+        .safeParse(stored);
+    if (!record.success) return { mutes: {}, schedules: {} };
+    return {
+        mutes: validEntries(record.data.mutes, notificationMuteSchema),
+        schedules: validEntries(record.data.schedules, notificationScheduleSchema)
+    };
+}
+
+/** The entries of a stored map whose key and value still parse, so one retired
+ *  event or group drops only its own hold. */
+function validEntries<T>(raw: unknown, value: z.ZodType<T>): Record<string, T> {
+    const entries: Record<string, T> = {};
+    const map = z.record(z.string(), z.unknown()).safeParse(raw);
+    if (!map.success) return entries;
+    for (const [key, entry] of Object.entries(map.data)) {
+        const parsed = value.safeParse(entry);
+        if (holdKeySchema.safeParse(key).success && parsed.success) entries[key] = parsed.data;
+    }
+    return entries;
 }
 
 /** Whether a mute still holds at `now`. */
@@ -150,12 +172,36 @@ export function holdReason(
     now: Date,
     timeZone: string
 ): HoldReason | null {
-    const event = notificationEvent(eventId);
-    if (!event || event.critical) return null;
-    const own = holdKey({ kind: "event", id: eventId });
-    const group = holdKey({ kind: "group", id: event.group });
-    if (muteActive(holds.mutes[own], now) || muteActive(holds.mutes[group], now)) return "muted";
-    const schedule = holds.schedules[own] ?? holds.schedules[group];
+    if (holdMuted(holds, eventId, now)) return "muted";
+    const schedule = holdSchedule(holds, eventId);
     if (schedule && !inSchedule(schedule, now, timeZone)) return "schedule";
     return null;
+}
+
+/** The event's own key and its group's, or null for an event that is never
+ *  held: a critical one, or one nothing declares. */
+function holdKeys(eventId: string): { own: string; group: string } | null {
+    const event = notificationEvent(eventId);
+    if (!event || event.critical) return null;
+    return {
+        own: holdKey({ kind: "event", id: eventId }),
+        group: holdKey({ kind: "group", id: event.group })
+    };
+}
+
+/** Whether a mute on the event or its group holds it back at `now`. */
+export function holdMuted(holds: NotificationHolds, eventId: string, now: Date): boolean {
+    const keys = holdKeys(eventId);
+    if (!keys) return false;
+    return muteActive(holds.mutes[keys.own], now) || muteActive(holds.mutes[keys.group], now);
+}
+
+/** The schedule that applies to the event: its own, else its group's. */
+export function holdSchedule(
+    holds: NotificationHolds,
+    eventId: string
+): NotificationSchedule | null {
+    const keys = holdKeys(eventId);
+    if (!keys) return null;
+    return holds.schedules[keys.own] ?? holds.schedules[keys.group] ?? null;
 }

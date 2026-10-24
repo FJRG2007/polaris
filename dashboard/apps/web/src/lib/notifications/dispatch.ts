@@ -31,7 +31,9 @@ import { destinationSummary, recordDestinationResult, resolveDestination } from 
 import {
     clearsMinLevel,
     heldByQuietHours,
-    holdReason,
+    holdMuted,
+    holdSchedule,
+    inSchedule,
     notificationEvent,
     resolveRule,
     type NotificationLevel,
@@ -291,27 +293,38 @@ export const RECORDED_QUIETLY =
 /**
  * Why this alert is held back now, as the delivery log's reason, or null to send
  * it. The one place every channel asks: a mute or the event's schedule first,
- * then quiet hours, all read on the account's own clock. Unreadable settings
- * never hold anything back: a missed alert costs more than an untimely one.
+ * then quiet hours, all read on the account's own clock. Quiet hours only hold
+ * back what `delivers` beyond the bell, so the clock is read only when a
+ * schedule or a delivery needs it. Unreadable settings never hold anything
+ * back: a missed alert costs more than an untimely one.
  */
-async function heldNow(userId: string, eventId: string, critical: boolean): Promise<string | null> {
+async function heldNow(
+    userId: string,
+    eventId: string,
+    critical: boolean,
+    delivers = true
+): Promise<string | null> {
+    const holds = critical
+        ? null
+        : await Promise.resolve()
+              .then(() => getNotificationHolds(userId))
+              .catch(() => null);
+    const now = new Date();
+    if (holds && holdMuted(holds, eventId, now)) return MUTED;
+    const schedule = holds ? holdSchedule(holds, eventId) : null;
+    if (!schedule && !delivers) return null;
     try {
         // Loaded here rather than at the top: it reads the deployment's settings
         // on import, and most alerts never need a clock at all.
         const { resolveDisplayPreferencesFor } = await import("@/lib/display-prefs-service");
-        const [holds, quiet, display] = await Promise.all([
-            // A mute that cannot be read must not switch quiet hours off too.
-            Promise.resolve()
-                .then(() => getNotificationHolds(userId))
-                .catch(() => null),
-            getQuietHours(userId),
+        const [quiet, display] = await Promise.all([
+            delivers ? getQuietHours(userId) : null,
             resolveDisplayPreferencesFor(userId)
         ]);
-        const now = new Date();
-        const reason = holds ? holdReason(holds, eventId, now, display.timeZone) : null;
-        if (reason === "muted") return MUTED;
-        if (reason === "schedule") return OUTSIDE_SCHEDULE;
-        return heldByQuietHours(quiet, now, display.timeZone, critical) ? QUIET_HOURS : null;
+        if (schedule && !inSchedule(schedule, now, display.timeZone)) return OUTSIDE_SCHEDULE;
+        return quiet && heldByQuietHours(quiet, now, display.timeZone, critical)
+            ? QUIET_HOURS
+            : null;
     } catch {
         return null;
     }
@@ -391,7 +404,13 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
     // Asked once, before the bell is written: a muted or out-of-hours alert is
     // still recorded, read, so it rings nothing and badges nothing - Slack's
     // behaviour. Quiet hours leave the bell alone, as they always have.
-    const held = await heldNow(input.userId, input.event, event.critical === true);
+    const extras = input.bellOnly ? { ...rule, email: false, destinations: [] } : rule;
+    const held = await heldNow(
+        input.userId,
+        input.event,
+        event.critical === true,
+        extras.email || extras.destinations.length > 0
+    );
     const silenced = held === MUTED || held === OUTSIDE_SCHEDULE;
 
     let watching = false;
@@ -429,7 +448,7 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
             // Still the same condition: the open notice now says the latest, and
             // that is all. Telling every channel again is the spam this prevents.
             const outcome = await raiseCondition(input.condition, row, {
-                resurface: input.resurface
+                resurface: input.resurface && !watching && !silenced
             });
             if (outcome === "updated") return { inapp: "updated" };
         } else {
@@ -456,7 +475,6 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
         });
     }
 
-    const extras = input.bellOnly ? { ...rule, email: false, destinations: [] } : rule;
     void fanOut(input, level, extras, event.critical === true, held).catch((error) => {
         console.error("polaris: notification fan-out failed:", error);
     });

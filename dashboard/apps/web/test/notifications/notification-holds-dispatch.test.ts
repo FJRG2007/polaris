@@ -36,8 +36,10 @@ vi.mock("@polaris/db", () => ({
         userEmail: { findFirst: async () => null }
     }
 }));
+const raised = vi.fn(async (_key: string, _input: unknown, _options: unknown) => "created");
 vi.mock("@/lib/notification-service", () => ({
-    createNotification: (input: unknown) => created(input)
+    createNotification: (input: unknown) => created(input),
+    raiseCondition: (key: string, input: unknown, options: unknown) => raised(key, input, options)
 }));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.test" }));
 vi.mock("@/lib/auth-mail", () => ({ sendAuthEmail: async () => ({}) }));
@@ -98,6 +100,7 @@ function bellRow(): { read: boolean } {
 
 beforeEach(() => {
     created.mockClear();
+    raised.mockClear();
     sent.mockClear();
     deliveries.length = 0;
     quiet = { enabled: false, start: "22:00", end: "08:00", criticalBypass: true };
@@ -205,5 +208,19 @@ describe("schedules at dispatch", () => {
             status: "skipped",
             detail: QUIET_HOURS
         });
+    });
+});
+
+describe("conditions at dispatch", () => {
+    it("does not resurface a muted condition, and does an unmuted one", async () => {
+        const condition = { userId: "u1", event: "deploy.failed", title: "Something" };
+        holds = { mutes: { "event:deploy.failed": { until: null } }, schedules: {} };
+        await notify({ ...condition, condition: "deploy:1", resurface: true });
+        expect(raised.mock.calls[0]![2]).toEqual({ resurface: false });
+
+        raised.mockClear();
+        holds = { mutes: {}, schedules: {} };
+        await notify({ ...condition, condition: "deploy:1", resurface: true });
+        expect(raised.mock.calls[0]![2]).toEqual({ resurface: true });
     });
 });

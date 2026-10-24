@@ -48,6 +48,27 @@ describe("hold schemas", () => {
         expect(holds.parseNotificationHolds(JSON.stringify(saved))).toEqual(saved);
     });
 
+    it("drops only the holds of a retired event or group, keeping the rest", () => {
+        const kept = { days: WEEKDAYS, startMinute: 540, endMinute: 1080 };
+        const stored = {
+            mutes: {
+                "event:old.retired": { until: null },
+                [`group:${GROUP}`]: { until: null },
+                [`event:${EVENT}`]: { until: "not a date" }
+            },
+            schedules: { "group:retired": kept, [`event:${EVENT}`]: kept }
+        };
+        expect(holds.parseNotificationHolds(JSON.stringify(stored))).toEqual(
+            withHolds({
+                mutes: { [`group:${GROUP}`]: { until: null } },
+                schedules: { [`event:${EVENT}`]: kept }
+            })
+        );
+        expect(holds.parseNotificationHolds(JSON.stringify({ mutes: [] }))).toEqual(
+            holds.EMPTY_NOTIFICATION_HOLDS
+        );
+    });
+
     it("works out when a mute ends", () => {
         expect(holds.muteUntil("1h", NOW)).toBe("2026-10-21T13:00:00.000Z");
         expect(holds.muteUntil("1w", NOW)).toBe("2026-10-28T12:00:00.000Z");

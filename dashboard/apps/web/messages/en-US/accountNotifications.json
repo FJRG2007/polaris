@@ -134,7 +134,7 @@
         }
     },
     "rules": {
-        "muted": "Muted",
+        "muted": "All off",
         "inApp": "In-app",
         "securityAlways": "Security alerts always appear in Polaris",
         "shownOnItsScreen": "Shown on the Apps list, not the bell",
