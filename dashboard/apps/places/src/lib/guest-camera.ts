@@ -30,6 +30,7 @@
 import { getCamera } from "./cameras";
 import { homeInstall } from "./access";
 import { isThingId, roomContents } from "./sharing";
+import { panelHoldsCamera } from "./panels";
 import { host } from "@polaris/app-host";
 import { randomBytes } from "node:crypto";
 import type * as core from "@polaris/core";
@@ -55,9 +56,15 @@ interface Watch {
 
 const watches = new Map<string, Watch>();
 
-/** Whether a link's subject holds a camera: is it, or is the room it is in. */
+/** Whether a link's subject holds a camera: is it, is the room it is in, or
+ *  is the wall panel it is on. */
 async function subjectHolds(subjectType: string, subjectId: string, cameraId: string) {
     if (subjectType === "place.camera") return subjectId === cameraId;
+    if (subjectType === "place.panel") {
+        if (!isThingId(cameraId)) return false;
+        const install = await homeInstall();
+        return install ? panelHoldsCamera(install.id, subjectId, cameraId) : false;
+    }
     if (subjectType !== "place.room" || !isThingId(cameraId)) return false;
     return (await roomContents([subjectId])).cameras.has(cameraId);
 }
@@ -73,7 +80,8 @@ async function linkCovers(
     actions: readonly string[],
     cameraId: string
 ): Promise<boolean> {
-    if (subjectType === "place.room" && !actions.includes("watch")) return false;
+    if ((subjectType === "place.room" || subjectType === "place.panel") && !actions.includes("watch"))
+        return false;
     return subjectHolds(subjectType, subjectId, cameraId);
 }
 
@@ -117,13 +125,15 @@ export async function openGuestWatch(
     token: string,
     ip: string,
     now = Date.now(),
-    /** Which camera, for a room's link; a camera's link names its own. */
+    /** Which camera, for a room's or a panel's link; a camera's link names its own. */
     asked?: string
 ): Promise<{ ok: true; watch: string } | { ok: false; error: OpenRefusal }> {
     const reached = await host.accessGrants.linkReach(token);
     if (
         !reached ||
-        (reached.subjectType !== "place.camera" && reached.subjectType !== "place.room")
+        (reached.subjectType !== "place.camera" &&
+            reached.subjectType !== "place.room" &&
+            reached.subjectType !== "place.panel")
     ) {
         return { ok: false, error: "closed" };
     }

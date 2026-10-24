@@ -3,15 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@polaris/ui";
 import { usePlacesT } from "../use-places-t";
+import { ColorWheel } from "./color-wheel";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 
 /** How long a slider is left still before what it says is sent: a drag is one
  *  setting, not forty. */
 const SETTLE_MS = 400;
 
-/** The hues the colour slider runs through, as its own track. */
-const HUE_TRACK =
-    "linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00)";
 const WARMTH_TRACK = "linear-gradient(to right, #ffb46b, #fff1e0, #dbe8ff)";
 
 /** A slider that shows where it is dragged at once and sends only once it is
@@ -86,7 +84,7 @@ function SettlingSlider({
     );
 }
 
-/** Brightness, colour temperature and colour, each drawn only when the light has it. */
+/** Brightness, colour temperature and a colour wheel, each drawn only when the light has it. */
 export function LightControls({
     device,
     canControl,
@@ -134,17 +132,17 @@ export function LightControls({
                 />
             ) : null}
             {light.color ? (
-                <SettlingSlider
+                <ColorWheel
                     label={t("devices.actions.set-color")}
-                    value={light.color.hue}
-                    min={0}
-                    max={360}
-                    step={1}
-                    unit="°"
+                    valueText={({ hue, saturation }) => t("devices.colorValue", { hue, saturation })}
+                    value={
+                        light.color.hue === null
+                            ? null
+                            : { hue: light.color.hue, saturation: light.color.saturation ?? 100 }
+                    }
                     disabled={disabled}
-                    track={HUE_TRACK}
-                    onCommit={(hue) =>
-                        onAct("set-color", { action: "set-color", hue, saturation: 100 })
+                    onCommit={({ hue, saturation }) =>
+                        onAct("set-color", { action: "set-color", hue, saturation })
                     }
                 />
             ) : null}

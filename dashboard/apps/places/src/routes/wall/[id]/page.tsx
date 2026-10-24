@@ -18,7 +18,7 @@ export default async function WallPanelPage({
 }) {
     const { id } = await params;
     if (typeof id !== "string") notFound();
-    const { install, canControl } = await requireHomeUser("home.read");
+    const { install, canControl, canManage } = await requireHomeUser("home.read");
     const contents = await panelContents(install.id, id).catch(() => null);
     if (!contents) notFound();
     return (
@@ -28,7 +28,9 @@ export default async function WallPanelPage({
             cards={contents.panel.cards}
             devices={contents.devices}
             rooms={contents.rooms}
-            access={{ kind: "session", canControl }}
+            cameras={contents.cameras}
+            automations={contents.automations}
+            access={{ kind: "session", canControl, canRun: canManage }}
         />
     );
 }

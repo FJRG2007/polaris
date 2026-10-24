@@ -1730,7 +1730,8 @@
             "binFull": "Cubo lleno",
             "litterLow": "Poca arena",
             "litterLevel": "Arena {percent}%"
-        }
+        },
+        "colorValue": "Tono {hue} grados, saturación {saturation}%"
     },
     "devicesView": {
         "rooms": "Salas",
@@ -2843,7 +2844,27 @@
         "roomEmpty": "No hay dispositivos en esta sala.",
         "clock": "Reloj",
         "picker": "Paneles",
-        "panelsAt": "Paneles de este lugar"
+        "panelsAt": "Paneles de este lugar",
+        "addCamera": "Cámara",
+        "addAction": "Automatización",
+        "addSensor": "Sensor",
+        "pickCamera": "Cámaras",
+        "pickAction": "Botones de automatización",
+        "pickSensor": "Lecturas de sensores",
+        "noCameras": "Aún no hay cámaras en este lugar.",
+        "noAutomations": "Aún no hay automatizaciones en este lugar.",
+        "askFirstPick": "Preguntar antes de ejecutar",
+        "askFirst": "Preguntar antes de ejecutar {name}",
+        "cameraFull": "Ver {name} a pantalla completa",
+        "runStarted": "En marcha",
+        "runNotAllowed": "Solo quien gestiona la casa puede ejecutarla",
+        "runPaused": "En pausa - solo se ejecuta desde aquí",
+        "runQuestion": "¿Ejecutar {name}?",
+        "runBody": "Se ejecuta ahora, como Ejecutar ahora en la pantalla de automatizaciones.",
+        "runConfirm": "Ejecutar",
+        "runFailed": "Esa automatización no pudo empezar. Vuelve a intentarlo.",
+        "sensorSince": "Desde las {time}",
+        "sensorOffline": "No responde"
     },
     "panelWall": {
         "nightDark": "Oscuro de noche",

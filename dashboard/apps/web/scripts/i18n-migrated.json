@@ -2322,6 +2322,8 @@
         "places/src/screens/panels/panel-grid.tsx",
         "places/src/screens/panels/panel-cards.tsx",
         "places/src/screens/panels/actions.ts",
+        "places/src/screens/devices/color-wheel.tsx",
+        "places/src/routes/api/home/keys/[token]/run/route.ts",
         "places/src/screens/devices/battery-meter.tsx",
         "places/src/routes/places/panels/page.tsx",
         "places/src/routes/wall/[id]/page.tsx",

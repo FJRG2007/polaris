@@ -19,6 +19,9 @@ import { usePlacesT } from "../use-places-t";
 import type { PanelCard } from "../../lib/panel-layout";
 import type { DeviceView } from "../../lib/device-kinds";
 import { Maximize, Minimize, Moon, Sun, WifiOff } from "lucide-react";
+import type { CameraView } from "../../lib/cameras";
+import type { PanelAutomation } from "../../lib/panels";
+import type { GuestPanelCamera } from "../../lib/guest-key";
 import { PanelBoard, type BoardAccess, type BoardRoom } from "./panel-board";
 
 const NIGHT_KEY = "polaris.wall.nightDark";
@@ -126,6 +129,9 @@ export function PanelWall({
     cards,
     devices,
     rooms,
+    cameras,
+    guestCameras,
+    automations,
     access
 }: {
     name: string;
@@ -133,6 +139,9 @@ export function PanelWall({
     cards: readonly PanelCard[];
     devices: readonly DeviceView[];
     rooms: readonly BoardRoom[];
+    cameras?: readonly CameraView[];
+    guestCameras?: readonly GuestPanelCamera[];
+    automations?: readonly PanelAutomation[];
     access: BoardAccess;
 }) {
     const t = usePlacesT();
@@ -239,6 +248,9 @@ export function PanelWall({
                     cards={cards}
                     devices={devices}
                     rooms={rooms}
+                    cameras={cameras}
+                    guestCameras={guestCameras}
+                    automations={automations}
                     access={access}
                     onError={setError}
                 />

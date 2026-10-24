@@ -12,6 +12,12 @@ const DOOR = "00000000-0000-4000-8000-0000000000d1";
 let reach: unknown = null;
 const actOnDevice = vi.fn(async (_i: string, id: string) => ({ id, state: "on" }));
 const panelHolds = vi.fn(async (_i: string, _p: string, id: string) => id === LAMP);
+const SCENE = "00000000-0000-4000-8000-0000000000f1";
+const OTHER_SCENE = "00000000-0000-4000-8000-0000000000f2";
+const CAMERA = "00000000-0000-4000-8000-0000000000c9";
+const panelHoldsAutomation = vi.fn(async (_i: string, _p: string, id: string) => id === SCENE);
+const runAutomationNow = vi.fn(async () => undefined);
+let contents: unknown = null;
 
 vi.mock("@polaris/app-host", () => ({
     host: {
@@ -31,16 +37,21 @@ vi.mock("@polaris-app/places/src/lib/access", () => ({
 }));
 vi.mock("@polaris-app/places/src/lib/panels", () => ({
     panelHolds,
-    panelContents: async () => null
+    panelHoldsAutomation,
+    panelPlaceId: async () => "place-1",
+    panelContents: async () => contents
 }));
+vi.mock("@polaris-app/places/src/lib/automations", () => ({ runAutomationNow }));
 vi.mock("@polaris-app/places/src/lib/devices", () => ({
     getDevice: async (_i: string, id: string) => ({ id, name: "x", kind: "light", placeId: null }),
     actOnDevice
 }));
 
-const { pressGuestKey } = await import("@polaris-app/places/src/lib/guest-key");
+const { guestPanel, pressGuestKey, runGuestAutomation } = await import(
+    "@polaris-app/places/src/lib/guest-key"
+);
 
-function live(subjectType: string, actions: string[], subjectId = PANEL) {
+function live(subjectType: string, actions: string[], subjectId = PANEL, capability = "control") {
     return {
         standing: "live",
         subjectType,
@@ -48,7 +59,7 @@ function live(subjectType: string, actions: string[], subjectId = PANEL) {
         note: "",
         grant: {
             id: "g1",
-            capability: "control",
+            capability,
             actions,
             until: null,
             counted: false,
@@ -113,5 +124,88 @@ describe("a wall panel link", () => {
             })
         ).rejects.toThrow("This link does not allow that");
         expect(actOnDevice).not.toHaveBeenCalled();
+    });
+});
+
+describe("a wall panel link's automation buttons", () => {
+    it("runs an automation the panel has a button for", async () => {
+        reach = live("place.panel", ["operate"]);
+        await runGuestAutomation("t", SCENE, null, "1.2.3.4");
+        expect(runAutomationNow).toHaveBeenCalledWith(
+            "install-1",
+            SCENE,
+            "Guest link",
+            expect.any(String)
+        );
+    });
+
+    it("refuses an automation that is not on the panel", async () => {
+        reach = live("place.panel", ["operate"]);
+        await expect(runGuestAutomation("t", OTHER_SCENE, null, "1.2.3.4")).rejects.toThrow(
+            "This link does not allow that"
+        );
+        expect(runAutomationNow).not.toHaveBeenCalled();
+    });
+
+    it("refuses a link lent only to look, or without operate", async () => {
+        reach = live("place.panel", ["operate"], PANEL, "view");
+        await expect(runGuestAutomation("t", SCENE, null, "1.2.3.4")).rejects.toThrow(
+            "This link does not allow that"
+        );
+        reach = live("place.panel", ["watch"]);
+        await expect(runGuestAutomation("t", SCENE, null, "1.2.3.4")).rejects.toThrow(
+            "This link does not allow that"
+        );
+        expect(runAutomationNow).not.toHaveBeenCalled();
+    });
+
+    it("never runs anything through a room's or a door's link", async () => {
+        reach = live("place.room", ["operate"]);
+        await expect(runGuestAutomation("t", SCENE, null, "1.2.3.4")).rejects.toThrow(
+            "This link does not open anything right now"
+        );
+        expect(runAutomationNow).not.toHaveBeenCalled();
+    });
+});
+
+describe("what a wall panel link shows", () => {
+    const full = {
+        panel: { id: PANEL, placeId: "place-1", name: "Hall", cards: [] },
+        devices: [],
+        rooms: [],
+        cameras: [
+            {
+                id: CAMERA,
+                name: "Porch",
+                privacy: false,
+                address: "192.0.2.10",
+                username: "admin",
+                mainPath: "/stream1"
+            }
+        ],
+        automations: [{ id: SCENE, name: "Good night", enabled: true }]
+    };
+
+    it("shows a camera by name only, and only when lent to watch", async () => {
+        contents = full;
+        reach = live("place.panel", ["watch", "operate"]);
+        const seen = await guestPanel("t");
+        expect(seen && seen.standing === "live" && seen.cameras).toEqual([
+            { id: CAMERA, name: "Porch", private: false }
+        ]);
+        expect(JSON.stringify(seen)).not.toContain("192.0.2.10");
+        reach = live("place.panel", ["operate"]);
+        const blind = await guestPanel("t");
+        expect(blind && blind.standing === "live" && blind.cameras).toEqual([]);
+    });
+
+    it("lists its automation buttons only for a link that may run them", async () => {
+        contents = full;
+        reach = live("place.panel", ["operate"]);
+        const runs = await guestPanel("t");
+        expect(runs && runs.standing === "live" && runs.automations).toHaveLength(1);
+        reach = live("place.panel", ["operate"], PANEL, "view");
+        const looks = await guestPanel("t");
+        expect(looks && looks.standing === "live" && looks.automations).toEqual([]);
     });
 });

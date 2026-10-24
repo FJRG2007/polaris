@@ -19,7 +19,7 @@ export async function POST(
 ): Promise<Response> {
     const t = await placesT();
     const ip = (await host.requestContext.clientIp()) ?? "unknown";
-    // A room's link says which of its cameras; a camera's link needs nothing.
+    // A room's or a panel's link says which of its cameras; a camera's link needs nothing.
     const asked = new URL(request.url).searchParams.get("camera") ?? undefined;
     const opened = await openGuestWatch(String((await params).token), ip, Date.now(), asked);
     if (opened.ok) return Response.json({ watch: opened.watch });

@@ -42,6 +42,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@polaris-app/places/src/lib/access", () => ({
     homeInstall: async () => ({ id: "install-1" })
 }));
+vi.mock("@polaris-app/places/src/lib/automations", () => ({ runAutomationNow: async () => undefined }));
 vi.mock("@polaris-app/places/src/lib/devices", () => ({
     getDevice: async () => ({ id: DOOR, name: "Front door", kind: "lock", placeId: PLACE }),
     actOnDevice

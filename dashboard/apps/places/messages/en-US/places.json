@@ -1730,7 +1730,8 @@
             "binFull": "Waste bin full",
             "litterLow": "Litter low",
             "litterLevel": "Litter {percent}%"
-        }
+        },
+        "colorValue": "Hue {hue} degrees, saturation {saturation}%"
     },
     "devicesView": {
         "rooms": "Rooms",
@@ -2843,7 +2844,27 @@
         "roomEmpty": "No devices in this room.",
         "clock": "Clock",
         "picker": "Panels",
-        "panelsAt": "Panels at this place"
+        "panelsAt": "Panels at this place",
+        "addCamera": "Camera",
+        "addAction": "Automation",
+        "addSensor": "Sensor",
+        "pickCamera": "Cameras",
+        "pickAction": "Automation buttons",
+        "pickSensor": "Sensor readings",
+        "noCameras": "No cameras at this place yet.",
+        "noAutomations": "No automations at this place yet.",
+        "askFirstPick": "Ask before running",
+        "askFirst": "Ask before running {name}",
+        "cameraFull": "Show {name} full screen",
+        "runStarted": "Started",
+        "runNotAllowed": "Only people who manage the house can run this",
+        "runPaused": "Paused - runs only from here",
+        "runQuestion": "Run {name}?",
+        "runBody": "It runs now, as Run now does on the automations screen.",
+        "runConfirm": "Run",
+        "runFailed": "That automation could not start. Try again.",
+        "sensorSince": "Since {time}",
+        "sensorOffline": "Not answering"
     },
     "panelWall": {
         "nightDark": "Dark at night",

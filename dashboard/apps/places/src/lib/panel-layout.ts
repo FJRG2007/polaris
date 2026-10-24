@@ -23,7 +23,7 @@ export const PANEL_CARDS = 48;
 export const PANELS_PER_PLACE = 20;
 export const PANEL_NAME_MAX = 60;
 
-export const PANEL_CARD_TYPES = ["device", "room", "clock"] as const;
+export const PANEL_CARD_TYPES = ["device", "room", "clock", "camera", "action", "sensor"] as const;
 export type PanelCardType = (typeof PANEL_CARD_TYPES)[number];
 
 /** Smallest and default size of each kind of card, in cells. */
@@ -32,7 +32,10 @@ export const CARD_SIZES: Readonly<
 > = {
     device: { minW: 2, minH: 2, w: 3, h: 2 },
     room: { minW: 3, minH: 2, w: 4, h: 3 },
-    clock: { minW: 2, minH: 1, w: 3, h: 2 }
+    clock: { minW: 2, minH: 1, w: 3, h: 2 },
+    camera: { minW: 3, minH: 2, w: 4, h: 3 },
+    action: { minW: 2, minH: 1, w: 3, h: 1 },
+    sensor: { minW: 2, minH: 2, w: 3, h: 2 }
 };
 
 const cell = z.number().int();
@@ -48,7 +51,19 @@ export const panelCardSchema = z
     .discriminatedUnion("type", [
         z.object({ ...box, type: z.literal("device"), deviceId: z.string().uuid() }),
         z.object({ ...box, type: z.literal("room"), roomId: z.string().uuid() }),
-        z.object({ ...box, type: z.literal("clock") })
+        z.object({ ...box, type: z.literal("clock") }),
+        z.object({ ...box, type: z.literal("camera"), cameraId: z.string().uuid() }),
+        // Runs an automation. `confirm` asks first, for one that should not
+        // fire on a brush of the screen ("Everything off", "Lock up").
+        z.object({
+            ...box,
+            type: z.literal("action"),
+            automationId: z.string().uuid(),
+            confirm: z.boolean().default(false)
+        }),
+        // One device's reading, large. A device card shows it too, smaller and
+        // among its controls.
+        z.object({ ...box, type: z.literal("sensor"), deviceId: z.string().uuid() })
     ])
     .refine((card) => card.x + card.w <= PANEL_COLUMNS, "A card runs past the panel's edge")
     .refine((card) => card.y + card.h <= PANEL_ROWS, "A card runs past the panel's edge")
@@ -110,10 +125,34 @@ export function panelDeviceIds(
 ): Set<string> {
     const ids = new Set<string>();
     for (const card of cards) {
-        if (card.type === "device") ids.add(card.deviceId);
+        if (card.type === "device" || card.type === "sensor") ids.add(card.deviceId);
         if (card.type === "room") for (const id of roomDevices.get(card.roomId) ?? []) ids.add(id);
     }
     return ids;
+}
+
+/** The devices a panel's cards name directly (device and sensor cards), not
+ *  through a room. */
+export function panelDirectDeviceIds(cards: readonly PanelCard[]): string[] {
+    return [
+        ...new Set(
+            cards.flatMap((card) =>
+                card.type === "device" || card.type === "sensor" ? [card.deviceId] : []
+            )
+        )
+    ];
+}
+
+/** The cameras a panel shows. This, and nothing wider, is what its link may watch. */
+export function panelCameraIds(cards: readonly PanelCard[]): string[] {
+    return [...new Set(cards.flatMap((card) => (card.type === "camera" ? [card.cameraId] : [])))];
+}
+
+/** The automations a panel's buttons run. This is all its link may start. */
+export function panelAutomationIds(cards: readonly PanelCard[]): string[] {
+    return [
+        ...new Set(cards.flatMap((card) => (card.type === "action" ? [card.automationId] : [])))
+    ];
 }
 
 /** The rooms a panel's cards name. */
@@ -192,7 +231,10 @@ export function firstFree(
 export type NewCard =
     | { readonly type: "device"; readonly deviceId: string }
     | { readonly type: "room"; readonly roomId: string }
-    | { readonly type: "clock" };
+    | { readonly type: "clock" }
+    | { readonly type: "camera"; readonly cameraId: string }
+    | { readonly type: "action"; readonly automationId: string; readonly confirm: boolean }
+    | { readonly type: "sensor"; readonly deviceId: string };
 
 /** A card added at its default size in the first free box, or the cards
  *  unchanged when the panel has no room left. */
