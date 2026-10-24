@@ -55,10 +55,7 @@ export interface DomainActor {
 export class DomainSecurityError extends Error {
     constructor(
         readonly key:
-            | "errors.notFound"
-            | "errors.cannotFix"
-            | "errors.planChanged"
-            | "errors.tooSoon"
+            "errors.notFound" | "errors.cannotFix" | "errors.planChanged" | "errors.tooSoon"
     ) {
         super(key);
         this.name = "DomainSecurityError";

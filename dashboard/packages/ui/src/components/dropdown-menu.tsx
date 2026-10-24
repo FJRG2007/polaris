@@ -24,45 +24,50 @@ export const DropdownMenuSeparatorRoot = RadixMenu.Separator;
 export const DropdownMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
->(({ className, sideOffset = 6, collisionPadding = MENU_GUTTER, onFocus, onKeyDown, ...props }, ref) => (
-    <RadixMenu.Portal>
-        <RadixMenu.Content
-            ref={ref}
-            sideOffset={sideOffset}
-            // Kept off the screen's edge, and never taller or wider than what is
-            // left of it: the app switcher lists every app with a line of
-            // description under each, which is taller than a phone, and a surface
-            // that clipped its overflow left the bottom half of it unreachable.
-            collisionPadding={collisionPadding}
-            className={cn(
-                "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
-                FLOATING_MOTION,
-                className
-            )}
-            {...props}
-            // A menu with a field at the top of it hands that field the focus
-            // the surface was given - see `redirectMenuFocus`. On the surface's
-            // own focus rather than on the way open, because the menu focuses
-            // itself and this has to be the answer to that rather than a race
-            // with it.
-            onFocus={(event) => {
-                onFocus?.(event);
-                redirectMenuFocus(event);
-            }}
-            // Tab walks the options instead of being refused - see `tabThroughMenu`.
-            onKeyDown={(event) => {
-                onKeyDown?.(event);
-                tabThroughMenu(event);
-            }}
-            // After the spread: the menu must never commit an option on the
-            // release of the press that opened it.
-            onPointerUpCapture={ignoreOpeningPress}
-            // And once it has it, the pointer does not take it back off it -
-            // see `keepSearchFocus`.
-            onPointerMoveCapture={keepSearchFocus}
-        />
-    </RadixMenu.Portal>
-));
+>(
+    (
+        { className, sideOffset = 6, collisionPadding = MENU_GUTTER, onFocus, onKeyDown, ...props },
+        ref
+    ) => (
+        <RadixMenu.Portal>
+            <RadixMenu.Content
+                ref={ref}
+                sideOffset={sideOffset}
+                // Kept off the screen's edge, and never taller or wider than what is
+                // left of it: the app switcher lists every app with a line of
+                // description under each, which is taller than a phone, and a surface
+                // that clipped its overflow left the bottom half of it unreachable.
+                collisionPadding={collisionPadding}
+                className={cn(
+                    "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
+                    FLOATING_MOTION,
+                    className
+                )}
+                {...props}
+                // A menu with a field at the top of it hands that field the focus
+                // the surface was given - see `redirectMenuFocus`. On the surface's
+                // own focus rather than on the way open, because the menu focuses
+                // itself and this has to be the answer to that rather than a race
+                // with it.
+                onFocus={(event) => {
+                    onFocus?.(event);
+                    redirectMenuFocus(event);
+                }}
+                // Tab walks the options instead of being refused - see `tabThroughMenu`.
+                onKeyDown={(event) => {
+                    onKeyDown?.(event);
+                    tabThroughMenu(event);
+                }}
+                // After the spread: the menu must never commit an option on the
+                // release of the press that opened it.
+                onPointerUpCapture={ignoreOpeningPress}
+                // And once it has it, the pointer does not take it back off it -
+                // see `keepSearchFocus`.
+                onPointerMoveCapture={keepSearchFocus}
+            />
+        </RadixMenu.Portal>
+    )
+);
 DropdownMenuContent.displayName = "DropdownMenuContent";
 
 /**

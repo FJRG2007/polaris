@@ -25,12 +25,7 @@ import type { Editor, Range } from "@tiptap/core";
 import type { SuggestionProps } from "@tiptap/suggestion";
 import { forwardRef, useEffect, useId, useImperativeHandle, useState } from "react";
 import { stepPickable, SuggestionList } from "./suggestion-list";
-import {
-    BLOCK_MENU_KEY,
-    mountPopup,
-    POPUP_LAYER_CLASS,
-    type SuggestionHandle
-} from "./suggestion";
+import { BLOCK_MENU_KEY, mountPopup, POPUP_LAYER_CLASS, type SuggestionHandle } from "./suggestion";
 import {
     Code2,
     Heading1,

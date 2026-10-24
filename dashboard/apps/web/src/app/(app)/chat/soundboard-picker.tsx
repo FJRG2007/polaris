@@ -285,9 +285,9 @@ export function SoundboardButton({ meetingId, call }: { meetingId: string; call:
                 createPortal(
                     <div
                         ref={(node) => {
-                        panel.current = node;
-                        keepOwnScroll(node);
-                    }}
+                            panel.current = node;
+                            keepOwnScroll(node);
+                        }}
                         role="dialog"
                         aria-label={t("soundboard.button")}
                         style={{

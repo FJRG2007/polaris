@@ -175,7 +175,7 @@ export function FixDialog({
                         reportTo
                     )
                     .catch(() => null);
-            if (cancelled) return;
+                if (cancelled) return;
                 if (result?.changes) setChanges(result.changes);
                 else setError(result?.error ?? t("errors.failed"));
             },
