@@ -61,7 +61,7 @@
         "@polaris/storage": "0.1.0",
         "@polaris/ui": "0.1.0",
         "@polaris/vault-crypto": "0.1.0",
-        "@sapphi-red/web-noise-suppressor": "0.4.0",
+        "@sapphi-red/web-noise-suppressor": "0.4.1",
         "@tanstack/react-virtual": "3.14.21",
         "@tiptap/core": "3.32.0",
         "@tiptap/extension-code-block": "3.32.0",
