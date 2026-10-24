@@ -66,6 +66,19 @@ export async function delegateSendAction(input: unknown) {
     }
 }
 
+export async function delegateOpenDraftAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = draftRef.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("mail"))("delegate.errors.input") };
+    try {
+        return {
+            draft: await delegate.delegateDraft(userId, parsed.data.accountId, parsed.data.draftId)
+        };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
 export async function delegateCancelAction(input: unknown) {
     const userId = await actorId();
     const parsed = draftRef.safeParse(input);

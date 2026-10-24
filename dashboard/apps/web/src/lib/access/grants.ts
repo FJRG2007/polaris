@@ -1344,9 +1344,19 @@ export interface GrantUseInput {
  * turn into a different answer for the person at the door.
  */
 export async function recordGrantUse(use: GrantUseInput, now = new Date()): Promise<void> {
+    await recordGrantUses([use], now);
+}
+
+/** `recordGrantUse` for many at once, in one write - one action over a
+ *  hundred messages is a hundred rows, not a hundred round trips. */
+export async function recordGrantUses(
+    uses: readonly GrantUseInput[],
+    now = new Date()
+): Promise<void> {
+    if (uses.length === 0) return;
     try {
-        await prisma.grantUse.create({
-            data: {
+        await prisma.grantUse.createMany({
+            data: uses.map((use) => ({
                 grantId: use.grantId,
                 subjectType: use.subjectType,
                 subjectId: use.subjectId,
@@ -1358,7 +1368,7 @@ export async function recordGrantUse(use: GrantUseInput, now = new Date()): Prom
                 outcome: use.outcome,
                 reason: (use.reason ?? "").slice(0, 80),
                 at: now
-            }
+            }))
         });
         if (now.getTime() - prunedAt >= PRUNE_EVERY_MS) {
             prunedAt = now.getTime();

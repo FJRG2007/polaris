@@ -43,6 +43,7 @@
         "undo": "Undo send",
         "tooLate": "Already sent",
         "retry": "Try again",
+        "edit": "Edit",
         "discard": "Discard",
         "unsent": "Your unsent messages",
         "state": {
@@ -236,7 +237,8 @@
         "forwardLoop": "That address is a mailbox here. Forwarding to it would loop.",
         "forwardUnverified": "Forward only to an address you have verified on your account.",
         "filtersFull": "This mailbox has as many filters as it can hold.",
-        "noLongerShared": "Not sent. This mailbox is no longer shared with you."
+        "noLongerShared": "Not sent. This mailbox is no longer shared with you.",
+        "shareUnchecked": "Not sent yet. Polaris could not check this mailbox is still shared, and will try again."
     },
     "schema": {
         "matchOn": "Add something to match on",

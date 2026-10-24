@@ -34,6 +34,7 @@ import {
     delegateActAction,
     delegateCancelAction,
     delegateDiscardAction,
+    delegateOpenDraftAction,
     delegateRetryAction,
     delegateSendAction
 } from "./actions";
@@ -83,10 +84,6 @@ function recipients(line: string): { name: string; address: string }[] {
         .map((address) => ({ name: "", address }));
 }
 
-function replySubject(subject: string): string {
-    return /^re:/i.test(subject.trim()) ? subject : `Re: ${subject}`;
-}
-
 /** What the composer holds while it is open. */
 interface Draft {
     readonly to: string;
@@ -94,6 +91,9 @@ interface Draft {
     readonly subject: string;
     readonly body: string;
     readonly inReplyToId: string | null;
+    /** The saved draft this goes on writing, so sending it again replaces it
+     *  instead of leaving the old one behind. */
+    readonly draftId: string | null;
 }
 
 export function DelegateInbox({
@@ -174,7 +174,8 @@ export function DelegateInbox({
                       cc: recipients(draft.cc),
                       subject: draft.subject,
                       body: draft.body,
-                      inReplyToId: draft.inReplyToId
+                      inReplyToId: draft.inReplyToId,
+                      draftId: draft.draftId
                   })
                 : null,
         [accountId, draft]
@@ -186,7 +187,8 @@ export function DelegateInbox({
 
     function send() {
         setTouched(true);
-        if (!parsed?.success) return;
+        if (!draft || !parsed?.success) return;
+        const writing = draft;
         startBusy(async () => {
             const answer = await delegateSendAction(parsed.data);
             const draftId = "draftId" in answer ? answer.draftId : undefined;
@@ -196,6 +198,7 @@ export function DelegateInbox({
                 });
                 return;
             }
+            const written = { ...writing, draftId };
             setDraft(null);
             setTouched(false);
             toast.show({
@@ -209,16 +212,37 @@ export function DelegateInbox({
                                 draftId
                             });
                             router.refresh();
-                            return "error" in undone
-                                ? undone.error
-                                : undone.undone
-                                  ? null
-                                  : t("delegate.tooLate");
+                            if ("error" in undone) return undone.error;
+                            if (!undone.undone) return t("delegate.tooLate");
+                            setTouched(false);
+                            setDraft(written);
+                            return null;
                         }
                     }
                 ]
             });
             router.refresh();
+        });
+    }
+
+    /** Go on writing one of the unsent messages, as it was saved. */
+    function reopen(draftId: string) {
+        startBusy(async () => {
+            const answer = await delegateOpenDraftAction({ accountId, draftId });
+            if ("error" in answer) {
+                toast.show({ title: answer.error });
+                router.refresh();
+                return;
+            }
+            setTouched(false);
+            setDraft({
+                to: answer.draft.to.join(", "),
+                cc: answer.draft.cc.join(", "),
+                subject: answer.draft.subject,
+                body: answer.draft.body,
+                inReplyToId: answer.draft.inReplyToId,
+                draftId: answer.draft.id
+            });
         });
     }
 
@@ -264,7 +288,14 @@ export function DelegateInbox({
                     title={mayRespond ? undefined : needRespond}
                     onClick={() => {
                         setTouched(false);
-                        setDraft({ to: "", cc: "", subject: "", body: "", inReplyToId: null });
+                        setDraft({
+                            to: "",
+                            cc: "",
+                            subject: "",
+                            body: "",
+                            inReplyToId: null,
+                            draftId: null
+                        });
                     }}
                 >
                     <SquarePen className="size-4 shrink-0" aria-hidden />
@@ -282,7 +313,10 @@ export function DelegateInbox({
                     </h2>
                     <ul className="divide-y divide-border">
                         {drafts.map((one) => (
-                            <li key={one.id} className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-2">
+                            <li
+                                key={one.id}
+                                className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-2"
+                            >
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm" title={one.subject}>
                                         {one.subject || t("delegate.noSubject")}
@@ -318,6 +352,17 @@ export function DelegateInbox({
                                         {t("delegate.undo")}
                                     </Button>
                                 ) : null}
+                                {one.state === "draft" || one.state === "failed" ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={!mayRespond || busy}
+                                        title={mayRespond ? undefined : needRespond}
+                                        onClick={() => reopen(one.id)}
+                                    >
+                                        {t("delegate.edit")}
+                                    </Button>
+                                ) : null}
                                 {one.state === "failed" && !one.permanent ? (
                                     <Button
                                         size="sm"
@@ -340,7 +385,10 @@ export function DelegateInbox({
                                         disabled={busy}
                                         onClick={() =>
                                             onDraft(() =>
-                                                delegateDiscardAction({ accountId, draftId: one.id })
+                                                delegateDiscardAction({
+                                                    accountId,
+                                                    draftId: one.id
+                                                })
                                             )
                                         }
                                     >
@@ -398,7 +446,9 @@ export function DelegateInbox({
                         <Input
                             value={draft.subject}
                             maxLength={500}
-                            onChange={(event) => setDraft({ ...draft, subject: event.target.value })}
+                            onChange={(event) =>
+                                setDraft({ ...draft, subject: event.target.value })
+                            }
                         />
                     </label>
                     <Textarea
@@ -502,14 +552,17 @@ export function DelegateInbox({
                                         setDraft({
                                             to: current.replyAddress,
                                             cc: "",
-                                            subject: replySubject(current.subject),
+                                            subject: core.replySubject(current.subject),
                                             body: "",
-                                            inReplyToId: current.id
+                                            inReplyToId: current.id,
+                                            draftId: null
                                         });
                                     }
                                 )}
                                 {tool(
-                                    current.seen ? t("delegate.markUnread") : t("delegate.markRead"),
+                                    current.seen
+                                        ? t("delegate.markUnread")
+                                        : t("delegate.markRead"),
                                     current.seen ? (
                                         <Mail className="size-4 shrink-0" aria-hidden />
                                     ) : (

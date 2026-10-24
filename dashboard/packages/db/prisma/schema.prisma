@@ -386,6 +386,7 @@ model User {
     ownOAuthApps        UserOAuthApp[]
     listenedAlongWith   SpotifyListenAlong[] @relation("ListenAlongHost")
     mailAccounts        MailAccount[]
+    mailDelegateDrafts  MailDraft[]
     mailLabels          MailLabel[]
     mailUploads         MailUpload[]
     mailTemplates       MailTemplate[]
@@ -12869,7 +12870,8 @@ model MailDraft {
     // to (`mail.mailbox`, respond or above). Null is the holder. A delegate's
     // draft is theirs - it is never listed, sent, retried or thrown away by
     // the holder, nor by anybody else it is lent to - and the grant is asked
-    // again at the moment it goes.
+    // again at the moment it goes. They go with the delegate's account, and a
+    // day after the mailbox stops being lent to them (`pruneOrphanDelegateDrafts`).
     authorId String? @db.Uuid
 
     createdAt DateTime @default(now())
@@ -12877,10 +12879,12 @@ model MailDraft {
 
     account     MailAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
     identity    MailIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+    author      User?         @relation(fields: [authorId], references: [id], onDelete: Cascade)
     attachments MailUpload[]
 
     @@index([accountId, updatedAt])
     @@index([accountId, authorId, updatedAt])
+    @@index([authorId])
     @@index([state, sendAt])
 }
 

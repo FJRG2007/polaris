@@ -42,6 +42,8 @@ export const MAIL_REFUSALS: Readonly<Record<string, MailKey>> = {
     "That message has no files to save.": "refusals.noFilesToSave",
     "That draft is not yours.": "refusals.draftNotYours",
     "Not sent. This mailbox is no longer shared with you.": "refusals.noLongerShared",
+    "Not sent yet. Polaris could not check this mailbox is still shared, and will try again.":
+        "refusals.shareUnchecked",
     "This mailbox needs its password again.": "refusals.needsPassword",
     "The account that authorized this mailbox is no longer linked.": "refusals.authorizerGone",
     "The account that authorized this mailbox needs authorizing again.":

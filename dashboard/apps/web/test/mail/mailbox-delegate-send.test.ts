@@ -16,7 +16,10 @@ const state = vi.hoisted(() => ({
     messageWhere: [] as unknown[],
     acted: [] as unknown[][],
     queued: [] as unknown[][],
-    used: [] as Record<string, unknown>[]
+    used: [] as Record<string, unknown>[],
+    draftWhere: [] as unknown[],
+    pairs: [] as { authorId: string; accountId: string }[],
+    pruned: [] as unknown[]
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -37,17 +40,43 @@ vi.mock("@polaris/db", () => ({
                 return args.where.id === IN ? { id: IN } : null;
             })
         },
-        mailDraft: { findMany: vi.fn(async () => []) }
+        mailDraft: {
+            findMany: vi.fn(async (args: { distinct?: unknown }) =>
+                args.distinct ? state.pairs : []
+            ),
+            findFirst: vi.fn(async (args: { where: Record<string, unknown> }) => {
+                state.draftWhere.push(args.where);
+                return args.where.id === IN
+                    ? {
+                          id: IN,
+                          toJson: [{ name: "", address: "ana@example.test" }],
+                          ccJson: [],
+                          subject: "Plans",
+                          body: "Half written",
+                          inReplyToId: null
+                      }
+                    : null;
+            }),
+            deleteMany: vi.fn(async (args: { where: unknown }) => {
+                state.pruned.push(args.where);
+                return { count: 2 };
+            })
+        }
     }
 }));
 vi.mock("@/lib/access/grants", () => ({
     liveGrants: vi.fn(async () =>
         state.capability ? [{ id: "grant-1", capability: state.capability }] : []
     ),
-    grantedCapability: vi.fn(async () => state.capability),
+    grantedCapability: vi.fn(async (_user: string, _subject: string, accountId: string) =>
+        accountId === BOX ? state.capability : ""
+    ),
     grantedSubjects: vi.fn(async () => new Map()),
     recordGrantUse: vi.fn(async (use: Record<string, unknown>) => {
         state.used.push(use);
+    }),
+    recordGrantUses: vi.fn(async (uses: Record<string, unknown>[]) => {
+        state.used.push(...uses);
     })
 }));
 vi.mock("@/lib/mailbox/messages", () => ({
@@ -75,6 +104,9 @@ beforeEach(() => {
     state.acted = [];
     state.queued = [];
     state.used = [];
+    state.draftWhere = [];
+    state.pairs = [];
+    state.pruned = [];
 });
 
 const compose = (extra: Record<string, unknown> = {}) =>
@@ -142,9 +174,7 @@ describe("acting on the lent inbox", () => {
 
     it("is refused on a mailbox that is not lent", async () => {
         state.capability = "manage";
-        await expect(
-            act.delegateAct("delegate", { ...input, accountId: OUT })
-        ).rejects.toThrow();
+        await expect(act.delegateAct("delegate", { ...input, accountId: OUT })).rejects.toThrow();
     });
 });
 
@@ -158,7 +188,11 @@ describe("writing from the lent mailbox", () => {
     it("at respond, queues as the holder's mailbox with the delegate as author", async () => {
         state.capability = "respond";
         await act.delegateSend("delegate", compose({ inReplyToId: IN }));
-        const [holder, queued, author] = state.queued[0] as [string, Record<string, unknown>, string];
+        const [holder, queued, author] = state.queued[0] as [
+            string,
+            Record<string, unknown>,
+            string
+        ];
         expect(holder).toBe("holder");
         expect(author).toBe("delegate");
         expect(queued).toMatchObject({
@@ -172,9 +206,7 @@ describe("writing from the lent mailbox", () => {
 
     it("never answers a message outside the lent inbox", async () => {
         state.capability = "manage";
-        await expect(
-            act.delegateSend("delegate", compose({ inReplyToId: OUT }))
-        ).rejects.toThrow();
+        await expect(act.delegateSend("delegate", compose({ inReplyToId: OUT }))).rejects.toThrow();
         expect(state.queued).toEqual([]);
     });
 
@@ -182,5 +214,44 @@ describe("writing from the lent mailbox", () => {
         state.capability = "view";
         await expect(act.delegateDiscard("delegate", BOX, IN)).resolves.toBeUndefined();
         await expect(act.delegateRetry("delegate", BOX, IN)).rejects.toThrow();
+    });
+});
+
+describe("going on writing an unsent message", () => {
+    it("opens only the delegate's own draft, and never one on its way", async () => {
+        state.capability = "respond";
+        const draft = await act.delegateDraft("delegate", BOX, IN);
+        expect(draft).toMatchObject({ id: IN, to: ["ana@example.test"], body: "Half written" });
+        expect(state.draftWhere[0]).toMatchObject({
+            accountId: BOX,
+            authorId: "delegate",
+            state: { in: ["draft", "failed"] }
+        });
+        await expect(act.delegateDraft("delegate", BOX, OUT)).rejects.toThrow();
+    });
+
+    it("is refused at view, since it is only opened to send", async () => {
+        state.capability = "view";
+        await expect(act.delegateDraft("delegate", BOX, IN)).rejects.toThrow();
+        expect(state.draftWhere).toEqual([]);
+    });
+});
+
+describe("drafts left on a mailbox no longer lent", () => {
+    it("are thrown away, and those still lent are kept", async () => {
+        state.capability = "view";
+        state.pairs = [
+            { authorId: "delegate", accountId: BOX },
+            { authorId: "delegate", accountId: OUT }
+        ];
+        expect(await act.pruneOrphanDelegateDrafts(new Date("2026-09-19T10:00:00Z"))).toBe(2);
+        expect(state.pruned).toEqual([
+            expect.objectContaining({
+                authorId: "delegate",
+                accountId: OUT,
+                state: { in: ["draft", "failed"] },
+                updatedAt: { lt: new Date("2026-09-18T10:00:00Z") }
+            })
+        ]);
     });
 });

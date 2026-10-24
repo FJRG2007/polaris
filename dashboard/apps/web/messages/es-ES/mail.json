@@ -43,6 +43,7 @@
         "undo": "Deshacer",
         "tooLate": "Ya se envió",
         "retry": "Reintentar",
+        "edit": "Editar",
         "discard": "Descartar",
         "unsent": "Tus mensajes sin enviar",
         "state": {
@@ -236,7 +237,8 @@
         "forwardLoop": "Esa dirección es un buzón de aquí. Reenviar a ella crearía un bucle.",
         "forwardUnverified": "Reenvía solo a una dirección que hayas verificado en tu cuenta.",
         "filtersFull": "Este buzón ya tiene todos los filtros que puede tener.",
-        "noLongerShared": "No enviado. Este buzón ya no se comparte contigo."
+        "noLongerShared": "No enviado. Este buzón ya no se comparte contigo.",
+        "shareUnchecked": "Todavía no se ha enviado. Polaris no pudo comprobar que este buzón se sigue compartiendo y lo volverá a intentar."
     },
     "schema": {
         "matchOn": "Añade algo con lo que coincidir",

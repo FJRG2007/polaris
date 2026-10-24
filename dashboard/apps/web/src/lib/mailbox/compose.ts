@@ -304,7 +304,27 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
     // Written by somebody the mailbox is lent to: the grant is asked again now,
     // not when they pressed Send, so taking it back stops a message still
     // waiting out its undo window or its scheduled hour.
-    const delegate = draft.authorId ? await delegateSender(draft.authorId, account.id) : null;
+    let delegate: Awaited<ReturnType<typeof delegateSender>> = null;
+    try {
+        delegate = draft.authorId ? await delegateSender(draft.authorId, account.id) : null;
+    } catch (caught) {
+        console.warn("polaris: could not check a delegated send's grant:", caught);
+        await prisma.mailDraft.update({
+            where: { id: draft.id },
+            data: {
+                state: "failed",
+                failure:
+                    "Not sent yet. Polaris could not check this mailbox is still shared, and will try again.",
+                permanent: false
+            }
+        });
+        publishMail({
+            accountId: account.id,
+            kind: "sending",
+            actorId: draft.authorId ?? account.userId
+        });
+        return false;
+    }
     if (draft.authorId && !delegate) {
         await prisma.mailDraft.update({
             where: { id: draft.id },
@@ -385,7 +405,8 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             await announcePartial(
                 account.id,
                 draft.subject,
-                core.partialSendSentence(outcome.refused)
+                core.partialSendSentence(outcome.refused),
+                draft.authorId
             ).catch(() => undefined);
         }
         await rememberContacts(account.id, "sent", {
@@ -453,7 +474,9 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             data: { state: "failed", failure, permanent, ...(permanent ? { sendAt: null } : {}) }
         });
         if (permanent) {
-            await announceUnsent(account.id, draft.subject, failure).catch(() => undefined);
+            await announceUnsent(account.id, draft.subject, failure, draft.authorId).catch(
+                () => undefined
+            );
         }
         publishMail({ accountId: draft.accountId, kind: "sending", actorId: account.userId });
         return false;

@@ -22,7 +22,7 @@ import type { z } from "zod";
 import type * as core from "@polaris/core";
 import { actOnMessages } from "./messages";
 import { MailAccessError } from "./access";
-import { recordGrantUse } from "@/lib/access/grants";
+import { grantedCapability, recordGrantUses } from "@/lib/access/grants";
 import { inboxOf, requireDelegate } from "./delegate";
 import { cancelSend, discardDraft, queueSend, retrySend } from "./compose";
 
@@ -52,8 +52,8 @@ export async function delegateAct(
     if (inside.length === 0) return 0;
     const ids = inside.map((row) => row.id);
     const done = await actOnMessages(holderId, ids, input.action, { strict: true });
-    for (const id of ids) {
-        await recordGrantUse({
+    await recordGrantUses(
+        ids.map((id) => ({
             grantId,
             subjectType: "mail.mailbox",
             subjectId: input.accountId,
@@ -61,9 +61,9 @@ export async function delegateAct(
             targetId: id,
             userId,
             action: input.action,
-            outcome: "done"
-        });
-    }
+            outcome: "done" as const
+        }))
+    );
     return done;
 }
 
@@ -159,6 +159,53 @@ export async function delegateDrafts(userId: string, accountId: string): Promise
     }));
 }
 
+/** What a delegate's composer reopens with: the message as they last wrote it. */
+export interface DelegateDraftContent {
+    readonly id: string;
+    readonly to: string[];
+    readonly cc: string[];
+    readonly subject: string;
+    readonly body: string;
+    readonly inReplyToId: string | null;
+}
+
+/** One of this delegate's own unsent messages, to go on writing it. Only
+ *  `respond` and above, since all it is opened for is sending; never one that
+ *  is waiting to go or on its way. */
+export async function delegateDraft(
+    userId: string,
+    accountId: string,
+    draftId: string
+): Promise<DelegateDraftContent> {
+    await requireDelegate(userId, accountId, "respond");
+    const row = await prisma.mailDraft.findFirst({
+        where: {
+            id: draftId,
+            accountId,
+            authorId: userId,
+            probe: false,
+            state: { in: ["draft", "failed"] }
+        },
+        select: {
+            id: true,
+            toJson: true,
+            ccJson: true,
+            subject: true,
+            body: true,
+            inReplyToId: true
+        }
+    });
+    if (!row) throw new MailAccessError();
+    return {
+        id: row.id,
+        to: addressesFrom(row.toJson).map((entry) => entry.address),
+        cc: addressesFrom(row.ccJson).map((entry) => entry.address),
+        subject: row.subject,
+        body: row.body,
+        inReplyToId: row.inReplyToId
+    };
+}
+
 /** Undo a delegate's send while it waits. Their own draft only. */
 export async function delegateCancel(
     userId: string,
@@ -188,4 +235,41 @@ export async function delegateDiscard(
 ): Promise<void> {
     const { holderId } = await requireDelegate(userId, accountId, "view");
     await discardDraft(holderId, draftId, userId);
+}
+
+/** How many writer and mailbox pairs one pass of `pruneOrphanDelegateDrafts`
+ *  looks at. */
+const PRUNE_PAIRS = 500;
+
+/**
+ * Throw away what a delegate left unsent on a mailbox that is no longer lent to
+ * them. Nobody can reach those rows any more: the delegate's screen needs the
+ * grant and the holder never sees another person's drafts. A day's grace, so
+ * sharing it again straight away gives back what was there; anything waiting
+ * to go or on its way is left to `deliverQueued`, which refuses it first.
+ */
+export async function pruneOrphanDelegateDrafts(now = new Date()): Promise<number> {
+    const before = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const idle = {
+        authorId: { not: null },
+        state: { in: ["draft", "failed"] },
+        updatedAt: { lt: before }
+    };
+    const pairs = await prisma.mailDraft.findMany({
+        where: idle,
+        distinct: ["authorId", "accountId"],
+        select: { authorId: true, accountId: true },
+        orderBy: [{ authorId: "asc" }, { accountId: "asc" }],
+        take: PRUNE_PAIRS
+    });
+    let pruned = 0;
+    for (const pair of pairs) {
+        if (!pair.authorId) continue;
+        if (await grantedCapability(pair.authorId, "mail.mailbox", pair.accountId, now)) continue;
+        const { count } = await prisma.mailDraft.deleteMany({
+            where: { ...idle, authorId: pair.authorId, accountId: pair.accountId }
+        });
+        pruned += count;
+    }
+    return pruned;
 }
