@@ -43,7 +43,10 @@ export async function listPanels(installedAppId: string, placeId: string): Promi
 }
 
 export async function requirePanel(installedAppId: string, id: string): Promise<PanelView> {
-    const row = await prisma.placePanel.findFirst({ where: { id, installedAppId }, select: FIELDS });
+    const row = await prisma.placePanel.findFirst({
+        where: { id, installedAppId },
+        select: FIELDS
+    });
     if (!row) throw new HomeError("That panel is not here");
     return toView(row);
 }
@@ -213,7 +216,10 @@ export async function panelPlaceReach(
         });
         const kept = new Set(here.map((device: { id: string }) => device.id));
         for (const deviceId of direct) {
-            if (!kept.has(deviceId) && ![...byRoom.values()].some((list) => list.includes(deviceId)))
+            if (
+                !kept.has(deviceId) &&
+                ![...byRoom.values()].some((list) => list.includes(deviceId))
+            )
                 ids.delete(deviceId);
         }
     }

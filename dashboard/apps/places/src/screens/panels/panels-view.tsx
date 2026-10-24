@@ -113,7 +113,10 @@ function NameDialog({
                     </label>
                     {issue || error ? (
                         <p role="alert" className="text-sm text-danger">
-                            {error || (issue === "That name is too long" ? t("refusals.panelNameLong") : t("refusals.panelName"))}
+                            {error ||
+                                (issue === "That name is too long"
+                                    ? t("refusals.panelNameLong")
+                                    : t("refusals.panelName"))}
                         </p>
                     ) : null}
                     <DialogFooter>
@@ -168,7 +171,9 @@ function AddCardDialog({
                             {t("panels.pickRoom")}
                         </h3>
                         {rooms.length === 0 ? (
-                            <p className="px-3 text-sm text-muted-foreground">{t("panels.noRooms")}</p>
+                            <p className="px-3 text-sm text-muted-foreground">
+                                {t("panels.noRooms")}
+                            </p>
                         ) : (
                             rooms.map((room) => (
                                 <button
@@ -277,7 +282,10 @@ export function PanelsView({
     };
     const rename = async (name: string): Promise<string | null> => {
         if (!selected) return null;
-        const result = await runAction(() => actions.renamePanelAction(selected.id, name), setError);
+        const result = await runAction(
+            () => actions.renamePanelAction(selected.id, name),
+            setError
+        );
         if (!result || result.error || !result.panel) return result?.error ?? t("panels.notSaved");
         replace(result.panel);
         return null;
@@ -315,7 +323,10 @@ export function PanelsView({
                     }
                 />
             ) : (
-                <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label={t("panels.panelsAt")}>
+                <div
+                    className="flex min-w-0 flex-wrap items-center gap-2"
+                    aria-label={t("panels.panelsAt")}
+                >
                     {panels.map((panel) => (
                         <Button
                             key={panel.id}
@@ -345,7 +356,10 @@ export function PanelsView({
             {selected ? (
                 <section className="flex flex-col gap-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <h2 className="min-w-0 flex-1 truncate text-base font-medium" title={selected.name}>
+                        <h2
+                            className="min-w-0 flex-1 truncate text-base font-medium"
+                            title={selected.name}
+                        >
                             {selected.name}
                             <span className="ml-2 text-sm font-normal text-muted-foreground">
                                 {t("panels.cards", { count: selected.cards.length })}
@@ -361,7 +375,11 @@ export function PanelsView({
                                     {editing ? t("panels.done") : t("panels.edit")}
                                 </Button>
                                 {editing ? (
-                                    <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setAdding(true)}
+                                    >
                                         <Plus className="size-4" />
                                         {t("panels.addCard")}
                                     </Button>
@@ -409,7 +427,10 @@ export function PanelsView({
                         <p className="text-xs text-muted-foreground">{t("panels.arrangeHint")}</p>
                     ) : null}
                     {error ? (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
                             {error}
                         </p>
                     ) : null}

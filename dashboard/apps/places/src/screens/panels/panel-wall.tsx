@@ -32,7 +32,9 @@ function useScreenAwake(): boolean {
         let gone = false;
         const wakeLock = (
             navigator as Navigator & {
-                wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> };
+                wakeLock?: {
+                    request: (type: "screen") => Promise<{ release: () => Promise<void> }>;
+                };
             }
         ).wakeLock;
         const take = async () => {
@@ -60,7 +62,8 @@ function useScreenAwake(): boolean {
                 video.playsInline = true;
                 video.loop = true;
                 video.setAttribute("aria-hidden", "true");
-                video.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none";
+                video.style.cssText =
+                    "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none";
                 video.srcObject = stream;
                 document.body.appendChild(video);
                 await video.play();
@@ -182,7 +185,10 @@ export function PanelWall({
                     {name}
                 </h1>
                 {!online ? (
-                    <span className="flex shrink-0 items-center gap-1.5 text-sm text-warning" role="status">
+                    <span
+                        className="flex shrink-0 items-center gap-1.5 text-sm text-warning"
+                        role="status"
+                    >
                         <WifiOff className="size-4" />
                         {t("panelWall.reconnecting")}
                     </span>
@@ -218,7 +224,10 @@ export function PanelWall({
                 </Button>
             </header>
             {error ? (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             ) : null}

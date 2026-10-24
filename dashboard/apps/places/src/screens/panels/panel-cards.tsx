@@ -122,9 +122,10 @@ export function ClockCard() {
         <CardFrame className="items-center justify-center text-center">
             <span className="text-4xl font-semibold tabular-nums">
                 {now
-                    ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(
-                          now
-                      )
+                    ? new Intl.DateTimeFormat(locale, {
+                          hour: "2-digit",
+                          minute: "2-digit"
+                      }).format(now)
                     : "--:--"}
             </span>
             <span className="min-w-0 truncate text-sm text-muted-foreground">

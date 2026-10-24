@@ -34,7 +34,11 @@ export default async function PanelsPage() {
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <PageHeader title={t("panels.title")} description={t("panels.description")} />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <PanelsView
                 key={placeId}

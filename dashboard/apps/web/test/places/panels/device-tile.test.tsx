@@ -104,11 +104,15 @@ describe("a device tile", () => {
 
     it("shows the battery, and warns once it is low", () => {
         const { rerender } = render(
-            withMessages(<DeviceTile device={device({ kind: "lock", batteryPercent: 80 })} acts={acts} />)
+            withMessages(
+                <DeviceTile device={device({ kind: "lock", batteryPercent: 80 })} acts={acts} />
+            )
         );
         expect(screen.getByRole("img", { name: "Battery 80%" })).toBeTruthy();
         rerender(
-            withMessages(<DeviceTile device={device({ kind: "lock", batteryPercent: 5 })} acts={acts} />)
+            withMessages(
+                <DeviceTile device={device({ kind: "lock", batteryPercent: 5 })} acts={acts} />
+            )
         );
         expect(screen.getByRole("img", { name: /Battery low/ })).toBeTruthy();
     });

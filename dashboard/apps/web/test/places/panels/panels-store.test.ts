@@ -38,7 +38,8 @@ function matches(row: Row, where: Row): boolean {
 
 function table(rows: () => Row[]) {
     return {
-        count: async ({ where }: { where: Row }) => rows().filter((row) => matches(row, where)).length,
+        count: async ({ where }: { where: Row }) =>
+            rows().filter((row) => matches(row, where)).length,
         findMany: async ({ where }: { where: Row }) => rows().filter((row) => matches(row, where)),
         findFirst: async ({ where }: { where: Row }) =>
             rows().find((row) => matches(row, where)) ?? null

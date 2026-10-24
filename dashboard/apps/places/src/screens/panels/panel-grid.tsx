@@ -113,9 +113,7 @@ export function PanelGrid({
                     // Arranging is done on the wide grid even on a narrow screen,
                     // scrolled sideways inside its box, so what is arranged is
                     // what the wall shows.
-                    editing
-                        ? "min-w-[48rem] grid-cols-12"
-                        : "grid-cols-1 md:grid-cols-12"
+                    editing ? "min-w-[48rem] grid-cols-12" : "grid-cols-1 md:grid-cols-12"
                 )}
                 style={{ gridAutoRows: `${ROW_REM}rem` } as CSSProperties}
             >
@@ -138,7 +136,12 @@ export function PanelGrid({
                                 drag?.id === card.id && "z-10 opacity-90"
                             )}
                         >
-                            <div className={cn("h-full", editing && "pointer-events-none select-none")}>
+                            <div
+                                className={cn(
+                                    "h-full",
+                                    editing && "pointer-events-none select-none"
+                                )}
+                            >
                                 {render(card)}
                             </div>
                             {editing ? (
@@ -172,7 +175,10 @@ export function PanelGrid({
                                         title={t("panels.resizeCard", { name: label })}
                                         onPointerDown={(event) => begin(event, card, "resize")}
                                         onKeyDown={(event) =>
-                                            nudge({ ...event, shiftKey: true } as React.KeyboardEvent, card)
+                                            nudge(
+                                                { ...event, shiftKey: true } as React.KeyboardEvent,
+                                                card
+                                            )
                                         }
                                         className="absolute bottom-2 right-2 flex size-9 cursor-nwse-resize touch-none items-center justify-center rounded-md border border-border bg-background/90 text-muted-foreground"
                                     >
