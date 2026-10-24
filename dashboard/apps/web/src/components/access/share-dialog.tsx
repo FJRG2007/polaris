@@ -20,7 +20,17 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+    type ReactNode
+} from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AccessLog } from "@/components/access/access-log";
 import { Avatar } from "@/components/avatar";
@@ -100,6 +110,8 @@ const STANDING_TONE: Record<core.GrantStanding, "success" | "warning" | "neutral
 
 /** One row of "People with access", in pixels, for the virtualizer. */
 const ROW_HEIGHT = 56;
+/** The tallest the suggestion list grows, room permitting. */
+const LIST_HEIGHT = 256;
 /** Values the role menu uses for what is not a role. */
 const LIMITS = "__limits";
 const REMOVE = "__remove";
@@ -271,11 +283,45 @@ export function ShareDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, subject, subjectId, principals.join(","), staged]);
 
+    const full = staged.length >= core.MAX_SHARE_TARGETS;
     const stage = (target: ShareTarget): void => {
+        if (full) return;
         setStaged((held) => [...held, target]);
         setQuery("");
         setFound([]);
     };
+
+    // The suggestions are drawn over the dialog rather than inside it, so a
+    // short window clips neither them nor the dialog's own scroll.
+    const addBox = useRef<HTMLDivElement>(null);
+    const [listAt, setListAt] = useState<CSSProperties | null>(null);
+    const listing = found.length > 0 && !full;
+    useLayoutEffect(() => {
+        if (!listing) {
+            setListAt(null);
+            return;
+        }
+        const measure = (): void => {
+            const box = addBox.current?.getBoundingClientRect();
+            if (!box) return;
+            const below = window.innerHeight - box.bottom - 12;
+            const above = box.top - 12;
+            const up = below < LIST_HEIGHT && above > below;
+            setListAt({
+                left: box.left,
+                width: box.width,
+                maxHeight: Math.max(Math.min(LIST_HEIGHT, up ? above : below), 0),
+                ...(up ? { bottom: window.innerHeight - box.top + 4 } : { top: box.bottom + 4 })
+            });
+        };
+        measure();
+        window.addEventListener("scroll", measure, true);
+        window.addEventListener("resize", measure);
+        return () => {
+            window.removeEventListener("scroll", measure, true);
+            window.removeEventListener("resize", measure);
+        };
+    }, [listing, staged.length]);
     const unstageAll = (): void => {
         setStaged([]);
         setLimits(EMPTY_LIMITS);
@@ -417,8 +463,10 @@ export function ShareDialog({
     const items = virtualizer.getVirtualItems();
     const lastIndex = items[items.length - 1]?.index ?? -1;
     useEffect(() => {
-        if (cursor && !paging && lastIndex >= people.length - 5) void loadPeople(filter, cursor);
-    }, [cursor, paging, lastIndex, people.length, filter, loadPeople]);
+        if (cursor && !paging && !pageFailed && lastIndex >= people.length - 5) {
+            void loadPeople(filter, cursor);
+        }
+    }, [cursor, paging, pageFailed, lastIndex, people.length, filter, loadPeople]);
 
     // --- Links ------------------------------------------------------------------------
     const [draftAudience, setDraftAudience] = useState<core.LinkAudience | null>(null);
@@ -552,7 +600,10 @@ export function ShareDialog({
                             <label className="sr-only" htmlFor="share-add">
                                 {t("share.addLabel")}
                             </label>
-                            <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 focus-within:ring-2 focus-within:ring-primary/40">
+                            <div
+                                ref={addBox}
+                                className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 focus-within:ring-2 focus-within:ring-primary/40"
+                            >
                                 {staged.map((one) => (
                                     <span
                                         key={`${one.type}:${one.id}`}
@@ -578,7 +629,7 @@ export function ShareDialog({
                                 <input
                                     id="share-add"
                                     role="combobox"
-                                    aria-expanded={found.length > 0}
+                                    aria-expanded={listing}
                                     aria-controls="share-add-list"
                                     aria-autocomplete="list"
                                     aria-activedescendant={
@@ -618,43 +669,53 @@ export function ShareDialog({
                                     />
                                 ) : null}
                             </div>
-                            {found.length > 0 ? (
-                                <ul
-                                    id="share-add-list"
-                                    role="listbox"
-                                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-surface-raised p-1 shadow-lg"
-                                >
-                                    {found.map((one, index) => (
-                                        <li
-                                            key={`${one.type}:${one.id}`}
-                                            id={`share-add-${index}`}
-                                            role="option"
-                                            aria-selected={index === active}
-                                            onMouseDown={(event) => event.preventDefault()}
-                                            onClick={() => stage(one)}
-                                            onMouseEnter={() => setActive(index)}
-                                            className={cn(
-                                                "flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1.5",
-                                                index === active && "bg-surface-hover"
-                                            )}
+                            {full ? (
+                                <p className="text-[12px] text-muted-foreground">
+                                    {t("share.tooMany", { count: core.MAX_SHARE_TARGETS })}
+                                </p>
+                            ) : listing ? (
+                                listAt ? (
+                                    createPortal(
+                                        <ul
+                                            id="share-add-list"
+                                            role="listbox"
+                                            style={listAt}
+                                            className="pointer-events-auto fixed z-[60] overflow-y-auto rounded-md border border-border bg-surface-raised p-1 shadow-lg"
                                         >
-                                            <TargetFace target={one} size={24} />
-                                            <span className="min-w-0 flex-1">
-                                                <span className="block truncate text-[13px] text-foreground">
-                                                    {one.name}
-                                                </span>
-                                                {one.detail ? (
-                                                    <span className="block truncate text-[12px] text-muted-foreground">
-                                                        {one.detail}
+                                            {found.map((one, index) => (
+                                                <li
+                                                    key={`${one.type}:${one.id}`}
+                                                    id={`share-add-${index}`}
+                                                    role="option"
+                                                    aria-selected={index === active}
+                                                    onMouseDown={(event) => event.preventDefault()}
+                                                    onClick={() => stage(one)}
+                                                    onMouseEnter={() => setActive(index)}
+                                                    className={cn(
+                                                        "flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1.5",
+                                                        index === active && "bg-surface-hover"
+                                                    )}
+                                                >
+                                                    <TargetFace target={one} size={24} />
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="block truncate text-[13px] text-foreground">
+                                                            {one.name}
+                                                        </span>
+                                                        {one.detail ? (
+                                                            <span className="block truncate text-[12px] text-muted-foreground">
+                                                                {one.detail}
+                                                            </span>
+                                                        ) : null}
                                                     </span>
-                                                ) : null}
-                                            </span>
-                                            <span className="shrink-0 text-[11px] text-foreground-subtle">
-                                                {t(`share.kinds.${one.type}`)}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
+                                                    <span className="shrink-0 text-[11px] text-foreground-subtle">
+                                                        {t(`share.kinds.${one.type}`)}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>,
+                                        document.body
+                                    )
+                                ) : null
                             ) : query.trim().length >= 2 && !searching ? (
                                 <p className="text-[12px] text-muted-foreground">{t("share.noMatch")}</p>
                             ) : null}
@@ -852,9 +913,19 @@ export function ShareDialog({
                                         </div>
                                     )}
                                     {pageFailed && rows !== null && rows.length > 0 ? (
-                                        <p role="alert" className="text-[12px] text-danger-ink">
-                                            {t("share.loadFailed")}
-                                        </p>
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <p role="alert" className="min-w-0 flex-1 text-[12px] text-danger-ink">
+                                                {t("share.loadFailed")}
+                                            </p>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                disabled={paging}
+                                                onClick={() => void loadPeople(filter, cursor)}
+                                            >
+                                                {t("share.retry")}
+                                            </Button>
+                                        </div>
                                     ) : null}
                                 </section>
 

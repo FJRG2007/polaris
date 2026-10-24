@@ -551,6 +551,9 @@ export const MAX_GRANTS_PER_SUBJECT = 5_000;
 /** The most rows one page of "People with access" carries. */
 export const GRANT_PAGE_SIZE = 50;
 
+/** The most people and groups one press of Share may add. */
+export const MAX_SHARE_TARGETS = 20;
+
 /**
  * The moment a picked day begins, in the reader's own zone.
  *

@@ -12,6 +12,8 @@ let members: { orgId: string; userId: string }[] = [];
 let viewer: { id: string; isAdmin: boolean } | null = null;
 let mayShare = false;
 let lastFindMany: Record<string, unknown> | null = null;
+let userSearch: Row | null = null;
+const ANA = "00000000-0000-4000-8000-0000000000a1";
 
 const matches = (row: Row, where: Row): boolean =>
     Object.entries(where).every(([key, want]) => {
@@ -30,6 +32,10 @@ vi.mock("@polaris/db", () => ({
             create: async ({ data }: { data: Row }) => {
                 grants.push({ ...data, id: `g${grants.length + 1}`, uses: 0 });
                 return { id: `g${grants.length}` };
+            },
+            createMany: async ({ data }: { data: Row[] }) => {
+                for (const one of data) grants.push({ ...one, id: `g${grants.length + 1}`, uses: 0 });
+                return { count: data.length };
             },
             findFirst: async ({ where }: { where: Row }) =>
                 grants.find((row) => matches(row, where)) ?? null,
@@ -52,12 +58,15 @@ vi.mock("@polaris/db", () => ({
         orgRole: { findMany: async () => [] },
         team: { findMany: async () => [] },
         user: {
-            findMany: async ({ where }: { where: Row }) =>
-                "OR" in where
-                    ? [{ id: "00000000-0000-4000-8000-0000000000a1" }].filter(() =>
-                          JSON.stringify(where).includes("ana")
-                      )
-                    : [{ id: "00000000-0000-4000-8000-0000000000a1", name: "Ana", username: "ana", email: "ana@example.test" }]
+            findUnique: async ({ where }: { where: { id: string } }) =>
+                where.id === ANA ? { id: ANA } : null,
+            findMany: async ({ where }: { where: Row }) => {
+                if (!("OR" in where)) {
+                    return [{ id: ANA, name: "Ana", username: "ana", email: "ana@example.test" }];
+                }
+                userSearch = where;
+                return JSON.stringify(where).includes("ana") ? [{ id: ANA }] : [];
+            }
         }
     }
 }));
@@ -97,7 +106,8 @@ vi.mock("@/lib/privacy-service", () => ({
 }));
 
 const core = await import("@polaris/core");
-const { linkReach, listSubjectGrantPage, writeGrantLink } = await import("@/lib/access/grants");
+const { linkReach, listSubjectGrantPage, listSubjectGrants, writeGrantLink, writeGrants } =
+    await import("@/lib/access/grants");
 const { unlockGrantLinkAction } = await import("@/app/k/[[...path]]/actions");
 
 const DOOR = "00000000-0000-4000-8000-000000000001";
@@ -283,5 +293,42 @@ describe("people with access, a page at a time", () => {
         expect(hit.total).toBe(1);
         const miss = await listSubjectGrantPage("task.space", DOOR, { links: false, search: "zz" }, me);
         expect(miss).toEqual({ grants: [], total: 0, nextCursor: null });
+    });
+
+    it("looks names up only among the people this is handed to", async () => {
+        grants.push(person(1));
+        const me = { id: "u-viewer", isAdmin: false };
+        await listSubjectGrantPage("task.space", DOOR, { links: false, search: "ana" }, me);
+        expect(userSearch?.id).toEqual({ in: [ANA] });
+        userSearch = null;
+        grants = [];
+        const none = await listSubjectGrantPage("task.space", DOOR, { links: false, search: "ana" }, me);
+        expect(none.total).toBe(0);
+        expect(userSearch).toBeNull();
+    });
+
+    it("reads every grant of one principal type, past the first page", async () => {
+        for (let index = 1; index <= core.GRANT_PAGE_SIZE + 7; index++) {
+            grants.push({ ...person(index), principalType: "role" });
+        }
+        grants.unshift(person(0));
+        const roles = await listSubjectGrants("task.space", DOOR, undefined, ["role"]);
+        expect(lastFindMany?.take).toBe(core.MAX_GRANTS_PER_SUBJECT);
+        expect((lastFindMany?.where as Row).principalType).toEqual({ in: ["role"] });
+        expect(roles.every((one) => one.principalType === "role")).toBe(true);
+    });
+});
+
+describe("writeGrants", () => {
+    const to = (principalId: string) =>
+        core.accessGrantSchema.parse({ principalType: "user", principalId, capability: "member" });
+
+    it("writes every one, or none when any is refused", async () => {
+        await expect(
+            writeGrants("task.space", DOOR, [to(ANA), to("00000000-0000-4000-8000-0000000000b2")], "me", [])
+        ).rejects.toThrow();
+        expect(grants).toHaveLength(0);
+        await expect(writeGrants("task.space", DOOR, [to(ANA)], "me", [])).resolves.toBe(1);
+        expect(grants).toHaveLength(1);
     });
 });

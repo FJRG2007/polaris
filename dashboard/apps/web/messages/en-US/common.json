@@ -41,6 +41,7 @@
     "share": {
         "unreadable": "That could not be read",
         "notWritten": "That share could not be written",
+        "tooMany": "Share with up to {count} at a time",
         "nobodyFound": "Nobody could be looked up",
         "notTakenBack": "That share could not be taken back",
         "notice": "{name} shared {what} with you",

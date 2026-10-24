@@ -5,7 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 
@@ -54,6 +54,7 @@ vi.mock("@/components/confirm-dialog", () => ({
     useConfirm: () => [async () => confirmAnswer, null]
 }));
 
+const core = await import("@polaris/core");
 const { MessagesWrapper } = await import("../setup/i18n");
 const { ShareDialog } = await import("@/components/access/share-dialog");
 
@@ -174,6 +175,48 @@ describe("ShareDialog", () => {
             expect(screen.getByRole("combobox", { name: "Access for Ana" }).textContent).not.toContain("Admin")
         );
     });
+
+    it("stops asking for the next page after it fails, until Try again", async () => {
+        actions.grantPageAction.mockImplementation(
+            async (_s: string, _id: string, q: { links?: boolean; cursor?: string | null }) =>
+                q.links
+                    ? { page: { grants: [], total: 0, nextCursor: null } }
+                    : q.cursor
+                      ? { error: "No" }
+                      : { page: { grants: [row("1", "Ana")], total: 80, nextCursor: "1" } }
+        );
+        const paged = () =>
+            actions.grantPageAction.mock.calls.filter(
+                (call) => (call[2] as { cursor?: string | null }).cursor
+            ).length;
+        open();
+        expect(await screen.findByText("Could not load the rest.")).toBeTruthy();
+        await new Promise((done) => setTimeout(done, 50));
+        expect(paged()).toBe(1);
+        await act(async () => screen.getByRole("button", { name: "Try again" }).click());
+        await waitFor(() => expect(paged()).toBe(2));
+        await new Promise((done) => setTimeout(done, 50));
+        expect(paged()).toBe(2);
+    });
+
+    it("draws suggestions over the dialog and stops staging at the most one Share takes", async () => {
+        let next = 0;
+        actions.findShareTargetsAction.mockImplementation(async () => ({
+            targets: [{ type: "user", id: `p${++next}`, name: `Person ${next}`, detail: "" }]
+        }));
+        open();
+        const box = screen.getByRole("combobox", { name: "Add people, teams or roles" }) as HTMLInputElement;
+        for (let index = 0; index < core.MAX_SHARE_TARGETS; index++) {
+            fireEvent.change(box, { target: { value: "pe" } });
+            const option = await screen.findByRole("option", {}, { timeout: 2000 });
+            expect(option.closest("ul")?.parentElement).toBe(document.body);
+            await act(async () => option.click());
+        }
+        fireEvent.change(box, { target: { value: "pe" } });
+        await waitFor(() => expect(actions.findShareTargetsAction).toHaveBeenCalledTimes(core.MAX_SHARE_TARGETS + 1));
+        expect(screen.queryByRole("option")).toBeNull();
+        expect(screen.getByText(`Up to ${core.MAX_SHARE_TARGETS} at a time. Share these first.`)).toBeTruthy();
+    }, 30_000);
 
     it("fits a phone: rows and names truncate instead of overflowing", async () => {
         Object.defineProperty(window, "innerWidth", { value: 360, configurable: true });

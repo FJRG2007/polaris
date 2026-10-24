@@ -41,6 +41,7 @@
     "share": {
         "unreadable": "No se ha podido leer",
         "notWritten": "No se pudo guardar esa compartición",
+        "tooMany": "Comparte con {count} como máximo a la vez",
         "nobodyFound": "No se ha podido buscar a nadie",
         "notTakenBack": "No se ha podido retirar esa compartición",
         "notice": "{name} ha compartido {what} contigo",

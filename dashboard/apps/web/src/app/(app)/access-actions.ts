@@ -42,6 +42,7 @@ import {
     setLinkAudience,
     updateGrant,
     writeGrant,
+    writeGrants,
     writeGrantLink,
     type GrantPage,
     type GrantView
@@ -116,7 +117,9 @@ function settled(subject: core.GrantSubject): void {
 
 export async function listGrantsAction(
     subject: string,
-    subjectId: string
+    subjectId: string,
+    /** Only grants to this kind of principal, every one of them. */
+    only?: string
 ): Promise<{
     grants?: GrantView[];
     candidates?: GrantCandidate[];
@@ -127,8 +130,14 @@ export async function listGrantsAction(
         const user = await requireUser();
         const kind = subjectOf(subject);
         await requireMayShare(user, kind, String(subjectId));
+        const principal = core.GRANT_PRINCIPALS.find((one) => one === only);
         const [grants, candidates, located] = await Promise.all([
-            listSubjectGrants(kind, String(subjectId)),
+            listSubjectGrants(
+                kind,
+                String(subjectId),
+                undefined,
+                principal ? [principal] : undefined
+            ),
             shareCandidates(user, kind, String(subjectId)),
             subjectPlaceLocated(kind, String(subjectId))
         ]);
@@ -465,13 +474,11 @@ export async function findShareTargetsAction(
     }
 }
 
-/** The most people and groups one press of Share may add. */
-const MAX_TARGETS_PER_SHARE = 20;
-
 /**
  * Hand this to several people and groups at once, with the same capability and
  * bounds, and - when asked - a notice in each person's bell carrying the
- * message. Each one is written through the same checks as `shareAction`.
+ * message. Every one is checked as `shareAction` checks it, and either all are
+ * written or none is.
  */
 export async function shareManyAction(
     subject: string,
@@ -482,14 +489,18 @@ export async function shareManyAction(
         const user = await requireUser();
         const kind = subjectOf(subject);
         await requireMayShare(user, kind, String(subjectId));
-        const targets = Array.isArray(input.targets)
-            ? input.targets.slice(0, MAX_TARGETS_PER_SHARE)
-            : [];
+        const targets = Array.isArray(input.targets) ? input.targets : [];
         if (targets.length === 0) {
             return { error: (await getTranslations("common"))("share.notWritten") };
         }
-        const message =
-            typeof input.message === "string" ? input.message.trim().slice(0, 500) : "";
+        if (targets.length > core.MAX_SHARE_TARGETS) {
+            return {
+                error: (await getTranslations("common"))("share.tooMany", {
+                    count: core.MAX_SHARE_TARGETS
+                })
+            };
+        }
+        const message = typeof input.message === "string" ? input.message.trim().slice(0, 500) : "";
         const orgIds = await owningOrgIds(user, kind, String(subjectId));
         const written: core.AccessGrantInput[] = [];
         for (const target of targets) {
@@ -504,9 +515,9 @@ export async function shareManyAction(
                         (await getTranslations("common"))("share.notWritten")
                 };
             }
-            await writeGrant(kind, String(subjectId), parsed.data, user.id, orgIds);
             written.push(parsed.data);
         }
+        await writeGrants(kind, String(subjectId), written, user.id, orgIds);
         await recordAudit({
             actorId: user.id,
             action: "access.shared",

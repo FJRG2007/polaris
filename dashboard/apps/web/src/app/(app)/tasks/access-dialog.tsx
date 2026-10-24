@@ -600,7 +600,7 @@ function RoleGrants({
     const [error, setError] = useState("");
 
     const load = useCallback(async (): Promise<void> => {
-        const answer = await listGrantsAction(subject, subjectId);
+        const answer = await listGrantsAction(subject, subjectId, "role");
         setGrants((answer.grants ?? []).filter((one) => one.principalType === "role"));
         setRoles((answer.candidates ?? []).filter((one) => one.type === "role"));
     }, [subject, subjectId]);

@@ -560,12 +560,17 @@ export interface GrantView {
 export async function listSubjectGrants(
     subject: core.GrantSubject,
     subjectId: string,
-    now = new Date()
+    now = new Date(),
+    principalTypes?: readonly string[]
 ): Promise<GrantView[]> {
     const rows = await prisma.accessGrant.findMany({
-        where: { subjectType: subject, subjectId },
+        where: {
+            subjectType: subject,
+            subjectId,
+            ...(principalTypes ? { principalType: { in: [...principalTypes] } } : {})
+        },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        take: core.GRANT_PAGE_SIZE
+        take: principalTypes ? core.MAX_GRANTS_PER_SUBJECT : core.GRANT_PAGE_SIZE
     });
     return viewsOf(rows, now, null);
 }
@@ -588,17 +593,13 @@ export interface GrantPage {
     readonly nextCursor: string | null;
 }
 
-/** How many principals a search may narrow a page to: a name typed into a
- *  list of thousands is looking for somebody, not for a census. */
-const SEARCH_CAP = 500;
-
 /**
  * A page of what one thing hands out, oldest first, with the total.
  *
  * Bounded whatever the subject carries: a page is at most GRANT_PAGE_SIZE rows,
  * read off the (subject, createdAt, id) index, and the count is one indexed
- * count. A search first finds the people, teams and roles whose names match -
- * capped - and then pages the subject's rows for those.
+ * count. A search first finds, among the people, teams and roles this subject
+ * is handed to, the ones whose names match, and then pages the rows for those.
  */
 export async function listSubjectGrantPage(
     subject: core.GrantSubject,
@@ -616,7 +617,7 @@ export async function listSubjectGrantPage(
     };
     const term = (query.search ?? "").trim();
     if (term.length > 0 && !query.links) {
-        const ids = await principalsNamed(term);
+        const ids = await principalsNamed(subject, subjectId, term);
         if (ids.length === 0) return { grants: [], total: 0, nextCursor: null };
         where.principalId = { in: ids };
     }
@@ -637,21 +638,42 @@ export async function listSubjectGrantPage(
     };
 }
 
-/** The ids of people, teams and roles a search names, capped. */
-async function principalsNamed(term: string): Promise<string[]> {
+/** The ids of the people, teams and roles one subject is handed to whose
+ *  names have this in them. Bounded by what a subject may carry. */
+async function principalsNamed(
+    subject: core.GrantSubject,
+    subjectId: string,
+    term: string
+): Promise<string[]> {
+    const held = await prisma.accessGrant.findMany({
+        where: { subjectType: subject, subjectId, principalType: { in: ["user", "team", "role"] } },
+        select: { principalType: true, principalId: true },
+        take: core.MAX_GRANTS_PER_SUBJECT
+    });
+    const of = (type: string) => [
+        ...new Set(held.filter((one) => one.principalType === type).map((one) => one.principalId))
+    ];
+    const [userIds, teamIds, roleIds] = [of("user"), of("team"), of("role")];
     const contains = { contains: term, mode: "insensitive" as const };
     const [users, teams, roles] = await Promise.all([
-        prisma.user.findMany({
-            where: { OR: [{ name: contains }, { username: contains }] },
-            select: { id: true },
-            take: SEARCH_CAP
-        }),
-        prisma.team.findMany({ where: { name: contains }, select: { id: true }, take: SEARCH_CAP }),
-        prisma.orgRole.findMany({
-            where: { name: contains },
-            select: { id: true },
-            take: SEARCH_CAP
-        })
+        userIds.length > 0
+            ? prisma.user.findMany({
+                  where: { id: { in: userIds }, OR: [{ name: contains }, { username: contains }] },
+                  select: { id: true }
+              })
+            : [],
+        teamIds.length > 0
+            ? prisma.team.findMany({
+                  where: { id: { in: teamIds }, name: contains },
+                  select: { id: true }
+              })
+            : [],
+        roleIds.length > 0
+            ? prisma.orgRole.findMany({
+                  where: { id: { in: roleIds }, name: contains },
+                  select: { id: true }
+              })
+            : []
     ]);
     return [...users, ...teams, ...roles].map((one) => one.id);
 }
@@ -810,6 +832,48 @@ export async function writeGrant(
     grantedById: string,
     orgIds: readonly string[]
 ): Promise<string> {
+    const data = await grantData(subject, subjectId, input, grantedById, orgIds);
+    const held = await prisma.accessGrant.count({ where: { subjectType: subject, subjectId } });
+    if (held >= core.MAX_GRANTS_PER_SUBJECT) {
+        throw new GrantError("This already has as many shares as it can hold");
+    }
+    const written = await prisma.accessGrant.create({ data, select: { id: true } });
+    return written.id;
+}
+
+/**
+ * Write several at once, all or none: every one is checked as `writeGrant`
+ * checks it before any is written, so a refusal halfway leaves nothing behind
+ * to be written a second time when the same list is sent again.
+ */
+export async function writeGrants(
+    subject: core.GrantSubject,
+    subjectId: string,
+    inputs: readonly core.AccessGrantInput[],
+    grantedById: string,
+    orgIds: readonly string[]
+): Promise<number> {
+    const data = [];
+    for (const input of inputs) {
+        data.push(await grantData(subject, subjectId, input, grantedById, orgIds));
+    }
+    if (data.length === 0) return 0;
+    const held = await prisma.accessGrant.count({ where: { subjectType: subject, subjectId } });
+    if (held + data.length > core.MAX_GRANTS_PER_SUBJECT) {
+        throw new GrantError("This already has as many shares as it can hold");
+    }
+    const written = await prisma.accessGrant.createMany({ data });
+    return written.count;
+}
+
+/** One grant's row, once it has been checked to make sense for the subject. */
+async function grantData(
+    subject: core.GrantSubject,
+    subjectId: string,
+    input: core.AccessGrantInput,
+    grantedById: string,
+    orgIds: readonly string[]
+) {
     const allowed = core.GRANT_CAPABILITIES[subject] as readonly string[];
     if (!allowed.includes(input.capability)) {
         throw new GrantError("That is not something this can be shared as");
@@ -831,33 +895,24 @@ export async function writeGrant(
                 : "That team or role is not one this can be shared with"
         );
     }
-    const held = await prisma.accessGrant.count({ where: { subjectType: subject, subjectId } });
-    if (held >= core.MAX_GRANTS_PER_SUBJECT) {
-        throw new GrantError("This already has as many shares as it can hold");
-    }
-
-    const written = await prisma.accessGrant.create({
-        data: {
-            subjectType: subject,
-            subjectId,
-            principalType: input.principalType,
-            principalId: input.principalId,
-            capability: input.capability,
-            actions,
-            startsAt: input.startsAt ? new Date(input.startsAt) : null,
-            endsAt: input.endsAt ? new Date(input.endsAt) : null,
-            days: input.days,
-            startMinute: input.startMinute,
-            endMinute: input.endMinute,
-            timeZone: input.timeZone,
-            maxUses: input.maxUses,
-            nearbyMeters: input.nearbyMeters,
-            note: input.note,
-            grantedById
-        },
-        select: { id: true }
-    });
-    return written.id;
+    return {
+        subjectType: subject,
+        subjectId,
+        principalType: input.principalType,
+        principalId: input.principalId,
+        capability: input.capability,
+        actions,
+        startsAt: input.startsAt ? new Date(input.startsAt) : null,
+        endsAt: input.endsAt ? new Date(input.endsAt) : null,
+        days: input.days,
+        startMinute: input.startMinute,
+        endMinute: input.endMinute,
+        timeZone: input.timeZone,
+        maxUses: input.maxUses,
+        nearbyMeters: input.nearbyMeters,
+        note: input.note,
+        grantedById
+    };
 }
 
 // ---------------------------------------------------------------------------
