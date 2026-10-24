@@ -40,7 +40,9 @@ describe("the node picker", () => {
 
     it("finds a Polaris event by its words and hands back the preset", () => {
         const onPick = open();
-        fireEvent.change(screen.getByPlaceholderText("Search nodes"), { target: { value: "NAS went offline" } });
+        fireEvent.change(screen.getByPlaceholderText("Search nodes"), {
+            target: { value: "NAS went offline" }
+        });
         fireEvent.click(screen.getByText("NAS went offline"));
         expect(onPick).toHaveBeenCalledWith("core.onEvent#nasOffline");
     });

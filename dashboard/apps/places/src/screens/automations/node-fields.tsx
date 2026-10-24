@@ -63,9 +63,15 @@ export function seedConfig(
         return { placeId, match: "all", groups: [group] };
     }
     if (typeof config.kind === "string") return null;
-    if ((nodes.TRIGGER_NODE_KINDS as readonly string[]).includes(kind) && type === nodes.triggerNodeType(kind as nodes.TriggerNodeKind))
+    if (
+        (nodes.TRIGGER_NODE_KINDS as readonly string[]).includes(kind) &&
+        type === nodes.triggerNodeType(kind as nodes.TriggerNodeKind)
+    )
         return configOf(auto.blankTrigger(kind as auto.TriggerKind), placeId);
-    if ((nodes.STEP_NODE_KINDS as readonly string[]).includes(kind) && type === nodes.stepNodeType(kind as nodes.StepNodeKind))
+    if (
+        (nodes.STEP_NODE_KINDS as readonly string[]).includes(kind) &&
+        type === nodes.stepNodeType(kind as nodes.StepNodeKind)
+    )
         return configOf(auto.blankStep(kind as auto.StepKind), placeId);
     return null;
 }
@@ -103,7 +109,8 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
 
     // A node just added from the central picker carries no block yet: start it as
     // the Places editor starts the same block, on the place the listing names.
-    const seed = listing && !disabled ? seedConfig(node.type, config, named ?? listing.placeId) : null;
+    const seed =
+        listing && !disabled ? seedConfig(node.type, config, named ?? listing.placeId) : null;
     useEffect(() => {
         if (seed) setConfig(seed);
     }, [seed !== null, node.id]);

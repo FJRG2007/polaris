@@ -15,14 +15,7 @@ import * as core from "@polaris/core";
 export const PLACES_APP = "home";
 
 export type CatalogGroupId =
-    | "basics"
-    | "polaris"
-    | "automations"
-    | "places"
-    | "logic"
-    | "timing"
-    | "data"
-    | "send";
+    "basics" | "polaris" | "automations" | "places" | "logic" | "timing" | "data" | "send";
 
 export interface CatalogItem {
     /** What the picker hands back: the node type, or `<type>#<preset>`. */
