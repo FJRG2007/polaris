@@ -94,7 +94,8 @@ export function ChannelHeader({
     onSearch,
     onPins,
     onMembers,
-    membersOpen = false
+    membersOpen = false,
+    searchInPanel = false
 }: {
     channel: ChatChannelView;
     /** Who is reading, which decides one thing here: a group's owner is the only
@@ -118,6 +119,9 @@ export function ChannelHeader({
     onMembers?: () => void;
     /** Whether that panel is showing, so its button reads as a switch. */
     membersOpen?: boolean;
+    /** The panel on the right is open as a column and carries the search box
+     *  at its top, the way Discord draws it, so the bar leaves it out. */
+    searchInPanel?: boolean;
 }) {
     const t = useTranslations("chat");
     const router = useRouter();
@@ -362,7 +366,7 @@ export function ChannelHeader({
                             )}
                         </HeaderButton>
                     )}
-                    {onSearch && (
+                    {onSearch && !searchInPanel && (
                         <HeaderSearch
                             placeholder={t("channelHeader.searchIn", { name: channel.name })}
                             label={t("channelHeader.searchMessages")}
@@ -746,6 +750,71 @@ function HeaderButton({
 }
 
 /**
+ * The search box at the top of the column on the right - Discord's place for it,
+ * above the profile or the member list rather than among the buttons. Same box
+ * and same behaviour as the header's, only filling the column's width.
+ */
+export function PanelSearch({
+    channelName,
+    onSearch
+}: {
+    channelName: string;
+    onSearch: (term: string) => void;
+}) {
+    const t = useTranslations("chat");
+    return (
+        <SearchBox
+            className="min-w-0 flex-1"
+            placeholder={t("channelHeader.searchIn", { name: channelName })}
+            label={t("channelHeader.searchMessages")}
+            onSearch={onSearch}
+        />
+    );
+}
+
+/** The box itself: typed into where it is, and Enter hands the words on. */
+function SearchBox({
+    className,
+    placeholder,
+    label,
+    onSearch
+}: {
+    className: string;
+    placeholder: string;
+    label: string;
+    onSearch: (term: string) => void;
+}) {
+    const [term, setTerm] = useState("");
+    return (
+        <form
+            role="search"
+            className={cn("relative", className)}
+            onSubmit={(event) => {
+                event.preventDefault();
+                const trimmed = term.trim();
+                if (!trimmed) return;
+                onSearch(trimmed);
+                setTerm("");
+            }}
+        >
+            <input
+                type="search"
+                value={term}
+                aria-label={label}
+                placeholder={placeholder}
+                title={placeholder}
+                onChange={(event) => setTerm(event.target.value)}
+                className="h-7 w-full min-w-0 truncate rounded-md border border-border bg-muted/40 pl-2 pr-7 text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <Search
+                aria-hidden
+                className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
+            />
+        </form>
+    );
+}
+
+/**
  * Discord's search box in the header: typed into where it is, and Enter opens
  * the search beside the conversation with what was typed already in it.
  *
@@ -761,34 +830,14 @@ function HeaderSearch({
     label: string;
     onSearch: (term: string) => void;
 }) {
-    const [term, setTerm] = useState("");
     return (
         <>
-            <form
-                role="search"
-                className="relative ml-1 hidden w-40 min-w-0 md:block lg:w-48"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    const trimmed = term.trim();
-                    if (!trimmed) return;
-                    onSearch(trimmed);
-                    setTerm("");
-                }}
-            >
-                <input
-                    type="search"
-                    value={term}
-                    aria-label={label}
-                    placeholder={placeholder}
-                    title={placeholder}
-                    onChange={(event) => setTerm(event.target.value)}
-                    className="h-7 w-full min-w-0 truncate rounded-md border border-border bg-muted/40 pl-2 pr-7 text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-                <Search
-                    aria-hidden
-                    className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
-                />
-            </form>
+            <SearchBox
+                className="ml-1 hidden w-40 min-w-0 md:block lg:w-48"
+                placeholder={placeholder}
+                label={label}
+                onSearch={onSearch}
+            />
             <button
                 type="button"
                 onClick={() => onSearch("")}

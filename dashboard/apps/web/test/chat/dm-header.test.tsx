@@ -12,7 +12,7 @@
 
 import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
-import { ChannelHeader } from "@/app/(app)/chat/channel-header";
+import { ChannelHeader, PanelSearch } from "@/app/(app)/chat/channel-header";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
@@ -100,7 +100,7 @@ vi.mock("@/app/(app)/chat/chat-people-picker", () => ({
     )
 }));
 
-function header(onSearch = vi.fn()) {
+function header(onSearch = vi.fn(), searchInPanel = false) {
     render(
         <ChannelHeader
             channel={CHANNEL as never}
@@ -112,6 +112,7 @@ function header(onSearch = vi.fn()) {
             onPins={() => undefined}
             onMembers={() => undefined}
             membersOpen
+            searchInPanel={searchInPanel}
         />,
         { wrapper: MessagesWrapper }
     );
@@ -161,6 +162,22 @@ describe("the search box", () => {
 
     it("opens the search with what was typed when Enter is pressed", async () => {
         const onSearch = header();
+        await userEvent.type(screen.getByPlaceholderText("Search Grace Hopper"), "compiler{Enter}");
+        expect(onSearch).toHaveBeenCalledWith("compiler");
+    });
+
+    it("leaves the bar when the panel on the right carries it, as in Discord", () => {
+        header(vi.fn(), true);
+        expect(screen.queryByPlaceholderText("Search Grace Hopper")).toBeNull();
+        // The other buttons stay where they were.
+        expect(screen.getAllByRole("button", { name: "Pinned messages" }).length).toBeGreaterThan(0);
+    });
+
+    it("works the same at the top of the panel", async () => {
+        const onSearch = vi.fn();
+        render(<PanelSearch channelName="Grace Hopper" onSearch={onSearch} />, {
+            wrapper: MessagesWrapper
+        });
         await userEvent.type(screen.getByPlaceholderText("Search Grace Hopper"), "compiler{Enter}");
         expect(onSearch).toHaveBeenCalledWith("compiler");
     });

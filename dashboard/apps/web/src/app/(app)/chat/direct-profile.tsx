@@ -54,7 +54,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { SidePane } from "./side-pane";
 import { useWideScreen } from "./use-wide-screen";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { askFriendAction } from "./actions";
 import { NicknameDialog } from "./nickname-dialog";
 import { PersonProfileDialog } from "./person-card";
@@ -206,7 +206,8 @@ export function DirectProfile({
     channel,
     open,
     onOpenChange,
-    onMention
+    onMention,
+    search
 }: {
     /** The other person, or null in a conversation whose other side has deleted
      *  their account - there is nobody to draw and the panel stays shut. */
@@ -219,6 +220,9 @@ export function DirectProfile({
     /** Put them into what is being written. The composer owns the box; this only
      *  says what to drop in it. */
     onMention: (text: string) => void;
+    /** The search box Discord keeps at the top of this column, drawn there
+     *  only while the panel is a column - not in the phone's dialog. */
+    search?: ReactNode;
 }) {
     const t = useTranslations("chat");
     const { viewerId } = useChat();
@@ -339,6 +343,11 @@ export function DirectProfile({
             label={t("directProfile.profileWidth")}
             className="border-l border-border"
         >
+            {search ? (
+                <div className="flex h-header shrink-0 items-center border-b border-border px-3">
+                    {search}
+                </div>
+            ) : null}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {refusal}
                 {details}
