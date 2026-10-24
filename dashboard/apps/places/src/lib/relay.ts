@@ -22,8 +22,15 @@ import { drawsFromBattery } from "./camera-models";
 import { streamPathOf } from "./stream-path";
 import { RELAY_LOG_TAIL, UNEXPLAINED, explainRelayFailure, relaySaid } from "./relay-failure";
 import { HomeError } from "./home-error";
+import { talkStreamName } from "./talk-audio";
 import type { CameraTarget } from "./cameras";
-import { assertServer, findService, serviceUrls, type ServiceUrls } from "./side-service";
+import {
+    assertServer,
+    findService,
+    serviceUrls,
+    type ServiceUrls,
+    type SideService
+} from "./side-service";
 import { host } from "@polaris/app-host";
 
 const { installApp } = host.appsInstallService;
@@ -117,9 +124,12 @@ async function relayFetch(
     path: string,
     init: {
         method?: string;
-        timeoutMs?: number;
+        /** Null waits for the answer as long as the call lasts: a pushed stream
+         *  is answered only once the push ends. */
+        timeoutMs?: number | null;
         headers?: Record<string, string>;
-        body?: string;
+        /** A stream is sent as it is written, for as long as it stays open. */
+        body?: string | ReadableStream<Uint8Array>;
         /**
          * The watcher's own request. A live stream ends when whoever was watching
          * closes the tab, and without this it does not: the relay keeps sending,
@@ -133,7 +143,10 @@ async function relayFetch(
     const controller = new AbortController();
     // The timeout is on getting a response started, not on the body: video reads
     // for as long as somebody watches. Cleared as soon as the headers land.
-    const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? 5000);
+    const timer =
+        init.timeoutMs === null
+            ? undefined
+            : setTimeout(() => controller.abort(), init.timeoutMs ?? 5000);
     if (init.signal) {
         if (init.signal.aborted) controller.abort();
         else init.signal.addEventListener("abort", () => controller.abort(), { once: true });
@@ -143,9 +156,11 @@ async function relayFetch(
             method: init.method ?? "GET",
             headers: { authorization: authHeader(endpoint), ...(init.headers ?? {}) },
             ...(init.body === undefined ? {} : { body: init.body }),
+            // Required by fetch for a body that is still being written.
+            ...(typeof init.body === "object" ? { duplex: "half" } : {}),
             signal: controller.signal,
             redirect: "manual"
-        });
+        } as RequestInit);
     } finally {
         clearTimeout(timer);
     }
@@ -668,6 +683,108 @@ export async function relayStream(
         ...(init?.body === undefined ? {} : { body: init.body }),
         ...(init?.signal ? { signal: init.signal } : {})
     });
+}
+
+/** The relay's own deployment on one server, for bringing it up to date. */
+export async function relayService(serverId: string): Promise<SideService | null> {
+    return findService(RELAY_APP, serverId);
+}
+
+/**
+ * Whether a relay can carry a voice to a camera.
+ *
+ * One from before talking was added does not let `/api/stream` through and
+ * answers it with the web server's own "404 page not found"; one that does
+ * answers a push with no stream named with "stream not found". Anything else
+ * is a relay that did not answer at all.
+ */
+export type TalkReadiness = "ready" | "outdated" | "unreachable";
+
+export async function talkReadiness(endpoint: RelayEndpoint): Promise<TalkReadiness> {
+    const response = await relayFetch(endpoint, "/api/stream", { timeoutMs: 3000 }).catch(
+        () => null
+    );
+    if (!response) return "unreachable";
+    const body = await response.text().catch(() => "");
+    if (/404 page not found/i.test(body)) return "outdated";
+    return "ready";
+}
+
+/** Where the relay re-serves its own streams to itself. Loopback, so it asks
+ *  for no password, and inside the relay, so it needs no port of anybody's. */
+const RELAY_LOOPBACK_RTSP = "rtsp://127.0.0.1:8554";
+
+/**
+ * The stream a camera's talk is pushed into, made ready to take a push.
+ *
+ * A push only lands in a stream that exists, and a stream cannot be written
+ * without a source. This one is a door nothing answers at: dialling it fails at
+ * once and is skipped, which leaves the pushed voice as the stream's only
+ * producer.
+ */
+export async function prepareTalk(endpoint: RelayEndpoint, cameraId: string): Promise<void> {
+    const query = new URLSearchParams({
+        name: talkStreamName(cameraId),
+        src: "tcp://127.0.0.1:1"
+    });
+    const response = await relayFetch(endpoint, `/api/streams?${query.toString()}`, {
+        method: "PUT"
+    });
+    if (!response.ok) throw new HomeError("The camera relay would not take a voice");
+}
+
+/**
+ * The voice itself, pushed for as long as `body` stays open.
+ *
+ * The relay answers only once the push ends, so there is no timeout on the
+ * answer; `signal` is what ends it early.
+ */
+export function pushTalk(
+    endpoint: RelayEndpoint,
+    cameraId: string,
+    body: ReadableStream<Uint8Array>,
+    signal: AbortSignal
+): Promise<Response> {
+    const query = new URLSearchParams({ dst: talkStreamName(cameraId) });
+    return relayFetch(endpoint, `/api/stream?${query.toString()}`, {
+        method: "POST",
+        timeoutMs: null,
+        headers: { "content-type": "audio/wav" },
+        body,
+        signal
+    });
+}
+
+/** The query that points a camera's speaker at its talk stream, or, with an
+ *  empty source, stops it. Exported for its test. */
+export function talkPlayQuery(cameraId: string, playing: boolean): string {
+    return new URLSearchParams({
+        dst: streamName(cameraId, "main"),
+        src: playing ? `${RELAY_LOOPBACK_RTSP}/${talkStreamName(cameraId)}?audio=pcma` : ""
+    }).toString();
+}
+
+/** Play the talk stream on the camera's speaker. False when the relay refused,
+ *  which is also what it does when the push has not reached it yet. */
+export async function playTalk(endpoint: RelayEndpoint, cameraId: string): Promise<boolean> {
+    const response = await relayFetch(endpoint, `/api/streams?${talkPlayQuery(cameraId, true)}`, {
+        method: "POST",
+        timeoutMs: 8000
+    }).catch(() => null);
+    return response?.ok === true;
+}
+
+/** Stop the speaker and forget the talk stream. Best effort: a relay that has
+ *  already let go is the state this asks for. */
+export async function endTalk(endpoint: RelayEndpoint, cameraId: string): Promise<void> {
+    await relayFetch(endpoint, `/api/streams?${talkPlayQuery(cameraId, false)}`, {
+        method: "POST"
+    }).catch(() => null);
+    await relayFetch(
+        endpoint,
+        `/api/streams?${new URLSearchParams({ src: talkStreamName(cameraId) }).toString()}`,
+        { method: "DELETE" }
+    ).catch(() => null);
 }
 
 /** The camera's own main path, recovered from the URL the target carries. The

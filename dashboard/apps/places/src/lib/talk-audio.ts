@@ -8,7 +8,8 @@
  * browser sends 16-bit PCM at 8 kHz, Polaris encodes it here, and the relay
  * hands the A-law to the camera untouched: no transcoder anywhere.
  *
- * Pure, so the bytes can be asserted in a test.
+ * Pure, so the bytes can be asserted in a test, and safe for a browser: the
+ * screen brings its microphone down to the talk rate with the resampler here.
  */
 
 /** Samples a second, and the only rate the camera plays. */
@@ -73,4 +74,43 @@ export function liveWavHeader(): Uint8Array {
 /** The relay's name for the stream a camera's talk is pushed into. */
 export function talkStreamName(cameraId: string): string {
     return `${cameraId}-talk`;
+}
+
+/**
+ * The microphone, at whatever rate the browser records, brought down to
+ * 16-bit little-endian PCM at `TALK_RATE` - what the talk route takes.
+ *
+ * Each output sample is the mean of the input samples it covers, which is the
+ * low-pass a voice needs before it loses five sixths of its samples. Stateful
+ * across pieces, so a rate that does not divide evenly (44.1 kHz) carries its
+ * remainder into the next piece instead of clicking at every boundary.
+ */
+export class TalkResampler {
+    private readonly ratio: number;
+    private position = 0;
+    private sum = 0;
+    private count = 0;
+
+    constructor(inputRate: number) {
+        this.ratio = Math.max(1, inputRate / TALK_RATE);
+    }
+
+    push(input: Float32Array): Uint8Array {
+        const out = new Uint8Array(Math.ceil(input.length / this.ratio + 1) * 2);
+        const view = new DataView(out.buffer);
+        let written = 0;
+        for (const sample of input) {
+            this.sum += sample;
+            this.count += 1;
+            this.position += 1;
+            if (this.position < this.ratio) continue;
+            this.position -= this.ratio;
+            const mean = Math.max(-1, Math.min(1, this.sum / this.count));
+            view.setInt16(written, Math.round(mean * 32767), true);
+            written += 2;
+            this.sum = 0;
+            this.count = 0;
+        }
+        return out.subarray(0, written);
+    }
 }

@@ -87,6 +87,7 @@ function camera(overrides: Partial<CameraView>): CameraView {
         offlineSince: null,
         privacy: false,
         privacyNative: false,
+        talk: "no",
         privacyPreset: "",
         ...overrides
     } as CameraView;

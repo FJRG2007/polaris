@@ -28,6 +28,8 @@
 
 import * as actions from "./actions";
 import { PtzPad } from "./ptz-pad";
+import { ViewerControl as Control } from "./viewer-control";
+import { TalkControl } from "./talk-control";
 import { TapoControlsPanel } from "./tapo-controls-panel";
 import type { TapoControls } from "../lib/camera-control-kinds";
 import { DetectionBox } from "./detection-box";
@@ -58,7 +60,7 @@ import {
     ZoomIn,
     ZoomOut
 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
+import { Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
 import {
     captureFrame,
     codedShape,
@@ -121,34 +123,6 @@ const FRAME_WIDTH = 1280;
  * stream is what this is waiting for.
  */
 const MOVING_WIDTH = 640;
-
-/** One control over the picture. Icon-only per the repeated-action rule, so it
- *  carries both the name and the tooltip rather than a visible label. */
-function Control({
-    label,
-    onClick,
-    disabled,
-    children
-}: {
-    label: string;
-    onClick: () => void;
-    disabled?: boolean;
-    children: React.ReactNode;
-}) {
-    return (
-        <Button
-            variant="ghost"
-            size="icon"
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            className="text-white/80 hover:bg-white/15 hover:text-white disabled:opacity-40"
-            onClick={onClick}
-        >
-            {children}
-        </Button>
-    );
-}
 
 /** How long the controls stay up after the pointer stops, in fullscreen. Long
  *  enough to reach one, short enough not to sit over the picture. */
@@ -810,6 +784,9 @@ export function CameraViewer({
                             >
                                 <SlidersHorizontal className="size-4 shrink-0" />
                             </Control>
+                        ) : null}
+                        {camera.talk !== "no" && canControl ? (
+                            <TalkControl cameraId={camera.id} support={camera.talk} />
                         ) : null}
                         <Control
                             label={t("viewer.zoomOut")}

@@ -718,7 +718,18 @@
         "tapoLocked": "La cámara ha pausado los inicios de sesión un rato. Vuelve a probar más tarde",
         "tapoUnreachable": "No se pudo conectar con la cámara",
         "tapoRefused": "La cámara no ha hecho eso",
-        "tapoNotOffered": "Esta cámara no ofrece eso"
+        "tapoNotOffered": "Esta cámara no ofrece eso",
+        "talkElsewhere": "Otra persona está hablando a través de esta cámara",
+        "talkEnded": "Esta conversación ha terminado",
+        "talkCannot": "Esta cámara no puede reproducir una voz desde Polaris",
+        "cameraOff": "Esta cámara está apagada",
+        "cameraPrivate": "Esta cámara está en modo privado",
+        "relayStarting": "El relé de cámaras aún se está iniciando",
+        "relayNotAnswering": "El relé de cámaras no responde",
+        "relayNoVoice": "El relé de cámaras no aceptó la voz",
+        "relayUpdating": "El relé de cámaras se está actualizando para poder llevar tu voz. Vuelve a probar en un minuto",
+        "relayOld": "El relé de cámaras está desactualizado. Actualiza Polaris en Ajustes para hablar a través de las cámaras",
+        "talkNotPlayed": "La cámara no reprodujo la voz"
     },
     "connections": {
         "nuki-web": {
@@ -2912,5 +2923,13 @@
         "siren": "Sirena",
         "sirenStart": "Activar",
         "sirenStop": "Detener"
+    },
+    "talk": {
+        "start": "Hablar",
+        "stop": "Dejar de hablar",
+        "noMic": "Permite el micrófono para hablar a través de la cámara.",
+        "failed": "No se pudo empezar a hablar. Vuelve a probar.",
+        "ended": "Se ha dejado de hablar.",
+        "rtsp": "Para hablar a través de esta cámara, edítala y elige TP-Link Tapo (contraseña de Tapo)."
     }
 }

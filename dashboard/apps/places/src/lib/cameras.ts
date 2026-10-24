@@ -13,7 +13,14 @@
 import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { loadEnv } from "@polaris/config";
-import { cameraVendor, hasNativePrivacy, rtspUrl, usesAccountPassword } from "./vendors";
+import {
+    cameraVendor,
+    hasNativePrivacy,
+    rtspUrl,
+    talkSupport,
+    usesAccountPassword,
+    type TalkSupport
+} from "./vendors";
 import { drawsFromBattery, modelCanPan } from "./camera-models";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput, type CameraSwitch } from "./schemas";
@@ -74,6 +81,8 @@ export interface CameraView {
     readonly privacyNative: boolean;
     /** The preset a pan-tilt camera is pointed at when it goes private, or "". */
     readonly privacyPreset: string;
+    /** Whether a voice can be played on its speaker from here. */
+    readonly talk: TalkSupport;
 }
 
 /** A camera as something that is about to connect to it sees it. */
@@ -142,7 +151,8 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         offlineSince: row.offlineSince?.toISOString() ?? null,
         privacy: row.privacy,
         privacyNative: hasNativePrivacy(row.vendor),
-        privacyPreset: row.privacyPreset ?? ""
+        privacyPreset: row.privacyPreset ?? "",
+        talk: talkSupport(row.vendor)
     };
 }
 
