@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import { isCidr, isIpAddress } from "../cidr.js";
+import { EVERY_DAY, MINUTES_IN_DAY } from "./presence-schedule.js";
 
 /** An IP address or a CIDR range. */
 export const cidrOrIp = z
@@ -61,9 +62,67 @@ export const addressRuleFields = {
     allowedContinents: z.array(regionCode).default([])
 } as const;
 
+/** Whether a name is an IANA time zone this runtime can read a clock in. */
+function isTimeZone(zone: string): boolean {
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone: zone });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** Minutes past midnight, or null for "no bound". */
+const dayMinute = z
+    .number()
+    .int()
+    .min(0)
+    .max(MINUTES_IN_DAY - 1)
+    .nullable();
+
 /**
- * A link's limits saved whole: the password, expiry, cap on opens and the
- * address rules every public link in Polaris offers. Absent or empty is no
+ * The part of the week a link opens in: days as the presence-schedule bitmask
+ * (bit 0 Sunday), hours as minutes past midnight in `timeZone`. Both hours null
+ * is the whole of each named day; an end before the start crosses midnight.
+ * The same shape and rules a grant's schedule follows.
+ */
+export const linkScheduleSchema = z
+    .object({
+        days: z.number().int().min(1).max(EVERY_DAY),
+        startMinute: dayMinute,
+        endMinute: dayMinute,
+        timeZone: z.string().trim().min(1).max(64).refine(isTimeZone, {
+            message: "Pick a time zone from the list"
+        })
+    })
+    .refine((schedule) => (schedule.startMinute === null) === (schedule.endMinute === null), {
+        message: "Give the hours a start and an end, or neither",
+        path: ["endMinute"]
+    })
+    .refine(
+        (schedule) => schedule.startMinute === null || schedule.startMinute !== schedule.endMinute,
+        { message: "Give it a start and an end that differ", path: ["endMinute"] }
+    );
+
+export type LinkSchedule = z.infer<typeof linkScheduleSchema>;
+
+/**
+ * Who may open a link and from when, beyond the address rules: a first moment,
+ * a weekly window, "only somebody with an account here", and named accounts.
+ * All absent or empty by default, which every enforcement path reads as no
+ * restriction. A list of named accounts implies sign-in wherever it is checked.
+ */
+export const linkPeopleFields = {
+    startsAt: z.coerce.date().nullable().default(null),
+    schedule: linkScheduleSchema.nullable().default(null),
+    requireLogin: z.boolean().default(false),
+    allowedUsers: accountIdentityList.pipe(z.array(z.string().min(1).max(320)).max(200)).default([])
+} as const;
+
+/**
+ * A link's limits saved whole: the password, start, expiry, weekly window, cap
+ * on opens, the address rules and the account rules every public link in
+ * Polaris offers. Absent or empty is no
  * restriction.
  */
 export const linkLimitsSchema = z.object({
@@ -73,7 +132,8 @@ export const linkLimitsSchema = z.object({
     clearPassword: z.boolean().default(false),
     maxViews: z.number().int().positive().max(1_000_000).nullable().default(null),
     expiresAt: z.coerce.date().nullable().default(null),
-    ...addressRuleFields
+    ...addressRuleFields,
+    ...linkPeopleFields
 });
 
 export type LinkLimitsInput = z.infer<typeof linkLimitsSchema>;

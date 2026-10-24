@@ -1615,7 +1615,7 @@
     },
     "linkAdvanced": {
         "title": "Avanzado",
-        "none": "Sin límites",
+        "none": "Ninguno - {offers}",
         "set": "{count, plural, one {# límite} other {# límites}}",
         "password": "Contraseña",
         "replacePassword": "Nueva clave",
@@ -1625,6 +1625,25 @@
         "expires": "Caduca",
         "uses": "Usos",
         "noLimit": "Sin límite",
-        "hint": "Se comprueba en cada apertura. Vacío: cualquiera con el enlace."
+        "hint": "Se comprueba en cada apertura. Vacío: cualquiera con el enlace.",
+        "starts": "Se abre el",
+        "days": "Días que abre",
+        "from": "Desde",
+        "to": "Hasta",
+        "hoursHint": "A cualquier hora si ambas están vacías. Horas en {zone}.",
+        "hoursIncomplete": "Indica una hora de inicio y otra de fin distinta, o deja ambas vacías.",
+        "requireLogin": "Exigir inicio de sesión",
+        "requireLoginHint": "Solo personas con cuenta aquí. Desactivado: cualquiera con el enlace.",
+        "people": "Solo estas personas",
+        "peoplePlaceholder": "Usuario o correo, separados por comas",
+        "peopleHint": "Inician sesión para abrirlo. Vacío: cualquiera permitido arriba.",
+        "offer": {
+            "password": "contraseña",
+            "dates": "fechas",
+            "hours": "horario",
+            "uses": "usos",
+            "people": "sesión y personas",
+            "places": "IPs y países"
+        }
     }
 }

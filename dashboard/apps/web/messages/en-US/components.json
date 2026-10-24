@@ -1615,7 +1615,7 @@
     },
     "linkAdvanced": {
         "title": "Advanced",
-        "none": "No limits",
+        "none": "None set - {offers}",
         "set": "{count, plural, one {# limit} other {# limits}}",
         "password": "Password",
         "replacePassword": "New password",
@@ -1625,6 +1625,25 @@
         "expires": "Expires",
         "uses": "Uses",
         "noLimit": "No limit",
-        "hint": "Checked on every open. Empty means anyone with the link."
+        "hint": "Checked on every open. Empty means anyone with the link.",
+        "starts": "Opens on",
+        "days": "Days it opens",
+        "from": "From",
+        "to": "Until",
+        "hoursHint": "Any hour when both are empty. Times are in {zone}.",
+        "hoursIncomplete": "Give the hours a start and a different end, or leave both empty.",
+        "requireLogin": "Require sign-in",
+        "requireLoginHint": "Only people with an account here. Off means anyone with the link.",
+        "people": "Only these people",
+        "peoplePlaceholder": "Username or email, separated by commas",
+        "peopleHint": "They sign in to open it. Empty means anyone allowed above.",
+        "offer": {
+            "password": "password",
+            "dates": "dates",
+            "hours": "hours",
+            "uses": "uses",
+            "people": "sign-in and people",
+            "places": "IPs and countries"
+        }
     }
 }

@@ -78,6 +78,7 @@ export function NoteShareDialog({
             if (found) {
                 setIncludeChildren(found.includeChildren);
                 setAdvanced({
+                    ...EMPTY_LINK_ADVANCED,
                     password: "",
                     maxUses: found.maxViews === null ? "" : String(found.maxViews),
                     expiresAt: asDateField(found.expiresAt),

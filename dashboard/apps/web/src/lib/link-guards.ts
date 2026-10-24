@@ -17,6 +17,7 @@
  * Server-only: it reads cookies and the request context.
  */
 
+import * as core from "@polaris/core";
 import { ipAllowed } from "@polaris/core";
 import { geoAllowedForIp } from "@/lib/geo-service";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -25,7 +26,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 export interface LinkLimits {
     revokedAt: Date | null;
     expiresAt: Date | null;
-    /** When set, the link is not live yet. Only drop points schedule this. */
+    /** When set, the link is not live yet. */
     startsAt?: Date | null;
     /** The cap on uses, or null for no cap. */
     maxUses: number | null;
@@ -34,10 +35,47 @@ export interface LinkLimits {
 
 /** Why a link cannot be used right now, or `ok`. */
 export type LinkUsability =
-    { ok: true } | { ok: false; reason: "revoked" | "expired" | "exhausted" | "scheduled" };
+    | { ok: true }
+    | { ok: false; reason: "revoked" | "expired" | "exhausted" | "scheduled" };
 
 /** Where a link's rules refused the caller, in the order they are checked. */
-export type LinkDenial = "not_allowed" | "ip_not_allowed" | "country_not_allowed";
+export type LinkDenial =
+    | "not_allowed"
+    | "outside_hours"
+    | "ip_not_allowed"
+    | "country_not_allowed"
+    | "sign_in_required"
+    | "not_invited";
+
+/**
+ * The part of the week a link opens in: days as the presence-schedule bitmask
+ * (bit 0 Sunday), and minutes past midnight in `timeZone`. Both minutes null is
+ * "at any hour" on those days; an end at or before the start crosses midnight.
+ */
+export type LinkSchedule = core.LinkSchedule;
+
+/**
+ * Who may open a link and when, as the columns every link table stores them:
+ * `requireLogin` for "only somebody with an account here", `allowedUsers` the
+ * JSON list of identities (username or address, or an account id) it opens for,
+ * and `linkSchedule` the JSON weekly window, empty for any time. Every field is
+ * optional so a table that predates one reads as "no restriction".
+ */
+export interface LinkPeopleRules {
+    requireLogin?: boolean;
+    allowedUsers?: string;
+    linkSchedule?: string;
+}
+
+/** The signed-in account asking, as much of it as an allowlist is matched on. */
+export interface LinkViewer {
+    id: string;
+    email?: string | null;
+    username?: string | null;
+}
+
+/** Who is asking, resolved only when a rule needs to know. */
+export type LinkViewerSource = () => Promise<LinkViewer | null>;
 
 /**
  * Whether a link is currently serveable. Revocation wins over everything: a link
@@ -116,27 +154,141 @@ export interface LinkAddressRules {
     allowedContinents: string;
 }
 
+/**
+ * A stored weekly window read back, or null for "any time". Unparseable reads as
+ * null for the same reason a corrupt allowlist reads as empty: it must not be
+ * able to lock the owner out of their own link.
+ */
+export function parseLinkSchedule(json: string | null | undefined): LinkSchedule | null {
+    if (!json) return null;
+    let raw: unknown;
+    try {
+        raw = JSON.parse(json);
+    } catch {
+        return null;
+    }
+    const parsed = core.linkScheduleSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+}
+
+/** Whether `now` falls inside a link's weekly window. No window is always. */
+export function linkScheduleOpen(schedule: LinkSchedule | null, now: Date = new Date()): boolean {
+    if (!schedule) return true;
+    return core.grantIsLive(
+        { ...schedule, startsAt: null, endsAt: null, maxUses: null, uses: 0 },
+        now,
+        "UTC"
+    );
+}
+
+/**
+ * Whether a signed-in account is one a link's allowlist names: by its account
+ * id, or by its username or address normalized the way they are saved. An
+ * empty list is anyone.
+ */
+export function linkViewerAllowed(viewer: LinkViewer, allowed: readonly string[]): boolean {
+    if (allowed.length === 0) return true;
+    const ids = new Set(allowed.map((value) => value.trim().toLowerCase()));
+    return ids.has(viewer.id.toLowerCase()) || core.userAllowedForRequest(viewer, allowed);
+}
+
+/** The signed-in account behind this request, with its username, or null. */
+export const sessionLinkViewer: LinkViewerSource = async () => {
+    const { guardedUser } = await import("@/lib/session");
+    const user = await guardedUser({ touch: false }).catch(() => null);
+    if (!user) return null;
+    const { prisma } = await import("@polaris/db");
+    const row = await prisma.user
+        .findUnique({ where: { id: user.id }, select: { username: true } })
+        .catch(() => null);
+    return { id: user.id, email: user.email, username: row?.username ?? null };
+};
+
+/**
+ * The account rules, in the order they are checked: an allowlist implies
+ * sign-in, so nobody is told "not for your account" before they have said who
+ * they are. The viewer is only resolved when a rule needs it.
+ */
+export async function linkPeopleDenial(
+    rules: LinkPeopleRules,
+    viewer: LinkViewerSource = sessionLinkViewer
+): Promise<LinkDenial | null> {
+    const allowed = parseStringList(rules.allowedUsers ?? "[]");
+    if (!rules.requireLogin && allowed.length === 0) return null;
+    const who = await viewer();
+    if (!who) return "sign_in_required";
+    return linkViewerAllowed(who, allowed) ? null : "not_invited";
+}
+
+/** People rules ready to store, as the columns `LinkPeopleRules` names. */
+export function storedPeopleRules(rules: {
+    requireLogin?: boolean;
+    allowedUsers?: readonly string[];
+    schedule?: LinkSchedule | null;
+}): { requireLogin: boolean; allowedUsers: string; linkSchedule: string } {
+    return {
+        requireLogin: rules.requireLogin ?? false,
+        allowedUsers: JSON.stringify(rules.allowedUsers ?? []),
+        linkSchedule: rules.schedule ? JSON.stringify(rules.schedule) : ""
+    };
+}
+
+/** The columns a link's start, window and account rules live in, for a select. */
+export const LINK_GUARD_FIELDS = {
+    startsAt: true,
+    requireLogin: true,
+    allowedUsers: true,
+    linkSchedule: true
+} as const;
+
+/** What a dialog is handed to show a link's start, window and people rules. */
+export interface LinkGuardsView {
+    startsAt: string | null;
+    schedule: LinkSchedule | null;
+    requireLogin: boolean;
+    allowedUsers: string[];
+}
+
+/** Stored people rules and start read back, for a dialog to show. */
+export function readLinkGuards(row: LinkPeopleRules & { startsAt?: Date | null }): LinkGuardsView {
+    return {
+        startsAt: row.startsAt ? row.startsAt.toISOString() : null,
+        schedule: parseLinkSchedule(row.linkSchedule),
+        requireLogin: row.requireLogin ?? false,
+        allowedUsers: parseStringList(row.allowedUsers ?? "[]")
+    };
+}
+
 /** The one verdict a public route acts on: serve, or the reason it may not. */
 export type LinkCheck = LinkUsability | { ok: false; reason: LinkDenial };
 
 /**
- * The single check every public link runs before it serves anything: whether
- * the link is live (revoked, scheduled, expired, used up), then whether the
- * caller's address and region are ones it accepts. Liveness comes first, so a
- * link that is off says so to everyone rather than "not from here".
+ * The single check every public link runs before it serves anything, in this
+ * order: whether the link is live (revoked, not started, expired, used up),
+ * whether this is one of the hours it opens, whether the caller's address and
+ * region are ones it accepts, and then whether it needs an account and whose.
+ * Liveness comes first, so a link that is off says so to everyone rather than
+ * "not from here"; the account comes last, so nobody is asked to sign in to a
+ * link that would refuse them anyway.
  *
  * The password is a separate gate (`verifyUnlock`), because a refused password
  * is a form to fill in rather than a dead end.
  */
 export async function checkLink(
-    link: { limits: LinkLimits; rules: LinkAddressRules },
+    link: { limits: LinkLimits; rules: LinkAddressRules; guards?: LinkPeopleRules },
     ip: string | undefined,
-    now: Date = new Date()
+    now: Date = new Date(),
+    viewer: LinkViewerSource = sessionLinkViewer
 ): Promise<LinkCheck> {
     const usable = linkUsability(link.limits, now);
     if (!usable.ok) return usable;
+    if (!linkScheduleOpen(parseLinkSchedule(link.guards?.linkSchedule), now)) {
+        return { ok: false, reason: "outside_hours" };
+    }
     const denial = await linkAddressDenial(link.rules, ip);
-    return denial ? { ok: false, reason: denial } : { ok: true };
+    if (denial) return { ok: false, reason: denial };
+    const people = link.guards ? await linkPeopleDenial(link.guards, viewer) : null;
+    return people ? { ok: false, reason: people } : { ok: true };
 }
 
 /** Address rules ready to store: each list as the JSON column it lives in. */

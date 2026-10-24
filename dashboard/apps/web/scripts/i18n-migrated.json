@@ -1462,6 +1462,7 @@
         "web/src/components/installed-app.tsx",
         "web/src/components/json-view.tsx",
         "web/src/components/launcher-waiting.tsx",
+        "web/src/components/link-advanced-fields.tsx",
         "web/src/components/log-viewer.tsx",
         "web/src/components/model-keys/model-keys-view.tsx",
         "web/src/components/model-keys/provider-select.tsx",

@@ -20,6 +20,7 @@ import {
     LinkAdvancedFields,
     linkLimits,
     linkExpiryDay,
+    linkGuardFields,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import {
@@ -62,7 +63,8 @@ function draftOf(form: FormView): Draft {
             maxUses: form.maxSubmissions === null ? "" : String(form.maxSubmissions),
             allowedCidrs: form.allowedCidrs,
             allowedCountries: form.allowedCountries,
-            allowedContinents: form.allowedContinents
+            allowedContinents: form.allowedContinents,
+            ...linkGuardFields(form.guards)
         }
     };
 }
@@ -325,6 +327,8 @@ export function FormEditorDialog({
                         passwordSet={form.hasPassword}
                         clearablePassword
                         usesLabel={t("forms.editor.maxSubmissions")}
+                        // The form has its own "require sign-in" switch above.
+                        omit={["signin"]}
                         idPrefix={`form-${form.id}`}
                     />
 

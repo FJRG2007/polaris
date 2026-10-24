@@ -28,7 +28,12 @@ import { translate } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import type { Locale } from "@polaris/core";
 import { TaskRefusal } from "./refusal";
-import { readAddressRules } from "@/lib/link-guards";
+import {
+    LINK_GUARD_FIELDS,
+    readAddressRules,
+    readLinkGuards,
+    type LinkGuardsView
+} from "@/lib/link-guards";
 import { linkLimitColumns } from "@/lib/link-limits";
 
 /** A task's public link as its owner sees it. */
@@ -44,6 +49,7 @@ export interface TaskShareView {
     readonly allowedCidrs: string[];
     readonly allowedCountries: string[];
     readonly allowedContinents: string[];
+    readonly guards: LinkGuardsView;
 }
 
 const SHARE_FIELDS = {
@@ -56,7 +62,8 @@ const SHARE_FIELDS = {
     maxViews: true,
     allowedCidrs: true,
     allowedCountries: true,
-    allowedContinents: true
+    allowedContinents: true,
+    ...LINK_GUARD_FIELDS
 } as const;
 
 /** The link to the task inside Polaris. Only resolves for people with access,
@@ -80,6 +87,10 @@ async function toShareView(share: {
     allowedCidrs: string;
     allowedCountries: string;
     allowedContinents: string;
+    startsAt: Date | null;
+    requireLogin: boolean;
+    allowedUsers: string;
+    linkSchedule: string;
 }): Promise<TaskShareView> {
     return {
         url: await publicUrl(share.token),
@@ -89,7 +100,8 @@ async function toShareView(share: {
         hasPassword: Boolean(share.passwordHash),
         expiresAt: share.expiresAt?.toISOString() ?? null,
         maxViews: share.maxViews,
-        ...readAddressRules(share)
+        ...readAddressRules(share),
+        guards: readLinkGuards(share)
     };
 }
 
@@ -167,7 +179,8 @@ export interface PublicTaskView {
     }[];
     /** Present only when the sharer chose to include the discussion. */
     readonly comments:
-        { readonly author: string; readonly body: string; readonly createdAt: string }[] | null;
+        | { readonly author: string; readonly body: string; readonly createdAt: string }[]
+        | null;
     readonly createdAt: string;
     readonly updatedAt: string;
 }

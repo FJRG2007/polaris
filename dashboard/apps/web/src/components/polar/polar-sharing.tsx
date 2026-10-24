@@ -19,6 +19,7 @@ import {
     EMPTY_LINK_ADVANCED,
     linkLimits,
     linkExpiryDay,
+    linkGuardFields,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { Link2, MessageSquareShare, Share2, Trash2, X } from "lucide-react";
@@ -628,6 +629,7 @@ function advancedOf(link: PolarShareLink | null): LinkAdvancedValue {
         maxUses: link.maxViews === null ? "" : String(link.maxViews),
         allowedCidrs: link.allowedCidrs,
         allowedCountries: link.allowedCountries,
-        allowedContinents: link.allowedContinents
+        allowedContinents: link.allowedContinents,
+        ...linkGuardFields(link.guards)
     };
 }

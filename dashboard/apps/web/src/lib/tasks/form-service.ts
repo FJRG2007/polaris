@@ -15,7 +15,7 @@ import { createTask } from "./task-service";
 import { generateToken } from "@polaris/core/tokens";
 import { TaskRefusal } from "./refusal";
 import { readerWords } from "@/lib/i18n/reader-words";
-import { readAddressRules } from "@/lib/link-guards";
+import { readAddressRules, readLinkGuards, type LinkGuardsView } from "@/lib/link-guards";
 import { linkLimitColumns } from "@/lib/link-limits";
 
 export interface FormView {
@@ -37,13 +37,16 @@ export interface FormView {
     readonly allowedCidrs: string[];
     readonly allowedCountries: string[];
     readonly allowedContinents: string[];
+    readonly guards: LinkGuardsView;
 }
 
 /** The columns a saved set of limits writes. The shared cap is on submissions
  *  here; none are written when no limits were sent. */
 async function limitColumns(limits: core.FormInput["limits"]) {
     if (!limits) return {};
-    const { maxViews, ...rest } = await linkLimitColumns(limits);
+    // The form's own "require sign-in" switch is the column this would write,
+    // so the shared editor leaves it out and it is not touched here.
+    const { maxViews, requireLogin: _requireLogin, ...rest } = await linkLimitColumns(limits);
     return { ...rest, maxSubmissions: maxViews };
 }
 
@@ -77,6 +80,9 @@ export async function listForms(spaceId: string): Promise<FormView[]> {
             allowedCidrs: true,
             allowedCountries: true,
             allowedContinents: true,
+            startsAt: true,
+            allowedUsers: true,
+            linkSchedule: true,
             list: { select: { name: true } },
             _count: { select: { submissions: true } }
         }
@@ -97,7 +103,8 @@ export async function listForms(spaceId: string): Promise<FormView[]> {
         hasPassword: Boolean(form.passwordHash),
         expiresAt: form.expiresAt?.toISOString() ?? null,
         maxSubmissions: form.maxSubmissions,
-        ...readAddressRules(form)
+        ...readAddressRules(form),
+        guards: readLinkGuards(form)
     }));
 }
 
