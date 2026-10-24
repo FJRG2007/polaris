@@ -86,11 +86,12 @@
         "scheduled": "Este enlace aún no está abierto.",
         "network": "Este enlace no está disponible desde tu red.",
         "location": "Este enlace no está disponible desde tu ubicación.",
-        "signIn": "Este fragmento se compartió con personas concretas. Inicia sesión para abrirlo.",
-        "notInvited": "Este fragmento no se compartió con tu cuenta.",
+        "signIn": "Este enlace es solo para personas con cuenta. Inicia sesión para abrirlo.",
+        "notInvited": "Este enlace no se compartió con tu cuenta.",
         "protected": "Este enlace está protegido.",
         "unavailable": "Este enlace no está disponible.",
-        "downloadLimit": "Este enlace ha llegado a su límite de descargas."
+        "downloadLimit": "Este enlace ha llegado a su límite de descargas.",
+        "closed": "Este enlace está fuera de su horario. Vuelve a intentarlo en las horas en que se abre."
     },
     "share": {
         "unreadable": "No se ha podido leer lo compartido. Puede que se haya movido o eliminado.",

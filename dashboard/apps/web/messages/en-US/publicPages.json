@@ -86,11 +86,12 @@
         "scheduled": "This link is not open yet.",
         "network": "This link is not available from your network.",
         "location": "This link is not available from your location.",
-        "signIn": "This snippet was shared with specific people. Sign in to open it.",
-        "notInvited": "This snippet was not shared with your account.",
+        "signIn": "This link is only for people with an account. Sign in to open it.",
+        "notInvited": "This link was not shared with your account.",
         "protected": "This link is protected.",
         "unavailable": "This link is not available.",
-        "downloadLimit": "This link has reached its download limit."
+        "downloadLimit": "This link has reached its download limit.",
+        "closed": "This link is outside its hours. Try again during the times it opens."
     },
     "share": {
         "unreadable": "The shared item could not be read. It may have been moved or deleted.",
