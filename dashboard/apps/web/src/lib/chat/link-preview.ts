@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { tiktokVideoOf } from "./tiktok-page";
 import { embedFor, isShareLink, landingOf, oembedFor } from "./embeds";
 import * as core from "@polaris/core";
 import { follow, readAtMost, readCapped, safeUrl, whereLeads } from "@/lib/safe-fetch";
@@ -172,7 +173,7 @@ export async function unfurl(
 
     const existing = await prisma.linkPreview.findUnique({
         where: { url: url.href },
-        select: { ok: true, url: true, target: true, fetchedAt: true }
+        select: { ok: true, url: true, target: true, imageUrl: true, fetchedAt: true }
     });
     const age = existing ? Date.now() - existing.fetchedAt.getTime() : Infinity;
     if (existing && !options.force && age < trustedFor(existing)) return;
@@ -324,8 +325,19 @@ async function lookAgainSoon(previewId: string): Promise<void> {
  * of staying a card until its week is up. Bounded either way: one look an hour
  * at most, never one per render.
  */
-function trustedFor(row: { ok: boolean; url: string; target: string | null }): number {
+function trustedFor(row: {
+    ok: boolean;
+    url: string;
+    target: string | null;
+    imageUrl: string | null;
+}): number {
     if (!row.ok || (row.target === null && isShareLink(row.url))) return RETRY_MS;
+    // A TikTok with no cover was looked at while TikTok's oEmbed had stopped
+    // naming one, before the page was read for it - look again within the hour
+    // rather than leaving it without a picture for the rest of its week.
+    if (row.imageUrl === null && embedFor(row.target ?? row.url)?.provider === "TikTok") {
+        return RETRY_MS;
+    }
     // A price is only as good as the last sale it saw.
     if (steamAppOf(row.url)) return STEAM_FRESH_MS;
     return FRESH_MS;
@@ -515,6 +527,21 @@ async function describePage(url: URL): Promise<Described | null> {
     const bytes = await readAtMost(response, MAX_PAGE_BYTES);
     if (!bytes) return null;
     const html = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+
+    // TikTok hands a fetch a page with no `og:` tags and an oEmbed with no
+    // caption, account or cover; all three are in the page's own JSON.
+    const video = /(^|\.)tiktok\.com$/i.test(url.hostname) ? tiktokVideoOf(html) : null;
+    if (video) {
+        return {
+            title: video.caption.slice(0, 200),
+            author: video.author.slice(0, 100),
+            accent: await accentOf(html, url),
+            siteName: "TikTok",
+            guessed: { title: false, siteName: false },
+            imageUrl: video.cover ? absolute(video.cover, url) : null,
+            description: ""
+        };
+    }
 
     const image = meta(html, "og:image") ?? meta(html, "twitter:image");
     const ogTitle = meta(html, "og:title");
