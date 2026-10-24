@@ -23,6 +23,9 @@ import type { NoteShareView } from "@/lib/notes/share-service";
 import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
+    linkGuardFields,
+    linkHoursIncomplete,
+    linkPeopleLimits,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import {
@@ -84,7 +87,8 @@ export function NoteShareDialog({
                     expiresAt: asDateField(found.expiresAt),
                     allowedCidrs: [...found.allowedCidrs],
                     allowedCountries: [...found.allowedCountries],
-                    allowedContinents: [...found.allowedContinents]
+                    allowedContinents: [...found.allowedContinents],
+                    ...linkGuardFields(found.guards)
                 });
                 const link = await actions.revealNoteShareAction(noteId);
                 if (alive && link.url) setUrl(link.url);
@@ -108,7 +112,8 @@ export function NoteShareDialog({
                 expires: asDateField(share.expiresAt),
                 allowedCidrs: share.allowedCidrs,
                 allowedCountries: share.allowedCountries,
-                allowedContinents: share.allowedContinents
+                allowedContinents: share.allowedContinents,
+                people: linkPeopleLimits({ ...EMPTY_LINK_ADVANCED, ...linkGuardFields(share.guards) })
             },
             {
                 includeChildren,
@@ -116,7 +121,8 @@ export function NoteShareDialog({
                 expires,
                 allowedCidrs: advanced.allowedCidrs,
                 allowedCountries: advanced.allowedCountries,
-                allowedContinents: advanced.allowedContinents
+                allowedContinents: advanced.allowedContinents,
+                people: linkPeopleLimits(advanced)
             }
         );
 
@@ -131,7 +137,8 @@ export function NoteShareDialog({
                     ...(expires ? { expiresAt: expires } : { clearExpiry: true }),
                     allowedCidrs: advanced.allowedCidrs,
                     allowedCountries: advanced.allowedCountries,
-                    allowedContinents: advanced.allowedContinents
+                    allowedContinents: advanced.allowedContinents,
+                    ...linkPeopleLimits(advanced)
                 }),
             setError
         );
@@ -224,7 +231,9 @@ export function NoteShareDialog({
                                 >
                                     {t("share.stop")}
                                 </Button>
-                                <Button disabled={busy || unchanged} onClick={() => void save()}>
+                                <Button
+                                    disabled={busy || unchanged || linkHoursIncomplete(advanced)}
+                                    onClick={() => void save()}>
                                     {t("share.save")}
                                 </Button>
                             </div>

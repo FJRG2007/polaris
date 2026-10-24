@@ -26,7 +26,7 @@
  */
 
 import { z } from "zod";
-import { addressRuleFields } from "./link-rules.js";
+import { addressRuleFields, linkPeopleFields } from "./link-rules.js";
 import { FOLDER_DEPTH_LIMIT, hexColor, SPACE_ROLES, SPACE_VISIBILITIES } from "./tasks.js";
 
 export const noteTitle = z.string().trim().min(1, "Give it a title").max(200);
@@ -237,7 +237,9 @@ export const noteShareSchema = z.object({
     clearMaxViews: z.boolean().default(false),
     expiresAt: z.coerce.date().optional(),
     clearExpiry: z.boolean().default(false),
-    ...addressRuleFields
+    ...addressRuleFields,
+    /** Start, weekly hours, and who must be signed in to open it. */
+    ...linkPeopleFields
 });
 
 export type NoteShareInput = z.infer<typeof noteShareSchema>;
