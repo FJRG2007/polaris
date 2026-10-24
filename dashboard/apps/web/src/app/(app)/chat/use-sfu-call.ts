@@ -102,6 +102,7 @@ import { callDevices, isDenial, openMedia, openScreen, refused, settle } from ".
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import { extraPublications, oneVoice, serialized, type PublishedTrack } from "./call-tracks";
 import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
+import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC } from "@/lib/chat/call-activity";
 import {
     cameraBackground,
     useCameraBackground,
@@ -737,6 +738,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * afterwards - which is what makes them the place for a fact that is
      * invisible in the media itself. An empty value is how one is taken back.
      */
+    /** The game this browser claims to be playing, said again on every announce. */
+    const activityRef = useRef("");
+    /** Who hears game messages: the call's game panel, while it is open. */
+    const heardActivity = useRef<((from: string, raw: unknown) => void) | null>(null);
+
     const say = useCallback((attributes: Record<string, string>) => {
         void room.current?.localParticipant.setAttributes(attributes).catch(() => undefined);
     }, []);
@@ -776,7 +782,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 [RECORDING]: recordingRef.current ? "1" : "",
                 [AUDIO_GROUP]: groupRef.current ?? "",
                 [HAND]: handUpAt.current ? "1" : "",
-                [HAND_AT]: handUpAt.current ? String(handUpAt.current) : ""
+                [HAND_AT]: handUpAt.current ? String(handUpAt.current) : "",
+                [ACTIVITY_ATTRIBUTE]: activityRef.current
             })
             .catch(() => undefined);
     }, []);
@@ -1908,6 +1915,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // one publishes with who sent it. The same shape from a participant
             // is somebody trying to play a sound the server never allowed, and
             // is dropped.
+            // A game message: handed to the game panel, which validates it and
+            // drops anything not from a vouched player in the same game.
+            if (topic === ACTIVITY_TOPIC) {
+                if (participant) heardActivity.current?.(participant.identity, raw);
+                return;
+            }
             if (topic === SOUNDBOARD_TOPIC) {
                 if (participant) return;
                 const played = soundPlayedSchema.safeParse(raw);
@@ -2461,6 +2474,33 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         },
         [show]
     );
+
+    const setActivity = useCallback(
+        (claim: string) => {
+            activityRef.current = claim;
+            say({ [ACTIVITY_ATTRIBUTE]: claim });
+        },
+        [say]
+    );
+
+    const sendActivity = useCallback((to: readonly string[], message: unknown) => {
+        const local = room.current?.localParticipant;
+        if (!local || to.length === 0) return;
+        void local
+            .publishData(new TextEncoder().encode(JSON.stringify(message)), {
+                reliable: false,
+                topic: ACTIVITY_TOPIC,
+                destinationIdentities: [...to]
+            })
+            .catch(() => undefined);
+    }, []);
+
+    const listenActivity = useCallback((listener: (from: string, raw: unknown) => void) => {
+        heardActivity.current = listener;
+        return () => {
+            if (heardActivity.current === listener) heardActivity.current = null;
+        };
+    }, []);
 
     /**
      * Who has a hand up, oldest first, this browser included.
@@ -3913,6 +3953,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         hosting,
         reactions,
         react,
+        setActivity,
+        sendActivity,
+        listenActivity,
         audio,
         outgoing: filteredTrack ?? micTrack
     };

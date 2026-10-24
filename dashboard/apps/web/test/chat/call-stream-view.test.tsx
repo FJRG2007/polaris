@@ -29,6 +29,10 @@ vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
     playSoundAction: async () => ({})
 }));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({ admitAction: async () => ({}) }));
+vi.mock("@/app/(app)/chat/call-activity-actions", () => ({
+    callGames: async () => ({ ok: false, reason: "missing" }),
+    vouchCallGames: async () => ({ seats: [], now: Date.now() })
+}));
 vi.mock("@/app/(app)/chat/actions", () => ({ searchPeopleAction: async () => ({ people: [] }) }));
 vi.mock("@/app/(app)/chat/call-session", () => ({ useHeldCall: () => null }));
 vi.mock("@/app/(app)/chat/speaker-device", () => ({
@@ -106,6 +110,9 @@ function call(over: Partial<CallState> = {}): CallState {
         screenQuality: "auto",
         cameraLevel: "high",
         screenLevel: "high",
+        setActivity: () => undefined,
+        sendActivity: () => undefined,
+        listenActivity: () => () => undefined,
         ...over
     } as unknown as CallState;
 }

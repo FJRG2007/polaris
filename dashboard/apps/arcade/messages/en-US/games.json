@@ -1,0 +1,20 @@
+{
+    "title": "Games",
+    "intro": "Play on your own, or together from a call.",
+    "play": "Play",
+    "close": "Close game",
+    "multiplayer": "Play together in calls",
+    "solo": "On your own",
+    "loading": "Loading {game}",
+    "loadingCity": "Building the city",
+    "failed": "The game could not start.",
+    "retry": "Try again",
+    "noGpu": "This browser cannot draw 3D. Try a recent Chrome, Edge, Firefox or Safari.",
+    "empty": "No games yet.",
+    "games": {
+        "new-york": {
+            "name": "New York",
+            "summary": "Explore Manhattan on foot, by car, by bike or by helicopter."
+        }
+    }
+}

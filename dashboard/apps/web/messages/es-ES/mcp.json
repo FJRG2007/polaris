@@ -69,6 +69,8 @@
         "chat_groups": "Abrir conversaciones de grupo",
         "chat_attach": "Enviar archivos",
         "chat_call": "Unirse a llamadas",
+        "arcade_open": "Abrir Juegos",
+        "arcade_calls": "Jugar en llamadas",
         "chat_meetings": "Crear enlaces de reunión",
         "deploy_read": "Ver apps, despliegues y registros",
         "deploy_manage": "Desplegar, reiniciar y cambiar apps",
@@ -218,7 +220,7 @@
         "files": "Archivos y enlaces",
         "development": "Desarrollo y despliegue",
         "databases": "BBDD",
-        "games": "Juegos",
+        "games": "Hosting juegos",
         "account": "Cuenta y administración"
     },
     "tools": {

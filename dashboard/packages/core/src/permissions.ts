@@ -34,6 +34,8 @@ export const PERMISSIONS = [
     "chat.attach",
     "chat.call",
     "chat.meetings",
+    "arcade.open",
+    "arcade.calls",
     "deploy.read",
     "deploy.manage",
     "games.read",
@@ -72,6 +74,16 @@ export const CHAT_CAPABILITIES = [
     "chat.groups",
     "chat.attach",
     "chat.call"
+] as const satisfies readonly Permission[];
+
+/**
+ * What the Games app adds, carried once to every role that already holds the
+ * chat (`seedDefaultRoles`), so an update does not leave existing members
+ * without a feature a fresh install grants them.
+ */
+export const GAMES_CAPABILITIES = [
+    "arcade.open",
+    "arcade.calls"
 ] as const satisfies readonly Permission[];
 
 /** A wildcard a role may hold to mean "all current and future permissions". */
@@ -113,6 +125,8 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "chat.groups",
         "chat.attach",
         "chat.call",
+        "arcade.open",
+        "arcade.calls",
         "deploy.read",
         "deploy.manage",
         "games.read",
@@ -167,6 +181,8 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "chat.groups",
         "chat.attach",
         "chat.call",
+        "arcade.open",
+        "arcade.calls",
         "deploy.read",
         "games.read",
         "agents.read",
@@ -251,6 +267,11 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
         area: "Chat",
         label: "Create meeting links people outside Polaris can join"
     },
+    // The Games app (not Game servers). Two decisions, like a chat platform's:
+    // whether somebody may open games at all, and whether they may start or join
+    // one inside a call. Both granted with the chat by default.
+    "arcade.open": { area: "Games", label: "Open Games" },
+    "arcade.calls": { area: "Games", label: "Play games in calls" },
     "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
     "games.read": { area: "Game servers", label: "See game servers and who is playing" },

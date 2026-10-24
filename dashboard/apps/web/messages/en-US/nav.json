@@ -166,6 +166,9 @@
         },
         "polar": {
             "description": "Ask about any page, and have things done with your access"
+        },
+        "arcade": {
+            "description": "Play on your own, or together from a call"
         }
     },
     "labels": {

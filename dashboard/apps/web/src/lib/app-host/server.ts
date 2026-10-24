@@ -43,6 +43,7 @@ import type {
     AppWidgetDefinition,
     AppWidgetView,
     AppSlot,
+    CallActivityHost,
     ChatGameLink,
     ConnectionsViewer,
     RelayedChannelMessage
@@ -590,6 +591,7 @@ declare module "@polaris/app-host" {
         ConnectionsViewer: ConnectionsViewer;
         AppStorageView: AppStorageView;
         BackupSource: BackupSource;
+        CallActivityHost: CallActivityHost;
         CalendarLink: CalendarLink;
         CalendarPerson: CalendarPerson;
         CalendarTask: CalendarTask;

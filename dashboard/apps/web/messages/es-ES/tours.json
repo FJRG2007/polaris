@@ -108,7 +108,7 @@
         }
     },
     "games": {
-        "name": "Juegos",
+        "name": "Hosting juegos",
         "summary": "Crea, encuentra y gestiona servidores de juegos.",
         "steps": {
             "create": {

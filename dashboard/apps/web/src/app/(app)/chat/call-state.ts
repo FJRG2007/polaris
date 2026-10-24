@@ -52,6 +52,9 @@ export interface PeerState {
      *  sharing one microphone between their devices - see `call-combine`. Null
      *  for an ordinary device, which is almost everybody. */
     readonly group: string | null;
+    /** The game they claim to be playing in this call, as their attribute
+     *  carries it; empty for none. Unvouched - see `lib/chat/call-activity`. */
+    readonly activity?: string;
 }
 
 /** One microphone or camera, as the picker lists it. */
@@ -237,6 +240,15 @@ export interface CallState {
      *  design: see `call-signals`. */
     readonly reactions: readonly ShownReaction[];
     react: (reaction: Reaction) => void;
+
+    /** Say which game this browser is playing in the call (an encoded claim),
+     *  or "" for none. A state: whoever joins later reads it. */
+    setActivity: (claim: string) => void;
+    /** Pass a game message to these seats only, unreliably: a late position is
+     *  worth nothing. */
+    sendActivity: (to: readonly string[], message: unknown) => void;
+    /** Hear game messages from the other seats; returns the way to stop. */
+    listenActivity: (listener: (from: string, raw: unknown) => void) => () => void;
 
     /**
      * Whether sound is actually flowing, and what to say when it is not.

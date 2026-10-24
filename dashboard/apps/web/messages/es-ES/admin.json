@@ -2639,7 +2639,7 @@
             "calendar": "Calendario",
             "chat": "Chat",
             "apps": "Apps",
-            "gameServers": "Juegos",
+            "gameServers": "Hosting juegos",
             "home": "Casa",
             "tools": "Útiles",
             "tasks": "Tareas",
@@ -2647,7 +2647,8 @@
             "management": "Gestión",
             "crm": "CRM",
             "automations": "Automatizaciones",
-            "statusPages": "Estado público"
+            "statusPages": "Estado público",
+            "games": "Juegos"
         },
         "permissions": {
             "drive": {
@@ -2745,6 +2746,10 @@
             "automations": {
                 "use": "Crear automatizaciones que actúan por ti",
                 "secrets": "Guardar secretos para automatizaciones"
+            },
+            "arcade": {
+                "open": "Abrir Juegos",
+                "calls": "Jugar en llamadas"
             }
         }
     },
@@ -3606,7 +3611,7 @@
             "originShared": "Otro volumen sigue usando el original, así que solo se puede conservar."
         },
         "policy": {
-            "title": "Juegos",
+            "title": "Hosting juegos",
             "description": "Dónde guardan sus mundos los servidores de juego.",
             "default": "Servidores nuevos",
             "defaultHint": "Se aplica a los servidores que se creen a partir de ahora. Los que ya existen se quedan donde están hasta que alguien elija.",

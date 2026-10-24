@@ -9,7 +9,7 @@
  */
 
 import type { Permission } from "@polaris/core";
-import type { AppSlot } from "@/lib/app-extensions/types";
+import type { AppSlot, CallActivityHost } from "@/lib/app-extensions/types";
 import { AppBundleMount } from "@/components/app-bundles/mount";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 
@@ -26,7 +26,13 @@ export interface InstalledSlotHost {
     readonly onStatus: (label: string | null, tone?: "danger") => void;
 }
 
-export function AppSlotView({ slot, host }: { slot: AppSlot; host?: InstalledSlotHost }) {
+export function AppSlotView({
+    slot,
+    host
+}: {
+    slot: AppSlot;
+    host?: InstalledSlotHost | CallActivityHost;
+}) {
     // The app draws it, with the component its bundle names for its slots.
     if (!slot.bundle) return null;
     return <AppBundleMount src={slot.bundle.src} name={slot.bundle.name} props={{ slot, host }} />;

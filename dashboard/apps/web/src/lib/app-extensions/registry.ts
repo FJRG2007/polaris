@@ -27,6 +27,7 @@ import type {
     AppRecordHit,
     AppSlot,
     AppWidgetDefinition,
+    CallActivityOffer,
     ConnectionsViewer,
     ChatCommandSpec,
     ChatGameLink,
@@ -545,6 +546,27 @@ export async function appDeckActions(): Promise<AppDeckAction[]> {
  * their language. One app failing to say leaves its tools to their English
  * titles and never anybody else's.
  */
+/** The games installed apps offer inside a call, in the reader's language. An
+ *  app that cannot answer offers none rather than taking the others down. */
+export async function callActivityGames(locale: Locale): Promise<CallActivityOffer[]> {
+    const games: CallActivityOffer[] = [];
+    for (const extension of await installedWith("callActivities")) {
+        try {
+            for (const game of await extension.callActivities!(locale)) {
+                const slot: AppSlot = {
+                    app: extension.id,
+                    kind: "call-activity",
+                    props: { gameId: game.id }
+                };
+                games.push({ ...game, slot: withBundleSlot(slot) });
+            }
+        } catch (caught) {
+            console.error(`polaris: ${extension.id} could not list its call games:`, caught);
+        }
+    }
+    return games;
+}
+
 export async function appMcpToolLabels(locale: Locale): Promise<Map<string, string>> {
     const labels = new Map<string, string>();
     for (const extension of await installedWith("mcpToolLabels")) {

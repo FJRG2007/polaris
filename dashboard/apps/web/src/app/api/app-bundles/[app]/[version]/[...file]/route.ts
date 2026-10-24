@@ -5,8 +5,14 @@
  * bundle's digest, so a file never changes under it and is cached for good.
  * `current` in its place is the bundle loaded now, for an address an app writes
  * into its own code (its icons, say), which cannot know its own digest; that one
- * is cached for an hour, since an update may change what it names. The server
- * half is never served: it is the app's server code.
+ * is cached for an hour, since an update may change what it names - except a
+ * file whose name carries its own content hash (`name-<16 hex>.ext`), which is
+ * cached for good under either, and a page, which is checked again every time
+ * so it never names files an update removed. The server half is never served:
+ * it is the app's server code.
+ *
+ * A page (an app's game, say) runs same-origin in a frame, so it gets a
+ * content policy that keeps it to files from here.
  */
 
 import { join } from "node:path";
@@ -22,6 +28,29 @@ const PART = /^[A-Za-z0-9._@()[\]-]+$/;
 
 const FOREVER = "public, max-age=31536000, immutable";
 const AN_HOUR = "public, max-age=3600";
+const HASHED = /-[0-9a-f]{16}\.[a-z0-9]+$/;
+
+/** What a bundle ships besides scripts and what `mimeForName` knows. */
+const TYPES: Record<string, string> = {
+    js: "text/javascript; charset=utf-8",
+    html: "text/html; charset=utf-8",
+    css: "text/css; charset=utf-8",
+    woff2: "font/woff2",
+    bin: "application/octet-stream"
+};
+
+const PAGE_POLICY = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "worker-src 'self' blob:",
+    "frame-ancestors 'self'",
+    "base-uri 'none'",
+    "form-action 'none'"
+].join("; ");
 
 export async function GET(
     _request: NextRequest,
@@ -41,16 +70,20 @@ export async function GET(
     const name = file[file.length - 1] as string;
     try {
         const bytes = await readFile(join(bundle.dir, ...file));
-        const type = name.endsWith(".js")
-            ? "text/javascript; charset=utf-8"
-            : (mimeForName(name) ?? "application/octet-stream");
-        return new Response(new Uint8Array(bytes), {
-            headers: {
-                "content-type": type,
-                "cache-control": version === "current" ? AN_HOUR : FOREVER,
-                "x-content-type-options": "nosniff"
-            }
-        });
+        const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
+        const type = TYPES[ext] ?? mimeForName(name) ?? "application/octet-stream";
+        const page = ext === "html";
+        const headers: Record<string, string> = {
+            "content-type": type,
+            "cache-control": page
+                ? "no-cache"
+                : version !== "current" || HASHED.test(name)
+                  ? FOREVER
+                  : AN_HOUR,
+            "x-content-type-options": "nosniff"
+        };
+        if (page) headers["content-security-policy"] = PAGE_POLICY;
+        return new Response(new Uint8Array(bytes), { headers });
     } catch {
         return new Response("Not found", { status: 404 });
     }

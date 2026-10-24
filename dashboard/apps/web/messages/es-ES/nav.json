@@ -166,6 +166,9 @@
         },
         "polar": {
             "description": "Pregunta por cualquier página y haz cosas con tu acceso"
+        },
+        "arcade": {
+            "description": "Juega solo o con otros desde una llamada"
         }
     },
     "labels": {
@@ -233,7 +236,7 @@
         "Filters": "Filtros",
         "Firewall": "Cortafuegos",
         "Friends": "Amigos",
-        "Game servers": "Juegos",
+        "Game servers": "Hosting juegos",
         "Goals": "Objetivos",
         "Get started": "Primeros pasos",
         "Groups": "Grupos",

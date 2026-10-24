@@ -93,6 +93,7 @@ afterAll(() => {
 describe("app bundles", () => {
     it("are built for every app package", () => {
         expect(built.map((bundle) => bundle.manifest.id).sort()).toEqual([
+            "arcade",
             "calendar",
             "cloud-servers",
             "crm",

@@ -47,7 +47,8 @@ export const ADDED_ON: Readonly<Record<string, string>> = {
     calendar: "2026-10-01",
     crm: "2026-10-09",
     "status-pages": "2026-10-15",
-    "dns-blocker": "2026-10-18"
+    "dns-blocker": "2026-10-18",
+    arcade: "2026-10-24"
 };
 
 /**
