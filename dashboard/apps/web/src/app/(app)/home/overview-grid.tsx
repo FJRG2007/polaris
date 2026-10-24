@@ -27,6 +27,7 @@ import { packOverviewSpans } from "@/lib/overview/pack";
 import { useShelfScope } from "@/components/shelf-scope";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { overviewRequestGroups } from "@/lib/overview/request-groups";
+import { emptyOverviewCards, writeEmptyCardsCookie } from "@/lib/overview/empty-cards";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import { CalendarWidget } from "./widgets/calendar";
 import { DnsBlockerWidget } from "./widgets/dns-blocker";
@@ -66,6 +67,8 @@ import {
     cn
 } from "@polaris/ui";
 import {
+    overviewArranged,
+    rankOverviewLayout,
     resolveOverviewLayout,
     type OverviewPreferences,
     type OverviewShortcut,
@@ -74,6 +77,14 @@ import {
     type OverviewWidgetSize,
     MAX_OVERVIEW_SHORTCUTS
 } from "@polaris/core";
+
+/** Everything about the grid one save writes. */
+interface Arrangement {
+    widgets: OverviewWidgetPreference[];
+    shortcuts: OverviewShortcut[];
+    greeting: boolean;
+    arranged: boolean;
+}
 
 export interface OverviewApp {
     id: string;
@@ -136,7 +147,8 @@ export function OverviewGrid({
     layout,
     apps,
     gate,
-    appKinds = []
+    appKinds = [],
+    knownEmpty = []
 }: {
     name: string;
     isAdmin: boolean;
@@ -153,8 +165,29 @@ export function OverviewGrid({
     gate: { held: string[]; installed: string[] };
     /** The cards the installed apps offer (see `app-widgets`). */
     appKinds?: readonly AppWidgetKind[];
+    /** The cards found empty on the last visit, so the first paint is already in
+     *  the order the figures will settle it into (see `empty-cards`). */
+    knownEmpty?: readonly OverviewWidgetId[];
 }) {
+    // The stored order. What is drawn is this with the empty cards sunk below the
+    // rest (`displayed`), unless the reader arranged the grid themselves.
     const [widgets, setWidgets] = useState(layout);
+    const [arranged, setArranged] = useState(() => overviewArranged(preferences));
+    const [placed, setPlaced] = useState<ReadonlySet<OverviewWidgetId>>(
+        () => new Set(preferences.widgets.map((widget) => widget.id))
+    );
+    // Decided once per visit: from the last visit's answer and what the page
+    // already knows, then once more when the figures land - never again while the
+    // page is open, so a card does not jump under somebody reading it.
+    const [empty, setEmpty] = useState<ReadonlySet<OverviewWidgetId>>(() => {
+        const known = new Set<OverviewWidgetId>(
+            knownEmpty.filter((id) => id !== "shortcuts" && id !== "apps")
+        );
+        if (preferences.shortcuts.length === 0) known.add("shortcuts");
+        if (apps.length === 0) known.add("apps");
+        return known;
+    });
+    const settled = useRef(false);
     const appState = useAppWidgets(preferences.appWidgets);
     const appCardsShown = appState.cards.some((card) =>
         appKinds.some((kind) => kind.app === card.app && kind.kind === card.kind)
@@ -187,14 +220,11 @@ export function OverviewGrid({
     const [columns, setColumns] = useState(0);
 
     // What the server last accepted, to put back if it refuses the next change.
-    const accepted = useRef<{
-        widgets: OverviewWidgetPreference[];
-        shortcuts: OverviewShortcut[];
-        greeting: boolean;
-    }>({
+    const accepted = useRef<Arrangement>({
         widgets: layout,
         shortcuts: preferences.shortcuts,
-        greeting: preferences.greeting
+        greeting: preferences.greeting,
+        arranged
     });
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const gridRef = useRef<HTMLDivElement | null>(null);
@@ -210,37 +240,38 @@ export function OverviewGrid({
     );
 
     const persist = useCallback(
-        (next: {
-            widgets: OverviewWidgetPreference[];
-            shortcuts: OverviewShortcut[];
-            greeting: boolean;
-        }) => {
+        (next: Arrangement) => {
             setWidgets(next.widgets);
             setShortcuts(next.shortcuts);
             setGreeting(next.greeting);
+            setArranged(next.arranged);
             setFailure(null);
             if (saveTimer.current) clearTimeout(saveTimer.current);
             saveTimer.current = setTimeout(() => {
                 const previous = accepted.current;
+                const restore = (): void => {
+                    setWidgets(previous.widgets);
+                    setShortcuts(previous.shortcuts);
+                    setGreeting(previous.greeting);
+                    setArranged(previous.arranged);
+                };
                 void saveOverviewPreferencesAction({
                     widgets: [...next.widgets, ...unseen],
                     shortcuts: next.shortcuts,
-                    greeting: next.greeting
+                    greeting: next.greeting,
+                    arranged: next.arranged
                 })
                     .then((result) => {
                         if (!result.error) {
                             accepted.current = next;
+                            setPlaced(new Set(next.widgets.map((widget) => widget.id)));
                             return;
                         }
-                        setWidgets(previous.widgets);
-                        setShortcuts(previous.shortcuts);
-                        setGreeting(previous.greeting);
+                        restore();
                         setFailure(result.error);
                     })
                     .catch(() => {
-                        setWidgets(previous.widgets);
-                        setShortcuts(previous.shortcuts);
-                        setGreeting(previous.greeting);
+                        restore();
                         setFailure(t("errors.changeNotSaved"));
                     });
             }, SAVE_DEBOUNCE_MS);
@@ -248,19 +279,26 @@ export function OverviewGrid({
         [unseen, t]
     );
 
-    const current = () => ({ widgets, shortcuts, greeting });
+    const current = (): Arrangement => ({ widgets, shortcuts, greeting, arranged });
 
+    const displayed = useMemo(
+        () => rankOverviewLayout(widgets, { arranged, placed, empty }),
+        [widgets, arranged, placed, empty]
+    );
+
+    /** Moving a card is the reader taking the order over: from here on it is
+     *  theirs, starting from the order they were looking at. */
     function reorder(from: number, to: number): void {
-        if (from < 0 || to < 0 || from === to || from >= widgets.length || to >= widgets.length)
+        if (from < 0 || to < 0 || from === to || from >= displayed.length || to >= displayed.length)
             return;
-        const next = [...widgets];
+        const next = [...displayed];
         const [held] = next.splice(from, 1);
         next.splice(to, 0, held!);
-        persist({ ...current(), widgets: next });
+        persist({ ...current(), widgets: next, arranged: true });
     }
 
     function move(id: OverviewWidgetId, direction: -1 | 1): void {
-        const index = widgets.findIndex((widget) => widget.id === id);
+        const index = displayed.findIndex((widget) => widget.id === id);
         reorder(index, index + direction);
     }
 
@@ -270,8 +308,8 @@ export function OverviewGrid({
     function moveOnto(id: OverviewWidgetId, target: OverviewWidgetId): void {
         if (id === target) return;
         reorder(
-            widgets.findIndex((widget) => widget.id === id),
-            widgets.findIndex((widget) => widget.id === target)
+            displayed.findIndex((widget) => widget.id === id),
+            displayed.findIndex((widget) => widget.id === target)
         );
     }
 
@@ -311,7 +349,8 @@ export function OverviewGrid({
         persist({
             widgets: resolveOverviewLayout({ ...preferences, widgets: [] }, available),
             shortcuts,
-            greeting: true
+            greeting: true,
+            arranged: false
         });
     }
 
@@ -420,12 +459,27 @@ export function OverviewGrid({
         };
     }, [watchingGames, on]);
 
+    // The first time every card's figures are in, settle which ones are empty -
+    // once, so later reads never move a card - and remember it for the next
+    // visit's first paint. A card not on the grid keeps what was known of it.
+    useEffect(() => {
+        if (settled.current || pending === null || pending.size > 0) return;
+        settled.current = true;
+        const next = emptyOverviewCards(data, { shortcuts: shortcuts.length, apps: apps.length });
+        for (const id of empty) {
+            if (!wanted.includes(id) && id !== "shortcuts" && id !== "apps") next.add(id);
+        }
+        writeEmptyCardsCookie(next);
+        const same = next.size === empty.size && [...next].every((id) => empty.has(id));
+        if (!same) setEmpty(next);
+    }, [pending, data, shortcuts.length, apps.length, empty, wanted]);
+
     function refresh(): void {
         dataCache.clear();
         setNonce((value) => value + 1);
     }
 
-    const visible = useMemo(() => widgets.filter((widget) => !widget.hidden), [widgets]);
+    const visible = useMemo(() => displayed.filter((widget) => !widget.hidden), [displayed]);
 
     // How many columns the grid ended up with. Read off the tracks the browser
     // worked out rather than worked out again here: the grid sizes itself against
@@ -618,7 +672,7 @@ export function OverviewGrid({
             <CustomizeDialog
                 open={customizing}
                 onOpenChange={setCustomizing}
-                layout={widgets}
+                layout={displayed}
                 greeting={greeting}
                 onMove={move}
                 onMoveOnto={moveOnto}

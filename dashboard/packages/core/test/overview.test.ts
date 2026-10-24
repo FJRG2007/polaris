@@ -18,8 +18,10 @@ const {
     MAX_RECENT_PLACES,
     OVERVIEW_WIDGET_IDS,
     mergeRecentPlaces,
+    overviewArranged,
     overviewPreferencesSchema,
     parseOverviewPreferences,
+    rankOverviewLayout,
     resolveOverviewLayout,
     stringifyOverviewPreferences
 } = overview;
@@ -191,5 +193,84 @@ describe("mergeRecentPlaces", () => {
         const merged = mergeRecentPlaces(many);
         expect(merged).toHaveLength(MAX_RECENT_PLACES);
         expect(merged[0]?.href).toBe(`/page-${many.length - 1}`);
+    });
+});
+
+describe("cards with nothing to show", () => {
+    const layout = resolveOverviewLayout(EMPTY_OVERVIEW_PREFERENCES, ALL);
+    const ids = (list: readonly { id: string }[]) => list.map((widget) => widget.id);
+
+    it("sink below the ones that do, each group keeping its order", () => {
+        const ranked = rankOverviewLayout(layout, {
+            arranged: false,
+            placed: new Set(),
+            empty: new Set(["shortcuts", "alarms"])
+        });
+        expect(ids(ranked).slice(-2)).toEqual(["shortcuts", "alarms"]);
+        expect(ids(ranked).slice(0, -2)).toEqual(
+            ids(layout).filter((id) => id !== "shortcuts" && id !== "alarms")
+        );
+    });
+
+    it("keep their place while nothing is known", () => {
+        const ranked = rankOverviewLayout(layout, {
+            arranged: false,
+            placed: new Set(),
+            empty: new Set()
+        });
+        expect(ids(ranked)).toEqual(ids(layout));
+    });
+
+    it("never move a card the reader placed in an order of their own", () => {
+        const preferences = {
+            ...EMPTY_OVERVIEW_PREFERENCES,
+            widgets: [
+                { id: "alarms" as const, size: "sm" as const, hidden: false },
+                { id: "shortcuts" as const, size: "lg" as const, hidden: false }
+            ],
+            arranged: true
+        };
+        const resolved = resolveOverviewLayout(preferences, ALL);
+        const ranked = rankOverviewLayout(resolved, {
+            arranged: overviewArranged(preferences),
+            placed: new Set(["alarms", "shortcuts"]),
+            empty: new Set(["alarms", "shortcuts", "games"])
+        });
+        // Both are empty, yet both stay where the reader put them.
+        expect(ids(ranked).filter((id) => id === "alarms" || id === "shortcuts")).toEqual([
+            "alarms",
+            "shortcuts"
+        ]);
+        // A card they never placed still sinks when it is empty.
+        expect(ids(ranked).at(-1)).toBe("games");
+    });
+
+    it("read an old layout that breaks the catalogue order as arranged by hand", () => {
+        const widget = (id: (typeof ALL)[number]) => ({ id, size: "md" as const, hidden: false });
+        expect(
+            overviewArranged({
+                ...EMPTY_OVERVIEW_PREFERENCES,
+                widgets: [widget("apps"), widget("shortcuts")]
+            })
+        ).toBe(true);
+        expect(
+            overviewArranged({
+                ...EMPTY_OVERVIEW_PREFERENCES,
+                widgets: [widget("shortcuts"), widget("usage"), widget("apps")]
+            })
+        ).toBe(false);
+        expect(overviewArranged(EMPTY_OVERVIEW_PREFERENCES)).toBe(false);
+    });
+
+    it("let a recorded answer win over the order it was saved in", () => {
+        const widget = (id: (typeof ALL)[number]) => ({ id, size: "md" as const, hidden: false });
+        expect(
+            overviewArranged({
+                ...EMPTY_OVERVIEW_PREFERENCES,
+                widgets: [widget("apps"), widget("shortcuts")],
+                arranged: false
+            })
+        ).toBe(false);
+        expect(parseOverviewPreferences(JSON.stringify({ arranged: true })).arranged).toBe(true);
     });
 });
