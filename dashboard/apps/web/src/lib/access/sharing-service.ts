@@ -80,6 +80,7 @@ export async function requireMayShare(
         case "place.camera":
         case "place.room":
         case "place.place":
+        case "place.panel":
             // Deciding who gets a key to the house is the same standing as
             // deciding what Polaris is connected to. Being able to open a door
             // is deliberately not enough: a visitor must not be able to lend it
@@ -503,7 +504,14 @@ export async function subjectPlaceLocated(
                           select: { placeId: true }
                       })
                   )?.placeId
-                : undefined;
+                : subject === "place.panel"
+                  ? (
+                        await prisma.placePanel.findUnique({
+                            where: { id: subjectId },
+                            select: { placeId: true }
+                        })
+                    )?.placeId
+                  : undefined;
     if (placeId === undefined) return null;
     if (!placeId) return false;
     const place = await prisma.place.findUnique({
@@ -535,6 +543,7 @@ export function shareIsBounded(subject: core.GrantSubject): boolean {
         subject === "place.domain" ||
         subject === "place.room" ||
         subject === "place.place" ||
+        subject === "place.panel" ||
         subject === "watch.connectivity"
     );
 }

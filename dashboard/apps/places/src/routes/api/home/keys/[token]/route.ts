@@ -2,7 +2,7 @@
  * One press on a door handed out as a link. No session: the link's token is
  * the whole of the right, checked, bounded and rate-limited in `guest-key`.
  *
- *   POST { action, where? }  ->  { device } | { error, nearby? }
+ *   POST { action, deviceId?, command?, where? }  ->  { device } | { error, nearby? }
  */
 
 import { z } from "zod";
@@ -11,7 +11,7 @@ import { HomeError } from "../../../../../lib/home-error";
 import { placesT } from "../../../../../lib/i18n";
 import { placesRefusalText } from "../../../../../lib/refusal-text";
 import { pressGuestKey } from "../../../../../lib/guest-key";
-import { DEVICE_ACTIONS } from "../../../../../lib/device-kinds";
+import { DEVICE_ACTIONS, deviceCommandSchema } from "../../../../../lib/device-kinds";
 import { NearbyRefusal, reportedLocation } from "../../../../../lib/nearby";
 
 export const runtime = "nodejs";
@@ -21,6 +21,8 @@ const bodySchema = z.object({
     action: z.enum(DEVICE_ACTIONS),
     /** Which device, for a room's link. */
     deviceId: z.string().uuid().optional(),
+    /** A light's level or colour, for a wall panel's link. */
+    command: deviceCommandSchema.optional(),
     where: z.unknown().optional()
 });
 
@@ -39,7 +41,8 @@ export async function POST(
             body.data.action,
             reportedLocation(body.data.where),
             ip,
-            body.data.deviceId
+            body.data.deviceId,
+            body.data.command
         );
         return Response.json({ device });
     } catch (caught) {

@@ -36,6 +36,7 @@ import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceAccountView } from "../../lib/device-accounts";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as registry from "../../lib/device-connections";
+import { BatteryMeter } from "./battery-meter";
 import { BatteryLow, DoorOpen, Plus, Radio, RefreshCw, Settings2, Unplug } from "lucide-react";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 import { useDeviceAct } from "./use-device-act";
@@ -640,10 +641,7 @@ const DeviceRow = memo(function DeviceRow({
     const details = [
         device.zone,
         device.model,
-        device.doorState === "none" ? null : kinds.doorText(device.doorState, t),
-        device.batteryPercent === null
-            ? null
-            : t("devicesView.batteryPercent", { percent: device.batteryPercent })
+        device.doorState === "none" ? null : kinds.doorText(device.doorState, t)
     ]
         .filter(Boolean)
         .join(" - ");
@@ -666,6 +664,7 @@ const DeviceRow = memo(function DeviceRow({
                         {kinds.badgeText(device, t)}
                     </Badge>
                     <FilterChip air={device.air} />
+                    <BatteryMeter device={device} />
                     {batteryLow(device) && (
                         <Badge
                             className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink"

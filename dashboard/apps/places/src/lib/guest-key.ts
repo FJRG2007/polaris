@@ -20,7 +20,14 @@ import { homeInstall } from "./access";
 import { requireNearby } from "./nearby";
 import { countDeviceUse, isThingId, roomContents } from "./sharing";
 import { getCamera } from "./cameras";
-import { actionsFor, grantActionFor, type DeviceAction, type DeviceView } from "./device-kinds";
+import { panelContents, panelHolds, type PanelContents } from "./panels";
+import {
+    actionsFor,
+    grantActionFor,
+    type DeviceAction,
+    type DeviceCommand,
+    type DeviceView
+} from "./device-kinds";
 
 type LiveGrant = AppHostTypes["LiveGrant"];
 
@@ -135,6 +142,34 @@ export async function guestRoom(token: string): Promise<GuestRoom | null> {
     };
 }
 
+/** What a wall panel's link shows: the panel and every device on it now. */
+export type GuestPanel =
+    | ({
+          readonly standing: "live";
+          readonly allowed: readonly string[];
+          readonly nearbyMeters: number | null;
+          readonly until: string | null;
+      } & PanelContents)
+    | { readonly standing: Exclude<core.GrantStanding, "live"> };
+
+/** A wall panel handed out as a link, read now, or null when it names none. */
+export async function guestPanel(token: string): Promise<GuestPanel | null> {
+    const reached = await host.accessGrants.linkReach(token);
+    if (!reached || reached.subjectType !== "place.panel") return null;
+    if (reached.standing !== "live") return { standing: reached.standing };
+    const install = await homeInstall();
+    if (!install) return null;
+    const contents = await panelContents(install.id, reached.subjectId).catch(() => null);
+    if (!contents) return null;
+    return {
+        standing: "live",
+        ...contents,
+        allowed: reached.grant.actions,
+        nearbyMeters: reached.grant.nearbyMeters ?? null,
+        until: reached.grant.until?.toISOString() ?? null
+    };
+}
+
 /**
  * Press one button on a link's door. Throws a `HomeError` the guest can read -
  * a `NearbyRefusal` when the link is fenced and the browser is not near.
@@ -144,15 +179,20 @@ export async function pressGuestKey(
     action: DeviceAction,
     where: core.ReportedLocation | null,
     ip: string,
-    /** Which device, for a room's link; a door's link names its own. */
-    deviceId?: string
+    /** Which device, for a room's or a panel's link; a door's link names its own. */
+    deviceId?: string,
+    /** A light's level or colour, from a wall panel's sliders. */
+    command?: DeviceCommand
 ): Promise<DeviceView> {
     const reached = await host.accessGrants.linkReach(token);
     const room = reached?.subjectType === "place.room";
-    if (!reached || !(room || reached.subjectType === "place.device")) {
+    const panel = reached?.subjectType === "place.panel";
+    if (!reached || !(room || panel || reached.subjectType === "place.device")) {
         throw new HomeError("This link does not open anything right now");
     }
-    const targetId = room ? (deviceId ?? "") : reached.subjectId;
+    // Only a panel's link carries a setting: a door's and a room's are one press.
+    if (command && !panel) throw new HomeError("This link does not allow that");
+    const targetId = room || panel ? (deviceId ?? "") : reached.subjectId;
     const log = (outcome: "done" | "refused", reason = "") =>
         host.accessGrants.recordGrantUse({
             grantId: reached.standing === "live" ? reached.grant.id : null,
@@ -172,9 +212,10 @@ export async function pressGuestKey(
         60_000
     );
     if (!limited.ok) throw new HomeError("Too many presses. Wait a minute and try again");
-    const held =
-        !room ||
-        (isThingId(targetId) && (await roomContents([reached.subjectId])).devices.has(targetId));
+    const held = panel
+        ? isThingId(targetId) && (await panelHeld(reached.subjectId, targetId))
+        : !room ||
+          (isThingId(targetId) && (await roomContents([reached.subjectId])).devices.has(targetId));
     if (reached.standing !== "live") {
         if (held) await log("refused", reached.standing);
         throw new HomeError("This link does not open anything right now");
@@ -199,7 +240,7 @@ export async function pressGuestKey(
     );
     let done: DeviceView;
     try {
-        done = await devices.actOnDevice(install.id, device.id, action, "Guest link");
+        done = await devices.actOnDevice(install.id, device.id, action, "Guest link", command);
     } catch (caught) {
         await log("refused", "failed");
         await host.auditService.recordAudit({
@@ -221,4 +262,10 @@ export async function pressGuestKey(
         metadata: { name: device.name, lent: true, link: true, ...(near ? { nearby: true } : {}) }
     });
     return done;
+}
+
+/** Whether a panel shows this device now; nothing when Places is not set up. */
+async function panelHeld(panelId: string, deviceId: string): Promise<boolean> {
+    const install = await homeInstall();
+    return install ? panelHolds(install.id, panelId, deviceId) : false;
 }
