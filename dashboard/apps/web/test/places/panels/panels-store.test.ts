@@ -88,7 +88,13 @@ vi.mock("@polaris/db", () => ({
 const dropGrantsFor = vi.fn(async () => undefined);
 vi.mock("@polaris/app-host", () => ({ host: { accessGrants: { dropGrantsFor } } }));
 vi.mock("@polaris-app/places/src/lib/cameras", () => ({
-    getCamera: async (_i: string, id: string) => cameras.find((camera) => camera.id === id) ?? null
+    getCamerasAt: async (installedAppId: string, placeId: string, ids: readonly string[]) =>
+        cameras.filter(
+            (camera) =>
+                ids.includes(camera.id as string) &&
+                camera.installedAppId === installedAppId &&
+                (camera.placeId === placeId || !camera.placeId)
+        )
 }));
 vi.mock("@polaris-app/places/src/lib/devices", () => ({
     listDevices: async () => devices.map((device) => ({ ...device, name: String(device.id) }))

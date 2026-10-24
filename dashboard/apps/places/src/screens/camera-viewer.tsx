@@ -26,6 +26,7 @@
  * everything drawn over it.
  */
 
+import * as actions from "./actions";
 import { PtzPad } from "./ptz-pad";
 import { TapoControlsPanel } from "./tapo-controls-panel";
 import type { TapoControls } from "../lib/camera-control-kinds";
@@ -355,6 +356,21 @@ export function CameraViewer({
      *  camera answered for once it was. */
     const [tapoOpen, setTapoOpen] = useState(false);
     const [tapo, setTapo] = useState<TapoControls | null>(null);
+    const readsTapo = !camera.ptz && camera.privacyNative && canControl;
+    useEffect(() => {
+        setTapo(null);
+        if (!readsTapo) return;
+        let gone = false;
+        void actions
+            .tapoControlsAction(camera.id)
+            .then((result) => {
+                if (!gone && result.controls) setTapo(result.controls);
+            })
+            .catch(() => undefined);
+        return () => {
+            gone = true;
+        };
+    }, [camera.id, readsTapo]);
 
     /** Whether the reader has stopped it. Held rather than closed: the picture
      *  stays on screen, and starting again reconnects rather than resuming - what

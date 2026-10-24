@@ -18,7 +18,7 @@
 import { prisma } from "@polaris/db";
 import * as devices from "./devices";
 import { host } from "@polaris/app-host";
-import { getCamera, type CameraView } from "./cameras";
+import { getCamerasAt, type CameraView } from "./cameras";
 import { HomeError } from "./home-error";
 import type { DeviceView } from "./device-kinds";
 import {
@@ -203,12 +203,7 @@ async function camerasHere(
     placeId: string,
     cards: readonly PanelCard[]
 ): Promise<CameraView[]> {
-    const ids = panelCameraIds(cards);
-    const found = await Promise.all(ids.map((id) => getCamera(installedAppId, id).catch(() => null)));
-    return found.filter(
-        (camera): camera is CameraView =>
-            camera !== null && (camera.placeId === placeId || !camera.placeId)
-    );
+    return getCamerasAt(installedAppId, placeId, panelCameraIds(cards));
 }
 
 async function automationsHere(

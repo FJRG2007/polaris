@@ -21,12 +21,10 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({}));
 vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({}));
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 
-const { ActionCard, DeviceTile, SensorCard } = await import(
-    "@polaris-app/places/src/screens/panels/panel-cards"
-);
-const { ColorWheel, hsFromPoint, pointFromHs, stepHs } = await import(
-    "@polaris-app/places/src/screens/devices/color-wheel"
-);
+const { ActionCard, DeviceTile, GuestCameraCard, SensorCard } =
+    await import("@polaris-app/places/src/screens/panels/panel-cards");
+const { ColorWheel, hsFromPoint, pointFromHs, stepHs } =
+    await import("@polaris-app/places/src/screens/devices/color-wheel");
 
 function device(overrides: Partial<DeviceView> = {}): DeviceView {
     return {
@@ -53,7 +51,30 @@ function device(overrides: Partial<DeviceView> = {}): DeviceView {
 
 const automation = { id: "a1", name: "Good night", enabled: true };
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+});
+
+describe("a camera card on a panel's link", () => {
+    it("opens its watch, and spends a use, only when pressed", async () => {
+        const fetch = vi.fn(async () => Response.json({ watch: "w".repeat(22) }));
+        vi.stubGlobal("fetch", fetch);
+        render(
+            withMessages(
+                <GuestCameraCard token="t1" camera={{ id: "c1", name: "Porch", private: false }} />
+            )
+        );
+        expect(screen.getByRole("heading", { level: 2, name: "Porch" })).toBeTruthy();
+        expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+        expect(fetch).not.toHaveBeenCalled();
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Watch live" }));
+        });
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(String(fetch.mock.calls[0]![0])).toBe("/api/home/keys/t1/watch?camera=c1");
+    });
+});
 
 describe("a sensor card", () => {
     it("draws the reading large", () => {
@@ -70,7 +91,11 @@ describe("a sensor card", () => {
 describe("an automation button", () => {
     it("runs at once when it does not ask first", async () => {
         const onRun = vi.fn(async () => null);
-        render(withMessages(<ActionCard automation={automation} confirm={false} canRun onRun={onRun} />));
+        render(
+            withMessages(
+                <ActionCard automation={automation} confirm={false} canRun onRun={onRun} />
+            )
+        );
         await act(async () => fireEvent.click(screen.getByRole("button", { name: /Good night/ })));
         expect(onRun).toHaveBeenCalledTimes(1);
         expect(screen.getByText("Started")).toBeTruthy();
@@ -88,7 +113,11 @@ describe("an automation button", () => {
 
     it("is greyed with the reason for somebody who may not run it", () => {
         const onRun = vi.fn(async () => null);
-        render(withMessages(<ActionCard automation={automation} confirm={false} canRun={false} onRun={onRun} />));
+        render(
+            withMessages(
+                <ActionCard automation={automation} confirm={false} canRun={false} onRun={onRun} />
+            )
+        );
         const button = screen.getByRole("button", { name: /Good night/ });
         expect(button.getAttribute("aria-disabled")).toBe("true");
         fireEvent.click(button);
@@ -109,9 +138,18 @@ describe("the colour wheel", () => {
     });
 
     it("turns with the arrow keys and stays in range", () => {
-        expect(stepHs({ hue: 355, saturation: 50 }, "ArrowRight", false)).toEqual({ hue: 0, saturation: 50 });
-        expect(stepHs({ hue: 0, saturation: 98 }, "ArrowUp", false)).toEqual({ hue: 0, saturation: 100 });
-        expect(stepHs({ hue: 10, saturation: 10 }, "ArrowDown", true)).toEqual({ hue: 10, saturation: 0 });
+        expect(stepHs({ hue: 355, saturation: 50 }, "ArrowRight", false)).toEqual({
+            hue: 0,
+            saturation: 50
+        });
+        expect(stepHs({ hue: 0, saturation: 98 }, "ArrowUp", false)).toEqual({
+            hue: 0,
+            saturation: 100
+        });
+        expect(stepHs({ hue: 10, saturation: 10 }, "ArrowDown", true)).toEqual({
+            hue: 10,
+            saturation: 0
+        });
         expect(stepHs({ hue: 10, saturation: 10 }, "Enter", false)).toBeNull();
     });
 
@@ -153,7 +191,9 @@ describe("the colour wheel", () => {
         const { unmount } = render(withMessages(<DeviceTile device={lamp(null)} acts={acts} />));
         expect(screen.queryByRole("slider", { name: "Color" })).toBeNull();
         unmount();
-        render(withMessages(<DeviceTile device={lamp({ hue: 200, saturation: 60 })} acts={acts} />));
+        render(
+            withMessages(<DeviceTile device={lamp({ hue: 200, saturation: 60 })} acts={acts} />)
+        );
         const wheel = screen.getByRole("slider", { name: "Color" });
         expect(wheel.getAttribute("aria-valuetext")).toBe("Hue 200 degrees, saturation 60%");
     });

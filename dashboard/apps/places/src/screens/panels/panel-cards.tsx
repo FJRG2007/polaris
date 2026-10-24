@@ -224,6 +224,8 @@ export function GuestCameraCard({
                 until={null}
                 note=""
                 initiallyPrivate={camera.private}
+                onPress
+                bare
             />
             <Button
                 type="button"

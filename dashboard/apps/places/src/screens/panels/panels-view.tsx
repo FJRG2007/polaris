@@ -28,6 +28,7 @@ import type { CameraView } from "../../lib/cameras";
 import type { PanelAutomation } from "../../lib/panels";
 import {
     Button,
+    Checkbox,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -243,11 +244,9 @@ function AddCardDialog({
                         ) : (
                             <>
                                 <label className="flex min-h-11 items-center gap-2 px-3 text-sm">
-                                    <input
-                                        type="checkbox"
+                                    <Checkbox
                                         checked={askFirst}
                                         onChange={(event) => setAskFirst(event.target.checked)}
-                                        className="size-4 accent-primary"
                                     />
                                     {t("panels.askFirstPick")}
                                 </label>
