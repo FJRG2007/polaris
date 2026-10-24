@@ -109,7 +109,8 @@ export function MeetingDetailsDialog({
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium">
-                            {t("meetings.name")}<span className="text-danger"> *</span>
+                            {t("meetings.name")}
+                            <span className="text-danger"> *</span>
                         </span>
                         <Input
                             autoFocus

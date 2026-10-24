@@ -37,9 +37,8 @@ vi.mock("@polaris-app/places/src/lib/cameras", () => ({
     getCamera: async (_i: string, id: string) => ({ id, name: "x", privacy: false })
 }));
 
-const { forgetWatches, guestWatchCamera, openGuestWatch } = await import(
-    "@polaris-app/places/src/lib/guest-camera"
-);
+const { forgetWatches, guestWatchCamera, openGuestWatch } =
+    await import("@polaris-app/places/src/lib/guest-camera");
 
 function live(actions: string[], subjectType = "place.panel") {
     return {

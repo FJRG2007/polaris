@@ -321,7 +321,9 @@ export function ActionCard({
             <Dialog open={asking} onOpenChange={(next) => (next ? undefined : setAsking(false))}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{t("panels.runQuestion", { name: automation.name })}</DialogTitle>
+                        <DialogTitle>
+                            {t("panels.runQuestion", { name: automation.name })}
+                        </DialogTitle>
                         <DialogDescription>{t("panels.runBody")}</DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -347,9 +349,10 @@ export function SensorCard({ device }: { device: DeviceView }) {
     const sinceText =
         since && !Number.isNaN(since.getTime())
             ? t("panels.sensorSince", {
-                  time: new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(
-                      since
-                  )
+                  time: new Intl.DateTimeFormat(locale, {
+                      hour: "2-digit",
+                      minute: "2-digit"
+                  }).format(since)
               })
             : "";
     return (

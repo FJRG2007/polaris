@@ -199,7 +199,11 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                             setOptions((prev) => ({ ...prev, upper: event.target.checked }))
                         }
                     />
-                    {options.kind === "passphrase" ? t("generator.capitalize") : "A-Z" /* i18n-ignore a character range */}
+                    {
+                        options.kind === "passphrase"
+                            ? t("generator.capitalize")
+                            : "A-Z" /* i18n-ignore a character range */
+                    }
                 </label>
                 <label className="flex items-center gap-2">
                     <Checkbox

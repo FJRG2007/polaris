@@ -117,7 +117,9 @@ export function ColorWheel({
     return (
         <div className={cn("flex min-w-0 flex-col gap-1", className)}>
             <span className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
-                <span className="truncate" title={label}>{label}</span>
+                <span className="truncate" title={label}>
+                    {label}
+                </span>
                 <span
                     aria-hidden
                     className="size-3 shrink-0 rounded-full border border-border"

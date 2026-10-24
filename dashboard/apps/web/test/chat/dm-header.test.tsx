@@ -170,7 +170,9 @@ describe("the search box", () => {
         header(vi.fn(), true);
         expect(screen.queryByPlaceholderText("Search Grace Hopper")).toBeNull();
         // The other buttons stay where they were.
-        expect(screen.getAllByRole("button", { name: "Pinned messages" }).length).toBeGreaterThan(0);
+        expect(screen.getAllByRole("button", { name: "Pinned messages" }).length).toBeGreaterThan(
+            0
+        );
     });
 
     it("works the same at the top of the panel", async () => {

@@ -216,7 +216,9 @@ function AddCardDialog({
                             {t("panels.pickCamera")}
                         </h3>
                         {cameras.length === 0 ? (
-                            <p className="px-3 text-sm text-muted-foreground">{t("panels.noCameras")}</p>
+                            <p className="px-3 text-sm text-muted-foreground">
+                                {t("panels.noCameras")}
+                            </p>
                         ) : (
                             cameras.map((camera) => (
                                 <button

@@ -369,8 +369,7 @@ export const polar = framedScene("polar", polarPage, (ctx) => ({
 export const polarSidePanel = defineScene({
     id: "polar-side-panel",
     path: "/polar",
-    api: (ctx) =>
-        polarApi(ctx, () => ({ stage: PANEL ?? PANEL_PLAY[current]!.stage, shop: true })),
+    api: (ctx) => polarApi(ctx, () => ({ stage: PANEL ?? PANEL_PLAY[current]!.stage, shop: true })),
     render: (ctx) => {
         openThread();
         return PANEL ? <SidePanel /> : <ShopWithPanel ctx={ctx} />;

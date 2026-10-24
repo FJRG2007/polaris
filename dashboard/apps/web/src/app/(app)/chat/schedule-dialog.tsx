@@ -142,9 +142,7 @@ export function ScheduleDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>{t("schedule.sendThisLater")}</DialogTitle>
-                    <DialogDescription>
-                        {t("schedule.itStaysOutOfThe")}
-                    </DialogDescription>
+                    <DialogDescription>{t("schedule.itStaysOutOfThe")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
@@ -163,7 +161,9 @@ export function ScheduleDialog({
                             disabled={busy}
                             onClick={() => take(core.zonedInstant(tomorrowMorning, timeZone))}
                         >
-                            {t("schedule.tomorrowAt", { time: format.time(core.zonedInstant(tomorrowMorning, timeZone)) })}
+                            {t("schedule.tomorrowAt", {
+                                time: format.time(core.zonedInstant(tomorrowMorning, timeZone))
+                            })}
                         </Button>
                         <Button
                             size="sm"
@@ -171,7 +171,9 @@ export function ScheduleDialog({
                             disabled={busy}
                             onClick={() => take(core.zonedInstant(mondayMorning, timeZone))}
                         >
-                            {t("schedule.mondayAt", { time: format.time(core.zonedInstant(mondayMorning, timeZone)) })}
+                            {t("schedule.mondayAt", {
+                                time: format.time(core.zonedInstant(mondayMorning, timeZone))
+                            })}
                         </Button>
                     </div>
 
@@ -204,10 +206,21 @@ export function ScheduleDialog({
                         </Button>
                     </div>
 
-                    <p className={refusal || error ? "text-xs text-danger" : "text-xs text-muted-foreground"}>
+                    <p
+                        className={
+                            refusal || error
+                                ? "text-xs text-danger"
+                                : "text-xs text-muted-foreground"
+                        }
+                    >
                         {error ??
                             refusal ??
-                            (at ? t("schedule.sendsOn", { date: format.date(at), time: format.time(at) }) : "")}
+                            (at
+                                ? t("schedule.sendsOn", {
+                                      date: format.date(at),
+                                      time: format.time(at)
+                                  })
+                                : "")}
                         {!refusal && !error && timeZone !== core.AUTOMATIC_TIME_ZONE
                             ? ` ${timeZone.replace(/_/g, " ")}.`
                             : ""}

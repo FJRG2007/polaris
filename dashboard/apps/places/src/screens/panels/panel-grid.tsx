@@ -189,7 +189,9 @@ export function PanelGrid({
                                         <MoveDiagonal2 className="size-4" />
                                     </button>
                                     {extra ? (
-                                        <div className="absolute bottom-2 left-2">{extra(card)}</div>
+                                        <div className="absolute bottom-2 left-2">
+                                            {extra(card)}
+                                        </div>
                                     ) : null}
                                 </>
                             ) : null}

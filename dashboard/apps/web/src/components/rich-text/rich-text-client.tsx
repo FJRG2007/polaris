@@ -42,17 +42,16 @@ export function Chip({ node }: { node: JSONContent }) {
     // would go somewhere that would refuse them.
     if (node.attrs?.unavailable === true) {
         return (
-            <span
-                className={`${chipClass(kind)} italic opacity-70`}
-                title={t("editor.noAccess")}
-            >
+            <span className={`${chipClass(kind)} italic opacity-70`} title={t("editor.noAccess")}>
                 {t("editor.unavailable")}
             </span>
         );
     }
 
     const label = chipLabel(kind, String(node.attrs?.label ?? ""), (of) =>
-        t.has(`editor.unnamed.${of}`) ? t(`editor.unnamed.${of}` as NamespaceKey<"components">) : undefined
+        t.has(`editor.unnamed.${of}`)
+            ? t(`editor.unnamed.${of}` as NamespaceKey<"components">)
+            : undefined
     );
     // A person has no page of their own to link to from here; what pressing one
     // does is the screen's to decide - see `PersonMention`.
@@ -60,7 +59,10 @@ export function Chip({ node }: { node: JSONContent }) {
     const href = refs.referenceHref(kind, id);
     if (!href) return <span className={chipClass(kind)}>{label}</span>;
     return (
-        <Link href={href} className={cn(chipClass(kind), "no-underline hover:bg-muted-foreground/20")}>
+        <Link
+            href={href}
+            className={cn(chipClass(kind), "no-underline hover:bg-muted-foreground/20")}
+        >
             {label}
         </Link>
     );

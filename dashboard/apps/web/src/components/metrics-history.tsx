@@ -50,8 +50,7 @@ import {
 type Point = ConsumptionPoint;
 
 type Window =
-    | { kind: "preset"; preset: RangePreset }
-    | { kind: "custom"; from: number; to: number };
+    { kind: "preset"; preset: RangePreset } | { kind: "custom"; from: number; to: number };
 
 function queryFor(window: Window): string {
     if (window.kind === "preset") return `range=${window.preset}`;

@@ -47,9 +47,8 @@ vi.mock("@polaris-app/places/src/lib/devices", () => ({
     actOnDevice
 }));
 
-const { guestPanel, pressGuestKey, runGuestAutomation } = await import(
-    "@polaris-app/places/src/lib/guest-key"
-);
+const { guestPanel, pressGuestKey, runGuestAutomation } =
+    await import("@polaris-app/places/src/lib/guest-key");
 
 function live(subjectType: string, actions: string[], subjectId = PANEL, capability = "control") {
     return {

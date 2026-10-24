@@ -49,7 +49,17 @@ const { MediaPlayer } = hostUi.mediaPlayer;
 const { useDisplayFormat } = hostUi.displayFormat;
 
 /** What the list can be narrowed to; each reads as `events.kinds.<value>`. */
-const KINDS = ["", "person", "face", "vehicle", "animal", "package", "motion", "tamper", "offline"] as const;
+const KINDS = [
+    "",
+    "person",
+    "face",
+    "vehicle",
+    "animal",
+    "package",
+    "motion",
+    "tamper",
+    "offline"
+] as const;
 
 /** The shape every tile is drawn at. The stills are not all this shape - a
  *  still keeps whatever the camera sends - so it is also what the box drawn over
@@ -253,7 +263,10 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         if (!subject) return null;
         // A recognized subject is shown by name; an outage's label is a sentence
         // Places wrote, and reads in the reader's words.
-        return people.find((person) => person.subjectId === subject)?.name ?? placesRefusalText(t, subject);
+        return (
+            people.find((person) => person.subjectId === subject)?.name ??
+            placesRefusalText(t, subject)
+        );
     };
 
     /** Puts the moment a link named where somebody can see it, once. */
@@ -296,7 +309,10 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     onValueChange={setKind}
                     className="w-44"
                     aria-label={t("events.what")}
-                    options={KINDS.map((value) => ({ value, label: t(`events.kinds.${value || "all"}`) }))}
+                    options={KINDS.map((value) => ({
+                        value,
+                        label: t(`events.kinds.${value || "all"}`)
+                    }))}
                 />
                 {people.length > 0 ? (
                     <Select
@@ -395,7 +411,10 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                     style={{ aspectRatio: TILE_SHAPE }}
                                     className="relative block w-full cursor-zoom-in bg-background"
                                     onClick={() => void openMoment(event)}
-                                    aria-label={t("events.see", { camera: event.cameraName, at: format.dateTime(event.at) })}
+                                    aria-label={t("events.see", {
+                                        camera: event.cameraName,
+                                        at: format.dateTime(event.at)
+                                    })}
                                 >
                                     {event.stillKey ? (
                                         // Drawn whole rather than cropped to
@@ -435,10 +454,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                     {event.stillKey ? (
                                         <DetectionBox
                                             box={event.box}
-                                            label={
-                                                nameFor(event.label) ??
-                                                kindLabel(event.kind, t)
-                                            }
+                                            label={nameFor(event.label) ?? kindLabel(event.kind, t)}
                                             picture={shapes[event.id] ?? null}
                                             tile={TILE_SHAPE}
                                         />
@@ -469,10 +485,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1">
                                         {event.score !== null ? (
-                                            <Badge
-                                                variant="neutral"
-                                                title={t("events.score")}
-                                            >
+                                            <Badge variant="neutral" title={t("events.score")}>
                                                 {event.score}
                                             </Badge>
                                         ) : null}

@@ -52,10 +52,7 @@ export const callMeeting = defineScene({
 
 /** Opens the screen Lena is sharing in the group call, once its card is drawn. */
 export async function watchSharedScreen(ctx: SceneContext): Promise<void> {
-    const screen = label(ctx.locale, "chat.callRoom.theirScreen").replace(
-        "{name}",
-        TEAM.lena.name
-    );
+    const screen = label(ctx.locale, "chat.callRoom.theirScreen").replace("{name}", TEAM.lena.name);
     const title = label(ctx.locale, "chat.callRoom.watchNamed").replace("{name}", screen);
     for (let tries = 0; ; tries++) {
         const card = document.querySelector<HTMLElement>(`button[title="${title}"]`);

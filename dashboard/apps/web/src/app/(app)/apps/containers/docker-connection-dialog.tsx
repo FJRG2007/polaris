@@ -153,7 +153,9 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                     checked={useInstallKey}
                                     onChange={(event) => setUseInstallKey(event.target.checked)}
                                 />
-                                {sshEnabled ? t("connection.installKey") : t("connection.installKeyNone")}
+                                {sshEnabled
+                                    ? t("connection.installKey")
+                                    : t("connection.installKeyNone")}
                             </label>
                             {useInstallKey ? null : (
                                 <>

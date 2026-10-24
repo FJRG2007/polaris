@@ -255,7 +255,10 @@ export function PanelBoard({
     );
     const byId = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
     const roomById = useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
-    const cameraById = useMemo(() => new Map(cameras.map((camera) => [camera.id, camera])), [cameras]);
+    const cameraById = useMemo(
+        () => new Map(cameras.map((camera) => [camera.id, camera])),
+        [cameras]
+    );
     const guestCameraById = useMemo(
         () => new Map(guestCameras.map((camera) => [camera.id, camera])),
         [guestCameras]
@@ -309,7 +312,11 @@ export function PanelBoard({
         if (card.type === "camera") {
             if (access.kind === "link") {
                 const camera = guestCameraById.get(card.cameraId);
-                return camera ? <GuestCameraCard token={access.token} camera={camera} /> : <GoneCard />;
+                return camera ? (
+                    <GuestCameraCard token={access.token} camera={camera} />
+                ) : (
+                    <GoneCard />
+                );
             }
             const camera = cameraById.get(card.cameraId);
             return camera ? (

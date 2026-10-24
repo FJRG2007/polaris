@@ -19,7 +19,16 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createEnvironmentAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Checkbox } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Checkbox
+} from "@polaris/ui";
 
 export const NEW_ENVIRONMENT = "__new_environment__";
 
@@ -30,7 +39,13 @@ const EMPTY = "__empty__";
  *  comes from the caller, in the reader's language. */
 export function newEnvironmentOption(canManage: boolean, label: string) {
     return canManage
-        ? [{ value: NEW_ENVIRONMENT, label, icon: <Plus className="size-3.5 text-muted-foreground" /> }]
+        ? [
+              {
+                  value: NEW_ENVIRONMENT,
+                  label,
+                  icon: <Plus className="size-3.5 text-muted-foreground" />
+              }
+          ]
         : [];
 }
 
@@ -107,7 +122,9 @@ export function NewEnvironmentDialog({
                     </label>
                     {environments.length > 0 && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">{t("newEnvironment.startFrom")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("newEnvironment.startFrom")}
+                            </span>
                             <Select
                                 value={from}
                                 onValueChange={setFrom}
@@ -116,7 +133,9 @@ export function NewEnvironmentDialog({
                                     { value: EMPTY, label: t("newEnvironment.empty") },
                                     ...environments.map((environment) => ({
                                         value: environment.id,
-                                        label: t("newEnvironment.copyOf", { name: environment.name })
+                                        label: t("newEnvironment.copyOf", {
+                                            name: environment.name
+                                        })
                                     }))
                                 ]}
                             />
@@ -128,7 +147,9 @@ export function NewEnvironmentDialog({
                         </label>
                     )}
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("newEnvironment.branch")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("newEnvironment.branch")}
+                        </span>
                         <Input
                             value={branch}
                             onChange={(event) => setBranch(event.target.value)}
@@ -154,7 +175,11 @@ export function NewEnvironmentDialog({
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             {t("newEnvironment.cancel")}
                         </Button>
-                        <Button onClick={submit} disabled={pending || !name.trim()} aria-disabled={!name.trim()}>
+                        <Button
+                            onClick={submit}
+                            disabled={pending || !name.trim()}
+                            aria-disabled={!name.trim()}
+                        >
                             {t("newEnvironment.create")}
                         </Button>
                     </div>

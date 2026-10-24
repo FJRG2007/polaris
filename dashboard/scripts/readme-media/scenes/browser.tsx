@@ -39,11 +39,7 @@ function savedLogins(ctx: SceneContext) {
 }
 
 /** The loop: the mark on the box, the chooser open, the form filled. */
-const PLAY = [
-    { hold: 1200 },
-    { hold: 2000 },
-    { hold: 2800 }
-] as const;
+const PLAY = [{ hold: 1200 }, { hold: 2000 }, { hold: 2800 }] as const;
 
 /** The step on screen; the still is the chooser open. */
 let current = 1;
@@ -226,7 +222,10 @@ function Autofill({ ctx }: { ctx: SceneContext }) {
         <BrowserFrame
             ctx={ctx}
             tabs={[
-                { title: ctx.say(`Sign in - ${SITE.name}`, `Iniciar sesión - ${SITE.name}`), color: SITE.brand },
+                {
+                    title: ctx.say(`Sign in - ${SITE.name}`, `Iniciar sesión - ${SITE.name}`),
+                    color: SITE.brand
+                },
                 { title: "Vault - Polaris", icon: <PolarisTabIcon /> }
             ]}
             url={SITE.url}
@@ -255,7 +254,10 @@ export const extensionAutofill = defineScene({
 export const vaultBrowser = framedScene("vault-browser", vault, (ctx) => ({
     tabs: [
         { title: "Vault - Polaris", icon: <PolarisTabIcon /> },
-        { title: ctx.say(`Sign in - ${SITE.name}`, `Iniciar sesión - ${SITE.name}`), color: SITE.brand }
+        {
+            title: ctx.say(`Sign in - ${SITE.name}`, `Iniciar sesión - ${SITE.name}`),
+            color: SITE.brand
+        }
     ],
     url: `https://polaris.example.com${vault.path}`
 }));

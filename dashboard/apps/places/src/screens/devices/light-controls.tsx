@@ -134,7 +134,9 @@ export function LightControls({
             {light.color ? (
                 <ColorWheel
                     label={t("devices.actions.set-color")}
-                    valueText={({ hue, saturation }) => t("devices.colorValue", { hue, saturation })}
+                    valueText={({ hue, saturation }) =>
+                        t("devices.colorValue", { hue, saturation })
+                    }
                     value={
                         light.color.hue === null
                             ? null

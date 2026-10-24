@@ -21,12 +21,26 @@ const DEV = "00000000-0000-4000-8000-0000000000d1";
 describe("new panel cards", () => {
     it("accepts a camera, an automation button and a sensor", () => {
         expect(
-            panelCardSchema.safeParse({ id: "c", type: "camera", cameraId: CAM, x: 0, y: 0, w: 4, h: 3 })
-                .success
+            panelCardSchema.safeParse({
+                id: "c",
+                type: "camera",
+                cameraId: CAM,
+                x: 0,
+                y: 0,
+                w: 4,
+                h: 3
+            }).success
         ).toBe(true);
         expect(
-            panelCardSchema.safeParse({ id: "s", type: "sensor", deviceId: DEV, x: 0, y: 0, w: 2, h: 2 })
-                .success
+            panelCardSchema.safeParse({
+                id: "s",
+                type: "sensor",
+                deviceId: DEV,
+                x: 0,
+                y: 0,
+                w: 2,
+                h: 2
+            }).success
         ).toBe(true);
     });
 
@@ -44,13 +58,31 @@ describe("new panel cards", () => {
     });
 
     it("refuses a card without its id, a bad id, or one too small to draw", () => {
-        expect(panelCardSchema.safeParse({ id: "c", type: "camera", x: 0, y: 0, w: 4, h: 3 }).success).toBe(false);
         expect(
-            panelCardSchema.safeParse({ id: "a", type: "action", automationId: "x", confirm: true, x: 0, y: 0, w: 3, h: 1 })
-                .success
+            panelCardSchema.safeParse({ id: "c", type: "camera", x: 0, y: 0, w: 4, h: 3 }).success
         ).toBe(false);
         expect(
-            panelCardSchema.safeParse({ id: "c", type: "camera", cameraId: CAM, x: 0, y: 0, w: 2, h: 2 }).success
+            panelCardSchema.safeParse({
+                id: "a",
+                type: "action",
+                automationId: "x",
+                confirm: true,
+                x: 0,
+                y: 0,
+                w: 3,
+                h: 1
+            }).success
+        ).toBe(false);
+        expect(
+            panelCardSchema.safeParse({
+                id: "c",
+                type: "camera",
+                cameraId: CAM,
+                x: 0,
+                y: 0,
+                w: 2,
+                h: 2
+            }).success
         ).toBe(false);
     });
 

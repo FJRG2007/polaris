@@ -181,9 +181,11 @@ export function AuditFeed({
             const next = new URLSearchParams(filters);
             next.set("cursor", nextCursor);
             const response = await fetch(`${endpoint}?${next.toString()}`, { cache: "no-store" });
-            const body = (await response.json().catch(() => null)) as Partial<AuditPage> & {
-                error?: string;
-            } | null;
+            const body = (await response.json().catch(() => null)) as
+                | (Partial<AuditPage> & {
+                      error?: string;
+                  })
+                | null;
             if (!response.ok || !body) throw new Error(body?.error ?? t("auditFeed.olderFailed"));
             const items = Array.isArray(body.items) ? body.items : [];
             setOlder((held) => [...held, ...items]);
@@ -269,7 +271,10 @@ export function AuditFeed({
                         className="h-8 w-full sm:w-48"
                         options={[
                             { value: ALL, label: t("auditFeed.everybody") },
-                            ...(facets?.actors ?? []).map((actor) => ({ value: actor.id, label: actor.name }))
+                            ...(facets?.actors ?? []).map((actor) => ({
+                                value: actor.id,
+                                label: actor.name
+                            }))
                         ]}
                     />
                 ) : null}
@@ -280,7 +285,10 @@ export function AuditFeed({
                     className="h-8 w-full sm:w-40"
                     options={[
                         { value: ALL, label: t("auditFeed.everyArea") },
-                        ...(facets?.areas ?? []).map((area) => ({ value: area, label: areaLabel(area) }))
+                        ...(facets?.areas ?? []).map((area) => ({
+                            value: area,
+                            label: areaLabel(area)
+                        }))
                     ]}
                 />
                 <Select
@@ -335,7 +343,12 @@ export function AuditFeed({
                 <div className="ml-auto flex items-center gap-1">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={t("auditFeed.export")} title={t("auditFeed.export")}>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={t("auditFeed.export")}
+                                title={t("auditFeed.export")}
+                            >
                                 <Download className="size-4" aria-hidden />
                             </Button>
                         </DropdownMenuTrigger>
@@ -360,7 +373,10 @@ export function AuditFeed({
                         aria-label={t("auditFeed.refresh")}
                         title={t("auditFeed.refresh")}
                     >
-                        <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} aria-hidden />
+                        <RefreshCw
+                            className={refreshing ? "size-4 animate-spin" : "size-4"}
+                            aria-hidden
+                        />
                     </Button>
                 </div>
             </div>
@@ -377,8 +393,15 @@ export function AuditFeed({
 
             {nextCursor ? (
                 <div ref={sentinel} className="flex justify-center py-2">
-                    <Button variant="ghost" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
-                        {loadingOlder ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void loadOlder()}
+                        disabled={loadingOlder}
+                    >
+                        {loadingOlder ? (
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        ) : null}
                         {loadingOlder ? t("auditFeed.loadingOlder") : t("auditFeed.loadOlder")}
                     </Button>
                 </div>

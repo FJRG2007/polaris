@@ -87,7 +87,9 @@ export function ExpirySelect({ onChange }: { onChange: (iso: string) => void }) 
                         }}
                         className="w-24"
                     />
-                    <span className="text-sm text-muted-foreground">{t(`expiry.units.${unit}`)}</span>
+                    <span className="text-sm text-muted-foreground">
+                        {t(`expiry.units.${unit}`)}
+                    </span>
                 </div>
             ) : null}
 

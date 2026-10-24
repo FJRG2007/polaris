@@ -31,8 +31,22 @@ export interface BrowserTab {
 /** The browser's own greys, by theme: no part of Polaris's design. */
 function shades(ctx: SceneContext) {
     return ctx.theme === "dark"
-        ? { strip: "#1f2023", bar: "#2b2c30", field: "#1a1b1e", text: "#e3e3e6", muted: "#9a9ca3", line: "#3a3b40" }
-        : { strip: "#dfe1e5", bar: "#f7f8fa", field: "#eceef1", text: "#202124", muted: "#5f6368", line: "#d3d6db" };
+        ? {
+              strip: "#1f2023",
+              bar: "#2b2c30",
+              field: "#1a1b1e",
+              text: "#e3e3e6",
+              muted: "#9a9ca3",
+              line: "#3a3b40"
+          }
+        : {
+              strip: "#dfe1e5",
+              bar: "#f7f8fa",
+              field: "#eceef1",
+              text: "#202124",
+              muted: "#5f6368",
+              line: "#d3d6db"
+          };
 }
 
 /** The Polaris star, as a tab icon. */
@@ -54,7 +68,9 @@ function ExtensionButton({ lit }: { lit: boolean }) {
                 font: "600 11px ui-sans-serif, system-ui, sans-serif",
                 color: "#fff",
                 background: EXTENSION_BRAND,
-                boxShadow: lit ? `0 0 0 3px color-mix(in srgb, ${EXTENSION_BRAND} 35%, transparent)` : "none"
+                boxShadow: lit
+                    ? `0 0 0 3px color-mix(in srgb, ${EXTENSION_BRAND} 35%, transparent)`
+                    : "none"
             }}
         >
             P
@@ -116,7 +132,14 @@ export function BrowserFrame({
             }}
         >
             <Lock size={13} style={{ flex: "none", color: tone.muted }} />
-            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span
+                style={{
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                }}
+            >
                 {host}
                 {!phone && <span style={{ color: tone.muted }}>{path}</span>}
             </span>
@@ -134,7 +157,9 @@ export function BrowserFrame({
             }}
         >
             {phone ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px" }}>
+                <div
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px" }}
+                >
                     {field}
                     <span
                         style={{
@@ -163,9 +188,24 @@ export function BrowserFrame({
                             background: tone.strip
                         }}
                     >
-                        <span style={{ display: "flex", gap: 8, alignSelf: "center", marginRight: 14 }}>
+                        <span
+                            style={{
+                                display: "flex",
+                                gap: 8,
+                                alignSelf: "center",
+                                marginRight: 14
+                            }}
+                        >
                             {["#ff5f57", "#febc2e", "#28c840"].map((color) => (
-                                <i key={color} style={{ width: 12, height: 12, borderRadius: 99, background: color }} />
+                                <i
+                                    key={color}
+                                    style={{
+                                        width: 12,
+                                        height: 12,
+                                        borderRadius: 99,
+                                        background: color
+                                    }}
+                                />
                             ))}
                         </span>
                         {tabs.map((tab, index) => (
@@ -200,9 +240,19 @@ export function BrowserFrame({
                                 <X size={13} style={{ flex: "none" }} />
                             </div>
                         ))}
-                        <Plus size={15} style={{ alignSelf: "center", margin: "0 8px", color: tone.muted }} />
+                        <Plus
+                            size={15}
+                            style={{ alignSelf: "center", margin: "0 8px", color: tone.muted }}
+                        />
                         <span style={{ flex: 1 }} />
-                        <span style={{ display: "flex", gap: 18, alignSelf: "center", color: tone.muted }}>
+                        <span
+                            style={{
+                                display: "flex",
+                                gap: 18,
+                                alignSelf: "center",
+                                color: tone.muted
+                            }}
+                        >
                             <Minus size={14} />
                             <Square size={12} />
                             <X size={14} />
@@ -226,7 +276,9 @@ export function BrowserFrame({
                     </div>
                 </>
             )}
-            <div style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}>{children}</div>
+            <div style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}>
+                {children}
+            </div>
         </div>
     );
 }

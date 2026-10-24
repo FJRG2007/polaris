@@ -76,7 +76,10 @@ export function AwayView({
                     <span className="mb-1 block text-[12px] text-muted-foreground">
                         {t("away.subject")}
                     </span>
-                    <Input value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} />
+                    <Input
+                        value={form.subject}
+                        onChange={(event) => setForm({ ...form, subject: event.target.value })}
+                    />
                 </label>
 
                 <label className="block">
@@ -93,7 +96,9 @@ export function AwayView({
 
                 <div className="flex flex-wrap gap-3">
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("away.from")}</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            {t("away.from")}
+                        </span>
                         <DateInput
                             mode="date"
                             value={form.startsAt}
@@ -101,7 +106,9 @@ export function AwayView({
                         />
                     </label>
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("away.until")}</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            {t("away.until")}
+                        </span>
                         <DateInput
                             mode="date"
                             value={form.endsAt}
@@ -118,14 +125,14 @@ export function AwayView({
                             max={90}
                             className="w-24"
                             value={String(form.repeatDays)}
-                            onChange={(event) => setForm({ ...form, repeatDays: Number(event.target.value) })}
+                            onChange={(event) =>
+                                setForm({ ...form, repeatDays: Number(event.target.value) })
+                            }
                         />
                     </label>
                 </div>
 
-                <p className="text-[12px] text-foreground-subtle">
-                    {t("away.never")}
-                </p>
+                <p className="text-[12px] text-foreground-subtle">{t("away.never")}</p>
 
                 {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
 

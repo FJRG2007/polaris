@@ -53,7 +53,15 @@ import { rosterItems, type ChatRosterMember, type RosterItem } from "@/lib/chat/
 import { useChatPane } from "./use-chat-pane";
 import { resetPaneLayout } from "./pane-preferences";
 import { PersonName, platedRow, usePersonNameplate } from "@/components/person-name";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+    type ReactNode
+} from "react";
 import {
     Dialog,
     DialogContent,

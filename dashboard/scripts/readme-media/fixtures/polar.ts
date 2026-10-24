@@ -224,7 +224,12 @@ function actOnPage(ctx: SceneContext, done: boolean) {
     const ask = id("polar-message", 5);
     const basket = ctx.say("Add to basket", "Añadir a la cesta");
     return [
-        { id: ask, role: "user", parentId: id("polar-message", 4), parts: [{ type: "text", text: ctx.say(SHOP_ACT.en, SHOP_ACT.es) }] },
+        {
+            id: ask,
+            role: "user",
+            parentId: id("polar-message", 4),
+            parts: [{ type: "text", text: ctx.say(SHOP_ACT.en, SHOP_ACT.es) }]
+        },
         {
             id: id("polar-message", 6),
             role: "assistant",

@@ -80,7 +80,10 @@ async function linkCovers(
     actions: readonly string[],
     cameraId: string
 ): Promise<boolean> {
-    if ((subjectType === "place.room" || subjectType === "place.panel") && !actions.includes("watch"))
+    if (
+        (subjectType === "place.room" || subjectType === "place.panel") &&
+        !actions.includes("watch")
+    )
         return false;
     return subjectHolds(subjectType, subjectId, cameraId);
 }
