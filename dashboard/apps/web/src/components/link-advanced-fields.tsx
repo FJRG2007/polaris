@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import * as core from "@polaris/core";
 import { Lock } from "lucide-react";
-import { Input, Switch, cn } from "@polaris/ui";
+import { Input, Switch, Checkbox, DateInput, cn } from "@polaris/ui";
 import { AccountInput } from "@/components/account-input";
 import type { LinkGuardsView } from "@/lib/link-guards";
 import { useDisplayFormat } from "@/components/display-format";
@@ -318,9 +318,7 @@ export function LinkAdvancedFields({
                                 </label>
                                 {passwordSet && clearablePassword ? (
                                     <label className="flex items-center gap-2 text-xs">
-                                        <input
-                                            type="checkbox"
-                                            className="size-4"
+                                        <Checkbox
                                             checked={value.clearPassword === true}
                                             onChange={(event) => {
                                                 const { clearPassword: _, ...rest } = value;
@@ -348,9 +346,9 @@ export function LinkAdvancedFields({
                                 <span className="text-xs text-muted-foreground">
                                     {t("linkAdvanced.starts")}
                                 </span>
-                                <Input
+                                <DateInput
+                                    mode="date"
                                     id={`${idPrefix}-starts`}
-                                    type="date"
                                     value={value.startsAt}
                                     max={value.expiresAt || undefined}
                                     onChange={(event) =>
@@ -367,9 +365,9 @@ export function LinkAdvancedFields({
                                 <span className="text-xs text-muted-foreground">
                                     {t("linkAdvanced.expires")}
                                 </span>
-                                <Input
+                                <DateInput
+                                    mode="date"
                                     id={`${idPrefix}-expires`}
-                                    type="date"
                                     value={value.expiresAt}
                                     min={value.startsAt || undefined}
                                     onChange={(event) =>
@@ -440,9 +438,9 @@ export function LinkAdvancedFields({
                                 <span className="text-xs text-muted-foreground">
                                     {t("linkAdvanced.from")}
                                 </span>
-                                <Input
+                                <DateInput
+                                    mode="time"
                                     id={`${idPrefix}-from`}
-                                    type="time"
                                     value={value.hoursFrom}
                                     aria-invalid={hoursBad || undefined}
                                     onChange={(event) =>
@@ -457,9 +455,9 @@ export function LinkAdvancedFields({
                                 <span className="text-xs text-muted-foreground">
                                     {t("linkAdvanced.to")}
                                 </span>
-                                <Input
+                                <DateInput
+                                    mode="time"
                                     id={`${idPrefix}-to`}
-                                    type="time"
                                     value={value.hoursTo}
                                     aria-invalid={hoursBad || undefined}
                                     onChange={(event) =>

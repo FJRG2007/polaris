@@ -38,7 +38,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    cn
+    cn,
+    Checkbox
 } from "@polaris/ui";
 
 function samePolicy(a: IpPolicy, b: IpPolicy): boolean {
@@ -174,8 +175,7 @@ export function IpRuleDialog({
                                 : t("connectedApps.exception.adminOnly")}
                         </p>
                         <label className="flex min-w-0 items-start gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
                                 className="mt-1"
                                 checked={exception.presets.includes("openai")}
                                 onChange={(event) =>

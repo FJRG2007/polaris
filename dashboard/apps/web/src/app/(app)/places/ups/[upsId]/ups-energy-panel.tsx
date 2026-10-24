@@ -14,7 +14,7 @@ import type { UpsReading } from "@/lib/ups/ups-reading";
 import { useLiveResource } from "@/components/use-live-resource";
 import { formatMoney, type UpsEnergyAnswer } from "../ups-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Input, MultiSeriesChart, SegmentedControl, Skeleton } from "@polaris/ui";
+import { MultiSeriesChart, SegmentedControl, Skeleton, DateInput } from "@polaris/ui";
 
 const PRESETS = {
     d1: { days: 1, unit: "hour" },
@@ -140,8 +140,8 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("ups.energy.from")}
-                            <Input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={from}
                                 max={to}
                                 onChange={(event) => setFrom(event.target.value)}
@@ -149,8 +149,8 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("ups.energy.to")}
-                            <Input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={to}
                                 min={from}
                                 onChange={(event) => setTo(event.target.value)}

@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createEnvironmentAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Checkbox } from "@polaris/ui";
 
 export const NEW_ENVIRONMENT = "__new_environment__";
 
@@ -142,11 +142,9 @@ export function NewEnvironmentDialog({
                     </label>
                     {cloning && (
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
                                 checked={deploy}
                                 onChange={(event) => setDeploy(event.target.checked)}
-                                className="size-4 accent-primary"
                             />
                             {t("newEnvironment.deploy")}
                         </label>

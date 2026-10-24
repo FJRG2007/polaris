@@ -48,7 +48,8 @@ import {
     DialogHeader,
     DialogContent,
     DialogTrigger,
-    DialogDescription
+    DialogDescription,
+    Checkbox
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import * as polls from "./drive-reads";
@@ -545,11 +546,9 @@ export function EditConnectionDialog({
                             <label key={field.name} className="flex flex-col gap-1 text-sm">
                                 {field.type === "checkbox" ? (
                                     <span className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
+                                        <Checkbox
                                             name={field.name}
                                             defaultChecked={Boolean(current)}
-                                            className="size-4"
                                         />
                                         {t(field.label)}
                                     </span>
@@ -798,11 +797,7 @@ export function ConnectionDialog() {
                             >
                                 {field.type === "checkbox" ? (
                                     <span className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name={field.name}
-                                            className="size-4"
-                                        />
+                                        <Checkbox name={field.name} />
                                         {t(field.label)}
                                     </span>
                                 ) : field.type === "keyfile" ? (

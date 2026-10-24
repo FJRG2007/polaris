@@ -13,7 +13,7 @@ import { useState } from "react";
 import * as core from "@polaris/core";
 import { Avatar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
-import { Input, Select, Textarea } from "@polaris/ui";
+import { Input, Select, Textarea, Checkbox, DateInput } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CustomFieldView } from "@/lib/tasks/space-service";
@@ -140,8 +140,7 @@ export function CustomFieldEditor({
     switch (field.type) {
         case "checkbox":
             return (
-                <input
-                    type="checkbox"
+                <Checkbox
                     checked={value === "true"}
                     disabled={disabled}
                     aria-label={field.name}
@@ -162,13 +161,12 @@ export function CustomFieldEditor({
             );
         case "date":
             return (
-                <input
-                    type={field.config.includeTime ? "datetime-local" : "date"}
+                <DateInput
+                    mode={field.config.includeTime ? "datetime" : "date"}
                     defaultValue={value ? value.slice(0, field.config.includeTime ? 16 : 10) : ""}
                     disabled={disabled}
                     aria-label={field.name}
                     onChange={(event) => commit(event.target.value)}
-                    className="rounded-md border border-border bg-field px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong"
                 />
             );
         case "number":

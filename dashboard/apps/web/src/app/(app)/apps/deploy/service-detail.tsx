@@ -71,7 +71,8 @@ import {
     Input,
     ScrollRow,
     SegmentedControl,
-    Select
+    Select,
+    DateInput
 } from "@polaris/ui";
 import {
     Activity,
@@ -1956,19 +1957,19 @@ function HttpLogsView({
                     className="h-8 w-36 min-w-[9rem]"
                     aria-label={t("http.status")}
                 />
-                <Input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={from}
                     onChange={(event) => setFrom(event.target.value)}
-                    className="h-8 w-auto text-xs"
+                    className="w-auto"
                     aria-label={t("http.from")}
                 />
                 <span className="text-muted-foreground">{t("http.to")}</span>
-                <Input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={to}
                     onChange={(event) => setTo(event.target.value)}
-                    className="h-8 w-auto text-xs"
+                    className="w-auto"
                     aria-label={t("http.toLabel")}
                 />
                 {(from || to || method !== "all" || statusClass !== "all" || ipFilter) && (

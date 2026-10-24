@@ -29,7 +29,8 @@ import {
     DialogHeader,
     DialogTitle,
     Select,
-    Skeleton
+    Skeleton,
+    Checkbox
 } from "@polaris/ui";
 
 export function ProtectDialog({
@@ -125,8 +126,7 @@ export function ProtectDialog({
                                 {candidates.map((candidate) => (
                                     <li key={candidate.selector}>
                                         <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-muted/40">
-                                            <input
-                                                type="checkbox"
+                                            <Checkbox
                                                 className="mt-1"
                                                 checked={chosen.includes(candidate.selector)}
                                                 onChange={(event) =>

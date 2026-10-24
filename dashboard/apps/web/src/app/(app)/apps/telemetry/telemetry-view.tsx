@@ -48,7 +48,8 @@ import {
     ScrollRow,
     SegmentedControl,
     Skeleton,
-    sameValue
+    sameValue,
+    Checkbox
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -487,8 +488,7 @@ function ProjectSettings({
                 </Button>
             </div>
             <label className="flex items-center gap-2 text-sm">
-                <input
-                    type="checkbox"
+                <Checkbox
                     checked={project.enabled}
                     onChange={async (event) => {
                         await runAction(
@@ -500,7 +500,6 @@ function ProjectSettings({
                         );
                         await onDone();
                     }}
-                    className="size-4 rounded border-border"
                 />
                 {t("settings.accept")}
             </label>

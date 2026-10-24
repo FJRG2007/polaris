@@ -17,7 +17,7 @@ import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { setVacationAction } from "@/app/(app)/mail/actions";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, Input, Switch, Textarea, useToast } from "@polaris/ui";
+import { Button, Input, Switch, Textarea, useToast, DateInput } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 interface Vacation {
@@ -94,16 +94,16 @@ export function AwayView({
                 <div className="flex flex-wrap gap-3">
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">{t("away.from")}</span>
-                        <Input
-                            type="date"
+                        <DateInput
+                            mode="date"
                             value={form.startsAt}
                             onChange={(event) => setForm({ ...form, startsAt: event.target.value })}
                         />
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">{t("away.until")}</span>
-                        <Input
-                            type="date"
+                        <DateInput
+                            mode="date"
                             value={form.endsAt}
                             onChange={(event) => setForm({ ...form, endsAt: event.target.value })}
                         />

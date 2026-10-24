@@ -19,7 +19,7 @@
  */
 
 import * as core from "@polaris/core";
-import { Button, Checkbox, Input, cn } from "@polaris/ui";
+import { Button, Checkbox, DateInput, Input, cn } from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -305,12 +305,16 @@ function Field({
     return (
         <label className="block">
             <span className="mb-1 block text-[12px] text-muted-foreground">{label}</span>
-            <Input
-                type={type}
-                value={value}
-                className="h-8 text-[13px]"
-                onChange={(event) => onChange(event.target.value)}
-            />
+            {type === "date" ? (
+                <DateInput value={value} onValueChange={onChange} aria-label={label} />
+            ) : (
+                <Input
+                    type={type}
+                    value={value}
+                    className="h-8 text-[13px]"
+                    onChange={(event) => onChange(event.target.value)}
+                />
+            )}
         </label>
     );
 }

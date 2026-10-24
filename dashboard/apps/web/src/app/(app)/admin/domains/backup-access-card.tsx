@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Skeleton } from "@polaris/ui";
+import { Button, Skeleton, Checkbox } from "@polaris/ui";
 import { saveBackupAccessAction } from "./actions";
 import { PageSection } from "@/components/page-section";
 import { RelativeTime } from "@/components/relative-time";
@@ -163,8 +163,7 @@ export function BackupAccessCard() {
                                 </div>
                             ) : null}
                             <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={view.config.dataSaver}
                                     disabled={busy}
                                     onChange={(event) =>

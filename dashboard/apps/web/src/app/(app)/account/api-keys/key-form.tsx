@@ -28,7 +28,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Copy, KeyRound } from "lucide-react";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
 import { createApiKeyAction, updateApiKeyAction } from "./actions";
-import { Button, Card, CardBody, Input, Select, Textarea, isDirty } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Select, Textarea, isDirty, DateInput } from "@polaris/ui";
 import { ClientRulesEditor, EMPTY_CLIENT_RULES } from "@/components/client-rules-editor";
 import {
     AccessRulesEditor,
@@ -334,8 +334,8 @@ export function KeyForm({
                             <span className="text-xs text-muted-foreground">
                                 {t("apiKeys.form.endOfDay")}
                             </span>
-                            <Input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={expiryDate}
                                 min={earliestExpiryDate()}
                                 onChange={(event) => setExpiryDate(event.target.value)}

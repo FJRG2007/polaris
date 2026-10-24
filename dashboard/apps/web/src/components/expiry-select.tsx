@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import { Input, Select } from "@polaris/ui";
+import { Input, Select, DateInput } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
@@ -92,8 +92,8 @@ export function ExpirySelect({ onChange }: { onChange: (iso: string) => void }) 
             ) : null}
 
             {mode === "date" ? (
-                <Input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={dateStr}
                     onChange={(event) => {
                         setDateStr(event.target.value);

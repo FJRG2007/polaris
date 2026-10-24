@@ -99,7 +99,9 @@ import {
     DialogTitle,
     Input,
     Skeleton,
-    cn
+    cn,
+    Checkbox,
+    DateInput
 } from "@polaris/ui";
 import * as polls from "./drive-reads";
 
@@ -1589,19 +1591,17 @@ function ScheduleDeleteDialog({
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         {t("explorer.schedule.deleteOn")}
-                        <Input
-                            type="datetime-local"
+                        <DateInput
+                            mode="datetime"
                             value={when}
                             onChange={(event) => setWhen(event.target.value)}
                             required
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
+                        <Checkbox
                             checked={permanent}
                             onChange={(event) => setPermanent(event.target.checked)}
-                            className="size-4"
                         />
                         {t("explorer.schedule.permanent")}
                     </label>

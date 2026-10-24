@@ -8,7 +8,7 @@
 
 import * as core from "@polaris/core";
 import type { ReactNode } from "react";
-import { Input, Switch } from "@polaris/ui";
+import { Input, Switch, DateInput } from "@polaris/ui";
 import type { GrantView } from "@/lib/access/grants";
 import { CalendarClock, MapPin } from "lucide-react";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -169,34 +169,34 @@ export function LimitsFields({
                         <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <Field label={t("share.fromDay")} htmlFor={id("from-day")}>
-                                    <Input
+                                    <DateInput
+                                        mode="date"
                                         id={id("from-day")}
-                                        type="date"
                                         value={value.startsAt}
                                         onChange={(event) => set({ startsAt: event.target.value })}
                                     />
                                 </Field>
                                 <Field label={t("share.toDay")} htmlFor={id("to-day")}>
-                                    <Input
+                                    <DateInput
+                                        mode="date"
                                         id={id("to-day")}
-                                        type="date"
                                         value={value.endsAt}
                                         onChange={(event) => set({ endsAt: event.target.value })}
                                     />
                                 </Field>
                                 <Field label={t("share.checkIn")} htmlFor={id("check-in")}>
-                                    <Input
+                                    <DateInput
+                                        mode="time"
                                         id={id("check-in")}
-                                        type="time"
                                         value={value.checkIn}
                                         disabled={!value.startsAt}
                                         onChange={(event) => set({ checkIn: event.target.value })}
                                     />
                                 </Field>
                                 <Field label={t("share.checkOut")} htmlFor={id("check-out")}>
-                                    <Input
+                                    <DateInput
+                                        mode="time"
                                         id={id("check-out")}
-                                        type="time"
                                         value={value.checkOut}
                                         disabled={!value.endsAt}
                                         onChange={(event) => set({ checkOut: event.target.value })}
@@ -210,9 +210,9 @@ export function LimitsFields({
                             />
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <Field label={t("share.fromHour")} htmlFor={id("from-hour")}>
-                                    <Input
+                                    <DateInput
+                                        mode="time"
                                         id={id("from-hour")}
-                                        type="time"
                                         value={value.hours.from}
                                         onChange={(event) =>
                                             set({
@@ -222,9 +222,9 @@ export function LimitsFields({
                                     />
                                 </Field>
                                 <Field label={t("share.toHour")} htmlFor={id("to-hour")}>
-                                    <Input
+                                    <DateInput
+                                        mode="time"
                                         id={id("to-hour")}
-                                        type="time"
                                         value={value.hours.to}
                                         onChange={(event) =>
                                             set({

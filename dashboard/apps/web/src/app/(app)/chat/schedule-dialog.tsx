@@ -32,7 +32,8 @@ import {
     DialogDescription,
     DialogFooter,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    DateInput
 } from "@polaris/ui";
 
 /** The hour "morning" means. Nine, which is what every client that offers this
@@ -177,22 +178,20 @@ export function ScheduleDialog({
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1 text-sm">
                             {t("schedule.date")}
-                            <input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={date}
                                 aria-label={t("schedule.date")}
                                 onChange={(event) => setDate(event.target.value)}
-                                className="rounded-md border border-border bg-field px-2 py-1.5 text-sm text-foreground hover:border-border-strong focus:border-border-strong"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             {t("schedule.time")}
-                            <input
-                                type="time"
+                            <DateInput
+                                mode="time"
                                 value={time}
                                 aria-label={t("schedule.time")}
                                 onChange={(event) => setTime(event.target.value)}
-                                className="rounded-md border border-border bg-field px-2 py-1.5 text-sm text-foreground hover:border-border-strong focus:border-border-strong"
                             />
                         </label>
                         <Button

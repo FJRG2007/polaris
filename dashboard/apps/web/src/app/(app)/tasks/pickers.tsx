@@ -34,7 +34,8 @@ import {
     MenuSearch,
     menuSearchMatches,
     refocusMenuSearch,
-    StatusIcon
+    StatusIcon,
+    DateInput
 } from "@polaris/ui";
 
 // ---------------------------------------------------------------------------
@@ -703,13 +704,12 @@ export function DateField({
             <span className="w-16 shrink-0 text-[0.6875rem] text-muted-foreground sm:hidden">
                 {label}
             </span>
-            <input
-                type={timed ? "datetime-local" : "date"}
+            <DateInput
+                mode={timed ? "datetime" : "date"}
                 aria-label={label}
                 disabled={disabled}
                 value={toDateInput(value, timed)}
                 onChange={(event) => onChange(fromDateInput(event.target.value))}
-                className="rounded-md border border-border bg-field px-2 py-1 text-xs text-foreground hover:border-border-strong focus:border-border-strong disabled:opacity-50"
             />
             {value && !disabled && (
                 <button
@@ -911,13 +911,12 @@ export function DuePicker({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-auto p-2">
                 <div className="flex items-center gap-2">
-                    <input
+                    <DateInput
+                        mode={timed ? "datetime" : "date"}
                         autoFocus
-                        type={timed ? "datetime-local" : "date"}
                         aria-label={t("pickers.dueDate")}
                         value={toDateInput(dueDate, timed)}
                         onChange={(event) => onChange(fromDateInput(event.target.value))}
-                        className="rounded-md border border-border bg-field px-2 py-1 text-xs text-foreground hover:border-border-strong focus:border-border-strong"
                     />
                     {dueDate && (
                         <button

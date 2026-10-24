@@ -41,7 +41,8 @@ import {
     Input,
     Skeleton,
     Switch,
-    cn
+    cn,
+    DateInput
 } from "@polaris/ui";
 
 export function MeetingsView() {
@@ -306,8 +307,8 @@ function NewMeetingDialog({
 
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium">{t("meetings.when")}</span>
-                        <Input
-                            type="datetime-local"
+                        <DateInput
+                            mode="datetime"
                             value={when}
                             onChange={(event) => setWhen(event.target.value)}
                         />

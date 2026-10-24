@@ -21,7 +21,7 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, TimeSeriesChart, cn, type TimePoint } from "@polaris/ui";
+import { Button, TimeSeriesChart, cn, type TimePoint, DateInput } from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -322,20 +322,18 @@ export function MetricsHistory<T extends { t: number } = Point>({
                 <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                         {t("auditFeed.from")}
-                        <input
-                            type="datetime-local"
+                        <DateInput
+                            mode="datetime"
                             value={customFrom}
                             onChange={(event) => setCustomFrom(event.target.value)}
-                            className="rounded-md border border-border bg-field px-2 py-1 text-sm text-foreground"
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                         {t("auditFeed.to")}
-                        <input
-                            type="datetime-local"
+                        <DateInput
+                            mode="datetime"
                             value={customTo}
                             onChange={(event) => setCustomTo(event.target.value)}
-                            className="rounded-md border border-border bg-field px-2 py-1 text-sm text-foreground"
                         />
                     </label>
                     <Button variant="outline" onClick={applyCustom}>

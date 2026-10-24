@@ -96,7 +96,8 @@ import {
     shortcutBindings,
     shortcutPressed,
     shellScroller,
-    useShortcutHint
+    useShortcutHint,
+    DateInput
 } from "@polaris/ui";
 import {
     ArrowDown,
@@ -2408,18 +2409,18 @@ export function FilesView({
                             </label>
                             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                                 {t("filesView.filters.after")}
-                                <Input
+                                <DateInput
+                                    mode="date"
                                     value={dateFrom}
                                     onChange={(e) => setDateFrom(e.target.value)}
-                                    type="date"
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                                 {t("filesView.filters.before")}
-                                <Input
+                                <DateInput
+                                    mode="date"
                                     value={dateTo}
                                     onChange={(e) => setDateTo(e.target.value)}
-                                    type="date"
                                 />
                             </label>
                         </div>

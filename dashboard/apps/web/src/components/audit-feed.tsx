@@ -36,7 +36,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Input,
-    Select
+    Select,
+    DateInput
 } from "@polaris/ui";
 
 /** How often the first page re-reads. An audit trail is appended to, not
@@ -309,21 +310,21 @@ export function AuditFeed({
                         className="h-8 pl-8"
                     />
                 </label>
-                <Input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={toInput(params.get("from"))}
                     onChange={(event) => setFilter("from", fromInput(event.target.value))}
                     aria-label={t("auditFeed.from")}
                     title={t("auditFeed.from")}
-                    className="h-8 w-full sm:w-auto"
+                    className="w-full sm:w-auto"
                 />
-                <Input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={toInput(params.get("to"))}
                     onChange={(event) => setFilter("to", fromInput(event.target.value))}
                     aria-label={t("auditFeed.to")}
                     title={t("auditFeed.to")}
-                    className="h-8 w-full sm:w-auto"
+                    className="w-full sm:w-auto"
                 />
                 {narrowed ? (
                     <Button variant="ghost" size="sm" onClick={clear}>

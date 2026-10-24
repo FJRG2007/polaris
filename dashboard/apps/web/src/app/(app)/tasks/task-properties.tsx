@@ -10,6 +10,7 @@
  * the empty ones fold away, since a column of dashes is not information.
  */
 
+import { Checkbox } from "@polaris/ui";
 import { useState } from "react";
 import * as pickers from "./pickers";
 import { optionLabel } from "./option-label";
@@ -148,8 +149,7 @@ export function PropertyRows({
                     onChange={(dueDate) => patch({ dueDate })}
                 />
                 <label className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
-                    <input
-                        type="checkbox"
+                    <Checkbox
                         checked={task.timed}
                         disabled={disabled}
                         onChange={(event) => patch({ timed: event.target.checked })}

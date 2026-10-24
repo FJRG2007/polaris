@@ -72,6 +72,12 @@ export {
 } from "./components/bone-skeleton";
 export { Checkbox, type CheckboxProps } from "./components/checkbox";
 export {
+    DateInput,
+    type DateInputChange,
+    type DateInputMode,
+    type DateInputProps
+} from "./components/date-input";
+export {
     ConfirmDeleteDialog,
     type ConfirmDeleteDialogProps
 } from "./components/confirm-delete-dialog";

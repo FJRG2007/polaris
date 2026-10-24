@@ -22,7 +22,8 @@ import {
     DialogHeader,
     DialogContent,
     DialogTrigger,
-    DialogDescription
+    DialogDescription,
+    Checkbox
 } from "@polaris/ui";
 import { createDockerConnectionAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -148,9 +149,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                 </label>
                             </div>
                             <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="size-4"
+                                <Checkbox
                                     checked={useInstallKey}
                                     onChange={(event) => setUseInstallKey(event.target.checked)}
                                 />
@@ -188,9 +187,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                 </label>
                             </div>
                             <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="size-4"
+                                <Checkbox
                                     checked={tls}
                                     onChange={(event) => setTls(event.target.checked)}
                                 />

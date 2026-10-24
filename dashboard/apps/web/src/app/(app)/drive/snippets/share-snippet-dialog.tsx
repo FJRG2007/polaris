@@ -31,7 +31,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    Checkbox
 } from "@polaris/ui";
 
 /** What the dialog needs to know about the snippet it is opened on. */
@@ -206,9 +207,7 @@ export function ShareSnippetDialog({
                         ) : (
                             <>
                                 <label className="flex items-center gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
-                                        className="size-4"
+                                    <Checkbox
                                         checked={burn}
                                         onChange={(event) => setBurn(event.target.checked)}
                                     />

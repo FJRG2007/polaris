@@ -29,7 +29,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    Checkbox
 } from "@polaris/ui";
 import * as polls from "./notes-polls";
 
@@ -547,8 +548,7 @@ export function ImportNotesDialog({
                             />
                         )}
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
                                 checked={keepFolders}
                                 onChange={(event) => setKeepFolders(event.target.checked)}
                             />

@@ -17,7 +17,8 @@ import {
     Input,
     SearchableSelect,
     Select,
-    Switch
+    Switch,
+    DateInput
 } from "@polaris/ui";
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -347,9 +348,9 @@ export function DnsListsSection() {
                                     <>
                                         <label className="flex flex-col gap-1 text-sm">
                                             <span>{t("schedules.from")}</span>
-                                            <Input
+                                            <DateInput
+                                                mode="time"
                                                 className="w-32"
-                                                type="time"
                                                 value={scheduleStart}
                                                 aria-invalid={Boolean(scheduleIssue)}
                                                 onChange={(event) =>
@@ -359,9 +360,9 @@ export function DnsListsSection() {
                                         </label>
                                         <label className="flex flex-col gap-1 text-sm">
                                             <span>{t("schedules.to")}</span>
-                                            <Input
+                                            <DateInput
+                                                mode="time"
                                                 className="w-32"
-                                                type="time"
                                                 value={scheduleEnd}
                                                 aria-invalid={Boolean(scheduleIssue)}
                                                 onChange={(event) =>

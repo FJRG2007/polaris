@@ -40,7 +40,7 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { Button, Card, CardBody, Input, PolarisMark } from "@polaris/ui";
+import { Button, Card, CardBody, Input, PolarisMark, Checkbox } from "@polaris/ui";
 import type { SecondFactorEnrollment } from "@polaris/core";
 import { armByEmailAction, noteAuthenticatorArmedAction, sendEnrollmentCodeAction } from "./actions";
 import { CodeInput, isWholeCode } from "@/components/code-input";
@@ -447,8 +447,7 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
             </Card>
 
             <label className="flex items-start gap-2 text-sm">
-                <input
-                    type="checkbox"
+                <Checkbox
                     className="mt-1"
                     checked={kept}
                     onChange={(event) => setKept(event.target.checked)}

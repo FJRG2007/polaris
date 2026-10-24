@@ -29,7 +29,7 @@ import { useState, type FormEvent } from "react";
 import { createAccountVaultAction } from "./vault-actions";
 import { createVaultKeys } from "@/lib/vault/crypto";
 import type { SymmetricKey } from "@/lib/vault/crypto";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Checkbox } from "@polaris/ui";
 import { KeyRound, Loader2, ShieldAlert } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -228,9 +228,8 @@ export function VaultSetup({
                         <div className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft p-3">
                             <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
                             <label className="flex items-start gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="mt-0.5 size-4"
+                                <Checkbox
+                                    className="mt-0.5"
                                     checked={understood}
                                     onChange={(event) => setUnderstood(event.target.checked)}
                                 />

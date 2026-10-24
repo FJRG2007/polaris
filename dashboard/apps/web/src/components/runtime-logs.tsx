@@ -16,7 +16,7 @@
 import { zonedInstant } from "@polaris/core";
 import { LogViewer } from "@/components/log-viewer";
 import { useDisplayFormat } from "@/components/display-format";
-import { Button, Input, SegmentedControl, cn } from "@polaris/ui";
+import { Button, Input, SegmentedControl, cn, DateInput } from "@polaris/ui";
 import { Loader2, Pause, Play, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatStreamLog, mergeStreamLines, type StreamLine } from "@/lib/deploy/log-stream";
@@ -412,21 +412,21 @@ function HistoryLog({
                         maxLength={200}
                     />
                 </div>
-                <Input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={from}
                     max={to || undefined}
                     onChange={(event) => setFrom(event.target.value)}
-                    className="h-8 w-auto text-xs"
+                    className="w-auto"
                     aria-label={t("auditFeed.from")}
                 />
                 <span className="text-muted-foreground">{t("runtimeLogs.to")}</span>
-                <Input
-                    type="datetime-local"
+                <DateInput
+                    mode="datetime"
                     value={to}
                     min={from || undefined}
                     onChange={(event) => setTo(event.target.value)}
-                    className="h-8 w-auto text-xs"
+                    className="w-auto"
                     aria-label={t("auditFeed.to")}
                 />
                 {filtered && (

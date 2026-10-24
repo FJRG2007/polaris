@@ -50,7 +50,8 @@ import {
     CardTitle,
     Input,
     Select,
-    Skeleton
+    Skeleton,
+    DateInput
 } from "@polaris/ui";
 import {
     Bug,
@@ -893,8 +894,8 @@ export function SettingsView({
                                 disabled={updating}
                             />
                             {policy.mode === "daily" ? (
-                                <Input
-                                    type="time"
+                                <DateInput
+                                    mode="time"
                                     aria-label={t("settings.schedule.timeLabel")}
                                     className="w-32"
                                     value={timeDraft}

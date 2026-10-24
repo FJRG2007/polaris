@@ -33,7 +33,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Textarea
+    Textarea,
+    Checkbox
 } from "@polaris/ui";
 
 /** Split a comma or space separated field into its entries. */
@@ -193,9 +194,7 @@ export function NewTextDropPointButton() {
                                 </label>
                             </div>
                             <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="size-4"
+                                <Checkbox
                                     checked={requireLogin}
                                     onChange={(event) => setRequireLogin(event.target.checked)}
                                 />
@@ -214,9 +213,8 @@ export function NewTextDropPointButton() {
                                 </span>
                             </label>
                             <label className="flex items-start gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="mt-0.5 size-4"
+                                <Checkbox
+                                    className="mt-0.5"
                                     checked={allowSealed}
                                     onChange={(event) => setAllowSealed(event.target.checked)}
                                 />

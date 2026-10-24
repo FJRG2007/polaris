@@ -31,7 +31,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Checkbox
 } from "@polaris/ui";
 
 export interface ShareTarget {
@@ -230,65 +231,35 @@ export function ShareDialog({
                         />
                         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
                             <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowDownload"
-                                    defaultChecked
-                                    className="size-4"
-                                />
+                                <Checkbox name="allowDownload" defaultChecked />
                                 {t("sharedLinks.allowDownload")}
                             </label>
                             <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="allowPreview"
-                                    defaultChecked
-                                    className="size-4"
-                                />
+                                <Checkbox name="allowPreview" defaultChecked />
                                 {t("share.allowPreview")}
                             </label>
                             {anyDir ? (
                                 <>
                                     <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name="allowUpload"
-                                            className="size-4"
-                                        />
+                                        <Checkbox name="allowUpload" />
                                         {many
                                             ? t("share.allowUploadMany")
                                             : t("share.allowUploadOne")}
                                     </label>
                                     <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name="allowOverwrite"
-                                            className="size-4"
-                                        />
+                                        <Checkbox name="allowOverwrite" />
                                         {t("sharedLinks.allowOverwrite")}
                                     </label>
                                     <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name="allowCreateFolder"
-                                            className="size-4"
-                                        />
+                                        <Checkbox name="allowCreateFolder" />
                                         {t("sharedLinks.allowMkdir")}
                                     </label>
                                     <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name="allowRename"
-                                            className="size-4"
-                                        />
+                                        <Checkbox name="allowRename" />
                                         {t("sharedLinks.allowRename")}
                                     </label>
                                     <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name="allowDelete"
-                                            className="size-4"
-                                        />
+                                        <Checkbox name="allowDelete" />
                                         {t("sharedLinks.allowDelete")}
                                     </label>
                                 </>

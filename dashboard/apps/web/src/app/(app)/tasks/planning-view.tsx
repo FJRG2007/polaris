@@ -19,7 +19,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { optionLabel } from "./option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CalendarRange, Plus, Target, Trash2, Users } from "lucide-react";
-import { Button, Card, CardBody, EmptyState, Input, Select, cn } from "@polaris/ui";
+import { Button, Card, CardBody, EmptyState, Input, Select, cn, DateInput } from "@polaris/ui";
 import type { GoalView, SprintView } from "@/lib/tasks/planning-service";
 import { AccessDialog, type AccessTarget } from "./access-dialog";
 
@@ -99,20 +99,18 @@ export function SprintsView({
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("create.sprint.starts")}
-                            <input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={start}
                                 onChange={(event) => setStart(event.target.value)}
-                                className="h-8 rounded-md border border-border bg-field px-2 text-xs"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("create.sprint.ends")}
-                            <input
-                                type="date"
+                            <DateInput
+                                mode="date"
                                 value={end}
                                 onChange={(event) => setEnd(event.target.value)}
-                                className="h-8 rounded-md border border-border bg-field px-2 text-xs"
                             />
                         </label>
                         <Button

@@ -14,7 +14,7 @@
  * sixteen random characters nobody can read off a screen.
  */
 
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, Input, Select, Checkbox } from "@polaris/ui";
 import { Check, Copy, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -193,9 +193,7 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
 
             <div className="flex flex-wrap gap-4 text-sm">
                 <label className="flex items-center gap-2">
-                    <input
-                        type="checkbox"
-                        className="size-4"
+                    <Checkbox
                         checked={options.upper}
                         onChange={(event) =>
                             setOptions((prev) => ({ ...prev, upper: event.target.checked }))
@@ -204,9 +202,7 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                     {options.kind === "passphrase" ? t("generator.capitalize") : "A-Z" /* i18n-ignore a character range */}
                 </label>
                 <label className="flex items-center gap-2">
-                    <input
-                        type="checkbox"
-                        className="size-4"
+                    <Checkbox
                         checked={options.digits}
                         onChange={(event) =>
                             setOptions((prev) => ({ ...prev, digits: event.target.checked }))
@@ -216,9 +212,7 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                 </label>
                 {options.kind === "password" ? (
                     <label className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            className="size-4"
+                        <Checkbox
                             checked={options.symbols}
                             onChange={(event) =>
                                 setOptions((prev) => ({ ...prev, symbols: event.target.checked }))

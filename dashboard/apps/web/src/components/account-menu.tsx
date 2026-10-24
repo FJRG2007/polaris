@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { cn } from "@polaris/ui";
+import { cn, DateInput } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
@@ -664,9 +664,9 @@ export function AccountMenu({
                         </DialogTitle>
                         <DialogDescription>{t("account.timing.description")}</DialogDescription>
                     </DialogHeader>
-                    <Input
+                    <DateInput
+                        mode="datetime"
                         autoFocus
-                        type="datetime-local"
                         value={moment}
                         min={localInput(new Date())}
                         aria-label={t("account.timing.moment")}
@@ -738,8 +738,8 @@ export function AccountMenu({
                             />
                         </label>
                         {clearsAt !== null ? (
-                            <Input
-                                type="datetime-local"
+                            <DateInput
+                                mode="datetime"
                                 value={clearsAt}
                                 min={localInput(new Date())}
                                 aria-label={t("account.status.clearsAt")}

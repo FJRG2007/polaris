@@ -53,7 +53,8 @@ import {
     Select,
     Skeleton,
     Switch,
-    cn
+    cn,
+    DateInput
 } from "@polaris/ui";
 
 type Overview = NonNullable<Awaited<ReturnType<typeof actions.databaseOverviewAction>>["overview"]>;
@@ -536,8 +537,8 @@ function VersionsSection({
                     {when === "later" ? (
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("database.versions.startAt")}
-                            <Input
-                                type="datetime-local"
+                            <DateInput
+                                mode="datetime"
                                 value={at}
                                 onChange={(event) => setAt(event.target.value)}
                                 className="w-64"
@@ -1015,8 +1016,8 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("database.pitr.moment")}
-                            <Input
-                                type="datetime-local"
+                            <DateInput
+                                mode="datetime"
                                 step={1}
                                 value={target}
                                 onChange={(event) => setTarget(event.target.value)}

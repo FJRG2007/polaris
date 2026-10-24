@@ -1648,5 +1648,14 @@
             "people": "sesión y personas",
             "places": "IPs y países"
         }
+    },
+    "dateInput": {
+        "pickDate": "Elegir fecha",
+        "pickDateTime": "Elegir fecha y hora",
+        "time": "Hora",
+        "today": "Hoy",
+        "clear": "Borrar",
+        "previousMonth": "Mes anterior",
+        "nextMonth": "Mes siguiente"
     }
 }

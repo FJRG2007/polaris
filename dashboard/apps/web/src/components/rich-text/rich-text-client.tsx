@@ -10,7 +10,7 @@
  */
 
 import Link from "next/link";
-import { cn } from "@polaris/ui";
+import { cn, Checkbox } from "@polaris/ui";
 import * as refs from "./references";
 import type { JSONContent } from "@tiptap/core";
 import { chipClass, chipLabel } from "./chip";
@@ -22,8 +22,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 export function TaskBox({ checked }: { checked: boolean }) {
     const t = useTranslations("components");
     return (
-        <input
-            type="checkbox"
+        <Checkbox
             disabled
             checked={checked}
             aria-label={checked ? t("editor.done") : t("editor.notDone")}
