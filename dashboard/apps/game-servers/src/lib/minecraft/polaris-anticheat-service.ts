@@ -24,6 +24,8 @@ import {
 import { SOFTWARE_KEY } from "./join-guard";
 import { PUBLIC_MOD_FILES, anticheatBundled } from "./polaris-mod-files";
 import { modToken } from "./mod-token";
+import { mapUrlRewrites } from "./maps";
+import { mapAddresses } from "./world-address";
 import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
 import { engineScore, reasonLine } from "./suspicion";
 import * as anticheat from "./polaris-anticheat";
@@ -197,15 +199,23 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
  * made before it was always there, a server whose owner switched the login and
  * the anti-cheat off, and a server that just moved to a release with a build.
  * Written for the next start, never forced into a running one. Only `MODS`
- * changes: an anti-xray switched off stays off, and the login stays as it was.
+ * changes for the mod: an anti-xray switched off stays off, and the login stays
+ * as it was.
  *
  * The same pass moves every jar this dashboard serves to its keyed address
  * (`keyedMods`), on every server and whatever its software: a server written
  * before the address carried a key would otherwise boot from the old one, which
- * only lets a handful of downloads through.
+ * only lets a handful of downloads through. And it moves a map's `WORLD` and
+ * `RESOURCE_PACK` to where this dashboard serves them (`mapUrlRewrites`), when
+ * Polaris wrote them and they name anywhere else.
  */
 export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
     const baseUrl = await publicAppUrl().catch(() => null);
+    // Also where a map's world and pack are served from now. A server created
+    // when they came from somewhere else, or before the key or the address
+    // changed, is moved to here by the same pass - on its next start it fetches
+    // a world only if it never got one, and a pack on every join.
+    const addresses = await mapAddresses();
     const installs = await prisma.installedApp.findMany({
         where: { catalogId: "minecraft", status: { not: "removed" }, applicationId: { not: null } },
         select: { id: true, ownerId: true, applicationId: true }
@@ -214,7 +224,7 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
         where: {
             scopeType: "application",
             scopeId: { in: installs.map((install) => install.applicationId!) },
-            key: { in: [MODS_KEY, SOFTWARE_KEY, "VERSION"] }
+            key: { in: [MODS_KEY, SOFTWARE_KEY, "VERSION", "WORLD", "RESOURCE_PACK"] }
         },
         select: { scopeId: true, key: true, value: true }
     });
@@ -237,10 +247,16 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
                 bundled.set(file, await anticheatBundled(file).catch(() => false));
             if (bundled.get(file)) wanted = withMod(keyed, modUrl(baseUrl, file, modToken()));
         }
-        if (wanted === mods) continue;
+        const rewrites = Object.entries(mapUrlRewrites(env, addresses)).map(([key, value]) => ({
+            key,
+            value,
+            isSecret: false
+        }));
+        if (wanted === mods && rewrites.length === 0) continue;
         try {
             await setEnvVars("application", install.applicationId!, install.ownerId, [
-                { key: MODS_KEY, value: wanted, isSecret: false }
+                ...(wanted === mods ? [] : [{ key: MODS_KEY, value: wanted, isSecret: false }]),
+                ...rewrites
             ]);
             adopted += 1;
         } catch (caught) {
