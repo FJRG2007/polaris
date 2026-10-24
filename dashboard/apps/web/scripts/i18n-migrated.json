@@ -1274,6 +1274,7 @@
         "web/src/components/dns/dns-records-table.tsx",
         "web/src/components/dns/dns-zone-editor.tsx",
         "web/src/components/domain-security/domain-security-panel.tsx",
+        "web/src/components/domain-security/fix-dialog.tsx",
         "web/src/components/download-guide.tsx",
         "web/src/components/favorite-apps.tsx",
         "web/src/components/file-picker/as-files.ts",

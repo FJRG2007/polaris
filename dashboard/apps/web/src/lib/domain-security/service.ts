@@ -430,14 +430,18 @@ async function edgeTargets(known: KnownDomain): Promise<EdgeTarget[]> {
 async function planWith(
     access: Access,
     report: SecurityReport,
-    dmarcPolicy: "quarantine" | "reject" | null
+    dmarcPolicy: "quarantine" | "reject" | null,
+    reportTo: string | null = null
 ): Promise<PlannedChange[]> {
     return planChanges({
         report,
         records: await zoneRecordsFor(access.scope, access.known.domain),
         canSign: access.signing !== null,
         edge: await edgeTargets(access.known),
-        reportAddress: reportAddressFor(access.known),
+        // Polaris's own reports mailbox when it receives mail here; otherwise the
+        // address the person typed, so a domain nobody reads reports for can be
+        // given somewhere to send them from this screen.
+        reportAddress: reportAddressFor(access.known) ?? reportTo,
         dmarcPolicy
     });
 }
@@ -446,7 +450,8 @@ async function planWith(
 export async function planFor(
     actor: DomainActor,
     domain: string,
-    dmarcPolicy: "quarantine" | "reject" | null
+    dmarcPolicy: "quarantine" | "reject" | null,
+    reportTo: string | null = null
 ): Promise<PlannedChange[]> {
     const access = await accessFor(actor, domain);
     const row = await prisma.domainSecurityAudit.findUnique({
@@ -455,7 +460,7 @@ export async function planFor(
     });
     const report = row ? readReport(row.report) : null;
     if (!report) return [];
-    return planWith(access, report, dmarcPolicy);
+    return planWith(access, report, dmarcPolicy, reportTo);
 }
 
 /** A record change as the DNS editor's form holds it, so it is checked by the
@@ -545,7 +550,8 @@ export async function applyFor(
     actor: DomainActor,
     domain: string,
     approved: readonly string[],
-    dmarcPolicy: "quarantine" | "reject" | null
+    dmarcPolicy: "quarantine" | "reject" | null,
+    reportTo: string | null = null
 ): Promise<{ results: ChangeResult[]; view: DomainSecurityView }> {
     const access = await accessFor(actor, domain);
     const row = await prisma.domainSecurityAudit.findUnique({
@@ -555,7 +561,7 @@ export async function applyFor(
     const report = row ? readReport(row.report) : null;
     if (!report) throw new DomainSecurityError("errors.planChanged");
     const wanted = new Set(approved);
-    const plan = await planWith(access, report, dmarcPolicy);
+    const plan = await planWith(access, report, dmarcPolicy, reportTo);
     const chosen = plan.filter((change) => wanted.has(fingerprint(change)));
     if (chosen.length !== wanted.size) throw new DomainSecurityError("errors.planChanged");
     const results: ChangeResult[] = [];

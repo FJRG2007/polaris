@@ -17,6 +17,7 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { reportHost } from "@/lib/domain-security/records";
 import { dmarcAdvice } from "@/lib/domain-security/dmarc-advice";
+import { normalizeReportTo, reportToSchema } from "@/lib/domain-security/report-to";
 import type { SecurityReport } from "@/lib/domain-security/types";
 import type { DomainSecurityView } from "@/lib/domain-security/service";
 import {
@@ -29,6 +30,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    Input,
     Select,
     Skeleton
 } from "@polaris/ui";
@@ -150,23 +152,41 @@ export function FixDialog({
     const [error, setError] = useState("");
     const [applying, setApplying] = useState(false);
     const [outcome, setOutcome] = useState("");
+    // Where reports go, for a domain nobody receives them for: the one fix the
+    // advice asks for, offered here so it can be applied like the others.
+    const asksForReports = advice?.kind === "noReports";
+    const [reportDraft, setReportDraft] = useState("");
+    const reportTyped = reportDraft.trim() !== "";
+    const reportValid = reportTyped && reportToSchema.safeParse(reportDraft).success;
+    const reportTo = asksForReports && reportValid ? normalizeReportTo(reportDraft) : null;
 
     useEffect(() => {
         let cancelled = false;
         setChanges(null);
-        void (async () => {
-            const result = await polls
-                .domainSecurityPlan(scope, domain, policy === "keep" ? null : policy)
-                .catch(() => null);
+        // Typing is waited out, so the plan is not read again on every key.
+        const timer = window.setTimeout(
+            async () => {
+                const result = await polls
+                    .domainSecurityPlan(
+                        scope,
+                        domain,
+                        policy === "keep" ? null : policy,
+                        undefined,
+                        reportTo
+                    )
+                    .catch(() => null);
             if (cancelled) return;
-            if (result?.changes) setChanges(result.changes);
-            else setError(result?.error ?? t("errors.failed"));
-        })();
+                if (result?.changes) setChanges(result.changes);
+                else setError(result?.error ?? t("errors.failed"));
+            },
+            reportTo ? 400 : 0
+        );
         return () => {
             cancelled = true;
+            window.clearTimeout(timer);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- re-planned when the policy changes
-    }, [policy]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- re-planned when the policy or the report address changes
+    }, [policy, reportTo]);
 
     const chosen = (changes ?? []).filter((change) => !left.has(change.fingerprint));
 
@@ -180,7 +200,8 @@ export function FixDialog({
                     scope,
                     domain,
                     chosen.map((change) => change.fingerprint),
-                    policy === "keep" ? null : policy
+                    policy === "keep" ? null : policy,
+                    reportTo
                 ),
             setError
         );
@@ -210,7 +231,8 @@ export function FixDialog({
         const again = await planDomainSecurityAction(
             scope,
             domain,
-            policy === "keep" ? null : policy
+            policy === "keep" ? null : policy,
+            reportTo
         ).catch(() => null);
         if (again?.changes) setChanges(again.changes);
     }
@@ -285,6 +307,38 @@ export function FixDialog({
                         <p className="text-muted-foreground text-xs">
                             {t("fix.policy.hint", { domain })}
                         </p>
+                        {asksForReports && (
+                            <div className="flex min-w-0 flex-col gap-1">
+                                <label
+                                    className="text-sm font-medium"
+                                    htmlFor={`dmarc-report-to-${domain}`}
+                                >
+                                    {t("fix.reportTo.label")}
+                                </label>
+                                <Input
+                                    id={`dmarc-report-to-${domain}`}
+                                    type="email"
+                                    autoComplete="email"
+                                    value={reportDraft}
+                                    placeholder={t("fix.reportTo.placeholder", { domain })}
+                                    aria-invalid={reportTyped && !reportValid}
+                                    aria-describedby={`dmarc-report-to-${domain}-hint`}
+                                    onChange={(event) => setReportDraft(event.target.value)}
+                                />
+                                <p
+                                    id={`dmarc-report-to-${domain}-hint`}
+                                    className={
+                                        reportTyped && !reportValid
+                                            ? "text-danger text-xs"
+                                            : "text-muted-foreground text-xs"
+                                    }
+                                >
+                                    {reportTyped && !reportValid
+                                        ? t("fix.reportTo.invalid")
+                                        : t("fix.reportTo.hint", { domain })}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -316,7 +370,11 @@ export function FixDialog({
                     </div>
                 ) : changes.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
-                        {current && policy === "keep" ? t("fix.noneButPolicy") : t("fix.none")}
+                        {current && policy === "keep"
+                            ? asksForReports
+                                ? t("fix.noneButReports")
+                                : t("fix.noneButPolicy")
+                            : t("fix.none")}
                     </p>
                 ) : (
                     <ul className="flex min-w-0 flex-col">
@@ -347,7 +405,11 @@ export function FixDialog({
                         disabled={applying || chosen.length === 0}
                         onClick={() => void apply()}
                     >
-                        {applying ? t("fix.applying") : t("fix.apply", { count: chosen.length })}
+                        {applying
+                            ? t("fix.applying")
+                            : chosen.length === 0
+                              ? t("fix.nothingToApply")
+                              : t("fix.apply", { count: chosen.length })}
                     </Button>
                 </DialogFooter>
             </DialogContent>

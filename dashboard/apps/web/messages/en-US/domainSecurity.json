@@ -73,6 +73,14 @@
         "cannotOwner": "Polaris publishes these for you once this domain has a Cloudflare token (under its certificate).",
         "cannotAdmin": "Polaris publishes these for you when the Cloudflare account connected under Integrations holds this zone.",
         "noneButPolicy": "Nothing else to change. The DMARC policy above is the one fix left.",
+        "noneButReports": "Nothing to change while the policy stays as it is. Add a report address above and the record change shows up here.",
+        "nothingToApply": "Nothing to apply",
+        "reportTo": {
+            "label": "Send DMARC reports to",
+            "placeholder": "reports@{domain}",
+            "hint": "An inbox you read. Receivers send a daily summary of who sends mail as {domain}. An address on another domain has to be allowed by that domain - the next check says whether it is.",
+            "invalid": "Enter an email address."
+        },
         "advice": {
             "title": "Recommended",
             "use": "Use recommended",
