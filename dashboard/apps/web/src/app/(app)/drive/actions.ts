@@ -12,6 +12,7 @@ import { AddressRefused } from "@/lib/storage-whereabouts/follow";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
+import { TRASH_BATCH_MAX } from "./trash/trash-listing";
 import { z } from "zod";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
 import { runBackupTask, writeFanProfile } from "@/lib/unifi-unas-control";
@@ -37,11 +38,14 @@ import {
 } from "@/lib/drive/name-conflicts";
 import {
     deleteTrashForever,
+    deleteTrashItemsForever,
     emptyTrash,
     hasTrash,
     moveToTrash,
     restoreTrash,
-    trashWithDriver
+    restoreTrashItems,
+    trashWithDriver,
+    type TrashBatchOutcome
 } from "@/lib/trash-service";
 import {
     AlreadyGoingError,
@@ -999,10 +1003,12 @@ export async function moveToTrashAction(
 }
 
 /** Restore a trashed item to its original location. */
-export async function restoreTrashAction(id: string): Promise<{ error?: string }> {
+export async function restoreTrashAction(id: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("drive.write");
+    const parsed = trashIdSchema.safeParse(id);
+    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.restoreFailed") };
     try {
-        await restoreTrash(user.id, id);
+        await restoreTrash(user.id, parsed.data);
     } catch (caught) {
         return {
             error: await driveErrorMessage(
@@ -1017,10 +1023,12 @@ export async function restoreTrashAction(id: string): Promise<{ error?: string }
 }
 
 /** Permanently delete a single trashed item. */
-export async function deleteTrashForeverAction(id: string): Promise<{ error?: string }> {
+export async function deleteTrashForeverAction(id: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("drive.delete");
+    const parsed = trashIdSchema.safeParse(id);
+    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.deleteFailed") };
     try {
-        await deleteTrashForever(user.id, id);
+        await deleteTrashForever(user.id, parsed.data);
     } catch (caught) {
         return {
             error: await driveErrorMessage(
@@ -1048,6 +1056,83 @@ export async function emptyTrashAction(): Promise<{ error?: string }> {
     }
     revalidatePath("/drive/trash");
     return {};
+}
+
+/**
+ * Bin rows picked in the Trash listing. Bounded so one request cannot ask for an
+ * unbounded amount of storage work; a selection past it is sent in pieces.
+ */
+const trashIdSchema = z.string().uuid();
+const trashIdsSchema = z.array(trashIdSchema).min(1).max(TRASH_BATCH_MAX);
+
+/** What a batched bin action did, worded for the screen. */
+export interface TrashBatchResult {
+    /** Rows that left the bin. */
+    done: string[];
+    /** Rows that stayed, each with why. */
+    failures: { id: string; reason: string }[];
+    error?: string;
+}
+
+/** The outcome with every refusal worded for the reader, never a raw cause. */
+async function trashBatchResult(
+    outcome: TrashBatchOutcome,
+    fallback: string
+): Promise<TrashBatchResult> {
+    const failures = await Promise.all(
+        outcome.failures.map(async (failure) => ({
+            id: failure.id,
+            reason: await driveErrorMessage(failure.cause ?? new Error(failure.reason), fallback)
+        }))
+    );
+    return { done: outcome.done, failures, error: failures[0]?.reason };
+}
+
+/** Restore several bin rows in one round trip. */
+export async function restoreTrashItemsAction(ids: unknown): Promise<TrashBatchResult> {
+    const user = await requirePermission("drive.write");
+    const t = await getTranslations("drive");
+    const parsed = trashIdsSchema.safeParse(ids);
+    if (!parsed.success) return { done: [], failures: [], error: t("errors.restoreFailed") };
+    let result: TrashBatchResult;
+    try {
+        result = await trashBatchResult(
+            await restoreTrashItems(user.id, parsed.data),
+            t("errors.restoreFailed")
+        );
+    } catch (caught) {
+        return {
+            done: [],
+            failures: [],
+            error: await driveErrorMessage(caught, t("errors.restoreFailed"))
+        };
+    }
+    revalidatePath("/drive");
+    revalidatePath("/drive/trash");
+    return result;
+}
+
+/** Permanently delete several bin rows in one round trip. */
+export async function deleteTrashItemsForeverAction(ids: unknown): Promise<TrashBatchResult> {
+    const user = await requirePermission("drive.delete");
+    const t = await getTranslations("drive");
+    const parsed = trashIdsSchema.safeParse(ids);
+    if (!parsed.success) return { done: [], failures: [], error: t("errors.deleteFailed") };
+    let result: TrashBatchResult;
+    try {
+        result = await trashBatchResult(
+            await deleteTrashItemsForever(user.id, parsed.data),
+            t("errors.deleteFailed")
+        );
+    } catch (caught) {
+        return {
+            done: [],
+            failures: [],
+            error: await driveErrorMessage(caught, t("errors.deleteFailed"))
+        };
+    }
+    revalidatePath("/drive/trash");
+    return result;
 }
 
 /** Human message for a Drive authorization/lock failure, else a fallback. */

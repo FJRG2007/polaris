@@ -21,9 +21,13 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { createSizeBudget, invalidateFolderSizes, measureFolder, FOLDER_SIZE_TTL_MS } = await import(
-    "../../src/lib/drive-folder-size"
-);
+const {
+    createSizeBudget,
+    invalidateFolderSizes,
+    invalidateFolderSizesMany,
+    measureFolder,
+    FOLDER_SIZE_TTL_MS
+} = await import("../../src/lib/drive-folder-size");
 
 const CONNECTION = "018f2b7a-0000-7000-8000-000000000001";
 
@@ -233,5 +237,26 @@ describe("invalidateFolderSizes", () => {
     it("does nothing for a source that is not a stored connection", async () => {
         await invalidateFolderSizes("container:app-1", "docs");
         expect(deleteMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("invalidateFolderSizesMany", () => {
+    it("forgets many paths in one query with their shared ancestors once", async () => {
+        await invalidateFolderSizesMany(CONNECTION, ["docs/a", "docs/b", "docs/a"]);
+        expect(deleteMany).toHaveBeenCalledTimes(1);
+        const where = deleteMany.mock.calls[0]?.[0]?.where as {
+            OR: Array<Record<string, unknown>>;
+        };
+        expect(where.OR).toEqual([
+            { path: { in: ["", "docs", "docs/a", "docs/b"] } },
+            { path: { startsWith: "docs/a/" } },
+            { path: { startsWith: "docs/b/" } }
+        ]);
+    });
+
+    it("splits a large batch into bounded queries", async () => {
+        const paths = Array.from({ length: 450 }, (_, index) => `docs/f${index}`);
+        await invalidateFolderSizesMany(CONNECTION, paths);
+        expect(deleteMany).toHaveBeenCalledTimes(3);
     });
 });

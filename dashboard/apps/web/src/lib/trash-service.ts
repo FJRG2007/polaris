@@ -12,7 +12,7 @@ import { randomBytes } from "node:crypto";
 import { getDriver } from "@/lib/storage-service";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { POLARIS_DIR, TRASH_DIR } from "@/lib/system-paths";
-import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { invalidateFolderSizes, invalidateFolderSizesMany } from "@/lib/drive-folder-size";
 
 export { TRASH_DIR };
 
@@ -153,7 +153,7 @@ export async function moveManyToTrash(
         await driver.dispose();
     }
 
-    for (const path of moved) await invalidateFolderSizes(connectionId, path);
+    await invalidateFolderSizesMany(connectionId, moved);
     return { moved, failures };
 }
 
@@ -239,35 +239,143 @@ export async function listTrash(ownerId: string) {
     });
 }
 
+/** What a batched bin operation did: the rows it finished, and why the rest did not. */
+export interface TrashBatchOutcome {
+    done: string[];
+    /** `cause` is the original error, for a caller that words its own message;
+     *  it is not for sending to the browser. */
+    failures: { id: string; reason: string; cause?: unknown }[];
+}
+
+type TrashRow = Awaited<ReturnType<typeof prisma.trashItem.findMany>>[number];
+
+/** Finished rows dropped from the bin per write, so a failure strands at most this many. */
+const TRASH_FLUSH = 50;
+
+/**
+ * Run `step` over each of the owner's rows among `ids`, one open connection per
+ * storage connection rather than one per item - selecting two hundred files in
+ * the bin and pressing Restore is two hundred moves, not two hundred handshakes.
+ *
+ * An id that is not the owner's, or no longer in the bin, counts as done: it is
+ * already in the state the caller asked for. A refusal on one item does not stop
+ * the rest; it comes back with its reason.
+ */
+async function eachTrashRow(
+    ownerId: string,
+    ids: readonly string[],
+    step: (driver: Driver, row: TrashRow) => Promise<void>
+): Promise<{ outcome: TrashBatchOutcome; finished: TrashRow[] }> {
+    const unique = [...new Set(ids)];
+    const rows = await prisma.trashItem.findMany({ where: { ownerId, id: { in: unique } } });
+    const found = new Set(rows.map((row: TrashRow) => row.id));
+    const outcome: TrashBatchOutcome = {
+        done: unique.filter((id) => !found.has(id)),
+        failures: []
+    };
+    const finished: TrashRow[] = [];
+    let pending: TrashRow[] = [];
+    const flush = async () => {
+        const batch = pending;
+        pending = [];
+        if (batch.length === 0) return;
+        try {
+            await prisma.trashItem.deleteMany({
+                where: { ownerId, id: { in: batch.map((row) => row.id) } }
+            });
+            finished.push(...batch);
+        } catch (caught) {
+            for (const row of batch)
+                outcome.failures.push({
+                    id: row.id,
+                    reason: "Could not update the bin",
+                    cause: caught
+                });
+        }
+    };
+    const byConnection = new Map<string, TrashRow[]>();
+    for (const row of rows)
+        byConnection.set(row.connectionId, [...(byConnection.get(row.connectionId) ?? []), row]);
+
+    for (const [connectionId, items] of byConnection) {
+        let driver: Driver;
+        try {
+            driver = await getDriver(connectionId, ownerId);
+        } catch (caught) {
+            const reason =
+                caught instanceof Error && caught.message ? caught.message : "Could not reach it";
+            for (const item of items) outcome.failures.push({ id: item.id, reason, cause: caught });
+            continue;
+        }
+        try {
+            for (const item of items) {
+                try {
+                    await step(driver, item);
+                    pending.push(item);
+                } catch (caught) {
+                    outcome.failures.push({
+                        id: item.id,
+                        reason:
+                            caught instanceof Error && caught.message
+                                ? caught.message
+                                : "Could not do it",
+                        cause: caught
+                    });
+                }
+                if (pending.length >= TRASH_FLUSH) await flush();
+            }
+        } finally {
+            await driver.dispose();
+        }
+    }
+    await flush();
+    outcome.done.push(...finished.map((row) => row.id));
+    return { outcome, finished };
+}
+
+/** Restore trashed items to their original paths (renamed where a path is taken). */
+export async function restoreTrashItems(
+    ownerId: string,
+    ids: readonly string[]
+): Promise<TrashBatchOutcome> {
+    const restored = new Map<string, string[]>();
+    const { outcome } = await eachTrashRow(ownerId, ids, async (driver, row) => {
+        const destination = await freeDestination(driver, row.originalPath);
+        await driver.move(row.trashPath, destination);
+        restored.set(row.connectionId, [...(restored.get(row.connectionId) ?? []), destination]);
+    });
+    for (const [connectionId, paths] of restored)
+        await invalidateFolderSizesMany(connectionId, paths);
+    return outcome;
+}
+
+/** Permanently delete trashed items. A file already gone still drops its record. */
+export async function deleteTrashItemsForever(
+    ownerId: string,
+    ids: readonly string[]
+): Promise<TrashBatchOutcome> {
+    const { outcome } = await eachTrashRow(ownerId, ids, async (driver, row) => {
+        try {
+            await driver.delete(row.trashPath, { recursive: true });
+        } catch {
+            // Already gone; drop the record regardless.
+        }
+    });
+    return outcome;
+}
+
 /** Restore a trashed item to its original path (renamed if that path is taken). */
 export async function restoreTrash(ownerId: string, id: string): Promise<void> {
-    const row = await prisma.trashItem.findFirst({ where: { id, ownerId } });
-    if (!row) return;
-    const driver = await getDriver(row.connectionId, ownerId);
-    let destination = row.originalPath;
-    try {
-        destination = await freeDestination(driver, row.originalPath);
-        await driver.move(row.trashPath, destination);
-    } finally {
-        await driver.dispose();
-    }
-    await invalidateFolderSizes(row.connectionId, destination);
-    await prisma.trashItem.delete({ where: { id: row.id } });
+    const outcome = await restoreTrashItems(ownerId, [id]);
+    const failure = outcome.failures[0];
+    if (failure) throw failure.cause ?? new Error(failure.reason);
 }
 
 /** Permanently delete a single trashed item. */
 export async function deleteTrashForever(ownerId: string, id: string): Promise<void> {
-    const row = await prisma.trashItem.findFirst({ where: { id, ownerId } });
-    if (!row) return;
-    const driver = await getDriver(row.connectionId, ownerId);
-    try {
-        await driver.delete(row.trashPath, { recursive: true });
-    } catch {
-        // Already gone; drop the record regardless.
-    } finally {
-        await driver.dispose();
-    }
-    await prisma.trashItem.delete({ where: { id: row.id } });
+    const outcome = await deleteTrashItemsForever(ownerId, [id]);
+    const failure = outcome.failures[0];
+    if (failure) throw failure.cause ?? new Error(failure.reason);
 }
 
 /** Permanently delete every trashed item the user owns. */

@@ -30,11 +30,13 @@
                 "name": "Name",
                 "created": "Created on",
                 "modified": "Last Modified",
-                "size": "Size"
+                "size": "Size",
+                "location": "Original location",
+                "deleted": "Deleted on"
             },
-            "sortedReverse": "Sorted by {column, select, name {name} created {created on} modified {last modified} other {size}}, {dir, select, asc {ascending} other {descending}}. Reverse it.",
-            "sortBy": "Sort by {column, select, name {name} created {created on} modified {last modified} other {size}}",
-            "sorted": "Sorted by {column, select, name {name} created {created on} modified {last modified} other {size}}, {dir, select, asc {ascending} other {descending}}",
+            "sortedReverse": "Sorted by {column, select, name {name} created {created on} modified {last modified} location {original location} deleted {deleted on} other {size}}, {dir, select, asc {ascending} other {descending}}. Reverse it.",
+            "sortBy": "Sort by {column, select, name {name} created {created on} modified {last modified} location {original location} deleted {deleted on} other {size}}",
+            "sorted": "Sorted by {column, select, name {name} created {created on} modified {last modified} location {original location} deleted {deleted on} other {size}}, {dir, select, asc {ascending} other {descending}}",
             "title": "Sort",
             "ascending": "A-Z",
             "descending": "Z-A"
@@ -991,7 +993,11 @@
         "restore": "Restore",
         "deleteForever": "Delete forever",
         "root": "(root)",
-        "deletedAt": "- deleted <time></time>"
+        "openOriginalFolder": "Open original folder",
+        "selectionHint": "Select items to restore or delete them for good.",
+        "restoreItem": "Restore {name}",
+        "permanentlyDeleteItems": "Permanently delete {count, plural, one {# item} other {# items}}?",
+        "somethingWentWrong": "Something went wrong. Try again."
     },
     "send": {
         "searchForAPerson": "Search for a person",

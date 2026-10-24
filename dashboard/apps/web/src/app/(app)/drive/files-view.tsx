@@ -15,6 +15,7 @@
 
 import Link from "next/link";
 import type { DriveEntry, ListingFailure } from "./types";
+import { originalFolder, type TrashRow } from "./trash/trash-listing";
 import { FolderTree } from "./folder-tree";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import { ListingError } from "./listing-error";
@@ -129,6 +130,7 @@ import {
     Lock,
     Palette,
     Pencil,
+    RotateCcw,
     Scissors,
     Search,
     Send,
@@ -151,7 +153,10 @@ function depthOf(path: string): number {
 }
 
 const SORT_KEYS = ["name", "created", "modified", "size"] as const;
-type SortKey = (typeof SORT_KEYS)[number];
+/** The bin's columns. Both dates of a binned item are the day it was deleted,
+ *  so where it came from and when it went take their places. */
+const TRASH_SORT_KEYS = ["name", "location", "deleted", "size"] as const;
+type SortKey = (typeof SORT_KEYS)[number] | (typeof TRASH_SORT_KEYS)[number];
 type SortDir = "asc" | "desc";
 
 type DriveT = NamespaceTranslator<"drive">;
@@ -360,7 +365,8 @@ export function FilesView({
     onScheduleDelete,
     onSaved,
     headerActions,
-    going
+    going,
+    trash
 }: {
     connectionId: string;
     path: string;
@@ -449,6 +455,21 @@ export function FilesView({
     onSaved?: () => void;
     /** Connection-level actions (Access, Open console) rendered in the toolbar, left of the panel. */
     headerActions?: ReactNode;
+    /**
+     * Draw the recycle bin instead of a folder: the same listing, with the bin's
+     * own actions in place of the explorer's. Entries are bin rows keyed by row
+     * id (`trashEntry`), and nothing here reaches `connectionId` - the bin spans
+     * every connection, so each row carries its own. An action is absent when the
+     * reader may not take it, and is then not offered.
+     */
+    trash?: {
+        rows: ReadonlyMap<string, TrashRow>;
+        /** The folder a row was deleted from, in the explorer. */
+        folderHref: (row: TrashRow) => string;
+        onRestore?: (entries: DriveEntry[]) => void;
+        onDeleteForever?: (entries: DriveEntry[]) => void;
+        onEmpty?: () => void;
+    };
 }) {
     // The keys in force for the toolbar's titles - the shared table's, so a key
     // moved in Keyboard shortcuts is the one a title names.
@@ -457,15 +478,18 @@ export function FilesView({
     const format = useDisplayFormat();
     const t = useTranslations("drive");
     const tc = useTranslations("common");
+    const inTrash = trash !== undefined;
     const [query, setQuery] = useState("");
     // Search scope: the current folder only, or a recursive walk from here.
     // Recursive by default so a search finds nested items without an extra click.
-    const [searchScope, setSearchScope] = useState<"current" | "recursive">("recursive");
+    const [searchScope, setSearchScope] = useState<"current" | "recursive">(
+        trash ? "current" : "recursive"
+    );
     const [remoteEntries, setRemoteEntries] = useState<DriveEntry[] | null>(null);
     const [searching, setSearching] = useState(false);
     const [searchTruncated, setSearchTruncated] = useState(false);
-    const [sortKey, setSortKey] = useState<SortKey>("name");
-    const [sortDir, setSortDir] = useState<SortDir>("asc");
+    const [sortKey, setSortKey] = useState<SortKey>(trash ? "deleted" : "name");
+    const [sortDir, setSortDir] = useState<SortDir>(trash ? "desc" : "asc");
 
     /**
      * What pressing a column means.
@@ -551,9 +575,15 @@ export function FilesView({
     const insights = useDriveInsights(
         connectionId,
         path,
-        !loading && error === null && hasInsights,
+        !loading && error === null && hasInsights && !inTrash,
         listingRevision
     );
+
+    /** Where a bin row came from, as text to sort by. Empty outside the bin. */
+    function trashLocation(entry: DriveEntry): string {
+        const row = trash?.rows.get(entry.path);
+        return row ? `${row.connectionName}/${row.originalPath}` : "";
+    }
 
     /** Measured weight of a folder, or the plain size of a file. */
     function sizeLabel(entry: DriveEntry): string {
@@ -702,6 +732,8 @@ export function FilesView({
 
     /** Open an item: folders navigate, archives browse, other files preview. */
     function openEntry(entry: DriveEntry) {
+        // A binned item is not where its path says; it is restored, not opened.
+        if (inTrash) return;
         if (entry.kind === "dir") router.push(href(connectionId, entry.path));
         else if (/\.(zip|rar)$/i.test(entry.name)) setArchiveTarget(entry);
         else if (isViewable(entry.name)) openViewer(entry);
@@ -753,16 +785,16 @@ export function FilesView({
             event.preventDefault();
             setSelected(new Set());
             cursorRef.current = null;
-        } else if (pressed("drive.copy") && selectedEntries.length > 0) {
+        } else if (pressed("drive.copy") && !inTrash && selectedEntries.length > 0) {
             event.preventDefault();
             setClipboard({ entries: selectedEntries, mode: "copy" });
-        } else if (pressed("drive.cut") && selectedEntries.length > 0) {
+        } else if (pressed("drive.cut") && !inTrash && selectedEntries.length > 0) {
             event.preventDefault();
             setClipboard({ entries: selectedEntries, mode: "cut" });
         } else if (pressed("drive.paste") && clipboard) {
             event.preventDefault();
             paste();
-        } else if (pressed("general.rename") && one) {
+        } else if (pressed("general.rename") && !inTrash && one) {
             event.preventDefault();
             startRename(one);
         } else if (pressed("drive.open") && one) {
@@ -770,7 +802,8 @@ export function FilesView({
             openEntry(one);
         } else if (pressed("drive.delete") && selectedEntries.length > 0) {
             event.preventDefault();
-            (onDelete ?? onDeletePermanent)(selectedEntries);
+            if (trash) trash.onDeleteForever?.(selectedEntries);
+            else (onDelete ?? onDeletePermanent)(selectedEntries);
         } else if (event.key === "ArrowDown") {
             event.preventDefault();
             moveCursor(viewMode === "grid" ? gridColumns() : 1, event.shiftKey);
@@ -797,12 +830,14 @@ export function FilesView({
 
     /** External file drag over the listing highlights it as an upload drop zone. */
     function onUploadDragOver(event: React.DragEvent) {
+        if (inTrash) return;
         if (!event.dataTransfer.types.includes("Files")) return;
         event.preventDefault();
         setDragUpload(true);
     }
 
     function onUploadDrop(event: React.DragEvent) {
+        if (inTrash) return;
         if (!event.dataTransfer.types.includes("Files")) return;
         event.preventDefault();
         setDragUpload(false);
@@ -1000,11 +1035,14 @@ export function FilesView({
                     (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction
                 );
             }
-            if (sortKey === "modified") {
+            if (sortKey === "modified" || sortKey === "deleted") {
                 return (
                     (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime()) *
                     direction
                 );
+            }
+            if (sortKey === "location") {
+                return trashLocation(a).localeCompare(trashLocation(b)) * direction;
             }
             return a.name.localeCompare(b.name) * direction;
         });
@@ -1021,7 +1059,8 @@ export function FilesView({
         sortDir,
         showHidden,
         starredOnly,
-        insights
+        insights,
+        trash
     ]);
 
     /** Everything that can still be acted on: what is already being removed is
@@ -1112,6 +1151,8 @@ export function FilesView({
 
     /** Drag handlers shared by list rows and grid cells: drag to move, drop onto a folder. */
     function entryDragProps(entry: DriveEntry, isRenaming: boolean) {
+        // Nothing in the bin moves by dragging; it is restored where it was.
+        if (inTrash) return {};
         // A folder is a valid drop target for the current drag unless it is the
         // dragged item itself or one of its descendants (which would be a cycle).
         const droppableFor = (source: string | null): boolean =>
@@ -1202,12 +1243,81 @@ export function FilesView({
         if (clipboard.mode === "cut") setClipboard(null);
     }
 
+    /** The bin's row menu: put it back, see where it was, or delete it for good. */
+    function trashMenu(entry: DriveEntry) {
+        const targets = menuTargets(entry);
+        const label =
+            targets.length > 1
+                ? t("filesView.menu.itemsSelected", { count: targets.length })
+                : entry.name;
+        const row = targets.length === 1 ? trash?.rows.get(entry.path) : undefined;
+        return (
+            <ContextMenuContent onCloseAutoFocus={keepFocusOnClose}>
+                <ContextMenuLabel title={label}>{label}</ContextMenuLabel>
+                {trash?.onRestore ? (
+                    <ContextMenuItem onSelect={() => trash.onRestore?.(targets)}>
+                        <RotateCcw className="size-4" />
+                        {t("trash.restore")}
+                    </ContextMenuItem>
+                ) : null}
+                {row && trash ? (
+                    <ContextMenuItem asChild>
+                        <Link href={trash.folderHref(row)}>
+                            <FolderInput className="size-4" />
+                            {t("trash.openOriginalFolder")}
+                        </Link>
+                    </ContextMenuItem>
+                ) : null}
+                {trash?.onDeleteForever ? (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                            variant="danger"
+                            onSelect={() => trash.onDeleteForever?.(targets)}
+                        >
+                            <Trash2 className="size-4" />
+                            {t("trash.deleteForever")}
+                        </ContextMenuItem>
+                    </>
+                ) : null}
+            </ContextMenuContent>
+        );
+    }
+
+    /** Where a bin row was deleted from, linking to that folder. */
+    function trashLocationCell(entry: DriveEntry): ReactNode {
+        const row = trash?.rows.get(entry.path);
+        if (!row || !trash) return null;
+        const folder = originalFolder(row);
+        return (
+            <Link
+                href={trash.folderHref(row)}
+                draggable={false}
+                onClick={(event) => event.stopPropagation()}
+                title={`${row.connectionName}/${row.originalPath}`}
+                className="block truncate hover:text-primary hover:underline"
+            >
+                {row.connectionName} / {folder || t("trash.root")}
+            </Link>
+        );
+    }
+
+    /** Where an entry's picture comes from: a bin row's file sits in the bin
+     *  folder of its own connection. */
+    function thumbSource(entry: DriveEntry): { connectionId: string; path: string } {
+        const row = trash?.rows.get(entry.path);
+        return row
+            ? { connectionId: row.connectionId, path: row.trashPath }
+            : { connectionId, path: entry.path };
+    }
+
     /** The right-click menu for an entry, shared by the list and grid views. It
      *  covers the whole selection when the entry belongs to one, so the items that
      *  only make sense for a single thing (open, rename, notes, details) drop out.
      *  Rename puts an input where the name was, so the menu leaves focus there
      *  instead of taking it back and blurring the field away. */
     function entryMenu(entry: DriveEntry) {
+        if (trash) return trashMenu(entry);
         const targets = menuTargets(entry);
         const many = targets.length > 1;
         const label = many
@@ -1460,7 +1570,7 @@ export function FilesView({
     const singleSelectedPath =
         selectedEntries.length === 1 ? (selectedEntries[0]?.path ?? null) : null;
     useEffect(() => {
-        if (!singleSelectedPath) {
+        if (!singleSelectedPath || inTrash) {
             setActivity([]);
             return;
         }
@@ -1487,7 +1597,7 @@ export function FilesView({
                 if (!controller.signal.aborted) setActivityLoading(false);
             });
         return () => controller.abort();
-    }, [connectionId, singleSelectedPath]);
+    }, [connectionId, singleSelectedPath, inTrash]);
 
     /**
      * How far the listing has to reach for the empty space under the last file to
@@ -1845,205 +1955,231 @@ export function FilesView({
             <div
                 className={cn(
                     "flex min-w-0 flex-1 flex-col",
-                    selectedEntries.length === 1 && "lg:pr-72",
+                    !inTrash && selectedEntries.length === 1 && "lg:pr-72",
                     viewerTarget && "hidden"
                 )}
             >
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
-                        <Link
-                            href={href(connectionId, rootPath)}
-                            {...segmentDropProps(rootPath)}
-                            className={cn(
-                                "rounded px-1 py-0.5 hover:text-foreground",
-                                dropSegment === rootPath &&
-                                    "bg-primary/15 text-primary ring-1 ring-primary/40"
-                            )}
-                        >
-                            {/* A location of your own starts at Home. One somebody
+                {trash ? (
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                                {t("trash.trash")}
+                            </h1>
+                            <p className="text-sm text-muted-foreground">
+                                {t("trash.deletedItemsAreKeptHere")}
+                            </p>
+                        </div>
+                        {trash.onEmpty && entries.length > 0 ? (
+                            <Button
+                                size="sm"
+                                variant="danger"
+                                onClick={trash.onEmpty}
+                                disabled={pending}
+                            >
+                                <Trash2 className="size-4" />
+                                {t("trash.emptyTrash")}
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : (
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
+                            <Link
+                                href={href(connectionId, rootPath)}
+                                {...segmentDropProps(rootPath)}
+                                className={cn(
+                                    "rounded px-1 py-0.5 hover:text-foreground",
+                                    dropSegment === rootPath &&
+                                        "bg-primary/15 text-primary ring-1 ring-primary/40"
+                                )}
+                            >
+                                {/* A location of your own starts at Home. One somebody
                                 shared starts at what they shared, and calling that
                                 Home would say the folder is the whole storage. */}
-                            {rootPath === ""
-                                ? t("filesView.home")
-                                : (rootPath.split("/").pop() ?? t("filesView.home"))}
-                        </Link>
-                        {segments.slice(depthOf(rootPath)).map((segment, index) => {
-                            const target = segments
-                                .slice(0, depthOf(rootPath) + index + 1)
-                                .join("/");
-                            return (
-                                <span key={target} className="flex items-center gap-1">
-                                    <ChevronRight className="size-3" />
-                                    <Link
-                                        href={href(connectionId, target)}
-                                        {...segmentDropProps(target)}
-                                        className={cn(
-                                            "truncate rounded px-1 py-0.5 hover:text-foreground",
-                                            dropSegment === target &&
-                                                "bg-primary/15 text-primary ring-1 ring-primary/40"
-                                        )}
-                                    >
-                                        {segment}
-                                    </Link>
-                                </span>
-                            );
-                        })}
-                    </div>
-                    {/* Below `sm` these are the icons alone: the row carries up to six
+                                {rootPath === ""
+                                    ? t("filesView.home")
+                                    : (rootPath.split("/").pop() ?? t("filesView.home"))}
+                            </Link>
+                            {segments.slice(depthOf(rootPath)).map((segment, index) => {
+                                const target = segments
+                                    .slice(0, depthOf(rootPath) + index + 1)
+                                    .join("/");
+                                return (
+                                    <span key={target} className="flex items-center gap-1">
+                                        <ChevronRight className="size-3" />
+                                        <Link
+                                            href={href(connectionId, target)}
+                                            {...segmentDropProps(target)}
+                                            className={cn(
+                                                "truncate rounded px-1 py-0.5 hover:text-foreground",
+                                                dropSegment === target &&
+                                                    "bg-primary/15 text-primary ring-1 ring-primary/40"
+                                            )}
+                                        >
+                                            {segment}
+                                        </Link>
+                                    </span>
+                                );
+                            })}
+                        </div>
+                        {/* Below `sm` these are the icons alone: the row carries up to six
                         actions, and their labels together are wider than a phone. */}
-                    <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-                        {headerActions}
-                        {clipboard ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={paste}
-                                disabled={pending}
-                                title={t("filesView.toolbar.pasteItems", {
-                                    count: clipboard.entries.length
-                                })}
-                                aria-label={t("filesView.toolbar.pasteItems", {
-                                    count: clipboard.entries.length
-                                })}
-                            >
-                                <ClipboardPaste className="size-4" />
-                                <span className="hidden sm:inline">
-                                    {t("filesView.toolbar.pasteCount", {
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+                            {headerActions}
+                            {clipboard ? (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={paste}
+                                    disabled={pending}
+                                    title={t("filesView.toolbar.pasteItems", {
                                         count: clipboard.entries.length
                                     })}
-                                </span>
-                            </Button>
-                        ) : null}
-                        {onSharePeopleFolder ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={onSharePeopleFolder}
-                                disabled={pending}
-                                title={t("filesView.toolbar.shareFolder")}
-                                aria-label={t("filesView.toolbar.shareFolder")}
-                            >
-                                <Users className="size-4" />
-                                <span className="hidden sm:inline">
-                                    {t("filesView.toolbar.share")}
-                                </span>
-                            </Button>
-                        ) : null}
-                        {onShareFolder ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={onShareFolder}
-                                disabled={pending}
-                                title={t("filesView.toolbar.linkFolder")}
-                                aria-label={t("filesView.toolbar.linkFolder")}
-                            >
-                                <Link2 className="size-4" />
-                            </Button>
-                        ) : null}
-                        {onRequestFiles ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                    onRequestFiles(path, segments[segments.length - 1] ?? "")
-                                }
-                                disabled={pending}
-                                title={
-                                    requestFilesKey
-                                        ? t("filesView.toolbar.requestFilesHint", {
-                                              shortcut: requestFilesKey
-                                          })
-                                        : t("filesView.toolbar.requestFiles")
-                                }
-                                aria-label={t("filesView.toolbar.requestFiles")}
-                            >
-                                <Inbox className="size-4" />
-                                <span className="hidden sm:inline">
-                                    {t("filesView.toolbar.requestFiles")}
-                                </span>
-                            </Button>
-                        ) : null}
-                        {abilities.write ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={onNewFolder}
-                                disabled={pending}
-                                title={
-                                    newFolderKey
-                                        ? t("filesView.toolbar.newFolderHint", {
-                                              shortcut: newFolderKey
-                                          })
-                                        : t("filesView.toolbar.newFolder")
-                                }
-                                aria-label={t("filesView.toolbar.newFolder")}
-                            >
-                                <FolderPlus className="size-4" />
-                                <span className="hidden sm:inline">
-                                    {t("filesView.toolbar.newFolder")}
-                                </span>
-                            </Button>
-                        ) : null}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    data-tour="drive.upload"
-                                    size="sm"
-                                    variant="secondary"
-                                    disabled={uploading || !abilities.write}
-                                    title={
-                                        abilities.write
-                                            ? t("filesView.toolbar.upload")
-                                            : t("filesView.toolbar.readOnly")
-                                    }
-                                    aria-label={t("filesView.toolbar.upload")}
+                                    aria-label={t("filesView.toolbar.pasteItems", {
+                                        count: clipboard.entries.length
+                                    })}
                                 >
-                                    <Upload className="size-4" />
+                                    <ClipboardPaste className="size-4" />
                                     <span className="hidden sm:inline">
-                                        {uploading
-                                            ? t("filesView.toolbar.uploading")
-                                            : t("filesView.toolbar.upload")}
+                                        {t("filesView.toolbar.pasteCount", {
+                                            count: clipboard.entries.length
+                                        })}
                                     </span>
                                 </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
-                                    <Upload className="size-4" />
-                                    {t("filesView.toolbar.uploadFiles")}
-                                    <ShortcutHint id={SHORTCUT_IDS["upload-files"]} />
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => void pickFolder()}>
-                                    <FolderUp className="size-4" />
-                                    {t("filesView.toolbar.uploadFolder")}
-                                    <ShortcutHint id={SHORTCUT_IDS["upload-folder"]} />
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        <input
-                            ref={fileInput}
-                            type="file"
-                            multiple
-                            hidden
-                            onChange={(event) => {
-                                if (event.target.files) onUpload(filesToItems(event.target.files));
-                            }}
-                        />
-                        <input
-                            ref={(element) => {
-                                folderInput.current = element;
-                                // webkitdirectory is not a standard React prop; set it directly.
-                                if (element) element.setAttribute("webkitdirectory", "");
-                            }}
-                            type="file"
-                            hidden
-                            onChange={(event) => {
-                                if (event.target.files) onUpload(filesToItems(event.target.files));
-                                if (folderInput.current) folderInput.current.value = "";
-                            }}
-                        />
+                            ) : null}
+                            {onSharePeopleFolder ? (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={onSharePeopleFolder}
+                                    disabled={pending}
+                                    title={t("filesView.toolbar.shareFolder")}
+                                    aria-label={t("filesView.toolbar.shareFolder")}
+                                >
+                                    <Users className="size-4" />
+                                    <span className="hidden sm:inline">
+                                        {t("filesView.toolbar.share")}
+                                    </span>
+                                </Button>
+                            ) : null}
+                            {onShareFolder ? (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={onShareFolder}
+                                    disabled={pending}
+                                    title={t("filesView.toolbar.linkFolder")}
+                                    aria-label={t("filesView.toolbar.linkFolder")}
+                                >
+                                    <Link2 className="size-4" />
+                                </Button>
+                            ) : null}
+                            {onRequestFiles ? (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() =>
+                                        onRequestFiles(path, segments[segments.length - 1] ?? "")
+                                    }
+                                    disabled={pending}
+                                    title={
+                                        requestFilesKey
+                                            ? t("filesView.toolbar.requestFilesHint", {
+                                                  shortcut: requestFilesKey
+                                              })
+                                            : t("filesView.toolbar.requestFiles")
+                                    }
+                                    aria-label={t("filesView.toolbar.requestFiles")}
+                                >
+                                    <Inbox className="size-4" />
+                                    <span className="hidden sm:inline">
+                                        {t("filesView.toolbar.requestFiles")}
+                                    </span>
+                                </Button>
+                            ) : null}
+                            {abilities.write ? (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={onNewFolder}
+                                    disabled={pending}
+                                    title={
+                                        newFolderKey
+                                            ? t("filesView.toolbar.newFolderHint", {
+                                                  shortcut: newFolderKey
+                                              })
+                                            : t("filesView.toolbar.newFolder")
+                                    }
+                                    aria-label={t("filesView.toolbar.newFolder")}
+                                >
+                                    <FolderPlus className="size-4" />
+                                    <span className="hidden sm:inline">
+                                        {t("filesView.toolbar.newFolder")}
+                                    </span>
+                                </Button>
+                            ) : null}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        data-tour="drive.upload"
+                                        size="sm"
+                                        variant="secondary"
+                                        disabled={uploading || !abilities.write}
+                                        title={
+                                            abilities.write
+                                                ? t("filesView.toolbar.upload")
+                                                : t("filesView.toolbar.readOnly")
+                                        }
+                                        aria-label={t("filesView.toolbar.upload")}
+                                    >
+                                        <Upload className="size-4" />
+                                        <span className="hidden sm:inline">
+                                            {uploading
+                                                ? t("filesView.toolbar.uploading")
+                                                : t("filesView.toolbar.upload")}
+                                        </span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
+                                        <Upload className="size-4" />
+                                        {t("filesView.toolbar.uploadFiles")}
+                                        <ShortcutHint id={SHORTCUT_IDS["upload-files"]} />
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => void pickFolder()}>
+                                        <FolderUp className="size-4" />
+                                        {t("filesView.toolbar.uploadFolder")}
+                                        <ShortcutHint id={SHORTCUT_IDS["upload-folder"]} />
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            <input
+                                ref={fileInput}
+                                type="file"
+                                multiple
+                                hidden
+                                onChange={(event) => {
+                                    if (event.target.files)
+                                        onUpload(filesToItems(event.target.files));
+                                }}
+                            />
+                            <input
+                                ref={(element) => {
+                                    folderInput.current = element;
+                                    // webkitdirectory is not a standard React prop; set it directly.
+                                    if (element) element.setAttribute("webkitdirectory", "");
+                                }}
+                                type="file"
+                                hidden
+                                onChange={(event) => {
+                                    if (event.target.files)
+                                        onUpload(filesToItems(event.target.files));
+                                    if (folderInput.current) folderInput.current.value = "";
+                                }}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative min-w-[12rem] flex-1">
@@ -2056,32 +2192,34 @@ export function FilesView({
                             title={t("filesView.search.help")}
                             className={cn("pl-8 pr-9", searchError && "border-danger")}
                         />
-                        <button
-                            type="button"
-                            onClick={() =>
-                                setSearchScope((prev) =>
-                                    prev === "current" ? "recursive" : "current"
-                                )
-                            }
-                            aria-label={t("filesView.search.toggleScope")}
-                            title={
-                                searchScope === "recursive"
-                                    ? t("filesView.search.recursive")
-                                    : t("filesView.search.current")
-                            }
-                            className={cn(
-                                "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
-                                searchScope === "recursive"
-                                    ? "text-primary"
-                                    : "text-muted-foreground"
-                            )}
-                        >
-                            {searchScope === "recursive" ? (
-                                <FolderTreeIcon className="size-4" />
-                            ) : (
-                                <Folder className="size-4" />
-                            )}
-                        </button>
+                        {inTrash ? null : (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setSearchScope((prev) =>
+                                        prev === "current" ? "recursive" : "current"
+                                    )
+                                }
+                                aria-label={t("filesView.search.toggleScope")}
+                                title={
+                                    searchScope === "recursive"
+                                        ? t("filesView.search.recursive")
+                                        : t("filesView.search.current")
+                                }
+                                className={cn(
+                                    "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
+                                    searchScope === "recursive"
+                                        ? "text-primary"
+                                        : "text-muted-foreground"
+                                )}
+                            >
+                                {searchScope === "recursive" ? (
+                                    <FolderTreeIcon className="size-4" />
+                                ) : (
+                                    <Folder className="size-4" />
+                                )}
+                            </button>
+                        )}
                     </div>
                     {/* Four buttons naming the columns, beside a table whose
                         columns are already named, is the same four words twice -
@@ -2110,7 +2248,7 @@ export function FilesView({
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-[11rem]">
-                                {SORT_KEYS.map((key) => (
+                                {(inTrash ? TRASH_SORT_KEYS : SORT_KEYS).map((key) => (
                                     <DropdownMenuItem
                                         key={key}
                                         onSelect={() => chooseSort(key)}
@@ -2170,34 +2308,45 @@ export function FilesView({
                             <Badge variant="neutral">{categories.size + (extFilter ? 1 : 0)}</Badge>
                         ) : null}
                     </Button>
-                    <Button
-                        size="sm"
-                        variant={starredOnly ? "secondary" : "ghost"}
-                        onClick={() => setStarredOnly((prev) => !prev)}
-                        aria-label={
-                            starredOnly
-                                ? t("filesView.filters.showAll")
-                                : t("filesView.filters.starredOnly")
-                        }
-                    >
-                        <Star
-                            className={cn("size-4", starredOnly && "fill-amber-400 text-amber-400")}
-                        />
-                        {t("filesView.filters.starred")}
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant={showHidden ? "secondary" : "ghost"}
-                        onClick={() => setShowHidden((prev) => !prev)}
-                        aria-label={
-                            showHidden
-                                ? t("filesView.filters.hideHidden")
-                                : t("filesView.filters.showHidden")
-                        }
-                    >
-                        {showHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                        {t("filesView.filters.hidden")}
-                    </Button>
+                    {inTrash ? null : (
+                        <>
+                            <Button
+                                size="sm"
+                                variant={starredOnly ? "secondary" : "ghost"}
+                                onClick={() => setStarredOnly((prev) => !prev)}
+                                aria-label={
+                                    starredOnly
+                                        ? t("filesView.filters.showAll")
+                                        : t("filesView.filters.starredOnly")
+                                }
+                            >
+                                <Star
+                                    className={cn(
+                                        "size-4",
+                                        starredOnly && "fill-amber-400 text-amber-400"
+                                    )}
+                                />
+                                {t("filesView.filters.starred")}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={showHidden ? "secondary" : "ghost"}
+                                onClick={() => setShowHidden((prev) => !prev)}
+                                aria-label={
+                                    showHidden
+                                        ? t("filesView.filters.hideHidden")
+                                        : t("filesView.filters.showHidden")
+                                }
+                            >
+                                {showHidden ? (
+                                    <EyeOff className="size-4" />
+                                ) : (
+                                    <Eye className="size-4" />
+                                )}
+                                {t("filesView.filters.hidden")}
+                            </Button>
+                        </>
+                    )}
                 </div>
 
                 {searchScope === "recursive" && query.trim() ? (
@@ -2310,60 +2459,107 @@ export function FilesView({
                                 {t("filesView.tally.selected", { count: selectedEntries.length })}
                             </span>
                             <div className="ml-auto flex items-center gap-1">
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => downloadSelection(connectionId, selectedEntries)}
-                                    title={
-                                        preparing > 0 ? t("filesView.selection.fetching") : zipLabel
-                                    }
-                                    aria-label={
-                                        preparing > 0 ? t("filesView.selection.fetching") : zipLabel
-                                    }
-                                >
-                                    {preparing > 0 ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <Download className="size-4" />
-                                    )}
-                                    <span className="hidden sm:inline">
-                                        {preparing > 0
-                                            ? t("filesView.selection.fetching")
-                                            : zipLabel}
-                                    </span>
-                                </Button>
-                                <SelectionZipMenu
-                                    connectionId={connectionId}
-                                    entries={selectedEntries}
-                                    currentPath={path}
-                                />
-                                {onShare ? (
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => onShare(selectedEntries)}
-                                        title={shareLabel}
-                                        aria-label={shareLabel}
-                                    >
-                                        <Share2 className="size-4" />
-                                        <span className="hidden sm:inline">
-                                            {t("filesView.selection.share")}
-                                        </span>
-                                    </Button>
-                                ) : null}
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => (onDelete ?? onDeletePermanent)(selectedEntries)}
-                                    disabled={pending}
-                                    title={t("filesView.selection.delete")}
-                                    aria-label={t("filesView.selection.delete")}
-                                >
-                                    <Trash2 className="size-4" />
-                                    <span className="hidden sm:inline">
-                                        {t("filesView.selection.delete")}
-                                    </span>
-                                </Button>
+                                {trash ? (
+                                    <>
+                                        {trash.onRestore ? (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => trash.onRestore?.(selectedEntries)}
+                                                disabled={pending}
+                                                title={t("trash.restore")}
+                                                aria-label={t("trash.restore")}
+                                            >
+                                                <RotateCcw className="size-4" />
+                                                <span className="hidden sm:inline">
+                                                    {t("trash.restore")}
+                                                </span>
+                                            </Button>
+                                        ) : null}
+                                        {trash.onDeleteForever ? (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    trash.onDeleteForever?.(selectedEntries)
+                                                }
+                                                disabled={pending}
+                                                title={t("trash.deleteForever")}
+                                                aria-label={t("trash.deleteForever")}
+                                            >
+                                                <Trash2 className="size-4" />
+                                                <span className="hidden sm:inline">
+                                                    {t("trash.deleteForever")}
+                                                </span>
+                                            </Button>
+                                        ) : null}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() =>
+                                                downloadSelection(connectionId, selectedEntries)
+                                            }
+                                            title={
+                                                preparing > 0
+                                                    ? t("filesView.selection.fetching")
+                                                    : zipLabel
+                                            }
+                                            aria-label={
+                                                preparing > 0
+                                                    ? t("filesView.selection.fetching")
+                                                    : zipLabel
+                                            }
+                                        >
+                                            {preparing > 0 ? (
+                                                <Loader2 className="size-4 animate-spin" />
+                                            ) : (
+                                                <Download className="size-4" />
+                                            )}
+                                            <span className="hidden sm:inline">
+                                                {preparing > 0
+                                                    ? t("filesView.selection.fetching")
+                                                    : zipLabel}
+                                            </span>
+                                        </Button>
+                                        <SelectionZipMenu
+                                            connectionId={connectionId}
+                                            entries={selectedEntries}
+                                            currentPath={path}
+                                        />
+                                        {onShare ? (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => onShare(selectedEntries)}
+                                                title={shareLabel}
+                                                aria-label={shareLabel}
+                                            >
+                                                <Share2 className="size-4" />
+                                                <span className="hidden sm:inline">
+                                                    {t("filesView.selection.share")}
+                                                </span>
+                                            </Button>
+                                        ) : null}
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() =>
+                                                (onDelete ?? onDeletePermanent)(selectedEntries)
+                                            }
+                                            disabled={pending}
+                                            title={t("filesView.selection.delete")}
+                                            aria-label={t("filesView.selection.delete")}
+                                        >
+                                            <Trash2 className="size-4" />
+                                            <span className="hidden sm:inline">
+                                                {t("filesView.selection.delete")}
+                                            </span>
+                                        </Button>
+                                    </>
+                                )}
                                 <Button
                                     size="sm"
                                     variant="ghost"
@@ -2380,7 +2576,7 @@ export function FilesView({
                         </>
                     ) : (
                         <span className="text-xs text-muted-foreground">
-                            {t("filesView.selection.hint")}
+                            {inTrash ? t("trash.selectionHint") : t("filesView.selection.hint")}
                         </span>
                     )}
                 </div>
@@ -2447,14 +2643,14 @@ export function FilesView({
                                                 className="min-w-0 flex-1 px-1"
                                             />
                                             <SortHeading
-                                                column="created"
+                                                column={inTrash ? "location" : "created"}
                                                 sortKey={sortKey}
                                                 sortDir={sortDir}
                                                 onChoose={chooseSort}
                                                 className="hidden w-44 shrink-0 px-2 lg:flex"
                                             />
                                             <SortHeading
-                                                column="modified"
+                                                column={inTrash ? "deleted" : "modified"}
                                                 sortKey={sortKey}
                                                 sortDir={sortDir}
                                                 onChoose={chooseSort}
@@ -2477,7 +2673,9 @@ export function FilesView({
                                                     ? t("filesView.empty.searching")
                                                     : t("filesView.empty.noMatchesRecursive")
                                                 : source.length === 0
-                                                  ? t("filesView.empty.folderEmpty")
+                                                  ? inTrash
+                                                      ? t("trash.theTrashIsEmpty")
+                                                      : t("filesView.empty.folderEmpty")
                                                   : t("filesView.empty.noMatches")}
                                         </p>
                                     ) : viewMode === "grid" ? (
@@ -2533,7 +2731,13 @@ export function FilesView({
                                                                     )}
                                                                 >
                                                                     <GridIcon
-                                                                        connectionId={connectionId}
+                                                                        connectionId={
+                                                                            thumbSource(entry)
+                                                                                .connectionId
+                                                                        }
+                                                                        path={
+                                                                            thumbSource(entry).path
+                                                                        }
                                                                         entry={entry}
                                                                     />
                                                                     {isRenaming ? (
@@ -2769,6 +2973,17 @@ export function FilesView({
                                                                                     )}
                                                                                     className="h-7 !w-auto max-w-full py-1"
                                                                                 />
+                                                                            ) : inTrash ? (
+                                                                                <span className="flex items-center gap-2">
+                                                                                    <EntryIcon
+                                                                                        entry={
+                                                                                            entry
+                                                                                        }
+                                                                                    />
+                                                                                    <span className="truncate">
+                                                                                        {entry.name}
+                                                                                    </span>
+                                                                                </span>
                                                                             ) : entry.kind ===
                                                                               "dir" ? (
                                                                                 <Link
@@ -2909,11 +3124,17 @@ export function FilesView({
                                                                             )}
                                                                         </div>
                                                                         <div className="hidden w-44 shrink-0 truncate px-2 text-muted-foreground lg:block">
-                                                                            <RelativeTime
-                                                                                iso={
-                                                                                    entry.createdAt
-                                                                                }
-                                                                            />
+                                                                            {inTrash ? (
+                                                                                trashLocationCell(
+                                                                                    entry
+                                                                                )
+                                                                            ) : (
+                                                                                <RelativeTime
+                                                                                    iso={
+                                                                                        entry.createdAt
+                                                                                    }
+                                                                                />
+                                                                            )}
                                                                         </div>
                                                                         <div className="hidden w-44 shrink-0 truncate px-2 text-muted-foreground sm:block">
                                                                             <RelativeTime
@@ -2929,7 +3150,36 @@ export function FilesView({
                                                                             {sizeLabel(entry)}
                                                                         </div>
                                                                         <div className="flex w-12 shrink-0 justify-end px-2">
-                                                                            {onShare ? (
+                                                                            {trash?.onRestore ? (
+                                                                                <Button
+                                                                                    size="icon"
+                                                                                    variant="ghost"
+                                                                                    onClick={(
+                                                                                        event
+                                                                                    ) => {
+                                                                                        event.stopPropagation();
+                                                                                        trash.onRestore?.(
+                                                                                            menuTargets(
+                                                                                                entry
+                                                                                            )
+                                                                                        );
+                                                                                    }}
+                                                                                    title={t(
+                                                                                        "trash.restoreItem",
+                                                                                        {
+                                                                                            name: entry.name
+                                                                                        }
+                                                                                    )}
+                                                                                    aria-label={t(
+                                                                                        "trash.restoreItem",
+                                                                                        {
+                                                                                            name: entry.name
+                                                                                        }
+                                                                                    )}
+                                                                                >
+                                                                                    <RotateCcw className="size-4" />
+                                                                                </Button>
+                                                                            ) : onShare ? (
                                                                                 <Button
                                                                                     size="icon"
                                                                                     variant="ghost"
@@ -2998,63 +3248,78 @@ export function FilesView({
                             ) : null}
                         </div>
                     </ContextMenuTrigger>
-                    <ContextMenuContent>
-                        <ContextMenuItem onSelect={onNewFolder}>
-                            <FolderPlus className="size-4" />
-                            {t("filesView.menu.newFolder")}
-                            <ShortcutHint id={SHORTCUT_IDS["new-folder"]} />
-                        </ContextMenuItem>
-                        <ContextMenuItem onSelect={onNewFile}>
-                            <FilePlus className="size-4" />
-                            {t("filesView.menu.newFile")}
-                            <ShortcutHint id={SHORTCUT_IDS["new-file"]} />
-                        </ContextMenuItem>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem onSelect={() => fileInput.current?.click()}>
-                            <Upload className="size-4" />
-                            {t("filesView.menu.uploadFiles")}
-                            <ShortcutHint id={SHORTCUT_IDS["upload-files"]} />
-                        </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => void pickFolder()}>
-                            <FolderUp className="size-4" />
-                            {t("filesView.menu.uploadFolder")}
-                            <ShortcutHint id={SHORTCUT_IDS["upload-folder"]} />
-                        </ContextMenuItem>
-                        {onSharePeopleFolder ? (
-                            <ContextMenuItem onSelect={onSharePeopleFolder}>
-                                <Users className="size-4" />
-                                {t("filesView.menu.shareFolder")}
+                    {trash ? (
+                        <ContextMenuContent>
+                            {trash.onEmpty && entries.length > 0 ? (
+                                <ContextMenuItem variant="danger" onSelect={trash.onEmpty}>
+                                    <Trash2 className="size-4" />
+                                    {t("trash.emptyTrash")}
+                                </ContextMenuItem>
+                            ) : (
+                                <ContextMenuLabel>{t("trash.trash")}</ContextMenuLabel>
+                            )}
+                        </ContextMenuContent>
+                    ) : (
+                        <ContextMenuContent>
+                            <ContextMenuItem onSelect={onNewFolder}>
+                                <FolderPlus className="size-4" />
+                                {t("filesView.menu.newFolder")}
+                                <ShortcutHint id={SHORTCUT_IDS["new-folder"]} />
                             </ContextMenuItem>
-                        ) : null}
-                        {onShareFolder ? (
-                            <ContextMenuItem onSelect={onShareFolder}>
-                                <Share2 className="size-4" />
-                                {t("filesView.menu.linkFolder")}
+                            <ContextMenuItem onSelect={onNewFile}>
+                                <FilePlus className="size-4" />
+                                {t("filesView.menu.newFile")}
+                                <ShortcutHint id={SHORTCUT_IDS["new-file"]} />
                             </ContextMenuItem>
-                        ) : null}
-                        {onRequestFiles ? (
-                            <ContextMenuItem
-                                onSelect={() => onRequestFiles(path, path.split("/").pop() ?? "")}
-                            >
-                                <Inbox className="size-4" />
-                                {t("filesView.menu.requestHere")}
-                                <ShortcutHint id={SHORTCUT_IDS["request-files"]} />
+                            <ContextMenuSeparator />
+                            <ContextMenuItem onSelect={() => fileInput.current?.click()}>
+                                <Upload className="size-4" />
+                                {t("filesView.menu.uploadFiles")}
+                                <ShortcutHint id={SHORTCUT_IDS["upload-files"]} />
                             </ContextMenuItem>
-                        ) : null}
-                        {clipboard ? (
-                            <ContextMenuItem onSelect={paste}>
-                                <ClipboardPaste className="size-4" />
-                                {clipboard.entries.length > 1
-                                    ? t("filesView.menu.pasteCount", {
-                                          count: clipboard.entries.length
-                                      })
-                                    : t("filesView.menu.paste")}
+                            <ContextMenuItem onSelect={() => void pickFolder()}>
+                                <FolderUp className="size-4" />
+                                {t("filesView.menu.uploadFolder")}
+                                <ShortcutHint id={SHORTCUT_IDS["upload-folder"]} />
                             </ContextMenuItem>
-                        ) : null}
-                    </ContextMenuContent>
+                            {onSharePeopleFolder ? (
+                                <ContextMenuItem onSelect={onSharePeopleFolder}>
+                                    <Users className="size-4" />
+                                    {t("filesView.menu.shareFolder")}
+                                </ContextMenuItem>
+                            ) : null}
+                            {onShareFolder ? (
+                                <ContextMenuItem onSelect={onShareFolder}>
+                                    <Share2 className="size-4" />
+                                    {t("filesView.menu.linkFolder")}
+                                </ContextMenuItem>
+                            ) : null}
+                            {onRequestFiles ? (
+                                <ContextMenuItem
+                                    onSelect={() =>
+                                        onRequestFiles(path, path.split("/").pop() ?? "")
+                                    }
+                                >
+                                    <Inbox className="size-4" />
+                                    {t("filesView.menu.requestHere")}
+                                    <ShortcutHint id={SHORTCUT_IDS["request-files"]} />
+                                </ContextMenuItem>
+                            ) : null}
+                            {clipboard ? (
+                                <ContextMenuItem onSelect={paste}>
+                                    <ClipboardPaste className="size-4" />
+                                    {clipboard.entries.length > 1
+                                        ? t("filesView.menu.pasteCount", {
+                                              count: clipboard.entries.length
+                                          })
+                                        : t("filesView.menu.paste")}
+                                </ContextMenuItem>
+                            ) : null}
+                        </ContextMenuContent>
+                    )}
                 </ContextMenu>
             </div>
-            {selectedEntries.length === 1 && selectedEntries[0] ? (
+            {!inTrash && selectedEntries.length === 1 && selectedEntries[0] ? (
                 <aside className="fixed right-0 top-14 bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         {/* The file, not a mark standing for its type. This panel
@@ -3577,11 +3842,14 @@ const THUMBNAIL_BOX = "size-14";
 function GridIcon({
     connectionId,
     entry,
+    path,
     className = THUMBNAIL_BOX,
     iconClassName = "size-10"
 }: {
     connectionId: string;
     entry: DriveEntry;
+    /** Where the file actually is, when that is not `entry.path` (a binned item). */
+    path?: string;
     /** How much room the picture gets. A tile in the grid and the details panel
      *  want different amounts of it and nothing else about them differs. */
     className?: string;
@@ -3596,7 +3864,7 @@ function GridIcon({
     return (
         <EntryThumbnail
             connectionId={connectionId}
-            path={entry.path}
+            path={path ?? entry.path}
             version={`${entry.modifiedAt}-${entry.size}`}
             moving={moving}
             className={className}
