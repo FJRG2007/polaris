@@ -42,7 +42,16 @@ export default async function GuestLinkPage(props: AppPageProps) {
         return <LinkPasswordForm token={token} unlock={unlockGrantLinkAction} />;
     }
     if (reached.standing !== "live") {
-        return <LinkUnavailable message={words(`guestLink.standing.${reached.standing}`)} />;
+        const signIn =
+            reached.standing === "signin" || reached.standing === "denied"
+                ? { back: `/k/${token}`, another: reached.standing === "denied" }
+                : undefined;
+        return (
+            <LinkUnavailable
+                message={words(`guestLink.standing.${reached.standing}`)}
+                signIn={signIn}
+            />
+        );
     }
     if (
         reached.subjectType === "place.device" ||

@@ -97,6 +97,7 @@
     "publicShell": {
         "open": "Open Polaris",
         "signIn": "Sign in",
+        "anotherAccount": "Use another account",
         "unavailable": "Link unavailable"
     },
     "ui": {

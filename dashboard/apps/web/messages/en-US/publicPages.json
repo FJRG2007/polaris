@@ -308,7 +308,7 @@
             "closed": "This link does not work at this hour. Try again later.",
             "spent": "This link has been used as many times as it allowed.",
             "elsewhere": "This link does not open from where you are.",
-            "signin": "This link opens for signed-in people. Sign in, then open it again.",
+            "signin": "This link opens for signed-in people. Sign in to open it.",
             "denied": "This link is not for the account you are signed in with.",
             "password": "This link asks for a password."
         },
