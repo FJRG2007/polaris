@@ -34,8 +34,8 @@
   --shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.2);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-  --font-sign: 'Overpass', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  --font-sign: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
@@ -360,23 +360,6 @@ body.hud-minimized .toolbar > :not(#btn-toggle-hud) {
   font-weight: 650;
   letter-spacing: -0.01em;
   line-height: 1.2;
-}
-
-.repo-link {
-  flex: none;
-  padding: 3px 0;
-  color: var(--text-2);
-  font-size: 11px;
-  line-height: 1;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.repo-link:hover,
-.repo-link:focus-visible {
-  color: var(--text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .brand-subtitle {
@@ -1286,7 +1269,6 @@ body.is-boosting #hud-speed-meter {
   .brand-heading h1,
   .brand-subtitle { display: none; }
   .brand { height: 44px; padding: 0 12px; }
-  .repo-link { display: flex; align-items: center; gap: 4px; min-height: 44px; font-size: 12px; }
   .radar { width: 220px; height: 148px; }
   .cluster { width: 220px; }
   #hud-speed { font-size: 34px; }
@@ -1449,4 +1431,29 @@ body.touch-enabled .pop-item { min-height: 44px; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Other people in a call session: their names over their markers */
+.remote-labels {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.remote-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 160px;
+  padding: 3px 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

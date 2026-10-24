@@ -6,7 +6,12 @@
     "description": "Games: games people play on their own or together in a call. An installable Polaris app.",
     "polaris": {
         "id": "arcade",
-        "extension": "src/lib/arcade-extension.ts#arcadeExtension"
+        "extension": "src/lib/arcade-extension.ts#arcadeExtension",
+        "slot": "src/screens/extension-slot.tsx#ArcadeSlot",
+        "prepare": "scripts/build-games.mjs",
+        "assets": {
+            "new-york": ".assets/new-york"
+        }
     },
     "dependencies": {
         "@polaris/app-host": "0.1.0",
