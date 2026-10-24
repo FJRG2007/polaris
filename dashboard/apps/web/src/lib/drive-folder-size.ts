@@ -287,23 +287,46 @@ export async function measureFolder(
  * successful file operation into an error.
  */
 export async function invalidateFolderSizes(connectionId: string, path: string): Promise<void> {
+    await invalidateFolderSizesMany(connectionId, [path]);
+}
+
+/** Paths whose subtrees one invalidation query covers. */
+const INVALIDATE_CHUNK = 200;
+
+/**
+ * `invalidateFolderSizes` for many paths on one connection, in a query per
+ * {@link INVALIDATE_CHUNK} paths rather than one per path - a batch of a
+ * thousand items shares most of its ancestors.
+ */
+export async function invalidateFolderSizesMany(
+    connectionId: string,
+    paths: readonly string[]
+): Promise<void> {
     if (!isUuid(connectionId)) return;
-    const segments = path.split("/").filter(Boolean);
-    const ancestors = [""];
-    for (let index = 0; index < segments.length; index++) {
-        ancestors.push(segments.slice(0, index + 1).join("/"));
-    }
-    try {
-        await prisma.driveFolderSize.deleteMany({
-            where: {
-                connectionId,
-                OR: [
-                    { path: { in: ancestors } },
-                    ...(path ? [{ path: { startsWith: `${path}/` } }] : [])
-                ]
+    const unique = [...new Set(paths)];
+    for (let start = 0; start < unique.length; start += INVALIDATE_CHUNK) {
+        const chunk = unique.slice(start, start + INVALIDATE_CHUNK);
+        const ancestors = new Set([""]);
+        for (const path of chunk) {
+            const segments = path.split("/").filter(Boolean);
+            for (let index = 0; index < segments.length; index++) {
+                ancestors.add(segments.slice(0, index + 1).join("/"));
             }
-        });
-    } catch {
-        // Best effort: the freshness window still bounds how long a stale row lives.
+        }
+        try {
+            await prisma.driveFolderSize.deleteMany({
+                where: {
+                    connectionId,
+                    OR: [
+                        { path: { in: [...ancestors] } },
+                        ...chunk
+                            .filter(Boolean)
+                            .map((path) => ({ path: { startsWith: `${path}/` } }))
+                    ]
+                }
+            });
+        } catch {
+            // Best effort: the freshness window still bounds how long a stale row lives.
+        }
     }
 }

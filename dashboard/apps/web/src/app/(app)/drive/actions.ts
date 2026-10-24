@@ -1003,10 +1003,12 @@ export async function moveToTrashAction(
 }
 
 /** Restore a trashed item to its original location. */
-export async function restoreTrashAction(id: string): Promise<{ error?: string }> {
+export async function restoreTrashAction(id: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("drive.write");
+    const parsed = trashIdSchema.safeParse(id);
+    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.restoreFailed") };
     try {
-        await restoreTrash(user.id, id);
+        await restoreTrash(user.id, parsed.data);
     } catch (caught) {
         return {
             error: await driveErrorMessage(
@@ -1021,10 +1023,12 @@ export async function restoreTrashAction(id: string): Promise<{ error?: string }
 }
 
 /** Permanently delete a single trashed item. */
-export async function deleteTrashForeverAction(id: string): Promise<{ error?: string }> {
+export async function deleteTrashForeverAction(id: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("drive.delete");
+    const parsed = trashIdSchema.safeParse(id);
+    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.deleteFailed") };
     try {
-        await deleteTrashForever(user.id, id);
+        await deleteTrashForever(user.id, parsed.data);
     } catch (caught) {
         return {
             error: await driveErrorMessage(
@@ -1058,7 +1062,8 @@ export async function emptyTrashAction(): Promise<{ error?: string }> {
  * Bin rows picked in the Trash listing. Bounded so one request cannot ask for an
  * unbounded amount of storage work; a selection past it is sent in pieces.
  */
-const trashIdsSchema = z.array(z.string().uuid()).min(1).max(TRASH_BATCH_MAX);
+const trashIdSchema = z.string().uuid();
+const trashIdsSchema = z.array(trashIdSchema).min(1).max(TRASH_BATCH_MAX);
 
 /** What a batched bin action did, worded for the screen. */
 export interface TrashBatchResult {

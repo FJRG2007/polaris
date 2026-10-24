@@ -26,7 +26,10 @@ const dispose = vi.fn(async () => undefined);
 const create = vi.fn(async () => ({ id: "trash-1" }));
 
 vi.mock("@polaris/db", () => ({ prisma: { trashItem: { create } } }));
-vi.mock("@/lib/drive-folder-size", () => ({ invalidateFolderSizes: async () => undefined }));
+vi.mock("@/lib/drive-folder-size", () => ({
+    invalidateFolderSizes: async () => undefined,
+    invalidateFolderSizesMany: async () => undefined
+}));
 vi.mock("@/lib/storage-service", () => ({
     getDriver: async () => ({ stat, move, mkdir, dispose })
 }));

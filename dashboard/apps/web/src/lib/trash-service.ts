@@ -12,7 +12,7 @@ import { randomBytes } from "node:crypto";
 import { getDriver } from "@/lib/storage-service";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { POLARIS_DIR, TRASH_DIR } from "@/lib/system-paths";
-import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { invalidateFolderSizes, invalidateFolderSizesMany } from "@/lib/drive-folder-size";
 
 export { TRASH_DIR };
 
@@ -153,7 +153,7 @@ export async function moveManyToTrash(
         await driver.dispose();
     }
 
-    for (const path of moved) await invalidateFolderSizes(connectionId, path);
+    await invalidateFolderSizesMany(connectionId, moved);
     return { moved, failures };
 }
 
@@ -249,6 +249,9 @@ export interface TrashBatchOutcome {
 
 type TrashRow = Awaited<ReturnType<typeof prisma.trashItem.findMany>>[number];
 
+/** Finished rows dropped from the bin per write, so a failure strands at most this many. */
+const TRASH_FLUSH = 50;
+
 /**
  * Run `step` over each of the owner's rows among `ids`, one open connection per
  * storage connection rather than one per item - selecting two hundred files in
@@ -271,6 +274,25 @@ async function eachTrashRow(
         failures: []
     };
     const finished: TrashRow[] = [];
+    let pending: TrashRow[] = [];
+    const flush = async () => {
+        const batch = pending;
+        pending = [];
+        if (batch.length === 0) return;
+        try {
+            await prisma.trashItem.deleteMany({
+                where: { ownerId, id: { in: batch.map((row) => row.id) } }
+            });
+            finished.push(...batch);
+        } catch (caught) {
+            for (const row of batch)
+                outcome.failures.push({
+                    id: row.id,
+                    reason: "Could not update the bin",
+                    cause: caught
+                });
+        }
+    };
     const byConnection = new Map<string, TrashRow[]>();
     for (const row of rows)
         byConnection.set(row.connectionId, [...(byConnection.get(row.connectionId) ?? []), row]);
@@ -289,7 +311,7 @@ async function eachTrashRow(
             for (const item of items) {
                 try {
                     await step(driver, item);
-                    finished.push(item);
+                    pending.push(item);
                 } catch (caught) {
                     outcome.failures.push({
                         id: item.id,
@@ -300,17 +322,13 @@ async function eachTrashRow(
                         cause: caught
                     });
                 }
+                if (pending.length >= TRASH_FLUSH) await flush();
             }
         } finally {
             await driver.dispose();
         }
     }
-
-    if (finished.length > 0) {
-        await prisma.trashItem.deleteMany({
-            where: { ownerId, id: { in: finished.map((row) => row.id) } }
-        });
-    }
+    await flush();
     outcome.done.push(...finished.map((row) => row.id));
     return { outcome, finished };
 }
@@ -320,13 +338,14 @@ export async function restoreTrashItems(
     ownerId: string,
     ids: readonly string[]
 ): Promise<TrashBatchOutcome> {
-    const restored: { connectionId: string; path: string }[] = [];
+    const restored = new Map<string, string[]>();
     const { outcome } = await eachTrashRow(ownerId, ids, async (driver, row) => {
         const destination = await freeDestination(driver, row.originalPath);
         await driver.move(row.trashPath, destination);
-        restored.push({ connectionId: row.connectionId, path: destination });
+        restored.set(row.connectionId, [...(restored.get(row.connectionId) ?? []), destination]);
     });
-    for (const item of restored) await invalidateFolderSizes(item.connectionId, item.path);
+    for (const [connectionId, paths] of restored)
+        await invalidateFolderSizesMany(connectionId, paths);
     return outcome;
 }
 
