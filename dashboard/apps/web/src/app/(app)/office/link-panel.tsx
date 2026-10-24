@@ -29,6 +29,8 @@ import {
     LinkAdvancedFields,
     EMPTY_LINK_ADVANCED,
     linkAddressRules,
+    linkHoursIncomplete,
+    linkPeopleLimits,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
 import { runAction } from "@/lib/run-action";
@@ -99,6 +101,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                     expiresAt: advanced.expiresAt,
                     maxUses: advanced.maxUses ? Number(advanced.maxUses) : null,
                     ...linkAddressRules(advanced),
+                    ...linkPeopleLimits(advanced),
                     note
                 }),
             (message) => toast.show({ title: message })
@@ -231,7 +234,11 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                         <Button size="sm" variant="secondary" onClick={() => setMaking(false)}>
                             {t("links.cancel")}
                         </Button>
-                        <Button size="sm" disabled={busy} onClick={() => void make()}>
+                        <Button
+                            size="sm"
+                            disabled={busy || linkHoursIncomplete(advanced)}
+                            onClick={() => void make()}
+                        >
                             {busy ? (
                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                             ) : null}
