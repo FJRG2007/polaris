@@ -1985,6 +1985,22 @@ export async function openDirect(
         }
     }
 
+    return createGroup(actor, others, orgId, name);
+}
+
+/**
+ * A new group, owned by whoever started it, holding them and `others`.
+ *
+ * Only reached once `directAllowed` has said yes to exactly these people: it is
+ * the write, not the check.
+ */
+async function createGroup(
+    actor: ChatActor,
+    others: readonly string[],
+    orgId: string | null,
+    name: string
+): Promise<string> {
+    const everyone = [actor.id, ...others];
     const channel = await prisma.chatChannel.create({
         data: {
             kind: "group",
@@ -2018,6 +2034,73 @@ export async function openDirect(
         audience: everyone
     });
     return channel.id;
+}
+
+/**
+ * Discord's "add people" in a one-to-one conversation: a new group holding the
+ * two of you and whoever was picked, with the conversation it started from left
+ * exactly as it was.
+ *
+ * Growing the one-to-one itself would hand everybody added the whole of a
+ * private history neither person agreed to share, and turn a conversation that
+ * is keyed by the pair into something that no longer is one.
+ *
+ * Asking twice for the same people opens the group already holding exactly them
+ * rather than a second one. Groups are otherwise unkeyed on purpose (see
+ * `openDirect`), but this button is pressed from one conversation with one set
+ * of people in mind, and a second identical group is the button misfiring.
+ *
+ * The person the conversation is with is not being added by anybody, so the
+ * friends-and-colleagues rule is asked only of the newcomers - the same
+ * arrangement a call taking a third person uses.
+ */
+export async function groupFromDirect(
+    actor: ChatActor,
+    channelId: string,
+    userIds: readonly string[]
+): Promise<string> {
+    const access = await requireChannel(actor, channelId);
+    if (access.kind !== "dm") throw new ChatAccessError({ key: "errors.channelAddNotAllowed" });
+
+    const partner = await prisma.chatChannelMember.findFirst({
+        where: { channelId, userId: { not: actor.id } },
+        select: { userId: true }
+    });
+    if (!partner) throw new ChatAccessError({ key: "errors.memberAccountGone" });
+
+    const newcomers = [...new Set(userIds)].filter(
+        (id) => id !== actor.id && id !== partner.userId
+    );
+    if (newcomers.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToMessage" });
+    if (newcomers.length + 2 > core.MAX_GROUP_MEMBERS) {
+        throw new ChatAccessError({
+            key: "errors.groupFull",
+            params: { count: core.MAX_GROUP_MEMBERS }
+        });
+    }
+
+    const { others, orgId } = await directAllowed(
+        actor,
+        [partner.userId, ...newcomers],
+        [partner.userId]
+    );
+    const everyone = [actor.id, ...others];
+
+    // Exactly these people: nobody else in it, and every one of them present.
+    // One read, bounded by the size a group can be.
+    const existing = await prisma.chatChannel.findFirst({
+        where: {
+            kind: "group",
+            orgId,
+            members: { every: { userId: { in: everyone } } },
+            AND: everyone.map((userId) => ({ members: { some: { userId } } }))
+        },
+        orderBy: { lastMessageAt: "desc" },
+        select: { id: true }
+    });
+    if (existing) return existing.id;
+
+    return createGroup(actor, others, orgId, "");
 }
 
 export async function listChannelMembers(

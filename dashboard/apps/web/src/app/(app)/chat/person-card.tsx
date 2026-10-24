@@ -348,7 +348,7 @@ function PersonCard({
  * The same profile with room: everything the card had, what the two of you
  * have in common, the whole of what they wrote, and the way to their own page.
  */
-function PersonProfileDialog({
+export function PersonProfileDialog({
     person,
     channelId,
     viewerId,

@@ -38,21 +38,30 @@
  * unreachable from the one place devoted to them. It is the same menu, opened by
  * a press instead of a right-click, not a second copy of it.
  *
+ * Discord's column, not a titled panel: no "Profile" bar across the top - the
+ * band is the top - with the friend request and the three dots laid over the
+ * band, the two halves of what you have in common as counts that open, the bio
+ * cut to a few lines with the rest one press away, when they joined, and the
+ * way to the larger view at the bottom.
+ *
  * The line they are showing comes from the presence store, which is already
  * asking about this person for the avatar in the header. So this costs one
  * request for the profile itself, once, and nothing after that.
  */
 
-import { MoreHorizontal, X } from "lucide-react";
+import { Clock, MoreHorizontal, UserPlus, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { SidePane } from "./side-pane";
 import { useWideScreen } from "./use-wide-screen";
 import { useState } from "react";
+import { askFriendAction } from "./actions";
 import { NicknameDialog } from "./nickname-dialog";
+import { PersonProfileDialog } from "./person-card";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import type { ChatProfile } from "@/lib/chat/profiles";
+import { Button, Dialog, DialogContent, DialogTitle } from "@polaris/ui";
 import { ProfileDetails, useChatProfile } from "./profile-details";
 
 /** Somebody, as this panel draws them. */
@@ -61,11 +70,72 @@ export interface DirectPerson {
     readonly name: string;
 }
 
-/** The panel's contents, whichever shape it is drawn in - the same profile the
- *  card a pressed name opens draws, see `ProfileDetails`. */
-function Body({ person, channelId }: { person: DirectPerson; channelId: string }) {
-    const { profile, loading } = useChatProfile(channelId, person.id);
-    return <ProfileDetails person={person} profile={profile} loading={loading} />;
+/** The round, see-through buttons laid over the band. Over a picture or a
+ *  colour taken from one, so they carry their own backing to stay readable. */
+const ON_BANNER =
+    "size-8 rounded-full bg-background/80 text-foreground shadow-sm backdrop-blur hover:bg-background";
+
+/**
+ * Discord's add-friend button on the band.
+ *
+ * Only when there is a request to make: nothing for yourself or a friend, and a
+ * still clock for one already waiting either way. Optimistic - it turns into the
+ * clock when pressed and back, with the reason, if the request did not go.
+ */
+function AddFriend({
+    person,
+    standing,
+    onError
+}: {
+    person: DirectPerson;
+    standing: ChatProfile["friendship"] | undefined;
+    onError: (message: string) => void;
+}) {
+    const t = useTranslations("chat");
+    const { friends } = useChat();
+    const [sent, setSent] = useState(false);
+    if (!standing || standing === "self" || standing === "friends" || friends.has(person.id))
+        return null;
+
+    if (standing === "pending" || sent) {
+        return (
+            <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled
+                className={ON_BANNER}
+                aria-label={t("directProfile.requestPending")}
+                title={t("directProfile.requestPending")}
+            >
+                <Clock className="size-4" />
+            </Button>
+        );
+    }
+
+    const ask = async () => {
+        setSent(true);
+        onError("");
+        const result = await askFriendAction(person.id).catch(() => ({
+            error: t("groupPicker.requestFailed")
+        }));
+        if (result.error) {
+            setSent(false);
+            onError(result.error);
+        }
+    };
+
+    return (
+        <Button
+            variant="ghost"
+            size="icon-sm"
+            className={ON_BANNER}
+            aria-label={t("directProfile.addFriend", { name: person.name })}
+            title={t("directProfile.addFriendShort")}
+            onClick={() => void ask()}
+        >
+            <UserPlus className="size-4" />
+        </Button>
+    );
 }
 
 /**
@@ -109,6 +179,7 @@ function PersonMenu({
             <Button
                 variant="ghost"
                 size="icon-sm"
+                className={ON_BANNER}
                 aria-label={t("personCard.actionsFor", { name: person.name })}
                 title={t("directProfile.more")}
             >
@@ -150,35 +221,49 @@ export function DirectProfile({
     onMention: (text: string) => void;
 }) {
     const t = useTranslations("chat");
+    const { viewerId } = useChat();
     // Before the early return, which is where a hook has to be: the same
     // question the roster asks, answered by the same hook so the two panels can
     // never disagree about whether there is room for a column.
     const wide = useWideScreen();
+    const { profile, loading } = useChatProfile(channel.id, open ? (person?.id ?? null) : null);
     /** Whose nickname is being changed, and anything the menu was refused. Both
      *  held out here rather than in the menu: the menu is unmounted the moment an
      *  item is chosen, and a dialog opened by something about to disappear never
      *  appears. */
     const [naming, setNaming] = useState<MenuPerson | null>(null);
     const [error, setError] = useState("");
+    /** The larger view, opened from the button at the bottom. */
+    const [expanded, setExpanded] = useState(false);
     if (!person || !open) return null;
 
-    const menu = (
-        <PersonMenu
-            person={person}
-            channel={channel}
-            onMention={onMention}
-            onNickname={setNaming}
-            onError={setError}
-        />
-    );
-
-    const nickname = (
-        <NicknameDialog
-            open={naming !== null}
-            person={naming ? { id: naming.userId, name: naming.name } : null}
-            onOpenChange={(next) => !next && setNaming(null)}
-            onSaved={() => setNaming(null)}
-        />
+    const bannerActions = (
+        <>
+            <AddFriend person={person} standing={profile?.friendship} onError={setError} />
+            <PersonMenu
+                person={person}
+                channel={channel}
+                onMention={onMention}
+                onNickname={setNaming}
+                onError={setError}
+            />
+            {/* The dialog brings its own close; the column needs one. */}
+            {wide ? (
+                <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={ON_BANNER}
+                    onClick={() => onOpenChange(false)}
+                    aria-label={t("directProfile.closeTheProfile")}
+                    title={t("directProfile.close")}
+                >
+                    <X className="size-4" />
+                </Button>
+            ) : (
+                // Room for the dialog's own close, which sits in this corner.
+                <span aria-hidden className="w-7" />
+            )}
+        </>
     );
 
     const refusal = error ? (
@@ -187,22 +272,59 @@ export function DirectProfile({
         </p>
     ) : null;
 
+    const details = (
+        <ProfileDetails
+            person={person}
+            profile={profile}
+            loading={loading}
+            bannerActions={bannerActions}
+            footer={
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setExpanded(true)}
+                >
+                    {t("personCard.viewFullProfile")}
+                </Button>
+            }
+        />
+    );
+
+    const extras = (
+        <>
+            <NicknameDialog
+                open={naming !== null}
+                person={naming ? { id: naming.userId, name: naming.name } : null}
+                onOpenChange={(next) => !next && setNaming(null)}
+                onSaved={() => setNaming(null)}
+            />
+            {expanded ? (
+                <PersonProfileDialog
+                    person={person}
+                    channelId={channel.id}
+                    viewerId={viewerId}
+                    onMention={onMention}
+                    onNickname={setNaming}
+                    onClose={() => setExpanded(false)}
+                />
+            ) : null}
+        </>
+    );
+
     if (!wide) {
         return (
             <Dialog open onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-xs">
-                    <DialogHeader>
-                        {/* Room left on the right for the dialog's own close,
-                            which sits in the corner this would otherwise be in. */}
-                        <DialogTitle className="flex items-center justify-between gap-2 pr-6">
-                            {t("directProfile.profile")}
-                            {menu}
-                        </DialogTitle>
-                    </DialogHeader>
-                    <Body person={person} channelId={channel.id} />
+                <DialogContent
+                    aria-describedby={undefined}
+                    className="max-w-xs overflow-hidden p-0"
+                >
+                    {/* Named for a screen reader; the band is the visible top. */}
+                    <DialogTitle className="sr-only">{profile?.name || person.name}</DialogTitle>
+                    {details}
                     {refusal}
                 </DialogContent>
-                {nickname}
+                {extras}
             </Dialog>
         );
     }
@@ -217,28 +339,11 @@ export function DirectProfile({
             label={t("directProfile.profileWidth")}
             className="border-l border-border"
         >
-            <div className="flex items-center justify-between gap-1 border-b border-border px-3 py-2">
-                <p className="text-xs font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                    {t("directProfile.profile")}
-                </p>
-                <span className="flex items-center gap-0.5">
-                    {menu}
-                    <button
-                        type="button"
-                        onClick={() => onOpenChange(false)}
-                        aria-label={t("directProfile.closeTheProfile")}
-                        title={t("directProfile.close")}
-                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                        <X className="size-3.5" />
-                    </button>
-                </span>
-            </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                <Body person={person} channelId={channel.id} />
                 {refusal}
+                {details}
             </div>
-            {nickname}
+            {extras}
         </SidePane>
     );
 }

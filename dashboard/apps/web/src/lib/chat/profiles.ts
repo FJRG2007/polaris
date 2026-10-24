@@ -82,6 +82,14 @@ export interface ChatProfile {
      * nothing they wrote or share with anybody.
      */
     readonly restricted: boolean;
+    /** When the account was made, ISO. Empty outside the profile audience. */
+    readonly memberSince: string;
+    /**
+     * Where the reader stands with them, which decides whether the panel offers
+     * a friend request: `self` and `friends` offer none, `pending` says one is
+     * already waiting (in either direction), `none` offers one.
+     */
+    readonly friendship: "self" | "friends" | "pending" | "none";
 }
 
 /** What somebody can be in a place, beyond being in it. */
@@ -131,7 +139,8 @@ export async function chatProfile(
                 username: true,
                 description: true,
                 headline: true,
-                pronouns: true
+                pronouns: true,
+                createdAt: true
             }
         }),
         // Asked the same way about them, rather than by looking for a membership
@@ -152,9 +161,10 @@ export async function chatProfile(
     // Asked after the reach above rather than beside it: there is no point
     // working out what two people have in common before it is settled that this
     // one may be shown the other at all.
-    const [mutual, role] = await Promise.all([
+    const [mutual, role, friendship] = await Promise.all([
         self || !mayReadProfile ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
-        roleIn(together, person.id)
+        roleIn(together, person.id),
+        self ? ("self" as const) : standing(actor.id, person.id)
     ]);
 
     // Outside the profile audience: what the roster beside this conversation
@@ -169,7 +179,9 @@ export async function chatProfile(
             pronouns: "",
             mutual,
             role,
-            restricted: true
+            restricted: true,
+            memberSince: "",
+            friendship
         };
     }
 
@@ -184,7 +196,9 @@ export async function chatProfile(
         pronouns: person.pronouns?.trim() ?? "",
         mutual,
         role,
-        restricted: false
+        restricted: false,
+        memberSince: person.createdAt.toISOString(),
+        friendship
     };
 }
 
@@ -209,4 +223,27 @@ async function roleIn(
     ]);
     if (space?.ownerId === userId) return "owner";
     return membership?.role === "admin" ? "admin" : null;
+}
+
+/**
+ * Whether two people are friends, have a request waiting between them in either
+ * direction, or neither. One row at most answers it - a friendship is one row
+ * naming both people.
+ */
+async function standing(
+    viewerId: string,
+    personId: string
+): Promise<"friends" | "pending" | "none"> {
+    const row = await prisma.friendship.findFirst({
+        where: {
+            status: { in: ["accepted", "pending"] },
+            OR: [
+                { requesterId: viewerId, addresseeId: personId },
+                { requesterId: personId, addresseeId: viewerId }
+            ]
+        },
+        select: { status: true }
+    });
+    if (!row) return "none";
+    return row.status === "accepted" ? "friends" : "pending";
 }

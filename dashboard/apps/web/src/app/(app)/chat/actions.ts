@@ -1161,6 +1161,30 @@ export async function openDirectAction(input: unknown): Promise<{ id?: string; e
     return result.error ? { error: result.error } : { id: result.value };
 }
 
+/**
+ * Add people to a one-to-one conversation: a new group of the two of you and
+ * them, or the one that already holds exactly those people. The conversation it
+ * was asked from is left as it was. Answers the group to open.
+ */
+export async function groupFromDirectAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatGroupFromDirectSchema.safeParse(input);
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.pickFirst")
+        };
+
+    const result = await guard(() =>
+        chat.groupFromDirect(me, parsed.data.channelId, parsed.data.userIds)
+    );
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result.error ? { error: result.error } : { id: result.value };
+}
+
 export async function addSpaceMembersAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatMembersSchema.safeParse(input);

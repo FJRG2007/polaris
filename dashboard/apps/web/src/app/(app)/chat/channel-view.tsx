@@ -236,6 +236,9 @@ export function ChannelView({
     const [error, setError] = useState("");
     const [thread, setThread] = useState<ChatMessageView | null>(null);
     const [searching, setSearching] = useState(false);
+    /** What the header's search box sent, and a count so the same words typed
+     *  twice still open a fresh search. */
+    const [searchSeed, setSearchSeed] = useState({ term: "", token: 0 });
     const members = useMembersPanel();
     const [highlight, setHighlight] = useState<string | null>(null);
     // The same, for a message a link led to that turned out to be a reply: it is
@@ -2361,7 +2364,17 @@ export function ChannelView({
                     onChanged={refresh}
                     call={live}
                     onStartCall={startCall}
-                    onSearch={() => setSearching((current) => !current)}
+                    // Words typed into the header's box open the search with
+                    // them in it; the bare icon (a phone's) is a switch.
+                    onSearch={(term) => {
+                        if (!term) {
+                            setSearchSeed((current) => ({ term: "", token: current.token }));
+                            setSearching((current) => !current);
+                            return;
+                        }
+                        setSearchSeed((current) => ({ term, token: current.token + 1 }));
+                        setSearching(true);
+                    }}
                     onPins={() => setPinsOpen(true)}
                     // In a conversation with a roster this opens it; in a
                     // one-to-one it opens the other person, which is what the
@@ -2369,6 +2382,7 @@ export function ChannelView({
                     // room: the call already shows who is in it, and the chat
                     // beside it is too narrow to share with a roster.
                     onMembers={voiceRoom ? undefined : members.toggle}
+                    membersOpen={members.open && !thread && !searching}
                 />
 
                 <PinnedBar pins={pins.pins} onJump={jumpHere} onShowAll={() => setPinsOpen(true)} />
@@ -2587,8 +2601,10 @@ export function ChannelView({
 
             {searching && !thread && (
                 <SearchPanel
+                    key={searchSeed.token}
                     channelId={channelId}
                     channelName={channel.name}
+                    initialTerm={searchSeed.term}
                     onClose={() => setSearching(false)}
                     onOpen={(hit) => {
                         // A hit in another conversation is a navigation; one in

@@ -107,13 +107,21 @@ export async function mutualSpaces(
         OR: [{ ownerId: userId }, { members: { some: { userId } } }]
     });
 
-    const shared = await prisma.chatSpace.findMany({
-        where: { AND: [inBoth(viewerId), inBoth(personId)] },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, color: true }
-    });
+    // Only the page a screen draws, and the count beside it: two people in
+    // hundreds of the same spaces are not shipped hundreds of rows to draw
+    // twelve.
+    const where = { AND: [inBoth(viewerId), inBoth(personId)] };
+    const [shared, total] = await Promise.all([
+        prisma.chatSpace.findMany({
+            where,
+            orderBy: { name: "asc" },
+            take: MOST_MUTUAL,
+            select: { id: true, name: true, color: true }
+        }),
+        prisma.chatSpace.count({ where })
+    ]);
 
-    return { spaces: shared.slice(0, MOST_MUTUAL), total: shared.length };
+    return { spaces: shared, total };
 }
 
 /** Both answers at once, which is how both screens ask for them. */

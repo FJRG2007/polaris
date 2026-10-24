@@ -735,6 +735,21 @@ export const chatMembersSchema = z.object({
 export type ChatMembersInput = z.infer<typeof chatMembersSchema>;
 
 /**
+ * People added to a one-to-one conversation, which makes a new group of the two
+ * of them and these rather than growing the conversation itself. Two seats of
+ * the group are the pair already talking.
+ */
+export const chatGroupFromDirectSchema = z.object({
+    channelId: z.string().uuid(),
+    userIds: z
+        .array(z.string().uuid())
+        .min(1, "Pick somebody")
+        .max(MAX_GROUP_MEMBERS - 2)
+});
+
+export type ChatGroupFromDirectInput = z.infer<typeof chatGroupFromDirectSchema>;
+
+/**
  * Looking for something somebody said.
  *
  * Every field narrows and none of them widens: the reader's own reachable

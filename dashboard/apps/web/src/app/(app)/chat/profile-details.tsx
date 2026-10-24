@@ -20,12 +20,15 @@
  */
 
 import Link from "next/link";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import { AtSign, Lock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { AtSign, ChevronRight, Lock } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { Badge, cn, Skeleton } from "@polaris/ui";
 import { PersonName } from "@/components/person-name";
+import { ProfileLink } from "@/components/profile-link";
+import { useRouter } from "next/navigation";
+import { useChat } from "./chat-context";
 import type { ChatProfile } from "@/lib/chat/profiles";
 import { MutualPanel } from "@/components/mutual-panel";
 import { usePresence } from "@/components/presence-store";
@@ -89,7 +92,9 @@ export function ProfileDetails({
     size = "panel",
     role,
     actions,
-    onAvatar
+    onAvatar,
+    bannerActions,
+    footer
 }: {
     person: ProfilePerson;
     profile: ChatProfile | null;
@@ -104,18 +109,32 @@ export function ProfileDetails({
      *  Discord, rather than a button of its own. Without it the face opens
      *  their picture. */
     onAvatar?: () => void;
+    /** Buttons laid over the band's top right corner, Discord's place for them. */
+    bannerActions?: ReactNode;
+    /** What closes the profile off at the bottom - the column's way to the
+     *  larger view. */
+    footer?: ReactNode;
 }) {
     const t = useTranslations("chat");
     const where = usePresence(person.id);
     const name = profile?.name || person.name;
     const full = size === "full";
+    const panel = size === "panel";
+    const locale = useLocale();
 
     return (
         <div className="flex flex-col">
-            <ProfileBanner
-                person={{ id: person.id, name }}
-                className={cn("shrink-0", full ? "h-28" : "h-16")}
-            />
+            <div className="relative shrink-0">
+                <ProfileBanner
+                    person={{ id: person.id, name }}
+                    className={cn("shrink-0", full ? "h-28" : panel ? "h-24" : "h-16")}
+                />
+                {bannerActions ? (
+                    <div className="absolute right-2 top-2 flex items-center gap-1">
+                        {bannerActions}
+                    </div>
+                ) : null}
+            </div>
 
             <div className={cn("flex flex-col gap-3 pb-4", full ? "px-5" : "px-4")}>
                 {/* Cut out of the band's lower edge, on the left, where a profile
@@ -225,7 +244,10 @@ export function ProfileDetails({
                     profile page draws it from. Not on the card: a glance is the
                     name, the face and what they said, and this is the part of a
                     profile somebody reads when they have sat down with it. */}
-                {size !== "card" && profile?.mutual && !profile.restricted ? (
+                {panel && profile?.mutual && !profile.restricted ? (
+                    <MutualSections mutual={profile.mutual} />
+                ) : null}
+                {full && profile?.mutual && !profile.restricted ? (
                     <div className="w-full text-left">
                         <MutualPanel
                             compact={!full}
@@ -240,19 +262,41 @@ export function ProfileDetails({
                         <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                             {t("profileDetails.about")}
                         </p>
-                        <p
-                            className={cn(
-                                "mt-1 whitespace-pre-wrap break-words text-muted-foreground",
-                                full ? "text-sm" : "text-xs",
-                                // A card is a glance; the whole of it is one press
-                                // away in the larger view.
-                                size === "card" && "line-clamp-4"
-                            )}
-                        >
-                            {profile.description}
-                        </p>
+                        {panel ? (
+                            <ClampedBio text={profile.description} />
+                        ) : (
+                            <p
+                                className={cn(
+                                    "mt-1 whitespace-pre-wrap break-words text-muted-foreground",
+                                    full ? "text-sm" : "text-xs",
+                                    // A card is a glance; the whole of it is one
+                                    // press away in the larger view.
+                                    size === "card" && "line-clamp-4"
+                                )}
+                            >
+                                {profile.description}
+                            </p>
+                        )}
                     </div>
                 )}
+
+                {size !== "card" && profile?.memberSince ? (
+                    <div className="w-full text-left">
+                        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                            {t("profileDetails.memberSince")}
+                        </p>
+                        <p
+                            className={cn(
+                                "mt-1 text-muted-foreground",
+                                full ? "text-sm" : "text-xs"
+                            )}
+                        >
+                            {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
+                                new Date(profile.memberSince)
+                            )}
+                        </p>
+                    </div>
+                ) : null}
 
                 {profile?.restricted ? (
                     <p className="flex w-full items-center gap-1.5 text-left text-xs text-muted-foreground">
@@ -260,7 +304,182 @@ export function ProfileDetails({
                         {t("profileDetails.restricted")}
                     </p>
                 ) : null}
+
+                {footer}
             </div>
+        </div>
+    );
+}
+
+/** How many lines of a bio the column shows before offering the rest. */
+const BIO_LINES = 6;
+
+/**
+ * What they wrote, cut to a few lines in the column, with the way to the rest
+ * only when something was actually cut. Measured after drawing rather than
+ * guessed from a character count: a short bio of long lines and a long one of
+ * short lines wrap nothing alike.
+ */
+export function ClampedBio({ text }: { text: string }) {
+    const t = useTranslations("chat");
+    const box = useRef<HTMLParagraphElement>(null);
+    const [whole, setWhole] = useState(false);
+    const [cut, setCut] = useState(false);
+
+    useLayoutEffect(() => {
+        const element = box.current;
+        if (!element || whole) return;
+        setCut(element.scrollHeight > element.clientHeight + 1);
+    }, [text, whole]);
+
+    return (
+        <>
+            <p
+                ref={box}
+                className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground"
+                style={
+                    whole
+                        ? undefined
+                        : {
+                              display: "-webkit-box",
+                              WebkitBoxOrient: "vertical",
+                              WebkitLineClamp: BIO_LINES,
+                              overflow: "hidden"
+                          }
+                }
+            >
+                {text}
+            </p>
+            {cut || whole ? (
+                <button
+                    type="button"
+                    onClick={() => setWhole((current) => !current)}
+                    className="mt-1 text-xs font-medium text-primary hover:underline"
+                >
+                    {whole ? t("profileDetails.showLess") : t("profileDetails.viewFullBio")}
+                </button>
+            ) : null}
+        </>
+    );
+}
+
+/** The two halves of what you have in common, as the column draws them. */
+type Shared = ChatProfile["mutual"];
+
+/**
+ * Discord's two rows under a profile: "3 mutual friends", "2 mutual servers",
+ * each a count that opens into the list. Collapsed to begin with - the count is
+ * the fact; the names are for whoever asks. Each person goes to their page and
+ * each space opens in the chat. Nothing is drawn for a half with nobody in it.
+ */
+export function MutualSections({ mutual }: { mutual: Shared }) {
+    const t = useTranslations("chat");
+    const router = useRouter();
+    const { channels, setActiveSpaceId } = useChat();
+    if (mutual.friends.total === 0 && mutual.spaces.total === 0) return null;
+
+    /** A space opens where its first channel is, the way picking it on the
+     *  rail does. */
+    const openSpace = (spaceId: string) => {
+        setActiveSpaceId(spaceId);
+        const first = channels.find(
+            (channel) =>
+                channel.spaceId === spaceId && !channel.archived && channel.kind !== "voice"
+        );
+        router.push(first ? `/chat/c/${first.id}` : "/chat");
+    };
+
+    return (
+        <div className="flex w-full flex-col gap-1 border-t border-border pt-3">
+            {mutual.friends.total > 0 ? (
+                <Section
+                    label={t("profileDetails.mutualFriends", { count: mutual.friends.total })}
+                    more={mutual.friends.total - mutual.friends.people.length}
+                >
+                    {mutual.friends.people.map((person) => (
+                        <li key={person.id}>
+                            <ProfileLink
+                                href={`/u/${person.username}`}
+                                className="flex min-w-0 items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors hover:bg-muted"
+                            >
+                                <Avatar person={person} size={20} />
+                                <span className="min-w-0 flex-1 truncate" title={person.name}>
+                                    <PersonName id={person.id} name={person.name} />
+                                </span>
+                            </ProfileLink>
+                        </li>
+                    ))}
+                </Section>
+            ) : null}
+            {mutual.spaces.total > 0 ? (
+                <Section
+                    label={t("profileDetails.mutualServers", { count: mutual.spaces.total })}
+                    more={mutual.spaces.total - mutual.spaces.spaces.length}
+                >
+                    {mutual.spaces.spaces.map((space) => (
+                        <li key={space.id}>
+                            <button
+                                type="button"
+                                onClick={() => openSpace(space.id)}
+                                className="flex w-full min-w-0 items-center gap-2 rounded px-1.5 py-1 text-left text-sm transition-colors hover:bg-muted"
+                            >
+                                <span
+                                    aria-hidden
+                                    className="size-2 shrink-0 rounded-full"
+                                    style={{ background: space.color }}
+                                />
+                                <span className="min-w-0 flex-1 truncate" title={space.name}>
+                                    {space.name}
+                                </span>
+                            </button>
+                        </li>
+                    ))}
+                </Section>
+            ) : null}
+        </div>
+    );
+}
+
+/** One collapsible count and the list under it. */
+function Section({
+    label,
+    more,
+    children
+}: {
+    label: string;
+    /** How many the list leaves out, said under it when it is any. */
+    more: number;
+    children: ReactNode;
+}) {
+    const t = useTranslations("chat");
+    const [open, setOpen] = useState(false);
+    return (
+        <div className="flex flex-col">
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen((current) => !current)}
+                className="flex min-w-0 items-center justify-between gap-2 rounded px-1.5 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            >
+                <span className="min-w-0 truncate">{label}</span>
+                <ChevronRight
+                    aria-hidden
+                    className={cn(
+                        "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                        open && "rotate-90"
+                    )}
+                />
+            </button>
+            {open ? (
+                <>
+                    <ul className="flex flex-col gap-0.5 pb-1">{children}</ul>
+                    {more > 0 ? (
+                        <p className="px-1.5 pb-1 text-xs text-muted-foreground">
+                            {t("profileDetails.andMore", { count: more })}
+                        </p>
+                    ) : null}
+                </>
+            ) : null}
         </div>
     );
 }

@@ -73,6 +73,7 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Input,
+    cn,
     isDirty
 } from "@polaris/ui";
 
@@ -92,7 +93,8 @@ export function ChannelHeader({
     onStartCall,
     onSearch,
     onPins,
-    onMembers
+    onMembers,
+    membersOpen = false
 }: {
     channel: ChatChannelView;
     /** Who is reading, which decides one thing here: a group's owner is the only
@@ -108,12 +110,14 @@ export function ChannelHeader({
     onStartCall: (withVideo: boolean) => void;
     /** Absent where there is nothing to search - a voice room holds no
      *  messages, and a button that does nothing is worse than no button. */
-    onSearch?: () => void;
+    onSearch?: (term: string) => void;
     /** Open the list of every message pinned here - Discord's pin button. */
     onPins?: () => void;
     /** Show or hide who is in here. Absent in a one-to-one conversation, where
      *  the roster is the two people already named at the top. */
     onMembers?: () => void;
+    /** Whether that panel is showing, so its button reads as a switch. */
+    membersOpen?: boolean;
 }) {
     const t = useTranslations("chat");
     const router = useRouter();
@@ -135,6 +139,30 @@ export function ChannelHeader({
     // somebody unless its owner closed that. What none of them can do is turn
     // anybody else out.
     const group = channel.kind === "group";
+    const direct = channel.kind === "dm";
+    // The two call buttons, which only exist when a call can be started here
+    // and none is running.
+    const startable = mayCall && !callsOff && !call;
+
+    /**
+     * Whether "add people" is offered here, and why it is refused if it is.
+     *
+     * A channel or a group offers it to whoever may add to it. A one-to-one
+     * conversation offers it to anybody in it - it makes a new group, see
+     * `AddPeopleDialog` - and draws it refused, with the reason, to somebody
+     * who may not start groups or where the conversation cannot go on.
+     */
+    const adder: { reason: string | null } | null = channel.mayInvite
+        ? { reason: null }
+        : direct && channel.others.length === 1
+          ? {
+                reason: !may.groups
+                    ? t("channelHeader.groupsNotAllowed")
+                    : channel.blocked
+                      ? t("channelHeader.cannotReachThem")
+                      : null
+            }
+          : null;
 
     useEffect(() => {
         if (renaming) setName(channel.name);
@@ -240,55 +268,11 @@ export function ChannelHeader({
                     </>
                 )}
 
-                <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                    {onMembers && (
-                        <button
-                            type="button"
-                            onClick={onMembers}
-                            // A conversation between two people has no roster:
-                            // the panel is the other person, and the control
-                            // says so rather than offering to list two names.
-                            aria-label={
-                                channel.kind === "dm"
-                                    ? t("channelHeader.profile")
-                                    : t("channelHeader.whoIsInHere")
-                            }
-                            title={
-                                channel.kind === "dm"
-                                    ? t("channelHeader.profile")
-                                    : t("channelHeader.whoIsInHere")
-                            }
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            {channel.kind === "dm" ? (
-                                <UserRound className="size-4" />
-                            ) : (
-                                <Users className="size-4" />
-                            )}
-                        </button>
-                    )}
-                    {onSearch && (
-                        <button
-                            type="button"
-                            onClick={onSearch}
-                            aria-label={t("channelHeader.searchMessages")}
-                            title={t("channelHeader.searchMessages")}
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            <Search className="size-4" />
-                        </button>
-                    )}
-                    {onPins && (
-                        <button
-                            type="button"
-                            onClick={onPins}
-                            aria-label={t("channelHeader.pinnedMessages")}
-                            title={t("channelHeader.pinnedMessages")}
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            <Pin className="size-4" />
-                        </button>
-                    )}
+                <div className="ml-auto flex min-w-0 shrink-0 items-center gap-0.5">
+                    {/* Discord's row, in Discord's order: the call, what is
+                        pinned, more people, and who this is. Below `sm` all of
+                        it moves into the three dots, where the same items wait
+                        - see the end of that menu. */}
                     {/* An account that may not be in calls is not shown the way
                         in, and is not told a call is running either: it is a room
                         it cannot enter. */}
@@ -303,7 +287,7 @@ export function ChannelHeader({
                             disabled
                             aria-label={t("channelHeader.callsAreUnavailable")}
                             title={callsOff}
-                            className="cursor-not-allowed rounded p-1.5 text-foreground-subtle"
+                            className="hidden cursor-not-allowed rounded p-1.5 text-foreground-subtle sm:block"
                         >
                             <PhoneOff className="size-4" />
                         </button>
@@ -318,6 +302,8 @@ export function ChannelHeader({
                         // open the camera anyway - so joining a conversation to
                         // hear what was being said put your face on everybody's
                         // screen without a single press that said so.
+                        //
+                        // Kept on a phone too: it is news, not furniture.
                         <button
                             type="button"
                             onClick={() => onStartCall(false)}
@@ -330,36 +316,58 @@ export function ChannelHeader({
                         </button>
                     ) : (
                         <>
-                            <button
-                                type="button"
+                            <HeaderButton
+                                label={t("channelHeader.startACall")}
                                 onClick={() => onStartCall(false)}
-                                aria-label={t("channelHeader.startACall")}
-                                title={t("channelHeader.startACall")}
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Phone className="size-4" />
-                            </button>
-                            <button
-                                type="button"
+                            </HeaderButton>
+                            <HeaderButton
+                                label={t("channelHeader.startAVideoCall")}
                                 onClick={() => onStartCall(true)}
-                                aria-label={t("channelHeader.startAVideoCall")}
-                                title={t("channelHeader.startAVideoCall")}
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Video className="size-4" />
-                            </button>
+                            </HeaderButton>
                         </>
                     )}
-                    {channel.mayInvite && (
-                        <button
-                            type="button"
-                            aria-label={t("channelHeader.addPeople")}
-                            title={t("channelHeader.addPeople")}
+                    {onPins && (
+                        <HeaderButton label={t("channelHeader.pinnedMessages")} onClick={onPins}>
+                            <Pin className="size-4" />
+                        </HeaderButton>
+                    )}
+                    {adder && (
+                        <HeaderButton
+                            label={t("channelHeader.addPeople")}
+                            reason={adder.reason}
                             onClick={() => setAdding(true)}
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <UserPlus className="size-4" />
-                        </button>
+                        </HeaderButton>
+                    )}
+                    {onMembers && (
+                        // A conversation between two people has no roster: the
+                        // panel is the other person, and the control says so
+                        // rather than offering to list two names.
+                        <HeaderButton
+                            label={
+                                direct ? t("channelHeader.profile") : t("channelHeader.whoIsInHere")
+                            }
+                            pressed={membersOpen}
+                            onClick={onMembers}
+                        >
+                            {direct ? (
+                                <UserRound className="size-4" />
+                            ) : (
+                                <Users className="size-4" />
+                            )}
+                        </HeaderButton>
+                    )}
+                    {onSearch && (
+                        <HeaderSearch
+                            placeholder={t("channelHeader.searchIn", { name: channel.name })}
+                            label={t("channelHeader.searchMessages")}
+                            onSearch={onSearch}
+                        />
                     )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -498,6 +506,65 @@ export function ChannelHeader({
                                     </DropdownMenuItem>
                                 </>
                             )}
+                            {/* The row above, on a phone, where it does not fit
+                                beside the name. Hidden at `sm` and up, where
+                                every one of these is a button of its own. */}
+                            {(startable || onPins || adder || onMembers) && (
+                                <DropdownMenuSeparator className="sm:hidden" />
+                            )}
+                            {startable && (
+                                <>
+                                    <DropdownMenuItem
+                                        className="sm:hidden"
+                                        onSelect={() => onStartCall(false)}
+                                    >
+                                        <Phone className="size-3.5" />
+                                        {t("channelHeader.startACall")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="sm:hidden"
+                                        onSelect={() => onStartCall(true)}
+                                    >
+                                        <Video className="size-3.5" />
+                                        {t("channelHeader.startAVideoCall")}
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            {mayCall && callsOff && (
+                                <DropdownMenuItem className="sm:hidden" disabled title={callsOff}>
+                                    <PhoneOff className="size-3.5" />
+                                    {t("channelHeader.callsAreUnavailable")}
+                                </DropdownMenuItem>
+                            )}
+                            {onPins && (
+                                <DropdownMenuItem className="sm:hidden" onSelect={onPins}>
+                                    <Pin className="size-3.5" />
+                                    {t("channelHeader.pinnedMessages")}
+                                </DropdownMenuItem>
+                            )}
+                            {adder && (
+                                <DropdownMenuItem
+                                    className="sm:hidden"
+                                    disabled={adder.reason !== null}
+                                    title={adder.reason ?? undefined}
+                                    onSelect={() => setAdding(true)}
+                                >
+                                    <UserPlus className="size-3.5" />
+                                    {t("channelHeader.addPeople")}
+                                </DropdownMenuItem>
+                            )}
+                            {onMembers && (
+                                <DropdownMenuItem className="sm:hidden" onSelect={onMembers}>
+                                    {direct ? (
+                                        <UserRound className="size-3.5" />
+                                    ) : (
+                                        <Users className="size-3.5" />
+                                    )}
+                                    {direct
+                                        ? t("channelHeader.profile")
+                                        : t("channelHeader.whoIsInHere")}
+                                </DropdownMenuItem>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -633,6 +700,102 @@ export function ChannelHeader({
                     router.push("/chat");
                 }}
             />
+        </>
+    );
+}
+
+/**
+ * One icon in the header's row.
+ *
+ * Hidden below `sm`, where the row moves into the three dots. `reason` draws it
+ * refused, with the reason on hover, rather than taking it away: a button that
+ * disappears leaves nobody anywhere to read why.
+ */
+function HeaderButton({
+    label,
+    onClick,
+    reason = null,
+    pressed,
+    children
+}: {
+    label: string;
+    onClick: () => void;
+    reason?: string | null;
+    pressed?: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={reason !== null}
+            aria-label={label}
+            aria-pressed={pressed}
+            title={reason ?? label}
+            className={cn(
+                "hidden rounded p-1.5 transition-colors sm:block",
+                reason !== null
+                    ? "cursor-not-allowed text-foreground-subtle"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                pressed && "bg-muted text-foreground"
+            )}
+        >
+            {children}
+        </button>
+    );
+}
+
+/**
+ * Discord's search box in the header: typed into where it is, and Enter opens
+ * the search beside the conversation with what was typed already in it.
+ *
+ * A box from `md` up and an icon below, where a box would push the name off a
+ * narrow bar. The icon opens the same panel empty.
+ */
+function HeaderSearch({
+    placeholder,
+    label,
+    onSearch
+}: {
+    placeholder: string;
+    label: string;
+    onSearch: (term: string) => void;
+}) {
+    const [term, setTerm] = useState("");
+    return (
+        <>
+            <form
+                role="search"
+                className="relative ml-1 hidden w-40 min-w-0 md:block lg:w-48"
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    onSearch(term.trim());
+                    setTerm("");
+                }}
+            >
+                <input
+                    type="search"
+                    value={term}
+                    aria-label={label}
+                    placeholder={placeholder}
+                    title={placeholder}
+                    onChange={(event) => setTerm(event.target.value)}
+                    className="h-7 w-full min-w-0 truncate rounded-md border border-border bg-muted/40 pl-2 pr-7 text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <Search
+                    aria-hidden
+                    className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
+                />
+            </form>
+            <button
+                type="button"
+                onClick={() => onSearch("")}
+                aria-label={label}
+                title={label}
+                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+            >
+                <Search className="size-4" />
+            </button>
         </>
     );
 }
