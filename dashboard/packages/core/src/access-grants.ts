@@ -49,7 +49,7 @@
  */
 
 import { z } from "zod";
-import { addressRuleFields } from "./schemas/link-rules.js";
+import { addressRuleFields, linkPeopleFields } from "./schemas/link-rules.js";
 import {
     EVERY_DAY,
     MINUTES_IN_DAY,
@@ -722,7 +722,11 @@ export const grantLinkSchema = withGrantRules(
         // still means that.
         audience: z.enum(["restricted", "org", "anyone"]).default("anyone"),
         /** Asked before it opens anything. Stored stretched, never in the clear. */
-        password: z.string().min(1).max(256).optional()
+        password: z.string().min(1).max(256).optional(),
+        /** Only somebody signed in to an account here may open it. */
+        requireLogin: linkPeopleFields.requireLogin,
+        /** Only these accounts may open it; naming any implies sign-in. */
+        allowedUsers: linkPeopleFields.allowedUsers
     })
 );
 
