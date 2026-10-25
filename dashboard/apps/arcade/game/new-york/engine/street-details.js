@@ -189,7 +189,6 @@ function buildStreetDetails(scene) {
   const pedPostMatrices = [];
   const cobraLampSites = [];
   const streetPointSites = [];
-  const placedPoles = [];
 
   const plazaRects = pavedPlazaRects || [];
   const inPlaza = (x, z, m = 1.0) =>
@@ -214,12 +213,32 @@ function buildStreetDetails(scene) {
     return !(b.park > 0.6) && !inPlaza(x, z, 1.0);
   };
 
+  // Poles are bucketed in POLE_CELL-metre cells: every clearance asked for is shorter than a cell, so the 3 x 3 cells
+  // around a point hold every pole that can be too close (a scan of all of them made this phase quadratic)
+  const POLE_CELL = 8;
+  const poleCells = new Map();
+  const poleCellKey = (cx, cz) => cx * 65536 + cz;
+  const addPole = (x, z) => {
+    const pole = { x, z };
+    const key = poleCellKey(Math.floor(x / POLE_CELL), Math.floor(z / POLE_CELL));
+    const cell = poleCells.get(key);
+    if (cell) cell.push(pole);
+    else poleCells.set(key, [pole]);
+  };
   const isClearOfPoles = (x, z, minDist = 6.0) => {
     const md2 = minDist * minDist;
-    for (let i = 0; i < placedPoles.length; i++) {
-      const dx = placedPoles[i].x - x;
-      const dz = placedPoles[i].z - z;
-      if (dx * dx + dz * dz < md2) return false;
+    const cx = Math.floor(x / POLE_CELL);
+    const cz = Math.floor(z / POLE_CELL);
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const cell = poleCells.get(poleCellKey(cx + i, cz + j));
+        if (!cell) continue;
+        for (const pole of cell) {
+          const dx = pole.x - x;
+          const dz = pole.z - z;
+          if (dx * dx + dz * dz < md2) return false;
+        }
+      }
     }
     return true;
   };
@@ -253,7 +272,7 @@ function buildStreetDetails(scene) {
         }
         // Ensure the cantilevered mast arm actually overhangs the avenue roadway
         if (blockAt(px + c.armDir * 3.1, pz) || !isClearOfPoles(px, pz, 6.0)) continue;
-        placedPoles.push({ x: px, z: pz });
+        addPole(px, pz);
         addFootprint(px, pz, 0.5, 0.5);
 
         // Vertical pole (6.4m tall)
@@ -372,7 +391,7 @@ function buildStreetDetails(scene) {
           ) {
             continue;
           }
-          placedPoles.push({ x: lx, z: lz });
+          addPole(lx, lz);
           addFootprint(lx, lz, 0.45, 0.45);
 
           // Tall ornamental streetlight pole
@@ -420,7 +439,7 @@ function buildStreetDetails(scene) {
           ) {
             continue;
           }
-          placedPoles.push({ x: px, z: pz });
+          addPole(px, pz);
           addFootprint(px, pz, 0.4, 0.4);
 
           dummy.position.set(px, 0.18, pz);
@@ -452,7 +471,7 @@ function buildStreetDetails(scene) {
           ) {
             continue;
           }
-          placedPoles.push({ x: px, z: pz });
+          addPole(px, pz);
           addFootprint(px, pz, 0.4, 0.4);
 
           dummy.position.set(px, 0.18, pz);
