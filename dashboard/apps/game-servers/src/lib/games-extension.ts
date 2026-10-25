@@ -218,6 +218,11 @@ export const gameServersExtension: AppExtension = {
         return { app: GAME_SERVERS_APP_ID, kind: GAME_SLOTS.server, props: { context } };
     },
 
+    // Its steps in the central automations engine: start, stop or restart a
+    // server and send a console line, as the run-as account, by the same
+    // standing the server pages read.
+    automationNodes: async () => (await import("./automation-nodes")).gameServerAutomationNodes(),
+
     // What a connected assistant may do with the servers: see them and who is
     // on them, and - on the scope that says so - start, stop, restart and use
     // the console, by the same standing the server pages read.

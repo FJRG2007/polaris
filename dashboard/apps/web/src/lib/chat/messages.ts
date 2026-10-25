@@ -602,6 +602,27 @@ export async function send(
             .then((links) => links.answerCommand(id, actor.id))
             .catch(() => undefined);
     }
+    // Automations listening for messages, each only if the account it runs as
+    // can read this channel. Loaded when it runs, like the relay above.
+    void Promise.all([import("@/lib/automations/app-events"), import("./access")])
+        .then(([events, access]) =>
+            events.emitAppEvent(
+                "chat.message",
+                {
+                    messageId: id,
+                    channelId: input.channelId,
+                    authorId: actor.id,
+                    body: input.body.slice(0, 4000),
+                    threadId: input.parentId ?? null
+                },
+                {
+                    key: id,
+                    mayReceive: async (runner) =>
+                        (await access.channelAccess(runner, input.channelId)) !== null
+                }
+            )
+        )
+        .catch(() => undefined);
 
     return id;
 }

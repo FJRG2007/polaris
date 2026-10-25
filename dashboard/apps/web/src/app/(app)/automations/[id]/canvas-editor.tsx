@@ -19,6 +19,10 @@ import {
     Send,
     Server,
     Workflow,
+    Gamepad2,
+    ListChecks,
+    MessagesSquare,
+    Rocket,
     LayoutGrid,
     Maximize,
     PanelRight,
@@ -39,6 +43,9 @@ import {
     Zap,
     ZoomIn,
     ZoomOut,
+    Mail,
+    HardDrive,
+    CalendarClock,
     type LucideIcon
 } from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
@@ -713,7 +720,7 @@ export function CanvasEditor({
             <Palette
                 open={palette}
                 stepsOnly={insertOn !== null}
-                apps={Object.keys(detail.appNodes ?? {})}
+                apps={[...Object.keys(detail.appNodes ?? {}), ...(detail.eventApps ?? [])]}
                 onOpenChange={(open) => {
                     setPalette(open);
                     if (!open) setInsertOn(null);
@@ -788,6 +795,13 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
     polaris: Server,
     automations: Workflow,
     places: House,
+    "game-servers": Gamepad2,
+    deploy: Rocket,
+    chat: MessagesSquare,
+    tasks: ListChecks,
+    mail: Mail,
+    drive: HardDrive,
+    calendar: CalendarClock,
     logic: GitBranch,
     timing: Hourglass,
     data: Database,
@@ -798,12 +812,17 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
 export function Palette({
     open,
     stepsOnly,
+    triggersOnly = false,
+    title,
     apps,
     onOpenChange,
     onPick
 }: {
     open: boolean;
     stepsOnly: boolean;
+    /** Only triggers: the list view's triggers, where a step has no place. */
+    triggersOnly?: boolean;
+    title?: string;
     apps: readonly string[];
     onOpenChange: (open: boolean) => void;
     onPick: (value: string) => void;
@@ -811,32 +830,34 @@ export function Palette({
     const t = useTranslations("automations");
     const groups = useMemo<AddGroup[]>(
         () =>
-            catalog.catalogGroups({ triggers: !stepsOnly, apps }).map((group) => {
-                const Icon = GROUP_ICONS[group.id];
-                return {
-                    id: group.id,
-                    label: t(`picker.groups.${group.id}`),
-                    icon: <Icon aria-hidden="true" />,
-                    items: group.items.map((item) => ({
-                        value: item.value,
-                        label: item.preset
-                            ? t(`picker.presets.${item.preset}`)
-                            : nodeTitle(t, item.type),
-                        description: item.preset
-                            ? t("picker.presetHint", {
-                                  name: catalog.EVENT_PRESETS[item.preset].name
-                              })
-                            : (nodeHint(t, item.type) ?? undefined),
-                        icon: <NodeIcon type={item.type} />
-                    }))
-                };
-            }),
-        [stepsOnly, apps.join(","), t]
+            catalog
+                .catalogGroups({ triggers: !stepsOnly, steps: !triggersOnly, apps })
+                .map((group) => {
+                    const Icon = GROUP_ICONS[group.id];
+                    return {
+                        id: group.id,
+                        label: t(`picker.groups.${group.id}`),
+                        icon: <Icon aria-hidden="true" />,
+                        items: group.items.map((item) => ({
+                            value: item.value,
+                            label: item.preset
+                                ? t(`picker.presets.${item.preset}`)
+                                : nodeTitle(t, item.type),
+                            description: item.preset
+                                ? t("picker.presetHint", {
+                                      name: catalog.EVENT_PRESETS[item.preset].name
+                                  })
+                                : (nodeHint(t, item.type) ?? undefined),
+                            icon: <NodeIcon type={item.type} />
+                        }))
+                    };
+                }),
+        [stepsOnly, triggersOnly, apps.join(","), t]
     );
     return (
         <AddBlockDialog
             open={open}
-            title={stepsOnly ? t("canvas.insertTitle") : t("canvas.paletteTitle")}
+            title={title ?? (stepsOnly ? t("canvas.insertTitle") : t("canvas.paletteTitle"))}
             strings={{
                 search: t("canvas.searchNodes"),
                 byTarget: t("picker.byTarget"),

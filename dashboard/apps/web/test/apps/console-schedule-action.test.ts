@@ -15,6 +15,11 @@ const INSTALL = "aaaaaaaa-1111-4111-8111-111111111111";
 const NOW = new Date("2026-10-11T12:00:00.000Z");
 const added: ConsoleSchedule[] = [];
 
+// Loaded through the repeat actions beside the schedule ones; never reached here.
+vi.mock("@polaris/db", () => ({ prisma: {} }));
+vi.mock("@polaris-app/game-servers/src/lib/games-operations", () => ({
+    runConsoleCommand: async () => "ok"
+}));
 vi.mock("@polaris/app-host", () => ({
     host: {
         auditService: { recordAudit: async () => undefined },
@@ -50,9 +55,8 @@ vi.mock("@polaris-app/game-servers/src/lib/console-run-service", () => ({
     runKeptCommand: async () => []
 }));
 
-const { scheduleKeptCommandAction } = await import(
-    "@polaris-app/game-servers/src/screens/installed/console-actions"
-);
+const { scheduleKeptCommandAction } =
+    await import("@polaris-app/game-servers/src/screens/installed/console-actions");
 
 beforeEach(() => {
     added.length = 0;

@@ -394,6 +394,14 @@
         "startVideo": "Start video",
         "stopSharing": "Stop sharing",
         "shareScreen": "Share screen",
+        "shareMenu": {
+            "label": "Your stream",
+            "stop": "Stop streaming",
+            "change": "Change stream",
+            "quality": "Stream quality",
+            "audio": "Share stream audio",
+            "noSound": "This share has no sound. Change stream and include its audio to send it."
+        },
         "undeafen": "Undeafen",
         "deafen": "Deafen",
         "aModeratorDeafenedYou": "A moderator deafened you",

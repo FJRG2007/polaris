@@ -159,6 +159,8 @@ import {
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { useShareAsked } from "./call-share-ask";
+import { ShareStreamItems } from "./share-stream-menu";
+import { sharePress } from "./call-share-menu";
 import { MeetingLinkLimits } from "./meeting-link-limits";
 
 /**
@@ -253,7 +255,7 @@ export function CallRoom({
     const muted = !call.micOn && call.audioRole !== "companion";
     const talkingMuted = useMutedSpeech(call.localStream?.getAudioTracks()[0] ?? null, muted);
     const micHint: ControlHintText | null = talkingMuted
-        ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
+        ? { text: t("callRoom.hints.talkingMuted"), tone: "speaking" }
         : null;
     // A deck key asked to share: the button is pointed at, and kept on the bar
     // even where it would fold into the menu - see `call-share-ask`.
@@ -1344,7 +1346,9 @@ export function CallRoom({
                                     : null
                             }
                             label={
-                                call.sharing ? t("callRoom.stopSharing") : t("callRoom.shareScreen")
+                                call.sharing
+                                    ? t("callRoom.shareMenu.label")
+                                    : t("callRoom.shareScreen")
                             }
                             icon={
                                 call.sharing ? (
@@ -1356,6 +1360,17 @@ export function CallRoom({
                             variant={call.sharing ? "primary" : "secondary"}
                             pressed={call.sharing}
                             onClick={call.toggleShare}
+                            // While a screen is going out the button opens
+                            // its menu instead: stop, change what is shared,
+                            // quality and sound.
+                            pressMenu={
+                                sharePress({
+                                    sharing: call.sharing,
+                                    canShare: screenShareable
+                                }) === "menu" ? (
+                                    <ShareStreamItems call={call} canShare={screenShareable} />
+                                ) : undefined
+                            }
                             // A screen is not a device to pick between: the browser's own
                             // picker does that, every time, and it is the only thing
                             // allowed to.
@@ -1398,16 +1413,24 @@ export function CallRoom({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" side="top" className="w-72">
-                                {narrow && !shareAsked && (screenShareable || call.sharing) && (
-                                    <DropdownMenuItem onSelect={call.toggleShare}>
-                                        {call.sharing ? (
-                                            <MonitorX className="size-4 shrink-0" />
-                                        ) : (
+                                {narrow && !shareAsked && call.sharing && (
+                                    <DropdownMenuSub>
+                                        <DropdownMenuSubTrigger>
                                             <MonitorUp className="size-4 shrink-0" />
-                                        )}
-                                        {call.sharing
-                                            ? t("callRoom.stopSharing")
-                                            : t("callRoom.shareScreen")}
+                                            {t("callRoom.shareMenu.label")}
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuSubContent className="w-64">
+                                            <ShareStreamItems
+                                                call={call}
+                                                canShare={screenShareable}
+                                            />
+                                        </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                )}
+                                {narrow && !shareAsked && screenShareable && !call.sharing && (
+                                    <DropdownMenuItem onSelect={call.toggleShare}>
+                                        <MonitorUp className="size-4 shrink-0" />
+                                        {t("callRoom.shareScreen")}
                                     </DropdownMenuItem>
                                 )}
                                 {narrow && (
@@ -1583,9 +1606,13 @@ function Split({
     hint,
     alert,
     disabled = false,
-    listOne = false
+    listOne = false,
+    pressMenu
 }: {
     label: string;
+    /** Rows the button itself opens instead of acting - the stream menu while a
+     *  screen is going out. */
+    pressMenu?: React.ReactNode;
     /** The control itself can't be pressed - a moderator's deafen. Its menu
      *  still opens: the device is the reader's to choose either way. */
     disabled?: boolean;
@@ -1711,19 +1738,39 @@ function Split({
                 looks and where a screen reader reads from - the shape is what
                 everybody else has already learned from every other call they
                 have been in. */}
-            <Button
-                size="icon"
-                variant={variant === "primary" ? "primary" : "secondary"}
-                onClick={onClick}
-                disabled={disabled}
-                aria-pressed={pressed}
-                aria-label={label}
-                aria-describedby={alert ? alertId : undefined}
-                title={alert ? `${title ?? label}\n${alert.reason}` : (title ?? label)}
-                className={cn(TINTS[variant], hasMenu && "rounded-r-none")}
-            >
-                {icon}
-            </Button>
+            {pressMenu ? (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            size="icon"
+                            variant={variant === "primary" ? "primary" : "secondary"}
+                            disabled={disabled}
+                            aria-label={label}
+                            title={title ?? label}
+                            className={cn(TINTS[variant], hasMenu && "rounded-r-none")}
+                        >
+                            {icon}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" side="top" className="w-64">
+                        {pressMenu}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            ) : (
+                <Button
+                    size="icon"
+                    variant={variant === "primary" ? "primary" : "secondary"}
+                    onClick={onClick}
+                    disabled={disabled}
+                    aria-pressed={pressed}
+                    aria-label={label}
+                    aria-describedby={alert ? alertId : undefined}
+                    title={alert ? `${title ?? label}\n${alert.reason}` : (title ?? label)}
+                    className={cn(TINTS[variant], hasMenu && "rounded-r-none")}
+                >
+                    {icon}
+                </Button>
+            )}
             {alert && (
                 <>
                     <span id={alertId} className="sr-only">

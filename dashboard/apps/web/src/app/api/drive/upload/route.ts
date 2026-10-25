@@ -28,6 +28,7 @@ import type { StorageDriver } from "@polaris/storage";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { recordItemCreator } from "@/lib/drive-meta-service";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { announceUpload } from "@/lib/automations/drive-events";
 import { hasTrash, trashWithDriver } from "@/lib/trash-service";
 import { baseName, normalizeRelPath, parentPath } from "@polaris/core";
 import { assertMayReplace, clashView } from "@/lib/drive/clash-view";
@@ -137,6 +138,15 @@ export async function PUT(request: Request): Promise<Response> {
             targetId: connectionId,
             metadata: { path: landed, size: written.size.toString(), conflict }
         });
+        // A new file, not a save into one already there: an edit is not an upload.
+        if (!writesInPlace) {
+            await announceUpload({
+                connectionId,
+                path: landed,
+                size: written.size,
+                uploaderId: user.id
+            });
+        }
         return Response.json({
             ok: true,
             path: landed,

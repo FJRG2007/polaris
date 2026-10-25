@@ -1040,6 +1040,12 @@
                 "summary": "Una torre de recorridos temáticos con puntos de control, que se sube desde abajo.",
                 "setup": "Los puntos de control se guardan por jugador, así que la gente puede entrar y salir sin perder la subida."
             },
+            "parkour-spiral-2": {
+                "summary": "La segunda torre: nuevos recorridos temáticos con puntos de control, que se sube desde abajo."
+            },
+            "parkour-spiral-3": {
+                "summary": "La tercera torre: más recorridos temáticos con puntos de control, que se sube desde abajo."
+            },
             "bedwars-treasure-island": {
                 "summary": "Ocho equipos, una cama cada uno y una isla pirata en el centro. Tiendas, generadores y trampas incluidos.",
                 "setup": "Ponte en la plataforma de un equipo para unirte y la partida empieza sola. Nada que configurar ni arena que registrar."
@@ -1226,6 +1232,40 @@
         "everyDays": "Cada {count} {count, plural, one {día} other {días}}",
         "precision": "Se ejecuta como mucho un minuto después de la hora fijada."
     },
+    "consoleRepeat": {
+        "errors": {
+            "times": "Entre {min} y {max} veces",
+            "every": "Al menos 1 s de separación",
+            "tooLong": "Una repetición dura como máximo {hours} horas",
+            "offline": "Inicia el servidor primero",
+            "busy": "Hay demasiadas repeticiones en curso. Detén una primero.",
+            "slowDown": "Demasiadas repeticiones iniciadas. Vuelve a intentarlo en un minuto."
+        },
+        "repeat": "Repetir",
+        "times": "Veces",
+        "every": "Cada",
+        "unit": "Unidad",
+        "unitSeconds": "segundos",
+        "unitMinutes": "minutos",
+        "note": "Se ejecuta en el servidor: cerrar esta página no lo detiene.",
+        "title": "Repetir comando",
+        "start": "Iniciar",
+        "repeatIt": "Repetir...",
+        "button": "Ejecutarlo varias veces",
+        "running": "Repitiendo",
+        "progress": "{done}/{total}",
+        "nextIn": "siguiente en {seconds} s",
+        "sendingNow": "enviando",
+        "by": "por {name}",
+        "stop": "Detener {name}",
+        "stopFailed": "No se pudo detener esa repetición",
+        "ended": {
+            "finished": "Terminado",
+            "stopped": "Detenido",
+            "serverStopped": "Terminado: el servidor se detuvo o reinició",
+            "noAccess": "Terminado: ya no tiene acceso a la consola"
+        }
+    },
     "playerPicker": {
         "choose": "Elige un jugador",
         "search": "Buscar jugadores",
@@ -1361,5 +1401,19 @@
             "noVolumes": "Este servidor no guarda archivos propios.",
             "unexpected": "No se pudo guardar. Vuelve a intentarlo."
         }
+    },
+    "automation": {
+        "server": "Servidor",
+        "serverPick": "Elige un servidor",
+        "serverLoading": "Cargando servidores...",
+        "serverNone": "No hay servidores que puedas gestionar.",
+        "serverGone": "Ese servidor ya no existe o perdiste el acceso.",
+        "power": "Acción",
+        "start": "Arrancar",
+        "stop": "Parar",
+        "restart": "Reiniciar",
+        "command": "Comando",
+        "commandHint": "Una línea, como en la consola. Puede usar valores de pasos anteriores.",
+        "consoleNone": "No hay servidores cuya consola puedas usar."
     }
 }

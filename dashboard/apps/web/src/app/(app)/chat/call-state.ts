@@ -173,6 +173,13 @@ export interface CallState {
     toggleMic: () => void;
     toggleCamera: () => void;
     toggleShare: () => void;
+    /** Pick another screen, tab or window without ending the share. */
+    changeShare: () => void;
+    /** A change of stream waiting on the picker. */
+    readonly changingShare: boolean;
+    /** Whether the share carries sound, and whether that sound is going out. */
+    readonly shareAudio: { readonly has: boolean; readonly on: boolean };
+    setShareAudio: (on: boolean) => void;
     toggleDeafen: () => void;
     chooseMicrophone: (deviceId: string) => void;
     chooseCamera: (deviceId: string) => void;

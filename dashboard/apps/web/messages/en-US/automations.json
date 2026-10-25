@@ -53,7 +53,11 @@
         "personal": "Just me",
         "submit": "Create",
         "cancel": "Cancel",
-        "untitled": "Untitled automation"
+        "untitled": "Untitled automation",
+        "hint": "Start blank or from a template. You can change everything later.",
+        "blank": "Start blank",
+        "blankHint": "Pick the trigger and steps yourself.",
+        "templates": "Templates"
     },
     "editor": {
         "back": "Automations",
@@ -139,7 +143,8 @@
         "set": "Set values",
         "message": "Post to a chat channel",
         "threshold": "A reading crosses a threshold",
-        "connectivity": "The internet goes down or comes back"
+        "connectivity": "The internet goes down or comes back",
+        "redeploy": "Redeploy a service"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -208,7 +213,13 @@
         "webhookReset": "This webhook was given a new secret, so the step stopped posting.",
         "webhookUseNew": "Keep posting with it",
         "webhookPostsAs": "Posts as {name}, marked as a bot.",
-        "webhookManage": "Manage webhooks"
+        "webhookManage": "Manage webhooks",
+        "service": "Service",
+        "servicePick": "Pick a service",
+        "serviceLoading": "Loading services...",
+        "serviceNone": "No services of yours yet.",
+        "serviceOpenDeploy": "Open Deploy",
+        "serviceGone": "That service is gone or out of reach."
     },
     "operators": {
         "eq": "equals",
@@ -306,7 +317,16 @@
         "webhookReset": "The chat webhook got a new secret",
         "webhookForbidden": "Its owner no longer runs that channel",
         "webhookLimited": "The webhook posted too much this minute",
-        "noticeNotDelivered": "No channel delivered the message"
+        "noticeNotDelivered": "No channel delivered the message",
+        "gameServerForbidden": "The account it runs as cannot do that on that server",
+        "gameServerFailed": "The server did not do it",
+        "commandEmpty": "The command came out empty",
+        "commandInvalid": "The command must be one line with no control characters",
+        "commandTooLong": "The command is longer than the console takes",
+        "deployForbidden": "The account it runs as cannot deploy that service",
+        "deployFailed": "The deploy did not start",
+        "deployLoop": "A deploy an automation started cannot redeploy again",
+        "serviceGone": "That service is gone or out of reach"
     },
     "secrets": {
         "title": "Secrets",
@@ -633,7 +653,8 @@
         "set": "Work values out once. Later steps pick them from this step's values.",
         "message": "Post in a space channel through its webhook, as a bot.",
         "threshold": "Starts when a server, service or UPS reading stays past a value.",
-        "connectivity": "Starts when the line drops, returns, changes address or stops being reachable."
+        "connectivity": "Starts when the line drops, returns, changes address or stops being reachable.",
+        "redeploy": "Deploy a service again, as Redeploy on its page does."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -724,7 +745,7 @@
         "recheckEvery": "Check again every",
         "recheckRange": "Check again between every minute and once a day.",
         "builtInEvent": "Polaris also announces {name} whenever an automation here ends.",
-        "eventNameReserved": "Names starting with {prefix} are kept for Polaris.",
+        "eventNameReserved": "This name is kept for events Polaris sends itself (anything starting with {prefix}, NAS and app events).",
         "useFinished": "Use it",
         "outcomes": "Only when it ends as",
         "outcomesAny": "None ticked takes any ending. Read it as {example}.",
@@ -804,7 +825,9 @@
         "homeRun": "Places: run another",
         "homePrivacy": "Places: camera privacy",
         "missing": "Needs an app that is not installed here, so it cannot be changed or run.",
-        "install": "Install the app"
+        "install": "Install the app",
+        "gameServerPower": "Game servers: start, stop or restart",
+        "gameServerCommand": "Game servers: send a command"
     },
     "filter": {
         "label": "Filters",
@@ -885,7 +908,32 @@
             "name": "Tell me when the internet comes back",
             "action": "Tell me when it comes back",
             "noticeTitle": "The internet is back",
-            "noticeBody": "It was down for {duration}."
+            "noticeBody": "It was down for {duration}.",
+            "description": "Get a notice when the line is back, with how long it was down."
+        },
+        "gameServerCrashed": {
+            "name": "Post in chat when a game server crashes",
+            "description": "When a game server stops after crashing again and again, post a message to a chat channel.",
+            "noticeTitle": "{server} crashed",
+            "noticeBody": "It stopped after crashing again and again. {cause}"
+        },
+        "playerJoined": {
+            "name": "Notify me when a player joins",
+            "description": "Get a notice when somebody joins one of your game servers.",
+            "noticeTitle": "{player} joined",
+            "noticeBody": "On {server}."
+        },
+        "deployFailed": {
+            "name": "Notify me when a deploy fails",
+            "description": "Get a notice with the error when a service fails to deploy.",
+            "noticeTitle": "{service} failed to deploy",
+            "noticeBody": "{error}"
+        },
+        "calendarStarting": {
+            "name": "Notify me before an event starts",
+            "description": "Get a notice when a calendar event's reminder goes off.",
+            "noticeTitle": "{event} starts soon",
+            "noticeBody": "In {calendar}."
         }
     },
     "picker": {
@@ -907,7 +955,14 @@
             "logic": "Logic",
             "timing": "Timing",
             "data": "Data",
-            "send": "Send"
+            "send": "Send",
+            "game-servers": "Game servers",
+            "deploy": "Deploy",
+            "chat": "Chat",
+            "tasks": "Tasks",
+            "mail": "Mail",
+            "drive": "Drive",
+            "calendar": "Calendar"
         },
         "presets": {
             "publicIpChanged": "Public IP changed",
@@ -918,7 +973,19 @@
             "nasPoolUnprotected": "NAS storage unprotected",
             "nasBackupFailed": "NAS backup failed",
             "nasBackupOverdue": "NAS backup overdue",
-            "automationFinished": "Another automation finished"
+            "automationFinished": "Another automation finished",
+            "gameServerStarted": "Game server started",
+            "gameServerStopped": "Game server stopped",
+            "deploySucceeded": "Deploy succeeded",
+            "deployFailed": "Deploy failed",
+            "taskCreated": "Task created",
+            "taskCompleted": "Task completed",
+            "chatMessage": "New chat message",
+            "gameServerCrashed": "Game server keeps crashing",
+            "playerJoined": "Player joined",
+            "mailReceived": "Mail received",
+            "driveFileUploaded": "File uploaded to Drive",
+            "calendarEventStarting": "Calendar event starting soon"
         }
     }
 }

@@ -28,6 +28,18 @@ describe("the node catalog", () => {
             expect(core.isCoreNodeType(type) || nodes.PLACES_NODE_TYPES.includes(type)).toBe(true);
     });
 
+    it("leaves steps out where only a trigger fits", () => {
+        const triggers = types(
+            catalog.catalogGroups({
+                triggers: true,
+                steps: false,
+                apps: [catalog.PLACES_APP, ...core.APP_EVENT_APPS]
+            })
+        );
+        expect(triggers.length).toBeGreaterThan(0);
+        expect(triggers.every((type) => catalog.isTriggerType(type))).toBe(true);
+    });
+
     it("leaves triggers out where only a step fits", () => {
         const steps = types(catalog.catalogGroups({ triggers: false, apps: [catalog.PLACES_APP] }));
         expect(steps.some((type) => catalog.isTriggerType(type))).toBe(false);
@@ -55,7 +67,7 @@ describe("the node catalog", () => {
 
     it("hands back presets with settings the On event trigger accepts", () => {
         const presets = catalog
-            .catalogGroups({ triggers: true, apps: [] })
+            .catalogGroups({ triggers: true, apps: [...core.APP_EVENT_APPS] })
             .flatMap((group) => group.items)
             .filter((item) => item.preset);
         expect(presets.length).toBe(Object.keys(catalog.EVENT_PRESETS).length);
@@ -72,7 +84,8 @@ describe("the node catalog", () => {
         const sent = new Set<string>([
             ...core.NAS_EVENT_NAMES,
             core.PUBLIC_IP_CHANGED_EVENT,
-            core.AUTOMATION_FINISHED_EVENT
+            core.AUTOMATION_FINISHED_EVENT,
+            ...core.APP_EVENT_NAMES
         ]);
         for (const preset of Object.values(catalog.EVENT_PRESETS))
             expect(sent).toContain(preset.name);

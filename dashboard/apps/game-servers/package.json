@@ -14,7 +14,8 @@
             "arkicons": ".assets/arkicons",
             "minecraft-mods": ".assets/minecraft-mods",
             "ogg-encoder": ".assets/ogg-encoder",
-            "default-skins": ".assets/default-skins"
+            "default-skins": ".assets/default-skins",
+            "minecraft-worlds": ".assets/minecraft-worlds"
         }
     },
     "dependencies": {

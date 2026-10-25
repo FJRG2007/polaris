@@ -22,6 +22,7 @@ import * as activity from "@/lib/activity/activity";
 import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import { TaskRefusal } from "./refusal";
+import { requireTask } from "./access";
 
 export interface AutomationEventInput {
     readonly trigger: core.AutomationTrigger;
@@ -164,6 +165,54 @@ export async function hasAutomationsFor(
     return found !== null;
 }
 
+/** The space rules' triggers Polaris's own automations hear too. */
+const POLARIS_TASK_EVENTS: Partial<
+    Record<core.AutomationTrigger, "task.created" | "task.completed">
+> = { "task.created": "task.created", "task.completed": "task.completed" };
+
+/**
+ * Tell Polaris automations a task was created or completed, each one only if
+ * the account it runs as can see that task. Every path that creates or finishes
+ * a task comes through the space rules, so this is the one place it is said.
+ */
+async function announceToAutomations(
+    trigger: core.AutomationTrigger,
+    taskIds: readonly string[],
+    actorId: string | null
+): Promise<void> {
+    const name = POLARIS_TASK_EVENTS[trigger];
+    if (!name) return;
+    // Loaded when it runs: the automations engine pulls in session and auth.
+    const { anyListening, emitAppEvent } = await import("@/lib/automations/app-events");
+    if (!(await anyListening(name).catch(() => false))) return;
+    const tasks = await prisma.task.findMany({
+        where: { id: { in: [...taskIds] } },
+        select: { id: true, name: true, listId: true, spaceId: true }
+    });
+    for (const task of tasks)
+        await emitAppEvent(
+            name,
+            {
+                taskId: task.id,
+                name: task.name.slice(0, 200),
+                spaceId: task.spaceId,
+                listId: task.listId,
+                actorId
+            },
+            {
+                key:
+                    name === "task.completed"
+                        ? `${task.id}:${Math.floor(Date.now() / 60_000)}`
+                        : task.id,
+                mayReceive: (runner) =>
+                    requireTask(runner, task.id, "guest").then(
+                        () => true,
+                        () => false
+                    )
+            }
+        );
+}
+
 /**
  * Run every rule that applies to what just happened. Safe to call after any task
  * write; it is a no-op when the space has no rules for that trigger.
@@ -188,6 +237,7 @@ export async function runAutomations(event: AutomationEventInput): Promise<void>
 export async function runAutomationsFor(event: AutomationBatchInput): Promise<void> {
     const taskIds = [...new Set(event.taskIds)];
     if (taskIds.length === 0) return;
+    await announceToAutomations(event.trigger, taskIds, event.actorId);
 
     const records = await prisma.task.findMany({
         where: { id: { in: taskIds } },

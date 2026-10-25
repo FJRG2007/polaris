@@ -1040,6 +1040,12 @@
                 "summary": "A tower of themed courses with checkpoints, climbed from the bottom.",
                 "setup": "Checkpoints are saved per player, so people can join and leave without losing the climb."
             },
+            "parkour-spiral-2": {
+                "summary": "The second tower: new themed courses with checkpoints, climbed from the bottom."
+            },
+            "parkour-spiral-3": {
+                "summary": "The third tower: more themed courses with checkpoints, climbed from the bottom."
+            },
             "bedwars-treasure-island": {
                 "summary": "Eight teams, a bed each and a pirate island in the middle. Shops, generators and traps are built in.",
                 "setup": "Stand on a team's pad to join it and the game starts itself. Nothing to configure and no arena to register."
@@ -1226,6 +1232,40 @@
         "everyDays": "Every {count} {count, plural, one {day} other {days}}",
         "precision": "Runs within a minute of the time set."
     },
+    "consoleRepeat": {
+        "errors": {
+            "times": "Between {min} and {max} times",
+            "every": "At least 1 second apart",
+            "tooLong": "A repeat can last {hours} hours at most",
+            "offline": "Start the server first",
+            "busy": "Too many repeats are running. Stop one first.",
+            "slowDown": "Too many repeats started. Try again in a minute."
+        },
+        "repeat": "Repeat",
+        "times": "Times",
+        "every": "Every",
+        "unit": "Unit",
+        "unitSeconds": "seconds",
+        "unitMinutes": "minutes",
+        "note": "Runs on the server, so closing this page does not stop it.",
+        "title": "Repeat command",
+        "start": "Start",
+        "repeatIt": "Repeat...",
+        "button": "Run it several times",
+        "running": "Repeating",
+        "progress": "{done}/{total}",
+        "nextIn": "next in {seconds}s",
+        "sendingNow": "sending",
+        "by": "by {name}",
+        "stop": "Stop {name}",
+        "stopFailed": "That repeat could not be stopped",
+        "ended": {
+            "finished": "Finished",
+            "stopped": "Stopped",
+            "serverStopped": "Ended: the server stopped or restarted",
+            "noAccess": "Ended: console access was removed"
+        }
+    },
     "playerPicker": {
         "choose": "Choose a player",
         "search": "Search players",
@@ -1361,5 +1401,19 @@
             "noVolumes": "This server keeps no files of its own.",
             "unexpected": "That couldn't be saved. Try again."
         }
+    },
+    "automation": {
+        "server": "Server",
+        "serverPick": "Choose a server",
+        "serverLoading": "Loading servers...",
+        "serverNone": "No servers you can manage here.",
+        "serverGone": "That server is gone or you lost access to it.",
+        "power": "Action",
+        "start": "Start",
+        "stop": "Stop",
+        "restart": "Restart",
+        "command": "Command",
+        "commandHint": "One line, as typed in the console. It can use values from earlier steps.",
+        "consoleNone": "No servers whose console you can use."
     }
 }

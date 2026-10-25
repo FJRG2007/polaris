@@ -286,7 +286,7 @@ describe("Try, Wait for a condition, and the finished event", () => {
     it("warns when Announce uses a name kept for Polaris", () => {
         fields(node("an", "core.announce", { name: "automation.finished", payload: [] }));
         expect(screen.getByRole("alert").textContent).toBe(
-            "Names starting with automation. are kept for Polaris."
+            "This name is kept for events Polaris sends itself (anything starting with automation., NAS and app events)."
         );
     });
 

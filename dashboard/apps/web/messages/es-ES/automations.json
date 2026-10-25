@@ -53,7 +53,11 @@
         "personal": "Solo yo",
         "submit": "Crear",
         "cancel": "Cancelar",
-        "untitled": "Nueva automatización"
+        "untitled": "Nueva automatización",
+        "hint": "Empieza desde cero o desde una plantilla. Podrás cambiarlo todo después.",
+        "blank": "Desde cero",
+        "blankHint": "Elige tú el disparador y los pasos.",
+        "templates": "Plantillas"
     },
     "editor": {
         "back": "Automatizaciones",
@@ -139,7 +143,8 @@
         "set": "Fijar valores",
         "message": "Publicar en un canal",
         "threshold": "Una lectura cruza un umbral",
-        "connectivity": "Internet se cae o vuelve"
+        "connectivity": "Internet se cae o vuelve",
+        "redeploy": "Redesplegar servicio"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -208,7 +213,13 @@
         "webhookReset": "Este webhook tiene un secreto nuevo y el paso dejó de publicar.",
         "webhookUseNew": "Seguir publicando",
         "webhookPostsAs": "Publica como {name}, marcado como bot.",
-        "webhookManage": "Ver webhooks"
+        "webhookManage": "Ver webhooks",
+        "service": "Servicio",
+        "servicePick": "Elige un servicio",
+        "serviceLoading": "Cargando servicios...",
+        "serviceNone": "Aún no tienes servicios.",
+        "serviceOpenDeploy": "Abrir Deploy",
+        "serviceGone": "Ese servicio ya no existe o no está a tu alcance."
     },
     "operators": {
         "eq": "igual a",
@@ -306,7 +317,16 @@
         "webhookReset": "El webhook tiene un secreto nuevo",
         "webhookForbidden": "Su dueño ya no lleva ese canal",
         "webhookLimited": "El webhook publicó mucho este minuto",
-        "noticeNotDelivered": "Ningún canal entregó el mensaje"
+        "noticeNotDelivered": "Ningún canal entregó el mensaje",
+        "gameServerForbidden": "La cuenta con la que se ejecuta no puede hacer eso en ese servidor",
+        "gameServerFailed": "El servidor no lo hizo",
+        "commandEmpty": "El comando quedó vacío",
+        "commandInvalid": "El comando debe ser una línea sin caracteres de control",
+        "commandTooLong": "El comando es más largo de lo que admite la consola",
+        "deployForbidden": "La cuenta con la que se ejecuta no puede desplegar ese servicio",
+        "deployFailed": "El despliegue no empezó",
+        "deployLoop": "Un despliegue que inició una automatización no puede volver a desplegar",
+        "serviceGone": "Ese servicio ya no existe o no está a su alcance"
     },
     "secrets": {
         "title": "Secretos",
@@ -633,7 +653,8 @@
         "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso.",
         "message": "Publica en un canal mediante su webhook, como bot.",
         "threshold": "Empieza cuando una lectura de un servidor, servicio o SAI se pasa de un valor.",
-        "connectivity": "Empieza cuando la línea cae, vuelve, cambia de IP o deja de verse desde fuera."
+        "connectivity": "Empieza cuando la línea cae, vuelve, cambia de IP o deja de verse desde fuera.",
+        "redeploy": "Despliega un servicio de nuevo, como Redesplegar en su página."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -724,7 +745,7 @@
         "recheckEvery": "Comprobar cada",
         "recheckRange": "Comprueba entre cada minuto y una vez al día.",
         "builtInEvent": "Polaris también anuncia {name} cuando termina una automatización.",
-        "eventNameReserved": "Los nombres que empiezan por {prefix} son de Polaris.",
+        "eventNameReserved": "Este nombre es de los eventos que envía Polaris (los que empiezan por {prefix}, los del NAS y los de las apps).",
         "useFinished": "Usarlo",
         "outcomes": "Solo si termina como",
         "outcomesAny": "Sin marcar vale cualquier final. Léelo como {example}.",
@@ -804,7 +825,9 @@
         "homeRun": "Lugares: ejecutar otro",
         "homePrivacy": "Lugares: privacidad",
         "missing": "Necesita una app que aquí no está instalada: no se puede cambiar ni ejecutar.",
-        "install": "Instalar la app"
+        "install": "Instalar la app",
+        "gameServerPower": "Juegos: arrancar, parar o reiniciar",
+        "gameServerCommand": "Juegos: enviar comando"
     },
     "filter": {
         "label": "Filtros",
@@ -885,7 +908,32 @@
             "name": "Avísame cuando vuelva internet",
             "action": "Avísame cuando vuelva",
             "noticeTitle": "Internet ha vuelto",
-            "noticeBody": "Estuvo caído {duration}."
+            "noticeBody": "Estuvo caído {duration}.",
+            "description": "Recibe un aviso cuando vuelva la conexión, con cuánto tiempo estuvo caída."
+        },
+        "gameServerCrashed": {
+            "name": "Avisar en el chat si cae un servidor",
+            "description": "Cuando un servidor de Hosting juegos se detiene tras fallar una y otra vez, publica un mensaje en un canal del chat.",
+            "noticeTitle": "{server} ha caído",
+            "noticeBody": "Se detuvo tras fallar una y otra vez. {cause}"
+        },
+        "playerJoined": {
+            "name": "Avisarme cuando entre un jugador",
+            "description": "Recibe un aviso cuando alguien entra en uno de tus servidores de Hosting juegos.",
+            "noticeTitle": "{player} ha entrado",
+            "noticeBody": "En {server}."
+        },
+        "deployFailed": {
+            "name": "Avisarme si falla un despliegue",
+            "description": "Recibe un aviso con el error cuando un servicio no se despliega.",
+            "noticeTitle": "{service} no se ha desplegado",
+            "noticeBody": "{error}"
+        },
+        "calendarStarting": {
+            "name": "Avisarme antes de un evento",
+            "description": "Recibe un aviso cuando salta el recordatorio de un evento del calendario.",
+            "noticeTitle": "{event} empieza pronto",
+            "noticeBody": "En {calendar}."
         }
     },
     "picker": {
@@ -907,7 +955,14 @@
             "logic": "Lógica",
             "timing": "Tiempo",
             "data": "Datos",
-            "send": "Enviar"
+            "send": "Enviar",
+            "game-servers": "Hosting juegos",
+            "deploy": "Deploy",
+            "chat": "Chat",
+            "tasks": "Tareas",
+            "mail": "Correo",
+            "drive": "Drive",
+            "calendar": "Calendario"
         },
         "presets": {
             "publicIpChanged": "Cambió la IP pública",
@@ -918,7 +973,19 @@
             "nasPoolUnprotected": "Volumen NAS sin protección",
             "nasBackupFailed": "Falló la copia del NAS",
             "nasBackupOverdue": "Copia del NAS atrasada",
-            "automationFinished": "Terminó otra automatización"
+            "automationFinished": "Terminó otra automatización",
+            "gameServerStarted": "Servidor iniciado",
+            "gameServerStopped": "Servidor detenido",
+            "deploySucceeded": "Deploy completado",
+            "deployFailed": "Deploy fallido",
+            "taskCreated": "Tarea creada",
+            "taskCompleted": "Tarea completada",
+            "chatMessage": "Mensaje de chat",
+            "gameServerCrashed": "Servidor de juego se cuelga",
+            "playerJoined": "Entra un jugador",
+            "mailReceived": "Correo recibido",
+            "driveFileUploaded": "Archivo subido a Drive",
+            "calendarEventStarting": "Evento del calendario pronto"
         }
     }
 }

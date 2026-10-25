@@ -27,6 +27,7 @@ import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import type { DeployStrategy } from "@/lib/deploy/releases";
 import { deployBehaviour } from "@/lib/deploy/deploy-behaviour";
 import { requirePermissionOn, resourceAccess, type ResourceAccess } from "@/lib/resource-access";
+import { announceGameServer } from "@/lib/automations/game-server-events";
 
 /** The backing application, resolved on the owner's behalf. */
 async function applicationFor(access: ResourceAccess, id: string): Promise<string> {
@@ -82,6 +83,7 @@ export async function setInstalledAppRunningAction(
         if (!running) await beforeInstallStops(access.ownerId, id);
         if (running) await afterInstallStarts(id);
         await setApplicationRunning(applicationId, access.ownerId, running, user.id);
+        await announceGameServer(access.ownerId, id, running);
         revalidatePath(`/apps/installed/${id}`);
         return {};
     } catch (caught) {

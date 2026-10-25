@@ -101,6 +101,7 @@ import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mi
 import { callDevices, isDenial, openMedia, openScreen, refused, settle } from "./call-media";
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import { extraPublications, oneVoice, serialized, type PublishedTrack } from "./call-tracks";
+import { retuneScreenEncoding, swapScreen, type EncodedTrack } from "./call-share-menu";
 import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC } from "@/lib/chat/call-activity";
 import {
@@ -352,6 +353,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * sharing can do anything about it, so they are the one told.
      */
     const [shareStill, setShareStill] = useState(false);
+    /** Whether the share carries a sound track, and whether it is going out -
+     *  the box in the share menu. */
+    const [shareAudio, setShareAudioState] = useState({ has: false, on: true });
+    /** The box as last set, kept for the next pick: somebody who turned the
+     *  sound off does not get it back by changing what they share. */
+    const shareAudioOn = useRef(true);
+    /** A change of stream waiting on the picker. */
+    const [changingShare, setChangingShare] = useState(false);
     const [deafened, setDeafened] = useState(false);
     /** What the seat is told on every beat. A ref, because the beat is set up
      *  once per room and would otherwise keep reporting the state it started
@@ -1372,6 +1381,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setLocalScreen(null);
         setSharing(false);
         setShareStill(false);
+        setShareAudioState({ has: false, on: true });
+        shareAudioOn.current = true;
         sharingRef.current = false;
         // Nothing about the last room is true of this one: the seats it named
         // are gone, and a browser that walked into a new call still pointing at
@@ -2724,20 +2735,116 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * server sends each subscriber only what they are watching, so a sharer's
      * face costs nothing to keep on and everybody can share at once.
      */
+    /** Take the screen and its sound down together, however it ended. */
+    const stopSharing = useCallback(() => {
+        screen.current = null;
+        screenAudio.current?.stop();
+        screenAudio.current = null;
+        void publish(SCREEN, null);
+        void publish(SCREEN_AUDIO, null);
+        publishLocalPreview();
+        setSharing(false);
+        setShareStill(false);
+        setShareAudioState({ has: false, on: true });
+        shareAudioOn.current = true;
+        sharingRef.current = false;
+        sound("shareOff");
+    }, [publish, publishLocalPreview, sound]);
+
+    /**
+     * Make a freshly picked screen the one being followed: what the encoder is
+     * told it is looking at, and the browser's own "stop sharing" and
+     * still-picture signals. Used for the first pick and every change after it.
+     */
+    const watchScreen = useCallback(
+        (track: MediaStreamTrack, level: quality.CallLevel) => {
+            // What the encoder is looking at, said out loud. Without it the
+            // browser guesses from the track alone and guesses "motion",
+            // which spends the whole allowance smoothing a page of text that
+            // never moved.
+            track.contentHint = quality.screenIsMotion(level) ? "motion" : "detail";
+            // The browser's own "stop sharing" bar ends the track without
+            // going through this hook, and the call has to notice.
+            track.onended = () => {
+                if (screen.current === track) stopSharing();
+            };
+            track.onmute = () => {
+                if (screen.current === track) setShareStill(true);
+            };
+            track.onunmute = () => {
+                if (screen.current === track) setShareStill(false);
+            };
+            setShareStill(track.muted);
+        },
+        [stopSharing]
+    );
+
+    /** Send the screen's sound or hold it back, as the share menu's box says. */
+    const applyShareAudio = useCallback((on: boolean) => {
+        const track = screenAudio.current;
+        if (track) track.enabled = on;
+        const publication = room.current?.localParticipant.getTrackPublication(SCREEN_AUDIO);
+        if (publication?.track) {
+            if (on) void publication.track.unmute().catch(() => undefined);
+            else void publication.track.mute().catch(() => undefined);
+        }
+        setShareAudioState({ has: track !== null, on });
+    }, []);
+
+    const setShareAudio = useCallback(
+        (on: boolean) => {
+            shareAudioOn.current = on;
+            applyShareAudio(on);
+        },
+        [applyShareAudio]
+    );
+
+    /**
+     * Share something else without ending the share - see `swapScreen`.
+     * Everybody watching keeps the stream; only what is in it changes.
+     */
+    const changeShare = useCallback(() => {
+        const video = screen.current;
+        if (!video) return;
+        const level = levelNow("screen");
+        setChangingShare(true);
+        void swapScreen({
+            current: { video, audio: screenAudio.current },
+            open: () => openScreen(quality.screenConstraints(level)),
+            // A share stopped while the picker was open is not started again
+            // by the answer to it.
+            publishVideo: async (track) => screen.current === video && publish(SCREEN, track),
+            publishAudio: (track) => {
+                // Held back from the first packet when the box is off.
+                if (track) track.enabled = shareAudioOn.current;
+                return publish(SCREEN_AUDIO, track);
+            }
+        })
+            .then((result) => {
+                if (result.kind === "failed") {
+                    if (screen.current === video) setError(refused(result.error, "screen"));
+                    return;
+                }
+                if (result.kind === "kept") return;
+                if (screen.current !== video) {
+                    // Stopped while the new pick was going up: whatever of it
+                    // reached the wire comes down with it.
+                    result.tracks.video.stop();
+                    result.tracks.audio?.stop();
+                    void publish(SCREEN, null);
+                    void publish(SCREEN_AUDIO, null);
+                    return;
+                }
+                screen.current = result.tracks.video;
+                screenAudio.current = result.tracks.audio;
+                watchScreen(result.tracks.video, level);
+                applyShareAudio(shareAudioOn.current);
+                publishLocalPreview();
+            })
+            .finally(() => setChangingShare(false));
+    }, [applyShareAudio, levelNow, publish, publishLocalPreview, watchScreen]);
+
     const toggleShare = useCallback(() => {
-        /** Take the screen and its sound down together, however it ended. */
-        const stopSharing = () => {
-            screen.current = null;
-            screenAudio.current?.stop();
-            screenAudio.current = null;
-            void publish(SCREEN, null);
-            void publish(SCREEN_AUDIO, null);
-            publishLocalPreview();
-            setSharing(false);
-            setShareStill(false);
-            sharingRef.current = false;
-            sound("shareOff");
-        };
         if (screen.current) {
             screen.current.stop();
             stopSharing();
@@ -2755,27 +2862,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     audio?.stop();
                     return;
                 }
-                // What the encoder is looking at, said out loud. Without it the
-                // browser guesses from the track alone and guesses "motion",
-                // which spends the whole allowance smoothing a page of text that
-                // never moved.
-                track.contentHint = quality.screenIsMotion(level) ? "motion" : "detail";
-                // The browser's own "stop sharing" bar ends the track without
-                // going through this hook, and the call has to notice.
-                track.onended = () => {
-                    if (screen.current === track) stopSharing();
-                };
-                track.onmute = () => {
-                    if (screen.current === track) setShareStill(true);
-                };
-                track.onunmute = () => {
-                    if (screen.current === track) setShareStill(false);
-                };
-                setShareStill(track.muted);
+                watchScreen(track, level);
                 screen.current = track;
                 screenAudio.current = audio;
                 await publish(SCREEN, track);
                 if (audio) await publish(SCREEN_AUDIO, audio);
+                applyShareAudio(shareAudioOn.current);
                 publishLocalPreview();
                 setSharing(true);
                 sharingRef.current = true;
@@ -2791,7 +2883,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // failure nobody can act on.
                 setError(refused(caught, "screen"));
             });
-    }, [levelNow, publish, publishLocalPreview, sound]);
+    }, [applyShareAudio, levelNow, publish, publishLocalPreview, sound, stopSharing, watchScreen]);
 
     /**
      * Silence everybody, and yourself with them.
@@ -3168,10 +3260,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         quality.screenConstraints(level, screen.current?.getSettings())
                     );
                     if (screen.current) {
-                        screen.current.contentHint = quality.screenIsMotion(level)
-                            ? "motion"
-                            : "detail";
-                        await publish(SCREEN, screen.current, { again: true });
+                        const motion = quality.screenIsMotion(level);
+                        screen.current.contentHint = motion ? "motion" : "detail";
+                        // In place where the browser allows it, so nobody
+                        // watching sees the share drop and come back; published
+                        // again only where it does not.
+                        const published = room.current?.localParticipant.getTrackPublication(SCREEN)
+                            ?.track as EncodedTrack | undefined;
+                        const live = await retuneScreenEncoding(
+                            published,
+                            quality.encodingFor(quality.SCREEN_LADDER, level),
+                            motion ? "maintain-framerate" : "maintain-resolution"
+                        );
+                        if (!live) await publish(SCREEN, screen.current, { again: true });
                     }
                 }
                 publishLocalPreview();
@@ -3929,6 +4030,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         toggleMic,
         toggleCamera,
         toggleShare,
+        changeShare,
+        changingShare,
+        shareAudio: sharing ? shareAudio : { has: false, on: true },
+        setShareAudio,
         toggleDeafen,
         chooseMicrophone,
         chooseCamera,

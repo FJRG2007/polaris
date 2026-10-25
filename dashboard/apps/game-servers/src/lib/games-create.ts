@@ -57,7 +57,16 @@ import {
 } from "./minecraft/join-guard";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "./ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "./ark/settings";
-import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "./minecraft/maps";
+import { mapAddresses } from "./minecraft/world-address";
+import {
+    isMapResourcePack,
+    mapFor,
+    mapPackEnv,
+    pinnedRelease,
+    worldUrl,
+    type MapAddresses,
+    type WorldMap
+} from "./minecraft/maps";
 import { formatSpigetList, parseSpigetList, SPIGET_KEY } from "./minecraft/spiget";
 import { commonVersions, knownUnsupported, wantsLatest } from "./minecraft/blueprint-version";
 import {
@@ -204,10 +213,13 @@ export async function minecraftShapeEnv(
     edition: "java" | "bedrock",
     blueprint: GameBlueprint,
     shape: MinecraftShape,
-    current: ReadonlyMap<string, string>
+    current: ReadonlyMap<string, string>,
+    /** Where the map archives are served from; looked up when a map needs it. */
+    addresses?: MapAddresses
 ): Promise<Map<string, string>> {
     const env = new Map(current);
     const map = mapFor(blueprint, shape.mapId);
+    const served = map ? (addresses ?? (await mapAddresses())) : undefined;
     const versions = await blueprintVersions(blueprint, shape.crossplay, shape.software, map).catch(
         () => []
     );
@@ -241,7 +253,7 @@ export async function minecraftShapeEnv(
 
     // The world the container fetches for itself, and the folder it lands in.
     // Blank for a generated world, so a server reset off a map stops fetching it.
-    env.set(WORLD_KEY, map?.url ?? "");
+    env.set(WORLD_KEY, map && served ? worldUrl(served.world, map, served.key) : "");
     if (map) env.set(levelEnvKey(edition), map.id);
 
     // The seed and the shape of the world only ever apply to one that does not
@@ -302,7 +314,9 @@ export async function minecraftShapeEnv(
     // Last, over the blueprint's own: where the two disagree the map is the one
     // that has to be right, because it is the thing people will be standing in.
     for (const [key, value] of Object.entries(map?.env ?? {})) env.set(key, value);
-    for (const [key, value] of Object.entries(resourcePackEnv(map, env.get("RESOURCE_PACK"))))
+    for (const [key, value] of Object.entries(
+        resourcePackEnv(map, served, env.get("RESOURCE_PACK"))
+    ))
         env.set(key, value);
     return env;
 }
@@ -320,10 +334,14 @@ export async function minecraftShapeEnv(
  */
 function resourcePackEnv(
     map: WorldMap | undefined,
+    addresses: MapAddresses | undefined,
     current: string | undefined
 ): Record<string, string> {
-    if (map?.resourcePack)
-        return { RESOURCE_PACK: map.resourcePack.url, RESOURCE_PACK_SHA1: map.resourcePack.sha1 };
+    // A pack with no address a client could reach is not written at all: a map's
+    // pack is how it looks, not whether it plays, and a pack nobody can fetch is
+    // a failed download on every join.
+    const own = map && addresses ? mapPackEnv(map, addresses) : null;
+    if (own?.RESOURCE_PACK) return own;
     return isMapResourcePack(current) ? { RESOURCE_PACK: "", RESOURCE_PACK_SHA1: "" } : {};
 }
 

@@ -31,6 +31,7 @@ import {
     ListOrdered,
     Plus,
     RefreshCw,
+    Repeat,
     Square,
     Trash2
 } from "lucide-react";
@@ -52,6 +53,14 @@ import type { ConsoleSchedule } from "../../lib/console-schedule";
 import { KeepCommandDialog, type KeepDraft } from "./console-keep-dialog";
 import { RunCommandDialog, type RunChoice, type ScheduleChoice } from "./console-run-dialog";
 import { ConsoleSchedules } from "./console-schedules";
+import {
+    ConsoleRepeats,
+    REPEAT_DRAFT,
+    RepeatFields,
+    readRepeatDraft,
+    type RepeatDraft
+} from "./console-repeats";
+import type { ConsoleRepeatView } from "../../lib/console-repeat";
 import { KeptCommandsMenu, duplicateDraft } from "./console-kept-menu";
 import {
     useCallback,
@@ -97,6 +106,11 @@ const KEPT_COMMANDS_MS = 24 * 3_600_000;
 /** How often the scheduled commands are read again while the console is open:
  *  the sweep that runs them moves once a minute. */
 const SCHEDULES_EVERY_MS = 60_000;
+
+/** How often this server's repeats are read again: often while one runs, so
+ *  its count moves, and now and then otherwise, to show one started elsewhere. */
+const REPEATS_RUNNING_MS = 2_000;
+const REPEATS_IDLE_MS = 15_000;
 
 /** One command and what the server said back. */
 interface Reply {
@@ -205,11 +219,19 @@ export function GameConsole({
     const [keeping, setKeeping] = useState<KeepDraft | null>(null);
     const [keepError, setKeepError] = useState("");
     /** The kept command being run with values, or scheduled; null while shut. */
-    const [asking, setAsking] = useState<{ entry: SavedCommand; mode: "run" | "schedule" } | null>(
-        null
-    );
+    const [asking, setAsking] = useState<{
+        entry: SavedCommand;
+        mode: "run" | "schedule";
+        repeat?: boolean;
+    } | null>(null);
     const [askError, setAskError] = useState("");
     const [schedules, setSchedules] = useState<readonly ConsoleSchedule[]>([]);
+    /** The repeats on this server, whoever started them. */
+    const [repeatList, setRepeatList] = useState<readonly ConsoleRepeatView[]>([]);
+    /** The typed line being set to repeat, or null while that dialog is shut. */
+    const [repeating, setRepeating] = useState<{ line: string; draft: RepeatDraft } | null>(null);
+    const [repeatError, setRepeatError] = useState("");
+    const repeatRunning = repeatList.some((one) => one.ended === null);
     /** The block being written in "Run several", or null while it is shut. */
     const [batch, setBatch] = useState<string | null>(null);
     /** Where a running sequence is, or null when none is. */
@@ -241,6 +263,23 @@ export function GameConsole({
             window.clearInterval(timer);
         };
     }, [installedAppId]);
+
+    useEffect(() => {
+        let live = true;
+        const read = () =>
+            void consoleActions.listConsoleRepeatsAction(installedAppId).then((answer) => {
+                if (live) setRepeatList(answer.repeats);
+            });
+        read();
+        const timer = window.setInterval(
+            read,
+            repeatRunning ? REPEATS_RUNNING_MS : REPEATS_IDLE_MS
+        );
+        return () => {
+            live = false;
+            window.clearInterval(timer);
+        };
+    }, [installedAppId, repeatRunning]);
 
     useEffect(() => {
         void consoleActions.listConsoleCommandsAction(installedAppId).then((answer) => {
@@ -454,13 +493,42 @@ export function GameConsole({
     const runKept = useCallback(
         (entry: SavedCommand, choice: RunChoice, inDialog: boolean) => {
             setAskError("");
+            const { repeatPlan, ...once } = choice;
+            if (repeatPlan) {
+                // Run by the server, timers and all: the dialog closes on it
+                // starting and the list below shows where it is.
+                startTransition(async () => {
+                    const result = await consoleActions
+                        .repeatKeptCommandAction({
+                            installedAppId,
+                            id: entry.id,
+                            ...once,
+                            repeat: repeatPlan
+                        })
+                        .catch(() => ({
+                            error: t("console.theServerDidNotAnswer"),
+                            repeats: undefined
+                        }));
+                    if (result.error || !result.repeats) {
+                        refuseKept(
+                            entry,
+                            result.error ?? t("console.theServerDidNotAnswer"),
+                            inDialog
+                        );
+                        return;
+                    }
+                    setRepeatList(result.repeats);
+                    setAsking(null);
+                });
+                return;
+            }
             if (isSequence(entry.command)) {
-                runKeptSequence(entry, choice, inDialog);
+                runKeptSequence(entry, once, inDialog);
                 return;
             }
             startTransition(async () => {
                 const result = await consoleActions
-                    .runKeptCommandAction({ installedAppId, id: entry.id, ...choice })
+                    .runKeptCommandAction({ installedAppId, id: entry.id, ...once })
                     .catch(() => ({
                         error: t("console.theServerDidNotAnswer"),
                         replies: undefined
@@ -499,7 +567,7 @@ export function GameConsole({
                 void refresh();
             });
         },
-        [installedAppId, refresh, t, runKeptSequence]
+        [installedAppId, refresh, t, runKeptSequence, refuseKept]
     );
 
     /** Pressing a kept command. One that asks for something opens the dialog that
@@ -537,6 +605,59 @@ export function GameConsole({
             }
             setSchedules(result.schedules);
             setAsking(null);
+        });
+    }
+
+    /** Start the typed line repeating, on the server. */
+    function startRepeat(line: string, draft: RepeatDraft): void {
+        const { plan } = readRepeatDraft(draft);
+        if (!plan) return;
+        setRepeatError("");
+        startTransition(async () => {
+            const result = await consoleActions
+                .repeatConsoleLineAction({ installedAppId, line, repeat: plan })
+                .catch(() => ({ error: t("console.theServerDidNotAnswer"), repeats: undefined }));
+            if (result.error || !result.repeats) {
+                setRepeatError(result.error ?? t("console.theServerDidNotAnswer"));
+                return;
+            }
+            remember(line);
+            setRepeatList(result.repeats);
+            setRepeating(null);
+            setLine("");
+            setCaret(0);
+        });
+    }
+
+    /** Stop a repeat: shown stopped at once, put back if the server says no. */
+    function stopRepeat(id: string): void {
+        const before = repeatList;
+        setRepeatList((current) =>
+            current.map((one) =>
+                one.id === id && one.ended === null
+                    ? { ...one, ended: "stopped", nextAt: null }
+                    : one
+            )
+        );
+        startTransition(async () => {
+            const result = await consoleActions
+                .stopConsoleRepeatAction(installedAppId, id)
+                .catch(() => ({ error: t("consoleRepeat.stopFailed"), repeats: undefined }));
+            if (result.repeats) {
+                setRepeatList(result.repeats);
+                return;
+            }
+            setRepeatList(before);
+            setReplies((current) =>
+                [
+                    ...current,
+                    {
+                        command: t("consoleRepeat.running"),
+                        output: result.error ?? t("consoleRepeat.stopFailed"),
+                        failed: true
+                    }
+                ].slice(-KEPT_REPLIES)
+            );
         });
     }
 
@@ -741,6 +862,10 @@ export function GameConsole({
                                 setAskError("");
                                 setAsking({ entry, mode: "schedule" });
                             }}
+                            onRepeat={(entry) => {
+                                setAskError("");
+                                setAsking({ entry, mode: "run", repeat: true });
+                            }}
                             onLoad={(entry) =>
                                 isSequence(entry.command)
                                     ? setBatch(entry.command)
@@ -769,6 +894,8 @@ export function GameConsole({
                 </div>
 
                 <ConsoleSchedules schedules={schedules} pending={pending} onRemove={unschedule} />
+
+                <ConsoleRepeats list={repeatList} pending={pending} onStop={stopRepeat} />
 
                 <div className="relative flex items-center gap-2">
                     {suggestions.length > 0 && (
@@ -888,6 +1015,22 @@ export function GameConsole({
                         <ListOrdered className="size-4" />
                     </Button>
                     <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("consoleRepeat.button")}
+                        title={t("consoleRepeat.button")}
+                        disabled={!running || queue !== null || line.trim().length === 0}
+                        onClick={() => {
+                            setRepeatError("");
+                            setRepeating({
+                                line: line.trim(),
+                                draft: { ...REPEAT_DRAFT, on: true }
+                            });
+                        }}
+                    >
+                        <Repeat className="size-4" />
+                    </Button>
+                    <Button
                         onClick={() => submit(line)}
                         disabled={!running || pending || queue !== null || line.trim().length === 0}
                     >
@@ -999,6 +1142,63 @@ export function GameConsole({
                     </Dialog>
                 )}
 
+                {repeating && (
+                    <Dialog open onOpenChange={(open: boolean) => !open && setRepeating(null)}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>{t("consoleRepeat.title")}</DialogTitle>
+                                <DialogDescription
+                                    className="min-w-0 truncate font-mono text-xs"
+                                    title={repeating.line}
+                                >
+                                    {repeating.line}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form
+                                className="flex min-w-0 flex-col gap-3"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    startRepeat(repeating.line, repeating.draft);
+                                }}
+                            >
+                                <RepeatFields
+                                    draft={repeating.draft}
+                                    toggle={false}
+                                    onChange={(draft) =>
+                                        setRepeating((current) =>
+                                            current ? { ...current, draft } : current
+                                        )
+                                    }
+                                />
+                                {repeatError && (
+                                    <p role="alert" className="text-sm text-danger">
+                                        {repeatError}
+                                    </p>
+                                )}
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => setRepeating(null)}
+                                    >
+                                        {t("console.cancel")}
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        aria-disabled={
+                                            !running || !readRepeatDraft(repeating.draft).plan
+                                        }
+                                        disabled={pending}
+                                        className="aria-disabled:opacity-50"
+                                    >
+                                        <Repeat className="size-4" /> {t("consoleRepeat.start")}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                )}
+
                 {keeping && (
                     <KeepCommandDialog
                         initial={keeping}
@@ -1015,6 +1215,7 @@ export function GameConsole({
                     <RunCommandDialog
                         entry={asking.entry}
                         mode={asking.mode}
+                        repeatOn={asking.repeat}
                         edition={edition}
                         players={players}
                         pending={pending}

@@ -17,6 +17,7 @@ import { z } from "zod";
 import { nextCronRun, parseCron } from "./cron.js";
 import { durationSchema, durationSeconds } from "./automation-schema.js";
 import { automationNodeId } from "./automation-nodes.js";
+import { isAppEventName, type AppEventApp } from "./automation-app-events.js";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -106,6 +107,19 @@ export const NAS_EVENT_NAMES = [
     "nas.backup-failed",
     "nas.backup-overdue"
 ] as const;
+
+/**
+ * Whether only Polaris may send an event of this name: its own prefix, and every
+ * event a watcher or an app sends, so an Announce step cannot pass for them.
+ */
+export function isReservedEventName(name: string): boolean {
+    return (
+        name.startsWith(RESERVED_EVENT_PREFIX) ||
+        name === PUBLIC_IP_CHANGED_EVENT ||
+        (NAS_EVENT_NAMES as readonly string[]).includes(name) ||
+        isAppEventName(name)
+    );
+}
 
 // ---------------------------------------------------------------------------
 // Statuses and modes
@@ -826,10 +840,7 @@ export const CORE_NODE_CONFIGS = {
         body: text(AUTOMATION_LIMITS.textLength).min(1)
     }),
     "core.announce": z.object({
-        name: eventName.refine(
-            (value) => !value.startsWith(RESERVED_EVENT_PREFIX),
-            "eventNameReserved"
-        ),
+        name: eventName.refine((value) => !isReservedEventName(value), "eventNameReserved"),
         payload: valuePairs
     }),
     "core.try": z.object({
@@ -838,7 +849,9 @@ export const CORE_NODE_CONFIGS = {
     }),
     "core.waitCondition": waitConditionConfigSchema,
     "core.threshold": thresholdConfigSchema,
-    "core.connectivity": connectivityTriggerConfigSchema
+    "core.connectivity": connectivityTriggerConfigSchema,
+    /** Deploy a service again, as Redeploy on its page does. */
+    "core.redeploy": z.object({ applicationId: z.string().uuid("serviceRequired") })
 } as const;
 export type CoreNodeType = keyof typeof CORE_NODE_CONFIGS;
 export const CORE_NODE_TYPES = Object.keys(CORE_NODE_CONFIGS) as CoreNodeType[];
@@ -883,6 +896,7 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.message": { role: "action", ports: [], idempotent: false },
     // The event's dedupe key is the step's idempotency key.
     "core.announce": { role: "action", ports: [], idempotent: true },
+    "core.redeploy": { role: "action", ports: [], idempotent: false },
     "core.try": {
         role: "flow",
         ports: ["body", "then", "catch", "always"],
@@ -1689,8 +1703,111 @@ export function normalizeAutomationName(value: string): string {
 }
 
 /** Ready-made automations somebody can start from. */
-export const AUTOMATION_TEMPLATES = ["internetBack"] as const;
+export const AUTOMATION_TEMPLATES = [
+    "internetBack",
+    "gameServerCrashed",
+    "playerJoined",
+    "deployFailed",
+    "calendarStarting"
+] as const;
 export type AutomationTemplate = (typeof AUTOMATION_TEMPLATES)[number];
+
+/** A template's words, in the reader's language, with the trigger's data already in them. */
+export interface TemplateWords {
+    readonly title: string;
+    readonly body: string;
+}
+
+interface TemplateSpec {
+    /** The apps whose events or steps it uses: offered only where all of them are here. */
+    readonly apps: readonly AppEventApp[];
+    /** What each placeholder in its words stands for, as an expression over the trigger. */
+    readonly params: Readonly<Record<string, string>>;
+    readonly graph: (timeZone: string, words: TemplateWords) => AutomationGraph;
+}
+
+const payload = (field: string) => `{{trigger.payload.${field}}}`;
+
+/** An "On event" trigger on one of Polaris's own events, followed by one step. */
+function eventThen(
+    timeZone: string,
+    event: string,
+    step: { type: string; config: unknown }
+): AutomationGraph {
+    const graph = emptyGraph(timeZone);
+    const trigger = automationNodeId();
+    const then = automationNodeId();
+    graph.nodes.push(
+        {
+            id: trigger,
+            type: "core.onEvent",
+            typeVersion: 1,
+            config: { name: event, outcomes: [] }
+        },
+        { id: then, type: step.type, typeVersion: 1, config: step.config }
+    );
+    graph.edges.push({ from: { node: trigger, port: "next" }, to: { node: then } });
+    return graph;
+}
+
+const notice = (words: TemplateWords) => ({
+    type: "core.notify",
+    config: { title: words.title, body: words.body }
+});
+
+export const AUTOMATION_TEMPLATE_SPECS: Readonly<Record<AutomationTemplate, TemplateSpec>> = {
+    internetBack: {
+        apps: [],
+        params: { duration: "{{trigger.duration}}" },
+        graph: (timeZone, words) => internetBackGraph(timeZone, words)
+    },
+    // The chat channel is left for the reader to pick: the step asks for it.
+    gameServerCrashed: {
+        apps: ["game-servers", "chat"],
+        params: { server: payload("name"), cause: payload("cause") },
+        graph: (timeZone, words) =>
+            eventThen(timeZone, "game-server.crashed", {
+                type: "core.message",
+                config: {
+                    webhookId: "",
+                    stamp: "",
+                    body: `${words.title}
+${words.body}`
+                }
+            })
+    },
+    playerJoined: {
+        apps: ["game-servers"],
+        params: { player: payload("player"), server: payload("name") },
+        graph: (timeZone, words) => eventThen(timeZone, "game-server.player-joined", notice(words))
+    },
+    deployFailed: {
+        apps: ["deploy"],
+        params: { service: payload("name"), error: payload("error") },
+        graph: (timeZone, words) => eventThen(timeZone, "deploy.failed", notice(words))
+    },
+    calendarStarting: {
+        apps: ["calendar"],
+        params: { event: payload("title"), calendar: payload("calendar") },
+        graph: (timeZone, words) => eventThen(timeZone, "calendar.event-starting", notice(words))
+    }
+};
+
+/** The templates that fit where these apps are here, in gallery order. */
+export function availableTemplates(apps: readonly string[]): AutomationTemplate[] {
+    return AUTOMATION_TEMPLATES.filter((template) =>
+        AUTOMATION_TEMPLATE_SPECS[template].apps.every((app) => apps.includes(app))
+    );
+}
+
+/** A template's graph, with its words already in the reader's language. */
+export function templateGraph(
+    template: AutomationTemplate,
+    timeZone: string,
+    words: TemplateWords
+): AutomationGraph {
+    return AUTOMATION_TEMPLATE_SPECS[template].graph(timeZone, words);
+}
 
 /**
  * "Tell me when the internet comes back": the connectivity trigger on "up" and a

@@ -21,6 +21,7 @@ import {
     Copy,
     ListOrdered,
     MoreHorizontal,
+    Repeat,
     Trash2
 } from "lucide-react";
 import {
@@ -44,6 +45,7 @@ import {
     hasPauses,
     isSequence,
     keptCommandCount,
+    placeholderRange,
     type SavedCommand
 } from "../../lib/console-commands";
 import type { KeepDraft } from "./console-keep-dialog";
@@ -78,6 +80,7 @@ export function KeptCommandsMenu({
     onRun,
     onEdit,
     onSchedule,
+    onRepeat,
     onLoad,
     onDuplicate,
     onForget
@@ -90,6 +93,8 @@ export function KeptCommandsMenu({
     onRun: (entry: SavedCommand) => void;
     onEdit: (entry: SavedCommand) => void;
     onSchedule: (entry: SavedCommand) => void;
+    /** Run it several times, a gap between runs. */
+    onRepeat?: (entry: SavedCommand) => void;
     onLoad: (entry: SavedCommand) => void;
     onDuplicate: (entry: SavedCommand) => void;
     onForget: (entry: SavedCommand) => void;
@@ -192,6 +197,16 @@ export function KeptCommandsMenu({
                                     ) : (
                                         <DropdownMenuItem onSelect={() => onSchedule(entry)}>
                                             <CalendarClock /> {t("consoleSchedule.scheduleIt")}
+                                        </DropdownMenuItem>
+                                    )}
+                                    {/* A blank still to fill in is filled in the box, once;
+                                        repeating it would send the blank. */}
+                                    {onRepeat && !placeholderRange(entry.command) && (
+                                        <DropdownMenuItem
+                                            disabled={!canRun}
+                                            onSelect={() => onRepeat(entry)}
+                                        >
+                                            <Repeat /> {t("consoleRepeat.repeatIt")}
                                         </DropdownMenuItem>
                                     )}
                                     <DropdownMenuItem onSelect={() => onLoad(entry)}>

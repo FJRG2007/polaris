@@ -66,6 +66,12 @@ const NoticeDeliveryFields = dynamic(
     { ssr: false }
 );
 
+/** A text field of an app's automation node that takes `{{ }}` values. */
+const RefInput = dynamic(
+    () => import("@/app/(app)/automations/[id]/references").then((module) => module.RefInput),
+    { ssr: false }
+);
+
 const ChooseFilesDialog = dynamic(
     () =>
         import("@/components/file-picker/choose-files-dialog").then(
@@ -171,6 +177,7 @@ export const clientHost = {
     appAppsInstalledIdUseRuntimeLog: { useRuntimeLog },
     appFavorites: { refreshAppFavorites },
     automationsList: { AutomationsList },
+    automationsReferences: { RefInput },
     automationsNotice: { NoticeDeliveryFields },
     avatar: { Avatar },
     brandIcons: { TpLinkMark },

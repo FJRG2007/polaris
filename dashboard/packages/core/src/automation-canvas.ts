@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import * as graphs from "./automation-graph.js";
+import * as appEvents from "./automation-app-events.js";
 
 /** The size every node card is drawn at, in board units. */
 export const CANVAS_NODE = { width: 240, height: 72 } as const;
@@ -707,7 +708,8 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
         "previous",
         "current",
         "publicIp"
-    ]
+    ],
+    "core.redeploy": ["deploymentId", "applicationId"]
 };
 
 export interface ReferenceOption {
@@ -792,8 +794,15 @@ export function referenceOptions(
     if (lane === "finally")
         for (const [id, at] of lanesOf(graph)) if (at === "main") upstream.add(id);
     const groups: ReferenceGroup[] = [];
-    const known = (node: graphs.GraphNode) =>
-        graphs.isCoreNodeType(node.type) ? CORE_NODE_OUTPUT_PATHS[node.type] : [];
+    const known = (node: graphs.GraphNode) => {
+        if (!graphs.isCoreNodeType(node.type)) return [];
+        const paths = CORE_NODE_OUTPUT_PATHS[node.type];
+        // An app's event: its fields are known before any sample is.
+        const name =
+            node.type === "core.onEvent" ? (node.config as { name?: unknown })?.name : null;
+        const fields = typeof name === "string" ? appEvents.appEventFields(name) : [];
+        return fields.length ? [...paths, ...fields.map((field) => `payload.${field}`)] : paths;
+    };
     for (const id of upstream) {
         const node = byId.get(id);
         if (!node) continue;

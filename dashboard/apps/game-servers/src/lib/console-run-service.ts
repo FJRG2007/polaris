@@ -228,7 +228,7 @@ export async function runConsoleSchedules(
 
 /** Whether whoever set a schedule up still has the console on this server: a
  *  grant taken away, a share revoked or an account switched off ends it. */
-async function mayStillRun(userId: string, installedAppId: string): Promise<boolean> {
+export async function mayStillRun(userId: string, installedAppId: string): Promise<boolean> {
     try {
         const user = await host.mcp.actingUser(userId);
         if (!user) return false;

@@ -1029,7 +1029,7 @@ export function FlowNodeFields({
                 <div className="space-y-3">
                     {hint(t("nodeHints.announce"))}
                     <EventName value={config.name ?? ""} onChange={(name) => set({ name })} />
-                    {String(config.name ?? "").startsWith(core.RESERVED_EVENT_PREFIX) ? (
+                    {core.isReservedEventName(String(config.name ?? "")) ? (
                         <p role="alert" className="text-xs text-danger">
                             {t("flow.eventNameReserved", { prefix: core.RESERVED_EVENT_PREFIX })}
                         </p>

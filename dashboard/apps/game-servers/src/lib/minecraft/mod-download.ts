@@ -55,7 +55,7 @@ export interface DownloadLimit {
 
 /** Whether this download fits under the limit. HEAD is not counted: it sends no
  *  file. */
-async function withinLimit(limit: DownloadLimit): Promise<boolean> {
+export async function withinLimit(limit: DownloadLimit): Promise<boolean> {
     const address = (await clientIp()) ?? "unknown";
     const mine = await rateLimit(`${limit.bucket}:${address}`, limit.perAddress, limit.windowMs);
     if (!mine.ok) return false;

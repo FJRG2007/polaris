@@ -795,6 +795,14 @@ async function storeMessages(
      *  time: filing opens a connection, and this function is already inside one. */
     const judged: string[] = [];
     let stored = 0;
+    /** Asked once a page: nobody listening is the common case, and costs one read. */
+    const toAutomations =
+        arrivals &&
+        folder.role === "inbox" &&
+        // Loaded when it runs: the automations engine pulls in session and auth.
+        (await import("@/lib/automations/app-events")
+            .then(({ anyListening }) => anyListening("mail.received"))
+            .catch(() => false));
 
     for (const message of fetched) {
         const envelope = message.envelope;
@@ -894,7 +902,7 @@ async function storeMessages(
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
                     message.headers["disposition-notification-to"] ??
-                        message.headers["return-receipt-to"]
+                    message.headers["return-receipt-to"]
                 ),
                 headers: message.headers,
                 attachments: {
@@ -948,7 +956,20 @@ async function storeMessages(
                 // the end of the pass. Answering junk with an out-of-office is
                 // how a mailbox confirms to a sender that the address is real,
                 // so the two are ordered rather than left to chance.
-                else await replyIfAway(account.id, row.id);
+                else {
+                    await replyIfAway(account.id, row.id);
+                    // Junk starts no automation, for the reason it gets no away reply.
+                    if (toAutomations)
+                        await (
+                            await import("@/lib/automations/mail-events")
+                        ).announceMail({
+                            messageId: row.id,
+                            account,
+                            from,
+                            subject: shape.subject,
+                            snippet
+                        });
+                }
             }
         }
     }

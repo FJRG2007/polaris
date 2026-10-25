@@ -8,11 +8,15 @@
 import * as core from "@polaris/core";
 import type { ServerNode } from "./types";
 import { HTTP_SERVER_NODES } from "./nodes/http-node";
+import { redeployNode } from "./nodes/deploy-node";
 import { CORE_SERVER_NODES } from "./nodes/core-nodes";
 import { appAutomationNodes } from "@/lib/app-extensions/registry";
 
 const CORE = new Map<string, ServerNode>(
-    [...CORE_SERVER_NODES, ...HTTP_SERVER_NODES].map((node) => [node.type, node])
+    [...CORE_SERVER_NODES, ...HTTP_SERVER_NODES, redeployNode as ServerNode].map((node) => [
+        node.type,
+        node
+    ])
 );
 
 export async function serverNode(type: string): Promise<ServerNode | null> {

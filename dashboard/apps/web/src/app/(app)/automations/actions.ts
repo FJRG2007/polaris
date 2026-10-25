@@ -17,6 +17,7 @@ import * as service from "@/lib/automations/service";
 import * as history from "@/lib/automations/history";
 import * as secrets from "@/lib/automations/secrets";
 import * as organize from "@/lib/automations/organize";
+import * as appEvents from "@/lib/automations/app-events";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { LegacyRunRow } from "@/lib/app-extensions/types";
 import type { RunActor } from "@/lib/automations/types";
@@ -96,14 +97,15 @@ export async function getAutomationAction(
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        const [found, appNodes] = await Promise.all([
+        const [found, appNodes, eventApps] = await Promise.all([
             service.getAutomation(who, parsed.data),
-            appAutomationNodeSlots().catch(() => ({}))
+            appAutomationNodeSlots().catch(() => ({})),
+            requirePermission("automations.use").then((user) => appEvents.eventApps(user))
         ]);
         const unnamed = core.LOCALES.some(
             (locale) => translate(locale, "automations.create.untitled") === found.name
         );
-        const automation = { ...found, appNodes, unnamed };
+        const automation = { ...found, appNodes, eventApps, unnamed };
         const shelf = await service.shelfOf(parsed.data);
         return {
             ok: true,
@@ -115,14 +117,31 @@ export async function getAutomationAction(
     }
 }
 
-/** The shelves this account may create an automation on: its own, and the organizations it administers. */
+/** The ready-made automations that fit here: those whose apps are installed and usable. */
+async function availableTemplates(): Promise<core.AutomationTemplate[]> {
+    const user = await requirePermission("automations.use");
+    return core.availableTemplates(await appEvents.eventApps(user).catch(() => []));
+}
+
+/**
+ * The shelves this account may create an automation on (its own, and the
+ * organizations it administers), and the templates it may start from.
+ */
 export async function creatableShelvesAction(): Promise<
-    Result<{ orgs: { id: string; name: string }[]; openOrgId: string | null }>
+    Result<{
+        orgs: { id: string; name: string }[];
+        openOrgId: string | null;
+        templates: core.AutomationTemplate[];
+    }>
 > {
     try {
         const who = await actor();
-        const orgs = await listAdministeredOrgs(who);
-        return { ok: true, orgs, openOrgId: await scopeOrgIdFor(who.id) };
+        const [orgs, openOrgId, templates] = await Promise.all([
+            listAdministeredOrgs(who),
+            scopeOrgIdFor(who.id),
+            availableTemplates()
+        ]);
+        return { ok: true, orgs, openOrgId, templates };
     } catch (caught) {
         return failure(caught);
     }
@@ -143,17 +162,19 @@ export async function createAutomationAction(
         };
     }
     try {
-        const t = parsed.data.template ? await getTranslations("automations") : null;
+        const template = parsed.data.template;
+        // A template whose app is not here would start an automation nothing ever runs.
+        if (template && !(await availableTemplates()).includes(template)) return invalid();
+        const t = template ? await getTranslations("automations") : null;
+        const params = template ? core.AUTOMATION_TEMPLATE_SPECS[template].params : {};
         const newId = await service.createAutomation(
             await actor(),
             parsed.data,
             zone.success ? zone.data : "UTC",
-            t && parsed.data.template
+            t && template
                 ? {
-                      title: t(`templates.${parsed.data.template}.noticeTitle`),
-                      body: t(`templates.${parsed.data.template}.noticeBody`, {
-                          duration: "{{trigger.duration}}"
-                      })
+                      title: t(`templates.${template}.noticeTitle`, params),
+                      body: t(`templates.${template}.noticeBody`, params)
                   }
                 : undefined
         );

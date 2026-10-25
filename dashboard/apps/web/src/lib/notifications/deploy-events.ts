@@ -156,6 +156,27 @@ export async function notifyDeployFinished(input: {
             });
         }
 
+        // Automations listening for deploys, run as somebody this alert was for:
+        // the owner, whoever triggered it, a follower, or an administrator.
+        // Loaded when it runs: the automations engine pulls in session and auth.
+        const { emitAppEvent } = await import("../automations/app-events");
+        await emitAppEvent(
+            event,
+            {
+                deploymentId: input.deploymentId,
+                deployableType: deployment.deployableType,
+                deployableId: deployment.deployableId,
+                name: deployable.label.slice(0, 200),
+                commitSha: deployment.commitSha?.slice(0, 64) ?? null,
+                trigger: deployment.trigger?.slice(0, 32) ?? null,
+                error: input.ok ? null : summarize(deployment.error)
+            },
+            {
+                key: input.deploymentId,
+                mayReceive: async (runner) => runner.isAdmin || recipients.has(runner.id)
+            }
+        );
+
         // The project's own endpoints, alongside the people. These belong to the
         // project rather than to anyone's account, so they keep reporting when
         // whoever added them is gone - which is the point of having them.

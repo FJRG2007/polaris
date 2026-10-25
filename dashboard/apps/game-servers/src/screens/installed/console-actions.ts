@@ -55,7 +55,14 @@ import {
     savedCommandProblem,
     type SavedCommand
 } from "../../lib/console-commands";
-import type { QueueStep } from "../../lib/console-queue";
+import { MAX_CONSOLE_LINE, type QueueStep } from "../../lib/console-queue";
+import {
+    repeatPlanSchema,
+    type ConsoleRepeatView,
+    type RepeatPlan
+} from "../../lib/console-repeat";
+import { listRepeats, stopRepeat } from "../../lib/console-repeat-jobs";
+import { startConsoleRepeat } from "../../lib/console-repeat-service";
 import { gameMessage } from "../../lib/game-message";
 import { host } from "@polaris/app-host";
 
@@ -424,6 +431,174 @@ export async function removeConsoleScheduleAction(
                 caught instanceof Error
                     ? await messageText(caught.message)
                     : words("errors.thatCommandCouldNotBe2")
+        };
+    }
+}
+
+// ------------------------------------------------------------------ repeats
+
+/** Repeats one person may start in a minute, on top of the per-server cap. */
+const REPEAT_STARTS_PER_MINUTE = 10;
+
+const repeatLineSchema = z.object({
+    installedAppId: z.string().uuid(),
+    line: z.string().trim().min(1).max(MAX_CONSOLE_LINE),
+    repeat: repeatPlanSchema
+});
+
+export type RepeatConsoleLineInput = z.input<typeof repeatLineSchema>;
+export type RepeatKeptCommandInput = RunKeptCommandInput & { repeat: RepeatPlan };
+
+/** The carried refusal for a person starting repeats faster than anybody would
+ *  by hand, or null. */
+async function tooFast(userId: string): Promise<string | null> {
+    const allowed = await host.rateLimitService
+        .rateLimit(`games-console-repeat:${userId}`, REPEAT_STARTS_PER_MINUTE, 60_000)
+        .catch(() => ({ ok: true }));
+    return allowed.ok ? null : gameMessage("games", "consoleRepeat.errors.slowDown");
+}
+
+async function repeatAudit(
+    userId: string,
+    installedAppId: string,
+    command: string,
+    repeat: RepeatPlan
+): Promise<void> {
+    await recordAudit({
+        actorId: userId,
+        action: "games.console.repeat",
+        targetType: "installedApp",
+        targetId: installedAppId,
+        metadata: { command, times: repeat.times, every: repeat.every, unit: repeat.unit }
+    });
+}
+
+/** Run a line typed in the console several times, with a gap between runs. It
+ *  runs here, on the server: closing the page does not stop it. */
+export async function repeatConsoleLineAction(
+    input: RepeatConsoleLineInput
+): Promise<{ repeats?: ConsoleRepeatView[]; error?: string }> {
+    const words = await gameWords("games");
+    const parsed = repeatLineSchema.safeParse(input);
+    if (!parsed.success) {
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                words("errors.checkTheCommandAndTry")
+        };
+    }
+    try {
+        const { user, access } = await requireGameServer(
+            "games.console",
+            parsed.data.installedAppId
+        );
+        const slow = await tooFast(user.id);
+        if (slow) return { error: await messageText(slow) };
+        const line = parsed.data.line;
+        await startConsoleRepeat({
+            actor: user,
+            server: access,
+            label: line,
+            command: line,
+            plan: parsed.data.repeat,
+            steps: async () => [{ kind: "command", line }]
+        });
+        await repeatAudit(user.id, access.install.id, line, parsed.data.repeat);
+        return { repeats: listRepeats(access.install.id) };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.thatCommandCouldNotBe")
+        };
+    }
+}
+
+/** Run a kept command several times. Its values are fixed now; who "every
+ *  player online" is, is worked out again on every run. */
+export async function repeatKeptCommandAction(
+    input: RepeatKeptCommandInput
+): Promise<{ repeats?: ConsoleRepeatView[]; error?: string }> {
+    const words = await gameWords("games");
+    const repeat = repeatPlanSchema.safeParse(input.repeat);
+    if (!repeat.success) {
+        return {
+            error:
+                (await issueText(repeat.error.issues[0]?.message)) ??
+                words("errors.checkTheCommandAndTry")
+        };
+    }
+    try {
+        const resolved = await keptRun(input);
+        if ("error" in resolved) return { error: resolved.error };
+        const { user, access, entry, run } = resolved;
+        const slow = await tooFast(user.id);
+        if (slow) return { error: await messageText(slow) };
+        await startConsoleRepeat({
+            actor: user,
+            server: access,
+            label: entry.label,
+            command: entry.command,
+            plan: repeat.data,
+            steps: () => keptCommandSteps(access, run)
+        });
+        await repeatAudit(user.id, access.install.id, entry.command, repeat.data);
+        return { repeats: listRepeats(access.install.id) };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.thatCommandCouldNotBe")
+        };
+    }
+}
+
+/** The repeats on this server, whoever started them. Empty for somebody who may
+ *  not use its console. */
+export async function listConsoleRepeatsAction(
+    installedAppId: string
+): Promise<{ repeats: ConsoleRepeatView[] }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { repeats: [] };
+    try {
+        await requireGameServer("games.console", parsed.data);
+        return { repeats: listRepeats(parsed.data) };
+    } catch {
+        return { repeats: [] };
+    }
+}
+
+/** Stop a repeat, whoever started it: anybody with this server's console. */
+export async function stopConsoleRepeatAction(
+    installedAppId: string,
+    id: string
+): Promise<{ repeats?: ConsoleRepeatView[]; error?: string }> {
+    const words = await gameWords("games");
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), id: z.string().uuid() })
+        .safeParse({ installedAppId, id });
+    if (!parsed.success) return { error: words("consoleRepeat.stopFailed") };
+    try {
+        const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
+        if (stopRepeat(parsed.data.installedAppId, parsed.data.id)) {
+            await recordAudit({
+                actorId: user.id,
+                action: "games.console.repeat.stop",
+                targetType: "installedApp",
+                targetId: parsed.data.installedAppId,
+                metadata: { id: parsed.data.id }
+            });
+        }
+        // Already over is what was asked for: the list says how it ended.
+        return { repeats: listRepeats(parsed.data.installedAppId) };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("consoleRepeat.stopFailed")
         };
     }
 }

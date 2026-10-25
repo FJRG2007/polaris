@@ -16,8 +16,10 @@ import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "
 
 export interface ControlHintText {
     readonly text: string;
-    /** `state` for a standing fact, `warn` for something to act on now. */
-    readonly tone: "state" | "warn";
+    /** `state` for a standing fact, `warn` for something to act on now,
+     *  `speaking` for a voice heard while muted - green, the way it reads in
+     *  every call client, since nothing is wrong yet. */
+    readonly tone: "state" | "warn" | "speaking";
 }
 
 /** Space kept between the hint and the button, and between it and the window. */
@@ -105,7 +107,9 @@ export function ControlHint({
                 !at && "invisible",
                 hint.tone === "warn"
                     ? "bg-danger-solid text-danger-foreground"
-                    : "border border-border-strong bg-elevated text-foreground"
+                    : hint.tone === "speaking"
+                      ? "bg-success-solid text-success-foreground"
+                      : "border border-border-strong bg-elevated text-foreground"
             )}
         >
             {hint.text}

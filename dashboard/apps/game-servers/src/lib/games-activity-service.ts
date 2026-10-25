@@ -267,6 +267,8 @@ async function writeRoster(
         await announcePlayers(installedAppId, [...new Set(names)]);
     }
 
+    if (change.arrived.length > 0) await announceArrivals(installedAppId, change.arrived, now);
+
     // When each visit still open began, for a live feed that says so.
     const since = new Map<string, Date>();
     const reopened = new Set(writes.close.map((row) => row.id));
@@ -318,6 +320,37 @@ async function announcePlayers(installedAppId: string, names: readonly string[])
         if (accounts.length > 0) await announceActivity(accounts);
     } catch {
         // The presence refresh picks it up within a minute.
+    }
+}
+
+/**
+ * Who arrived, told to the automations listening for a player joining. Best
+ * effort like the cards: the record is already written.
+ */
+export async function announceArrivals(
+    installedAppId: string,
+    players: readonly RosterPlayer[],
+    now: Date
+): Promise<void> {
+    try {
+        if (!(await host.automations.anyListening("game-server.player-joined"))) return;
+        const install = await prisma.installedApp.findUnique({
+            where: { id: installedAppId },
+            select: { ownerId: true }
+        });
+        if (!install) return;
+        const minute = Math.floor(now.getTime() / 60_000);
+        for (const player of players) {
+            await host.automations.announceGameServerEvent(
+                install.ownerId,
+                installedAppId,
+                "game-server.player-joined",
+                { player: player.name.slice(0, 64) },
+                `join:${player.name}:${minute}`
+            );
+        }
+    } catch {
+        // An automation never undoes the record.
     }
 }
 

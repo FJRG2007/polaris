@@ -15,8 +15,14 @@ import {
     Tags,
     Share2,
     Trash2,
+    UserPlus,
+    Wifi,
     Workflow,
-    X
+    Rocket,
+    Gamepad2,
+    CalendarClock,
+    X,
+    type LucideIcon
 } from "lucide-react";
 import {
     Badge,
@@ -39,6 +45,7 @@ import {
     EmptyState,
     Input,
     Select,
+    Skeleton,
     Switch,
     isDirty,
     useToast
@@ -99,18 +106,8 @@ export function AutomationsList({
     );
     const mayCreate = Boolean(data?.canEdit) && !origin;
     const [creating, setCreating] = useState(false);
-    const router = useRouter();
-    const [opening, startOpening] = useTransition();
-    // Nothing is asked up front: the editor names it from its first trigger. Only
-    // somebody who can also add to an organization is asked where it belongs.
-    const createNew = () =>
-        startOpening(async () => {
-            const shelves = await creatableShelvesAction().catch(() => null);
-            if (shelves?.ok && shelves.orgs.length > 0) return setCreating(true);
-            const answer = await createUnnamed(t("create.untitled"), null);
-            if (!answer.ok) return void toast.show({ title: answer.error });
-            router.push(`/automations/${answer.id}`);
-        });
+    // No name is asked up front: a blank one is named by its first trigger.
+    const createNew = () => setCreating(true);
     const [folder, setFolder] = useState<string>(ALL);
     const [tag, setTag] = useState<string | null>(null);
     const [managing, setManaging] = useState(false);
@@ -236,7 +233,7 @@ export function AutomationsList({
                 <div className="ml-auto flex items-center gap-2">
                     {actions}
                     {mayCreate ? (
-                        <Button onClick={createNew} disabled={opening} aria-busy={opening}>
+                        <Button onClick={createNew}>
                             <Plus aria-hidden="true" />
                             {t("newAutomation")}
                         </Button>
@@ -284,7 +281,7 @@ export function AutomationsList({
                     }
                     action={
                         mayCreate ? (
-                            <Button onClick={createNew} disabled={opening} aria-busy={opening}>
+                            <Button onClick={createNew}>
                                 <Plus aria-hidden="true" />
                                 {t("newAutomation")}
                             </Button>
@@ -860,26 +857,42 @@ function TagsDialog({
     );
 }
 
-/** A new automation with the placeholder name, on a person's own shelf or an organization's. */
-function createUnnamed(name: string, orgId: string | null) {
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    return createAutomationAction({ name, description: "", orgId }, zone);
-}
+const TEMPLATE_ICONS: Record<core.AutomationTemplate, LucideIcon> = {
+    internetBack: Wifi,
+    gameServerCrashed: Gamepad2,
+    playerJoined: UserPlus,
+    deployFailed: Rocket,
+    calendarStarting: CalendarClock
+};
 
-/** Asked only of somebody who can add automations to an organization: where the new one belongs. */
-function CreateDialog({ onClose }: { onClose: () => void }) {
+/**
+ * Where a new automation starts: blank (named later by its first trigger) or
+ * from a template whose apps are here. Somebody who can also add to an
+ * organization picks where it belongs.
+ */
+export function CreateDialog({ onClose }: { onClose: () => void }) {
     const t = useTranslations("automations");
     const router = useRouter();
     const [orgId, setOrgId] = useState<string>("personal");
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
     const shelves = useCachedAction("polaris.automations.shelves", creatableShelvesAction);
+    const loaded = shelves.data?.ok ? shelves.data : null;
+    // A cached answer from before templates existed has none.
+    const templates = loaded?.templates ?? [];
 
-    const submit = () =>
+    const create = (template?: core.AutomationTemplate) =>
         start(async () => {
-            const answer = await createUnnamed(
-                t("create.untitled"),
-                orgId === "personal" ? null : orgId
+            setError(null);
+            const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+            const answer = await createAutomationAction(
+                {
+                    name: template ? t(`templates.${template}.name`) : t("create.untitled"),
+                    description: "",
+                    orgId: orgId === "personal" ? null : orgId,
+                    template
+                },
+                zone
             );
             if (!answer.ok) return setError(answer.error);
             router.push(`/automations/${answer.id}`);
@@ -887,24 +900,17 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
 
     const options = [
         { value: "personal", label: t("create.personal") },
-        ...(shelves.data?.ok
-            ? shelves.data.orgs.map((org) => ({ value: org.id, label: org.name }))
-            : [])
+        ...(loaded?.orgs ?? []).map((org) => ({ value: org.id, label: org.name }))
     ];
 
     return (
         <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>{t("create.title")}</DialogTitle>
+                    <DialogDescription>{t("create.hint")}</DialogDescription>
                 </DialogHeader>
-                <form
-                    className="space-y-3"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        submit();
-                    }}
-                >
+                {options.length > 1 ? (
                     <label className="block space-y-1 text-sm">
                         <span>{t("create.shelf")}</span>
                         <Select
@@ -914,21 +920,91 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
                             aria-label={t("create.shelf")}
                         />
                     </label>
-                    {error ? (
-                        <p role="alert" className="text-sm text-danger">
-                            {error}
-                        </p>
-                    ) : null}
-                    <DialogFooter>
-                        <Button type="button" variant="ghost" onClick={onClose}>
-                            {t("create.cancel")}
-                        </Button>
-                        <Button type="submit" disabled={pending}>
-                            {t("create.submit")}
-                        </Button>
-                    </DialogFooter>
-                </form>
+                ) : null}
+                <ul className="space-y-1" aria-busy={pending}>
+                    <StartOption
+                        icon={<Plus aria-hidden="true" />}
+                        label={t("create.blank")}
+                        description={t("create.blankHint")}
+                        disabled={pending}
+                        onPick={() => create()}
+                    />
+                </ul>
+                {(loaded && templates.length === 0) ||
+                (!shelves.data && shelves.error !== null) ? null : (
+                    <section className="space-y-1">
+                        <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                            {t("create.templates")}
+                        </h3>
+                        {!shelves.data ? (
+                            <div className="space-y-1" aria-hidden="true">
+                                <Skeleton className="h-12 w-full" />
+                                <Skeleton className="h-12 w-full" />
+                            </div>
+                        ) : (
+                            <ul className="space-y-1">
+                                {templates.map((template) => {
+                                    const Icon = TEMPLATE_ICONS[template];
+                                    return (
+                                        <StartOption
+                                            key={template}
+                                            icon={<Icon aria-hidden="true" />}
+                                            label={t(`templates.${template}.name`)}
+                                            description={t(`templates.${template}.description`)}
+                                            disabled={pending}
+                                            onPick={() => create(template)}
+                                        />
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+                )}
+                {error ? (
+                    <p role="alert" className="text-sm text-danger">
+                        {error}
+                    </p>
+                ) : null}
+                <DialogFooter>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        {t("create.cancel")}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** One way to start: an icon, its name and a line on what it does. */
+function StartOption({
+    icon,
+    label,
+    description,
+    disabled,
+    onPick
+}: {
+    icon: ReactNode;
+    label: string;
+    description: string;
+    disabled: boolean;
+    onPick: () => void;
+}) {
+    return (
+        <li>
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={onPick}
+                className="flex w-full min-w-0 items-start gap-3 rounded-md border border-border px-3 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            >
+                <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">
+                    {icon}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm font-medium [overflow-wrap:anywhere]">{label}</span>
+                    <span className="text-xs text-muted-foreground">{description}</span>
+                </span>
+            </button>
+        </li>
     );
 }

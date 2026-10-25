@@ -9,10 +9,10 @@
  * the game and no plugin ships one.
  *
  * A map is the other half - a world somebody built, fetched while the server is
- * being created and extracted into its data directory before it boots. Nothing is
- * kept on the machine Polaris runs on: the entry names a URL and the container
- * downloads it itself, once, on the first start, and only when that level does not
- * already exist. A server that is never created never downloads anything.
+ * being created and extracted into its data directory before it boots. The entry
+ * names an archive and the container downloads it from Polaris itself, once, on
+ * the first start, and only when that level does not already exist. A server that
+ * is never created never downloads anything.
  *
  * Three things make a map more than a download, and all three are why this is a
  * table rather than a URL on the blueprint:
@@ -33,30 +33,32 @@
  *   one world. `projects` says what the map itself needs, and an empty list is a
  *   map that needs nothing.
  *
- * The archives are mirrored rather than fetched from the page each map was
- * published on. Those pages hand their downloads out through a gate - a token in
- * the URL, a check on where the request came from - which is a download that works
- * when a person clicks it and fails from inside a container, and failing there
- * means a server that boots into an empty world with the reason only in its log.
- * What is mirrored is the world folder and nothing else. Every entry credits its
- * author and links the page it came from.
+ * The archives ship with Polaris rather than being fetched from the page each map
+ * was published on. Those pages hand their downloads out through a gate - a token
+ * in the URL, a check on where the request came from - which is a download that
+ * works when a person clicks it and fails from inside a container, and failing
+ * there means a server that boots into an empty world with the reason only in its
+ * log. What ships is the world folder and nothing else
+ * (resources/minecraft-worlds), staged into the Game servers bundle, so an
+ * instance that never installed Game servers carries none of it. Every entry
+ * credits its author and links the page it came from, and carries the hash of
+ * the archive it names.
  *
- * The mirror is a CDN over a tagged repository, and both halves of that are the
- * result of the same measurement. A GitHub release was the obvious place to put
- * them and is the wrong one: its asset host redirects to a signed URL that closes
- * HTTP/1.1 connections part way through often enough to fail two downloads in
- * three, and HTTP/1.1 is what the image's downloader speaks - so the first server
- * built on a map usually got no map. The tag is what makes the URL immutable, and
- * immutable is what lets each entry carry the hash of what it will actually get.
+ * The dashboard serves them (`world-download.ts`): a world to the server's
+ * container behind the instance's key, a pack to the players' clients. This
+ * module only knows the paths, so a screen can import it.
  */
 
 import { gameMessage } from "../game-message";
 import { FLAT_LEVEL_TYPE } from "./world";
 import type { GameBlueprint } from "./blueprints";
 
-/** Where the mirrored archives live. One tag, so a map added later is a commit
- *  and a new tag rather than a new place for these to come from. */
-const MIRROR = "https://cdn.jsdelivr.net/gh/FJRG2007/polaris-minecraft-worlds@v4";
+/** Where a server's container downloads a world: `<base>/<key>/<archive>`. */
+export const WORLD_PATH = "/api/minecraft/world";
+
+/** Where a player's client downloads a map's pack: `<base>/<archive>`. Public,
+ *  because the game fetches it with no credential of any kind. */
+export const MAP_PACK_PATH = "/api/minecraft/map-pack";
 
 /** The kind of game a map is, which is what a blueprint offers a choice of. */
 export type MapCategory = "skyblock" | "parkour" | "bedwars" | "luckyblock";
@@ -77,7 +79,8 @@ export interface MapRelease {
 
 /** A pack the map needs the client to load for it to look like itself. */
 export interface MapResourcePack {
-    readonly url: string;
+    /** The file in resources/minecraft-worlds. */
+    readonly archive: string;
     /** Required by the game before a client will use a downloaded pack. */
     readonly sha1: string;
 }
@@ -113,9 +116,9 @@ export interface WorldMap {
     readonly author: string;
     /** The page it was published on, which is where credit points. */
     readonly source: string;
-    /** The archive the container downloads. */
-    readonly url: string;
-    /** What that archive is, so a mirror that changed under us is visible. */
+    /** The file in resources/minecraft-worlds the container downloads. */
+    readonly archive: string;
+    /** What that archive is, so a file that changed under us is visible. */
     readonly sha256: string;
     readonly bytes: number;
     readonly minecraft: MapRelease;
@@ -155,7 +158,7 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         summary: gameMessage("games", "lib.maps.skyblock-2-1.summary"),
         author: "Noobcrew",
         source: "https://skyblock.net",
-        url: `${MIRROR}/skyblock-2-1.zip`,
+        archive: "skyblock-2-1.zip",
         sha256: "2dc429f5b76292559fe20de44676400d60ed7d1cb4fa0959291ff39358554920",
         bytes: 2554241,
         // Terrain and a chest, with no commands of its own to go out of date.
@@ -172,7 +175,7 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         summary: gameMessage("games", "lib.maps.parkour-spiral.summary"),
         author: "Hielke",
         source: "https://hielkemaps.com/maps/parkour-spiral",
-        url: `${MIRROR}/parkour-spiral.zip`,
+        archive: "parkour-spiral.zip",
         sha256: "d8ca9541c2c38b9e31170322ed6b3f0fde59b2f75078b8d2f297c1e769513f3f",
         bytes: 5367784,
         // The build the author publishes for the current release. Pinned rather
@@ -185,13 +188,50 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         setup: gameMessage("games", "lib.maps.parkour-spiral.setup")
     },
     {
+        id: "parkour-spiral-2",
+        name: "Parkour Spiral 2",
+        category: "parkour",
+        summary: gameMessage("games", "lib.maps.parkour-spiral-2.summary"),
+        author: "Hielke",
+        source: "https://hielkemaps.com/maps/parkour-spiral-2",
+        archive: "parkour-spiral-2.zip",
+        sha256: "ab8a96a391ce3a9056fd12ab609a8f9fa84f8a217e6672747312b66b2a131ef5",
+        bytes: 16606371,
+        // Run by command blocks like the first one, and reissued by the author
+        // for each release in the same way, so pinned the same way.
+        minecraft: { version: "26.2", policy: "exact" },
+        players: { min: 1, max: 20 },
+        env: { ...MAP_BASE_ENV, MODE: "adventure", DIFFICULTY: "peaceful", PVP: "false" },
+        projects: [],
+        setup: gameMessage("games", "lib.maps.parkour-spiral.setup")
+    },
+    {
+        id: "parkour-spiral-3",
+        name: "Parkour Spiral 3",
+        category: "parkour",
+        summary: gameMessage("games", "lib.maps.parkour-spiral-3.summary"),
+        author: "Hielke",
+        source: "https://hielkemaps.com/maps/parkour-spiral-3",
+        archive: "parkour-spiral-3.zip",
+        sha256: "2659e167bb875bd5e1ee1f139fa8ea387962174ff1d13993a2106e88de706632",
+        bytes: 27644845,
+        // Run by command blocks like the first one, and reissued by the author
+        // for each release in the same way, so pinned the same way.
+        minecraft: { version: "26.2", policy: "exact" },
+        players: { min: 1, max: 20 },
+        // Easy rather than peaceful: the author set it, and the map is built for it.
+        env: { ...MAP_BASE_ENV, MODE: "adventure", DIFFICULTY: "easy", PVP: "false" },
+        projects: [],
+        setup: gameMessage("games", "lib.maps.parkour-spiral.setup")
+    },
+    {
         id: "bedwars-treasure-island",
         name: "Bedwars: Treasure Island",
         category: "bedwars",
         summary: gameMessage("games", "lib.maps.bedwars-treasure-island.summary"),
         author: "TriplicataMC",
         source: "https://www.minecraftmaps.com/51834-bedwars-treasure-island",
-        url: `${MIRROR}/bedwars-treasure-island.zip`,
+        archive: "bedwars-treasure-island.zip",
         sha256: "0649d573b032b0635512e10f47aab19994d24336d9e33d4cdd6b70ea8be52008",
         bytes: 4889177,
         // The game is a datapack, and a datapack declares the release it was
@@ -202,7 +242,7 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         players: { min: 2, max: 16 },
         env: { ...MAP_BASE_ENV, MODE: "adventure", DIFFICULTY: "easy", PVP: "true" },
         resourcePack: {
-            url: `${MIRROR}/bedwars-treasure-island-resources.zip`,
+            archive: "bedwars-treasure-island-resources.zip",
             sha1: "7e015ebb19ae0101cbddbbd5a24fee772094eee1"
         },
         // The map is the whole game, which is what makes it worth having: the
@@ -218,7 +258,7 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         summary: gameMessage("games", "lib.maps.luckyblock-towers.summary"),
         author: "Polaris",
         source: "https://www.minecraftmaps.com",
-        url: `${MIRROR}/luckyblock-towers.zip`,
+        archive: "luckyblock-towers.zip",
         sha256: "9c86023e637b4aae3a291932b395f3cd4b65db89d2bb646499d0e9946981a310",
         bytes: 2170584,
         // Command blocks only, and every command in them is the modern syntax -
@@ -234,12 +274,15 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         // terrain around the towers and put spawn under it.
         generator: {
             levelType: FLAT_LEVEL_TYPE,
-            settings: JSON.stringify({ layers: [{ block: "minecraft:air", height: 1 }], biome: "minecraft:desert" })
+            settings: JSON.stringify({
+                layers: [{ block: "minecraft:air", height: 1 }],
+                biome: "minecraft:desert"
+            })
         },
         // The lucky blocks are sponges wearing the pack. Without it the map plays
         // exactly the same and looks like a sponge farm.
         resourcePack: {
-            url: `${MIRROR}/luckyblock-towers-resources.zip`,
+            archive: "luckyblock-towers-resources.zip",
             sha1: "9dac960cbdb8fea3f027bb64bce4352f99080223"
         },
         projects: []
@@ -265,8 +308,12 @@ export function isWorldMap(id: string): boolean {
 }
 
 /** Every map a blueprint can be built on, which is every map of its category. */
-export function mapsFor(blueprint: Pick<GameBlueprint, "mapCategory"> | undefined): readonly WorldMap[] {
-    return blueprint?.mapCategory ? WORLD_MAPS.filter((map) => map.category === blueprint.mapCategory) : [];
+export function mapsFor(
+    blueprint: Pick<GameBlueprint, "mapCategory"> | undefined
+): readonly WorldMap[] {
+    return blueprint?.mapCategory
+        ? WORLD_MAPS.filter((map) => map.category === blueprint.mapCategory)
+        : [];
 }
 
 /** Whether this blueprint could be built on a map at all. */
@@ -284,7 +331,8 @@ export function hasMaps(blueprint: Pick<GameBlueprint, "mapCategory"> | undefine
 export function mapFor(blueprint: GameBlueprint, id: string | undefined): WorldMap | undefined {
     if (!id) return undefined;
     const map = findMap(id);
-    if (!map || map.category !== blueprint.mapCategory) throw new Error(gameMessage("games", "lib.notMapForGame"));
+    if (!map || map.category !== blueprint.mapCategory)
+        throw new Error(gameMessage("games", "lib.notMapForGame"));
     return map;
 }
 
@@ -293,9 +341,115 @@ export function pinnedRelease(map: WorldMap | undefined): string | null {
     return map && map.minecraft.policy === "exact" ? map.minecraft.version : null;
 }
 
+/** Every world archive a server may be given, and every pack a client may be. */
+export const WORLD_FILES: readonly string[] = WORLD_MAPS.map((map) => map.archive);
+export const MAP_PACK_FILES: readonly string[] = WORLD_MAPS.flatMap((map) =>
+    map.resourcePack ? [map.resourcePack.archive] : []
+);
+
+/** Where a server's container downloads this map's world. */
+export function worldUrl(baseUrl: string, map: WorldMap, key: string): string {
+    return `${baseUrl.replace(/\/+$/, "")}${WORLD_PATH}/${encodeURIComponent(key)}/${map.archive}`;
+}
+
+/** Where a client downloads this map's pack, or null for a map with none. */
+export function mapPackUrl(baseUrl: string, map: WorldMap): string | null {
+    return map.resourcePack
+        ? `${baseUrl.replace(/\/+$/, "")}${MAP_PACK_PATH}/${map.resourcePack.archive}`
+        : null;
+}
+
+/**
+ * The host the archives were served from before Polaris carried them. Only ever
+ * matched, never written: a server created then still names it in `WORLD` or
+ * `RESOURCE_PACK` until the component sweep rewrites the value, and recognising
+ * it is what lets that sweep - and a reset - replace it.
+ */
+const FORMER_HOST = "cdn.jsdelivr.net";
+
+/** The archive a URL Polaris wrote names - one of ours, served from `path`
+ *  here or from the former host - or null when it is anything else. */
+function archiveOf(url: string | undefined, path: string, files: readonly string[]): string | null {
+    let parsed: URL;
+    try {
+        parsed = new URL((url ?? "").trim());
+    } catch {
+        return null;
+    }
+    const file = parsed.pathname.split("/").pop() ?? "";
+    if (!files.includes(file)) return null;
+    const ours = parsed.hostname === FORMER_HOST || parsed.pathname.startsWith(`${path}/`);
+    return ours ? file : null;
+}
+
+/** The map whose world a `WORLD` value Polaris wrote fetches, or undefined when
+ *  the value is somebody else's or blank. */
+export function mapOfWorldUrl(url: string | undefined): WorldMap | undefined {
+    const file = archiveOf(url, WORLD_PATH, WORLD_FILES);
+    return file ? WORLD_MAPS.find((map) => map.archive === file) : undefined;
+}
+
+/** The map whose pack a `RESOURCE_PACK` value Polaris wrote is, or undefined. */
+export function mapOfPackUrl(url: string | undefined): WorldMap | undefined {
+    const file = archiveOf(url, MAP_PACK_PATH, MAP_PACK_FILES);
+    return file ? WORLD_MAPS.find((map) => map.resourcePack?.archive === file) : undefined;
+}
+
 /** Whether a resource pack URL is one of ours, which is what makes it safe for a
- *  map that needs no pack to clear: an operator's own pack is left alone. */
+ *  map that needs no pack to clear: an operator's own pack is left alone. Also
+ *  true for the address a map's pack had before Polaris carried it. */
 export function isMapResourcePack(url: string | undefined): boolean {
-    const trimmed = (url ?? "").trim();
-    return trimmed.length > 0 && WORLD_MAPS.some((map) => map.resourcePack?.url === trimmed);
+    return mapOfPackUrl(url) !== undefined;
+}
+
+/** Where this instance serves the archives from, as a server and its players
+ *  reach it (`world-address.ts` decides). */
+export interface MapAddresses {
+    /** The base a server's container fetches a world from. */
+    readonly world: string;
+    /** The base a player's client fetches a pack from, or null when Polaris has
+     *  no address a client could reach. */
+    readonly pack: string | null;
+    /** The instance's key, which the world's address carries. */
+    readonly key: string;
+}
+
+/** The pack settings a map needs, or blanks when its pack has no address a
+ *  client could reach: a pack nobody can download is a warning on every join.
+ *  Null for a map with no pack. */
+export function mapPackEnv(
+    map: WorldMap,
+    addresses: MapAddresses
+): { RESOURCE_PACK: string; RESOURCE_PACK_SHA1: string } | null {
+    if (!map.resourcePack) return null;
+    const url = addresses.pack === null ? null : mapPackUrl(addresses.pack, map);
+    return url
+        ? { RESOURCE_PACK: url, RESOURCE_PACK_SHA1: map.resourcePack.sha1 }
+        : { RESOURCE_PACK: "", RESOURCE_PACK_SHA1: "" };
+}
+
+/**
+ * What a server's `WORLD` and `RESOURCE_PACK` should become, when Polaris wrote
+ * them and they no longer name where the archive is served now: the host they
+ * came from before Polaris carried them, a key that was rotated, an address that
+ * changed. Empty when nothing has to change. A value anybody else set is never
+ * touched.
+ */
+export function mapUrlRewrites(
+    env: ReadonlyMap<string, string>,
+    addresses: MapAddresses
+): Record<string, string> {
+    const changes: Record<string, string> = {};
+    const world = env.get("WORLD") ?? "";
+    const worldMap = mapOfWorldUrl(world);
+    if (worldMap) {
+        const wanted = worldUrl(addresses.world, worldMap, addresses.key);
+        if (wanted !== world) changes.WORLD = wanted;
+    }
+    const pack = env.get("RESOURCE_PACK") ?? "";
+    const packMap =
+        mapOfPackUrl(pack) ?? (env.has("RESOURCE_PACK") && pack === "" ? worldMap : undefined);
+    const packEnv = packMap ? mapPackEnv(packMap, addresses) : null;
+    if (packEnv && packEnv.RESOURCE_PACK !== pack) Object.assign(changes, packEnv);
+    return changes;
 }

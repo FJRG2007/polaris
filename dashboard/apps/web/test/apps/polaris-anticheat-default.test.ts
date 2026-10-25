@@ -24,7 +24,8 @@ const fake = vi.hoisted(() => ({
     publicUrl: "https://polaris.example" as string | null,
     broken: new Set<string>(),
     read: [] as string[],
-    bundled: true
+    bundled: true,
+    edge: ""
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -55,6 +56,12 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files", () => (
 vi.mock("@polaris/app-host", () => ({
     host: {
         domainService: { publicAppUrl: async () => fake.publicUrl },
+        appEdge: {
+            appEdgeOrigin: async () => "http://web:3000",
+            writeAppEdge: async (_app: string, content: string) => {
+                fake.edge = content;
+            }
+        },
         envVarService: {
             listEnvVars: async (_scope: string, applicationId: string) => {
                 fake.read.push(applicationId);
@@ -82,9 +89,8 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { adoptAnticheatDefaults, adoptPolarisComponent } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/polaris-anticheat-service"
-);
+const { adoptAnticheatDefaults, adoptPolarisComponent } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/polaris-anticheat-service");
 
 const server = (id: string, env: Record<string, string>) => {
     fake.installs.push({
@@ -232,5 +238,37 @@ describe("the Polaris mod on every server it has a build for", () => {
         fake.bundled = false;
         expect(await adoptPolarisComponent()).toEqual({ adopted: 0 });
         expect(fake.written.size).toBe(0);
+    });
+});
+
+describe("a map's world and pack, moved to where Polaris serves them", () => {
+    const FORMER = "https://cdn.jsdelivr.net/gh/former/worlds@v4";
+
+    it("rewrites what Polaris wrote, alone, and leaves everything else", async () => {
+        server("1", {
+            TYPE: "PAPER",
+            VERSION: "1.21.4",
+            WORLD: `${FORMER}/skyblock-2-1.zip`
+        });
+        server("2", { TYPE: "PAPER", VERSION: "1.21.4", WORLD: "https://example.test/mine.zip" });
+        expect(await adoptPolarisComponent()).toEqual({ adopted: 1 });
+        expect(fake.written.get("app-1")).toEqual([
+            {
+                key: "WORLD",
+                value: "https://polaris.example/api/minecraft/world/key/skyblock-2-1.zip",
+                isSecret: false
+            }
+        ]);
+        expect(fake.written.has("app-2")).toBe(false);
+    });
+
+    it("without a public address, fetches through the edge and publishes the route for it", async () => {
+        fake.publicUrl = null;
+        server("1", { TYPE: "PAPER", VERSION: "1.21.4", WORLD: `${FORMER}/skyblock-2-1.zip` });
+        expect(await adoptPolarisComponent()).toEqual({ adopted: 1 });
+        expect(fake.written.get("app-1")?.[0]?.value).toBe(
+            "http://traefik/api/minecraft/world/key/skyblock-2-1.zip"
+        );
+        expect(fake.edge).toContain("Host(`traefik`) && PathPrefix(`/api/minecraft/world/`)");
     });
 });

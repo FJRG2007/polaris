@@ -15,6 +15,7 @@ import { FivemPanel } from "./installed/fivem-panel";
 import { HytalePanel } from "./installed/hytale-panel";
 import type { GameContext } from "./installed/game-context";
 import { MinecraftPanel } from "./installed/minecraft-panel";
+import { GameNodeFields, type GameNodeFieldsProps } from "./automations/node-fields";
 import { GamesFirewallSection, type GamesFirewallSectionProps } from "./firewall-section";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -27,6 +28,8 @@ export function GameServersSlot({ slot, host }: { slot: AppSlot; host?: Installe
             return <GamesFirewallSection {...(slot.props as GamesFirewallSectionProps)} />;
         case "app-home":
             return <GameServersHome />;
+        case "automation-node":
+            return <GameNodeFields {...(slot.props as GameNodeFieldsProps)} />;
         case "server":
             return host ? (
                 <ServerPanel

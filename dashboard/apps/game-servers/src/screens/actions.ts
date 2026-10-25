@@ -21,7 +21,7 @@ import { clearQueue } from "../lib/minecraft/queue-service";
 import { clearSnapshots } from "../lib/minecraft/inventory-service";
 import { releaseVersions } from "../lib/minecraft/blueprint-version";
 import { blueprintVersions, createGameServer, expectedMinecraftHeapMb } from "../lib/games-create";
-import { listGameMachines, type GameMachine } from "../lib/games-service";
+import { listGameMachines, listGameServerFacts, type GameMachine } from "../lib/games-service";
 import { clearGameServerPrefs, setGameServerPref } from "../lib/games-prefs";
 import { clearLogins } from "../lib/minecraft/polaris-login-service";
 import { clearSounds } from "../lib/minecraft/sounds-service";
@@ -613,6 +613,32 @@ export async function installGameServersAction(): Promise<{ error?: string }> {
                 caught instanceof Error
                     ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotTurnGameServers")
+        };
+    }
+}
+
+/**
+ * The servers an automation step may name: those the signed-in account can
+ * start and stop (`games.manage`) or use the console of (`games.console`), as
+ * their pages would let it. Asked again on every run, as the run-as account.
+ */
+export async function automationServersAction(
+    permission: unknown
+): Promise<{ servers?: { id: string; name: string }[]; error?: string }> {
+    const parsed = z.enum(["games.manage", "games.console"]).safeParse(permission);
+    if (!parsed.success)
+        return { error: (await gameWords("games"))("errors.couldNotChangeTheServer") };
+    try {
+        const user = await host.session.requireUser();
+        const granted = await host.appsInstallAccess.reachableInstallIds(user, parsed.data);
+        const servers = await listGameServerFacts(user.id, granted);
+        return { servers: servers.map((server) => ({ id: server.id, name: server.name })) };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.couldNotChangeTheServer")
         };
     }
 }
