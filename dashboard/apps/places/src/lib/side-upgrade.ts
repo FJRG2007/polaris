@@ -186,3 +186,47 @@ export async function upgradeHomeServices(): Promise<void> {
     await setSetting(LANDED_KEY, JSON.stringify(landed));
     if (allWell) await setSetting(BUILD_KEY, build);
 }
+
+/** The applications brought forward out of turn, and the build that was for. */
+const REFRESHED_KEY = "home.services.refreshed";
+
+const refreshedSchema = z.object({ build: z.string(), applications: z.array(z.string()) });
+
+/**
+ * Redeploy one of Home's own containers that was found too old for something
+ * somebody just asked of it.
+ *
+ * The sweep above is what normally brings them forward, and it trusts the
+ * registry's digest. When that could not be read, or the sweep ran before the
+ * image moved, a container can sit a version behind with nothing to notice -
+ * until a feature asks it for something it does not have. That is the moment
+ * it is noticed, so that is when it is brought forward.
+ *
+ * Once per build and application, and the attempt is what is recorded: if the
+ * one it pulls is still too old, the image itself is behind, and redeploying
+ * it again on every press would be a pull on every press. Answers whether a
+ * redeploy was started now. Not awaited: a pull takes longer than anybody
+ * holds a button.
+ */
+export async function refreshHomeService(applicationId: string, ownerId: string): Promise<boolean> {
+    const build = loadEnv().POLARIS_BUILD_SHA?.trim();
+    if (!build) return false;
+    let done: z.infer<typeof refreshedSchema> = { build, applications: [] };
+    try {
+        const parsed = refreshedSchema.safeParse(
+            JSON.parse((await getSetting(REFRESHED_KEY)) ?? "{}")
+        );
+        if (parsed.success && parsed.data.build === build) done = parsed.data;
+    } catch {
+        // Unreadable is the same as nothing done yet.
+    }
+    if (done.applications.includes(applicationId)) return false;
+    await setSetting(
+        REFRESHED_KEY,
+        JSON.stringify({ build, applications: [...done.applications, applicationId] })
+    );
+    void deployApplication(applicationId, ownerId, null).catch((error: unknown) => {
+        console.error("polaris: could not bring a Home service forward:", error);
+    });
+    return true;
+}

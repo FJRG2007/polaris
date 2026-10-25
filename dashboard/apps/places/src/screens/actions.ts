@@ -36,6 +36,7 @@ import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
 import * as privacy from "../lib/privacy";
 import * as tapoControls from "../lib/tapo-controls";
+import * as talk from "../lib/talk";
 import { tapoCommandSchema, type TapoControls } from "../lib/camera-control-kinds";
 import * as cameraSets from "../lib/camera-sets";
 import {
@@ -121,8 +122,9 @@ const ptzPresetSchema = zod.object({
 });
 
 /** Presses per minute, per person and camera. A siren is a few presses a
- *  minute at most; arrows are held and tapped, so they get room. */
-const CONTROL_LIMITS = { siren: 6, ptz: 120, setting: 30 } as const;
+ *  minute at most; arrows are held and tapped, so they get room. Talking is
+ *  started and stopped by hand, a few times a minute at the most. */
+const CONTROL_LIMITS = { siren: 6, ptz: 120, setting: 30, talk: 10 } as const;
 
 async function withinControlLimit(
     kind: keyof typeof CONTROL_LIMITS,
@@ -1165,6 +1167,53 @@ export async function tapoCommandAction(
         metadata: { ...command.data }
     });
     return { controls: result.value };
+}
+
+/**
+ * Talk through a camera's speaker: open it, and close it again.
+ *
+ * `home.control`, like its siren: speaking into somebody's house through a
+ * camera is using the house. Starting is rate limited per person and camera
+ * and both ends are audited; the voice itself goes to the talk route, which
+ * only takes it for the talk this person started.
+ */
+export async function startTalkAction(
+    cameraId: string
+): Promise<{ talkId?: string; error?: string }> {
+    const { user, install } = await requireHome("home.control");
+    const id = cameraIdSchema.safeParse(cameraId);
+    if (!id.success) return { error: await say("actions.someWrong") };
+    if (!(await withinControlLimit("talk", user.id, id.data)))
+        return { error: await say("refusals.linkTooMany") };
+    const result = await guard(() => talk.startTalk(install.id, id.data, user.id));
+    if (result.error || !result.value) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.camera.talk",
+        targetType: "camera",
+        targetId: id.data
+    });
+    return { talkId: result.value };
+}
+
+export async function stopTalkAction(
+    cameraId: string,
+    talkId: string
+): Promise<{ error?: string }> {
+    const { user } = await requireHome("home.control");
+    const id = cameraIdSchema.safeParse(cameraId);
+    const talkIdParsed = cameraIdSchema.safeParse(talkId);
+    if (!id.success || !talkIdParsed.success) return { error: await say("actions.someWrong") };
+    const result = await guard(() => talk.stopTalk(id.data, user.id, talkIdParsed.data));
+    if (result.error) return { error: result.error };
+    if (!result.value) return {};
+    await recordAudit({
+        actorId: user.id,
+        action: "places.camera.talkEnd",
+        targetType: "camera",
+        targetId: id.data
+    });
+    return {};
 }
 
 /** Where the camera points now becomes where it turns when it goes private.

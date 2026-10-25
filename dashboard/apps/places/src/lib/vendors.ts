@@ -347,3 +347,15 @@ export function relaySource(
 export function hasNativePrivacy(vendorId: string): boolean {
     return vendorId === "tapo" || vendorId === "tapo-cloud";
 }
+
+/**
+ * Whether Polaris can play a voice on this camera's speaker. "yes" for a Tapo
+ * reached over its own protocol, which carries the speaker; "rtsp" for one
+ * reached over RTSP, which has no way in to it; "no" for every other make.
+ */
+export type TalkSupport = "yes" | "rtsp" | "no";
+
+export function talkSupport(vendorId: string): TalkSupport {
+    if (cameraVendor(vendorId).nativeScheme === "tapo") return "yes";
+    return vendorId === "tapo" ? "rtsp" : "no";
+}

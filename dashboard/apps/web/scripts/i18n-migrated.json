@@ -2335,6 +2335,9 @@
         "places/src/routes/places/panels/page.tsx",
         "places/src/routes/wall/[id]/page.tsx",
         "places/src/lib/panels.ts",
-        "places/src/lib/panel-layout.ts"
+        "places/src/lib/panel-layout.ts",
+        "places/src/routes/api/home/cameras/[id]/talk/route.ts",
+        "places/src/screens/talk-control.tsx",
+        "places/src/screens/viewer-control.tsx"
     ]
 }

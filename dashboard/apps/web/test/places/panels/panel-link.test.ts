@@ -42,6 +42,7 @@ vi.mock("@polaris-app/places/src/lib/panels", () => ({
     panelContents: async () => contents
 }));
 vi.mock("@polaris-app/places/src/lib/automations", () => ({ runAutomationNow }));
+vi.mock("@polaris-app/places/src/lib/talk", () => ({ endCameraTalk: async () => undefined }));
 vi.mock("@polaris-app/places/src/lib/devices", () => ({
     getDevice: async (_i: string, id: string) => ({ id, name: "x", kind: "light", placeId: null }),
     actOnDevice

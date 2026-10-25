@@ -57,6 +57,24 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Could not reach the camera", "refusals.tapoUnreachable"],
     ["The camera would not do that", "refusals.tapoRefused"],
     ["This camera does not offer that", "refusals.tapoNotOffered"],
+    ["Somebody else is talking through this camera", "refusals.talkElsewhere"],
+    ["Your talk through this camera is already starting", "refusals.talkStarting"],
+    ["This talk has ended", "refusals.talkEnded"],
+    ["This camera cannot play a voice from Polaris", "refusals.talkCannot"],
+    ["This camera is switched off", "refusals.cameraOff"],
+    ["This camera is private", "refusals.cameraPrivate"],
+    ["The camera relay is still starting", "refusals.relayStarting"],
+    ["The camera relay is not answering", "refusals.relayNotAnswering"],
+    ["The camera relay would not take a voice", "refusals.relayNoVoice"],
+    [
+        "The camera relay is updating so it can carry your voice. Try again in a minute",
+        "refusals.relayUpdating"
+    ],
+    [
+        "The camera relay is out of date. Update Polaris in Settings to talk through cameras",
+        "refusals.relayOld"
+    ],
+    ["The camera would not play a voice", "refusals.talkNotPlayed"],
     ["An area on this camera is already called that.", "refusals.areaTaken"],
     ["Area not found", "refusals.areaGone"],
     [

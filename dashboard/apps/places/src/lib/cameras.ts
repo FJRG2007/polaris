@@ -13,13 +13,21 @@
 import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { loadEnv } from "@polaris/config";
-import { cameraVendor, hasNativePrivacy, rtspUrl, usesAccountPassword } from "./vendors";
+import {
+    cameraVendor,
+    hasNativePrivacy,
+    rtspUrl,
+    talkSupport,
+    usesAccountPassword,
+    type TalkSupport
+} from "./vendors";
 import { drawsFromBattery, modelCanPan } from "./camera-models";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput, type CameraSwitch } from "./schemas";
 import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "./detection";
 import { host } from "@polaris/app-host";
 import * as rooms from "./rooms";
+import { endCameraTalk } from "./talk";
 
 const { dropGrantsFor } = host.accessGrants;
 
@@ -74,6 +82,8 @@ export interface CameraView {
     readonly privacyNative: boolean;
     /** The preset a pan-tilt camera is pointed at when it goes private, or "". */
     readonly privacyPreset: string;
+    /** Whether a voice can be played on its speaker from here. */
+    readonly talk: TalkSupport;
 }
 
 /** A camera as something that is about to connect to it sees it. */
@@ -142,7 +152,8 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         offlineSince: row.offlineSince?.toISOString() ?? null,
         privacy: row.privacy,
         privacyNative: hasNativePrivacy(row.vendor),
-        privacyPreset: row.privacyPreset ?? ""
+        privacyPreset: row.privacyPreset ?? "",
+        talk: talkSupport(row.vendor)
     };
 }
 
@@ -333,7 +344,7 @@ export async function updateCamera(
 ): Promise<CameraView> {
     const existing = await prisma.camera.findFirst({
         where: { id, installedAppId },
-        select: { id: true, placeId: true, address: true, vendor: true }
+        select: { id: true, placeId: true, address: true, vendor: true, reachVia: true }
     });
     if (!existing) throw new HomeError("Camera not found");
     const moved = existing.address !== input.address || existing.vendor !== input.vendor;
@@ -384,6 +395,7 @@ export async function updateCamera(
             ...(secretColumns(input.password) ?? {})
         }
     });
+    if (!input.enabled || moved || existing.reachVia !== input.reachVia) await endCameraTalk(id);
     return toView(row);
 }
 
@@ -400,6 +412,7 @@ export async function deleteCamera(installedAppId: string, id: string): Promise<
     // than by foreign key, so nothing takes them away on the camera's behalf.
     await dropGrantsFor("place.camera", id);
     await prisma.camera.delete({ where: { id } });
+    await endCameraTalk(id);
 }
 
 /** Flip a camera on or off, or change what it keeps, leaving the rest of it as
@@ -421,6 +434,7 @@ export async function switchCamera(
             ...(change.recording !== undefined ? { recording: change.recording } : {})
         }
     });
+    if (change.enabled === false) await endCameraTalk(id);
     return toView(row);
 }
 

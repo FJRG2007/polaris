@@ -60,7 +60,8 @@ vi.mock("@/lib/setting-store", () => ({
     })
 }));
 
-const { upgradeHomeServices } = await import("@polaris-app/places/src/lib/side-upgrade");
+const { refreshHomeService, upgradeHomeServices } =
+    await import("@polaris-app/places/src/lib/side-upgrade");
 
 beforeEach(() => {
     build = "abc123";
@@ -215,5 +216,42 @@ describe("which containers are Places' own", () => {
         expect(owned).toEqual(
             expect.arrayContaining(["camera-hub", "vision-worker", "face-recognizer"])
         );
+    });
+});
+
+describe("bringing one service forward when a feature finds it too old", () => {
+    it("redeploys it once per build, and says whether it started one", async () => {
+        expect(await refreshHomeService("relay-app", "owner-1")).toBe(true);
+        expect(deployApplication).toHaveBeenCalledWith("relay-app", "owner-1", null);
+        expect(await refreshHomeService("relay-app", "owner-1")).toBe(false);
+        expect(deployApplication).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps each application apart", async () => {
+        expect(await refreshHomeService("relay-app", "owner-1")).toBe(true);
+        expect(await refreshHomeService("other-relay", "owner-1")).toBe(true);
+        expect(deployApplication).toHaveBeenCalledTimes(2);
+    });
+
+    it("tries again on the next build", async () => {
+        await refreshHomeService("relay-app", "owner-1");
+        build = "def456";
+        expect(await refreshHomeService("relay-app", "owner-1")).toBe(true);
+        expect(deployApplication).toHaveBeenCalledTimes(2);
+    });
+
+    it("does nothing on a development run, which has no build", async () => {
+        build = "";
+        expect(await refreshHomeService("relay-app", "owner-1")).toBe(false);
+        expect(deployApplication).not.toHaveBeenCalled();
+    });
+
+    it("counts a deploy that failed as the attempt for this build", async () => {
+        deployApplication.mockImplementation(async () => {
+            throw new Error("pull failed");
+        });
+        expect(await refreshHomeService("relay-app", "owner-1")).toBe(true);
+        await Promise.resolve();
+        expect(await refreshHomeService("relay-app", "owner-1")).toBe(false);
     });
 });

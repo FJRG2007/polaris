@@ -718,7 +718,19 @@
         "tapoLocked": "The camera has paused sign-ins for a while. Try again later",
         "tapoUnreachable": "Could not reach the camera",
         "tapoRefused": "The camera would not do that",
-        "tapoNotOffered": "This camera does not offer that"
+        "tapoNotOffered": "This camera does not offer that",
+        "talkElsewhere": "Somebody else is talking through this camera",
+        "talkStarting": "Your talk through this camera is already starting",
+        "talkEnded": "This talk has ended",
+        "talkCannot": "This camera cannot play a voice from Polaris",
+        "cameraOff": "This camera is switched off",
+        "cameraPrivate": "This camera is private",
+        "relayStarting": "The camera relay is still starting",
+        "relayNotAnswering": "The camera relay is not answering",
+        "relayNoVoice": "The camera relay would not take a voice",
+        "relayUpdating": "The camera relay is updating so it can carry your voice. Try again in a minute",
+        "relayOld": "The camera relay is out of date. Update Polaris in Settings to talk through cameras",
+        "talkNotPlayed": "The camera would not play a voice"
     },
     "connections": {
         "nuki-web": {
@@ -2912,5 +2924,13 @@
         "siren": "Siren",
         "sirenStart": "Sound",
         "sirenStop": "Stop"
+    },
+    "talk": {
+        "start": "Talk",
+        "stop": "Stop talking",
+        "noMic": "Allow the microphone to talk through the camera.",
+        "failed": "Could not start talking. Try again.",
+        "ended": "Talking stopped.",
+        "rtsp": "To talk through this camera, edit it and choose TP-Link Tapo (Tapo password)."
     }
 }
