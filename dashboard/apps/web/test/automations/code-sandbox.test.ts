@@ -29,7 +29,12 @@ describe("Code step sandbox: transforms", () => {
             ITEMS[2]
         ]);
         expect(
-            ok(await runCode("return items.map((item) => ({ ...item, double: item.price * 2 }));", ITEMS))
+            ok(
+                await runCode(
+                    "return items.map((item) => ({ ...item, double: item.price * 2 }));",
+                    ITEMS
+                )
+            )
         ).toEqual(ITEMS.map((item) => ({ ...item, double: item.price * 2 })));
         expect(
             ok(
@@ -58,14 +63,20 @@ describe("Code step sandbox: transforms", () => {
     it("asks for a return value and caps the log", async () => {
         const nothing = await runCode("const x = 1;", ITEMS);
         expect(nothing.ok).toBe(false);
-        const chatty = await runCode("for (let i = 0; i < 500; i++) console.log(i); return [];", []);
+        const chatty = await runCode(
+            "for (let i = 0; i < 500; i++) console.log(i); return [];",
+            []
+        );
         expect(chatty.logs.length).toBe(100);
     });
 });
 
 describe("Code step sandbox: errors", () => {
     it("names the line of a thrown error", async () => {
-        const result = await runCode("const a = 1;\nconst b = 2;\nthrow new Error('broken here');", []);
+        const result = await runCode(
+            "const a = 1;\nconst b = 2;\nthrow new Error('broken here');",
+            []
+        );
         expect(result).toMatchObject({ ok: false, kind: "runtime", line: 3 });
         if (!result.ok) expect(result.message).toContain("broken here");
     });
@@ -84,7 +95,10 @@ describe("Code step sandbox: escape attempts", () => {
         ["require", "return [typeof require];"],
         ["module", "return [typeof module, typeof exports, typeof __dirname];"],
         ["fetch", "return [typeof fetch, typeof XMLHttpRequest, typeof WebSocket];"],
-        ["timers", "return [typeof setTimeout, typeof setInterval, typeof queueMicrotask === 'function' ? 'x' : 'undefined'];"],
+        [
+            "timers",
+            "return [typeof setTimeout, typeof setInterval, typeof queueMicrotask === 'function' ? 'x' : 'undefined'];"
+        ],
         ["Buffer", "return [typeof Buffer, typeof globalThis.Deno, typeof globalThis.Bun];"],
         ["std/os", "return [typeof std, typeof os, typeof scriptArgs];"]
     ];
@@ -94,7 +108,9 @@ describe("Code step sandbox: escape attempts", () => {
     });
 
     it("sees nothing but the language on globalThis", async () => {
-        const names = ok(await runCode("return Object.getOwnPropertyNames(globalThis);", [])) as string[];
+        const names = ok(
+            await runCode("return Object.getOwnPropertyNames(globalThis);", [])
+        ) as string[];
         expect(names).not.toContain("process");
         expect(names).not.toContain("require");
         expect(names).not.toContain("fetch");
@@ -110,7 +126,12 @@ describe("Code step sandbox: escape attempts", () => {
             const p3 = items.constructor.constructor("return typeof globalThis.process")();
             const p4 = $input.all.constructor("return this")() === globalThis;
             return [p1, p2, p3, p4];`;
-        expect(ok(await runCode(code, [{ a: 1 }]))).toEqual(["undefined", "undefined", "undefined", true]);
+        expect(ok(await runCode(code, [{ a: 1 }]))).toEqual([
+            "undefined",
+            "undefined",
+            "undefined",
+            true
+        ]);
     });
 
     it("cannot import or load a module", async () => {
@@ -131,7 +152,10 @@ describe("Code step sandbox: escape attempts", () => {
     });
 
     it("refuses an item carrying __proto__", async () => {
-        const result = await runCode('return [JSON.parse(\'{"__proto__": {"polluted": "yes"}}\')];', []);
+        const result = await runCode(
+            'return [JSON.parse(\'{"__proto__": {"polluted": "yes"}}\')];',
+            []
+        );
         expect(result).toMatchObject({ ok: false, kind: "output" });
         expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     });
@@ -150,7 +174,9 @@ describe("Code step sandbox: escape attempts", () => {
 
     it("does not keep state between runs", async () => {
         await runCode("globalThis.leftOver = 42; return [];", []);
-        expect(ok(await runCode("return [typeof globalThis.leftOver];", []))).toEqual(["undefined"]);
+        expect(ok(await runCode("return [typeof globalThis.leftOver];", []))).toEqual([
+            "undefined"
+        ]);
     });
 });
 
@@ -167,17 +193,24 @@ describe("Code step sandbox: limits", () => {
     });
 
     it("ends an endless promise chain at the time limit", async () => {
-        const result = await runCode("const spin = () => Promise.resolve().then(spin); await spin();", [], {
-            timeMs: 200,
-            memoryBytes: 32 * 1024 * 1024,
-            outputBytes: 64 * 1024
-        });
+        const result = await runCode(
+            "const spin = () => Promise.resolve().then(spin); await spin();",
+            [],
+            {
+                timeMs: 200,
+                memoryBytes: 32 * 1024 * 1024,
+                outputBytes: 64 * 1024
+            }
+        );
         expect(result.ok).toBe(false);
     });
 
     it("ends a memory blow-up", async () => {
         const started = Date.now();
-        const result = await runCode("const list = []; while (true) list.push('x'.repeat(1024 * 1024));", []);
+        const result = await runCode(
+            "const list = []; while (true) list.push('x'.repeat(1024 * 1024));",
+            []
+        );
         expect(result.ok).toBe(false);
         if (!result.ok) expect(["memory", "timeout"]).toContain(result.kind);
         // The thread is killed at the time limit even while the engine is stuck failing to allocate.
@@ -197,7 +230,10 @@ describe("Code step sandbox: limits", () => {
     it("refuses input that is not JSON", async () => {
         const circular: Record<string, unknown> = {};
         circular.self = circular;
-        expect(await runCode("return items;", [circular])).toMatchObject({ ok: false, kind: "input" });
+        expect(await runCode("return items;", [circular])).toMatchObject({
+            ok: false,
+            kind: "input"
+        });
     });
 });
 

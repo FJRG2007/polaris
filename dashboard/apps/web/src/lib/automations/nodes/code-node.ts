@@ -63,7 +63,11 @@ export const codeNode: ServerNode<CodeConfig> = {
         ]);
         const items = codeInput(config, context, io.incoming ?? []);
         io.recordInput({ count: items.length });
-        const allowed = await rateLimit(`automation-code:${io.actor.id}`, L.codeRunsPerMinute, 60_000);
+        const allowed = await rateLimit(
+            `automation-code:${io.actor.id}`,
+            L.codeRunsPerMinute,
+            60_000
+        );
         if (!allowed.ok) throw new StepError("codeLimited");
         const result = await runCode(config.code, items);
         if (!result.ok) {

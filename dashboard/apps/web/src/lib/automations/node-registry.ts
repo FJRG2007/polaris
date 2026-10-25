@@ -14,10 +14,12 @@ import { CORE_SERVER_NODES } from "./nodes/core-nodes";
 import { appAutomationNodes } from "@/lib/app-extensions/registry";
 
 const CORE = new Map<string, ServerNode>(
-    [...CORE_SERVER_NODES, ...HTTP_SERVER_NODES, redeployNode as ServerNode, codeNode as ServerNode].map((node) => [
-        node.type,
-        node
-    ])
+    [
+        ...CORE_SERVER_NODES,
+        ...HTTP_SERVER_NODES,
+        redeployNode as ServerNode,
+        codeNode as ServerNode
+    ].map((node) => [node.type, node])
 );
 
 export async function serverNode(type: string): Promise<ServerNode | null> {

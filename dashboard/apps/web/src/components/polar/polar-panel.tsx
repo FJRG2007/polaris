@@ -335,8 +335,7 @@ function reloaded(): boolean {
     if (reloadSeen) return false;
     reloadSeen = true;
     const entry = performance.getEntriesByType?.("navigation")[0] as
-        | PerformanceNavigationTiming
-        | undefined;
+        PerformanceNavigationTiming | undefined;
     return entry?.type === "reload";
 }
 

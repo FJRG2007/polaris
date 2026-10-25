@@ -39,7 +39,10 @@ const io = {
 };
 const context = {
     trigger: {},
-    steps: { http1: { body: { rows: [{ n: 1 }, { n: 2 }, { n: 3 }] } }, list1: { items: [{ n: 9 }] } },
+    steps: {
+        http1: { body: { rows: [{ n: 1 }, { n: 2 }, { n: 3 }] } },
+        list1: { items: [{ n: 9 }] }
+    },
     run: { id: "r1", startedAt: null, status: null, error: null },
     automation: { id: "a1", name: "A" },
     now: new Date().toISOString()
@@ -68,14 +71,18 @@ describe("Code step", () => {
     it("requires code in its config", () => {
         expect(core.CORE_NODE_CONFIGS["core.code"].safeParse({ code: "  " }).success).toBe(false);
         expect(
-            core.CORE_NODE_CONFIGS["core.code"].safeParse({ code: "x".repeat(core.AUTOMATION_LIMITS.codeLength + 1) })
-                .success
+            core.CORE_NODE_CONFIGS["core.code"].safeParse({
+                code: "x".repeat(core.AUTOMATION_LIMITS.codeLength + 1)
+            }).success
         ).toBe(false);
     });
 
     it("reads the named list and returns items, count and logs", async () => {
         const result = await codeNode.run!(
-            config("console.log(items.length);\nreturn items.filter((item) => item.n > 1);", "{{steps.http1.body.rows}}"),
+            config(
+                "console.log(items.length);\nreturn items.filter((item) => item.n > 1);",
+                "{{steps.http1.body.rows}}"
+            ),
             context,
             io
         );
@@ -84,27 +91,39 @@ describe("Code step", () => {
     });
 
     it("reads the step wired into it when no list is named", async () => {
-        const result = await codeNode.run!(config("return items;"), context, { ...io, incoming: ["list1"] });
+        const result = await codeNode.run!(config("return items;"), context, {
+            ...io,
+            incoming: ["list1"]
+        });
         expect(result).toEqual({ output: { items: [{ n: 9 }], count: 1, logs: [] } });
         expect(asItems(null)).toEqual([]);
         expect(asItems({ a: 1 })).toEqual([{ a: 1 }]);
     });
 
     it("stores a thrown error with its line and message", async () => {
-        const error = await failureOf(codeNode.run!(config("const a = 1;\nthrow new Error('no rows');"), context, io));
+        const error = await failureOf(
+            codeNode.run!(config("const a = 1;\nthrow new Error('no rows');"), context, io)
+        );
         expect(error.code).toBe("codeRuntime:2");
-        expect(error.output).toMatchObject({ error: { line: 2, message: expect.stringContaining("no rows") } });
+        expect(error.output).toMatchObject({
+            error: { line: 2, message: expect.stringContaining("no rows") }
+        });
     });
 
     it("stores a timeout and an oversized output as their codes", async () => {
-        expect((await failureOf(codeNode.run!(config("while (true) {}"), context, io))).code).toBe("codeTimeout");
-        expect((await failureOf(codeNode.run!(config("return ['x'.repeat(100000)];"), context, io))).code).toBe(
-            "codeOutput"
+        expect((await failureOf(codeNode.run!(config("while (true) {}"), context, io))).code).toBe(
+            "codeTimeout"
         );
+        expect(
+            (await failureOf(codeNode.run!(config("return ['x'.repeat(100000)];"), context, io)))
+                .code
+        ).toBe("codeOutput");
     }, 20_000);
 
     it("is refused past the account's runs a minute", async () => {
         limiter.ok = false;
-        expect((await failureOf(codeNode.run!(config("return items;"), context, io))).code).toBe("codeLimited");
+        expect((await failureOf(codeNode.run!(config("return items;"), context, io))).code).toBe(
+            "codeLimited"
+        );
     });
 });
