@@ -2658,10 +2658,10 @@ function createBeamSet() {
     build(parent, name, shadowMats = new Set()) {
       const geo = new THREE.BoxGeometry(1, 1, 1);
       for (const [material, mats] of sets) {
-        const mesh = new THREE.InstancedMesh(geo, material, mats.length);
-        mats.forEach((m, i) => mesh.setMatrixAt(i, m));
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.computeBoundingSphere();
+        // Shared instances: the bridges use the same steel, stone and deck materials, and share their shaders
+        const matrices = new Float32Array(mats.length * 16);
+        mats.forEach((m, i) => m.toArray(matrices, i * 16));
+        const mesh = new SharedInstances(geo, material, matrices);
         mesh.castShadow = shadowMats.has(material);
         mesh.receiveShadow = false;
         mesh.name = name;
