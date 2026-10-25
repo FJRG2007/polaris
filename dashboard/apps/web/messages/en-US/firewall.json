@@ -313,7 +313,9 @@
         "setByOperator": "Set by whoever runs this instance.",
         "loginAboveWhy": "A scope above this one requires a login, and a narrower scope cannot waive it.",
         "polarisNote": "Applies to the public domains Polaris answers on. The local network name is served separately and stays reachable.",
-        "remoteNote": "The local edge applies changes instantly; a service on a remote server picks them up on its next deploy."
+        "remoteNote": "The local edge applies changes instantly; a service on a remote server picks them up on its next deploy.",
+        "loginBelow": "On for {count, plural, one {# service} other {# services}}",
+        "loginBelowMore": "{names} and {count} more"
     },
     "access": {
         "addressesTitle": "IP access rules",
@@ -413,7 +415,18 @@
         "notRequired": "No login is required",
         "aboveNote": "A scope above this one requires a login, and a narrower scope cannot waive it. The lists below still apply: every scope that names who it admits gets a say.",
         "admits": "Who it admits",
-        "admitsHint": "Named nobody means anyone with a Polaris account."
+        "admitsHint": "Named nobody means anyone with a Polaris account.",
+        "belowTitle": "Services that already require it",
+        "belowHint": "This scope does not require a login, but these services already do. Open one to see where it is set.",
+        "belowMore": "And {count} more",
+        "via": {
+            "application": "Its own rule",
+            "environment": "Its environment",
+            "project": "Its project",
+            "server": "Its server",
+            "server-group": "Its server group",
+            "private": "A private address"
+        }
     },
     "page": {
         "backToList": "Back to the rule list",

@@ -36,7 +36,7 @@ import { ChipList } from "./chip-list";
 import { Frame, Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { WafInheritedView } from "@/lib/waf-service";
+import type { WafInheritedView, WafLoginBelowView } from "@/lib/waf-service";
 import { Input, Select, Skeleton, Switch } from "@polaris/ui";
 import { AddressRulesPage, LoginRulePage } from "./access-rules";
 import { emptyRule, RuleEditor, type RulePosition } from "./rule-editor";
@@ -129,6 +129,17 @@ const RULE_FIELDS: readonly SearchField<{ name: string; description: string }>[]
 /** Said once, because the row and the rule's own page both say it. */
 const armedAbove = (t: Words) => ({ label: t("scope.armedAbove"), why: t("scope.armedAboveWhy") });
 const offAbove = (t: Words) => ({ label: t("scope.offAbove"), why: t("scope.offAboveWhy") });
+
+const NO_LOGIN_BELOW: WafLoginBelowView = { count: 0, services: [] };
+/** Names in the login row's tooltip before the rest are only counted. */
+const BELOW_NAMED = 5;
+function belowNames(below: WafLoginBelowView, t: Words): string {
+    const names = below.services.slice(0, BELOW_NAMED).map((service) => service.name);
+    const rest = below.count - names.length;
+    return rest > 0
+        ? t("scope.loginBelowMore", { names: names.join(", "), count: rest })
+        : names.join(", ");
+}
 const instanceFeed = (t: Words) => ({
     label: t("scope.instanceWide"),
     why: t("scope.instanceWideWhy")
@@ -212,6 +223,9 @@ export function WafEditor({
     // What the scopes above this one already enforce, and the instance-wide feeds.
     // Read with the rule because a row cannot be drawn honestly without them.
     const [inherited, setInherited] = useState<WafInheritedView | null>(null);
+    // Services under this scope already behind a login a narrower rule or a private
+    // address switched on, so this scope's own "off" is not read as "nobody signs in".
+    const [loginBelow, setLoginBelow] = useState<WafLoginBelowView>(NO_LOGIN_BELOW);
     const [tor, setTor] = useState<WafFeedView | null>(null);
     const [view, setView] = useState<View>({ kind: "list" });
     const [error, setError] = useState<string | null>(null);
@@ -237,6 +251,7 @@ export function WafEditor({
         let active = true;
         setSaved(null);
         setInherited(null);
+        setLoginBelow(NO_LOGIN_BELOW);
         setTor(null);
         setError(null);
         setView({ kind: "list" });
@@ -249,6 +264,7 @@ export function WafEditor({
             onScreen.current = rule;
             setSaved(rule);
             setInherited(result.inherited ?? null);
+            setLoginBelow(result.loginBelow ?? NO_LOGIN_BELOW);
             setTor(result.tor ?? null);
             if (result.error) setError(result.error);
         });
@@ -437,6 +453,7 @@ export function WafEditor({
                 scope={{ scopeType, scopeId }}
                 required={saved.requireLogin}
                 requiredAbove={inherited?.requireLogin ?? false}
+                below={loginBelow}
                 admitted={saved.loginAllowPrincipals}
                 refused={saved.loginDenyPrincipals}
                 onBack={backToList}
@@ -488,6 +505,13 @@ export function WafEditor({
                                     on: true,
                                     label: armedAbove(t).label,
                                     why: t("scope.loginAboveWhy")
+                                }
+                              : undefined,
+                      below:
+                          !saved.requireLogin && loginBelow.count > 0
+                              ? {
+                                    label: t("scope.loginBelow", { count: loginBelow.count }),
+                                    why: belowNames(loginBelow, t)
                                 }
                               : undefined,
                       activity: null
@@ -640,7 +664,14 @@ export function WafEditor({
                     setView(id === "addresses" ? { kind: "addresses" } : { kind: "login" })
                 }
                 onToggle={(_, on) => persist({ requireLogin: on })}
-                rows={accessRows.filter((row) => shown(`row:${row.id}`, row.enabled))}
+                rows={accessRows.filter((row) =>
+                    shown(
+                        `row:${row.id}`,
+                        row.enabled === null
+                            ? null
+                            : Boolean(row.decidedElsewhere?.on || row.enabled || row.below)
+                    )
+                )}
             />
 
             <PredefinedRuleList
