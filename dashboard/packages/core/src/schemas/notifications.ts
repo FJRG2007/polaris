@@ -493,6 +493,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "chat.reminder",
+        group: "people",
+        label: "Message reminders",
+        description: "A reminder you set on a message came due.",
+        // Asked for by the reader, at a time they chose: it is the point of the
+        // feature that it reaches them, so it is on the bell by default.
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "account.orgInvite",
         group: "people",
         // Both halves again, and for the same reason: whoever sent it wants to

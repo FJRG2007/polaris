@@ -222,7 +222,8 @@
         "soundboardUnreachable": "El servidor de llamadas no respondió. Inténtalo de nuevo.",
         "soundboardOwner": "Al dueño del espacio no se le puede negar la botonera",
         "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción",
-        "inviteSendLimit": "Demasiadas invitaciones. Prueba en {seconds} s."
+        "inviteSendLimit": "Demasiadas invitaciones. Prueba en {seconds} s.",
+        "tooManyReminders": "Puedes tener hasta {max} recordatorios pendientes"
     },
     "media": {
         "refused": {
@@ -851,7 +852,17 @@
         "edit": "Editar",
         "delete": "Borrar",
         "pin": "Fijar",
-        "unpin": "No fijar"
+        "unpin": "No fijar",
+        "addReaction": "Añadir reacción",
+        "remindMe": "Recordármelo",
+        "in15Minutes": "En 15 minutos",
+        "in1Hour": "En 1 hora",
+        "in3Hours": "En 3 horas",
+        "tomorrow": "Mañana",
+        "nextMonday": "Próximo lunes",
+        "custom": "Personalizado...",
+        "reminderSet": "Recordatorio para el {date} a las {time}",
+        "speak": "Leer en voz alta"
     },
     "poll": {
         "createAPoll": "Crear encuesta",
@@ -1717,7 +1728,9 @@
         "nobodyPicked": "Nadie la cogió.",
         "nobodyPickedIn": "En {name}. Nadie la cogió.",
         "nobodyPickedGroup": "En un grupo de {count}. Nadie la cogió.",
-        "roomMention": "{name} usó {mention} en {where}"
+        "roomMention": "{name} usó {mention} en {where}",
+        "reminder": "Recordatorio de un mensaje",
+        "reminderDeleted": "Se eliminó un mensaje del que tenías un recordatorio"
     },
     "callRepair": {
         "notShipped": "Este despliegue no ejecuta el servidor de llamadas, así que aquí no hay nada que reiniciar.",
@@ -1971,5 +1984,16 @@
         "files": "{count, plural, one {1 archivo} other {{count} archivos}}",
         "protip": "<tip>Consejo:</tip> Mantén <key>{shift}</key> al hacer clic en Borrar para saltarte esta confirmación.",
         "protipKey": "<tip>Consejo:</tip> Mantén <key>{shift}</key> al hacer clic en Borrar, o pulsa <key>{combo}</key>, para saltarte esta confirmación."
+    },
+    "reminders": {
+        "yourReminders": "Tus recordatorios",
+        "cancelReminder": "Anular recordatorio",
+        "deleted": "Este mensaje se eliminó",
+        "due": "{date} a las {time}",
+        "remindMeAboutThis": "Recordarme este mensaje",
+        "youGetANotification": "Recibirás una notificación que abre el mensaje.",
+        "setReminder": "Programar aviso",
+        "setting": "Guardando...",
+        "remindsOn": "Te avisa el {date} a las {time}."
     }
 }

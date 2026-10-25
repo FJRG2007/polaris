@@ -495,6 +495,28 @@ export function scheduleRefusal(sendAt: Date, now: Date = new Date()): string | 
     return problem ? SCHEDULE_PROBLEM_WORDS[problem] : null;
 }
 
+/**
+ * How many reminders one person may have waiting at once.
+ *
+ * A bound rather than a limit anybody meets: a reminder is a thing to come back
+ * to, and a hundred of them is already a list nobody reads. Setting one again on
+ * the same message moves it and does not count twice.
+ */
+export const MAX_PENDING_REMINDERS = 100;
+
+/**
+ * A reminder on a message, for the person setting it.
+ *
+ * The moment is an instant for the same reason a scheduled message's is, and it
+ * has the same window - see `scheduleProblem`, which the server asks again.
+ */
+export const chatReminderSchema = z.object({
+    messageId: z.string().uuid(),
+    dueAt: z.string().datetime()
+});
+
+export type ChatReminderInput = z.infer<typeof chatReminderSchema>;
+
 /** Sending somebody else's message on to another conversation. */
 export const chatForwardSchema = z.object({
     messageId: z.string().uuid(),

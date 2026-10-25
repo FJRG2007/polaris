@@ -26,6 +26,7 @@ import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
 import * as pins from "@/lib/chat/pins";
+import * as reminders from "@/lib/chat/reminders";
 import * as webhooks from "@/lib/chat/webhooks";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { MAX_REREAD } from "@/lib/chat/reread-limit";
@@ -983,6 +984,41 @@ export async function cancelScheduledAction(id: string): Promise<{ error?: strin
     if (!parsed.success) return {};
     const result = await guard(() => cancelScheduled(me, parsed.data));
     return result.error ? { error: result.error } : {};
+}
+
+// ---------------------------------------------------------------------------
+// Reminders
+// ---------------------------------------------------------------------------
+
+/** Bring a message back to this reader at a time they chose. Returns the moment
+ *  it is set for. */
+export async function setReminderAction(
+    input: unknown
+): Promise<{ dueAt?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatReminderSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: (await getTranslations("chat"))("errors.schedule.noDate") };
+    }
+    const result = await guard(() => reminders.setReminder(me, parsed.data));
+    return result.error ? { error: result.error } : { dueAt: result.value };
+}
+
+/** What this reader has waiting. Theirs only. */
+export async function remindersAction(): Promise<{
+    reminders?: reminders.ChatReminderView[];
+    error?: string;
+}> {
+    const me = await actor();
+    const result = await guard(() => reminders.listReminders(me));
+    return result.error ? { error: result.error } : { reminders: result.value };
+}
+
+export async function cancelReminderAction(id: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(id);
+    if (!parsed.success) return {};
+    return guard(() => reminders.cancelReminder(me, parsed.data));
 }
 
 export async function sendScheduledNowAction(id: string): Promise<{ error?: string }> {

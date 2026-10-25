@@ -222,7 +222,8 @@
         "soundboardUnreachable": "The call server did not answer. Try again.",
         "soundboardOwner": "The owner of the space cannot be denied the soundboard",
         "soundboardDenialOwnerOnly": "Only the owner of the space can change this denial",
-        "inviteSendLimit": "Too many invites at once. Try again in {seconds} s."
+        "inviteSendLimit": "Too many invites at once. Try again in {seconds} s.",
+        "tooManyReminders": "You can have up to {max} reminders waiting"
     },
     "media": {
         "refused": {
@@ -851,7 +852,17 @@
         "edit": "Edit",
         "delete": "Delete",
         "pin": "Pin",
-        "unpin": "Unpin"
+        "unpin": "Unpin",
+        "addReaction": "Add reaction",
+        "remindMe": "Remind me",
+        "in15Minutes": "In 15 minutes",
+        "in1Hour": "In 1 hour",
+        "in3Hours": "In 3 hours",
+        "tomorrow": "Tomorrow",
+        "nextMonday": "Next Monday",
+        "custom": "Custom...",
+        "reminderSet": "Reminder set for {date} at {time}",
+        "speak": "Speak message"
     },
     "poll": {
         "createAPoll": "Create a poll",
@@ -1717,7 +1728,9 @@
         "nobodyPicked": "Nobody picked it up.",
         "nobodyPickedIn": "In {name}. Nobody picked it up.",
         "nobodyPickedGroup": "In a group of {count}. Nobody picked it up.",
-        "roomMention": "{name} used {mention} in {where}"
+        "roomMention": "{name} used {mention} in {where}",
+        "reminder": "Reminder about a message",
+        "reminderDeleted": "A message you set a reminder for was deleted"
     },
     "callRepair": {
         "notShipped": "This deployment does not run the call server, so there is nothing here to restart.",
@@ -1971,5 +1984,16 @@
         "files": "{count, plural, one {1 file} other {{count} files}}",
         "protip": "<tip>Protip:</tip> Hold <key>{shift}</key> while you click Delete to skip this confirmation.",
         "protipKey": "<tip>Protip:</tip> Hold <key>{shift}</key> while you click Delete, or press <key>{combo}</key>, to skip this confirmation."
+    },
+    "reminders": {
+        "yourReminders": "Your reminders",
+        "cancelReminder": "Cancel reminder",
+        "deleted": "This message was deleted",
+        "due": "{date} at {time}",
+        "remindMeAboutThis": "Remind me about this",
+        "youGetANotification": "You get a notification that opens the message.",
+        "setReminder": "Set reminder",
+        "setting": "Setting...",
+        "remindsOn": "Reminds you on {date} at {time}."
     }
 }

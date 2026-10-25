@@ -369,6 +369,10 @@
             "label": "Llamada perdida",
             "description": "Alguien te ha llamado y nadie ha contestado."
         },
+        "chatReminder": {
+            "label": "Recordatorios",
+            "description": "Ha llegado la hora de un recordatorio que pusiste en un mensaje."
+        },
         "accountOrgInvite": {
             "label": "Invitaciones a organizaciones",
             "description": "Te han invitado a una organización, o alguien ha aceptado la tuya."

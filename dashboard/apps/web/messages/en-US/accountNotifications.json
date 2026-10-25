@@ -369,6 +369,10 @@
             "label": "Missed calls",
             "description": "Somebody called you and nobody picked it up."
         },
+        "chatReminder": {
+            "label": "Message reminders",
+            "description": "A reminder you set on a message came due."
+        },
         "accountOrgInvite": {
             "label": "Organization invitations",
             "description": "You were invited to an organization, or somebody accepted yours."
