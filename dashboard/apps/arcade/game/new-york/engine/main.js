@@ -62,10 +62,19 @@ async function initApp() {
   let initMark = performance.now();
   const markInit = (label) => {
     const now = performance.now();
-    initTimings.push(`${label} ${Math.round(now - initMark)}ms`);
+    if (initTimings) initTimings.push(`${label} ${Math.round(now - initMark)}ms`);
+    performance.mark(`init:${label}`);
     initMark = now;
     const step = BUILD_STEPS.indexOf(label);
     if (step >= 0) reportProgress('build', (step + 1) / BUILD_STEPS.length);
+  };
+  // Hands the main thread back between start-up phases: the game shares it with the page that frames it, so without
+  // this the whole tab (and the host's progress bar) froze until the city was built
+  const nextTask = () => (globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise((resolve) => setTimeout(resolve, 0)));
+  // (a plain task, not scheduler.yield(), whose continuation would run ahead of the host's progress messages)
+  const stepDone = (label) => {
+    markInit(label);
+    return new Promise((resolve) => setTimeout(resolve, 0));
   };
 
   try {
@@ -74,12 +83,12 @@ async function initApp() {
     reportFailure('graphics');
     throw e;
   }
-  markInit('renderer');
+  await stepDone('renderer');
 
   // 2. Build Scene & Physical Atmospheric Sky / PMREM IBL / 4096x4096 Shadow Lighting
   const scene = new THREE.Scene();
   const lightingSystem = new LightingSystem(scene, renderer);
-  markInit('lighting');
+  await stepDone('lighting');
 
   if (loadingStatus) {
     loadingStatus.textContent = 'Constructing Manhattan Grid, Landmarks & Streetscape...';
@@ -87,17 +96,17 @@ async function initApp() {
 
   // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
   const cityGrid = buildCityGrid(scene);
-  markInit('cityGrid');
+  await stepDone('cityGrid');
   const boroughs = buildBoroughs(scene, { sidewalks: cityGrid.sidewalks });
-  markInit('boroughs');
+  await stepDone('boroughs');
   const { colliders: landmarkColliders } = buildLandmarks(scene);
-  markInit('landmarks');
+  await stepDone('landmarks');
   const cityBlocks = buildCityBlocks(scene);
-  markInit('blocks');
+  await stepDone('blocks');
   const allColliders = [...landmarkColliders, ...cityBlocks.colliders, ...boroughs.colliders, ...(cityGrid.colliders || [])];
 
   const streetDetails = buildStreetDetails(scene);
-  markInit('streetDetails');
+  await stepDone('streetDetails');
   // Buildings turned along non-grid streets have oriented colliders whose world bounds reach past their lots: they stay
   // inside the property line anyway, so the road network (lanes & sidewalks) doesn't need them.
   // Elevated building sections that clear even a bus don't obstruct ground traffic.
@@ -106,10 +115,10 @@ async function initApp() {
     ...streetDetails.footprints,
     ...allColliders.filter((c) => !c.obb && (c.minY ?? 0) < 3.5)
   ]);
-  markInit('traffic');
+  await stepDone('traffic');
   const highwayTraffic = createHighwayTraffic(scene, cityGrid.highwayLanes);
   buildRoadPaint(scene, trafficSystem.network);
-  markInit('roadPaint');
+  await stepDone('roadPaint');
 
   // 4. Initialize Third-Person Controllers (Person, Car, Cyclist, Helicopter) & Multi-Camera System
   const controllerManager = new ThirdPersonControllerManager(scene, allColliders);
@@ -159,7 +168,7 @@ async function initApp() {
     if (!event.persisted) audioSystem.dispose();
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) savePlayerState(); });
-  markInit('controllers');
+  await stepDone('controllers');
 
   // Island-wide static geometry: chunk & distance-cull the small props, shadow stand-ins for the big casters
   // (scene-culling.js)
@@ -167,7 +176,7 @@ async function initApp() {
     .map((name) => scene.getObjectByName(name))
     .filter(Boolean);
   setupSceneCulling(scene, cullingRoots, lightingSystem.sunLight.shadow);
-  markInit('culling');
+  await stepDone('culling');
 
   // On WebGPU, small InstancedMeshes (<= 1000 instances) keep their matrices in uniform buffers that three.js
   // re-uploads on every draw of every pass (~2.5 MB/frame with the shadow cascades, stalling the GPU queue).
@@ -566,21 +575,36 @@ async function initApp() {
   selectTime('golden');
   // the web fonts change the buttons' widths once they arrive
   if (document.fonts) document.fonts.ready.then(placeModeIndicator);
-  markInit('ui');
+  await stepDone('ui');
 
-  // The loading screen stays up while the shaders compile (precompileShaders() & the warm-up frame, see the loop) and
+  // The loading screen stays up while the first frame's shaders compile (precompileShaders(), see the loop) and
   // until the first frame is on screen
   if (loadingStatus) {
     loadingStatus.textContent = 'Compiling Shaders & Render Pipelines...';
   }
 
-  // 6b. Shader pre-compilation behind the loading screen. compileAsync() builds the node graphs in slices and has the GPU
-  //     process compile the pipelines in parallel, but after every 8 ms slice it waits for a rendered frame, which
-  //     leaves the main thread idle about half the time while nothing else animates; several calls side by side keep
-  //     it busy (warm cache: 2.1 s instead of 4.0 s). (Rendering straight away compiled ~500 pipelines one after
-  //     another: ~25 s with a cold shader cache.)
+  // 6b. Shader pre-compilation. The city has several hundred distinct pipelines and building one costs the main thread
+  //     tens to hundreds of milliseconds (over a second each under the WebGL2 fallback), so compiling all of them behind
+  //     the loading screen kept it up for minutes. Only the pipelines of what the first frame draws - visible after
+  //     distance culling and inside the camera's frustum - are compiled before it; the rest compile in the background
+  //     once the game is on screen, one at a time and nearest first, so turning the camera rarely meets an uncompiled
+  //     pipeline and play never waits for the far side of the city. compileAsync() builds the node graphs in slices
+  //     and has the GPU process compile the pipelines in parallel, waiting for a rendered frame after every 8 ms slice,
+  //     so several calls side by side keep the start-up compile busy.
   const COMPILE_POOL = 16;
-  const nextTask = () => (globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise((resolve) => setTimeout(resolve, 0)));
+  const BACKGROUND_POOL = 1;
+  const FIRST_FRAME_RADIUS = 300; // metres: what is farther fills in after the game starts
+  let backgroundJobs = [];
+  // Objects whose pipeline is still to be compiled are taken off every layer (so no camera, shadow maps included,
+  // draws them) and given their layers back once it is; `visible` stays with distance culling and the game's systems
+  const pending = new Map(); // object -> its layer mask
+  const pendingOf = new Map(); // a compiled object -> the objects that waited on its pipeline
+  const reveal = (o) => {
+    const mask = pending.get(o);
+    if (mask === undefined) return;
+    pending.delete(o);
+    o.layers.mask = mask;
+  };
   async function precompileShaders() {
     // An empty frame first: it sets up the post-processing chain, which configures the scene pass's render target
     // (MSAA samples, depth format), so the pipelines compiled below are the very ones the scene pass asks for
@@ -589,23 +613,22 @@ async function initApp() {
     scene.visible = true;
     markInit('postFX');
 
-    // Every visible object with frustum culling off (like the warm-up frame, see the loop). Plain meshes that share
-    // a material share its shader, so one job compiles them in turn (the first build serves the rest); every
-    // instanced mesh gets a build of its own unless its chunks share a pipeline
-    const culled = [];
+    // Every object of the whole city, before distance culling hides the far chunks. Plain meshes that share a material
+    // share its shader, so one job compiles them in turn (the first build serves the rest); every instanced mesh gets a
+    // build of its own unless its chunks share a pipeline
     const jobs = [];
     const jobByMaterial = new Map();
     const pipelines = new Set();
+    const members = new Map(); // pipeline -> every object drawn with it
     scene.traverseVisible((o) => {
-      if (o.frustumCulled) {
-        culled.push(o);
-        o.frustumCulled = false;
-      }
       if (!o.isMesh && !o.isLine && !o.isPoints && !o.isSprite) return;
       // Use the first visible chunk: the original representative may be in an inactive tree cell. Shadow stand-ins
-      // only draw in the shadow maps (the warm-up frame compiles those).
+      // only draw in the shadow maps (the first frames compile those).
       if (o.userData.shadowProxy) return;
       const pipeline = o.userData.sharesPipelineWith || o;
+      let drawn = members.get(pipeline);
+      if (!drawn) members.set(pipeline, (drawn = []));
+      drawn.push(o);
       if (pipelines.has(pipeline)) return;
       pipelines.add(pipeline);
       if (o.isInstancedMesh || Array.isArray(o.material)) {
@@ -621,36 +644,141 @@ async function initApp() {
       job.push(o);
     });
 
+    // What the first frame draws: the chunks distance culling keeps, inside the frustum
+    // (the camera placed behind the player first, as the first frame will place it)
+    cameraSystem.update(1 / 60, 0);
+    const camera = cameraSystem.camera;
+    camera.updateMatrixWorld();
+    scene.updateMatrixWorld();
+    updateSceneCulling(camera.position);
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    );
+    const sphere = new THREE.Sphere();
+    const distance = (o) => {
+      if (o.isInstancedMesh) {
+        if (!o.boundingSphere) o.computeBoundingSphere();
+        sphere.copy(o.boundingSphere);
+      } else if (o.geometry) {
+        if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+        sphere.copy(o.geometry.boundingSphere);
+      } else return Infinity;
+      sphere.applyMatrix4(o.matrixWorld);
+      return Math.max(0, sphere.center.distanceTo(camera.position) - sphere.radius);
+    };
+    const shown = (o) => {
+      for (let p = o; p; p = p.parent) if (!p.visible) return false;
+      return !o.frustumCulled || (frustum.intersectsObject(o) && distance(o) < FIRST_FRAME_RADIUS);
+    };
+    const firstJobs = [];
+    const laterJobs = [];
+    const drawnWith = (o) => members.get(o.userData.sharesPipelineWith || o) ?? [o];
+    for (const job of jobs) {
+      const first = job.filter((o) => drawnWith(o).some(shown));
+      if (first.length > 0) firstJobs.push(first);
+      const later = job.filter((o) => !first.includes(o));
+      if (later.length > 0) {
+        laterJobs.push({ objects: later, near: Math.min(...later.flatMap((o) => drawnWith(o).map(distance))) });
+      }
+    }
+    laterJobs.sort((x, y) => x.near - y.near);
+    backgroundJobs = laterJobs.map((job) => job.objects);
+    // Until its pipeline is compiled, whatever draws with it stays hidden (see revealCompiled), so no frame ever
+    // compiles one on the spot: the far side of the city appears as the background compiles reach it
+    for (const job of backgroundJobs) {
+      for (const o of job) {
+        pendingOf.set(o, drawnWith(o));
+        for (const drawn of drawnWith(o)) {
+          if (pending.has(drawn)) continue;
+          pending.set(drawn, drawn.layers.mask);
+          drawn.layers.mask = 0;
+        }
+      }
+    }
+
+    console.log(`[init] pipelines: ${firstJobs.length} before the first frame, ${backgroundJobs.length} after`);
     renderer.setRenderTarget(scenePass.renderTarget);
     renderer.setMRT(sceneMRT);
-    const compile = async (object) => {
-      // Each compile starts in a task of its own: compileAsync() keeps one precompilation state on the renderer,
-      // which must not be mid-step for two of them in the same microtask checkpoint
-      await nextTask();
-      try {
-        await renderer.compileAsync(object, cameraSystem.camera, scene);
-      } catch (e) {
-        console.warn('[compile]', e); // the warm-up frame compiles it instead
-      }
-    };
     let next = 0;
     let done = 0;
     const worker = async () => {
-      while (next < jobs.length) {
-        const job = jobs[next++];
-        for (const object of job) await compile(object);
+      while (next < firstJobs.length) {
+        const job = firstJobs[next++];
+        for (const object of job) await compileObject(object);
         done++;
         if (loadingStatus) {
-          loadingStatus.textContent = `Compiling Shaders & Render Pipelines... ${Math.round((done / jobs.length) * 100)}%`;
+          loadingStatus.textContent = `Compiling Shaders & Render Pipelines... ${Math.round((done / firstJobs.length) * 100)}%`;
         }
-        setLoadingProgress(done / jobs.length);
-        reportProgress('compile', done / jobs.length);
+        setLoadingProgress(done / firstJobs.length);
+        reportProgress('compile', done / firstJobs.length);
       }
     };
     await Promise.all(Array.from({ length: COMPILE_POOL }, worker));
     renderer.setMRT(null);
     renderer.setRenderTarget(null);
-    for (const o of culled) o.frustumCulled = true;
+  }
+
+  // Each compile starts in a task of its own: compileAsync() keeps one precompilation state on the renderer, which
+  // must not be mid-step for two of them in the same microtask checkpoint. A chunk distance culling hides is shown
+  // for the synchronous part of the call (where compileAsync() collects what to build) and hidden again straight
+  // after, so the frame that may run in between does not draw it. `ownTarget` sets the scene pass's render target and
+  // MRT for that synchronous part only, for a compile that runs between frames.
+  async function compileObject(object, ownTarget = false) {
+    await nextTask();
+    const target = renderer.getRenderTarget();
+    const mrt = renderer.getMRT();
+    if (ownTarget) {
+      renderer.setRenderTarget(scenePass.renderTarget);
+      renderer.setMRT(sceneMRT);
+    }
+    const hidden = [];
+    for (let p = object; p; p = p.parent) {
+      if (!p.visible) {
+        hidden.push(p);
+        p.visible = true;
+      }
+    }
+    const culled = object.frustumCulled;
+    object.frustumCulled = false;
+    const layers = object.layers.mask;
+    if (pending.has(object)) object.layers.mask = pending.get(object);
+    let compiling;
+    try {
+      compiling = renderer.compileAsync(object, cameraSystem.camera, scene);
+    } catch (e) {
+      compiling = Promise.reject(e);
+    } finally {
+      object.frustumCulled = culled;
+      object.layers.mask = layers;
+      for (const p of hidden) p.visible = false;
+      if (ownTarget) {
+        renderer.setMRT(mrt);
+        renderer.setRenderTarget(target);
+      }
+    }
+    try {
+      await compiling;
+    } catch (e) {
+      console.warn('[compile]', e); // drawing it compiles it instead
+    }
+  }
+
+  // The rest of the city's pipelines, after the first frame and between frames, nearest first.
+  async function compileInBackground() {
+    const started = performance.now();
+    let next = 0;
+    const worker = async () => {
+      while (next < backgroundJobs.length) {
+        const job = backgroundJobs[next++];
+        for (const object of job) await compileObject(object, true);
+        for (const object of job) {
+          for (const drawn of pendingOf.get(object) ?? [object]) reveal(drawn);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: BACKGROUND_POOL }, worker));
+    console.log(`[init] ${backgroundJobs.length} background pipelines in ${Math.round(performance.now() - started)}ms`);
+    backgroundJobs = [];
   }
 
   await precompileShaders();
@@ -697,36 +825,17 @@ async function initApp() {
     lightingSystem.update(cameraSystem.currentPos);
     mapSystem.update();
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
-    if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk
+    updateSceneCulling(cameraSystem.camera.position);
     remotePlayers.update(dt, cameraSystem.camera);
     shareState(now, controllerManager.getActiveEntity(), controllerManager.activeMode);
 
     // Render frame via TSL RenderPipeline (SSR + Bloom)
-    if (!warmedUp) {
-      // First frame = pipeline warm-up behind the loading screen, for what precompileShaders() can't reach (the shadow
-      // map passes): with frustum culling off, every visible material's pipelines compile now instead of stalling the
-      // first time the camera turns towards it (one chunk / shadow stand-in per shared pipeline is enough)
-      const culled = [];
-      const pipelines = new Set();
-      scene.traverseVisible((o) => {
-        const pipeline = o.userData.sharesPipelineWith || o;
-        if (pipelines.has(pipeline)) return;
-        pipelines.add(pipeline);
-        if (o.frustumCulled) {
-          culled.push(o);
-          o.frustumCulled = false;
-        }
-      });
-      renderPipeline.render();
-      for (const o of culled) o.frustumCulled = true;
-      markInit('warmup');
-    }
     renderPipeline.render();
     if (!warmedUp) {
       warmedUp = true;
       markInit('firstFrame');
-      // The loading screen stays up until the GPU has got through the first frame (and the pipelines its warm-up
-      // compiled), i.e. until the city is actually on screen
+      // The loading screen stays up until the GPU has got through the first frame (and the pipelines it compiled),
+      // i.e. until the city is actually on screen; the rest of the city's pipelines compile after that
       const device = renderer.backend.device;
       Promise.resolve(device && device.queue.onSubmittedWorkDone()).catch(() => {}).then(() => {
         markInit('gpu');
@@ -736,6 +845,7 @@ async function initApp() {
         audioSystem.ready = true;
         setLoadingProgress(1);
         reportReady();
+        compileInBackground().catch((e) => console.warn('[compile]', e));
       });
     }
 
