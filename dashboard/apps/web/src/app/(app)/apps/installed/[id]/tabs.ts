@@ -68,6 +68,7 @@ export const GAME_TABS: readonly GameTab[] = [
     // same grant as events, since they talk to everybody and hand out items.
     { slug: "challenges", label: "Challenges", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME }, // i18n-ignore
+    { slug: "ranks", label: "Ranks", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] }, // i18n-ignore
     { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME }, // i18n-ignore
     {

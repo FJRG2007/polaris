@@ -1123,7 +1123,8 @@
         "access": "Acceso",
         "schedule": "Horario",
         "settings": "Ajustes",
-        "moderation": "Moderación"
+        "moderation": "Moderación",
+        "ranks": "Rangos"
     },
     "itemSlots": {
         "empty": "Hueco vacío",

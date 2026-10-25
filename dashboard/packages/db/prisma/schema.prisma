@@ -360,6 +360,7 @@ model User {
     contactNamesReceived ContactName[]       @relation("ContactNamesReceived")
     chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
     chatScheduled       ChatScheduledMessage[]
+    chatReminders       ChatReminder[]
     chatReportsHandled  ChatReport[]         @relation("ChatReportsHandled")
     safetyCasesAbout    SafetyCase[]         @relation("SafetyCasesAbout")
     safetyCasesMade     SafetyCase[]         @relation("SafetyCasesMade")
@@ -9830,6 +9831,7 @@ model ChatMessage {
     attachments ChatAttachment[]
     poll        ChatPoll?
     stars       ChatStar[]
+    reminders   ChatReminder[]
     linkFlags   ChatMessageLinkFlag[]
     edits       ChatMessageEdit[]
     reports     ChatReport[]
@@ -10321,6 +10323,31 @@ model ChatScheduledMessage {
     @@index([sendAt])
     // What the composer asks: mine, here, soonest first.
     @@index([channelId, authorId, sendAt])
+}
+
+// A reminder somebody set on a message, for themselves.
+//
+// One per person per message: setting it again moves the time rather than
+// adding a second bell for the same thing. Fired once - `firedAt` is claimed
+// by the sweep before the notification is written - and a fired row is kept
+// only until the sweep prunes it, so the table is bounded by what is pending.
+model ChatReminder {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    userId    String    @db.Uuid
+    messageId String    @db.Uuid
+    dueAt     DateTime
+    createdAt DateTime  @default(now())
+    // Done. Null while it is waiting.
+    firedAt   DateTime?
+
+    user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, messageId])
+    // What the sweep asks: still waiting, and due.
+    @@index([firedAt, dueAt])
+    // What the list asks: mine, still waiting, soonest first.
+    @@index([userId, firedAt, dueAt])
 }
 
 // A file waiting with the message it belongs to.

@@ -49,6 +49,7 @@ import { runMailServerPass } from "@/lib/mail-server/scheduled";
 import { runDesiredStatePass } from "@/lib/deploy/desired-state";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
+import { sweepDueReminders } from "@/lib/chat/reminders";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
 import { pollLastfm } from "@/lib/presence-activity/lastfm-poll";
@@ -638,6 +639,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // Leased, because sending twice is the one thing this must not do.
         leaseMs: 5 * MINUTE,
         run: sweepDueScheduledMessages
+    },
+    {
+        key: "chat-reminders",
+        // Every minute, for the same reason as the scheduled messages above: a
+        // reminder is asked for at a minute, and the soonest one may be set is
+        // a minute away.
+        everyMs: Number(process.env.POLARIS_CHAT_REMINDER_MS) || MINUTE,
+        // Leased so two runners do not both walk the list. Each row is claimed
+        // before it fires as well, which is what makes a second pass harmless.
+        leaseMs: 5 * MINUTE,
+        run: () => sweepDueReminders()
     },
     {
         key: "task-trackers",

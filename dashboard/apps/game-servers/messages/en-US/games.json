@@ -1123,7 +1123,8 @@
         "access": "Access",
         "schedule": "Schedule",
         "settings": "Settings",
-        "moderation": "Moderation"
+        "moderation": "Moderation",
+        "ranks": "Ranks"
     },
     "itemSlots": {
         "empty": "Empty slot",

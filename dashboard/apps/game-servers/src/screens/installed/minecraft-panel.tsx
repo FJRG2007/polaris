@@ -57,6 +57,7 @@ import type { PlayerTimeout } from "../../lib/player-timeout";
 import { useGamePresence } from "../../components/use-game-presence";
 import { RestartPlanner } from "./restart-planner";
 import { MinecraftModeration } from "./minecraft-moderation";
+import { MinecraftRanks } from "./minecraft-ranks";
 import {
     awaitingPassword,
     LOGIN_IDLE_MS,
@@ -673,6 +674,11 @@ export function MinecraftPanel({
                             running={isRunning}
                             playersOnline={status?.players.online ?? 0}
                         />
+                    </CardBoundary>
+                )}
+                {tab === "ranks" && (
+                    <CardBoundary name="Ranks">
+                        <MinecraftRanks installedAppId={installedAppId} />
                     </CardBoundary>
                 )}
                 {tab === "players" && (

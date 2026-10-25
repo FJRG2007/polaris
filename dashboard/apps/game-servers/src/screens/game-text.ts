@@ -32,6 +32,7 @@ const TAB_WORDS: Readonly<Record<string, GameKey<"games">>> = {
     Events: "tabs.events",
     Challenges: "tabs.challenges",
     Players: "tabs.players",
+    Ranks: "tabs.ranks",
     World: "tabs.world",
     Rules: "tabs.rules",
     Mods: "tabs.mods",
