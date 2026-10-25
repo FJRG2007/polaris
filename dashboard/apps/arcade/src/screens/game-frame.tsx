@@ -2,9 +2,15 @@
 
 /**
  * A game, running in a frame of its own page (built by `scripts/build-games.mjs`
- * and served from the app's bundle), with a progress bar over it until the
- * first frame is drawn. The game's code is fetched only when this mounts, so a
- * Polaris where nobody plays never loads it.
+ * and served from the app's bundle). This draws a plain loading line only until
+ * the game's page reports progress: from then on the game's own loading screen,
+ * with its steps and tips, is the one on screen. The game's code is fetched only
+ * when this mounts, so a Polaris where nobody plays never loads it.
+ *
+ * The game asks for its words (`polaris-game:hello`) and is sent the reader's
+ * language and catalog (`polaris-game:setup`), again whenever the language
+ * changes. Once the city is up the frame takes the keyboard, unless the reader
+ * has moved on to a field of the page meanwhile.
  *
  * The frame and its page talk over `postMessage`, same origin only; the
  * messages are listed in the app's README ("Embed contract"). Inside a call,
@@ -14,6 +20,9 @@
 
 import { z } from "zod";
 import { useArcadeT } from "./i18n";
+import { hostUi } from "@polaris/app-host/client";
+import { gameMessages } from "../../messages";
+import { mayTakeFocus } from "./frame-focus";
 import { Button } from "@polaris/ui";
 import { gameFrameSrc } from "../games/registry";
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +32,8 @@ import type { AppHostTypes } from "@polaris/app-host";
 type CallActivityHost = AppHostTypes["CallActivityHost"];
 
 const fromGame = z.discriminatedUnion("type", [
+    z.object({ type: z.literal("polaris-game:hello") }),
+    z.object({ type: z.literal("polaris-game:exit") }),
     z.object({
         type: z.literal("polaris-game:progress"),
         stage: z.enum(["data", "build", "compile"]),
@@ -37,21 +48,32 @@ const fromGame = z.discriminatedUnion("type", [
     z.object({ type: z.literal("polaris-game:state") }).passthrough()
 ]);
 
-/** Where each stage sits on the one bar: the download, the city, the shaders. */
-const STAGES = { data: [0, 0.3], build: [0.3, 0.55], compile: [0.55, 1] } as const;
-
 /** A page that has said nothing this long after loading did not start. */
 const SILENT_MS = 30_000;
 
 type Load =
-    | { phase: "loading"; stage: keyof typeof STAGES | null; progress: number }
+    // Nothing from the game yet: this draws the loading line
+    | { phase: "starting" }
+    // The game draws its own loading screen
+    | { phase: "loading" }
     | { phase: "ready" }
     | { phase: "failed"; reason: "graphics" | "data" | "error" };
 
-const STARTING: Load = { phase: "loading", stage: null, progress: 0 };
+const STARTING: Load = { phase: "starting" };
 
-export function GameFrame({ game, call }: { game: GameDefinition; call?: CallActivityHost }) {
+export function GameFrame({
+    game,
+    call,
+    onExit
+}: {
+    game: GameDefinition;
+    call?: CallActivityHost;
+    /** Where the game's Exit game goes; without it the game's menu has no Exit. */
+    onExit?: () => void;
+}) {
     const t = useArcadeT();
+    const locale = hostUi.i18nProvider.useLocale();
+    const root = useRef<HTMLDivElement>(null);
     const frame = useRef<HTMLIFrameElement>(null);
     const [attempt, setAttempt] = useState(0);
     const [load, setLoad] = useState<Load>(STARTING);
@@ -60,6 +82,20 @@ export function GameFrame({ game, call }: { game: GameDefinition; call?: CallAct
     const name = t(`games.${game.id}.name` as never);
     const host = useRef(call);
     host.current = call;
+    const exit = useRef(onExit);
+    exit.current = onExit;
+    const canExit = Boolean(onExit);
+    const setup = useRef<() => void>(() => {});
+    setup.current = () =>
+        frame.current?.contentWindow?.postMessage(
+            {
+                type: "polaris-game:setup",
+                locale,
+                messages: gameMessages(locale, game.id),
+                exit: canExit
+            },
+            window.location.origin
+        );
 
     useEffect(() => {
         heard.current = false;
@@ -71,22 +107,17 @@ export function GameFrame({ game, call }: { game: GameDefinition; call?: CallAct
             heard.current = true;
             const data = message.data;
             if (data.type === "polaris-game:state") host.current?.onState(data);
-            else if (data.type === "polaris-game:ready") setLoad({ phase: "ready" });
+            else if (data.type === "polaris-game:hello") setup.current();
+            else if (data.type === "polaris-game:exit") exit.current?.();
+            else if (data.type === "polaris-game:ready") {
+                setLoad({ phase: "ready" });
+                // Keys go to the frame that has the focus: without this they stayed with the page
+                // and the car ignored them until something in the game was clicked
+                if (mayTakeFocus(document.activeElement, root.current)) frame.current?.focus();
+            }
             else if (data.type === "polaris-game:failed")
                 setLoad({ phase: "failed", reason: data.reason });
-            else {
-                const [from, to] = STAGES[data.stage];
-                const progress = from + (to - from) * data.done;
-                setLoad((now) =>
-                    now.phase === "loading"
-                        ? {
-                              phase: "loading",
-                              stage: data.stage,
-                              progress: Math.max(now.progress, progress)
-                          }
-                        : now
-                );
-            }
+            else setLoad((now) => (now.phase === "starting" ? { phase: "loading" } : now));
         };
         window.addEventListener("message", onMessage);
         return () => {
@@ -94,6 +125,11 @@ export function GameFrame({ game, call }: { game: GameDefinition; call?: CallAct
             window.clearTimeout(silence.current);
         };
     }, [attempt]);
+
+    // A change of language while the game is open reaches it too
+    useEffect(() => {
+        setup.current();
+    }, [locale, canExit]);
 
     // In a call, once the city is up: join, then draw the others wherever the
     // call says they are.
@@ -119,7 +155,9 @@ export function GameFrame({ game, call }: { game: GameDefinition; call?: CallAct
         silence.current = window.setTimeout(() => {
             if (!heard.current)
                 setLoad((now) =>
-                    now.phase === "loading" ? { phase: "failed", reason: "error" } : now
+                    now.phase === "starting" || now.phase === "loading"
+                        ? { phase: "failed", reason: "error" }
+                        : now
                 );
         }, SILENT_MS);
     };
@@ -130,7 +168,7 @@ export function GameFrame({ game, call }: { game: GameDefinition; call?: CallAct
     };
 
     return (
-        <div className="relative h-full w-full overflow-hidden bg-black">
+        <div ref={root} className="relative h-full w-full overflow-hidden bg-black">
             <iframe
                 key={attempt}
                 ref={frame}
@@ -140,29 +178,12 @@ export function GameFrame({ game, call }: { game: GameDefinition; call?: CallAct
                 onLoad={onFrameLoad}
                 className="absolute inset-0 h-full w-full border-0"
             />
-            {load.phase !== "ready" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background px-4">
-                    {load.phase === "loading" ? (
-                        <div className="flex w-full max-w-xs flex-col items-center gap-3 text-center">
-                            <p className="w-full truncate text-sm font-medium">
-                                {load.stage === "build" || load.stage === "compile"
-                                    ? t("loadingCity")
-                                    : t("loading", { game: name })}
-                            </p>
-                            <div
-                                role="progressbar"
-                                aria-label={t("loading", { game: name })}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                                aria-valuenow={Math.round(load.progress * 100)}
-                                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                            >
-                                <div
-                                    className="h-full origin-left rounded-full bg-primary transition-transform duration-300"
-                                    style={{ transform: `scaleX(${load.progress})` }}
-                                />
-                            </div>
-                        </div>
+            {(load.phase === "starting" || load.phase === "failed") && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black px-4 text-white">
+                    {load.phase === "starting" ? (
+                        <p role="status" className="w-full max-w-xs truncate text-center text-sm font-medium">
+                            {t("loading", { game: name })}
+                        </p>
                     ) : (
                         <div
                             role="alert"

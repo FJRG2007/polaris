@@ -2,21 +2,32 @@
 // (Polaris, same origin only) and what it accepts from it. The contract itself is
 // written down in the app's README (`apps/arcade/README.md`).
 //
-// Out: polaris-game:progress { stage: 'data' | 'build' | 'compile', done: 0..1 }
+// Out: polaris-game:hello                                      (once, as the page starts: asks for setup)
+//      polaris-game:progress { stage: 'data' | 'build' | 'compile', done: 0..1 }
 //      polaris-game:ready
 //      polaris-game:failed { reason: 'graphics' | 'data' | 'error' }
 //      polaris-game:state { x, y, z, heading, mode, speed }   (10 a second, while joined)
-// In:  polaris-game:join { self: { id, name } }
+//      polaris-game:exit                                       (the reader chose Exit game in the menu)
+// In:  polaris-game:setup { locale, messages, exit }            (the reader's words; whether Exit game is offered)
+//      polaris-game:join { self: { id, name } }
 //      polaris-game:players { players: [{ id, name, x, y, z, heading, mode }] }   (everyone else, replaces the last list)
 //      polaris-game:leave
+
+import { applyCatalog, keepFallback, readCatalog } from './i18n.js';
 
 const embedded = window.parent !== window;
 const MODES = new Set(['person', 'car', 'cyclist', 'helicopter']);
 const MAX_PLAYERS = 32;
 
+// A host that never answers the hello (none framing the page, or a broken one) leaves the English words
+const SETUP_WAIT_MS = 2000;
+
 let finished = false;
 let joined = null;
+let canExit = false;
 const listeners = new Set();
+const progressListeners = new Set();
+const exitListeners = new Set();
 
 /** Post one message to the framing page; nothing when the page is opened on its own. */
 export function tellHost(message) {
@@ -24,7 +35,29 @@ export function tellHost(message) {
 }
 
 export function reportProgress(stage, done) {
-  if (!finished) tellHost({ type: 'polaris-game:progress', stage, done: Math.min(1, Math.max(0, done)) });
+  if (finished) return;
+  const share = Math.min(1, Math.max(0, done));
+  tellHost({ type: 'polaris-game:progress', stage, done: share });
+  for (const listener of progressListeners) listener(stage, share);
+}
+
+/** Called with every `reportProgress`, for the page's own loading screen. */
+export function onProgress(listener) {
+  progressListeners.add(listener);
+}
+
+/** Whether the host takes the reader back to its list of games (the menu's Exit game). */
+export function exitAvailable() {
+  return canExit;
+}
+
+/** Called when the host says whether Exit game is offered. */
+export function onExitAvailability(listener) {
+  exitListeners.add(listener);
+}
+
+export function exitGame() {
+  if (canExit) tellHost({ type: 'polaris-game:exit' });
 }
 
 export function reportReady() {
@@ -69,7 +102,13 @@ window.addEventListener('message', (event) => {
   if (!embedded || event.source !== parent || event.origin !== location.origin) return;
   const data = event.data;
   if (!data || typeof data !== 'object') return;
-  if (data.type === 'polaris-game:join') {
+  if (data.type === 'polaris-game:setup') {
+    const catalog = readCatalog(data.messages);
+    if (catalog && typeof data.locale === 'string' && /^[a-z]{2}(-[A-Z]{2})?$/.test(data.locale)) applyCatalog(data.locale, catalog);
+    else keepFallback();
+    canExit = data.exit === true;
+    for (const listener of exitListeners) listener(canExit);
+  } else if (data.type === 'polaris-game:join') {
     const self = data.self;
     if (self && text(self.id, 128) && text(self.name, 64)) joined = { id: self.id, name: self.name };
   } else if (data.type === 'polaris-game:leave') {
@@ -90,4 +129,11 @@ export function shareState(now, entity, mode) {
   const { x, y, z } = entity.position;
   const heading = Math.atan2(Math.sin(entity.heading), Math.cos(entity.heading));
   tellHost({ type: 'polaris-game:state', x, y, z, heading, mode, speed: entity.speed || 0 });
+}
+
+if (embedded) {
+  tellHost({ type: 'polaris-game:hello' });
+  setTimeout(keepFallback, SETUP_WAIT_MS);
+} else {
+  keepFallback();
 }

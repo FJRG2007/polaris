@@ -1,3 +1,5 @@
+// First: the loading screen runs before any module that waits on the city data
+import { enterStage, hideLoadingScreen } from './loading-screen.js';
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, vec4, smoothstep } from 'three/tsl';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
@@ -23,6 +25,8 @@ import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
 import { createRemotePlayers } from './remote-players.js';
 import { reportFailure, reportProgress, reportReady, shareState } from './embed.js';
+import { formatNumber, onLocaleChange, t } from './i18n.js';
+import { GameMenu } from './game-menu.js';
 
 // js/main.js
 // Main entry point for New York City (Midtown Manhattan) in Three.js WebGPURenderer & TSL (three.js, bundled by the app build)
@@ -36,20 +40,8 @@ const BUILD_STEPS = ['renderer', 'lighting', 'cityGrid', 'boroughs', 'landmarks'
 
 async function initApp() {
   const container = document.getElementById('canvas-container');
-  const loadingOverlay = document.getElementById('loading-overlay');
-  const loadingStatus = document.getElementById('loading-status');
-  const loadingTrack = loadingOverlay ? loadingOverlay.querySelector('.loader-track') : null;
-  const loadingFill = document.getElementById('loading-progress');
-  // The loading bar sweeps while the city is being built (the main thread is busy) and fills as the shaders compile
-  const setLoadingProgress = (p) => {
-    if (!loadingFill) return;
-    if (loadingTrack) loadingTrack.classList.remove('is-indeterminate');
-    loadingFill.style.transform = `scaleX(${Math.min(1, Math.max(0, p))})`;
-  };
-
-  if (loadingStatus) {
-    loadingStatus.textContent = `Initializing Three.js r${THREE.REVISION} WebGPURenderer & TSL Shaders...`;
-  }
+  // The city data is in (nyc-geodata.js holds every module that needs it until it is): the build starts
+  enterStage('build');
 
   // 1. Initialize Three.js WebGPURenderer with 32-bit float reversedDepthBuffer
   const renderer = new THREE.WebGPURenderer({
@@ -105,10 +97,6 @@ async function initApp() {
   const lightingSystem = new LightingSystem(scene, renderer);
   lightingSystem.sunLight.castShadow = preset.shadows;
   await stepDone('lighting');
-
-  if (loadingStatus) {
-    loadingStatus.textContent = 'Constructing Manhattan Grid, Landmarks & Streetscape...';
-  }
 
   // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
   const cityGrid = buildCityGrid(scene);
@@ -172,10 +160,13 @@ async function initApp() {
     if (!soundButton) return;
     soundButton.disabled = !audioSystem.supported;
     soundButton.setAttribute('aria-pressed', String(audioSystem.enabled));
-    soundButton.setAttribute('aria-label', audioSystem.enabled ? 'Mute sound' : 'Enable sound');
-    soundButton.title = audioSystem.supported ? `${audioSystem.enabled ? 'Mute' : 'Enable'} sound [N]` : 'Web Audio is unavailable';
+    const label = t(audioSystem.enabled ? 'toolbar.mute' : 'toolbar.unmute');
+    soundButton.setAttribute('aria-label', label);
+    soundButton.title = audioSystem.supported ? `${label} [N]` : t('toolbar.noAudio');
     soundButton.querySelector('use').setAttribute('href', audioSystem.enabled ? '#i-sound' : '#i-sound-off');
+    gameMenu?.refresh();
   }
+  let gameMenu = null;
   soundButton?.addEventListener('click', () => audioSystem.setEnabled(!audioSystem.enabled));
   updateSoundButton();
   // pagehide also covers navigation away on mobile; preserve the context across back-forward cache restores.
@@ -270,7 +261,6 @@ async function initApp() {
   const modeSwitch = document.getElementById('mode-switch');
   touchControls.onAvailabilityChange = placeModeIndicator;
 
-  const elFps = document.getElementById('hud-fps');
   const elMode = document.getElementById('hud-active-mode');
   const elCamera = document.getElementById('hud-active-camera');
   const elSpeed = document.getElementById('hud-speed');
@@ -288,19 +278,55 @@ async function initApp() {
     onCloseMap: () => mapSystem.toggleFullMap(false)
   });
 
-  // Keyboard guide for each mode: [keys, action]
+  // Keyboard guide for each mode: [keys, action] (the action is a key of controls.<mode>; 'Drag' is the mouse)
   const controlHints = {
-    person: [[['W', 'S'], 'Walk'], [['A', 'D'], 'Turn'], [['Shift'], 'Sprint'], [['Space'], 'Jump'], [['Drag'], 'Orbit']],
-    car: [[['W', 'S'], 'Drive / Reverse'], [['A', 'D'], 'Steer'], [['Shift'], 'Boost'], [['B'], 'Horn'], [['Drag'], 'Orbit']],
-    cyclist: [[['W', 'S'], 'Pedal / Brake'], [['A', 'D'], 'Lean & Turn'], [['Shift'], 'Sprint'], [['Drag'], 'Orbit']],
-    helicopter: [[['W', 'S'], 'Pitch'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Ascend'], [['Q', 'C'], 'Descend'], [['Shift'], 'Boost']]
+    person: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Shift'], 'boost'], [['Space'], 'up'], [['Drag'], 'orbit']],
+    car: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Shift'], 'boost'], [['B'], 'horn'], [['Drag'], 'orbit']],
+    cyclist: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Shift'], 'boost'], [['Drag'], 'orbit']],
+    helicopter: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Space', 'E'], 'up'], [['Q', 'C'], 'down'], [['Shift'], 'boost']]
   };
+  const keyName = (key) => (key === 'Drag' ? t('controls.drag') : key);
+  const modeHints = (mode) => (controlHints[mode] || []).map(([keys, action]) => [keys.map(keyName), t(`controls.${mode}.${action}`)]);
+  // The menu's Controls page: this mode's keys, the ones that work everywhere, and the gamepad's
+  function controlSections(mode) {
+    const driving = mode === 'car' || mode === 'cyclist';
+    return [
+      { title: t(`modes.${mode}`), rows: modeHints(mode) },
+      {
+        title: t('controls.general'),
+        rows: [
+          [['1', '2', '3', '4'], t('controls.modes')],
+          [['V'], t('controls.camera')],
+          [['Shift', 'V'], t('controls.cameraBack')],
+          [['M'], t('controls.map')],
+          [['H'], t('controls.hud')],
+          [['N'], t('controls.sound')],
+          [['Esc'], t('controls.menu')]
+        ]
+      },
+      {
+        title: t('controls.gamepad'),
+        rows: [
+          [[t('controls.leftStick')], t('controls.padMove')],
+          [[t('controls.rightStick')], t('controls.padLook')],
+          ...(driving ? [[['RT', 'LT'], t('controls.padThrottle')]] : mode === 'helicopter' ? [[['RT', 'LT'], t('controls.padLift')]] : []),
+          ...(mode === 'person' ? [[['A'], t('controls.padJump')]] : []),
+          [['X'], t('controls.padBoost')],
+          [['Y'], t('controls.padCamera')],
+          [['LB', 'RB'], t('controls.padModes')],
+          [['↑', '↓'], t('controls.padZoom')],
+          [['Back'], t('controls.padMap')],
+          [['Start'], t('controls.padMenu')]
+        ]
+      }
+    ];
+  }
   // Boosted top speeds in mph (controllers.js caps them at 8.2, 36, 19 & 52 m/s): full scale of the speed meter
   const topSpeedMph = { person: 18, car: 81, cyclist: 43, helicopter: 116 };
 
   function renderControlHints(mode) {
     if (!elControlsHint) return;
-    const items = (controlHints[mode] || []).map(([keys, action]) => {
+    const items = modeHints(mode).map(([keys, action]) => {
       const item = document.createElement('span');
       item.className = 'hint';
       for (const key of keys) {
@@ -334,9 +360,9 @@ async function initApp() {
     });
     document.body.dataset.mode = mode;
     placeModeIndicator();
-    const ent = controllerManager.getActiveEntity();
-    if (elMode) elMode.textContent = ent.label;
+    if (elMode) elMode.textContent = t(`player.${mode}`);
     renderControlHints(mode);
+    gameMenu?.refresh();
 
     // If currently on a static scenic camera, switch to 3rd-Person Chase so user sees their selected character/vehicle
     const currentCam = cameraSystem.getActivePreset();
@@ -350,8 +376,7 @@ async function initApp() {
     cameraButtons.forEach((btn) => {
       btn.classList.toggle('active', btn.getAttribute('data-camera') === camId);
     });
-    const preset = cameraSystem.getActivePreset();
-    if (elCamera) elCamera.textContent = preset.name;
+    if (elCamera) elCamera.textContent = t(`cameras.${cameraSystem.activePresetId}`);
   }
 
   // Steps through CAMERA_PRESETS (V / Shift+V, and the arrows either side of the camera name)
@@ -433,10 +458,11 @@ async function initApp() {
 
   // Graphics quality: the chosen level is saved for this device and the city restarts at it (every shader depends on
   // it). Auto shows the level it picked.
-  const qualityNames = { low: 'Low', medium: 'Medium', high: 'High' };
   const qualityButtons = document.querySelectorAll('[data-quality]');
-  const qualityAutoSub = document.getElementById('quality-auto-sub');
-  if (qualityAutoSub && qualitySetting === 'auto') qualityAutoSub.textContent = `${qualityNames[quality]} on this device`;
+  function renderQualityNames() {
+    const text = qualitySetting === 'auto' ? t('quality.autoPicked', { level: t(`quality.${quality}`) }) : t('quality.autoHint');
+    for (const el of document.querySelectorAll('.quality-auto-sub')) el.textContent = text;
+  }
   qualityButtons.forEach((btn) => {
     const value = btn.getAttribute('data-quality');
     btn.classList.toggle('active', value === qualitySetting);
@@ -489,7 +515,7 @@ async function initApp() {
         streets = streets.slice(5);
         const near = document.createElement('span');
         near.className = 'location-near';
-        near.textContent = 'near';
+        near.textContent = t('location.near');
         row.appendChild(near);
       }
       for (const name of streets.split(' & ')) {
@@ -526,10 +552,7 @@ async function initApp() {
       controllerManager.resetInput();
       touchControls.setEnabled(!open);
       gamepadControls.setEnabled(!open);
-      const mapHint = document.getElementById('fullmap-hover-info');
-      if (open && touchControls.available && mapHint) {
-        mapHint.textContent = 'Tap to teleport · Drag to pan · Use + / − to zoom';
-      }
+      if (open) renderMapHint();
     },
     onTeleport: teleportTo
   });
@@ -552,16 +575,64 @@ async function initApp() {
     hudToggleBtn.addEventListener('click', () => {
       document.body.classList.toggle('hud-minimized');
       const isMin = document.body.classList.contains('hud-minimized');
-      hudToggleBtn.setAttribute('aria-pressed', String(isMin));
-      hudToggleBtn.setAttribute('aria-label', isMin ? 'Show HUD' : 'Hide HUD');
-      hudToggleBtn.title = isMin ? 'Show the HUD [H]' : 'Clean view: hide the HUD [H]';
+      renderHudToggle();
       if (isMin) closePopovers();
     });
   }
+  function renderHudToggle() {
+    if (!hudToggleBtn) return;
+    const isMin = document.body.classList.contains('hud-minimized');
+    hudToggleBtn.setAttribute('aria-pressed', String(isMin));
+    const label = t(isMin ? 'toolbar.showHud' : 'toolbar.hideHud');
+    hudToggleBtn.setAttribute('aria-label', label);
+    hudToggleBtn.title = `${label} [H]`;
+  }
+  function renderMapHint() {
+    const mapHint = document.getElementById('fullmap-hover-info');
+    if (mapHint) mapHint.textContent = t(touchControls.available ? 'map.touchHint' : 'map.hint');
+  }
+
+  // Esc (or the menu button, or Start on a gamepad) pauses the game behind its menu (game-menu.js)
+  let paused = false;
+  let playing = false; // the city is on screen: no menu over the loading screen
+  gameMenu = new GameMenu({
+    audio: audioSystem,
+    mode: () => controllerManager.activeMode,
+    controls: controlSections,
+    quality: () => (qualitySetting === 'auto' ? `${t('quality.auto')} · ${t(`quality.${quality}`)}` : t(`quality.${qualitySetting}`)),
+    blocked: () => !playing || mapSystem.isFullMapOpen || (supportsPopover && document.querySelector('.popover:popover-open') !== null),
+    onOpenChange: (open) => {
+      paused = open;
+      if (open) closePopovers();
+      controllerManager.resetInput();
+      touchControls.setEnabled(!open);
+      gamepadControls.reset();
+      audioSystem.setPaused(open);
+      // A frame that ran before the pause must not count the menu's time as one long step
+      lastTime = performance.now();
+    }
+  });
+  gamepadControls.callbacks.menu = gameMenu;
+
+  // Text drawn by code follows the reader's language too (the page's own text is translated by i18n.js)
+  function renderTexts() {
+    updateSoundButton();
+    renderHudToggle();
+    renderMapHint();
+    renderQualityNames();
+    touchControls.setMode(controllerManager.activeMode);
+    if (elMode) elMode.textContent = t(`player.${controllerManager.activeMode}`);
+    renderControlHints(controllerManager.activeMode);
+    if (elCamera) elCamera.textContent = t(`cameras.${cameraSystem.activePresetId}`);
+    locationText = '';
+    gameMenu.refresh();
+    placeModeIndicator();
+  }
+  onLocaleChange(renderTexts);
 
   // Global keyboard shortcuts for modes (1-4), cameras (V / 5-0), and HUD (H)
   window.addEventListener('keydown', (e) => {
-    if (isTypingInField(e)) return;
+    if (isTypingInField(e) || paused) return;
     switch (e.code) {
       case 'Digit1':
         selectMode('person');
@@ -622,15 +693,14 @@ async function initApp() {
   selectMode(controllerManager.activeMode);
   selectCamera('chase', true);
   selectTime('golden');
+  renderTexts();
   // the web fonts change the buttons' widths once they arrive
   if (document.fonts) document.fonts.ready.then(placeModeIndicator);
   await stepDone('ui');
 
-  // The loading screen stays up while the first frame's shaders compile (precompileShaders(), see the loop) and
-  // until the first frame is on screen
-  if (loadingStatus) {
-    loadingStatus.textContent = 'Compiling Shaders & Render Pipelines...';
-  }
+  // The loading screen stays up while the first frame's pipelines are built (see the loop) and until the first frame
+  // is on screen
+  enterStage('compile');
 
   // 6b. Pipelines. The city draws with several hundred: each needs its node graph built on the main thread (tens of
   //     milliseconds, once per instanced mesh, since three.js keys an instanced mesh's graph by the mesh) and its GPU
@@ -670,25 +740,15 @@ async function initApp() {
   // 6. Animation Loop
   let lastTime = performance.now();
   let elapsed = 0;
-  let frameCount = 0;
-  let fpsTimer = 0;
+  let hudTimer = 0;
   let nextPlayerSave = 0;
   let warmedUp = false; // see the first frame below
   const STALL_MS = 4000;
   let lastBuiltNear = -1;
   let lastProgressAt = performance.now();
 
-  if (elFps) elFps.textContent = '60';
-
-  renderer.setAnimationLoop((now) => {
-    pipelineGate.beginFrame();
-    const rawDt = (now - lastTime) * 0.001;
-    lastTime = now;
-    const dt = Math.min(Math.max(rawDt, 0.001), 0.05);
+  function simulate(dt, now) {
     elapsed += dt;
-
-    // Update 3rd-person controllers, camera, signals, traffic & vehicle collisions, building LODs, and dynamic shadow focus
-    gamepadControls.update(dt);
     controllerManager.update(dt, elapsed);
     cameraSystem.update(dt, elapsed);
     streetDetails.signalClock.value = elapsed;
@@ -715,6 +775,18 @@ async function initApp() {
     updateSceneCulling(cameraSystem.camera.position);
     remotePlayers.update(dt, cameraSystem.camera);
     shareState(now, controllerManager.getActiveEntity(), controllerManager.activeMode);
+  }
+
+  renderer.setAnimationLoop((now) => {
+    pipelineGate.beginFrame();
+    const rawDt = (now - lastTime) * 0.001;
+    lastTime = now;
+    const dt = Math.min(Math.max(rawDt, 0.001), 0.05);
+
+    // Update 3rd-person controllers, camera, signals, traffic & vehicle collisions, building LODs, and dynamic shadow focus.
+    // Behind the menu the city holds still: only the gamepad (which drives the menu) is read, and the frame is drawn.
+    gamepadControls.update(dt);
+    if (!paused) simulate(dt, now);
 
     // Render frame via TSL RenderPipeline (SSR + Bloom)
     viewPosition.copy(cameraSystem.camera.position);
@@ -730,10 +802,7 @@ async function initApp() {
       // The loading screen stays up while the pipelines of the view around the player are created between frames;
       // the bar shows how many of those it has (the count of the ones still missing only grows while it is found)
       const { builtNear, waitingNear } = pipelineGate.stats;
-      const share = builtNear / (builtNear + waitingNear);
-      if (loadingStatus) loadingStatus.textContent = `Compiling Shaders & Render Pipelines... ${Math.round(share * 100)}%`;
-      setLoadingProgress(share);
-      reportProgress('compile', share);
+      reportProgress('compile', builtNear / (builtNear + waitingNear));
     } else if (!warmedUp) {
       warmedUp = true;
       markInit('firstFrame');
@@ -744,38 +813,30 @@ async function initApp() {
         markInit('gpu');
         console.log(`[init] ${initTimings.join(', ')}; first frame waited on ${pipelineGate.stats.built} pipelines (${pipelineGate.stats.failed} failed)`);
         initTimings = null;
-        if (loadingOverlay) loadingOverlay.classList.add('hidden');
+        hideLoadingScreen();
+        playing = true;
         pipelineGate.setBudget(PLAYING_BUILD_BUDGET);
         sunShadow.autoUpdate = true;
         audioSystem.ready = true;
-        setLoadingProgress(1);
         reportReady();
         if (qualitySetting === 'auto') measureAutoQuality();
       });
     }
 
-    // Telemetry uses wall time, not the clamped simulation step, so slow frames and high-refresh displays report
-    // their actual frame rate (updates DOM every 250ms).
-    frameCount++;
-    fpsTimer += Math.max(0, rawDt);
-    if (fpsTimer >= 0.25) {
-      const currentFps = Math.round(frameCount / fpsTimer);
-      frameCount = 0;
-      fpsTimer = 0;
+    // The HUD's readouts are redrawn every 250 ms of wall time
+    hudTimer += Math.max(0, rawDt);
+    if (hudTimer >= 0.25) {
+      hudTimer = 0;
 
       const activeEnt = controllerManager.getActiveEntity();
       const mode = controllerManager.activeMode;
       const mph = Math.round(Math.abs(activeEnt.speed) * 2.237);
       const altFt = Math.max(0, Math.round(activeEnt.position.y * 3.281));
 
-      if (elFps) {
-        elFps.textContent = String(currentFps);
-        elFps.className = currentFps >= 50 ? 'fps-ok' : currentFps >= 30 ? 'fps-warn' : 'fps-bad';
-      }
       if (elSpeed) elSpeed.textContent = String(mph);
       if (elSpeedMeter) elSpeedMeter.style.transform = `scaleX(${Math.min(1, mph / (topSpeedMph[mode] || 80))})`;
       document.body.classList.toggle('is-boosting', controllerManager.keys.boost && mph > 0);
-      if (elAltitude) elAltitude.textContent = altFt.toLocaleString('en-US');
+      if (elAltitude) elAltitude.textContent = formatNumber(altFt);
       // The street corner of the player on the follow cameras, of the camera itself on the scenic ones
       const where = cameraSystem.getActivePreset().category === 'follow' ? activeEnt.position : cameraSystem.currentPos;
       renderLocation(getLocationLabel(where.x, where.z));

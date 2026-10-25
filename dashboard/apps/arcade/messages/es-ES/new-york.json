@@ -1,0 +1,212 @@
+{
+    "loading": {
+        "stage": {
+            "data": "Descargando el mapa",
+            "build": "Construyendo la ciudad",
+            "compile": "Preparando los gráficos"
+        },
+        "step": {
+            "data": "Mapa",
+            "build": "Ciudad",
+            "compile": "Gráficos"
+        },
+        "tip": "Truco",
+        "tips": {
+            "menu": "Pulsa Esc para abrir el menú: gráficos, controles y sonido.",
+            "modes": "Pulsa del 1 al 4 para andar, conducir, ir en bici o volar.",
+            "map": "Pulsa M para ver el mapa y haz clic en una calle para ir allí.",
+            "camera": "Pulsa V para cambiar de cámara.",
+            "boost": "Mantén Mayús para ir más rápido.",
+            "hud": "Pulsa H para ocultarlo todo menos la ciudad.",
+            "gamepad": "Con un mando, Start abre el menú."
+        },
+        "touchTips": {
+            "stick": "Arrastra el joystick para moverte y girar.",
+            "look": "Arrastra en cualquier otro sitio para mirar y pellizca para acercar.",
+            "map": "Abre el mapa y toca una calle para ir allí.",
+            "menu": "El botón de menú de arriba tiene gráficos y sonido."
+        }
+    },
+    "view": "Vista de Nueva York",
+    "time": {
+        "group": "Hora del día",
+        "golden": "Hora dorada",
+        "midday": "Mediodía",
+        "twilight": "Hora azul",
+        "midnight": "Noche"
+    },
+    "toolbar": {
+        "teleport": "Viajar",
+        "teleportHint": "Lleva al jugador a un lugar",
+        "map": "Mapa",
+        "mapHint": "Callejero",
+        "graphics": "Gráficos",
+        "mute": "Silenciar",
+        "unmute": "Activar sonido",
+        "noAudio": "El sonido no está disponible en este navegador.",
+        "hideHud": "Ocultar HUD",
+        "showHud": "Mostrar HUD",
+        "menu": "Menú"
+    },
+    "teleport": {
+        "title": "Ir a"
+    },
+    "quality": {
+        "title": "Gráficos",
+        "auto": "Auto",
+        "autoHint": "Elegido para este equipo",
+        "autoPicked": "{level} en este equipo",
+        "low": "Baja",
+        "lowHint": "Arranque rápido, sin sombras",
+        "medium": "Media",
+        "mediumHint": "Sombras y brillo",
+        "high": "Alta",
+        "highHint": "Sombras, reflejos y brillo",
+        "restart": "Al cambiarla, la ciudad se reinicia donde estás."
+    },
+    "modes": {
+        "group": "Forma de moverse",
+        "person": "Andar",
+        "car": "Conducir",
+        "cyclist": "Bici",
+        "helicopter": "Volar"
+    },
+    "player": {
+        "person": "Peatón",
+        "car": "Taxi amarillo",
+        "cyclist": "Ciclista",
+        "helicopter": "Helicóptero turístico"
+    },
+    "cluster": {
+        "label": "Velocidad y cámara",
+        "altitude": "Alt",
+        "feet": "ft",
+        "mph": "mph",
+        "prevCamera": "Cámara anterior",
+        "nextCamera": "Otra cámara",
+        "allCameras": "Cámaras"
+    },
+    "cameras": {
+        "group": "Cámaras",
+        "follow": "Seguir",
+        "scenic": "Vistas",
+        "chase": "Tercera persona",
+        "action": "Acción a ras",
+        "pov": "Primera persona",
+        "centralPark": "Oasis de Central Park",
+        "fifthAve": "5th Ave y Empire State",
+        "timesSquare": "Cruce de Times Square",
+        "chryslerGCT": "42nd St · Chrysler y GCT",
+        "observatory": "Mirador del Empire State",
+        "bryantPark": "Bryant Park y NYPL",
+        "waterfront": "East River y skyline",
+        "drone": "Dron automático"
+    },
+    "minimap": "Radar de calles, abre el mapa",
+    "location": {
+        "near": "junto a"
+    },
+    "touch": {
+        "group": "Controles táctiles",
+        "stick": "Joystick: arrastra arriba o abajo para moverte, a los lados para girar",
+        "move": "Moverse y girar",
+        "look": "Arrastra: mirar · Pellizca: zoom",
+        "actions": "Mantén pulsado para actuar",
+        "jump": "Saltar",
+        "ascend": "Subir",
+        "descend": "Bajar",
+        "boost": "Turbo",
+        "sprint": "Correr"
+    },
+    "map": {
+        "label": "Callejero",
+        "title": "Mapa de Manhattan",
+        "youAreAt": "Estás en {place}",
+        "search": "Buscar calles y lugares",
+        "searchHint": "Broadway, Canal, Wall St…",
+        "close": "Cerrar",
+        "closeMap": "Cerrar el mapa",
+        "compass": "Norte real. La cuadrícula de Manhattan está girada 29° al este.",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "center": "Centrar en ti",
+        "fit": "Todo Manhattan",
+        "hint": "Haz clic para ir · Arrastra para mover · Rueda para acercar",
+        "touchHint": "Toca para ir · Arrastra para mover · Usa + y − para acercar",
+        "hover": "{place} · Haz clic para ir",
+        "legend": {
+            "you": "Tú",
+            "landmark": "Lugar",
+            "route": "Ruta GPS",
+            "bridge": "Puente o autovía"
+        },
+        "counts": "{streets} calles · {blocks} manzanas"
+    },
+    "controls": {
+        "person": {
+            "move": "Andar",
+            "turn": "Girar",
+            "boost": "Correr",
+            "up": "Saltar",
+            "orbit": "Mirar"
+        },
+        "car": {
+            "move": "Avanzar / Atrás",
+            "turn": "Girar",
+            "boost": "Turbo",
+            "horn": "Claxon",
+            "orbit": "Mirar"
+        },
+        "cyclist": {
+            "move": "Pedalear / Frenar",
+            "turn": "Girar",
+            "boost": "Correr",
+            "orbit": "Mirar"
+        },
+        "helicopter": {
+            "move": "Cabeceo",
+            "turn": "Rotar",
+            "up": "Subir",
+            "down": "Bajar",
+            "boost": "Turbo"
+        },
+        "drag": "Ratón",
+        "general": "Siempre",
+        "modes": "Cambiar modo",
+        "camera": "Cambiar cámara",
+        "cameraBack": "Cámara anterior",
+        "map": "Callejero",
+        "hud": "Ocultar HUD",
+        "sound": "Sonido sí o no",
+        "menu": "Menú",
+        "gamepad": "Mando",
+        "leftStick": "Stick izq.",
+        "rightStick": "Stick der.",
+        "padMove": "Moverse y girar",
+        "padLook": "Mirar",
+        "padThrottle": "Acelerar y frenar",
+        "padLift": "Subir y bajar",
+        "padJump": "Saltar",
+        "padBoost": "Turbo",
+        "padCamera": "Cambiar cámara",
+        "padModes": "Cambiar modo",
+        "padZoom": "Zoom",
+        "padMap": "Callejero",
+        "padMenu": "Menú"
+    },
+    "menu": {
+        "title": "En pausa",
+        "resume": "Seguir",
+        "graphics": "Gráficos",
+        "controls": "Controles",
+        "sound": "Sonido",
+        "mode": "Modo",
+        "exit": "Salir",
+        "back": "Volver",
+        "on": "Sí",
+        "off": "No",
+        "volume": "Volumen",
+        "soundOn": "Con sonido",
+        "noAudio": "El sonido no está disponible en este navegador."
+    }
+}

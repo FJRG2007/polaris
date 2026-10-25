@@ -95,6 +95,13 @@ class CityAudioSystem {
     this.supported = !!(globalThis.AudioContext || globalThis.webkitAudioContext);
     this.enabled = true;
     try { this.enabled = localStorage.getItem('nyc-sound') !== 'off'; } catch { /* Private browsing. */ }
+    // 0..1, the menu's volume; and whether the game is paused (its menu is open), which silences it until it resumes
+    this.volume = 1;
+    try {
+      const saved = Number(localStorage.getItem('nyc-volume') ?? 1);
+      if (Number.isFinite(saved)) this.volume = Math.max(0, Math.min(1, saved));
+    } catch { /* Private browsing. */ }
+    this.paused = false;
     const smallDevice = navigator.hardwareConcurrency <= 4 || matchMedia('(pointer: coarse)').matches;
     this.limits = smallDevice ? { motors: 6, sirens: 1, events: 5 } : { motors: 8, sirens: 2, events: 8 };
     this.motors = new Map();
@@ -130,12 +137,12 @@ class CityAudioSystem {
   }
 
   unlock() {
-    if (!this.supported || !this.enabled || this.disposed || document.hidden) return;
+    if (!this.supported || !this.enabled || this.paused || this.disposed || document.hidden) return;
     try {
       if (!this.context) this.initialize();
       if (this.context.state !== 'running') {
         this.context.resume().then(() => {
-          if (!this.enabled || document.hidden || this.disposed) return this.suspend();
+          if (!this.enabled || this.paused || document.hidden || this.disposed) return this.suspend();
           this.onStateChange();
         }).catch(() => {}); // A later user gesture can retry autoplay/interruption failures.
       }
@@ -198,8 +205,21 @@ class CityAudioSystem {
     // Visibility/mute can change again while suspend is pending. Reconcile after it settles so a rapid unmute
     // cannot leave an enabled system suspended merely because resume saw the old 'running' state.
     return this.context.suspend().then(() => {
-      if (this.enabled && !document.hidden && !this.disposed) this.unlock();
+      if (this.enabled && !this.paused && !document.hidden && !this.disposed) this.unlock();
     }).catch(() => {});
+  }
+
+  setVolume(volume) {
+    this.volume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
+    try { localStorage.setItem('nyc-volume', String(this.volume)); } catch { /* Storage is optional. */ }
+    this.onStateChange();
+  }
+
+  /** Paused, the city goes quiet (the context is suspended) and picks up where it was on resume. */
+  setPaused(paused) {
+    this.paused = !!paused;
+    if (this.paused) this.suspend();
+    else this.unlock();
   }
 
   reset() {
@@ -389,7 +409,7 @@ class CityAudioSystem {
   }
 
   update(dt, elapsed, camera, night = false) {
-    if (!this.ready || !this.enabled || this.context?.state !== 'running' || document.hidden) return;
+    if (!this.ready || !this.enabled || this.paused || this.context?.state !== 'running' || document.hidden) return;
     this.accumulator += dt;
     if (this.accumulator < 0.1) return;
     dt = Math.min(this.accumulator, 0.25);
@@ -418,7 +438,7 @@ class CityAudioSystem {
     const enclosure = this.acoustics.enclosure;
     smooth(this.reflections.gain, 0.02 + enclosure * 0.22, now, 0.4);
     smooth(this.reflectionFilter.frequency, 2400 + enclosure * 3400, now, 0.4);
-    smooth(this.master.gain, 0.65, now, 0.12);
+    smooth(this.master.gain, 0.65 * this.volume, now, 0.12);
     const sources = this.sources.collect(this.listener, elapsed);
     for (let i = this.events.length - 1; i >= 0; i--) {
       const event = this.events[i];

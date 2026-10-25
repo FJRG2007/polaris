@@ -3,6 +3,7 @@
 /** One game, full screen, with the way back to the library above it. */
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { useArcadeT } from "./i18n";
 import { GameFrame } from "./game-frame";
@@ -10,6 +11,7 @@ import { findGame } from "../games/registry";
 
 export function GamePlayer({ gameId }: { gameId: string }) {
     const t = useArcadeT();
+    const router = useRouter();
     const game = findGame(gameId);
     if (!game) return null;
     const Icon = game.icon;
@@ -30,7 +32,7 @@ export function GamePlayer({ gameId }: { gameId: string }) {
                 </Link>
             </header>
             <div className="min-h-0 flex-1">
-                <GameFrame game={game} />
+                <GameFrame game={game} onExit={() => router.push("/games")} />
             </div>
         </div>
     );

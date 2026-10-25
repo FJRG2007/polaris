@@ -6,17 +6,17 @@ import { bryantParkLawn } from './landmarks.js';
 // Low-Angle Action Cam, POV/Cockpit Cam, 7 Iconic NYC Architectural Cameras, and Auto-Director Drone.
 
 const CAMERA_PRESETS = [
-  { id: 'chase',       name: '3rd-Person Chase',         short: 'Chase',       category: 'follow', fov: 56 },
-  { id: 'action',      name: 'Low-Angle Action',         short: 'Action',      category: 'follow', fov: 60 },
-  { id: 'pov',         name: 'First-Person / Cockpit',   short: 'POV / Dash',  category: 'follow', fov: 68 },
-  { id: 'centralPark', name: 'Central Park Oasis',       short: 'Central Pk',  category: 'scenic', fov: 52 },
-  { id: 'fifthAve',    name: '5th Ave & Empire State',   short: '5th Ave',     category: 'scenic', fov: 48 },
-  { id: 'timesSquare', name: 'Times Square Crossroads',  short: 'Times Sq',    category: 'scenic', fov: 58 },
-  { id: 'chryslerGCT', name: '42nd St · Chrysler & GCT', short: 'Chrysler',    category: 'scenic', fov: 50 },
-  { id: 'observatory', name: 'Empire State 86th Deck',   short: '86th Deck',   category: 'scenic', fov: 52 },
-  { id: 'bryantPark',  name: 'Bryant Park & NYPL',       short: 'Bryant Pk',   category: 'scenic', fov: 52 },
-  { id: 'waterfront',  name: 'East River & Skyline',     short: 'Skyline',     category: 'scenic', fov: 46 },
-  { id: 'drone',       name: 'Auto-Director Aerial',     short: 'Director',    category: 'scenic', fov: 50 }
+  { id: 'chase',       category: 'follow', fov: 56 },
+  { id: 'action',      category: 'follow', fov: 60 },
+  { id: 'pov',         category: 'follow', fov: 68 },
+  { id: 'centralPark', category: 'scenic', fov: 52 },
+  { id: 'fifthAve',    category: 'scenic', fov: 48 },
+  { id: 'timesSquare', category: 'scenic', fov: 58 },
+  { id: 'chryslerGCT', category: 'scenic', fov: 50 },
+  { id: 'observatory', category: 'scenic', fov: 52 },
+  { id: 'bryantPark',  category: 'scenic', fov: 52 },
+  { id: 'waterfront',  category: 'scenic', fov: 46 },
+  { id: 'drone',       category: 'scenic', fov: 50 }
 ];
 
 class CameraSystem {
