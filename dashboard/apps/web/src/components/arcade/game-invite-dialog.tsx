@@ -66,7 +66,9 @@ export function GameInviteDialog({
     const shown = useMemo(() => {
         const wanted = search.trim().toLowerCase();
         const all = targets ?? [];
-        const found = wanted ? all.filter((target) => target.name.toLowerCase().includes(wanted)) : all;
+        const found = wanted
+            ? all.filter((target) => target.name.toLowerCase().includes(wanted))
+            : all;
         return found.slice(0, 50);
     }, [targets, search]);
 
@@ -130,10 +132,14 @@ export function GameInviteDialog({
                                                 aria-label={t("gameInvite.remove", {
                                                     name: person.name
                                                 })}
-                                                title={t("gameInvite.remove", { name: person.name })}
+                                                title={t("gameInvite.remove", {
+                                                    name: person.name
+                                                })}
                                                 onClick={() =>
                                                     setPeople((was) =>
-                                                        was.filter((other) => other.id !== person.id)
+                                                        was.filter(
+                                                            (other) => other.id !== person.id
+                                                        )
                                                     )
                                                 }
                                                 className="shrink-0 rounded-full hover:text-foreground"
@@ -158,7 +164,10 @@ export function GameInviteDialog({
                         {targets === null ? (
                             <ul className="flex flex-col gap-1" aria-hidden>
                                 {[0, 1, 2].map((row) => (
-                                    <li key={row} className="h-9 animate-pulse rounded-md bg-muted" />
+                                    <li
+                                        key={row}
+                                        className="h-9 animate-pulse rounded-md bg-muted"
+                                    />
                                 ))}
                             </ul>
                         ) : shown.length === 0 ? (

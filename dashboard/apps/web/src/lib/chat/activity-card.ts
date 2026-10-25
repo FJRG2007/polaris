@@ -107,7 +107,12 @@ export interface ActivityCardView {
  *  reader is in, or people to play with (a direct message for one, a group for
  *  several). */
 export const inviteInputSchema = z.union([
-    z.object({ game: z.string().regex(/^[a-z0-9][a-z0-9-]{0,47}$/), channelId: z.string().uuid() }).strict(),
+    z
+        .object({
+            game: z.string().regex(/^[a-z0-9][a-z0-9-]{0,47}$/),
+            channelId: z.string().uuid()
+        })
+        .strict(),
     z
         .object({
             game: z.string().regex(/^[a-z0-9][a-z0-9-]{0,47}$/),

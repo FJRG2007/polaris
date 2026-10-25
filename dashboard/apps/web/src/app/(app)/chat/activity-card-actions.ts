@@ -52,7 +52,10 @@ export async function readActivityCard(sessionId: unknown): Promise<card.Activit
     ]);
     const games = installed ? await callActivityGames(await getUserLocale(user.id)) : [];
     const offered = games.find((game) => game.id === session.game);
-    const ended = card.sessionEnded({ ...session, callEnded: !meeting || meeting.endedAt !== null }, now);
+    const ended = card.sessionEnded(
+        { ...session, callEnded: !meeting || meeting.endedAt !== null },
+        now
+    );
     // Closed on first sight, so the next reader is not asked to work it out.
     if (ended && !session.endedAt) {
         await prisma.arcadeSession
@@ -190,9 +193,7 @@ export async function inviteToGame(input: unknown): Promise<InviteAnswer> {
     // everybody in a direct message or group. A channel in a server is told by
     // its card alone - a bell for every member of a server is not an invitation.
     const audience =
-        "userIds" in parsed.data
-            ? parsed.data.userIds
-            : await directAudience(channelId);
+        "userIds" in parsed.data ? parsed.data.userIds : await directAudience(channelId);
     for (const userId of audience.filter((id) => id !== user.id).slice(0, NOTIFY_MAX)) {
         const t = translatorFor(await getUserLocale(userId), "chat");
         await createNotification({

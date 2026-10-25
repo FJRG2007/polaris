@@ -79,22 +79,41 @@ export function ActivityCard({
             <div className="flex min-w-0 max-w-md flex-wrap items-center gap-3 rounded-md border bg-card p-3">
                 <Joystick className="size-5 shrink-0 text-muted-foreground" aria-hidden />
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm" title={t("activityCard.started", { name: starter, game })}>
-                        {view ? t("activityCard.started", { name: starter, game }) : t("callGames.checking")}
+                    <p
+                        className="truncate text-sm"
+                        title={t("activityCard.started", { name: starter, game })}
+                    >
+                        {view
+                            ? t("activityCard.started", { name: starter, game })
+                            : t("callGames.checking")}
                     </p>
                     {view && (
                         <p className="truncate text-xs text-muted-foreground">
                             {view.ended
                                 ? t("activityCard.ended")
-                                : t("activityCard.players", { count: view.playing, max: view.max })}{" "}
+                                : t("activityCard.players", {
+                                      count: view.playing,
+                                      max: view.max
+                                  })}{" "}
                             <MessageTime iso={message.createdAt} />
                         </p>
                     )}
                     {view && !view.ended && view.players.length > 0 && (
-                        <ul className="mt-1.5 flex min-w-0 -space-x-1.5" aria-label={t("activityCard.whoIsPlaying")}>
+                        <ul
+                            className="mt-1.5 flex min-w-0 -space-x-1.5"
+                            aria-label={t("activityCard.whoIsPlaying")}
+                        >
                             {view.players.map((player) => (
-                                <li key={player.id} title={player.name} className="rounded-full ring-2 ring-card">
-                                    <Avatar person={{ id: player.id, name: player.name }} size={20} status={false} />
+                                <li
+                                    key={player.id}
+                                    title={player.name}
+                                    className="rounded-full ring-2 ring-card"
+                                >
+                                    <Avatar
+                                        person={{ id: player.id, name: player.name }}
+                                        size={20}
+                                        status={false}
+                                    />
                                 </li>
                             ))}
                         </ul>
@@ -104,7 +123,10 @@ export function ActivityCard({
                     <div className="flex shrink-0 flex-col items-end gap-1">
                         <Button
                             size="sm"
-                            disabled={reason !== null || (view.inGame && session?.meetingId === view.meetingId)}
+                            disabled={
+                                reason !== null ||
+                                (view.inGame && session?.meetingId === view.meetingId)
+                            }
                             title={reason ?? undefined}
                             onClick={join}
                         >
@@ -113,7 +135,9 @@ export function ActivityCard({
                                 : t("callGames.join")}
                         </Button>
                         {reason && (
-                            <span className="max-w-48 text-right text-xs text-muted-foreground">{reason}</span>
+                            <span className="max-w-48 text-right text-xs text-muted-foreground">
+                                {reason}
+                            </span>
                         )}
                     </div>
                 )}

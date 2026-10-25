@@ -66,7 +66,12 @@ vi.mock("@/lib/app-extensions/registry", () => ({
     callActivityGames: async () => [{ id: "new-york", name: "New York", src: "/x" }]
 }));
 vi.mock("@/lib/chat/activity-sessions", () => ({
-    openSession: async () => ({ id: SESSION, channelId: CHANNEL, game: "new-york", messageId: null }),
+    openSession: async () => ({
+        id: SESSION,
+        channelId: CHANNEL,
+        game: "new-york",
+        messageId: null
+    }),
     sessionForCard: async () => state.session
 }));
 
@@ -101,7 +106,10 @@ describe("inviting people to play", () => {
     });
 
     it("refuses an input that does not fit before anything else", async () => {
-        expect(await actions.inviteToGame({ game: "new-york" })).toEqual({ ok: false, reason: "invalid" });
+        expect(await actions.inviteToGame({ game: "new-york" })).toEqual({
+            ok: false,
+            reason: "invalid"
+        });
         expect(state.limitKeys).toEqual([]);
     });
 

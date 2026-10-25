@@ -114,8 +114,7 @@ export function GameFrame({
                 // Keys go to the frame that has the focus: without this they stayed with the page
                 // and the car ignored them until something in the game was clicked
                 if (mayTakeFocus(document.activeElement, root.current)) frame.current?.focus();
-            }
-            else if (data.type === "polaris-game:failed")
+            } else if (data.type === "polaris-game:failed")
                 setLoad({ phase: "failed", reason: data.reason });
             else setLoad((now) => (now.phase === "starting" ? { phase: "loading" } : now));
         };
@@ -181,7 +180,10 @@ export function GameFrame({
             {(load.phase === "starting" || load.phase === "failed") && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black px-4 text-white">
                     {load.phase === "starting" ? (
-                        <p role="status" className="w-full max-w-xs truncate text-center text-sm font-medium">
+                        <p
+                            role="status"
+                            className="w-full max-w-xs truncate text-center text-sm font-medium"
+                        >
                             {t("loading", { game: name })}
                         </p>
                     ) : (

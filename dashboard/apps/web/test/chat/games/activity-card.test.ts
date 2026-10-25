@@ -32,7 +32,12 @@ describe("whether a session is over", () => {
     });
 
     it("is live while somebody renewed within a pass's life", () => {
-        const facts = { createdAt: at(60_000), endedAt: null, callEnded: false, players: [player(1000)] };
+        const facts = {
+            createdAt: at(60_000),
+            endedAt: null,
+            callEnded: false,
+            players: [player(1000)]
+        };
         expect(card.sessionEnded(facts, NOW)).toBe(false);
     });
 
@@ -87,9 +92,13 @@ describe("the invitation's input", () => {
     const person = (n: number) => `0192f6a0-0000-7000-8000-0000000000${String(n).padStart(2, "0")}`;
 
     it("takes one conversation or up to nine people", () => {
-        expect(card.inviteInputSchema.safeParse({ game: "new-york", channelId: CHANNEL }).success).toBe(true);
+        expect(
+            card.inviteInputSchema.safeParse({ game: "new-york", channelId: CHANNEL }).success
+        ).toBe(true);
         const nine = Array.from({ length: 9 }, (_, n) => person(n));
-        expect(card.inviteInputSchema.safeParse({ game: "new-york", userIds: nine }).success).toBe(true);
+        expect(card.inviteInputSchema.safeParse({ game: "new-york", userIds: nine }).success).toBe(
+            true
+        );
     });
 
     it("refuses nobody, too many people, both at once, a bad game or extra fields", () => {

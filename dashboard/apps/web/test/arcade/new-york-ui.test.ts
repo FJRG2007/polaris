@@ -20,14 +20,17 @@ import { fill, readCatalog } from "../../../arcade/game/new-york/engine/i18n.js"
 
 const GAME = resolve(__dirname, "../../../arcade/game/new-york");
 const english = flattenCatalog(
-    JSON.parse(readFileSync(resolve(__dirname, "../../../arcade/messages/en-US/new-york.json"), "utf8")) as Catalog
+    JSON.parse(
+        readFileSync(resolve(__dirname, "../../../arcade/messages/en-US/new-york.json"), "utf8")
+    ) as Catalog
 );
 
 /** Every literal key the game asks for, in its page and in its code. */
 function usedKeys(): Set<string> {
     const keys = new Set<string>();
     const page = readFileSync(join(GAME, "index.html"), "utf8");
-    for (const match of page.matchAll(/data-t(?:-title|-aria|-placeholder)?="([^"]+)"/g)) keys.add(match[1]!);
+    for (const match of page.matchAll(/data-t(?:-title|-aria|-placeholder)?="([^"]+)"/g))
+        keys.add(match[1]!);
     for (const file of readdirSync(join(GAME, "engine")).filter((name) => name.endsWith(".js"))) {
         const code = readFileSync(join(GAME, "engine", file), "utf8");
         for (const match of code.matchAll(/\bt\('([\w.]+)'/g)) keys.add(match[1]!);
@@ -57,7 +60,10 @@ describe("the New York catalog", () => {
 
 describe("the game's catalog reader", () => {
     it("flattens nested strings", () => {
-        expect([...readCatalog({ a: { b: "x" }, c: "y" })!]).toEqual([["a.b", "x"], ["c", "y"]]);
+        expect([...readCatalog({ a: { b: "x" }, c: "y" })!]).toEqual([
+            ["a.b", "x"],
+            ["c", "y"]
+        ]);
     });
 
     it("refuses anything that is not a catalog of strings", () => {

@@ -40,7 +40,11 @@ vi.mock("@/lib/chat/meeting-seat", () => ({
 vi.mock("@/lib/apps/install-presence", () => ({ isAppInstalled: async () => state.installed }));
 vi.mock("@/lib/i18n/locale-service", () => ({ getUserLocale: async () => "en-US" }));
 vi.mock("@/lib/app-extensions/registry", () => ({ callActivityGames: async () => state.games }));
-const recorded = vi.hoisted(() => ({ plays: [] as string[], touches: [] as string[], leaves: [] as string[] }));
+const recorded = vi.hoisted(() => ({
+    plays: [] as string[],
+    touches: [] as string[],
+    leaves: [] as string[]
+}));
 vi.mock("@/lib/chat/activity-sessions", () => ({
     recordPlay: async (meetingId: string, userId: string, game: string) => {
         recorded.plays.push(`${meetingId}|${userId}|${game}`);

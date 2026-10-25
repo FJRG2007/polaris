@@ -69,7 +69,11 @@ vi.mock("@polaris/db", () => {
                 db.sessions
                     .filter((row) => row.meetingId === where.meetingId && !row.endedAt)
                     .map((row) => ({ ...row, players: playersOf(row.id) })),
-            create: async ({ data }: { data: Omit<Session, "id" | "createdAt" | "endedAt" | "messageId"> }) => {
+            create: async ({
+                data
+            }: {
+                data: Omit<Session, "id" | "createdAt" | "endedAt" | "messageId">;
+            }) => {
                 const row: Session = {
                     ...data,
                     id: `session-${db.sessions.length + 1}`,
@@ -97,7 +101,9 @@ vi.mock("@polaris/db", () => {
                 update: Partial<Player>;
             }) => {
                 const { sessionId, userId } = where.sessionId_userId;
-                const row = db.players.find((p) => p.sessionId === sessionId && p.userId === userId);
+                const row = db.players.find(
+                    (p) => p.sessionId === sessionId && p.userId === userId
+                );
                 if (row) Object.assign(row, update);
                 else db.players.push({ ...create, leftAt: null });
             },
@@ -114,7 +120,8 @@ vi.mock("@polaris/db", () => {
                     data
                 );
             },
-            findMany: async ({ where }: { where: { sessionId: string } }) => playersOf(where.sessionId)
+            findMany: async ({ where }: { where: { sessionId: string } }) =>
+                playersOf(where.sessionId)
         }
     };
     return { prisma };

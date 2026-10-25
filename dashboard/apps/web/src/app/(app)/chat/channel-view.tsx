@@ -1247,28 +1247,26 @@ export function ChannelView({
                     return;
                 }
                 setJoining(true);
-                void runAction(() => callRequests.startCall(channelId), setError).then(
-                    (result) => {
-                        setJoining(false);
-                        if (!result) return;
-                        if (result.error) {
-                            setError(result.error);
-                            return;
-                        }
-                        if (!result.meetingId) return;
-                        requestActivityJoin(result.meetingId, found.game);
-                        enter(
-                            {
-                                meetingId: result.meetingId,
-                                channelId,
-                                title: callTitle,
-                                ...placed(result)
-                            },
-                            false
-                        );
-                        checkCall();
+                void runAction(() => callRequests.startCall(channelId), setError).then((result) => {
+                    setJoining(false);
+                    if (!result) return;
+                    if (result.error) {
+                        setError(result.error);
+                        return;
                     }
-                );
+                    if (!result.meetingId) return;
+                    requestActivityJoin(result.meetingId, found.game);
+                    enter(
+                        {
+                            meetingId: result.meetingId,
+                            channelId,
+                            title: callTitle,
+                            ...placed(result)
+                        },
+                        false
+                    );
+                    checkCall();
+                });
             })
             .catch(() => undefined);
     }, [activityAsked, callTitle, callsOff, channel, channelId, checkCall, enter, router, session]);
