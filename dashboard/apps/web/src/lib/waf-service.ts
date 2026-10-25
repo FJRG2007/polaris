@@ -700,6 +700,14 @@ export interface WafLoginBelow {
     readonly id: string;
     readonly name: string;
     readonly via: WafLoginSource;
+    /** Whether the caller owns it, and so can open its own rules. */
+    readonly owned: boolean;
+}
+
+/** How many services under a scope already require a login, and the first of them. */
+export interface WafLoginBelowView {
+    readonly count: number;
+    readonly services: WafLoginBelow[];
 }
 
 /** The scopes strictly narrower than each one, which is where a login this scope does
@@ -714,8 +722,9 @@ const NARROWER: Record<WafScopeType, readonly WafScopeType[]> = {
     application: []
 };
 
-/** Services read for the list, at most. A scope wider than this is an instance where
- *  the count is what matters and the names would not fit on the page anyway. */
+/** Services named in the list, and read per query. A scope wider than this is an
+ *  instance where the names would not fit on the page anyway; every service is still
+ *  read, so the count stays right. */
 const BELOW_MAX = 500;
 
 /**
@@ -728,9 +737,9 @@ export async function getWafLoginBelow(
     ownerId: string,
     scopeType: WafScopeType,
     scopeId: string
-): Promise<WafLoginBelow[]> {
+): Promise<WafLoginBelowView> {
     await assertScopeOwner(ownerId, scopeType, scopeId);
-    if (scopeType === "polaris") return [];
+    if (scopeType === "polaris") return { count: 0, services: [] };
 
     const hostIds =
         scopeType === "server-group"
@@ -743,30 +752,59 @@ export async function getWafLoginBelow(
             : scopeType === "server"
               ? [scopeId]
               : null;
-    const apps = await prisma.application.findMany({
-        where:
-            scopeType === "application"
-                ? { id: scopeId }
-                : scopeType === "environment"
-                  ? { environmentId: scopeId }
-                  : scopeType === "project"
-                    ? { environment: { projectId: scopeId } }
-                    : hostIds
-                      ? { target: { hostId: { in: hostIds } } }
-                      : {},
-        select: {
-            id: true,
-            name: true,
-            environmentId: true,
-            environment: { select: { projectId: true } },
-            target: { select: { hostId: true } },
-            domains: { where: { privateAccess: { not: null } }, select: { privateAccess: true } }
-        },
-        orderBy: { name: "asc" },
-        take: BELOW_MAX
-    });
-    if (apps.length === 0) return [];
+    const where =
+        scopeType === "application"
+            ? { id: scopeId }
+            : scopeType === "environment"
+              ? { environmentId: scopeId }
+              : scopeType === "project"
+                ? { environment: { projectId: scopeId } }
+                : hostIds
+                  ? { target: { hostId: { in: hostIds } } }
+                  : {};
 
+    const services: WafLoginBelow[] = [];
+    let count = 0;
+    let cursor: string | undefined;
+    for (;;) {
+        const apps = await prisma.application.findMany({
+            where,
+            select: {
+                id: true,
+                name: true,
+                environmentId: true,
+                environment: { select: { projectId: true, project: { select: { ownerId: true } } } },
+                target: { select: { hostId: true } },
+                domains: { where: { privateAccess: { not: null } }, select: { privateAccess: true } }
+            },
+            orderBy: [{ name: "asc" }, { id: "asc" }],
+            take: BELOW_MAX,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
+        });
+        if (apps.length === 0) break;
+        const found = await loginBelowIn(ownerId, scopeType, apps);
+        count += found.length;
+        services.push(...found.slice(0, BELOW_MAX - services.length));
+        if (apps.length < BELOW_MAX) break;
+        cursor = apps[apps.length - 1]!.id;
+    }
+    return { count, services };
+}
+
+/** Which of these services, all under the scope, a narrower rule or a private address
+ *  puts behind a login. */
+async function loginBelowIn(
+    ownerId: string,
+    scopeType: WafScopeType,
+    apps: readonly {
+        id: string;
+        name: string;
+        environmentId: string;
+        environment: { projectId: string; project: { ownerId: string } };
+        target: { hostId: string | null };
+        domains: { privateAccess: string | null }[];
+    }[]
+): Promise<WafLoginBelow[]> {
     const groups =
         scopeType === "global"
             ? await groupsOfHosts(apps.flatMap((app) => (app.target.hostId ? [app.target.hostId] : [])))
@@ -795,6 +833,7 @@ export async function getWafLoginBelow(
 
     return apps.flatMap((app): WafLoginBelow[] => {
         const hostId = app.target.hostId;
+        const owned = app.environment.project.ownerId === ownerId;
         // Narrowest first: the rule somebody would open to change it is the closest one.
         const candidates: [Exclude<WafLoginSource, "private">, string | null][] = [
             ["application", app.id],
@@ -806,9 +845,9 @@ export async function getWafLoginBelow(
         const found = candidates.find(
             ([type, id]) => id !== null && narrower.includes(type) && on.has(`${type}:${id}`)
         );
-        if (found) return [{ id: app.id, name: app.name, via: found[0] }];
+        if (found) return [{ id: app.id, name: app.name, via: found[0], owned }];
         return app.domains.some((domain) => parsePrivateAccess(domain.privateAccess))
-            ? [{ id: app.id, name: app.name, via: "private" }]
+            ? [{ id: app.id, name: app.name, via: "private", owned }]
             : [];
     });
 }

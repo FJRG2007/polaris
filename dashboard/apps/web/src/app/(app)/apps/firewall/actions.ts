@@ -28,7 +28,7 @@ import {
     getWafRule,
     setWafRule,
     type WafInheritedView,
-    type WafLoginBelow,
+    type WafLoginBelowView,
     type WafRuleView
 } from "@/lib/waf-service";
 import {
@@ -112,7 +112,7 @@ export async function getWafRuleAction(input: {
     rule?: WafRuleView;
     inherited?: WafInheritedView;
     /** Services under this scope already behind a login this scope does not show. */
-    loginBelow?: WafLoginBelow[];
+    loginBelow?: WafLoginBelowView;
     tor?: WafFeedView;
     error?: string;
 }> {

@@ -36,7 +36,7 @@ import { ChipList } from "./chip-list";
 import { Frame, Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { WafInheritedView, WafLoginBelow } from "@/lib/waf-service";
+import type { WafInheritedView, WafLoginBelowView } from "@/lib/waf-service";
 import { Input, Select, Skeleton, Switch } from "@polaris/ui";
 import { AddressRulesPage, LoginRulePage } from "./access-rules";
 import { emptyRule, RuleEditor, type RulePosition } from "./rule-editor";
@@ -129,6 +129,15 @@ const RULE_FIELDS: readonly SearchField<{ name: string; description: string }>[]
 /** Said once, because the row and the rule's own page both say it. */
 const armedAbove = (t: Words) => ({ label: t("scope.armedAbove"), why: t("scope.armedAboveWhy") });
 const offAbove = (t: Words) => ({ label: t("scope.offAbove"), why: t("scope.offAboveWhy") });
+
+const NO_LOGIN_BELOW: WafLoginBelowView = { count: 0, services: [] };
+/** Names in the login row's tooltip before the rest are only counted. */
+const BELOW_NAMED = 5;
+function belowNames(below: WafLoginBelowView, t: Words): string {
+    const names = below.services.slice(0, BELOW_NAMED).map((service) => service.name);
+    const rest = below.count - names.length;
+    return rest > 0 ? t("scope.loginBelowMore", { names: names.join(", "), count: rest }) : names.join(", ");
+}
 const instanceFeed = (t: Words) => ({
     label: t("scope.instanceWide"),
     why: t("scope.instanceWideWhy")
@@ -214,7 +223,7 @@ export function WafEditor({
     const [inherited, setInherited] = useState<WafInheritedView | null>(null);
     // Services under this scope already behind a login a narrower rule or a private
     // address switched on, so this scope's own "off" is not read as "nobody signs in".
-    const [loginBelow, setLoginBelow] = useState<WafLoginBelow[]>([]);
+    const [loginBelow, setLoginBelow] = useState<WafLoginBelowView>(NO_LOGIN_BELOW);
     const [tor, setTor] = useState<WafFeedView | null>(null);
     const [view, setView] = useState<View>({ kind: "list" });
     const [error, setError] = useState<string | null>(null);
@@ -240,7 +249,7 @@ export function WafEditor({
         let active = true;
         setSaved(null);
         setInherited(null);
-        setLoginBelow([]);
+        setLoginBelow(NO_LOGIN_BELOW);
         setTor(null);
         setError(null);
         setView({ kind: "list" });
@@ -253,7 +262,7 @@ export function WafEditor({
             onScreen.current = rule;
             setSaved(rule);
             setInherited(result.inherited ?? null);
-            setLoginBelow(result.loginBelow ?? []);
+            setLoginBelow(result.loginBelow ?? NO_LOGIN_BELOW);
             setTor(result.tor ?? null);
             if (result.error) setError(result.error);
         });
@@ -497,10 +506,10 @@ export function WafEditor({
                                 }
                               : undefined,
                       below:
-                          !saved.requireLogin && loginBelow.length > 0
+                          !saved.requireLogin && loginBelow.count > 0
                               ? {
-                                    label: t("scope.loginBelow", { count: loginBelow.length }),
-                                    why: loginBelow.map((service) => service.name).join(", ")
+                                    label: t("scope.loginBelow", { count: loginBelow.count }),
+                                    why: belowNames(loginBelow, t)
                                 }
                               : undefined,
                       activity: null

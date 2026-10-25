@@ -314,7 +314,8 @@
         "loginAboveWhy": "A scope above this one requires a login, and a narrower scope cannot waive it.",
         "polarisNote": "Applies to the public domains Polaris answers on. The local network name is served separately and stays reachable.",
         "remoteNote": "The local edge applies changes instantly; a service on a remote server picks them up on its next deploy.",
-        "loginBelow": "On for {count, plural, one {# service} other {# services}}"
+        "loginBelow": "On for {count, plural, one {# service} other {# services}}",
+        "loginBelowMore": "{names} and {count} more"
     },
     "access": {
         "addressesTitle": "IP access rules",
@@ -417,6 +418,7 @@
         "admitsHint": "Named nobody means anyone with a Polaris account.",
         "belowTitle": "Services that already require it",
         "belowHint": "This scope does not require a login, but these services already do. Open one to see where it is set.",
+        "belowMore": "And {count} more",
         "via": {
             "application": "Its own rule",
             "environment": "Its environment",

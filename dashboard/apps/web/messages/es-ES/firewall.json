@@ -314,7 +314,8 @@
         "loginAboveWhy": "Un ámbito por encima de este exige iniciar sesión, y uno más estrecho no puede eximirlo.",
         "polarisNote": "Se aplica a los dominios públicos en los que responde Polaris. El nombre de la red local se sirve aparte y sigue accesible.",
         "remoteNote": "El edge local aplica los cambios al momento; un servicio en un servidor remoto los recoge en su siguiente despliegue.",
-        "loginBelow": "Activo en {count, plural, one {# servicio} other {# servicios}}"
+        "loginBelow": "Activo en {count, plural, one {# servicio} other {# servicios}}",
+        "loginBelowMore": "{names} y {count} más"
     },
     "access": {
         "addressesTitle": "Acceso por IP",
@@ -417,6 +418,7 @@
         "admitsHint": "Sin nadie nombrado, entra cualquiera con cuenta en Polaris.",
         "belowTitle": "Servicios que ya lo piden",
         "belowHint": "Este ámbito no exige iniciar sesión, pero estos servicios ya lo hacen. Abre uno para ver dónde está activado.",
+        "belowMore": "Y {count} más",
         "via": {
             "application": "Su propia regla",
             "environment": "Su entorno",

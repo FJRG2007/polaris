@@ -16,7 +16,7 @@ import { Button, Switch } from "@polaris/ui";
 import { PageHeader, Section } from "./page-parts";
 import { ChipList, validAddress } from "./chip-list";
 import type { WafPrincipalGrant } from "@polaris/core";
-import type { WafLoginBelow } from "@/lib/waf-service";
+import type { WafLoginBelowView } from "@/lib/waf-service";
 import { Ban, ShieldCheck, TriangleAlert } from "lucide-react";
 import { LoginPrincipals, type LoginPrincipalsPatch, type WafPrincipalScope } from "./login-principals";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -142,7 +142,7 @@ export function LoginRulePage({
     scope,
     required,
     requiredAbove = false,
-    below = [],
+    below,
     admitted,
     refused,
     disabled,
@@ -155,7 +155,7 @@ export function LoginRulePage({
      *  scope cannot waive it and the switch must not pretend otherwise. */
     requiredAbove?: boolean;
     /** Services under this scope already behind a login set somewhere narrower. */
-    below?: readonly WafLoginBelow[];
+    below?: WafLoginBelowView;
     admitted: WafPrincipalGrant[];
     refused: WafPrincipalGrant[];
     disabled?: boolean;
@@ -193,23 +193,34 @@ export function LoginRulePage({
                 ) : null}
             </Section>
 
-            {!on && below.length > 0 ? (
+            {!on && below && below.count > 0 ? (
                 <Section title={t("login.belowTitle")} hint={t("login.belowHint")}>
                     <ul className="flex flex-col divide-y divide-border rounded-md border border-border text-sm">
-                        {below.map((service) => (
+                        {below.services.map((service) => (
                             <li key={service.id} className="flex min-w-0 items-center justify-between gap-3 px-3 py-2">
-                                <Link
-                                    href={`/apps/firewall?scope=application&id=${service.id}`}
-                                    className="min-w-0 truncate font-medium underline-offset-2 hover:underline"
-                                    title={service.name}
-                                >
-                                    {service.name}
-                                </Link>
+                                {service.owned ? (
+                                    <Link
+                                        href={`/apps/firewall?scope=application&id=${service.id}`}
+                                        className="min-w-0 truncate font-medium underline-offset-2 hover:underline"
+                                        title={service.name}
+                                    >
+                                        {service.name}
+                                    </Link>
+                                ) : (
+                                    <span className="min-w-0 truncate font-medium" title={service.name}>
+                                        {service.name}
+                                    </span>
+                                )}
                                 <span className="shrink-0 text-xs text-muted-foreground">
                                     {t(`login.via.${service.via}`)}
                                 </span>
                             </li>
                         ))}
+                        {below.count > below.services.length ? (
+                            <li className="px-3 py-2 text-xs text-muted-foreground">
+                                {t("login.belowMore", { count: below.count - below.services.length })}
+                            </li>
+                        ) : null}
                     </ul>
                 </Section>
             ) : null}

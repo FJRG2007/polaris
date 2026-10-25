@@ -11,7 +11,7 @@ interface App {
     id: string;
     name: string;
     environmentId: string;
-    environment: { projectId: string };
+    environment: { projectId: string; project: { ownerId: string } };
     target: { hostId: string | null };
     domains: { privateAccess: string | null }[];
 }
@@ -29,9 +29,10 @@ vi.mock("@polaris/db", () => ({
         hostGroup: { count: vi.fn(async () => 1) },
         application: {
             count: vi.fn(async () => 1),
-            findMany: vi.fn(async (args: Record<string, unknown>) => {
+            findMany: vi.fn(async (args: { take: number; cursor?: { id: string } } & Record<string, unknown>) => {
                 asked.push(args);
-                return apps;
+                const from = args.cursor ? apps.findIndex((row) => row.id === args.cursor!.id) + 1 : 0;
+                return apps.slice(from, from + args.take);
             })
         },
         wafRule: {
@@ -54,12 +55,15 @@ vi.mock("@/lib/restore-points/service", () => ({ capture: vi.fn(async () => unde
 
 const { getWafLoginBelow } = await import("@/lib/waf-service");
 
+/** The services named, which is what most of these cases are about. */
+const below = async (...args: Parameters<typeof getWafLoginBelow>) => (await getWafLoginBelow(...args)).services;
+
 function app(id: string, environmentId: string, extra: Partial<App> = {}): App {
     return {
         id,
         name: id,
         environmentId,
-        environment: { projectId: "project-1" },
+        environment: { projectId: "project-1", project: { ownerId: "owner" } },
         target: { hostId: "host-1" },
         domains: [],
         ...extra
@@ -76,34 +80,34 @@ describe("services behind a login set below a scope", () => {
     it("names each service a narrower rule or a private address puts behind a login", async () => {
         login = ["environment:env-1"];
         apps[2] = app("docs", "env-2", { domains: [{ privateAccess: PRIVATE }] });
-        expect(await getWafLoginBelow("owner", "project", "project-1")).toEqual([
-            { id: "web", name: "web", via: "environment" },
-            { id: "api", name: "api", via: "environment" },
-            { id: "docs", name: "docs", via: "private" }
+        expect(await below("owner", "project", "project-1")).toEqual([
+            { id: "web", name: "web", via: "environment", owned: true },
+            { id: "api", name: "api", via: "environment", owned: true },
+            { id: "docs", name: "docs", via: "private", owned: true }
         ]);
         expect(asked[0]!.where).toEqual({ environment: { projectId: "project-1" } });
     });
 
     it("prefers the narrowest rule, since that is the one to open", async () => {
         login = ["environment:env-1", "application:web"];
-        const found = await getWafLoginBelow("owner", "project", "project-1");
+        const found = await below("owner", "project", "project-1");
         expect(found.find((service) => service.id === "web")?.via).toBe("application");
     });
 
     it("ignores the scope's own rule and anything above it", async () => {
         login = ["project:project-1", "server:host-1", "server-group:group-1"];
-        expect(await getWafLoginBelow("owner", "project", "project-1")).toEqual([]);
+        expect(await below("owner", "project", "project-1")).toEqual([]);
     });
 
     it("counts a project rule under a server, and a server rule under its group", async () => {
         login = ["project:project-1"];
-        expect((await getWafLoginBelow("owner", "server", "host-1")).map((s) => s.via)).toEqual([
+        expect((await below("owner", "server", "host-1")).map((s) => s.via)).toEqual([
             "project",
             "project",
             "project"
         ]);
         login = ["server:host-1"];
-        expect((await getWafLoginBelow("owner", "server-group", "group-1")).map((s) => s.via)).toEqual([
+        expect((await below("owner", "server-group", "group-1")).map((s) => s.via)).toEqual([
             "server",
             "server",
             "server"
@@ -113,21 +117,46 @@ describe("services behind a login set below a scope", () => {
 
     it("counts a group rule under the instance-wide scope", async () => {
         login = ["server-group:group-1"];
-        expect(await getWafLoginBelow("owner", "global", "")).toHaveLength(3);
+        expect(await below("owner", "global", "")).toHaveLength(3);
     });
 
     it("reads a private address on a service's own scope, and an unreadable one as public", async () => {
         apps = [app("web", "env-1", { domains: [{ privateAccess: "{broken" }] })];
-        expect(await getWafLoginBelow("owner", "application", "web")).toEqual([]);
+        expect(await below("owner", "application", "web")).toEqual([]);
         apps = [app("web", "env-1", { domains: [{ privateAccess: PRIVATE }] })];
-        expect(await getWafLoginBelow("owner", "application", "web")).toEqual([
-            { id: "web", name: "web", via: "private" }
+        expect(await below("owner", "application", "web")).toEqual([
+            { id: "web", name: "web", via: "private", owned: true }
         ]);
     });
 
     it("has nothing to say for the dashboard's own scope", async () => {
         login = ["application:web"];
-        expect(await getWafLoginBelow("owner", "polaris", "")).toEqual([]);
+        expect(await below("owner", "polaris", "")).toEqual([]);
         expect(asked).toEqual([]);
+    });
+
+    it("marks a service someone else owns, so the list does not link to rules the caller cannot open", async () => {
+        login = ["application:api"];
+        apps[1] = app("api", "env-1", { environment: { projectId: "project-2", project: { ownerId: "someone" } } });
+        expect(await below("owner", "global", "")).toEqual([
+            { id: "api", name: "api", via: "application", owned: false }
+        ]);
+    });
+
+    it("counts every service past the first page, and names only the first page", async () => {
+        apps = Array.from({ length: 1201 }, (_, index) => app(`app-${String(index).padStart(4, "0")}`, "env-1"));
+        login = ["environment:env-1"];
+        const view = await getWafLoginBelow("owner", "global", "");
+        expect(view.count).toBe(1201);
+        expect(view.services).toHaveLength(500);
+        expect(asked).toHaveLength(3);
+        login = ["application:app-1100", "application:app-1200"];
+        expect(await getWafLoginBelow("owner", "global", "")).toEqual({
+            count: 2,
+            services: [
+                { id: "app-1100", name: "app-1100", via: "application", owned: true },
+                { id: "app-1200", name: "app-1200", via: "application", owned: true }
+            ]
+        });
     });
 });
