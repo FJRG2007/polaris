@@ -239,7 +239,8 @@
             "add": "Add a camera",
             "more": "{count, plural, one {# more camera} other {# more cameras}}",
             "watch": "Watch {name}",
-            "noPicture": "No picture"
+            "noPicture": "No picture",
+            "connecting": "Connecting..."
         },
         "routines": {
             "title": "Automations",

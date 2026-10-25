@@ -28,6 +28,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { plainText } from "@/components/rich-text/excerpt";
 import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
+import type { DeleteMessage } from "./delete-message";
 import { AUDIO_FORMATS, extensionOf, saveRecording, type AudioFormat } from "./audio-download";
 import {
     Copy,
@@ -97,7 +98,7 @@ export interface MessageActions {
      * it - a badge of zero, which reads as a menu item that did nothing.
      */
     readonly onMarkUnread?: (message: ChatMessageView) => void;
-    readonly onDelete: (message: ChatMessageView) => void;
+    readonly onDelete: DeleteMessage;
     /** Say something is wrong with it. Not offered on your own message: the
      *  thing to do about your own words is take them back, which is Delete. */
     readonly onReport: (message: ChatMessageView) => void;
@@ -460,9 +461,12 @@ export function MessageMenu({
                                 <ShortcutHint id="chat.edit" />
                             </ContextMenuItem>
                         )}
+                        {/* Shift held skips the question - only the click
+                            knows it was. A key press or a tap arrives as a
+                            click as well. */}
                         <ContextMenuItem
                             variant="danger"
-                            onSelect={() => actions.onDelete(message)}
+                            onClick={(event) => actions.onDelete(message, event.shiftKey)}
                         >
                             <Trash2 className="size-3.5" />
                             {t("messageMenu.delete")}

@@ -57,6 +57,9 @@ export interface ConfirmDeleteDialogProps {
     /** Overrides the plain question, for the same reason. Only asked when
      *  `requireTyping` is false; name the thing, so the reader sees which row. */
     question?: ReactNode;
+    /** Under the question, over the buttons - a tip or a footnote, quieter than
+     *  either. */
+    note?: ReactNode;
     /** Blocks confirmation entirely and explains why (e.g. a volume a service needs). */
     blockedReason?: string | null;
     /** Holds the button while something in `children` is still unanswered - a
@@ -81,6 +84,7 @@ export function ConfirmDeleteDialog({
     confirmLabel,
     title,
     question,
+    note,
     blockedReason,
     confirmDisabled = false,
     error,
@@ -122,12 +126,17 @@ export function ConfirmDeleteDialog({
                         </p>
                     ) : !requireTyping ? (
                         <p className="text-sm text-muted-foreground">
-                            {question ?? words.deleteQuestion(<span className="font-medium text-foreground">{name}</span>)}
+                            {question ??
+                                words.deleteQuestion(
+                                    <span className="font-medium text-foreground">{name}</span>
+                                )}
                         </p>
                     ) : (
                         <label className="flex flex-col gap-1.5" htmlFor={fieldId}>
                             <span className="text-xs text-muted-foreground">
-                                {words.typeToConfirm(<span className="font-medium text-foreground">{name}</span>)}
+                                {words.typeToConfirm(
+                                    <span className="font-medium text-foreground">{name}</span>
+                                )}
                             </span>
                             <Input
                                 id={fieldId}
@@ -143,10 +152,16 @@ export function ConfirmDeleteDialog({
                         </label>
                     )}
 
+                    {note}
+
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+                        <Button
+                            variant="ghost"
+                            onClick={() => onOpenChange(false)}
+                            disabled={pending}
+                        >
                             {words.cancel}
                         </Button>
                         <Button variant="danger" onClick={onConfirm} disabled={!ready}>

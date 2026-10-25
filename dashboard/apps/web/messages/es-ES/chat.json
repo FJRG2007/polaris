@@ -689,9 +689,6 @@
         "joinThisRoom": "Entrar en la sala",
         "callHeight": "Altura",
         "voiceChannelChatWidth": "Ancho del chat de voz",
-        "itLeavesALineSaying": "Deja una línea que dice que se borró, así las respuestas que cuelgan de él siguen teniendo sentido.",
-        "itGoesWithoutTraceAlong": "Desaparece sin rastro, junto con lo que tenga adjunto. No se avisa a nadie de que estuvo ahí.",
-        "deleteMessage": "Borrar mensaje",
         "goingIn": "Entrando",
         "join": "Entrar",
         "withVideo": "Con vídeo",
@@ -704,7 +701,6 @@
         "roomCount": "{count, plural, =0 { - no hay nadie} one { - hay una persona} other { - hay {count} personas}}",
         "inRoom": "En {name}",
         "slowMode": "Aquí está activo el modo lento. Podrás volver a enviar en {wait}.",
-        "deleteQuestion": "¿Borrar <strong>{name}</strong>?",
         "fileNoAnswer": "Se envió {name}, pero el servidor no respondió. No se publicó nada.",
         "fileDropped": "No se pudo enviar {name}: se cortó la conexión. No se publicó nada."
     },
@@ -1964,5 +1960,16 @@
         "denied": "Un administrador ha desactivado los juegos en llamadas para tu cuenta.",
         "missing": "Juegos no está instalado en este Polaris. Un administrador puede añadirlo desde la tienda.",
         "seat": "Únete a la llamada para jugar."
+    },
+    "deleteMessage": {
+        "title": "Borrar mensaje",
+        "question": "¿Seguro que quieres borrar este mensaje?",
+        "leavesTrace": "Deja una línea que dice que se borró, así las respuestas que cuelgan de él siguen teniendo sentido.",
+        "noTrace": "Desaparece sin rastro, junto con lo que tenga adjunto. No se avisa a nadie de que estuvo ahí.",
+        "delete": "Borrar",
+        "images": "{count, plural, one {1 imagen} other {{count} imágenes}}",
+        "files": "{count, plural, one {1 archivo} other {{count} archivos}}",
+        "protip": "<tip>Consejo:</tip> Mantén <key>{shift}</key> al hacer clic en Borrar para saltarte esta confirmación.",
+        "protipKey": "<tip>Consejo:</tip> Mantén <key>{shift}</key> al hacer clic en Borrar, o pulsa <key>{combo}</key>, para saltarte esta confirmación."
     }
 }

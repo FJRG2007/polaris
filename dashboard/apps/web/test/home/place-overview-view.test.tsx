@@ -262,6 +262,44 @@ describe("the Overview", () => {
         );
     });
 
+    it("asks a camera again within seconds when its picture does not arrive", async () => {
+        // After an update the relay restarts and every camera dials afresh; the
+        // first frame often misses. Waiting for the 30 s refresh to ask again
+        // was a card saying "No picture" for a camera that was fine.
+        served = {
+            ...HOUSE,
+            cameras: [{ id: "cam-1", name: "Garden", enabled: true, power: "mains" } as never]
+        };
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            draw();
+            const card = await screen.findByRole("button", { name: "Watch Garden" });
+            const picture = () => card.querySelector("img")!;
+            const first = picture().getAttribute("src");
+            fireEvent.error(picture());
+            expect(card.textContent).toContain("Connecting...");
+            expect(card.textContent).not.toContain("No picture");
+            await act(async () => {
+                vi.advanceTimersByTime(5_000);
+            });
+            expect(picture().getAttribute("src")).not.toBe(first);
+            fireEvent.load(picture());
+            expect(card.textContent).not.toContain("Connecting...");
+
+            // A camera that keeps missing is called what it is, and left alone.
+            for (let miss = 0; miss < 4; miss += 1) {
+                fireEvent.error(picture());
+                await act(async () => {
+                    vi.advanceTimersByTime(5_000);
+                });
+            }
+            expect(card.textContent).toContain("No picture");
+            expect(card.querySelector("img")).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("speaks Spanish", async () => {
         draw({ locale: "es-ES" });
         await screen.findByText("Reading lamp");

@@ -797,6 +797,16 @@ function CamerasCard({
     );
 }
 
+/** After a picture that did not arrive: the same pace as a camera tile, so a
+ *  camera reconnecting - every one of them, after the relay restarts on an
+ *  update - shows up within seconds instead of at the next refresh. */
+const THUMB_RETRY_MS = 5_000;
+
+/** Misses in a row before the card says there is no picture rather than that
+ *  it is connecting. A camera that is really gone stops being asked until the
+ *  next refresh. */
+const THUMB_GIVE_UP = 4;
+
 /**
  * One camera's picture.
  *
@@ -814,10 +824,22 @@ function CameraThumb({
     onWatch: (camera: CameraView) => void;
 }) {
     const t = usePlacesT();
-    const [failedAt, setFailedAt] = useState<number | null>(null);
-    const failed = failedAt === tick;
+    const [misses, setMisses] = useState(0);
+    const [retry, setRetry] = useState(0);
+    // Every refresh starts over, so a camera given up on is asked again.
+    useEffect(() => setMisses(0), [tick]);
+    useEffect(() => {
+        if (misses === 0 || misses >= THUMB_GIVE_UP) return;
+        const timer = setTimeout(() => setRetry((value) => value + 1), THUMB_RETRY_MS);
+        return () => clearTimeout(timer);
+    }, [misses]);
     const battery = drawsFromBattery(camera.power);
-    const picture = camera.enabled && !battery && !failed;
+    const picture = camera.enabled && !battery && misses < THUMB_GIVE_UP;
+    const note = battery
+        ? t("camera.batteryOpenToWatch")
+        : picture
+          ? t("placeOverview.cameras.connecting")
+          : t("placeOverview.cameras.noPicture");
     return (
         <button
             type="button"
@@ -829,19 +851,21 @@ function CameraThumb({
             {picture ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                    src={`/api/home/cameras/${encodeURIComponent(camera.id)}/snapshot?w=480&n=${tick}`}
+                    src={`/api/home/cameras/${encodeURIComponent(camera.id)}/snapshot?w=480&n=${tick}.${retry}`}
                     alt=""
                     loading="lazy"
-                    className="size-full object-cover"
-                    onError={() => setFailedAt(tick)}
+                    // Kept out of sight while it is being asked again, so a miss
+                    // is the line below rather than a broken image.
+                    className={cn("size-full object-cover", misses > 0 && "opacity-0")}
+                    onLoad={() => setMisses(0)}
+                    onError={() => setMisses((value) => value + 1)}
                 />
-            ) : (
-                <span className="flex size-full items-center justify-center px-2 text-center text-[0.6875rem] text-muted-foreground">
-                    {battery
-                        ? t("camera.batteryOpenToWatch")
-                        : t("placeOverview.cameras.noPicture")}
+            ) : null}
+            {!picture || misses > 0 ? (
+                <span className="absolute inset-0 flex items-center justify-center px-2 text-center text-[0.6875rem] text-muted-foreground">
+                    {note}
                 </span>
-            )}
+            ) : null}
             <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-2 py-1 text-[0.6875rem] font-medium text-white">
                 {camera.name}
             </span>
