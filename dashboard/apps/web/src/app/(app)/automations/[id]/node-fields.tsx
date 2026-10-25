@@ -28,6 +28,7 @@ import { useEffect, useState } from "react";
 import { rotateHookAction } from "../actions";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { RefInput, RefTextarea } from "./references";
+import { CodeEditor } from "@/components/json-view";
 import { ThresholdFields } from "./threshold-fields";
 import { NoticeDeliveryFields } from "@/components/automations/notice-delivery-fields";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
@@ -77,6 +78,7 @@ export const STEP_TYPES = [
     "core.run",
     "core.answer",
     "core.set",
+    "core.code",
     "core.announce",
     "core.stop"
 ] as const;
@@ -144,6 +146,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.set": () => ({ values: [] }),
     "core.announce": () => ({ name: "", payload: [] }),
     "core.redeploy": () => ({ applicationId: "" }),
+    "core.code": () => ({ code: CODE_TEMPLATES.filter, items: "" }),
     "core.chat": () => ({
         preset: "slack",
         secretId: "",
@@ -497,6 +500,8 @@ export function NodeFields({
             return <ChatMessageFields config={config} set={set} />;
         case "core.redeploy":
             return <RedeployFields config={config} set={set} />;
+        case "core.code":
+            return <CodeFields config={config} set={set} />;
         case "core.connectivity":
             return (
                 <Field label={t("connectivity.when")}>
@@ -909,6 +914,62 @@ function ChatMessageFields({ config, set }: { config: Config; set: (change: Conf
                     onChange={(event) => set({ body: event.target.value })}
                 />
             </Field>
+        </div>
+    );
+}
+
+/** Starting points for a Code step; picking one replaces the code. */
+export const CODE_TEMPLATES = {
+    // i18n-ignore: example code
+    filter: "// Keep the items that match.\nreturn items.filter((item) => item.price > 10);\n",
+    // i18n-ignore: example code
+    map: "// Change each item.\nreturn items.map((item) => ({ ...item, total: item.price * item.quantity }));\n",
+    // i18n-ignore: example code
+    aggregate:
+        "// Sum the items into one.\nconst total = items.reduce((sum, item) => sum + item.price, 0);\nreturn [{ total, count: items.length }];\n"
+} as const;
+type CodeTemplate = keyof typeof CODE_TEMPLATES;
+
+function CodeFields({ config, set }: { config: Config; set: (change: Config) => void }) {
+    const t = useTranslations("automations");
+    const code = typeof config.code === "string" ? config.code : "";
+    const tooLong = code.length > core.AUTOMATION_LIMITS.codeLength;
+    return (
+        <div className="space-y-3">
+            <Field label={t("code.items")}>
+                <RefInput
+                    value={typeof config.items === "string" ? config.items : ""}
+                    maxLength={500}
+                    placeholder={t("code.itemsPlaceholder")}
+                    onChange={(event) => set({ items: event.target.value })}
+                />
+            </Field>
+            <Field label={t("code.template")}>
+                <Select
+                    value=""
+                    onValueChange={(name) => set({ code: CODE_TEMPLATES[name as CodeTemplate] })}
+                    options={(Object.keys(CODE_TEMPLATES) as CodeTemplate[]).map((name) => ({
+                        value: name,
+                        label: t(`code.templates.${name}`)
+                    }))}
+                    placeholder={t("code.templatePick")}
+                    aria-label={t("code.template")}
+                />
+            </Field>
+            <div className="min-w-0 space-y-1 text-sm">
+                <span>{`${t("code.code")} *`}</span>
+                <CodeEditor
+                    value={code}
+                    onChange={(next) => set({ code: next })}
+                    language="javascript"
+                    label={t("code.code")}
+                    invalid={tooLong}
+                    className="max-h-96"
+                />
+                <span className={tooLong ? "text-xs text-danger" : "text-xs text-muted-foreground"}>
+                    {tooLong ? t("code.tooLong") : t("code.hint")}
+                </span>
+            </div>
         </div>
     );
 }

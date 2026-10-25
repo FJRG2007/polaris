@@ -709,7 +709,8 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
         "current",
         "publicIp"
     ],
-    "core.redeploy": ["deploymentId", "applicationId"]
+    "core.redeploy": ["deploymentId", "applicationId"],
+    "core.code": ["items", "count", "logs"]
 };
 
 export interface ReferenceOption {

@@ -23,7 +23,7 @@ import {
 const CACHE_KEY = "polar.display";
 
 let current: PolarDisplay | null = null;
-let fetched = false;
+let request: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
 function cached(): PolarDisplay {
@@ -52,15 +52,17 @@ export const polarDisplayStore = {
         }
         for (const listener of listeners) listener();
     },
+    /** The settings once the server has answered, or the device's copy if it could not. */
+    load(): Promise<PolarDisplay> {
+        request ??= fetch("/api/polar/preferences")
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: unknown) => (data ? polarDisplayStore.set(displayOf(data)) : undefined))
+            .catch(() => undefined);
+        return request.then(() => polarDisplayStore.get());
+    },
     subscribe(listener: () => void): () => void {
         listeners.add(listener);
-        if (!fetched) {
-            fetched = true;
-            void fetch("/api/polar/preferences")
-                .then((response) => (response.ok ? response.json() : null))
-                .then((data: unknown) => (data ? polarDisplayStore.set(displayOf(data)) : null))
-                .catch(() => undefined);
-        }
+        void polarDisplayStore.load();
         return () => listeners.delete(listener);
     }
 };
@@ -95,11 +97,15 @@ export async function changePolarDisplay(key: PolarDisplayKey, value: boolean): 
 /** The suggestion switch lives with the helper model (`polar-helper-settings.tsx`). */
 type DisplayRow = Exclude<PolarDisplayKey, "suggestions">;
 
-const ROWS: readonly { key: DisplayRow; hint?: "settings.display.autoCompactHint" }[] = [
+const ROWS: readonly {
+    key: DisplayRow;
+    hint?: "settings.display.autoCompactHint" | "settings.display.reopenLastChatHint";
+}[] = [
     { key: "showTokens" },
     { key: "showCost" },
     { key: "showContextBar" },
-    { key: "autoCompact", hint: "settings.display.autoCompactHint" }
+    { key: "autoCompact", hint: "settings.display.autoCompactHint" },
+    { key: "reopenLastChat", hint: "settings.display.reopenLastChatHint" }
 ];
 
 /** The "Chat display" section of Polar's settings. */

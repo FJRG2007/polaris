@@ -420,12 +420,14 @@
         },
         "display": {
             "title": "Vista del chat",
-            "intro": "Lo que muestran tus chats y cuándo compactan.",
+            "intro": "Lo que muestran tus chats, cuándo compactan y cuál se abre.",
             "showTokens": "Tokens en las respuestas",
             "showCost": "Coste estimado",
             "showContextBar": "Barra de contexto",
             "autoCompact": "Compactar automáticamente",
             "autoCompactHint": "Cerca del límite del modelo, se resumen los mensajes antiguos antes de enviar.",
+            "reopenLastChat": "Reabrir el último chat",
+            "reopenLastChatHint": "Si está apagado, Polar abre un chat nuevo.",
             "failed": "No se pudo guardar el ajuste. Prueba otra vez."
         },
         "helper": {

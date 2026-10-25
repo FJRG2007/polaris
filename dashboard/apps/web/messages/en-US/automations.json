@@ -144,7 +144,8 @@
         "message": "Post to a chat channel",
         "threshold": "A reading crosses a threshold",
         "connectivity": "The internet goes down or comes back",
-        "redeploy": "Redeploy a service"
+        "redeploy": "Redeploy a service",
+        "code": "Run code"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -326,7 +327,15 @@
         "deployForbidden": "The account it runs as cannot deploy that service",
         "deployFailed": "The deploy did not start",
         "deployLoop": "A deploy an automation started cannot redeploy again",
-        "serviceGone": "That service is gone or out of reach"
+        "serviceGone": "That service is gone or out of reach",
+        "codeSyntax": "The code has a syntax error",
+        "codeRuntime": "The code threw an error",
+        "codeAtLine": "{error} on line {line}",
+        "codeTimeout": "The code ran past its time limit",
+        "codeMemory": "The code used too much memory",
+        "codeOutput": "The code returned too much, or something that is not JSON",
+        "codeInput": "The items were too large for a Code step",
+        "codeLimited": "Too many Code runs this minute"
     },
     "secrets": {
         "title": "Secrets",
@@ -654,7 +663,8 @@
         "message": "Post in a space channel through its webhook, as a bot.",
         "threshold": "Starts when a server, service or UPS reading stays past a value.",
         "connectivity": "Starts when the line drops, returns, changes address or stops being reachable.",
-        "redeploy": "Deploy a service again, as Redeploy on its page does."
+        "redeploy": "Deploy a service again, as Redeploy on its page does.",
+        "code": "Change items with JavaScript and pass them on."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -987,5 +997,19 @@
             "driveFileUploaded": "File uploaded to Drive",
             "calendarEventStarting": "Calendar event starting soon"
         }
+    },
+    "code": {
+        "code": "Code",
+        "items": "Items",
+        "itemsPlaceholder": "The step before this one",
+        "template": "Start from",
+        "templatePick": "Pick an example",
+        "templates": {
+            "filter": "Filter",
+            "map": "Map",
+            "aggregate": "Sum up"
+        },
+        "hint": "Read items, return a list for the next step. console.log goes to the run. No network, files or secrets; 1 second per run.",
+        "tooLong": "The code is longer than a step takes."
     }
 }

@@ -15672,6 +15672,9 @@ model PolarPreference {
     transcriptionModel String?
     // Whether a suggested next message follows each answer.
     suggestions    Boolean  @default(true)
+    // Whether opening Polar brings back the chat open last time. Off opens a
+    // new chat; a reload keeps the chat it was on either way.
+    reopenLastChat Boolean  @default(false)
     // The model titles and suggestions are written with, as
     // { provider, model, payer }; null is Automatic (the fastest one the
     // person can use). Read through a schema: an unreadable value is Automatic.

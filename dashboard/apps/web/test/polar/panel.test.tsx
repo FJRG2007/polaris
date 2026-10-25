@@ -111,7 +111,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-const { PolarAside, PolarChat, PolarProvider, ownCommandIn, slashMatches } =
+const { PolarAside, PolarChat, PolarProvider, ownCommandIn, resetReloadForTests, slashMatches } =
     await import("@/components/polar/polar-panel");
 const { polarDisplayStore } = await import("@/components/polar/polar-display");
 
@@ -633,6 +633,14 @@ describe("the queue", () => {
     });
 });
 
+/** This page load as the browser reports it: a reload, or a visit. */
+function loadedBy(type: "reload" | "navigate") {
+    resetReloadForTests();
+    return vi
+        .spyOn(performance, "getEntriesByType")
+        .mockReturnValue([{ type } as unknown as PerformanceEntry]);
+}
+
 describe("the open conversation after a reload", () => {
     // Not every test environment has storage; the panel's own is a plain map here.
     beforeEach(() => {
@@ -643,7 +651,9 @@ describe("the open conversation after a reload", () => {
             removeItem: (key: string) => void kept.delete(key),
             clear: () => kept.clear()
         });
+        loadedBy("reload");
     });
+    afterEach(() => vi.restoreAllMocks());
 
     it("opens the conversation that was open before", async () => {
         storedThread = {
@@ -689,6 +699,71 @@ describe("the open conversation after a reload", () => {
         );
         mount();
         await waitFor(() => expect(window.localStorage.getItem("polar.thread")).toBe(""));
+    });
+});
+
+describe("opening Polar again", () => {
+    const opened = () =>
+        vi
+            .mocked(globalThis.fetch as ReturnType<typeof vi.fn>)
+            .mock.calls.some(([url]) => url === "/api/polar/threads/t-old");
+    beforeEach(() => {
+        const kept = new Map<string, string>([["polar.thread", "t-old"]]);
+        vi.stubGlobal("localStorage", {
+            getItem: (key: string) => kept.get(key) ?? null,
+            setItem: (key: string, value: string) => void kept.set(key, value),
+            removeItem: (key: string) => void kept.delete(key),
+            clear: () => kept.clear()
+        });
+        storedThread = {
+            id: "t-old",
+            messages: [
+                { id: "u1", parentId: null, role: "user", parts: [{ type: "text", text: "Hi" }] }
+            ],
+            queue: [],
+            choice: null
+        };
+        loadedBy("navigate");
+    });
+    afterEach(() => {
+        polarDisplayStore.set({ ...polarDisplayStore.get(), reopenLastChat: false });
+        vi.restoreAllMocks();
+    });
+
+    it("starts on a new chat, leaving the last one in the list", async () => {
+        mount();
+        await ready();
+        expect(opened()).toBe(false);
+    });
+
+    it("brings the last chat back for a person who asked for that", async () => {
+        polarDisplayStore.set({ ...polarDisplayStore.get(), reopenLastChat: true });
+        mount();
+        await waitFor(() => expect(opened()).toBe(true));
+    });
+
+    it("starts on a new chat when opened again after a reload", async () => {
+        loadedBy("reload");
+        mount();
+        await waitFor(() => expect(opened()).toBe(true));
+        cleanup();
+        vi.mocked(globalThis.fetch as ReturnType<typeof vi.fn>).mockClear();
+        mount();
+        await ready();
+        expect(opened()).toBe(false);
+    });
+
+    it("brings the last chat back once the account's setting arrives", async () => {
+        let settle: () => void = () => undefined;
+        const answered = new Promise<void>((resolve) => (settle = resolve));
+        vi.spyOn(polarDisplayStore, "load").mockImplementation(() =>
+            answered.then(() => ({ ...polarDisplayStore.get(), reopenLastChat: true }))
+        );
+        mount();
+        await ready();
+        expect(opened()).toBe(false);
+        settle();
+        await waitFor(() => expect(opened()).toBe(true));
     });
 });
 

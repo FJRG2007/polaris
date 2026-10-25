@@ -114,7 +114,12 @@ import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { UsageDialog } from "@/components/polar/polar-usage";
 import { ContextBar, ContextDialog, CompactionDivider } from "@/components/polar/polar-context";
-import { AnswerSpendLine, answerSpendOf, usePolarDisplay } from "@/components/polar/polar-display";
+import {
+    AnswerSpendLine,
+    answerSpendOf,
+    polarDisplayStore,
+    usePolarDisplay
+} from "@/components/polar/polar-display";
 import {
     compactionOf,
     contextUsed,
@@ -322,6 +327,21 @@ function keepScope(key: string): void {
         }
     }
     writeStored(SCOPES_KEY, JSON.stringify(next));
+}
+let reloadSeen = false;
+/** Whether this is the first chat since the browser reloaded the page, not a visit
+ *  or a later opening of Polar on the same page. */
+function reloaded(): boolean {
+    if (reloadSeen) return false;
+    reloadSeen = true;
+    const entry = performance.getEntriesByType?.("navigation")[0] as
+        PerformanceNavigationTiming | undefined;
+    return entry?.type === "reload";
+}
+
+/** Treat the next chat as the first since the page loaded. Tests only. */
+export function resetReloadForTests(): void {
+    reloadSeen = false;
 }
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
@@ -983,6 +1003,8 @@ export function PolarChat({
         resume: true
     });
     const busy = chat.status === "submitted" || chat.status === "streaming";
+    const messagesNow = useRef(0);
+    messagesNow.current = chat.messages.length;
     const goalState = polarGoal.usePolarGoal(threadId);
     const conversationRef = useRef(onConversation);
     conversationRef.current = onConversation;
@@ -1325,7 +1347,9 @@ export function PolarChat({
     // chat picked beside the settings) opens once, and the address goes back
     // to plain /polar; `new` starts one, in the project it names if any, and
     // `session` opens a Code session (`new` for a new task).
-    // Otherwise the chat that was open before a reload opens again.
+    // Otherwise a reload stays on the chat it was on, and opening Polar starts
+    // a new chat unless the person asked for the last one back; a scoped chat
+    // (a document's own) always comes back, since it belongs to that place.
     useEffect(() => {
         const params = fullPage ? new URLSearchParams(window.location.search) : null;
         const named = params?.get("thread") ?? null;
@@ -1342,8 +1366,25 @@ export function PolarChat({
             startNew(fresh === "1" ? null : fresh);
             return;
         }
-        const reopen = named ?? readStored(threadKey);
-        if (reopen) void openThread(reopen);
+        const keep = chatScope || reloaded() || polarDisplayStore.get().reopenLastChat;
+        const reopen = named ?? (keep ? readStored(threadKey) : null);
+        if (reopen) {
+            void openThread(reopen);
+            return;
+        }
+        if (named || keep) return;
+        // This device's copy of the setting may be behind the account's.
+        const first = threadId;
+        let gone = false;
+        void polarDisplayStore.load().then((settings) => {
+            if (gone || !settings.reopenLastChat) return;
+            if (live.current.threadId !== first || messagesNow.current > 0) return;
+            const last = readStored(threadKey);
+            if (last) void openThread(last);
+        });
+        return () => {
+            gone = true;
+        };
     }, []);
     // Remembered once it has something in it; a temporary chat is deleted when
     // the page goes, so there is nothing to come back to.

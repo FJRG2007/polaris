@@ -144,7 +144,8 @@
         "message": "Publicar en un canal",
         "threshold": "Una lectura cruza un umbral",
         "connectivity": "Internet se cae o vuelve",
-        "redeploy": "Redesplegar servicio"
+        "redeploy": "Redesplegar servicio",
+        "code": "Código JS"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -326,7 +327,15 @@
         "deployForbidden": "La cuenta con la que se ejecuta no puede desplegar ese servicio",
         "deployFailed": "El despliegue no empezó",
         "deployLoop": "Un despliegue que inició una automatización no puede volver a desplegar",
-        "serviceGone": "Ese servicio ya no existe o no está a su alcance"
+        "serviceGone": "Ese servicio ya no existe o no está a su alcance",
+        "codeSyntax": "Error de sintaxis en el código",
+        "codeRuntime": "El código lanzó un error",
+        "codeAtLine": "{error} en la línea {line}",
+        "codeTimeout": "El código superó su tiempo límite",
+        "codeMemory": "El código usó demasiada memoria",
+        "codeOutput": "El código devolvió demasiado, o algo que no es JSON",
+        "codeInput": "Los elementos eran demasiado grandes para un paso de código",
+        "codeLimited": "Demasiadas ejecuciones este minuto"
     },
     "secrets": {
         "title": "Secretos",
@@ -654,7 +663,8 @@
         "message": "Publica en un canal mediante su webhook, como bot.",
         "threshold": "Empieza cuando una lectura de un servidor, servicio o SAI se pasa de un valor.",
         "connectivity": "Empieza cuando la línea cae, vuelve, cambia de IP o deja de verse desde fuera.",
-        "redeploy": "Despliega un servicio de nuevo, como Redesplegar en su página."
+        "redeploy": "Despliega un servicio de nuevo, como Redesplegar en su página.",
+        "code": "Cambia elementos con JavaScript y pásalos al siguiente paso."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -987,5 +997,19 @@
             "driveFileUploaded": "Archivo subido a Drive",
             "calendarEventStarting": "Evento del calendario pronto"
         }
+    },
+    "code": {
+        "code": "Código",
+        "items": "Ítems",
+        "itemsPlaceholder": "El paso anterior",
+        "template": "Partir de",
+        "templatePick": "Elige un ejemplo",
+        "templates": {
+            "filter": "Filtrar",
+            "map": "Mapear",
+            "aggregate": "Sumar"
+        },
+        "hint": "Lee items y devuelve una lista para el siguiente paso. console.log va a la ejecución. Sin red, archivos ni secretos; 1 segundo por ejecución.",
+        "tooLong": "El código es más largo de lo que admite un paso."
     }
 }

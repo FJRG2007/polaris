@@ -51,6 +51,8 @@ export interface NodeIo {
     readonly signal: AbortSignal;
     /** Whether this automation was allowed onto the local network by an administrator. */
     readonly allowLocalNetwork: boolean;
+    /** The nodes wired into this one, in the order their wires were drawn. */
+    readonly incoming?: readonly string[];
     /** A secret's value, from the automation's own shelf. Every value read is redacted from stored data. */
     secret(id: string): Promise<string>;
     /** What the step was asked to do, stored (redacted) on the step for the runs view. */

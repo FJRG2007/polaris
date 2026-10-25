@@ -134,7 +134,14 @@ const nextConfig = {
         // The command-line client and its install scripts, served by
         // `/cli/[file]` and imported by nothing - so named, or the image ships
         // without them and the install line downloads a 503.
-        "/cli/**": ["../../packages/cli/dist/**", "../../packages/cli/scripts/**"]
+        "/cli/**": ["../../packages/cli/dist/**", "../../packages/cli/scripts/**"],
+        // The Code step's engine is loaded by a worker thread from a path, so
+        // nothing imports it and tracing would leave it out of the image.
+        "/**": [
+            "../../node_modules/quickjs-emscripten-core/**",
+            "../../node_modules/@jitl/quickjs-ffi-types/**",
+            "../../node_modules/@jitl/quickjs-singlefile-cjs-release-sync/**"
+        ]
     },
     // Pages that moved; the old paths keep working for anything already linking to
     // them. Two rules, and the second is why the first exists:

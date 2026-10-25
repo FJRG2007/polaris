@@ -942,6 +942,9 @@ async function executeStep(
         depth: run.depth,
         since: step.createdAt,
         leads: (port) => leaving(graph, node.id, port).length > 0,
+        incoming: graph.edges
+            .filter((edge) => edge.to.node === node.id)
+            .map((edge) => edge.from.node),
         shelf: { orgId: run.automation.orgId, userId: run.automation.userId },
         timeZone: graph.timeZone,
         signal: controller.signal,

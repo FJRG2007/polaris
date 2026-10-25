@@ -48,10 +48,10 @@
         "copying": "Este servidor se está copiando. Podrás arrancarlo cuando termine la copia."
     },
     "deployGap": {
-        "none": "Redesplegar no corta el servicio: la versión nueva entra cuando responde.",
-        "hostPort": "Redesplegar lo reinicia: ocupa el puerto {port}/{protocol} del servidor, que dos versiones no pueden compartir.",
-        "volumes": "Redesplegar lo reinicia: guarda datos en {names}, que dos copias no deben escribir a la vez.",
-        "other": "Redesplegar lo reinicia. Sus ajustes en Deploy dicen por qué."
+        "none": "Redesplegar no corta el servicio: la versión nueva entra cuando está lista.",
+        "hostPort": "Redesplegar lo corta un momento: usa el puerto {port}/{protocol}, así que la versión vieja se para antes de arrancar la nueva.",
+        "volumes": "Redesplegar lo corta un momento: la versión vieja se para antes, para que dos copias no escriban en {names} a la vez.",
+        "other": "Redesplegar lo corta un momento. Sus ajustes en Deploy dicen por qué."
     },
     "duplicate": "Duplicar",
     "duplicateCannotCreate": "No puedes crear servidores, así que no puedes duplicar este.",

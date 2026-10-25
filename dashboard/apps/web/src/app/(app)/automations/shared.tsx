@@ -11,6 +11,7 @@ import {
     Bell,
     CircleStop,
     Clock,
+    Code,
     Columns3,
     Ear,
     EyeOff,
@@ -237,7 +238,14 @@ const RUN_ERRORS = [
     "deployForbidden",
     "deployFailed",
     "deployLoop",
-    "serviceGone"
+    "serviceGone",
+    "codeSyntax",
+    "codeRuntime",
+    "codeTimeout",
+    "codeMemory",
+    "codeOutput",
+    "codeInput",
+    "codeLimited"
 ] as const;
 
 /** A stored error code in the reader's words. */
@@ -246,6 +254,12 @@ export function useRunError(): (code: string | null) => string | null {
     return (code) => {
         if (!code) return null;
         const bare = code.replace(/^finally:/, "");
+        const atLine = /^(codeSyntax|codeRuntime):(\d+)$/.exec(bare);
+        if (atLine)
+            return t("runErrors.codeAtLine", {
+                line: atLine[2]!,
+                error: t(`runErrors.${atLine[1] as "codeSyntax" | "codeRuntime"}`)
+            });
         if (bare.startsWith("httpStatus:"))
             return t("runErrors.httpStatus", { status: bare.slice("httpStatus:".length) });
         if ((RUN_ERRORS as readonly string[]).includes(bare))
@@ -282,7 +296,8 @@ const NODE_KEYS = {
     "core.announce": "announce",
     "core.try": "try",
     "core.waitCondition": "waitCondition",
-    "core.redeploy": "redeploy"
+    "core.redeploy": "redeploy",
+    "core.code": "code"
 } as const;
 
 /**
@@ -324,6 +339,7 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "game-servers.action.power": Power,
     "game-servers.action.command": SquareTerminal,
     "core.redeploy": Rocket,
+    "core.code": Code,
     "core.manual": Hand,
     "core.schedule": Clock,
     "core.webhook": Webhook,
