@@ -69,7 +69,8 @@ function joined(parts: Uint8Array[]): Uint8Array {
 function dropStale(parts: Uint8Array[]): void {
     let size = 0;
     for (const part of parts) size += part.byteLength;
-    while (size > MAX_QUEUED_BYTES && parts.length > 1) size -= (parts.shift() as Uint8Array).byteLength;
+    while (size > MAX_QUEUED_BYTES && parts.length > 1)
+        size -= (parts.shift() as Uint8Array).byteLength;
 }
 
 export function TalkControl({ cameraId, support }: { cameraId: string; support: TalkSupport }) {
@@ -92,7 +93,8 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
             current.node.disconnect();
             void current.context.close().catch(() => undefined);
             for (const track of current.stream.getTracks()) track.stop();
-            if (tellServer) void actions.stopTalkAction(cameraId, current.talkId).catch(() => undefined);
+            if (tellServer)
+                void actions.stopTalkAction(cameraId, current.talkId).catch(() => undefined);
         },
         [cameraId]
     );
@@ -120,7 +122,10 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
             .then((response) => {
                 // Over on the server: ended by the camera, by the relay, or by a
                 // pause long enough to close it.
-                if (live.current === current && (response.status === 409 || response.status === 403)) {
+                if (
+                    live.current === current &&
+                    (response.status === 409 || response.status === 403)
+                ) {
                     stop(false);
                     toast.show({ key, title: t("talk.ended") });
                 }
@@ -150,7 +155,8 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
         if (!result?.talkId || !mounted.current) {
             for (const track of stream.getTracks()) track.stop();
             void context.close().catch(() => undefined);
-            if (result?.talkId) void actions.stopTalkAction(cameraId, result.talkId).catch(() => undefined);
+            if (result?.talkId)
+                void actions.stopTalkAction(cameraId, result.talkId).catch(() => undefined);
             if (mounted.current) {
                 setState("idle");
                 toast.show({ key, title: result?.error ?? t("talk.failed") });

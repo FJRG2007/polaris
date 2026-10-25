@@ -124,9 +124,15 @@ describe("starting a talk", () => {
     });
 
     it("tells the same person their own start is still on its way", async () => {
-        const first = talk.startTalk("install-1", CAMERA, "user-1").catch((caught: unknown) => caught);
-        await expect(talk.startTalk("install-1", CAMERA, "user-1")).rejects.toThrow(talk.ALREADY_STARTING);
-        await expect(talk.startTalk("install-1", CAMERA, "user-2")).rejects.toThrow(talk.TALKING_ELSEWHERE);
+        const first = talk
+            .startTalk("install-1", CAMERA, "user-1")
+            .catch((caught: unknown) => caught);
+        await expect(talk.startTalk("install-1", CAMERA, "user-1")).rejects.toThrow(
+            talk.ALREADY_STARTING
+        );
+        await expect(talk.startTalk("install-1", CAMERA, "user-2")).rejects.toThrow(
+            talk.TALKING_ELSEWHERE
+        );
         await vi.advanceTimersByTimeAsync(1500);
         expect(await first).toMatch(/^[0-9a-f-]{36}$/);
     });
@@ -187,7 +193,12 @@ describe("feeding and ending a talk", () => {
         const id = await started();
         expect(() => talk.feedTalk(CAMERA, "user-2", id, new Uint8Array(2))).toThrow(HomeError);
         expect(() =>
-            talk.feedTalk(CAMERA, "user-1", "22222222-2222-4222-8222-222222222222", new Uint8Array(2))
+            talk.feedTalk(
+                CAMERA,
+                "user-1",
+                "22222222-2222-4222-8222-222222222222",
+                new Uint8Array(2)
+            )
         ).toThrow(talk.NOT_TALKING);
     });
 
@@ -224,11 +235,15 @@ describe("feeding and ending a talk", () => {
         await talk.endCameraTalk(CAMERA);
         expect(talk.talking(CAMERA)).toBe(false);
         expect(endTalk).toHaveBeenCalledTimes(1);
-        expect(() => talk.feedTalk(CAMERA, "user-1", id, new Uint8Array(2))).toThrow(talk.NOT_TALKING);
+        expect(() => talk.feedTalk(CAMERA, "user-1", id, new Uint8Array(2))).toThrow(
+            talk.NOT_TALKING
+        );
     });
 
     it("ends a talk that was still starting when the camera was made private", async () => {
-        const pending = talk.startTalk("install-1", CAMERA, "user-1").catch((caught: unknown) => caught);
+        const pending = talk
+            .startTalk("install-1", CAMERA, "user-1")
+            .catch((caught: unknown) => caught);
         await vi.advanceTimersByTimeAsync(100);
         await talk.endCameraTalk(CAMERA);
         await vi.advanceTimersByTimeAsync(1500);

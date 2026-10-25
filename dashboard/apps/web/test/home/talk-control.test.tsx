@@ -16,7 +16,9 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 const TALK = "33333333-3333-4333-8333-333333333333";
 const CAMERA = "11111111-1111-4111-8111-111111111111";
 
-const startTalkAction = vi.fn(async (_camera: string) => ({ talkId: TALK }) as { talkId?: string; error?: string });
+const startTalkAction = vi.fn(
+    async (_camera: string) => ({ talkId: TALK }) as { talkId?: string; error?: string }
+);
 const stopTalkAction = vi.fn(async (_camera: string, _talk: string) => ({}));
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
     startTalkAction: (camera: string) => startTalkAction(camera),
@@ -115,7 +117,10 @@ describe("the Talk button", () => {
     it("keeps at most a second of voice waiting behind a stalled send", async () => {
         let release: () => void = () => undefined;
         fetchMock.mockImplementationOnce(
-            () => new Promise<Response>((resolve) => (release = () => resolve(new Response(null, { status: 204 }))))
+            () =>
+                new Promise<Response>(
+                    (resolve) => (release = () => resolve(new Response(null, { status: 204 })))
+                )
         );
         render(withMessages(<TalkControl cameraId={CAMERA} support="yes" />));
         fireEvent.click(screen.getByRole("button", { name: "Talk" }));
@@ -132,7 +137,9 @@ describe("the Talk button", () => {
         release();
         await settle(1000);
         expect(fetchMock).toHaveBeenCalledTimes(2);
-        expect(((fetchMock.mock.calls[1]![1] as RequestInit).body as ArrayBuffer).byteLength).toBeLessThanOrEqual(16000);
+        expect(
+            ((fetchMock.mock.calls[1]![1] as RequestInit).body as ArrayBuffer).byteLength
+        ).toBeLessThanOrEqual(16000);
         fireEvent.click(screen.getByRole("button", { name: "Stop talking" }));
     });
 

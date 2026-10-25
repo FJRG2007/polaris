@@ -57,7 +57,8 @@ export async function POST(
 ): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
-    if (!(await sessionCan(user, "home.control"))) return new Response("Forbidden", { status: 403 });
+    if (!(await sessionCan(user, "home.control")))
+        return new Response("Forbidden", { status: 403 });
 
     const { id } = await context.params;
     const camera = idSchema.safeParse(id);

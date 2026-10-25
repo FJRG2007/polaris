@@ -60,9 +60,8 @@ vi.mock("@/lib/setting-store", () => ({
     })
 }));
 
-const { refreshHomeService, upgradeHomeServices } = await import(
-    "@polaris-app/places/src/lib/side-upgrade"
-);
+const { refreshHomeService, upgradeHomeServices } =
+    await import("@polaris-app/places/src/lib/side-upgrade");
 
 beforeEach(() => {
     build = "abc123";

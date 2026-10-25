@@ -1196,7 +1196,10 @@ export async function startTalkAction(
     return { talkId: result.value };
 }
 
-export async function stopTalkAction(cameraId: string, talkId: string): Promise<{ error?: string }> {
+export async function stopTalkAction(
+    cameraId: string,
+    talkId: string
+): Promise<{ error?: string }> {
     const { user } = await requireHome("home.control");
     const id = cameraIdSchema.safeParse(cameraId);
     const talkIdParsed = cameraIdSchema.safeParse(talkId);

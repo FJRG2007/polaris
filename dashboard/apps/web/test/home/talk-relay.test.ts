@@ -157,7 +157,8 @@ describe("the microphone at the talk rate", () => {
     it("carries 44.1 kHz's remainder across pieces instead of losing it", () => {
         const resampler = new TalkResampler(44_100);
         let samples = 0;
-        for (let i = 0; i < 10; i++) samples += resampler.push(new Float32Array(4410)).byteLength / 2;
+        for (let i = 0; i < 10; i++)
+            samples += resampler.push(new Float32Array(4410)).byteLength / 2;
         // A second of input is the talk rate's second of output, give or take one.
         expect(Math.abs(samples - TALK_RATE)).toBeLessThanOrEqual(1);
     });

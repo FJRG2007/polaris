@@ -215,7 +215,9 @@ export async function startTalk(
         }
         if (!playing || starting.cancelled) {
             await finish(talk);
-            throw new HomeError(starting.cancelled ? NOT_TALKING : "The camera would not play a voice");
+            throw new HomeError(
+                starting.cancelled ? NOT_TALKING : "The camera would not play a voice"
+            );
         }
         return talk.id;
     } finally {
@@ -230,7 +232,12 @@ export async function startTalk(
  * Answers false, and drops the piece, when the talk is being fed faster than
  * anybody speaks.
  */
-export function feedTalk(cameraId: string, userId: string, talkId: string, pcm: Uint8Array): boolean {
+export function feedTalk(
+    cameraId: string,
+    userId: string,
+    talkId: string,
+    pcm: Uint8Array
+): boolean {
     const talk = registry().talks.get(cameraId);
     if (!talk || talk.ended || talk.id !== talkId || talk.userId !== userId)
         throw new HomeError(NOT_TALKING);

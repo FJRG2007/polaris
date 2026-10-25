@@ -25,7 +25,11 @@ describe("messageGallery", () => {
     });
 
     it("skips a picture still under a spoiler, but keeps the one already open", () => {
-        const pictures = [file("a"), file("hidden", { spoiler: true }), file("open", { spoiler: true })];
+        const pictures = [
+            file("a"),
+            file("hidden", { spoiler: true }),
+            file("open", { spoiler: true })
+        ];
         const gallery = messageGallery(message(pictures), false, "/api/chat/attachments/open");
         expect(gallery.map((image) => image.url)).toEqual([
             "/api/chat/attachments/a",
@@ -34,7 +38,11 @@ describe("messageGallery", () => {
     });
 
     it("steps through nothing when the whole conversation is covered", () => {
-        const gallery = messageGallery(message([file("a"), file("b")]), true, "/api/chat/attachments/a");
+        const gallery = messageGallery(
+            message([file("a"), file("b")]),
+            true,
+            "/api/chat/attachments/a"
+        );
         expect(gallery.map((image) => image.url)).toEqual(["/api/chat/attachments/a"]);
     });
 });
