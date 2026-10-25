@@ -26,8 +26,6 @@ CREATE TABLE IF NOT EXISTS "ArcadeSessionPlayer" (
     CONSTRAINT "ArcadeSessionPlayer_pkey" PRIMARY KEY ("sessionId", "userId")
 );
 
-DO $$ BEGIN
-    ALTER TABLE "ArcadeSessionPlayer" ADD CONSTRAINT "ArcadeSessionPlayer_sessionId_fkey"
-        FOREIGN KEY ("sessionId") REFERENCES "ArcadeSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "ArcadeSessionPlayer" DROP CONSTRAINT IF EXISTS "ArcadeSessionPlayer_sessionId_fkey";
+ALTER TABLE "ArcadeSessionPlayer" ADD CONSTRAINT "ArcadeSessionPlayer_sessionId_fkey"
+    FOREIGN KEY ("sessionId") REFERENCES "ArcadeSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;

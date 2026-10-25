@@ -207,7 +207,8 @@ const EAGER_UI = [
     // the first time it is made - which is the point the dynamic pieces make.
     "appAppsInstalledIdAccessActions.installAccessAction",
     "appAppsInstalledIdAccessActions.revokeInstallAccessAction",
-    "appAppsInstalledIdAccessActions.shareInstallAction"
+    "appAppsInstalledIdAccessActions.shareInstallAction",
+    "arcadeInvite.gameInviteAccess"
 ];
 
 function sourceOf(module: string): string {

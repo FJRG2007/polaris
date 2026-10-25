@@ -6,6 +6,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.unmock("@/app/(app)/chat/activity-card-actions");
+
 const SESSION = "0192f6a0-0000-7000-8000-0000000000bb";
 const CHANNEL = "0192f6a0-0000-7000-8000-0000000000cc";
 const MEETING = "0192f6a0-0000-7000-8000-0000000000aa";

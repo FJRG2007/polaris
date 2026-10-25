@@ -18,7 +18,7 @@ import type { ActivityCardView, JoinRefusal } from "@/lib/chat/activity-card";
 import { joinHref } from "@/lib/chat/activity-card";
 import { readActivityCard } from "./activity-card-actions";
 import { requestActivityJoin } from "./activity-join";
-import { useCallHold } from "./call-session";
+import { useCallHold } from "./call-hold";
 import { MessageTime } from "@/components/message-time";
 
 const REFRESH_MS = 30_000;
