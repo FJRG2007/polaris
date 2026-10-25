@@ -11,7 +11,7 @@
 
 import * as core from "@polaris/core";
 import { useEffect, useMemo, useState } from "react";
-import { toFacts } from "@/lib/tasks/facts";
+import { toFacts, type TaskRow } from "@/lib/tasks/facts";
 import { useRowCursor } from "./row-cursor";
 import {
     Checkbox,
@@ -27,17 +27,19 @@ import { CustomFieldValue } from "../custom-fields";
 import { PriorityMark } from "@/components/priority-mark";
 import { columnStatusIds, reorderColumns } from "./board";
 import { useDisplayFormat } from "@/components/display-format";
-import { Check, ChevronDown, ChevronRight, Columns3, Plus } from "lucide-react";
+import {
+    Check,
+    ChevronDown,
+    ChevronRight,
+    Columns3,
+    CornerDownLeft,
+    GitBranch,
+    Plus
+} from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { dropEdge, neighbours, type DropEdge } from "../drop-edge";
-import { clickMode, type SelectMode, type ViewProps } from "./shared";
-import {
-    commandsFor,
-    TaskControls,
-    TaskMenu,
-    TaskStatusMarker,
-    type TaskCommands
-} from "./task-actions";
+import { clickMode, type QuickCreateExtra, type SelectMode, type ViewProps } from "./shared";
+import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 import {
     AssigneePicker,
     AvatarStack,
@@ -46,10 +48,126 @@ import {
     DuePicker,
     PriorityPicker,
     StatusDot,
+    StatusIcon,
     StatusPicker,
     TagChip,
+    TagPicker,
+    tagColorFor,
     TaskLocation
 } from "../pickers";
+
+/**
+ * The columns a list row lines up under, after the name. Fixed widths, so the
+ * values of one column sit under each other down the whole group and can be
+ * compared at a glance, the way ClickUp's list reads.
+ */
+const LIST_COLUMNS = ["assignees", "due", "priority"] as const;
+type ListColumn = (typeof LIST_COLUMNS)[number];
+
+/** Each column's width from `md` up. Below it the cells fold under the name. */
+const LIST_COLUMN_WIDTH: Record<ListColumn, string> = {
+    assignees: "md:w-28",
+    due: "md:w-28",
+    priority: "md:w-28"
+};
+
+/** The list's own hidden columns, apart from the table's: the two show
+ *  different sets, and hiding the due date on one should not hide it on both. */
+const LIST_HIDDEN_COLUMNS_KEY = "polaris.tasks.list.hidden";
+
+/** The caret a parent row leads with, and how many subtasks it opens onto. */
+interface RowSubtasks {
+    readonly count: number;
+    /** Absent where there is nothing on screen to open: subtasks listed as tasks
+     *  of their own, or kept off the screen by a filter. */
+    readonly open?: boolean;
+    readonly onToggle?: () => void;
+}
+
+/** One value under its column heading: the picker that changes it, showing the
+ *  value when there is one and a faint placeholder when there is not. */
+function ListCell({ column, commands }: { column: ListColumn; commands: TaskCommands }) {
+    const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
+    const tp = useTranslations("tasks");
+    const { task, context, canEdit } = commands;
+    const cell = cn("flex min-w-0 shrink-0 items-center", LIST_COLUMN_WIDTH[column]);
+
+    if (column === "assignees")
+        return (
+            <span className={cell}>
+                <AssigneePicker
+                    people={context.people}
+                    selected={task.assignees.map((person) => person.id)}
+                    disabled={!canEdit}
+                    onChange={(assigneeIds) => commands.onEdit({ assigneeIds })}
+                    trigger={
+                        task.assignees.length > 0 ? (
+                            <button
+                                type="button"
+                                aria-label={t("table.assignees")}
+                                className="flex items-center rounded-full transition-opacity hover:opacity-75 disabled:cursor-default"
+                            >
+                                <AvatarStack people={task.assignees} size={20} />
+                            </button>
+                        ) : undefined
+                    }
+                />
+            </span>
+        );
+
+    if (column === "due")
+        return (
+            <span className={cell}>
+                <DuePicker
+                    dueDate={task.dueDate}
+                    timed={task.timed}
+                    disabled={!canEdit}
+                    onChange={(dueDate) => commands.onEdit({ dueDate })}
+                    trigger={
+                        task.dueDate ? (
+                            <button
+                                type="button"
+                                aria-label={tp("pickers.dueDate")}
+                                className="inline-flex min-w-0 items-center rounded-md px-1 py-0.5 transition-colors hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
+                            >
+                                <DueBadge
+                                    dueDate={task.dueDate}
+                                    statusType={task.statusType}
+                                    timed={task.timed}
+                                    format={format.date}
+                                />
+                            </button>
+                        ) : undefined
+                    }
+                />
+            </span>
+        );
+
+    return (
+        <span className={cell}>
+            <PriorityPicker
+                value={task.priority}
+                disabled={!canEdit}
+                onChange={(priority) => commands.onEdit({ priority })}
+                trigger={
+                    task.priority !== "none" ? (
+                        <button
+                            type="button"
+                            aria-label={tp("pickers.priority")}
+                            className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs transition-colors hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent data-[state=open]:bg-muted"
+                        >
+                            <PriorityMark priority={task.priority} />
+                            <span className="truncate">
+                                {tp(`labels.priority.${task.priority}`)}
+                            </span>
+                        </button>
+                    ) : undefined
+                }
+            />
+        </span>
+    );
+}
 
 /** One task as a row. Shared by both views so a task reads the same in either. */
 function TaskLine({
@@ -61,6 +179,8 @@ function TaskLine({
     showStatus,
     showLocation,
     positioned = true,
+    columns,
+    subtasks,
     onSelect,
     onPoint,
     onRegister,
@@ -86,6 +206,9 @@ function TaskLine({
     /** Whether dropping here would actually put the row here. False while a
      *  search is on, where the rows are ranked by how well they matched. */
     positioned?: boolean;
+    /** The columns this reader has on, in the order the heading draws them. */
+    columns: readonly ListColumn[];
+    subtasks?: RowSubtasks;
     onSelect: (mode: SelectMode) => void;
     /** A press anywhere on the row moves the cursor here, so the keyboard picks
      *  up from wherever the reader last looked rather than from the top. */
@@ -98,7 +221,8 @@ function TaskLine({
     const format = useDisplayFormat();
     const t = useTranslations("tasksViews");
     const [over, setOver] = useState<DropEdge | null>(null);
-    const { task, canEdit, onOpen } = commands;
+    const { task, context, canEdit, onOpen } = commands;
+    const toggleable = subtasks?.onToggle !== undefined;
 
     return (
         <TaskMenu commands={commands}>
@@ -129,12 +253,12 @@ function TaskLine({
                     onDropAt(edge);
                 }}
                 className={cn(
-                    "group relative flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors duration-fast hover:bg-card-hover",
+                    "group relative flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-2 py-1.5 transition-colors duration-fast hover:bg-card-hover md:flex-nowrap",
                     selected && "bg-primary/5",
                     cursor &&
                         "bg-card-hover before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary"
                 )}
-                style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}
+                style={{ paddingLeft: `${0.5 + depth * 1.5}rem` }}
             >
                 {/* The line the drop would land on, drawn on the edge it would
                 actually use rather than always above: a row dragged downwards
@@ -165,77 +289,301 @@ function TaskLine({
                         onClick={(event) => onSelect(event.shiftKey ? "range" : "toggle")}
                     />
                 </span>
-                <TaskStatusMarker commands={commands} />
-                <div className="flex min-w-0 flex-1 flex-col">
-                    <button
-                        type="button"
-                        // A shift-click would otherwise drag a text selection across
-                        // half the screen on its way to selecting the rows.
-                        onMouseDown={(event) =>
-                            event.shiftKey ? event.preventDefault() : undefined
-                        }
-                        onClick={(event) => {
-                            const mode = clickMode(event);
-                            if (mode) onSelect(mode);
-                            else onOpen();
-                        }}
-                        className="flex min-w-0 items-center gap-2 text-left"
-                    >
-                        {/* Priority first, because the list is sorted by it out of
-                        the box and a list ordered by something it never shows is
-                        a list nobody can check. Nothing is drawn for a task with
-                        none, so it costs no width in the common case. */}
-                        <PriorityMark priority={task.priority} />
-                        <span className="hidden font-mono text-[0.6875rem] text-muted-foreground sm:inline">
-                            {task.reference}
-                        </span>
-                        <span
-                            title={task.name}
-                            className={cn(
-                                "truncate text-sm",
-                                core.isFinishedStatus(task.statusType) && "text-muted-foreground"
-                            )}
+                {/* The caret has its own slot on every row, used or not, so the
+                    status marks and the names line up down the whole group. */}
+                <span className="flex size-4 shrink-0 items-center justify-center">
+                    {toggleable && (
+                        <button
+                            type="button"
+                            onClick={subtasks?.onToggle}
+                            aria-expanded={subtasks?.open}
+                            aria-label={
+                                subtasks?.open
+                                    ? t("list.hideSubtasks", { name: task.name })
+                                    : t("list.showSubtasks", { name: task.name })
+                            }
+                            className="rounded text-muted-foreground transition-colors hover:text-foreground"
                         >
-                            {task.name}
-                        </span>
+                            {subtasks?.open ? (
+                                <ChevronDown className="size-3.5" />
+                            ) : (
+                                <ChevronRight className="size-3.5" />
+                            )}
+                        </button>
+                    )}
+                </span>
+                <TaskStatusMarker commands={commands} />
+                <div className="flex min-w-0 flex-1 basis-0 flex-col">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <button
+                            type="button"
+                            // A shift-click would otherwise drag a text selection
+                            // across half the screen on its way to selecting rows.
+                            onMouseDown={(event) =>
+                                event.shiftKey ? event.preventDefault() : undefined
+                            }
+                            onClick={(event) => {
+                                const mode = clickMode(event);
+                                if (mode) onSelect(mode);
+                                else onOpen();
+                            }}
+                            className="flex min-w-0 items-center gap-2 text-left"
+                        >
+                            <span className="hidden shrink-0 font-mono text-[0.6875rem] text-muted-foreground sm:inline">
+                                {task.reference}
+                            </span>
+                            <span
+                                title={task.name}
+                                className={cn(
+                                    "truncate text-sm",
+                                    core.isFinishedStatus(task.statusType) &&
+                                        "text-muted-foreground"
+                                )}
+                            >
+                                {task.name}
+                            </span>
+                        </button>
+                        {subtasks && subtasks.count > 0 && (
+                            <button
+                                type="button"
+                                disabled={!toggleable}
+                                onClick={subtasks.onToggle}
+                                title={t("list.subtaskCount", { count: subtasks.count })}
+                                aria-label={t("list.subtaskCount", { count: subtasks.count })}
+                                className="inline-flex shrink-0 items-center gap-0.5 rounded px-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:hover:bg-transparent"
+                            >
+                                <GitBranch className="size-3" />
+                                {subtasks.count}
+                            </button>
+                        )}
                         <BlockedMarker task={task} format={format.date} />
                         {task.tags.slice(0, 2).map((tag) => (
                             <TagChip key={tag.id} tag={tag} />
                         ))}
-                    </button>
+                        {/* Tags have no column of their own, so the picker for
+                            them waits beside the ones already on the task. */}
+                        {canEdit && (
+                            <span className="flex shrink-0 items-center transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+                                <TagPicker
+                                    tags={context.tags}
+                                    spaceId={context.spaceId}
+                                    selected={task.tags.map((tag) => tag.id)}
+                                    onChange={(tagIds) => commands.onEdit({ tagIds })}
+                                    onCreate={
+                                        commands.onCreateTag
+                                            ? async (name) =>
+                                                  (await commands.onCreateTag?.(
+                                                      name,
+                                                      tagColorFor(name)
+                                                  )) ?? null
+                                            : undefined
+                                    }
+                                />
+                            </span>
+                        )}
+                    </div>
                     {showLocation && <TaskLocation task={task} />}
                 </div>
 
                 {showStatus && (
-                    <span className="hidden items-center gap-1 text-[0.6875rem] text-muted-foreground md:flex">
+                    <span className="hidden w-[10rem] shrink-0 items-center gap-1 text-[0.6875rem] text-muted-foreground md:flex">
                         <StatusDot color={task.statusColor} />
-                        {task.statusName}
+                        <span className="truncate" title={task.statusName}>
+                            {task.statusName}
+                        </span>
                     </span>
                 )}
-                <span className="hidden w-24 justify-end md:flex">
-                    <DueBadge
-                        dueDate={task.dueDate}
-                        statusType={task.statusType}
-                        timed={task.timed}
-                        format={format.date}
-                    />
-                </span>
-                <AvatarStack people={task.assignees} size={20} />
-                {/* The editable versions of what the row just showed. They sit at the
-                end so the row still reads left to right, and stay out of the way
-                until somebody is actually pointing at this task. */}
-                <span
-                    className={cn(
-                        "flex shrink-0 items-center transition-opacity focus-within:opacity-100 md:group-hover:opacity-100",
-                        canEdit ? "md:opacity-0" : "hidden"
-                    )}
-                >
-                    <TaskControls commands={commands} />
+                {/* On a phone the cells take a line of their own under the name,
+                    lined up with it, rather than squeezing it to nothing. */}
+                <span className="flex w-full min-w-0 items-center gap-2 pl-12 md:w-auto md:gap-0 md:pl-0">
+                    {columns.map((column) => (
+                        <ListCell key={column} column={column} commands={commands} />
+                    ))}
+                    <span aria-hidden className="hidden w-8 shrink-0 md:block" />
                 </span>
             </li>
         </TaskMenu>
     );
 }
+
+/**
+ * Making a task where it will live: under the last row of a group, or under a
+ * parent as its subtask. The name is all it needs; the people, the date, the
+ * priority and the tags can be set on the way, as ClickUp's composer allows.
+ */
+function TaskComposer({
+    context,
+    depth,
+    label,
+    onCreateTag,
+    onSave,
+    onCancel
+}: {
+    context: ViewProps["context"];
+    depth: number;
+    /** What the input is called for a screen reader: where the task goes. */
+    label: string;
+    onCreateTag?: ViewProps["onCreateTag"];
+    onSave: (name: string, extra: QuickCreateExtra) => void;
+    onCancel: () => void;
+}) {
+    const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
+    const [name, setName] = useState("");
+    const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+    const [dueDate, setDueDate] = useState<string | null>(null);
+    const [priority, setPriority] = useState<core.TaskPriority>("none");
+    const [tagIds, setTagIds] = useState<string[]>([]);
+    const assigned = context.people.filter((person) => assigneeIds.includes(person.id));
+    const chosenTags = context.tags.filter((tag) => tagIds.includes(tag.id));
+
+    const save = () => {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        onSave(trimmed, {
+            ...(assigneeIds.length > 0 ? { assigneeIds } : {}),
+            ...(dueDate ? { dueDate } : {}),
+            ...(priority !== "none" ? { priority } : {}),
+            ...(tagIds.length > 0 ? { tagIds } : {})
+        });
+        // Ready for the next one, the way a list is usually filled in.
+        setName("");
+        setAssigneeIds([]);
+        setDueDate(null);
+        setPriority("none");
+        setTagIds([]);
+    };
+
+    return (
+        <li
+            className="flex flex-wrap items-center gap-2 border-b border-border px-2 py-1.5"
+            style={{ paddingLeft: `${2.25 + depth * 1.5}rem` }}
+        >
+            <span
+                aria-hidden
+                className="size-3.5 shrink-0 rounded-full border border-dashed border-muted-foreground"
+            />
+            <input
+                autoFocus
+                value={name}
+                aria-label={label}
+                placeholder={t("list.taskName")}
+                onChange={(event) => setName(event.target.value)}
+                onKeyDown={(event) => {
+                    if (event.key === "Escape") onCancel();
+                    if (event.key === "Enter") {
+                        event.preventDefault();
+                        save();
+                    }
+                }}
+                className="min-w-0 flex-1 basis-40 bg-transparent py-0.5 text-sm outline-none placeholder:text-muted-foreground"
+            />
+            <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
+                <AssigneePicker
+                    people={context.people}
+                    selected={assigneeIds}
+                    onChange={setAssigneeIds}
+                    trigger={
+                        assigned.length > 0 ? (
+                            <button
+                                type="button"
+                                aria-label={t("table.assignees")}
+                                className="flex items-center rounded-full px-1 hover:opacity-75"
+                            >
+                                <AvatarStack people={assigned} size={18} />
+                            </button>
+                        ) : undefined
+                    }
+                />
+                <DuePicker
+                    dueDate={dueDate}
+                    timed={false}
+                    onChange={setDueDate}
+                    trigger={
+                        dueDate ? (
+                            <button
+                                type="button"
+                                aria-label={t("list.columnDue")}
+                                className="inline-flex items-center rounded-md px-1 py-0.5 hover:bg-muted"
+                            >
+                                <DueBadge
+                                    dueDate={dueDate}
+                                    statusType="open"
+                                    timed={false}
+                                    format={format.date}
+                                />
+                            </button>
+                        ) : undefined
+                    }
+                />
+                <PriorityPicker value={priority} onChange={setPriority} />
+                {chosenTags.slice(0, 2).map((tag) => (
+                    <TagChip key={tag.id} tag={tag} />
+                ))}
+                <TagPicker
+                    tags={context.tags}
+                    spaceId={context.spaceId}
+                    selected={tagIds}
+                    onChange={setTagIds}
+                    onCreate={
+                        onCreateTag
+                            ? async (tagName) =>
+                                  (await onCreateTag(tagName, tagColorFor(tagName))) ?? null
+                            : undefined
+                    }
+                />
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                    {t("list.cancel")}
+                </button>
+                <button
+                    type="button"
+                    onClick={save}
+                    disabled={!name.trim()}
+                    className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                    {t("list.save")}
+                    <CornerDownLeft className="size-3" aria-hidden />
+                </button>
+            </span>
+        </li>
+    );
+}
+
+/** The row under a group, or under an open parent, that opens the composer. */
+function AddTaskRow({
+    depth,
+    label,
+    onClick
+}: {
+    depth: number;
+    label: string;
+    onClick: () => void;
+}) {
+    const t = useTranslations("tasksViews");
+    return (
+        <li className="border-b border-border">
+            <button
+                type="button"
+                onClick={onClick}
+                aria-label={label}
+                className="flex w-full items-center gap-2 py-1.5 pr-2 text-left text-xs text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+                style={{ paddingLeft: `${2.25 + depth * 1.5}rem` }}
+            >
+                <Plus className="size-3.5" />
+                {t("list.addTask")}
+            </button>
+        </li>
+    );
+}
+
+/** A row the list draws, in the order it draws them. */
+type ListEntry =
+    | { kind: "task"; task: TaskRow; depth: number; subtasks?: RowSubtasks; root: boolean }
+    | { kind: "add"; parent: TaskRow; depth: number };
 
 export function ListView(props: ViewProps) {
     const {
@@ -248,13 +596,31 @@ export function ListView(props: ViewProps) {
         onSelect,
         onMove,
         onQuickCreate,
-        orderable
+        orderable,
+        subtasks
     } = props;
     const t = useTranslations("tasksViews");
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
+    /** Where the composer is open: a group's key, or `parent:<id>` under a parent. */
     const [addingTo, setAddingTo] = useState<string | null>(null);
-    const [draft, setDraft] = useState("");
+
+    // Read after mount: the server has no localStorage.
+    const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+    useEffect(() => setHidden(readHiddenColumns(LIST_HIDDEN_COLUMNS_KEY)), []);
+    const columns = LIST_COLUMNS.filter((id) => !hidden.has(id));
+    const toggleColumn = (id: string) => {
+        const next = new Set(hidden);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setHidden(next);
+        writeHiddenColumns(LIST_HIDDEN_COLUMNS_KEY, next);
+    };
+    const columnLabel: Record<ListColumn, string> = {
+        assignees: t("list.columnAssignee"),
+        due: t("list.columnDue"),
+        priority: t("list.columnPriority")
+    };
 
     /**
      * Arranging the sections, which the board has always allowed and this did
@@ -277,7 +643,7 @@ export function ListView(props: ViewProps) {
      *  sections do not spring back for the length of a round trip. */
     const [pendingOrder, setPendingOrder] = useState<readonly string[] | null>(null);
 
-    const columns = useMemo(() => core.statusColumns(context.statuses), [context.statuses]);
+    const statusColumns = useMemo(() => core.statusColumns(context.statuses), [context.statuses]);
     const byStatus = (groupBy ?? "status") === "status";
     const canOrderGroups = byStatus && props.onReorderStatuses !== undefined && groups.length > 1;
 
@@ -310,7 +676,7 @@ export function ListView(props: ViewProps) {
         // A section can stand for more than one status - two statuses sharing a
         // name are read as one - so the order written down is every status
         // behind every section, in the order the sections now sit in.
-        await props.onReorderStatuses(order.flatMap((key) => columnStatusIds(columns, key)));
+        await props.onReorderStatuses(order.flatMap((key) => columnStatusIds(statusColumns, key)));
     };
 
     const toggleGroup = (key: string) => {
@@ -321,41 +687,147 @@ export function ListView(props: ViewProps) {
     };
 
     /**
+     * The rows of each group in the order they are drawn.
+     *
+     * With subtasks under their parents, a group holds only the work at the top
+     * and each parent opens onto its own, however deep, with a row at the end to
+     * add another. Listed as tasks of their own, every row stands alone. A screen
+     * that hands no subtasks over nests whatever parents and children happen to
+     * share a group, as the list always has.
+     */
+    const entries = useMemo(() => {
+        const byGroup = new Map<string, ListEntry[]>();
+        for (const group of groups) {
+            const list: ListEntry[] = [];
+            if (subtasks && subtasks.mode !== "separate") {
+                const walk = (task: TaskRow, depth: number, root: boolean) => {
+                    const children = subtasks.children.get(task.id) ?? [];
+                    const open = children.length > 0 && subtasks.isOpen(task.id);
+                    list.push({
+                        kind: "task",
+                        task,
+                        depth,
+                        root,
+                        subtasks:
+                            children.length > 0
+                                ? {
+                                      count: children.length,
+                                      open,
+                                      onToggle: () => subtasks.toggle(task.id)
+                                  }
+                                : { count: task.subtaskCount }
+                    });
+                    // Bounded, so a cycle in bad data cannot hang the screen.
+                    if (!open || depth >= 7) return;
+                    for (const child of children) walk(child, depth + 1, false);
+                    if (canEdit) list.push({ kind: "add", parent: task, depth: depth + 1 });
+                };
+                for (const task of group.tasks) walk(task, 0, true);
+            } else if (subtasks) {
+                for (const task of group.tasks)
+                    list.push({
+                        kind: "task",
+                        task,
+                        depth: 0,
+                        root: true,
+                        subtasks: { count: task.subtaskCount }
+                    });
+            } else {
+                const byId = new Map(group.tasks.map((task) => [task.id, task]));
+                // The engine works in facts, so the rows are mapped in and
+                // looked back up by id when they are drawn.
+                for (const node of core.flattenTree(core.buildTaskTree(group.tasks.map(toFacts)))) {
+                    const task = byId.get(node.task.id);
+                    if (task) list.push({ kind: "task", task, depth: node.depth, root: true });
+                }
+            }
+            byGroup.set(group.key, list);
+        }
+        return byGroup;
+    }, [groups, subtasks, canEdit]);
+
+    /**
      * The rows as the screen is drawing them - every open group in order, each
      * nested the way it renders - which is what a shift-click reaches across. A
-     * collapsed group is not on screen, so a range never quietly picks up work
-     * nobody can see.
+     * collapsed group or a closed parent is not on screen, so a range never
+     * quietly picks up work nobody can see.
      */
     const rendered = useMemo(
         () =>
             groups
                 .filter((group) => !collapsed.has(group.key))
                 .flatMap((group) =>
-                    core
-                        .flattenTree(core.buildTaskTree(group.tasks.map(toFacts)))
-                        .map((node) => node.task.id)
+                    (entries.get(group.key) ?? []).flatMap((entry) =>
+                        entry.kind === "task" ? [entry.task.id] : []
+                    )
                 ),
-        [groups, collapsed]
+        [groups, collapsed, entries]
     );
 
     const cursor = useRowCursor(rendered, { onOpen, onSelect });
 
+    const columnMenu = (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    aria-label={t("table.columns")}
+                    title={t("table.columns")}
+                    className="inline-flex size-6 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:bg-card-hover hover:text-foreground data-[state=open]:bg-card-hover data-[state=open]:text-foreground"
+                >
+                    <Plus className="size-3.5" />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel>{t("table.columns")}</DropdownMenuLabel>
+                {LIST_COLUMNS.map((id) => (
+                    <DropdownMenuItem
+                        key={id}
+                        role="menuitemcheckbox"
+                        aria-checked={!hidden.has(id)}
+                        // Stays open, so several columns can be switched in one
+                        // visit to the menu.
+                        onSelect={(event) => {
+                            event.preventDefault();
+                            toggleColumn(id);
+                        }}
+                    >
+                        <span className="flex size-4 items-center justify-center">
+                            {!hidden.has(id) && <Check className="text-primary" />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate" title={columnLabel[id]}>
+                            {columnLabel[id]}
+                        </span>
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+
     return (
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
             {shown.map((group) => {
                 const isCollapsed = collapsed.has(group.key);
-                // Nest subtasks under the parent they belong to, when both are in
-                // this group. The engine works in facts, so the rows are mapped
-                // in and looked back up by id when they are drawn.
-                const byId = new Map(group.tasks.map((task) => [task.id, task]));
-                const rows = core.flattenTree(core.buildTaskTree(group.tasks.map(toFacts)));
-
+                const rows = entries.get(group.key) ?? [];
                 // The pile of work with no status is not a section of the space:
                 // there is nothing there to move.
                 const movable = canOrderGroups && group.key !== "";
+                const statusType =
+                    context.statuses.find((status) => status.id === group.key)?.type ?? "open";
+
+                const dropAtEnd = () => {
+                    if (!dragging) return;
+                    const last = group.tasks.filter((task) => task.id !== dragging).at(-1);
+                    onMove({
+                        taskId: dragging,
+                        groupKey: group.key,
+                        position: { beforeId: last?.id ?? null, afterId: null, placed: false }
+                    });
+                    setDragging(null);
+                };
 
                 return (
-                    <section key={group.key} className="rounded-lg border border-border">
+                    <section key={group.key} className="min-w-0 rounded-lg border border-border">
                         {/* Sticky, because a long group scrolls past its own
                             heading and "which status am I looking at" is the one
                             question the heading exists to answer. */}
@@ -387,7 +859,8 @@ export function ListView(props: ViewProps) {
                                 void dropGroup(group.key);
                             }}
                             className={cn(
-                                "sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-surface px-3 py-2",
+                                "sticky top-0 z-10 flex min-w-0 items-center gap-2 rounded-t-lg bg-surface px-3 py-2",
+                                isCollapsed ? "rounded-b-lg" : "border-b border-border",
                                 movable && "cursor-grab active:cursor-grabbing",
                                 draggingGroup === group.key && "opacity-50",
                                 groupOver === group.key && "ring-2 ring-inset ring-primary"
@@ -396,6 +869,7 @@ export function ListView(props: ViewProps) {
                             <button
                                 type="button"
                                 onClick={() => toggleGroup(group.key)}
+                                aria-expanded={!isCollapsed}
                                 aria-label={
                                     isCollapsed
                                         ? t("list.expand", { name: group.label })
@@ -409,14 +883,33 @@ export function ListView(props: ViewProps) {
                                     <ChevronDown className="size-4" />
                                 )}
                             </button>
-                            {group.color && <StatusDot color={group.color} />}
-                            <h3
-                                className="min-w-0 truncate text-sm font-medium"
-                                title={group.label}
-                            >
-                                {group.label}
-                            </h3>
-                            <span className="rounded bg-background px-1.5 text-[0.6875rem] text-muted-foreground">
+                            {/* The status as the pill ClickUp heads a group with:
+                                its mark and its name, in its own colour. */}
+                            {group.color ? (
+                                <span
+                                    className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-0.5"
+                                    style={{
+                                        backgroundColor: `${group.color}26`,
+                                        color: group.color
+                                    }}
+                                >
+                                    <StatusIcon color={group.color} type={statusType} size={14} />
+                                    <h3
+                                        className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide"
+                                        title={group.label}
+                                    >
+                                        {group.label}
+                                    </h3>
+                                </span>
+                            ) : (
+                                <h3
+                                    className="min-w-0 truncate text-sm font-medium"
+                                    title={group.label}
+                                >
+                                    {group.label}
+                                </h3>
+                            )}
+                            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                                 {group.tasks.length}
                             </span>
                             <span className="flex-1" />
@@ -425,10 +918,7 @@ export function ListView(props: ViewProps) {
                                     type="button"
                                     aria-label={t("list.addTo", { name: group.label })}
                                     title={t("empty.add")}
-                                    onClick={() => {
-                                        setAddingTo(group.key);
-                                        setDraft("");
-                                    }}
+                                    onClick={() => setAddingTo(group.key)}
                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                 >
                                     <Plus className="size-3.5" />
@@ -438,106 +928,165 @@ export function ListView(props: ViewProps) {
 
                         {!isCollapsed && (
                             <ul
+                                className="min-w-0"
                                 onDragOver={(event) => event.preventDefault()}
-                                onDrop={() => {
-                                    if (!dragging) return;
-                                    const last = group.tasks
-                                        .filter((task) => task.id !== dragging)
-                                        .at(-1);
-                                    onMove({
-                                        taskId: dragging,
-                                        groupKey: group.key,
-                                        position: {
-                                            beforeId: last?.id ?? null,
-                                            afterId: null,
-                                            placed: false
-                                        }
-                                    });
-                                    setDragging(null);
-                                }}
+                                onDrop={dropAtEnd}
                             >
-                                {rows.map((node) => {
-                                    const task = byId.get(node.task.id);
-                                    if (!task) return null;
+                                {/* What each column is, over the values under it.
+                                    A phone folds the values under the name, where
+                                    there is nothing for a heading to stand over. */}
+                                <li className="hidden items-center gap-2 border-b border-border py-1 pl-[3.75rem] pr-2 text-[0.6875rem] text-muted-foreground md:flex">
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {t("list.columnName")}
+                                    </span>
+                                    {props.groupBy !== "status" && (
+                                        <span className="w-[10rem] shrink-0 truncate">
+                                            {t("table.status")}
+                                        </span>
+                                    )}
+                                    <span className="flex items-center">
+                                        {columns.map((column) => (
+                                            <span
+                                                key={column}
+                                                className={cn(
+                                                    "shrink-0 truncate",
+                                                    LIST_COLUMN_WIDTH[column]
+                                                )}
+                                            >
+                                                {columnLabel[column]}
+                                            </span>
+                                        ))}
+                                        <span className="flex w-8 shrink-0 justify-end">
+                                            {columnMenu}
+                                        </span>
+                                    </span>
+                                </li>
+
+                                {rows.map((entry) => {
+                                    if (entry.kind === "add") {
+                                        const key = `parent:${entry.parent.id}`;
+                                        return addingTo === key ? (
+                                            <TaskComposer
+                                                key={key}
+                                                context={context}
+                                                depth={entry.depth}
+                                                label={t("list.addSubtask", {
+                                                    name: entry.parent.name
+                                                })}
+                                                onCreateTag={props.onCreateTag}
+                                                onCancel={() => setAddingTo(null)}
+                                                onSave={(name, extra) =>
+                                                    onQuickCreate(group.key, name, {
+                                                        ...extra,
+                                                        parent: {
+                                                            id: entry.parent.id,
+                                                            listId: entry.parent.listId
+                                                        }
+                                                    })
+                                                }
+                                            />
+                                        ) : (
+                                            <AddTaskRow
+                                                key={key}
+                                                depth={entry.depth}
+                                                label={t("list.addSubtask", {
+                                                    name: entry.parent.name
+                                                })}
+                                                onClick={() => setAddingTo(key)}
+                                            />
+                                        );
+                                    }
+                                    const { task } = entry;
                                     return (
                                         <TaskLine
                                             key={task.id}
                                             commands={commandsFor(props, task)}
-                                            depth={node.depth}
+                                            depth={entry.depth}
                                             selected={selection.has(task.id)}
                                             selecting={selection.size > 0}
                                             cursor={cursor.at === task.id}
                                             showStatus={props.groupBy !== "status"}
                                             showLocation={props.showLocation}
-                                            positioned={orderable && dragging !== task.id}
+                                            positioned={
+                                                entry.root && orderable && dragging !== task.id
+                                            }
+                                            columns={columns}
+                                            subtasks={entry.subtasks}
                                             onPoint={() => cursor.moveTo(task.id)}
                                             onRegister={(element) =>
                                                 cursor.register(task.id, element)
                                             }
                                             onSelect={(mode) => onSelect(task.id, mode, rendered)}
-                                            onDragStart={() => setDragging(task.id)}
-                                            onDropAt={(edge) => {
-                                                if (!dragging) return;
-                                                setDragging(null);
-                                                // Let go on its own row: the place it
-                                                // is already in, and nothing to write.
-                                                if (dragging === task.id) return;
-                                                // Only the group is honoured while a
-                                                // search is on: the row landed on says
-                                                // which one, not where in it.
-                                                const at = orderable
-                                                    ? neighbours(
-                                                          group.tasks,
-                                                          task.id,
-                                                          dragging,
-                                                          edge
-                                                      )
-                                                    : null;
-                                                if (orderable && !at) return;
-                                                const last = group.tasks
-                                                    .filter((entry) => entry.id !== dragging)
-                                                    .at(-1);
-                                                onMove({
-                                                    taskId: dragging,
-                                                    groupKey: group.key,
-                                                    position: at
-                                                        ? { ...at, placed: true }
-                                                        : {
-                                                              beforeId: last?.id ?? null,
-                                                              afterId: null,
-                                                              placed: false
-                                                          }
-                                                });
-                                            }}
+                                            // A subtask moves with its parent: the
+                                            // order among the group's rows is the
+                                            // parents' order.
+                                            onDragStart={
+                                                entry.root ? () => setDragging(task.id) : undefined
+                                            }
+                                            onDropAt={
+                                                entry.root
+                                                    ? (edge) => {
+                                                          if (!dragging) return;
+                                                          setDragging(null);
+                                                          // Let go on its own row: the
+                                                          // place it is already in.
+                                                          if (dragging === task.id) return;
+                                                          // Only the group is honoured
+                                                          // while a search is on.
+                                                          const at = orderable
+                                                              ? neighbours(
+                                                                    group.tasks,
+                                                                    task.id,
+                                                                    dragging,
+                                                                    edge
+                                                                )
+                                                              : null;
+                                                          if (orderable && !at) return;
+                                                          const last = group.tasks
+                                                              .filter((row) => row.id !== dragging)
+                                                              .at(-1);
+                                                          onMove({
+                                                              taskId: dragging,
+                                                              groupKey: group.key,
+                                                              position: at
+                                                                  ? { ...at, placed: true }
+                                                                  : {
+                                                                        beforeId: last?.id ?? null,
+                                                                        afterId: null,
+                                                                        placed: false
+                                                                    }
+                                                          });
+                                                      }
+                                                    : undefined
+                                            }
                                         />
                                     );
                                 })}
 
-                                {addingTo === group.key ? (
-                                    <li className="px-2 py-1.5">
-                                        <input
-                                            autoFocus
-                                            value={draft}
-                                            placeholder={t("list.quickPlaceholder")}
-                                            onChange={(event) => setDraft(event.target.value)}
-                                            onBlur={() => setAddingTo(null)}
-                                            onKeyDown={(event) => {
-                                                if (event.key === "Escape") setAddingTo(null);
-                                                if (event.key === "Enter" && draft.trim()) {
-                                                    onQuickCreate(group.key, draft.trim());
-                                                    setDraft("");
-                                                }
-                                            }}
-                                            className="w-full rounded-md border border-primary bg-background px-2 py-1 text-sm outline-none"
-                                        />
+                                {group.tasks.length === 0 && addingTo !== group.key && (
+                                    <li className="px-4 py-3 text-xs text-muted-foreground">
+                                        {t("empty.title")}
                                     </li>
-                                ) : (
-                                    group.tasks.length === 0 && (
-                                        <li className="px-4 py-4 text-xs text-muted-foreground">
-                                            {t("empty.title")}
-                                        </li>
-                                    )
                                 )}
+                                {canEdit &&
+                                    (addingTo === group.key ? (
+                                        <TaskComposer
+                                            context={context}
+                                            depth={0}
+                                            label={t("list.addTo", { name: group.label })}
+                                            onCreateTag={props.onCreateTag}
+                                            onCancel={() => setAddingTo(null)}
+                                            onSave={(name, extra) =>
+                                                onQuickCreate(group.key, name, extra)
+                                            }
+                                        />
+                                    ) : (
+                                        <AddTaskRow
+                                            depth={0}
+                                            label={t("list.addTo", { name: group.label })}
+                                            onClick={() => setAddingTo(group.key)}
+                                        />
+                                    ))}
                             </ul>
                         )}
                     </section>
@@ -568,9 +1117,9 @@ const TABLE_COLUMNS = ["status", "assignees", "priority", "due", "estimate", "tr
  */
 const HIDDEN_COLUMNS_KEY = "polaris.tasks.table.hidden";
 
-function readHiddenColumns(): ReadonlySet<string> {
+function readHiddenColumns(key = HIDDEN_COLUMNS_KEY): ReadonlySet<string> {
     try {
-        const raw = window.localStorage.getItem(HIDDEN_COLUMNS_KEY);
+        const raw = window.localStorage.getItem(key);
         const parsed: unknown = raw ? JSON.parse(raw) : [];
         return new Set(
             Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : []
@@ -580,9 +1129,9 @@ function readHiddenColumns(): ReadonlySet<string> {
     }
 }
 
-function writeHiddenColumns(hidden: ReadonlySet<string>): void {
+function writeHiddenColumns(key: string, hidden: ReadonlySet<string>): void {
     try {
-        window.localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hidden]));
+        window.localStorage.setItem(key, JSON.stringify([...hidden]));
     } catch {
         // Private browsing or a full quota: the choice holds for this visit only.
     }
@@ -610,7 +1159,7 @@ export function TableView(props: ViewProps) {
         if (next.has(id)) next.delete(id);
         else next.add(id);
         setHidden(next);
-        writeHiddenColumns(next);
+        writeHiddenColumns(HIDDEN_COLUMNS_KEY, next);
     };
     const shownFields = fields.filter((field) => shows(field.id));
     const span = 3 + TABLE_COLUMNS.filter(shows).length + shownFields.length + 1;

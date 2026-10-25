@@ -20,7 +20,7 @@
 
 import * as core from "@polaris/core";
 import type { TaskRow } from "@/lib/tasks/facts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { optionLabel } from "../option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -32,12 +32,20 @@ import {
     type ViewProps
 } from "./shared";
 import { dropEdge, neighbours as edgeNeighbours, type DropEdge } from "../drop-edge";
-import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
+import { descendants } from "./subtasks";
 import {
+    commandsFor,
+    TaskControls,
+    TaskMenu,
+    TaskStatusMarker,
+    type TaskCommands
+} from "./task-actions";
+import {
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
+    GitBranch,
     GripVertical,
-    ListTree,
     MessageSquare,
     MoreHorizontal,
     Pencil,
@@ -276,9 +284,13 @@ export function TaskCard({
     selected,
     landed = false,
     showLocation,
+    subtasks,
     onSelect
 }: {
     commands: TaskCommands;
+    /** The footer that opens this card's subtasks under it, when it has any on
+     *  the screen. */
+    subtasks?: { count: number; open: boolean; onToggle: () => void };
     /** Whether this card is a drop target at all. False while a column is being
      *  dragged, so the drop falls through to the column underneath instead of
      *  being swallowed by a card that has nothing to do with it. */
@@ -320,11 +332,11 @@ export function TaskCard({
     );
     const { task, context, canEdit, onOpen } = commands;
     // The bottom line only earns its space when there is something on it.
+    // A card whose subtasks can be opened says how many on the footer that
+    // opens them, so the count is not drawn twice.
+    const countsSubtasks = !subtasks && task.subtaskCount > 0;
     const hasMeta =
-        task.dueDate !== null ||
-        task.subtaskCount > 0 ||
-        task.commentCount > 0 ||
-        task.points !== null;
+        task.dueDate !== null || countsSubtasks || task.commentCount > 0 || task.points !== null;
 
     return (
         <TaskMenu commands={commands}>
@@ -492,12 +504,12 @@ export function TaskCard({
                                 timed={task.timed}
                                 format={format.date}
                             />
-                            {task.subtaskCount > 0 && (
+                            {countsSubtasks && (
                                 <span
                                     className="inline-flex items-center gap-0.5 tabular-nums"
                                     title={t("board.subtasks", { count: task.subtaskCount })}
                                 >
-                                    <ListTree className="size-3" />
+                                    <GitBranch className="size-3" />
                                     {task.subtaskCount}
                                 </span>
                             )}
@@ -517,6 +529,108 @@ export function TaskCard({
                             )}
                         </div>
                     )}
+
+                    {subtasks && subtasks.count > 0 && (
+                        <button
+                            type="button"
+                            aria-expanded={subtasks.open}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                subtasks.onToggle();
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            className="-mx-1 -mb-1 inline-flex items-center gap-1 self-start rounded px-1 py-0.5 text-[0.6875rem] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            {subtasks.open ? (
+                                <ChevronDown className="size-3" />
+                            ) : (
+                                <ChevronRight className="size-3" />
+                            )}
+                            <GitBranch className="size-3" />
+                            {t("board.subtasks", { count: subtasks.count })}
+                        </button>
+                    )}
+                </div>
+            </li>
+        </TaskMenu>
+    );
+}
+
+/**
+ * A subtask under its open parent, smaller than a card and indented beside it,
+ * so it reads as part of that task rather than as work of its own in the column.
+ * It carries the same quick controls a card does: status, people, date,
+ * priority and tags, each one the picker that changes it.
+ */
+function SubtaskCard({
+    commands,
+    depth,
+    selected,
+    onSelect
+}: {
+    commands: TaskCommands;
+    depth: number;
+    selected: boolean;
+    onSelect: (mode: SelectMode) => void;
+}) {
+    const format = useDisplayFormat();
+    const { task, onOpen } = commands;
+    return (
+        <TaskMenu commands={commands}>
+            <li style={{ marginLeft: `${0.75 * depth}rem` }} className="min-w-0">
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onMouseDown={(event) => (event.shiftKey ? event.preventDefault() : undefined)}
+                    onClick={(event) => {
+                        const mode = clickMode(event);
+                        if (mode) onSelect(mode);
+                        else onOpen();
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onOpen();
+                        }
+                    }}
+                    className={cn(
+                        "flex min-w-0 cursor-pointer flex-col gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-left transition-colors duration-fast hover:border-border-strong active:bg-card-hover",
+                        selected && "border-primary ring-1 ring-primary"
+                    )}
+                >
+                    <div className="flex min-w-0 items-center gap-2">
+                        <span
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            role="presentation"
+                        >
+                            <TaskStatusMarker commands={commands} />
+                        </span>
+                        <p
+                            title={task.name}
+                            className={cn(
+                                "min-w-0 flex-1 truncate text-xs",
+                                core.isFinishedStatus(task.statusType) && "text-muted-foreground"
+                            )}
+                        >
+                            {task.name}
+                        </p>
+                    </div>
+                    <span
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        role="presentation"
+                        className="flex min-w-0 flex-wrap items-center gap-0.5 text-[0.6875rem] text-muted-foreground"
+                    >
+                        <AvatarStack people={task.assignees} size={16} />
+                        <DueBadge
+                            dueDate={task.dueDate}
+                            statusType={task.statusType}
+                            timed={task.timed}
+                            format={format.date}
+                        />
+                        <TaskControls commands={commands} />
+                    </span>
                 </div>
             </li>
         </TaskMenu>
@@ -695,9 +809,25 @@ export function BoardView(props: ViewProps) {
 
     // A board is read down each column and then on to the next, which is the
     // order a shift-click spans.
+    // An open parent's subtasks are drawn under it, and are part of that run.
+    const subtasks = props.subtasks;
+    const underCard = (taskId: string) =>
+        subtasks && subtasks.isOpen(taskId)
+            ? descendants(taskId, subtasks.children, () => true)
+            : [];
     const rendered = useMemo(
-        () => shown.flatMap((group) => group.tasks.map((task) => task.id)),
-        [shown]
+        () =>
+            shown.flatMap((group) =>
+                group.tasks.flatMap((task) => [
+                    task.id,
+                    ...(subtasks && subtasks.isOpen(task.id)
+                        ? descendants(task.id, subtasks.children, () => true).map(
+                              (row) => row.task.id
+                          )
+                        : [])
+                ])
+            ),
+        [shown, subtasks]
     );
 
     const drop = (
@@ -1012,26 +1142,56 @@ export function BoardView(props: ViewProps) {
                                             />
                                         </li>
                                     )}
-                                    {group.tasks.map((task) => (
-                                        <TaskCard
-                                            key={task.id}
-                                            commands={commandsFor(props, task)}
-                                            accepting={draggingColumn === null}
-                                            selected={selection.has(task.id)}
-                                            landed={landed === task.id}
-                                            showLocation={props.showLocation}
-                                            positioned={orderable && dragging !== task.id}
-                                            onSelect={(mode) => onSelect(task.id, mode, rendered)}
-                                            onDragStart={() => setDragging(task.id)}
-                                            onDragEnd={() => {
-                                                setDragging(null);
-                                                setCardOver(null);
-                                            }}
-                                            onDropAt={(edge) =>
-                                                drop(group.key, group.tasks, { id: task.id, edge })
-                                            }
-                                        />
-                                    ))}
+                                    {group.tasks.map((task) => {
+                                        const count = subtasks?.children.get(task.id)?.length ?? 0;
+                                        return (
+                                            <Fragment key={task.id}>
+                                                <TaskCard
+                                                    commands={commandsFor(props, task)}
+                                                    subtasks={
+                                                        subtasks && count > 0
+                                                            ? {
+                                                                  count,
+                                                                  open: subtasks.isOpen(task.id),
+                                                                  onToggle: () =>
+                                                                      subtasks.toggle(task.id)
+                                                              }
+                                                            : undefined
+                                                    }
+                                                    accepting={draggingColumn === null}
+                                                    selected={selection.has(task.id)}
+                                                    landed={landed === task.id}
+                                                    showLocation={props.showLocation}
+                                                    positioned={orderable && dragging !== task.id}
+                                                    onSelect={(mode) =>
+                                                        onSelect(task.id, mode, rendered)
+                                                    }
+                                                    onDragStart={() => setDragging(task.id)}
+                                                    onDragEnd={() => {
+                                                        setDragging(null);
+                                                        setCardOver(null);
+                                                    }}
+                                                    onDropAt={(edge) =>
+                                                        drop(group.key, group.tasks, {
+                                                            id: task.id,
+                                                            edge
+                                                        })
+                                                    }
+                                                />
+                                                {underCard(task.id).map((row) => (
+                                                    <SubtaskCard
+                                                        key={row.task.id}
+                                                        commands={commandsFor(props, row.task)}
+                                                        depth={row.depth}
+                                                        selected={selection.has(row.task.id)}
+                                                        onSelect={(mode) =>
+                                                            onSelect(row.task.id, mode, rendered)
+                                                        }
+                                                    />
+                                                ))}
+                                            </Fragment>
+                                        );
+                                    })}
                                     {group.tasks.length === 0 && addingTo !== group.key && (
                                         <li
                                             className={cn(

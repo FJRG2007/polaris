@@ -79,7 +79,9 @@
         "search": "Buscar tareas",
         "count": "{shown} de {total}",
         "view": "Vista",
-        "clearSearch": "Borrar búsqueda"
+        "clearSearch": "Borrar búsqueda",
+        "subtasks": "{mode, select, collapsed {Subtareas: contraídas} expanded {Subtareas: expandidas} other {Subtareas: separadas}}",
+        "subtasksLabel": "Subtareas"
     },
     "empty": {
         "title": "Aquí no hay nada todavía.",
@@ -93,7 +95,19 @@
         "addTo": "Añadir una tarea a {name}",
         "quickPlaceholder": "Nombre y pulsa Intro",
         "noMatch": "Ninguna tarea coincide con esta vista.",
-        "noMatchDescription": "Cambia los filtros o añade la primera."
+        "noMatchDescription": "Cambia los filtros o añade la primera.",
+        "columnName": "Nombre",
+        "columnAssignee": "Responsable",
+        "columnDue": "Vence",
+        "columnPriority": "Prioridad",
+        "addTask": "Nueva tarea",
+        "addSubtask": "Añadir una subtarea a {name}",
+        "taskName": "Nombre",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "showSubtasks": "Mostrar las subtareas de {name}",
+        "hideSubtasks": "Ocultar las subtareas de {name}",
+        "subtaskCount": "{count, plural, one {# subtarea} other {# subtareas}}"
     },
     "search": {
         "noMatch": "Ninguna tarea contiene “{query}”.",

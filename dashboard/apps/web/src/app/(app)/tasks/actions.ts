@@ -984,6 +984,13 @@ export async function createTaskAction(
         return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkTask") };
     try {
         const { spaceId } = await access.requireList(caller, parsed.data.listId, "member");
+        // A subtask hangs under a task the caller can reach, in the same space:
+        // an id typed in from elsewhere would otherwise tie this work to a task
+        // in a space they have nothing to do with.
+        if (parsed.data.parentId) {
+            const parent = await access.requireTask(caller, parsed.data.parentId, "member");
+            if (parent.spaceId !== spaceId) throw new access.TaskAccessError();
+        }
         const created = await tasks.createTask(caller.id, spaceId, parsed.data);
         refresh(caller, spaceId);
         return created;

@@ -8,6 +8,7 @@
  */
 
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import type { SubtaskView } from "./subtasks";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     TASK_SELECTION_MAX,
@@ -172,6 +173,16 @@ export function shortfallMessage(
     return `${verb} ${count} of ${asked}: ${rest === 1 ? "one task is" : `${rest} tasks are`} not yours to change.`;
 }
 
+/** What an inline composer can say about the task it is making, besides its name. */
+export interface QuickCreateExtra {
+    /** Made as a subtask of this task, in that task's own list. */
+    readonly parent?: { readonly id: string; readonly listId: string };
+    readonly assigneeIds?: string[];
+    readonly dueDate?: string | null;
+    readonly priority?: TaskPriority;
+    readonly tagIds?: string[];
+}
+
 export interface ViewProps {
     readonly rows: readonly TaskRow[];
     readonly groups: readonly TaskGroup<TaskRow>[];
@@ -216,7 +227,13 @@ export interface ViewProps {
      *  box at the head of a table's checkbox column does. */
     readonly onReplaceSelection?: (taskIds: readonly string[]) => void;
     readonly onMove: (move: BoardMove) => void;
-    readonly onQuickCreate: (groupKey: string, name: string) => void;
+    readonly onQuickCreate: (groupKey: string, name: string, extra?: QuickCreateExtra) => void;
+    /**
+     * Subtasks pulled under their parents. Handed to the list and the board,
+     * where `groups` then holds only the work at the top; absent everywhere
+     * else, which draws every task as its own row.
+     */
+    readonly subtasks?: SubtaskView;
     /** Apply a change from the row itself, optimistically. */
     readonly onEdit: (task: TaskRow, change: TaskEdit) => void;
     /** Apply a change to everything a menu is acting on, which is one task or a

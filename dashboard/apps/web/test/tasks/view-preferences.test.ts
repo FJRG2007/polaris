@@ -32,7 +32,8 @@ const preferences = {
     groupBy: "priority",
     sort: { field: "manual", direction: "desc" },
     filter: { match: "all", conditions: [] },
-    showClosed: true
+    showClosed: true,
+    subtasks: "expanded"
 } as const;
 
 describe("what a Tasks screen was left looking like", () => {
@@ -81,7 +82,8 @@ describe("what a Tasks screen was left looking like", () => {
             groupBy: "status",
             sort: { field: "priority", direction: "asc" },
             filter: { match: "all", conditions: [] },
-            showClosed: false
+            showClosed: false,
+            subtasks: "collapsed"
         });
     });
 
@@ -115,5 +117,18 @@ describe("which screen a preference belongs to", () => {
         // Not "" - an empty key would put every screen with no space of its own
         // on top of each other.
         expect(viewScopeKey(null, "")).toBe("everything");
+    });
+});
+
+describe("how subtasks are shown", () => {
+    beforeEach(() => {
+        store.clear();
+        useWorkingStorage();
+    });
+
+    it("tucks them under their parent for a screen saved before the choice existed", () => {
+        const { subtasks: _dropped, ...older } = preferences;
+        store.set("polaris.tasks.view.list-1", JSON.stringify(older));
+        expect(readViewPreferences("list-1")?.subtasks).toBe("collapsed");
     });
 });

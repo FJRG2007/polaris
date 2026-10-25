@@ -34,7 +34,8 @@ import { downloadCsv, tasksToCsv } from "./export-csv";
 import { AssigneePicker, PriorityPicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
-import { holdSelection, shortfallMessage } from "./views/shared";
+import { nestSubtasks, useOpenParents, type SubtaskView } from "./views/subtasks";
+import { holdSelection, shortfallMessage, type QuickCreateExtra } from "./views/shared";
 import { groupLabel, optionLabel } from "./option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
@@ -165,6 +166,10 @@ export function ListScreen({
         initialFilter ?? initial?.filter ?? core.EMPTY_FILTER
     );
     const [showClosed, setShowClosed] = useState(initial?.showClosed ?? false);
+    // Subtasks sit under their parent behind a closed caret until somebody asks
+    // for otherwise; "separate" is the opt-in that lists them as tasks of their own.
+    const [subtaskMode, setSubtaskMode] = useState<core.TaskSubtaskMode>("collapsed");
+    const openParents = useOpenParents(subtaskMode);
     // Not remembered anywhere: a half-typed name is a question somebody asked
     // once, and a screen that reopened still narrowed to it looks empty for no
     // reason anybody could see.
@@ -218,6 +223,7 @@ export function ListScreen({
         setGroupBy(stored?.groupBy ?? initial?.groupBy ?? "status");
         setSort(stored?.sort ?? initial?.sort ?? DEFAULT_SORT);
         setShowClosed(stored?.showClosed ?? initial?.showClosed ?? false);
+        setSubtaskMode(stored?.subtasks ?? "collapsed");
         setFilter(initialFilter ?? stored?.filter ?? initial?.filter ?? core.EMPTY_FILTER);
         setRestored(scope);
         // The saved view and the incoming filter belong to the screen, so they
@@ -236,8 +242,15 @@ export function ListScreen({
      */
     useEffect(() => {
         if (restored !== scope) return;
-        writeViewPreferences(scope, { type: viewType, groupBy, sort, filter, showClosed });
-    }, [restored, scope, viewType, groupBy, sort, filter, showClosed]);
+        writeViewPreferences(scope, {
+            type: viewType,
+            groupBy,
+            sort,
+            filter,
+            showClosed,
+            subtasks: subtaskMode
+        });
+    }, [restored, scope, viewType, groupBy, sort, filter, showClosed, subtaskMode]);
 
     const rows = useMemo(
         () => tasks.map((task) => ({ ...task, ...pending[task.id] })),
@@ -590,7 +603,7 @@ export function ListScreen({
         refresh();
     };
 
-    const quickCreate = async (groupKey: string, name: string) => {
+    const quickCreate = async (groupKey: string, name: string, extra: QuickCreateExtra = {}) => {
         // The key says what it is rather than being read off the current view: a
         // calendar hands back "date:<iso>", every other view hands back the group
         // it was added to. Guessing from the view type puts a status id in the
@@ -598,7 +611,8 @@ export function ListScreen({
         const dueDate = groupKey.startsWith("date:") ? groupKey.slice(5) : null;
         const statusId = !dueDate && groupBy === "status" && groupKey ? groupKey : null;
 
-        const target = listId ?? defaultListId;
+        // A subtask lives in its parent's list, whichever screen it was typed on.
+        const target = extra.parent?.listId ?? listId ?? defaultListId;
         if (!target) {
             // A screen spanning several lists has nowhere to put a typed-in name,
             // and the column it was typed into is a status belonging to whichever
@@ -609,8 +623,21 @@ export function ListScreen({
             return;
         }
 
+        const tagIds = extra.tagIds ? await settleTagIds(extra.tagIds) : undefined;
         const result = await runAction(
-            () => actions.createTaskAction({ listId: target, name, statusId, dueDate }),
+            () =>
+                actions.createTaskAction({
+                    listId: target,
+                    name,
+                    statusId,
+                    dueDate: extra.dueDate ?? dueDate,
+                    parentId: extra.parent?.id ?? null,
+                    ...(extra.priority ? { priority: extra.priority } : {}),
+                    ...(extra.assigneeIds ? { assigneeIds: extra.assigneeIds } : {}),
+                    // A tag made in the composer a moment ago still carries
+                    // this browser's own id until it is settled into a real one.
+                    ...(extra.tagIds ? { tagIds: tagIds ?? [] } : {})
+                }),
             setError
         );
         if (result?.error) setError(result.error);
@@ -900,6 +927,25 @@ export function ListScreen({
      */
     const canManageColumns = context.canModerate && context.spaceId !== "";
 
+    /**
+     * Subtasks under their parents, for the two views that draw them that way.
+     * Built from what is already loaded - the screen fetches every task in
+     * reach, subtasks included - so opening a parent costs no round trip.
+     */
+    const nested = useMemo(
+        () => nestSubtasks(groups, subtaskMode, groupBy === "status"),
+        [groups, subtaskMode, groupBy]
+    );
+    const subtaskView = useMemo<SubtaskView>(
+        () => ({
+            mode: subtaskMode,
+            children: nested.children,
+            isOpen: openParents.isOpen,
+            toggle: openParents.toggle
+        }),
+        [subtaskMode, nested.children, openParents.isOpen, openParents.toggle]
+    );
+
     const viewProps: ViewProps = {
         rows: visible,
         groups,
@@ -988,7 +1034,10 @@ export function ListScreen({
     return (
         // Room under the last row while the selection bar is up, so the bar never
         // sits over the task somebody is trying to reach.
-        <div className={cn("flex min-w-0 flex-col gap-4", selected.length > 0 && "pb-16")}>
+        // flex-1, as on every other Tasks screen: the page lays this out in a row
+        // beside the space tree, where without it the screen shrinks to its
+        // content and the list stops halfway across.
+        <div className={cn("flex min-w-0 flex-1 flex-col gap-4", selected.length > 0 && "pb-16")}>
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
                     <h1
@@ -1050,6 +1099,22 @@ export function ListScreen({
                         }))}
                         aria-label={t("toolbar.groupBy")}
                         className="h-8 w-44 text-xs"
+                    />
+                )}
+
+                {(viewType === "list" || viewType === "board") && (
+                    <Select
+                        value={subtaskMode}
+                        onValueChange={(value) => {
+                            setSubtaskMode(value as core.TaskSubtaskMode);
+                            openParents.reset();
+                        }}
+                        options={core.TASK_SUBTASK_MODES.map((mode) => ({
+                            value: mode,
+                            label: t("toolbar.subtasks", { mode })
+                        }))}
+                        aria-label={t("toolbar.subtasksLabel")}
+                        className="h-8 w-48 text-xs"
                     />
                 )}
 
@@ -1216,8 +1281,12 @@ export function ListScreen({
             {/* Keyed by the view, so switching between them settles in rather than
                 swapping in a single frame. */}
             <div key={viewType} className="min-w-0 animate-in fade-in-0 duration-fast">
-                {viewType === "board" && <BoardView {...viewProps} />}
-                {viewType === "list" && <ListView {...viewProps} />}
+                {viewType === "board" && (
+                    <BoardView {...viewProps} groups={nested.groups} subtasks={subtaskView} />
+                )}
+                {viewType === "list" && (
+                    <ListView {...viewProps} groups={nested.groups} subtasks={subtaskView} />
+                )}
                 {viewType === "table" && <TableView {...viewProps} />}
                 {viewType === "calendar" && <CalendarView {...viewProps} />}
                 {viewType === "gantt" && <GanttView {...viewProps} />}
