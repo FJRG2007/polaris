@@ -95,11 +95,15 @@ export async function changePolarDisplay(key: PolarDisplayKey, value: boolean): 
 /** The suggestion switch lives with the helper model (`polar-helper-settings.tsx`). */
 type DisplayRow = Exclude<PolarDisplayKey, "suggestions">;
 
-const ROWS: readonly { key: DisplayRow; hint?: "settings.display.autoCompactHint" }[] = [
+const ROWS: readonly {
+    key: DisplayRow;
+    hint?: "settings.display.autoCompactHint" | "settings.display.reopenLastChatHint";
+}[] = [
     { key: "showTokens" },
     { key: "showCost" },
     { key: "showContextBar" },
-    { key: "autoCompact", hint: "settings.display.autoCompactHint" }
+    { key: "autoCompact", hint: "settings.display.autoCompactHint" },
+    { key: "reopenLastChat", hint: "settings.display.reopenLastChatHint" }
 ];
 
 /** The "Chat display" section of Polar's settings. */

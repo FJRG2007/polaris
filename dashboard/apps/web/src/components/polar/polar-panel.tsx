@@ -114,7 +114,12 @@ import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { UsageDialog } from "@/components/polar/polar-usage";
 import { ContextBar, ContextDialog, CompactionDivider } from "@/components/polar/polar-context";
-import { AnswerSpendLine, answerSpendOf, usePolarDisplay } from "@/components/polar/polar-display";
+import {
+    AnswerSpendLine,
+    answerSpendOf,
+    polarDisplayStore,
+    usePolarDisplay
+} from "@/components/polar/polar-display";
 import {
     compactionOf,
     contextUsed,
@@ -322,6 +327,13 @@ function keepScope(key: string): void {
         }
     }
     writeStored(SCOPES_KEY, JSON.stringify(next));
+}
+/** Whether this page load is the browser reloading it, not a visit. */
+function reloaded(): boolean {
+    const entry = performance.getEntriesByType?.("navigation")[0] as
+        | PerformanceNavigationTiming
+        | undefined;
+    return entry?.type === "reload";
 }
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
@@ -1325,7 +1337,9 @@ export function PolarChat({
     // chat picked beside the settings) opens once, and the address goes back
     // to plain /polar; `new` starts one, in the project it names if any, and
     // `session` opens a Code session (`new` for a new task).
-    // Otherwise the chat that was open before a reload opens again.
+    // Otherwise a reload stays on the chat it was on, and opening Polar starts
+    // a new chat unless the person asked for the last one back; a scoped chat
+    // (a document's own) always comes back, since it belongs to that place.
     useEffect(() => {
         const params = fullPage ? new URLSearchParams(window.location.search) : null;
         const named = params?.get("thread") ?? null;
@@ -1342,7 +1356,11 @@ export function PolarChat({
             startNew(fresh === "1" ? null : fresh);
             return;
         }
-        const reopen = named ?? readStored(threadKey);
+        const remembered =
+            chatScope || reloaded() || polarDisplayStore.get().reopenLastChat
+                ? readStored(threadKey)
+                : null;
+        const reopen = named ?? remembered;
         if (reopen) void openThread(reopen);
     }, []);
     // Remembered once it has something in it; a temporary chat is deleted when

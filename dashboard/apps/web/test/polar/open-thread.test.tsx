@@ -95,6 +95,7 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
 });
 
 const { PolarChat } = await import("@/components/polar/polar-panel");
@@ -111,6 +112,9 @@ describe("opening a stored chat", () => {
     it("opens nothing when the remembered chat answers with something else", async () => {
         // A chat remembered from before a reload, whose address answers with no chat.
         const stored = new Map([["polar.thread", "t-gone"]]);
+        vi.spyOn(performance, "getEntriesByType").mockReturnValue([
+            { type: "reload" } as unknown as PerformanceEntry
+        ]);
         vi.stubGlobal("localStorage", {
             getItem: (key: string) => stored.get(key) ?? null,
             setItem: (key: string, value: string) => void stored.set(key, value),

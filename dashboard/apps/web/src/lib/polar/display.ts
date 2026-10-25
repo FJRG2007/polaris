@@ -2,9 +2,10 @@
  * What a Polar chat shows, per person: tokens and estimated cost under each
  * answer, the context bar above the composer, and whether a turn that would
  * fill the model's window compacts the chat first, and whether a suggested
- * next message follows each answer. Every one is on until the
- * person turns it off, and the defaults live here so an install whose
- * database has no row yet behaves the same. Client-safe.
+ * next message follows each answer, and whether opening Polar brings back
+ * the last chat. Every one but the last is on until the person turns it off,
+ * and the defaults live here so an install whose database has no row yet
+ * behaves the same. Client-safe.
  */
 
 import { z } from "zod";
@@ -16,7 +17,8 @@ export const POLAR_DISPLAY_KEYS = [
     "showCost",
     "showContextBar",
     "autoCompact",
-    "suggestions"
+    "suggestions",
+    "reopenLastChat"
 ] as const;
 
 export type PolarDisplayKey = (typeof POLAR_DISPLAY_KEYS)[number];
@@ -28,7 +30,8 @@ export const POLAR_DISPLAY_DEFAULTS: PolarDisplay = {
     showCost: true,
     showContextBar: true,
     autoCompact: true,
-    suggestions: true
+    suggestions: true,
+    reopenLastChat: false
 };
 
 /** A stored or cached value read whole: anything missing or not a boolean
@@ -73,6 +76,7 @@ export const polarPreferencesPatchSchema = z
         showCost: z.boolean().optional(),
         showContextBar: z.boolean().optional(),
         autoCompact: z.boolean().optional(),
+        reopenLastChat: z.boolean().optional(),
         /** The mic menu's model, `provider/model`; null goes back to the default. */
         transcriptionModel: transcriptionChoiceSchema.nullable().optional()
     })

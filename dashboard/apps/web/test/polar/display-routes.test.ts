@@ -77,13 +77,14 @@ beforeEach(() => {
 });
 
 describe("chat display settings", () => {
-    it("are all on for a person with no row yet", async () => {
+    it("are all on but reopening the last chat for a person with no row yet", async () => {
         expect(await (await preferences.GET()).json()).toEqual({
             memory: true,
             showTokens: true,
             showCost: true,
             showContextBar: true,
             autoCompact: true,
+            reopenLastChat: false,
             transcriptionModel: null,
             suggestions: true,
             helperModel: null
@@ -97,6 +98,7 @@ describe("chat display settings", () => {
             showCost: true,
             showContextBar: false,
             autoCompact: true,
+            reopenLastChat: true,
             transcriptionModel: "groq/whisper-large-v3-turbo",
             suggestions: false,
             helperModel: { provider: "openai", model: "gpt-mini", payer: "own" }

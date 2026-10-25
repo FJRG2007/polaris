@@ -32,6 +32,7 @@ const SELECTED = {
     showCost: true,
     showContextBar: true,
     autoCompact: true,
+    reopenLastChat: true,
     transcriptionModel: true
 } as const;
 
