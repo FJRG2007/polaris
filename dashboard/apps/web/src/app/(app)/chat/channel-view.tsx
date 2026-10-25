@@ -39,6 +39,7 @@ import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
 import { useComposerEmoji, useSpaceEmojiScope } from "./space-emoji";
 import { runAction } from "@/lib/run-action";
+import { useMessageDelete } from "./delete-message";
 import { useCallHold } from "./call-session";
 import { useCallHidden } from "./call-hidden";
 import { CallRosterList } from "./call-roster";
@@ -68,7 +69,6 @@ import type { SendOutcome, SendProgress } from "./outgoing";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
 import type { RosterModeration } from "./call-moderation-menu";
-import { plainExcerpt } from "@/components/rich-text/excerpt";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
@@ -86,7 +86,6 @@ import { keepReading, readingPosition, type ReadingPosition } from "./reading-po
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
     Button,
-    ConfirmDeleteDialog,
     EmptyState,
     ResizeHandle,
     Skeleton,
@@ -250,7 +249,6 @@ export function ChannelView({
     // pointed at inside the thread panel rather than in the channel.
     const [threadHighlight, setThreadHighlight] = useState<string | null>(null);
     const [editing, setEditing] = useState<ChatMessageView | null>(null);
-    const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
     const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
     /** Every press of Reply, counted. The composer puts the caret in the box on
      *  the press rather than on the message changing - see `replyAt` there. */
@@ -501,6 +499,15 @@ export function ChannelView({
     // has arrived there is no channel to ask about, and the defaults are the
     // permissive ones, so nothing is briefly refused that would be allowed.
     const rules = channel ? rulesFor(channel) : core.DEFAULT_CHAT_RULES;
+    // Asked with the message on screen, or straight away with Shift held - the
+    // line becomes a tombstone at once and comes back if the server refuses.
+    const { request: deleteMessage, dialog: deleteDialog } = useMessageDelete({
+        setMessages,
+        setError,
+        leavesTrace: rules.deleteLeavesTrace,
+        emoji: emojiScope,
+        onDone: () => router.refresh()
+    });
 
     // Everything about this screen is about one id; a different one is a
     // different conversation and none of the previous state belongs to it.
@@ -2055,7 +2062,7 @@ export function ChannelView({
                         }
                         onForward={setForwarding}
                         onEdit={setEditing}
-                        onDelete={setDeleting}
+                        onDelete={deleteMessage}
                         // The same box the roster's menu writes into, so a name
                         // mentioned from the messages lands where one mentioned
                         // from the column does.
@@ -2685,63 +2692,7 @@ export function ChannelView({
                 onSent={refresh}
             />
 
-            <ConfirmDeleteDialog
-                open={deleting !== null}
-                onOpenChange={(open) => !open && setDeleting(null)}
-                name={deleting ? plainExcerpt(deleting.body, 40) : ""}
-                kind="message"
-                requireTyping={false}
-                title={t("channelView.deleteMessage")}
-                question={t.rich("channelView.deleteQuestion", {
-                    name: deleting ? plainExcerpt(deleting.body, 40) : "",
-                    strong: (chunks) => (
-                        <span key="name" className="font-medium text-foreground">
-                            {chunks}
-                        </span>
-                    )
-                })}
-                description={
-                    rules.deleteLeavesTrace || (deleting?.replyCount ?? 0) > 0
-                        ? t("channelView.itLeavesALineSaying")
-                        : t("channelView.itGoesWithoutTraceAlong")
-                }
-                confirmLabel={t("channelView.deleteMessage")}
-                onConfirm={async () => {
-                    if (deleting) {
-                        const result = await runAction(
-                            () => actions.deleteMessageAction(deleting.id),
-                            setError
-                        );
-                        // The tombstone, exactly as the server draws one: the
-                        // line stays and says so, because a conversation whose
-                        // replies suddenly answer nothing is worse than one that
-                        // admits something was taken back.
-                        if (!result?.error) {
-                            patchMessage(deleting.id, {
-                                body: "",
-                                deleted: true,
-                                reactions: [],
-                                attachments: [],
-                                // Everything the body was carrying goes with
-                                // it. The server resolves all four from the
-                                // text, and a tombstone has no text - so a
-                                // voice room card, a link preview or a forward
-                                // left on screen is this browser showing what
-                                // the message said after it was taken back,
-                                // until somebody reloads.
-                                references: [],
-                                invites: [],
-                                link: null,
-                                preview: null,
-                                previewPending: false,
-                                forwardable: false
-                            });
-                        }
-                    }
-                    setDeleting(null);
-                    router.refresh();
-                }}
-            />
+            {deleteDialog}
             {confirmElement}
         </div>
     );

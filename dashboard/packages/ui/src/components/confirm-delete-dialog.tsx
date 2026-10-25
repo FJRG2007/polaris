@@ -57,6 +57,9 @@ export interface ConfirmDeleteDialogProps {
     /** Overrides the plain question, for the same reason. Only asked when
      *  `requireTyping` is false; name the thing, so the reader sees which row. */
     question?: ReactNode;
+    /** Under the question, over the buttons - a tip or a footnote, quieter than
+     *  either. */
+    note?: ReactNode;
     /** Blocks confirmation entirely and explains why (e.g. a volume a service needs). */
     blockedReason?: string | null;
     /** Holds the button while something in `children` is still unanswered - a
@@ -81,6 +84,7 @@ export function ConfirmDeleteDialog({
     confirmLabel,
     title,
     question,
+    note,
     blockedReason,
     confirmDisabled = false,
     error,
@@ -142,6 +146,8 @@ export function ConfirmDeleteDialog({
                             />
                         </label>
                     )}
+
+                    {note}
 
                     {error && <p className="text-sm text-danger">{error}</p>}
 

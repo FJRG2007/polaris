@@ -689,9 +689,6 @@
         "joinThisRoom": "Join this room",
         "callHeight": "Call height",
         "voiceChannelChatWidth": "Voice channel chat width",
-        "itLeavesALineSaying": "It leaves a line saying it was deleted, so any replies under it still make sense.",
-        "itGoesWithoutTraceAlong": "It goes without trace, along with anything attached to it. Nobody is told it was there.",
-        "deleteMessage": "Delete message",
         "goingIn": "Going in",
         "join": "Join",
         "withVideo": "With video",
@@ -704,7 +701,6 @@
         "roomCount": "{count, plural, =0 { - nobody is in here} one { - one person is in here} other { - {count} people are in here}}",
         "inRoom": "In {name}",
         "slowMode": "Slow mode is on here. You can send again in {wait}.",
-        "deleteQuestion": "Delete <strong>{name}</strong>?",
         "fileNoAnswer": "{name} was sent, but the server did not answer. Nothing was posted.",
         "fileDropped": "{name} could not be sent: the connection dropped. Nothing was posted."
     },
@@ -1964,5 +1960,16 @@
         "denied": "An admin has turned off games in calls for your account.",
         "missing": "Games is not installed on this Polaris. An admin can add it from the app store.",
         "seat": "Join the call to play."
+    },
+    "deleteMessage": {
+        "title": "Delete message",
+        "question": "Are you sure you want to delete this message?",
+        "leavesTrace": "It leaves a line saying it was deleted, so any replies under it still make sense.",
+        "noTrace": "It goes without trace, along with anything attached to it. Nobody is told it was there.",
+        "delete": "Delete",
+        "images": "{count, plural, one {1 image} other {{count} images}}",
+        "files": "{count, plural, one {1 file} other {{count} files}}",
+        "protip": "<tip>Protip:</tip> Hold <key>{shift}</key> while you click Delete to skip this confirmation.",
+        "protipKey": "<tip>Protip:</tip> Hold <key>{shift}</key> while you click Delete, or press <key>{combo}</key>, to skip this confirmation."
     }
 }

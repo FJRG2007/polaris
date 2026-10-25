@@ -30,6 +30,7 @@ import { Avatar } from "@/components/avatar";
 import { PersonName } from "@/components/person-name";
 import { Spoiler } from "./spoiler";
 import { MessageMenu } from "./message-menu";
+import { deleteKeyWithShift, type DeleteMessage } from "./delete-message";
 import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
 import { PollCard } from "./poll-card";
@@ -284,7 +285,7 @@ export interface MessageListProps {
     onReplyPrivately?: (message: ChatMessageView) => void;
     onForward?: (message: ChatMessageView) => void;
     onEdit?: (message: ChatMessageView) => void;
-    onDelete: (message: ChatMessageView) => void;
+    onDelete: DeleteMessage;
     /** Put somebody into what is being written, for the mention a name offers.
      *  Absent where there is no composer under the list, and then that one item
      *  is not drawn rather than drawn doing nothing. */
@@ -614,7 +615,7 @@ function useMessageKeys({
     canModerate: boolean;
     onReply?: (message: ChatMessageView) => void;
     onEdit?: (message: ChatMessageView) => void;
-    onDelete: (message: ChatMessageView) => void;
+    onDelete: DeleteMessage;
 }) {
     // Held in a ref so the listener is bound once rather than rebuilt on every
     // message that arrives.
@@ -627,12 +628,16 @@ function useMessageKeys({
             // only with exactly its modifiers, which is what keeps AltGr+C (Ctrl+Alt
             // on Windows) typing its character and Ctrl+Shift+C opening the
             // developer tools instead of copying a message.
-            const matched = matchShortcut(event, [
+            // Shift with the delete key is the same delete with the question
+            // skipped - only when no action of its own is bound to that press.
+            const exact = matchShortcut(event, [
                 "chat.copy",
                 "chat.edit",
                 "chat.delete",
                 "chat.reply"
             ]);
+            const immediately = !exact && deleteKeyWithShift(event);
+            const matched = exact ?? (immediately ? "chat.delete" : null);
             const wanted = matched
                 ? (matched.slice("chat.".length) as "copy" | "edit" | "delete" | "reply")
                 : null;
@@ -692,7 +697,7 @@ function useMessageKeys({
             event.preventDefault();
             if (wanted === "edit") shown.onEdit?.(message);
             else if (wanted === "reply") shown.onReply?.(message);
-            else shown.onDelete(message);
+            else shown.onDelete(message, immediately);
         };
         document.addEventListener("keydown", onKey);
         return () => document.removeEventListener("keydown", onKey);
@@ -754,7 +759,7 @@ function Message({
     onReplyPrivately?: (message: ChatMessageView) => void;
     onForward?: (message: ChatMessageView) => void;
     onEdit?: (message: ChatMessageView) => void;
-    onDelete: (message: ChatMessageView) => void;
+    onDelete: DeleteMessage;
     /** A picture on this message was pressed. Opened over the conversation
      *  rather than in a tab: a tab is the browser's viewer, with no way back and
      *  nothing to do with the picture but look at it. */
@@ -1381,9 +1386,13 @@ function Message({
                                                 {t("messageList.edit")}
                                             </DropdownMenuItem>
                                         )}
+                                        {/* The click rather than the select: only the
+                                            click knows Shift was held, which skips
+                                            the question. A key press on the item
+                                            arrives as a click too. */}
                                         <DropdownMenuItem
                                             variant="danger"
-                                            onSelect={() => onDelete(message)}
+                                            onClick={(event) => onDelete(message, event.shiftKey)}
                                         >
                                             <Trash2 className="size-3.5" />
                                             {t("messageList.delete")}

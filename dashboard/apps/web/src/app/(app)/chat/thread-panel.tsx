@@ -21,6 +21,7 @@ import { Composer } from "./composer";
 import { useChat } from "./chat-context";
 import { threadDraftKey } from "./drafts";
 import { MessageList } from "./message-list";
+import { useMessageDelete } from "./delete-message";
 import { runAction } from "@/lib/run-action";
 import { useChatPane } from "./use-chat-pane";
 import type { PollDraft } from "./poll-dialog";
@@ -95,6 +96,19 @@ export function ThreadPanel({
         }
         setMessages(result.messages ?? []);
     }, [root.id]);
+
+    // Asked the same way the channel asks, Shift included - a reply was taken
+    // down on the first click in here, with nothing to say which one.
+    const { request: deleteMessage, dialog: deleteDialog } = useMessageDelete({
+        setMessages,
+        setError,
+        leavesTrace: rules.deleteLeavesTrace,
+        emoji,
+        onDone: async () => {
+            await load();
+            onChanged();
+        }
+    });
 
     useEffect(() => {
         setMessages(null);
@@ -203,18 +217,12 @@ export function ThreadPanel({
                                     text
                                 }))
                             }
-                            onDelete={async (message) => {
-                                await runAction(
-                                    () => actions.deleteMessageAction(message.id),
-                                    setError
-                                );
-                                await load();
-                                onChanged();
-                            }}
+                            onDelete={deleteMessage}
                         />
                     )}
                 </div>
 
+                {deleteDialog}
                 {error && (
                     <p role="alert" className="px-3 pb-1 text-xs text-danger">
                         {error}

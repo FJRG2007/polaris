@@ -828,6 +828,7 @@
         "web/src/app/(app)/chat/chat-sidebar.tsx",
         "web/src/app/(app)/chat/clip-dialog.tsx",
         "web/src/app/(app)/chat/composer.tsx",
+        "web/src/app/(app)/chat/delete-message.tsx",
         "web/src/app/(app)/chat/direct-profile.tsx",
         "web/src/app/(app)/chat/draft-message.ts",
         "web/src/app/(app)/chat/edit-history-dialog.tsx",
