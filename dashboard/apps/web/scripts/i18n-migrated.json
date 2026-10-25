@@ -2156,6 +2156,7 @@
         "web/src/app/(app)/automations/webhooks/page.tsx",
         "web/src/app/(app)/automations/webhooks/actions.ts",
         "web/src/app/(app)/automations/webhooks/delivery-log-dialog.tsx",
+        "web/src/components/app-bundles/unavailable.tsx",
         "web/src/components/icon-action.tsx",
         "web/src/components/incoming-calls.tsx",
         "web/src/components/presence-store.tsx",

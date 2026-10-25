@@ -34,7 +34,13 @@
         "partFailed": "Part of this page did not load. Reload the page to try again.",
         "unavailable": "{name} is not available right now",
         "thisApp": "This app",
-        "stillDownloading": "Polaris is still downloading it. Try again in a moment."
+        "stillDownloading": "Polaris is still downloading it. Try again in a moment.",
+        "needsUpdate": "{name} needs an update",
+        "polarisTooOld": "This version of {name} needs a newer Polaris.",
+        "appTooOld": "This version of {name} was made for an older Polaris.",
+        "askAdmin": "Ask an administrator to update it.",
+        "updateApp": "Update {name}",
+        "updatePolaris": "Update Polaris"
     },
     "presence": {
         "online": "Online",

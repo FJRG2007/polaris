@@ -55,6 +55,11 @@ export interface BundleManifest {
     readonly format: number;
     readonly id: string;
     readonly build: string;
+    /** The app's own version, from its package.json. */
+    readonly version?: string;
+    /** The host API it needs (`@polaris/app-host/version`); absent on a bundle
+     *  built before bundles declared one. */
+    readonly hostApi?: string;
     readonly server: string;
     readonly routes: readonly string[];
     readonly actions: Readonly<Record<string, readonly string[]>>;
@@ -68,6 +73,20 @@ export interface BundleManifest {
 
 /** Why a bundle could not be had, in words for the screen that asked. */
 export class BundleUnavailable extends Error {}
+
+/**
+ * A bundle that is here but cannot run on this dashboard: built for a newer
+ * one, or for an older host API this one no longer provides. `update` names the
+ * side that has to move - never a crash, never a blank page.
+ */
+export class BundleIncompatible extends BundleUnavailable {
+    constructor(
+        message: string,
+        readonly update: "dashboard" | "app"
+    ) {
+        super(message);
+    }
+}
 
 /** Where the image keeps its index, and its bundles when it was built here. */
 export function imageBundleDir(): string {
@@ -187,8 +206,14 @@ async function unpack(bytes: Buffer, id: string, target: string): Promise<void> 
         const manifest = JSON.parse(
             await readFile(join(temporary, "manifest.json"), "utf8")
         ) as BundleManifest;
-        if (manifest.id !== id || manifest.format !== BUNDLE_FORMAT) {
+        if (manifest.id !== id) {
             throw new BundleUnavailable("The bundle is not the app it was fetched for.");
+        }
+        if (manifest.format !== BUNDLE_FORMAT) {
+            throw new BundleIncompatible(
+                "It is packed in a way this version of Polaris cannot read.",
+                manifest.format > BUNDLE_FORMAT ? "dashboard" : "app"
+            );
         }
         await rm(target, { recursive: true, force: true });
         await rename(temporary, target);

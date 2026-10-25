@@ -17,7 +17,14 @@ import { readFile } from "node:fs/promises";
 import { sharedPiece, sharedServerModules } from "./shared-server";
 import { isBuiltin } from "node:module";
 import type { AppExtension } from "@/lib/app-extensions/types";
-import { ensureBundle, readManifest, type BundleManifest } from "./store";
+import { HOST_API, hostApiVerdict } from "@polaris/app-host/version";
+import {
+    BUNDLE_FORMAT,
+    BundleIncompatible,
+    ensureBundle,
+    readManifest,
+    type BundleManifest
+} from "./store";
 
 /** What a bundle's server entry exports (see the bundler's generated entry). */
 interface BundleServer {
@@ -54,13 +61,37 @@ export function loadedBundles(): LoadedBundle[] {
     return [...registry.loaded.values()];
 }
 
+/**
+ * Whether this dashboard can run a bundle, before a line of it is evaluated:
+ * the format it is packed in, the host API it needs and the shared libraries
+ * it takes. Throws `BundleIncompatible`, naming the side that needs an update.
+ */
+export function checkCompatible(manifest: BundleManifest, provided = sharedServerModules()): void {
+    if (manifest.format !== BUNDLE_FORMAT) {
+        throw new BundleIncompatible(
+            "It is packed in a way this version of Polaris cannot read.",
+            manifest.format > BUNDLE_FORMAT ? "dashboard" : "app"
+        );
+    }
+    const verdict = hostApiVerdict(manifest.hostApi, HOST_API);
+    if (!verdict.ok) {
+        throw new BundleIncompatible(
+            verdict.update === "dashboard"
+                ? "It needs a newer version of Polaris."
+                : "It was made for an older version of Polaris and needs an update of its own.",
+            verdict.update
+        );
+    }
+    const missing = (manifest.shared?.server ?? []).filter((spec) => !provided.has(spec));
+    if (missing.length > 0) {
+        console.error(`polaris: ${manifest.id} needs what this Polaris does not provide: ${missing.join(", ")}`);
+        throw new BundleIncompatible("It needs a newer version of Polaris.", "dashboard");
+    }
+}
+
 async function evaluate(id: string, dir: string): Promise<LoadedBundle> {
     const manifest = await readManifest(dir);
-    const provided = sharedServerModules();
-    const missing = manifest.shared.server.filter((spec) => !provided.has(spec));
-    if (missing.length > 0) {
-        throw new Error(`${id} needs what this Polaris does not provide: ${missing.join(", ")}`);
-    }
+    checkCompatible(manifest);
     const filename = join(dir, manifest.server);
     const code = await readFile(filename, "utf8");
     const require = (spec: string): unknown => {

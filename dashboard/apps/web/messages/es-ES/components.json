@@ -34,7 +34,13 @@
         "partFailed": "Una parte de esta página no se ha cargado. Recarga la página para volver a intentarlo.",
         "unavailable": "{name} no está disponible ahora mismo",
         "thisApp": "Esta app",
-        "stillDownloading": "Polaris aún la está descargando. Inténtalo en un momento."
+        "stillDownloading": "Polaris aún la está descargando. Inténtalo en un momento.",
+        "needsUpdate": "{name} necesita una actualización",
+        "polarisTooOld": "Esta versión de {name} necesita un Polaris más reciente.",
+        "appTooOld": "Esta versión de {name} se hizo para un Polaris anterior.",
+        "askAdmin": "Pide a un administrador que la actualice.",
+        "updateApp": "Actualizar {name}",
+        "updatePolaris": "Actualizar Polaris"
     },
     "presence": {
         "online": "En línea",

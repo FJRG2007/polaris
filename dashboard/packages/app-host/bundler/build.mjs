@@ -83,8 +83,35 @@ function readApp(dir) {
         extensionExport,
         slot: app.slot ? app.slot.split("#") : null,
         prepare: app.prepare ? resolve(dir, app.prepare) : null,
-        assets: app.assets ?? {}
+        assets: app.assets ?? {},
+        hostApi: hostApiOf(pkg.name, app.hostApi)
     };
+}
+
+/** The host API this workspace's dashboard provides (`@polaris/app-host`). */
+export function providedHostApi() {
+    const here = dirname(fileURLToPath(import.meta.url));
+    return JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8")).hostApi;
+}
+
+/**
+ * The host API an app needs: what it declares, else what the dashboard it is
+ * built beside provides - the one it was type-checked against. Refused when it
+ * is not `MAJOR.MINOR` or asks for more than that dashboard has, since no
+ * dashboard built from this commit could load it.
+ */
+function hostApiOf(name, declared) {
+    const provided = providedHostApi();
+    const value = declared ?? provided;
+    const [major, minor] = String(value).split(".").map(Number);
+    const [hostMajor, hostMinor] = String(provided).split(".").map(Number);
+    if (!/^(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})$/.test(String(value))) {
+        throw new Error(`${name}: polaris.hostApi "${value}" is not MAJOR.MINOR`);
+    }
+    if (major !== hostMajor || minor > hostMinor) {
+        throw new Error(`${name}: needs host API ${value}, and this dashboard provides ${provided}`);
+    }
+    return value;
 }
 
 /**
@@ -284,6 +311,7 @@ export async function buildAppBundle(dir, out, build = "") {
         package: app.name,
         version: app.version,
         build,
+        hostApi: app.hostApi,
         server: "server/index.cjs",
         routes: routes.map((route) => `${route.kind} ${route.path}`),
         actions: Object.fromEntries(actionFiles.map((file) => [moduleId(src, file), actions.names.get(file)])),
