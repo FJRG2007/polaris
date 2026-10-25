@@ -22,6 +22,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import { listGameServerPresence } from "./games-service";
 import {
     NO_UPTIME,
+    ONLINE_SINCE_KEY,
     readServerUptime,
     uptimePatch,
     type ServerUptime,
@@ -106,12 +107,20 @@ export async function sweepGameActivity(
 
     for (const presence of presences) {
         known.set(presence.id, presence.answering ? presence.online : null);
-        await recordUptime(
+        const cameUp = await recordUptime(
             presence.id,
             uptime.get(presence.id) ?? NO_UPTIME,
             uptimeReading(presence),
             now
         );
+        // A server that has just come up gets its ranks again. Teams persist in
+        // the world, so this only repairs one that lost them (a new world, a
+        // restored backup); the module is loaded only for that moment.
+        if (cameUp) {
+            await import("./minecraft/ranks-service")
+                .then((ranks) => ranks.applyRanksOnStart(presence.id))
+                .catch(() => null);
+        }
 
         // A container that is down is not a server anybody is on, and its visits
         // have to be closed rather than left running: an open visit counts up to
@@ -267,7 +276,18 @@ async function writeRoster(
         await announcePlayers(installedAppId, [...new Set(names)]);
     }
 
-    if (change.arrived.length > 0) await announceArrivals(installedAppId, change.arrived, now);
+    if (change.arrived.length > 0) {
+        await announceArrivals(installedAppId, change.arrived, now);
+        // Each ranked arrival joins their rank's team, best effort.
+        await import("./minecraft/ranks-service")
+            .then((ranks) =>
+                ranks.applyRanksOnJoin(
+                    installedAppId,
+                    change.arrived.map((player) => player.name)
+                )
+            )
+            .catch(() => 0);
+    }
 
     // When each visit still open began, for a live feed that says so.
     const since = new Map<string, Date>();
@@ -615,16 +635,18 @@ function uptimeReading(presence: {
 }
 
 /** Write down that a server is up, came up, or has gone down - and nothing at all
- *  for one that is doing what it was doing a minute ago. */
+ *  for one that is doing what it was doing a minute ago. True when this reading
+ *  is the one that saw it come up. */
 async function recordUptime(
     installedAppId: string,
     current: ServerUptime,
     reading: UptimeReading,
     now: Date
-): Promise<void> {
+): Promise<boolean> {
     const patch = uptimePatch(current, reading, now);
-    if (!patch) return;
+    if (!patch) return false;
     await patchInstallConfig(installedAppId, patch).catch(() => undefined);
+    return typeof patch[ONLINE_SINCE_KEY] === "string";
 }
 
 /** One reading, and never a reason to fail the sweep around it. */
