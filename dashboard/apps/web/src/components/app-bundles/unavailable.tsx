@@ -10,11 +10,11 @@
  */
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpCircle, PackageX, RotateCw } from "lucide-react";
 import { Button, EmptyState, buttonVariants } from "@polaris/ui";
-import { retryAppAction } from "@/lib/app-bundles/actions";
+import { changeAppBuildAction, retryAppAction } from "@/lib/app-bundles/actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Where an administrator updates Polaris and each app. */
@@ -25,12 +25,15 @@ export function AppUnavailable({
     name,
     reason,
     update,
+    updating = false,
     canUpdate = false
 }: {
     app: string;
     name: string;
     reason: string;
     update?: "dashboard" | "app";
+    /** An update is bringing it up right now. */
+    updating?: boolean;
     canUpdate?: boolean;
 }) {
     const t = useTranslations("components");
@@ -45,16 +48,48 @@ export function AppUnavailable({
             else router.refresh();
         });
 
+    // While an update brings it up, look again every few seconds: the screen
+    // becomes the app the moment it is running.
+    useEffect(() => {
+        if (!updating) return;
+        const timer = setInterval(() => router.refresh(), 3_000);
+        return () => clearInterval(timer);
+    }, [updating, router]);
+
+    const updateHere = () =>
+        start(async () => {
+            const result = await changeAppBuildAction(app, "update").catch(() => ({
+                refused: "failed" as const
+            }));
+            if (result.refused) setError(t(`appUpdates.refused.${result.refused}`, { name }));
+            else router.refresh();
+        });
+
+    if (updating) {
+        return (
+            <EmptyState
+                icon={<RotateCw className="animate-spin" />}
+                title={t("appBundles.updatingNow", { name })}
+                description={t("appBundles.updatingBody")}
+            />
+        );
+    }
+
     if (update) {
         const why = t(update === "app" ? "appBundles.appTooOld" : "appBundles.polarisTooOld", { name });
-        const description = canUpdate ? why : `${why} ${t("appBundles.askAdmin")}`;
+        const description = error ?? (canUpdate ? why : `${why} ${t("appBundles.askAdmin")}`);
         return (
             <EmptyState
                 icon={<ArrowUpCircle />}
                 title={t("appBundles.needsUpdate", { name })}
                 description={description}
                 action={
-                    canUpdate ? (
+                    canUpdate && update === "app" ? (
+                        <Button onClick={updateHere} disabled={pending}>
+                            <ArrowUpCircle className={pending ? "animate-pulse" : undefined} />
+                            {t("appBundles.updateApp", { name })}
+                        </Button>
+                    ) : canUpdate ? (
                         <Link href={APP_UPDATES_HREF} className={buttonVariants()}>
                             <ArrowUpCircle />
                             {update === "app"

@@ -59,9 +59,14 @@ export async function GET(
     const { app, version, file } = await params;
     const bundle = loadedBundle(app);
     const [area] = file;
+    // The build an update just replaced is still served to the pages opened
+    // before it, so they keep working until they are reloaded.
+    const dir =
+        version === bundle?.previous?.version ? bundle.previous.dir : bundle?.dir;
     if (
         !bundle ||
-        (version !== bundle.version && version !== "current") ||
+        !dir ||
+        (version !== bundle.version && version !== "current" && version !== bundle.previous?.version) ||
         (area !== "client" && area !== "assets") ||
         file.some((part) => !PART.test(part) || part === "." || part === "..")
     ) {
@@ -69,7 +74,7 @@ export async function GET(
     }
     const name = file[file.length - 1] as string;
     try {
-        const bytes = await readFile(join(bundle.dir, ...file));
+        const bytes = await readFile(join(dir, ...file));
         const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
         const type = TYPES[ext] ?? mimeForName(name) ?? "application/octet-stream";
         const page = ext === "html";

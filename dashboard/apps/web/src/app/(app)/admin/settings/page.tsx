@@ -6,6 +6,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { SettingsView } from "./settings-view";
 import { TransferCard } from "./transfer-card";
 import { SeasonalAdminCard } from "./seasonal-card";
+import { AppUpdatesCard } from "@/components/app-bundles/app-updates-card";
 import { seasonsAllowed } from "@/lib/seasonal-service";
 import { getUpdateSource } from "@/lib/update-source";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
@@ -57,6 +58,7 @@ export default async function SettingsPage() {
                     autoUpdate: env.POLARIS_AUTO_UPDATE
                 }}
             />
+            <AppUpdatesCard />
             <SeasonalAdminCard initial={seasons} />
             <TransferCard identity={[user.email, user.name].filter(Boolean)} />
         </div>

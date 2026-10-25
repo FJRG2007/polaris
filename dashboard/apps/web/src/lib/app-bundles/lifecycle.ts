@@ -48,6 +48,11 @@ export function appFailure(id: string): AppFailure | null {
     return loadedBundle(id) ? null : (state.failures.get(id) ?? null);
 }
 
+/** An app is running again: whatever kept it from running is past. */
+export function clearAppFailure(id: string): void {
+    state.failures.delete(id);
+}
+
 /** Why an installed app's code is not here, in words for its screen. */
 export function appUnavailableReason(id: string): string | null {
     return appFailure(id)?.reason ?? null;

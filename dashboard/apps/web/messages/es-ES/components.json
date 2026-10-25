@@ -40,7 +40,9 @@
         "appTooOld": "Esta versión de {name} se hizo para un Polaris anterior.",
         "askAdmin": "Pide a un administrador que la actualice.",
         "updateApp": "Actualizar {name}",
-        "updatePolaris": "Actualizar Polaris"
+        "updatePolaris": "Actualizar Polaris",
+        "updatingNow": "Actualizando {name}",
+        "updatingBody": "Tarda un momento. La página se recarga cuando esté lista."
     },
     "presence": {
         "online": "En línea",
@@ -1663,5 +1665,35 @@
         "clear": "Borrar",
         "previousMonth": "Mes anterior",
         "nextMonth": "Mes siguiente"
+    },
+    "appUpdates": {
+        "title": "Apps",
+        "body": "Cada app se actualiza por su cuenta, sin reiniciar Polaris.",
+        "check": "Buscar actualizaciones de apps",
+        "loadFailed": "No se han podido leer las apps. Recarga la página para volver a intentarlo.",
+        "none": "No hay apps instaladas.",
+        "notHere": "Aún no descargada",
+        "installed": "Instalada {version}",
+        "available": "{version} disponible",
+        "needsPolaris": "{version} necesita un Polaris más reciente",
+        "checkFailed": "No se han podido buscar actualizaciones",
+        "upToDate": "Al día",
+        "update": "Actualizar",
+        "updating": "Actualizando",
+        "rollback": "Volver a {version}",
+        "phase": {
+            "checking": "Comprobando...",
+            "downloading": "Descargando...",
+            "starting": "Iniciando la nueva versión..."
+        },
+        "refused": {
+            "unknown": "Esa app no forma parte de este Polaris.",
+            "notInstalled": "{name} no está instalada.",
+            "busy": "{name} ya se está actualizando.",
+            "unreachable": "No se ha podido descargar la actualización. Revisa la conexión y vuelve a intentarlo.",
+            "needsPolaris": "Esta versión de {name} necesita un Polaris más reciente. Actualiza Polaris primero.",
+            "failed": "La nueva versión no ha arrancado, así que {name} sigue con la que tenía.",
+            "noPrevious": "No hay una versión anterior de {name} a la que volver."
+        }
     }
 }

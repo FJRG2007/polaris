@@ -8,6 +8,7 @@
  * Server-only.
  */
 
+import { anyAppUpdating } from "./releases";
 import { findAppRoute } from "./code";
 import type { NextRequest } from "next/server";
 
@@ -22,7 +23,17 @@ const METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as 
 export function appRouteHandler(method: (typeof METHODS)[number]) {
     return async (request: NextRequest): Promise<Response> => {
         const hit = findAppRoute("route", request.nextUrl.pathname);
-        if (!hit) return new Response("Not found", { status: 404 });
+        if (!hit) {
+            // An app that was not running is being brought up by an update: a
+            // moment's wait, not a missing page.
+            if (anyAppUpdating()) {
+                return new Response("This app is being updated. Try again in a moment.", {
+                    status: 503,
+                    headers: { "retry-after": "5" }
+                });
+            }
+            return new Response("Not found", { status: 404 });
+        }
         const module = await hit.load();
         const handler = (module[method] ?? (method === "HEAD" ? module.GET : undefined)) as
             | Handler

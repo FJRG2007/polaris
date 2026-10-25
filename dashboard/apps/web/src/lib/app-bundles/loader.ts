@@ -40,6 +40,9 @@ export interface LoadedBundle {
     readonly version: string;
     readonly manifest: BundleManifest;
     readonly server: BundleServer;
+    /** The build this one replaced without a restart: a page opened before the
+     *  swap still loads its browser files from there until it is reloaded. */
+    readonly previous?: { readonly dir: string; readonly version: string };
 }
 
 type Registry = { loaded: Map<string, LoadedBundle>; loading: Map<string, Promise<LoadedBundle>> };
@@ -127,6 +130,31 @@ export function loadBundle(id: string): Promise<LoadedBundle> {
     })().finally(() => registry.loading.delete(id));
     registry.loading.set(id, work);
     return work;
+}
+
+/**
+ * Evaluate a bundle in a folder without serving it: what an update does before
+ * it swaps, so a bundle that cannot run never replaces one that can.
+ */
+export function stageBundle(id: string, dir: string): Promise<LoadedBundle> {
+    return evaluate(id, dir);
+}
+
+/**
+ * Serve a staged bundle in place of the one loaded now, without a restart.
+ * One map entry changes: a request already inside the old one finishes there,
+ * the next one reaches the new one. What the old one started - a server's
+ * container, a copy in progress - is not its to stop and keeps running; the new
+ * one's `onBoot` is not run, because that recovers work only a restart cuts off.
+ */
+export function swapBundle(bundle: LoadedBundle): void {
+    const before = registry.loaded.get(bundle.id);
+    registry.loaded.set(
+        bundle.id,
+        before && before.dir !== bundle.dir
+            ? { ...bundle, previous: { dir: before.dir, version: before.version } }
+            : bundle
+    );
 }
 
 /** Stop serving an app's bundle. What it already started keeps its own lifetime. */
