@@ -251,6 +251,12 @@ async function initApp() {
     // Roughness mip blur must not spread reflections back onto matte or nonreflective surfaces.
     const reflectionMask = scenePassMetalRough.r.greaterThan(0).select(smoothstep(maxSSRRoughness, 0.55, scenePassMetalRough.g), 0);
     reflections = ssrPass.mul(reflectionMask);
+  } else {
+    // Without reflections the pass draws colour alone, but the decal, lamp-pool and flare materials still carry an MRT
+    // of their own (normal, metalRough). Without a scene MRT three would use it in place of the colour output, find
+    // none of its targets in the pass and emit an empty WGSL output struct, so those pipelines failed to compile.
+    // Merged into this one, their colour is kept and the targets the pass does not have are dropped.
+    scenePass.setMRT(mrt({ output }));
   }
   const colorGrade = createPostProcessing(renderer, scenePassColor, reflections, { bloom: preset.bloom });
   const renderPipeline = new THREE.RenderPipeline(renderer, colorGrade.outputNode);
