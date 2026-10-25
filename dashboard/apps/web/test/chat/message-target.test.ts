@@ -189,3 +189,15 @@ describe("a video in the message", () => {
         expect(messageTarget(null, root, BASE)).toEqual(NOTHING);
     });
 });
+
+describe("a right-click on an attachment", () => {
+    it("names the file under the pointer, whatever it is drawn as", () => {
+        const { root, at } = row(
+            '<p>words</p><ul><li data-attachment="f1"><a href="/x"><span>plan.pdf</span></a></li>' +
+                '<li data-attachment="a1"><button>play</button></li></ul>'
+        );
+        expect(messageTarget(at("span"), root, BASE).attachment).toBe("f1");
+        expect(messageTarget(at("button"), root, BASE).attachment).toBe("a1");
+        expect(messageTarget(at("p"), root, BASE).attachment).toBeNull();
+    });
+});

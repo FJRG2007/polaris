@@ -56,10 +56,18 @@ export interface MessageTarget {
      * download, opening it - is the same act on a different file.
      */
     readonly video: ImageTarget | null;
+    /**
+     * The id of the attachment the pointer was over: a picture, a clip, a
+     * recording or a file chip. Read from `data-attachment` on whatever the row
+     * drew it in, so it is set for the kinds that have no element of their own
+     * to recognise - a voice note, a document - and the menu can offer that one
+     * file's download instead of every file the message carries.
+     */
+    readonly attachment: string | null;
 }
 
 /** A right-click on the message itself and nothing in it. */
-export const NOTHING: MessageTarget = { link: null, image: null, video: null };
+export const NOTHING: MessageTarget = { link: null, image: null, video: null, attachment: null };
 
 /**
  * Read the gesture.
@@ -90,11 +98,13 @@ export function messageTarget(
             ? player
             : player.querySelector("video")
         : null;
+    const file = inside(from.closest("[data-attachment]"));
 
     return {
         link: anchor ? linkOf(anchor.getAttribute("href"), baseUrl) : null,
         image: image ? imageOf(image) : null,
-        video: video ? videoOf(video) : null
+        video: video ? videoOf(video) : null,
+        attachment: file?.getAttribute("data-attachment")?.trim() || null
     };
 }
 
