@@ -67,6 +67,7 @@ import { RichText } from "@/components/rich-text/rich-text";
 import { VideoPreview } from "@/components/video-preview";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
+import { attachmentImageUrl, messageGallery } from "./message-gallery";
 import { usePersonPress } from "@/components/person-press";
 import { NoticeText } from "./notice-line";
 import { useSwipeReply } from "./swipe-reply";
@@ -338,6 +339,14 @@ export function MessageList({
     /** The file being read, held here for the same reason as the picture: one is
      *  open at a time and it covers the whole conversation. */
     const [reading, setReading] = useState<ViewedFile | null>(null);
+    /** The other pictures on the message whose picture is open, so the arrows
+     *  step through a message sent with several. */
+    const gallery = useMemo(() => {
+        const found = viewing?.messageId
+            ? messages.find((entry) => entry.id === viewing.messageId)
+            : undefined;
+        return found && viewing ? messageGallery(found, coverMedia, viewing.url) : undefined;
+    }, [messages, viewing, coverMedia]);
     const [reporting, setReporting] = useState<string | null>(null);
     const [explaining, setExplaining] = useState<ChatMessageView | null>(null);
     /** Whose nickname is being changed. Up here with the other dialogs, and for
@@ -493,6 +502,8 @@ export function MessageList({
 
                 <ImageViewer
                     image={viewing}
+                    gallery={gallery}
+                    onNavigate={setViewing}
                     onClose={() => setViewing(null)}
                     origin={thumbnailOf}
                     // Absent inside a thread, where forwarding is left to the
@@ -1133,13 +1144,13 @@ function Message({
                                         >
                                             {file.inline ? (
                                                 <KeepableImage
-                                                    href={`/api/chat/attachments/${file.id}`}
+                                                    href={attachmentImageUrl(file.id)}
                                                     alt={file.name}
                                                     source={`attachment:${file.id}`}
                                                     name={file.name}
                                                     onOpen={() =>
                                                         onOpenImage({
-                                                            url: `/api/chat/attachments/${file.id}`,
+                                                            url: attachmentImageUrl(file.id),
                                                             name: file.name,
                                                             messageId: message.id,
                                                             forwardable: message.forwardable
