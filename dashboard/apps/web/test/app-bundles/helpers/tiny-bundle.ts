@@ -21,6 +21,8 @@ export async function tinyBundle(
         readonly version?: string;
         /** Server code that throws when evaluated: a bundle that cannot start. */
         readonly broken?: boolean;
+        /** An extension whose boot work throws: a bundle that starts, then fails. */
+        readonly bootFails?: boolean;
     } = {}
 ): Promise<TinyBundle> {
     const label = options.label ?? "one";
@@ -45,7 +47,7 @@ export async function tinyBundle(
         "server/index.cjs",
         options.broken
             ? `throw new Error("broken ${label}");`
-            : `module.exports = { extension: { id: ${JSON.stringify(id)}, label: ${JSON.stringify(label)} }, routes: {}, actions: {} };`
+            : `module.exports = { extension: { id: ${JSON.stringify(id)}, label: ${JSON.stringify(label)}${options.bootFails ? `, onBoot: async () => { throw new Error("boot ${label}"); }` : ""} }, routes: {}, actions: {} };`
     );
     const bytes = await zip.generateAsync({ type: "nodebuffer" });
     return {

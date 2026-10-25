@@ -50,7 +50,7 @@ const saved = {
 };
 
 /** What the stub registry publishes on the app's channel now. */
-const channel: { bundle?: TinyBundle; hostApi?: string; blob?: Buffer; requests: string[] } = {
+const channel: { bundle?: TinyBundle; hostApi?: string; blob?: Buffer; manifest?: string; hold?: Promise<void>; requests: string[] } = {
     requests: []
 };
 
@@ -73,6 +73,7 @@ beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), "polaris-releases-"));
     ociManifest = ((await import(/* @vite-ignore */ BUNDLER)) as { ociManifest: OciManifest })
         .ociManifest;
+    builds.bootFails = await tinyBundle("tiny", { label: "boot", bootFails: true });
     for (const label of ["one", "two", "three"]) builds[label] = await tinyBundle("tiny", { label, version: `0.${label.length}.0` });
     builds.broken = await tinyBundle("tiny", { label: "broken", broken: true });
     writeIndex(builds.one!);
@@ -87,8 +88,13 @@ beforeAll(async () => {
     vi.stubGlobal("fetch", async (input: string | URL) => {
         const url = String(input);
         channel.requests.push(url);
+        await channel.hold;
         if (url.includes("/token?")) return Response.json({ token: "anonymous" });
         const bundle = channel.bundle;
+        if (url.endsWith("/manifests/latest-app-tiny") && channel.manifest !== undefined) {
+            const body = channel.manifest;
+            return new Response(new ReadableStream({ start: (stream) => { stream.enqueue(new TextEncoder().encode(body)); stream.close(); } }));
+        }
         if (url.endsWith("/manifests/latest-app-tiny") && bundle) {
             const oci = ociManifest("tiny", bundle.digest, bundle.size, {
                 version: "0.2.0",
@@ -117,6 +123,8 @@ afterAll(() => {
 beforeEach(() => {
     channel.blob = undefined;
     channel.hostApi = undefined;
+    channel.manifest = undefined;
+    channel.hold = undefined;
     channel.requests = [];
 });
 
@@ -158,6 +166,12 @@ describe("a release on an app's channel", () => {
         expect(() => readRelease(Buffer.from(oci.bytes), `sha256:${"0".repeat(64)}`)).toThrow(/other than what it named/);
         expect(() => readRelease(Buffer.from("{}"))).toThrow(/not an app/);
         expect(() => readRelease(Buffer.from("nope"))).toThrow(/not an app/);
+    });
+
+    it("is refused when an answer with no length runs past any manifest", async () => {
+        const { latestRelease } = await import("@/lib/app-bundles/releases");
+        channel.manifest = "x".repeat(65 * 1024);
+        await expect(latestRelease("tiny", { force: true })).rejects.toThrow(/not an app/);
     });
 });
 
@@ -250,14 +264,35 @@ describe("an app's own updates", () => {
     });
 
     it("refuses an app that is not installed, and one already being updated", async () => {
-        const { updateApp, rollbackApp } = await import("@/lib/app-bundles/releases");
+        const { updateApp, rollbackApp, anyAppUpdating, appUpdating } = await import("@/lib/app-bundles/releases");
         installed.delete("tiny");
         expect(await updateApp("tiny")).toEqual({ ok: false, code: "notInstalled" });
         installed.add("tiny");
         channel.bundle = builds.two;
+        let release = () => undefined as void;
+        channel.hold = new Promise((done) => (release = done));
         const first = updateApp("tiny");
+        await vi.waitFor(() => expect(appUpdating("tiny")).not.toBeNull());
+        expect(anyAppUpdating()).toBe(false);
+        release();
         expect(await rollbackApp("tiny")).toEqual({ ok: false, code: "busy" });
         expect(await first).toMatchObject({ ok: true });
         expect(await updateApp("../etc")).toEqual({ ok: false, code: "unknown" });
+    });
+
+    it("serves and records a build brought up by an update even when its boot work fails", async () => {
+        const { updateApp, anyAppUpdating } = await import("@/lib/app-bundles/releases");
+        (await import("@/lib/app-bundles/loader")).unloadBundle("tiny");
+        channel.bundle = builds.bootFails;
+        let release = () => undefined as void;
+        channel.hold = new Promise((done) => (release = done));
+        const update = updateApp("tiny");
+        await vi.waitFor(() => expect(anyAppUpdating()).toBe(true));
+        release();
+        expect(await update).toEqual({ ok: true, changed: true });
+        expect(await label()).toBe("boot");
+        expect(readState().current.digest).toBe(builds.bootFails!.digest);
+        const hex = builds.bootFails!.digest.slice("sha256:".length);
+        expect(existsSync(join(root, "data", "apps", "tiny", hex, "manifest.json"))).toBe(true);
     });
 });

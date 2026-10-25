@@ -27,7 +27,7 @@ import { createHash } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { clearAppFailure } from "./lifecycle";
 import { isAppInstalled } from "@/lib/apps/install-presence";
-import { loadedBundle, stageBundle, swapBundle } from "./loader";
+import { loadedBundle, stageBundle, swapBundle, type LoadedBundle } from "./loader";
 import { HOST_API, hostApiVerdict } from "@polaris/app-host/version";
 import * as store from "./store";
 import type { BundlePin } from "./store";
@@ -141,6 +141,25 @@ export function readRelease(bytes: Buffer, named?: string | null): AppRelease {
     };
 }
 
+/** A response's body, refused as soon as it runs past `max` bytes. */
+async function readBounded(response: Response, max: number): Promise<Buffer> {
+    if (!response.body) return Buffer.from(await response.arrayBuffer());
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    const reader = response.body.getReader();
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        if (received > max) {
+            await reader.cancel().catch(() => undefined);
+            throw new store.BundleUnavailable("The registry answered something that is not an app.");
+        }
+        chunks.push(value);
+    }
+    return Buffer.concat(chunks);
+}
+
 /** The newest published build of an app, from its channel in the registry. */
 export async function latestRelease(
     id: string,
@@ -165,7 +184,7 @@ export async function latestRelease(
         if (!response.ok) throw new store.BundleUnavailable(`${host} answered ${response.status}.`);
         const length = Number(response.headers.get("content-length") ?? 0);
         if (length > MAX_MANIFEST_BYTES) throw new store.BundleUnavailable("The registry answered something that is not an app.");
-        const bytes = Buffer.from(await response.arrayBuffer());
+        const bytes = await readBounded(response, MAX_MANIFEST_BYTES);
         const release = readRelease(bytes, response.headers.get("docker-content-digest"));
         state.checks.set(id, { at: Date.now(), release });
         return release;
@@ -176,9 +195,18 @@ export async function latestRelease(
     }
 }
 
-/** Whether any app is being updated or rolled back now. */
+/**
+ * Whether an app that is not running is being brought up by an update now:
+ * the one case where a path no loaded app answers may belong to it in a moment.
+ */
 export function anyAppUpdating(): boolean {
-    return state.updating.size > 0;
+    for (const id of state.updating.keys()) if (!loadedBundle(id)) return true;
+    return false;
+}
+
+/** Every app being updated or rolled back now, and how far each got. */
+export function appsUpdating(): Record<string, UpdateProgress> {
+    return Object.fromEntries(state.updating);
 }
 
 /** An app being updated or rolled back now, and how far it got. */
@@ -199,19 +227,27 @@ function pinOf(release: AppRelease, version?: string): BundlePin {
 /** Load a build from its folder in place of the one serving now. */
 async function serve(id: string, dir: string): Promise<UpdateOutcome | null> {
     const before = loadedBundle(id);
+    let staged: LoadedBundle;
     try {
-        const staged = await stageBundle(id, dir);
+        staged = await stageBundle(id, dir);
         swapBundle(staged);
         clearAppFailure(id);
-        // An app that was not running had nothing started; one that was keeps
-        // what it started (see `swapBundle`).
-        if (!before) await staged.server.extension.onBoot?.();
-        return null;
     } catch (error) {
         console.error(`polaris: ${id} could not be started from ${dir}:`, error);
         const newer = error instanceof store.BundleIncompatible && error.update === "dashboard";
         return { ok: false, code: newer ? "needsPolaris" : "failed" };
     }
+    // An app that was not running had nothing started; one that was keeps
+    // what it started (see `swapBundle`). The new build is serving either way,
+    // so what its boot work does is its own to report.
+    if (!before) {
+        try {
+            await staged.server.extension.onBoot?.();
+        } catch (error) {
+            console.error(`polaris: ${id} could not start what it runs from boot:`, error);
+        }
+    }
+    return null;
 }
 
 async function guarded(id: string, work: () => Promise<UpdateOutcome>): Promise<UpdateOutcome> {

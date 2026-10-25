@@ -8,6 +8,7 @@
  * for how far it got, so the bar moves while the download runs.
  */
 
+import { z } from "zod";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpCircle, RotateCcw, RotateCw } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -20,6 +21,15 @@ import {
 import type { UpdateRefusal } from "@/lib/app-bundles/releases";
 
 const POLL_MS = 1_000;
+
+const Progress = z.record(
+    z.string(),
+    z.object({
+        phase: z.enum(["checking", "downloading", "starting"]),
+        received: z.number().nonnegative(),
+        total: z.number().nonnegative()
+    })
+);
 
 /** A build as a reader tells two apart: its version and the start of its digest. */
 function buildLabel(build: { version?: string; digest: string }): string {
@@ -44,6 +54,20 @@ export function AppUpdatesCard() {
         }
     }, []);
 
+    const track = useCallback(async (id: string) => {
+        try {
+            const response = await fetch("/api/app-bundles/progress", { cache: "no-store" });
+            if (!response.ok) return;
+            const parsed = Progress.safeParse(await response.json());
+            if (!parsed.success) return;
+            const progress = parsed.data[id];
+            if (!progress || !poll.current) return;
+            setRows((all) => all?.map((row) => (row.id === id ? { ...row, progress } : row)) ?? all);
+        } catch {
+            return;
+        }
+    }, []);
+
     useEffect(() => {
         void load(true);
         return () => {
@@ -54,7 +78,7 @@ export function AppUpdatesCard() {
     async function change(id: string, kind: "update" | "rollback") {
         setBusy(id);
         setRefusals(({ [id]: _dropped, ...rest }) => rest);
-        poll.current = setInterval(() => void load(false), POLL_MS);
+        poll.current = setInterval(() => void track(id), POLL_MS);
         try {
             const result = await changeAppBuildAction(id, kind);
             setRows(result.rows);
