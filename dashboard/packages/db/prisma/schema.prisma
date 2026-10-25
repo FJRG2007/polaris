@@ -15879,7 +15879,9 @@ model DnsBlockerDay {
 // Not foreign keys, so a session outlives the call and the message it names.
 model ArcadeSession {
     id          String    @id @default(uuid(7)) @db.Uuid
-    meetingId   String    @db.Uuid
+    // The call it is played in, or null for a lobby: a game somebody was
+    // invited to, played in its own room with no call around it.
+    meetingId   String?   @db.Uuid
     channelId   String    @db.Uuid
     game        String
     startedById String    @db.Uuid
@@ -15889,8 +15891,26 @@ model ArcadeSession {
     endedAt     DateTime?
 
     players ArcadeSessionPlayer[]
+    invites ArcadeInvite[]
 
     @@index([meetingId, endedAt])
+}
+
+// Somebody invited to a session: what their toast and bell offer until it
+// expires, they decline it, or the session ends. Also what lets somebody who is
+// not in the session's conversation into a lobby.
+model ArcadeInvite {
+    sessionId   String    @db.Uuid
+    userId      String    @db.Uuid
+    invitedById String    @db.Uuid
+    createdAt   DateTime  @default(now())
+    expiresAt   DateTime
+    declinedAt  DateTime?
+
+    session ArcadeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@id([sessionId, userId])
+    @@index([userId, expiresAt])
 }
 
 // One person in a session. Playing while `seenAt` is within a pass's life
@@ -15905,4 +15925,5 @@ model ArcadeSessionPlayer {
     session ArcadeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
     @@id([sessionId, userId])
+    @@index([userId, leftAt])
 }

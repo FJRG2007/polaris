@@ -42,6 +42,7 @@ import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { GuidedTours } from "@/components/tours/guided-tours";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { IncomingCalls } from "@/components/incoming-calls";
+import { GameInviteToasts } from "@/components/game-invite-toasts";
 import { CallElsewhere } from "@/app/(app)/chat/call-elsewhere";
 import { MessageToasts } from "@/components/message-toasts";
 import { TransfersView } from "@/components/transfers/transfers-view";
@@ -342,11 +343,14 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                     {apps.ids.includes(
                                                                                         "chat"
                                                                                     ) ? (
-                                                                                        <IncomingCalls
-                                                                                            viewerId={
-                                                                                                user.id
-                                                                                            }
-                                                                                        />
+                                                                                        <>
+                                                                                            <IncomingCalls
+                                                                                                viewerId={
+                                                                                                    user.id
+                                                                                                }
+                                                                                            />
+                                                                                            <GameInviteToasts />
+                                                                                        </>
                                                                                     ) : null}
                                                                                     {/* Beside the ringing card and never at the same
                                             time as one: a call you are already in

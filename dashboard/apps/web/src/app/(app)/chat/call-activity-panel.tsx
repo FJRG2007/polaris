@@ -16,13 +16,23 @@
  */
 
 import type { CallState } from "./call-state";
-import { Expand, Joystick, LogOut, Maximize2, Minimize2, Shrink } from "lucide-react";
+import {
+    Expand,
+    Joystick,
+    LogOut,
+    Maximize2,
+    Minimize2,
+    Rocket,
+    Shrink,
+    UserPlus
+} from "lucide-react";
 import { onActivityJoin, takeActivityJoin } from "./activity-join";
 import * as actions from "./call-activity-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallActivityHost } from "@/lib/app-extensions/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
+import { Avatar } from "@/components/avatar";
 import {
     Button,
     Dialog,
@@ -52,6 +62,29 @@ export interface CallActivity {
     readonly setFocused: (focused: boolean) => void;
 }
 
+/**
+ * What the game needs from the room it is played in: who is there and what
+ * each of them claims, a way to say this seat's claim, and the data channel
+ * positions travel on. A call provides it (`use-sfu-call`), and so does a
+ * lobby's data-only room (`use-lobby-room`).
+ */
+export type ActivityTransport = Pick<
+    CallState,
+    "participantId" | "setActivity" | "sendActivity" | "listenActivity"
+> & {
+    readonly states: ReadonlyMap<string, { readonly activity?: string }>;
+    readonly meeting: {
+        readonly participants: readonly { readonly id: string; readonly name: string }[];
+    } | null;
+};
+
+/** The server's side of playing: the same five questions for a call and for
+ *  a lobby, each keyed by the room's id. */
+export type ActivityApi = Pick<
+    typeof actions,
+    "callGames" | "claimCallGame" | "renewCallGame" | "leaveCallGame" | "vouchCallGames"
+>;
+
 /** How far the server's clock is ahead of this browser's, read off a pass it
  *  has just minted. */
 function skewFrom(claim: callGame.ActivityClaim): number {
@@ -63,8 +96,10 @@ function skewFrom(claim: callGame.ActivityClaim): number {
 /** Off for a guest, who has no account to hold `arcade.calls` with. */
 export function useCallActivity(
     meetingId: string,
-    call: CallState,
-    enabled: boolean
+    call: ActivityTransport,
+    enabled: boolean,
+    /** Who decides: the call's actions, or a lobby's (`lobby-actions`). */
+    api: ActivityApi = actions
 ): CallActivity {
     const self = call.participantId ?? "";
     const [mine, setMine] = useState<callGame.ActivityClaim | null>(null);
@@ -110,7 +145,7 @@ export function useCallActivity(
         }
         for (const [seat, claim] of unasked) checked.current.set(claimKey(seat, claim), false);
         let live = true;
-        void actions
+        void api
             .vouchCallGames(
                 meetingId,
                 unasked.map(([seat, claim]) => ({ seat, claim }))
@@ -129,7 +164,7 @@ export function useCallActivity(
         return () => {
             live = false;
         };
-    }, [claims, meetingId]);
+    }, [claims, meetingId, api]);
 
     const session = useMemo(() => {
         const people = [...claims].map(([seat, claim]) => ({ seat, claim }));
@@ -150,7 +185,7 @@ export function useCallActivity(
             callGame.passExpiresAt(mine.pass) - callGame.RENEW_BEFORE_MS - (Date.now() + skew);
         const timer = window.setTimeout(
             () => {
-                void actions
+                void api
                     .renewCallGame(meetingId, mine)
                     .then((result) => {
                         if ("claim" in result) {
@@ -170,21 +205,21 @@ export function useCallActivity(
             Math.max(0, due)
         );
         return () => window.clearTimeout(timer);
-    }, [mine, meetingId, clock, skew, setActivity]);
+    }, [mine, meetingId, clock, skew, setActivity, api]);
 
     // Asked afresh every time, so a permission given back or a seat admitted
     // since shows the next time anybody looks.
     const ask = useCallback(() => {
         if (!enabled || asking.current) return;
         asking.current = true;
-        void actions
+        void api
             .callGames(meetingId)
             .then(setAnswer)
             .catch(() => undefined)
             .finally(() => {
                 asking.current = false;
             });
-    }, [meetingId, enabled]);
+    }, [meetingId, enabled, api]);
     // As the reader takes their seat, so the button shows only to whoever may
     // use it, and when somebody starts a game, so the line can offer it.
     const running = session !== null;
@@ -200,16 +235,16 @@ export function useCallActivity(
     const held = useRef(false);
     held.current = mine !== null;
     const leave = useCallback(() => {
-        if (held.current) void actions.leaveCallGame(meetingId).catch(() => undefined);
+        if (held.current) void api.leaveCallGame(meetingId).catch(() => undefined);
         held.current = false;
         setMine(null);
         setActivity("");
-    }, [meetingId, setActivity]);
+    }, [meetingId, setActivity, api]);
 
     const play = useCallback(
         (game: string) => {
             setBusy(true);
-            void actions
+            void api
                 .claimCallGame(meetingId, game)
                 .then((result) => {
                     if ("claim" in result) {
@@ -223,7 +258,7 @@ export function useCallActivity(
                 .catch(() => undefined)
                 .finally(() => setBusy(false));
         },
-        [meetingId, setActivity]
+        [meetingId, setActivity, api]
     );
 
     // Started a game at the same moment as somebody else and lost: the call
@@ -235,10 +270,10 @@ export function useCallActivity(
     // Leaving the call, or closing it, ends taking part.
     useEffect(
         () => () => {
-            if (held.current) void actions.leaveCallGame(meetingId).catch(() => undefined);
+            if (held.current) void api.leaveCallGame(meetingId).catch(() => undefined);
             setActivity("");
         },
-        [meetingId, setActivity]
+        [meetingId, setActivity, api]
     );
 
     // A game asked for from its card, a notification or an invitation: played
@@ -315,7 +350,7 @@ function usePoseSync({
     playing,
     nameOf
 }: {
-    call: CallState;
+    call: ActivityTransport;
     self: string;
     session: callGame.ActivitySession | null;
     playing: boolean;
@@ -435,7 +470,7 @@ export function CallGamesButton({ activity }: { activity: CallActivity }) {
                     refused && "opacity-50"
                 )}
             >
-                <Joystick className="size-4 shrink-0" />
+                <Rocket className="size-4 shrink-0" />
             </button>
             {open && (
                 <Dialog open onOpenChange={setOpen}>
@@ -522,7 +557,17 @@ function refusal(
  * The line that offers a running game to whoever is not in it, and the game
  * itself for whoever is.
  */
-export function CallGamesPanel({ activity }: { activity: CallActivity }) {
+export function CallGamesPanel({
+    activity,
+    onInvite,
+    onLeave
+}: {
+    activity: CallActivity;
+    /** Shown as "Invite friends" while the reader plays. */
+    onInvite?: () => void;
+    /** Instead of the plain Leave, for a lobby whose page goes back. */
+    onLeave?: () => void;
+}) {
     const t = useTranslations("chat");
     const { session, playing, answer, host } = activity;
     const [frame, setFrame] = useState<HTMLElement | null>(null);
@@ -545,6 +590,24 @@ export function CallGamesPanel({ activity }: { activity: CallActivity }) {
                         {t("callGames.playing", { count: session.players.length })}
                     </span>
                 </span>
+                <ul
+                    className="flex shrink-0 -space-x-1.5"
+                    aria-label={t("activityCard.whoIsPlaying")}
+                >
+                    {session.players.slice(0, 6).map((seat) => (
+                        <li
+                            key={seat}
+                            title={activity.nameOf(seat)}
+                            className="rounded-full ring-2 ring-background"
+                        >
+                            <Avatar
+                                person={{ id: seat, name: activity.nameOf(seat) || "?" }}
+                                size={20}
+                                status={false}
+                            />
+                        </li>
+                    ))}
+                </ul>
                 {answer === null ? null : answer.ok ? (
                     <Button
                         size="sm"
@@ -594,7 +657,18 @@ export function CallGamesPanel({ activity }: { activity: CallActivity }) {
                     )}
                 </button>
                 <FullscreenButton target={frame} />
-                <Button size="sm" variant="ghost" onClick={activity.leave}>
+                {onInvite && (
+                    <button
+                        type="button"
+                        onClick={onInvite}
+                        aria-label={t("callGames.invite")}
+                        title={t("callGames.invite")}
+                        className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                        <UserPlus className="size-4" />
+                    </button>
+                )}
+                <Button size="sm" variant="ghost" onClick={onLeave ?? activity.leave}>
                     <LogOut className="size-4" />
                     {t("callGames.leave")}
                 </Button>

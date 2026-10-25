@@ -62,7 +62,8 @@ export interface ChatChange {
         | "read"
         | "activity"
         | "pins"
-        | "emoji";
+        | "emoji"
+        | "game-invite";
     /** Only on `read`: the mark moved BACKWARDS - somebody put a conversation
      *  back to unread. The same fact changing, so it is the same frame, but the
      *  opposite instruction for anything that withdraws a notice about it. */
@@ -83,6 +84,9 @@ export interface ChatChange {
     readonly actorId: string;
     /** Only on `emoji`: whose list changed. */
     readonly spaceId?: string;
+    /** Only on `game-invite`: the game session somebody was invited to. Sent to
+     *  its `audience` alone, who read the invitation through its own check. */
+    readonly sessionId?: string;
     /** Only on `typing` and `call`: what to draw beside the dots, or who is
      *  calling. */
     readonly actorName?: string;

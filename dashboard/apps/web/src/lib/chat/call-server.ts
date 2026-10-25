@@ -294,6 +294,35 @@ export async function joinToken(
     return token.toJwt();
 }
 
+/**
+ * A ticket for a game lobby's room: data and its own attributes only. A lobby
+ * is not a call - nothing in it publishes a microphone, a camera or a screen,
+ * so the grant says so and the media server enforces it. Who may be in the
+ * lobby at all was decided by the caller (`lobby-actions`).
+ */
+export async function lobbyToken(
+    endpoint: CallServerEndpoint,
+    room: string,
+    /** The account: one seat per account in a lobby, as in a game launcher. */
+    identity: string,
+    name: string
+): Promise<string> {
+    const token = new AccessToken(endpoint.apiKey, endpoint.apiSecret, {
+        identity,
+        name,
+        ttl: TOKEN_TTL
+    });
+    token.addGrant({
+        room,
+        roomJoin: true,
+        canPublish: false,
+        canSubscribe: true,
+        canPublishData: true,
+        canUpdateOwnMetadata: true
+    });
+    return token.toJwt();
+}
+
 /** What a moderator's decision does to a seat on the media server: hold it to a
  *  restriction, or show it out of the room. */
 export type SeatMediaChange =
