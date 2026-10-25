@@ -23,7 +23,7 @@ import {
 const CACHE_KEY = "polar.display";
 
 let current: PolarDisplay | null = null;
-let fetched = false;
+let request: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
 function cached(): PolarDisplay {
@@ -52,15 +52,17 @@ export const polarDisplayStore = {
         }
         for (const listener of listeners) listener();
     },
+    /** The settings once the server has answered, or the device's copy if it could not. */
+    load(): Promise<PolarDisplay> {
+        request ??= fetch("/api/polar/preferences")
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: unknown) => (data ? polarDisplayStore.set(displayOf(data)) : undefined))
+            .catch(() => undefined);
+        return request.then(() => polarDisplayStore.get());
+    },
     subscribe(listener: () => void): () => void {
         listeners.add(listener);
-        if (!fetched) {
-            fetched = true;
-            void fetch("/api/polar/preferences")
-                .then((response) => (response.ok ? response.json() : null))
-                .then((data: unknown) => (data ? polarDisplayStore.set(displayOf(data)) : null))
-                .catch(() => undefined);
-        }
+        void polarDisplayStore.load();
         return () => listeners.delete(listener);
     }
 };

@@ -200,3 +200,12 @@ describe("Code step sandbox: limits", () => {
         expect(await runCode("return items;", [circular])).toMatchObject({ ok: false, kind: "input" });
     });
 });
+
+describe("Code step sandbox: load", () => {
+    it("runs many at once in turns, each with its own answer", async () => {
+        const results = await Promise.all(
+            Array.from({ length: 12 }, (_, index) => runCode(`return [${index}];`, []))
+        );
+        expect(results.map(ok)).toEqual(Array.from({ length: 12 }, (_, index) => [index]));
+    });
+});

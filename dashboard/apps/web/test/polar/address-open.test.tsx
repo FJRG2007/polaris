@@ -117,7 +117,7 @@ afterEach(() => {
     window.history.replaceState(null, "", "/");
 });
 
-const { PolarChat } = await import("@/components/polar/polar-panel");
+const { PolarChat, resetReloadForTests } = await import("@/components/polar/polar-panel");
 
 function Wrapper({ children }: { children: ReactNode }) {
     return (
@@ -170,6 +170,7 @@ describe("an address that names what /polar opens", () => {
 
     it("keeps the last chat behind a Code session opened from the address on a reload", async () => {
         stored.set("polar.thread", "t-old");
+        resetReloadForTests();
         vi.spyOn(performance, "getEntriesByType").mockReturnValue([
             { type: "reload" } as unknown as PerformanceEntry
         ]);

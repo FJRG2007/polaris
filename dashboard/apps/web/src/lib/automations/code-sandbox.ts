@@ -30,6 +30,7 @@ import { z } from "zod";
 import { join } from "node:path";
 import * as core from "@polaris/core";
 import { createRequire } from "node:module";
+import { availableParallelism } from "node:os";
 import { Worker } from "node:worker_threads";
 import { CODE_WORKER_SOURCE } from "./code-sandbox-worker";
 
@@ -42,6 +43,11 @@ const MAX_DEPTH = 64;
 const GRACE_MS = 250;
 /** Starting the thread and the engine, before the code's own clock starts. */
 const BOOT_MS = 10_000;
+/** Threads running at once in this process, each holding its own heap; the rest wait their turn. */
+const SLOTS = Math.max(1, Math.min(4, availableParallelism()));
+const WAITING_MOST = SLOTS * 32;
+/** What a person sees when the failure is this server's, not their code's; the cause goes to the log. */
+const HOST_FAILED = "The Code step failed on this server.";
 
 export interface CodeLimits {
     readonly timeMs: number;
@@ -169,9 +175,11 @@ function settle(reply: Reply, limits: CodeLimits): CodeResult {
         return failure("runtime", "The code waits for something that never finishes.", logs);
     if (reply.type === "threw") return fromThrown(reply.error, reply.interrupted, logs);
     if (reply.type === "crashed") {
-        if (reply.interrupted) return failure("timeout", reply.message, logs);
-        const memory = /memory/i.test(reply.message) || STACK.test(reply.message);
-        return failure(memory ? "memory" : "runtime", reply.message, logs);
+        if (reply.interrupted) return failure("timeout", "The code ran past its time limit.", logs);
+        if (/memory/i.test(reply.message) || STACK.test(reply.message))
+            return failure("memory", "The code ran out of memory.", logs);
+        console.error("polaris: the Code step's engine failed:", reply.message);
+        return failure("runtime", HOST_FAILED, logs);
     }
     if (reply.text === null)
         return failure("runtime", "The code must return the items for the next step.", logs);
@@ -207,6 +215,27 @@ function engine(): { core: string; variant: string } {
     return enginePaths;
 }
 
+let running = 0;
+const waiting: (() => void)[] = [];
+
+/** A turn on one of the threads, or false when too many runs already wait for one. */
+async function turn(): Promise<boolean> {
+    if (running < SLOTS) {
+        running++;
+        return true;
+    }
+    if (waiting.length >= WAITING_MOST) return false;
+    await new Promise<void>((resolve) => waiting.push(resolve));
+    return true;
+}
+
+/** Hands the turn to the next run waiting, or frees it. */
+function release(): void {
+    const next = waiting.shift();
+    if (next) next();
+    else running--;
+}
+
 /**
  * Run `source` over `items`. Never throws for anything the code does: every
  * outcome, the thread being killed included, is a `CodeResult`.
@@ -231,6 +260,22 @@ export async function runCode(
         console.error("polaris: the Code step's engine is not installed:", caught);
         return failure("runtime", "The Code step is not available on this server.", []);
     }
+    if (!(await turn()))
+        return failure("runtime", "Too many Code steps are running on this server.", []);
+    try {
+        return await execute(source, input, paths, limits);
+    } finally {
+        release();
+    }
+}
+
+/** One run on its own thread, settled by its answer, its crash or its deadline. */
+function execute(
+    source: string,
+    input: string,
+    paths: { core: string; variant: string },
+    limits: CodeLimits
+): Promise<CodeResult> {
     return new Promise<CodeResult>((resolve) => {
         const worker = new Worker(CODE_WORKER_SOURCE, {
             eval: true,
@@ -262,8 +307,7 @@ export async function runCode(
             if (done) return;
             done = true;
             clearTimeout(timer);
-            void worker.terminate();
-            resolve(result);
+            void worker.terminate().finally(() => resolve(result));
         };
         timer = setTimeout(
             () => finish(failure("timeout", "The Code step did not start in time.", [])),
@@ -286,14 +330,10 @@ export async function runCode(
             );
         });
         worker.on("error", (caught: Error & { code?: string }) => {
-            const memory = caught.code === "ERR_WORKER_OUT_OF_MEMORY";
-            finish(
-                failure(
-                    memory ? "memory" : "runtime",
-                    memory ? "The code ran out of memory." : caught.message,
-                    []
-                )
-            );
+            if (caught.code === "ERR_WORKER_OUT_OF_MEMORY")
+                return finish(failure("memory", "The code ran out of memory.", []));
+            console.error("polaris: the Code step's thread failed:", caught);
+            finish(failure("runtime", HOST_FAILED, []));
         });
         worker.on("exit", () =>
             finish(failure("runtime", "The Code step stopped without an answer.", []))

@@ -335,7 +335,7 @@
         "codeMemory": "El código usó demasiada memoria",
         "codeOutput": "El código devolvió demasiado, o algo que no es JSON",
         "codeInput": "Los elementos eran demasiado grandes para un paso de código",
-        "codeLimited": "Demasiado código este minuto"
+        "codeLimited": "Demasiadas ejecuciones este minuto"
     },
     "secrets": {
         "title": "Secretos",

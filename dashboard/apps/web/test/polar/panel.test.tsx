@@ -111,7 +111,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-const { PolarAside, PolarChat, PolarProvider, ownCommandIn, slashMatches } =
+const { PolarAside, PolarChat, PolarProvider, ownCommandIn, resetReloadForTests, slashMatches } =
     await import("@/components/polar/polar-panel");
 const { polarDisplayStore } = await import("@/components/polar/polar-display");
 
@@ -635,6 +635,7 @@ describe("the queue", () => {
 
 /** This page load as the browser reports it: a reload, or a visit. */
 function loadedBy(type: "reload" | "navigate") {
+    resetReloadForTests();
     return vi
         .spyOn(performance, "getEntriesByType")
         .mockReturnValue([{ type } as unknown as PerformanceEntry]);
@@ -738,6 +739,30 @@ describe("opening Polar again", () => {
     it("brings the last chat back for a person who asked for that", async () => {
         polarDisplayStore.set({ ...polarDisplayStore.get(), reopenLastChat: true });
         mount();
+        await waitFor(() => expect(opened()).toBe(true));
+    });
+
+    it("starts on a new chat when opened again after a reload", async () => {
+        loadedBy("reload");
+        mount();
+        await waitFor(() => expect(opened()).toBe(true));
+        cleanup();
+        vi.mocked(globalThis.fetch as ReturnType<typeof vi.fn>).mockClear();
+        mount();
+        await ready();
+        expect(opened()).toBe(false);
+    });
+
+    it("brings the last chat back once the account's setting arrives", async () => {
+        let settle: () => void = () => undefined;
+        const answered = new Promise<void>((resolve) => (settle = resolve));
+        vi.spyOn(polarDisplayStore, "load").mockImplementation(() =>
+            answered.then(() => ({ ...polarDisplayStore.get(), reopenLastChat: true }))
+        );
+        mount();
+        await ready();
+        expect(opened()).toBe(false);
+        settle();
         await waitFor(() => expect(opened()).toBe(true));
     });
 });

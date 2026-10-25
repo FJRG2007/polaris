@@ -918,10 +918,6 @@ function ChatMessageFields({ config, set }: { config: Config; set: (change: Conf
     );
 }
 
-/**
- * Which service "Redeploy a service" deploys: the services the person editing
- * runs. The run asks again, as the run-as account, whether it may deploy it.
- */
 /** Starting points for a Code step; picking one replaces the code. */
 export const CODE_TEMPLATES = {
     // i18n-ignore: example code
@@ -978,6 +974,10 @@ function CodeFields({ config, set }: { config: Config; set: (change: Config) => 
     );
 }
 
+/**
+ * Which service "Redeploy a service" deploys: the services the person editing
+ * runs. The run asks again, as the run-as account, whether it may deploy it.
+ */
 function RedeployFields({ config, set }: { config: Config; set: (change: Config) => void }) {
     const t = useTranslations("automations");
     const [services, setServices] = useState<readonly { id: string; name: string }[] | null>(null);
