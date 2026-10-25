@@ -86,7 +86,7 @@ describe("which servers have a build", () => {
             expect(dockerfile).toContain(`COPY --from=${stage} /out ${staged}`);
         }
         expect(dockerfile.indexOf(`COPY --from=minecraft-plugins /out ${staged}`)).toBeLessThan(
-            dockerfile.indexOf("RUN node packages/app-host/bundler/build.mjs")
+            dockerfile.indexOf("node packages/app-host/bundler/build.mjs /build/app-bundles")
         );
     });
 });

@@ -166,7 +166,7 @@ describe("the file", () => {
             "COPY --from=minecraft-symbiote /out ./apps/game-servers/.assets/minecraft-mods";
         expect(dockerfile).toContain(staged);
         expect(dockerfile.indexOf(staged)).toBeLessThan(
-            dockerfile.indexOf("RUN node packages/app-host/bundler/build.mjs")
+            dockerfile.indexOf("node packages/app-host/bundler/build.mjs /build/app-bundles")
         );
     });
 
