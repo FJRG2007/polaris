@@ -16,7 +16,8 @@ import { notFound, redirect } from "next/navigation";
 import { loadedBundle } from "./loader";
 import { provideShared } from "./shared-server";
 import { findAppRoute, knownApps } from "./code";
-import { appUnavailableReason } from "./lifecycle";
+import { appFailure } from "./lifecycle";
+import { appUpdating } from "./releases";
 import * as mount from "@/components/app-bundles/mount";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { homePathForUser, requireUser } from "@/lib/session";
@@ -66,13 +67,19 @@ export async function renderAppPage(
         redirect(user.isAdmin ? polarisAppsHref(app) : await homePathForUser(user));
     }
     if (loadedBundle(app)) notFound();
-    // Installed, and its code not here yet.
-    const t = await getTranslations("components");
+    // Installed, and its code not here yet - or here and unable to run on this
+    // version of Polaris, which only an update fixes.
+    const [t, user] = await Promise.all([getTranslations("components"), requireUser()]);
+    const failure = appFailure(app);
+    const progress = appUpdating(app);
     return (
         <AppUnavailable
             app={app}
             name={findApp(app)?.name ?? t("appBundles.thisApp")}
-            reason={appUnavailableReason(app) ?? t("appBundles.stillDownloading")}
+            reason={failure?.reason ?? t("appBundles.stillDownloading")}
+            update={failure?.update}
+            updating={Boolean(progress)}
+            canUpdate={user.isAdmin}
         />
     );
 }

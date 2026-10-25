@@ -17,7 +17,14 @@ import { readFile } from "node:fs/promises";
 import { sharedPiece, sharedServerModules } from "./shared-server";
 import { isBuiltin } from "node:module";
 import type { AppExtension } from "@/lib/app-extensions/types";
-import { ensureBundle, readManifest, type BundleManifest } from "./store";
+import { HOST_API, hostApiVerdict } from "@polaris/app-host/version";
+import {
+    BUNDLE_FORMAT,
+    BundleIncompatible,
+    ensureBundle,
+    readManifest,
+    type BundleManifest
+} from "./store";
 
 /** What a bundle's server entry exports (see the bundler's generated entry). */
 interface BundleServer {
@@ -33,6 +40,9 @@ export interface LoadedBundle {
     readonly version: string;
     readonly manifest: BundleManifest;
     readonly server: BundleServer;
+    /** The build this one replaced without a restart: a page opened before the
+     *  swap still loads its browser files from there until it is reloaded. */
+    readonly previous?: { readonly dir: string; readonly version: string };
 }
 
 type Registry = { loaded: Map<string, LoadedBundle>; loading: Map<string, Promise<LoadedBundle>> };
@@ -54,13 +64,39 @@ export function loadedBundles(): LoadedBundle[] {
     return [...registry.loaded.values()];
 }
 
+/**
+ * Whether this dashboard can run a bundle, before a line of it is evaluated:
+ * the format it is packed in, the host API it needs and the shared libraries
+ * it takes. Throws `BundleIncompatible`, naming the side that needs an update.
+ */
+export function checkCompatible(manifest: BundleManifest, provided = sharedServerModules()): void {
+    if (manifest.format !== BUNDLE_FORMAT) {
+        throw new BundleIncompatible(
+            "It is packed in a way this version of Polaris cannot read.",
+            manifest.format > BUNDLE_FORMAT ? "dashboard" : "app"
+        );
+    }
+    const verdict = hostApiVerdict(manifest.hostApi, HOST_API);
+    if (!verdict.ok) {
+        throw new BundleIncompatible(
+            verdict.update === "dashboard"
+                ? "It needs a newer version of Polaris."
+                : "It was made for an older version of Polaris and needs an update of its own.",
+            verdict.update
+        );
+    }
+    const missing = (manifest.shared?.server ?? []).filter((spec) => !provided.has(spec));
+    if (missing.length > 0) {
+        console.error(
+            `polaris: ${manifest.id} needs what this Polaris does not provide: ${missing.join(", ")}`
+        );
+        throw new BundleIncompatible("It needs a newer version of Polaris.", "dashboard");
+    }
+}
+
 async function evaluate(id: string, dir: string): Promise<LoadedBundle> {
     const manifest = await readManifest(dir);
-    const provided = sharedServerModules();
-    const missing = manifest.shared.server.filter((spec) => !provided.has(spec));
-    if (missing.length > 0) {
-        throw new Error(`${id} needs what this Polaris does not provide: ${missing.join(", ")}`);
-    }
+    checkCompatible(manifest);
     const filename = join(dir, manifest.server);
     const code = await readFile(filename, "utf8");
     const require = (spec: string): unknown => {
@@ -96,6 +132,31 @@ export function loadBundle(id: string): Promise<LoadedBundle> {
     })().finally(() => registry.loading.delete(id));
     registry.loading.set(id, work);
     return work;
+}
+
+/**
+ * Evaluate a bundle in a folder without serving it: what an update does before
+ * it swaps, so a bundle that cannot run never replaces one that can.
+ */
+export function stageBundle(id: string, dir: string): Promise<LoadedBundle> {
+    return evaluate(id, dir);
+}
+
+/**
+ * Serve a staged bundle in place of the one loaded now, without a restart.
+ * One map entry changes: a request already inside the old one finishes there,
+ * the next one reaches the new one. What the old one started - a server's
+ * container, a copy in progress - is not its to stop and keeps running; the new
+ * one's `onBoot` is not run, because that recovers work only a restart cuts off.
+ */
+export function swapBundle(bundle: LoadedBundle): void {
+    const before = registry.loaded.get(bundle.id);
+    registry.loaded.set(
+        bundle.id,
+        before && before.dir !== bundle.dir
+            ? { ...bundle, previous: { dir: before.dir, version: before.version } }
+            : bundle
+    );
 }
 
 /** Stop serving an app's bundle. What it already started keeps its own lifetime. */

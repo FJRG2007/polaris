@@ -6,6 +6,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { SettingsView } from "./settings-view";
 import { TransferCard } from "./transfer-card";
 import { SeasonalAdminCard } from "./seasonal-card";
+import { AppUpdatesCard } from "@/components/app-bundles/app-updates-card";
 import { seasonsAllowed } from "@/lib/seasonal-service";
 import { getUpdateSource } from "@/lib/update-source";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
@@ -42,7 +43,10 @@ export default async function SettingsPage() {
         // Narrow page: centre the column in the content area, header included, and
         // keep it at the top so it does not shift as the update card grows.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader title={t("settings.page.title")} description={t("settings.page.description")} />
+            <PageHeader
+                title={t("settings.page.title")}
+                description={t("settings.page.description")}
+            />
             {/* The update this page shows is one the reader now knows about. */}
             <SeenOnVisit screen="/admin/settings" />
             <SettingsView
@@ -57,6 +61,7 @@ export default async function SettingsPage() {
                     autoUpdate: env.POLARIS_AUTO_UPDATE
                 }}
             />
+            <AppUpdatesCard />
             <SeasonalAdminCard initial={seasons} />
             <TransferCard identity={[user.email, user.name].filter(Boolean)} />
         </div>

@@ -9,6 +9,7 @@
  * another origin.
  */
 
+import { appUpdating } from "@/lib/app-bundles/releases";
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
@@ -53,6 +54,9 @@ export async function POST(request: NextRequest) {
     const bundle = loadedBundle(app);
     const declared = bundle?.manifest.actions[module];
     const load = bundle?.server.actions[module];
+    if (!bundle && appUpdating(app)) {
+        return refuse(503, "This app is being updated. Try again in a moment.");
+    }
     if (!bundle || !declared?.includes(name) || !load) {
         return refuse(404, "That is not something this app does. Reload the page.");
     }

@@ -232,7 +232,10 @@ COPY --from=minecraft-plugins /out ./apps/game-servers/.assets/minecraft-mods
 COPY --from=minecraft-anticheat /out ./apps/game-servers/.assets/minecraft-mods
 COPY --from=minecraft-symbiote /out ./apps/game-servers/.assets/minecraft-mods
 ARG POLARIS_APP_BUNDLES=embed
-RUN node packages/app-host/bundler/build.mjs /build/app-bundles \
+# The commit the bundles were built from, on their published manifests only
+# (never inside a bundle, so an app that did not change keeps its digest).
+ARG POLARIS_BUILD_SHA=""
+RUN POLARIS_BUILD_SHA="$POLARIS_BUILD_SHA" node packages/app-host/bundler/build.mjs /build/app-bundles \
     && mkdir -p /build/app-bundles-image \
     && cp /build/app-bundles/index.json /build/app-bundles-image/ \
     && if [ "$POLARIS_APP_BUNDLES" = "embed" ]; then cp /build/app-bundles/*.zip /build/app-bundles-image/; fi

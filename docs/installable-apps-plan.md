@@ -278,7 +278,7 @@ false` only when it only adds (creating, sending, starting a run);
      components as references) may register its copies after an app has loaded.
      In the browser each module is handed over as CommonJS marked `__esModule`
      with its real default on `default` (`asCommonJs`), so `import Image from
-     "next/image"` in an app is the component, not the module namespace.
+"next/image"` in an app is the component, not the module namespace.
    - **Screens.** An app page is a server component drawn by a catch-all route
      per surface (`/places/[[...path]]`, `/apps/games/[[...path]]`; API routes
      under `/api/home`, `/api/minecraft`, `/api/apps/games`,
@@ -331,4 +331,8 @@ false` only when it only adds (creating, sending, starting a run);
    they arrive with its code. `npm run dev:up` builds the bundles into
    `dashboard/.app-bundles` for a local dashboard.
 
-5. **Places** went through the same phases with Game servers.
+5. **Updates of their own.** An app updates alone from Settings -> Apps, with no
+   restart, against a versioned host API: see
+   [app-bundles-contract.md](app-bundles-contract.md).
+
+6. **Places** went through the same phases with Game servers.

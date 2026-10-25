@@ -17,6 +17,7 @@
  */
 
 import JSZip from "jszip";
+import { z } from "zod";
 import { createHash } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { afterPredecessor } from "@/lib/deploy/dashboard-peers";
@@ -55,6 +56,11 @@ export interface BundleManifest {
     readonly format: number;
     readonly id: string;
     readonly build: string;
+    /** The app's own version, from its package.json. */
+    readonly version?: string;
+    /** The host API it needs (`@polaris/app-host/version`); absent on a bundle
+     *  built before bundles declared one. */
+    readonly hostApi?: string;
     readonly server: string;
     readonly routes: readonly string[];
     readonly actions: Readonly<Record<string, readonly string[]>>;
@@ -68,6 +74,20 @@ export interface BundleManifest {
 
 /** Why a bundle could not be had, in words for the screen that asked. */
 export class BundleUnavailable extends Error {}
+
+/**
+ * A bundle that is here but cannot run on this dashboard: built for a newer
+ * one, or for an older host API this one no longer provides. `update` names the
+ * side that has to move - never a crash, never a blank page.
+ */
+export class BundleIncompatible extends BundleUnavailable {
+    constructor(
+        message: string,
+        readonly update: "dashboard" | "app"
+    ) {
+        super(message);
+    }
+}
 
 /** Where the image keeps its index, and its bundles when it was built here. */
 export function imageBundleDir(): string {
@@ -111,7 +131,7 @@ export function bundleDir(id: string, digest: string): string {
 }
 
 /** Registry host and repository to fetch from: the index's, else the image's. */
-function registryOf(index: BundleIndex): { host: string; repository: string } {
+export function registryOf(index: BundleIndex): { host: string; repository: string } {
     const location = (index.registry || loadEnv().POLARIS_WEB_IMAGE).replace(/:[^/]*$/, "");
     const [host, ...rest] = location.split("/");
     if (!host || rest.length === 0)
@@ -120,7 +140,7 @@ function registryOf(index: BundleIndex): { host: string; repository: string } {
 }
 
 /** An anonymous pull token, which is all a public package needs. */
-async function pullToken(
+export async function pullToken(
     host: string,
     repository: string,
     signal: AbortSignal
@@ -132,7 +152,15 @@ async function pullToken(
     return typeof body?.token === "string" ? body.token : null;
 }
 
-async function download(index: BundleIndex, ref: BundleRef): Promise<Buffer> {
+/** How far a download has got, for a screen showing it. */
+export type DownloadProgress = (received: number, total: number) => void;
+
+/** A bundle's bytes, from the registry, by digest. Bounded in size and time. */
+export async function download(
+    index: BundleIndex,
+    ref: Pick<BundleRef, "digest" | "size">,
+    progress?: DownloadProgress
+): Promise<Buffer> {
     const { host, repository } = registryOf(index);
     const signal = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
     let response: Response;
@@ -155,12 +183,32 @@ async function download(index: BundleIndex, ref: BundleRef): Promise<Buffer> {
     if (!response.ok)
         throw new BundleUnavailable(`${host} answered ${response.status} when asked for it.`);
     const length = Number(response.headers.get("content-length") ?? ref.size);
-    if (length > MAX_BUNDLE_BYTES)
+    if (length > MAX_BUNDLE_BYTES || ref.size > MAX_BUNDLE_BYTES)
         throw new BundleUnavailable("What was published for it is larger than any app.");
-    return Buffer.from(await response.arrayBuffer());
+    if (!response.body) return Buffer.from(await response.arrayBuffer());
+    // Read as it arrives, so a screen can show how far it got and an answer
+    // longer than any app is cut off rather than kept.
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    const reader = response.body.getReader();
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            received += value.byteLength;
+            if (received > MAX_BUNDLE_BYTES)
+                throw new BundleUnavailable("What was published for it is larger than any app.");
+            chunks.push(value);
+            progress?.(received, ref.size || length);
+        }
+    } catch (error) {
+        if (error instanceof BundleUnavailable) throw error;
+        throw new BundleUnavailable(`The download from ${host} was cut off.`, { cause: error });
+    }
+    return Buffer.concat(chunks);
 }
 
-function verify(bytes: Buffer, ref: BundleRef): void {
+export function verify(bytes: Buffer, ref: Pick<BundleRef, "digest">): void {
     const actual = createHash("sha256").update(bytes).digest("hex");
     if (actual !== hexOf(ref.digest)) {
         throw new BundleUnavailable(
@@ -169,7 +217,7 @@ function verify(bytes: Buffer, ref: BundleRef): void {
     }
 }
 
-async function unpack(bytes: Buffer, id: string, target: string): Promise<void> {
+export async function unpack(bytes: Buffer, id: string, target: string): Promise<void> {
     const zip = await JSZip.loadAsync(bytes);
     const temporary = `${target}.partial-${process.pid}-${Date.now()}`;
     await rm(temporary, { recursive: true, force: true });
@@ -187,8 +235,14 @@ async function unpack(bytes: Buffer, id: string, target: string): Promise<void> 
         const manifest = JSON.parse(
             await readFile(join(temporary, "manifest.json"), "utf8")
         ) as BundleManifest;
-        if (manifest.id !== id || manifest.format !== BUNDLE_FORMAT) {
+        if (manifest.id !== id) {
             throw new BundleUnavailable("The bundle is not the app it was fetched for.");
+        }
+        if (manifest.format !== BUNDLE_FORMAT) {
+            throw new BundleIncompatible(
+                "It is packed in a way this version of Polaris cannot read.",
+                manifest.format > BUNDLE_FORMAT ? "dashboard" : "app"
+            );
         }
         await rm(target, { recursive: true, force: true });
         await rename(temporary, target);
@@ -198,15 +252,79 @@ async function unpack(bytes: Buffer, id: string, target: string): Promise<void> 
     }
 }
 
-/** Every other build of this app, which nothing will load again. */
-async function dropOthers(id: string, keep: string): Promise<void> {
+/**
+ * Every other build of this app, which nothing will load again. The one in use
+ * and the one before it stay: that one is what a rollback goes back to, and what
+ * a page opened before an update still loads its files from.
+ */
+export async function dropOthers(id: string): Promise<void> {
     const dir = join(bundleRoot(), id);
+    const state = await readBundleState(id);
+    const keep = new Set([STATE_FILE]);
+    for (const pin of [state?.current, state?.previous]) if (pin) keep.add(hexOf(pin.digest));
     const entries = await readdir(dir).catch(() => [] as string[]);
     await Promise.all(
         entries
-            .filter((entry) => entry !== keep)
+            .filter((entry) => !keep.has(entry) && !entry.startsWith(`${STATE_FILE}.`))
             .map((entry) => rm(join(dir, entry), { recursive: true, force: true }))
     );
+}
+
+const STATE_FILE = "state.json";
+
+const Digest = z.string().regex(DIGEST);
+
+const Pin = z.object({
+    digest: Digest,
+    /** Where it came from: the image's own bundle, or an update of the app alone. */
+    source: z.enum(["image", "registry"]),
+    version: z.string().max(64).optional(),
+    revision: z.string().max(64).optional(),
+    notes: z.string().max(300).optional()
+});
+
+const BundleStateSchema = z.object({
+    current: Pin,
+    previous: Pin.nullable().optional(),
+    /** The bundle the image named when this was written. When the image names
+     *  another one, the dashboard was updated and its bundle takes over. */
+    image: Digest.nullable()
+});
+
+/** Which build of an app this server runs, and the one before it. */
+export type BundleState = z.infer<typeof BundleStateSchema>;
+export type BundlePin = z.infer<typeof Pin>;
+
+/** The app's state on the volume, or null when there is none or it is unreadable. */
+export async function readBundleState(id: string): Promise<BundleState | null> {
+    try {
+        const text = await readFile(join(bundleRoot(), id, STATE_FILE), "utf8");
+        const parsed = BundleStateSchema.safeParse(JSON.parse(text));
+        return parsed.success ? parsed.data : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Written beside and renamed over, so a cut-off write never leaves half a file. */
+export async function writeBundleState(id: string, state: BundleState): Promise<void> {
+    const dir = join(bundleRoot(), id);
+    await mkdir(dir, { recursive: true });
+    const temporary = join(dir, `${STATE_FILE}.${process.pid}-${Date.now()}`);
+    await writeFile(temporary, `${JSON.stringify(BundleStateSchema.parse(state), null, 2)}\n`);
+    await rename(temporary, join(dir, STATE_FILE));
+}
+
+/** The image's bundle of an app, unpacked if it is not yet. */
+async function ensureImageBundle(index: BundleIndex, id: string, ref: BundleRef): Promise<string> {
+    const target = bundleDir(id, ref.digest);
+    if (existsSync(join(target, "manifest.json"))) return target;
+    const seed = join(imageBundleDir(), ref.file);
+    const bytes = existsSync(seed) ? await readFile(seed) : await download(index, ref);
+    verify(bytes, ref);
+    await mkdir(dirname(target), { recursive: true });
+    await unpack(bytes, id, target);
+    return target;
 }
 
 /** Kept on the process rather than in this module: Next evaluates a module once
@@ -227,18 +345,35 @@ export function ensureBundle(id: string): Promise<string> {
         const ref = index?.apps[id];
         if (!index || !ref)
             throw new BundleUnavailable("This version of Polaris was built without it.");
-        const target = bundleDir(id, ref.digest);
-        if (existsSync(join(target, "manifest.json"))) return target;
-        const seed = join(imageBundleDir(), ref.file);
-        const bytes = existsSync(seed) ? await readFile(seed) : await download(index, ref);
-        verify(bytes, ref);
-        await mkdir(dirname(target), { recursive: true });
-        await unpack(bytes, id, target);
+        // An app updated on its own stays on that update for as long as the
+        // dashboard is the one it was updated under. A dashboard update brings
+        // the image's own bundle - the newest there was when the image was built -
+        // and an install from before any of this has no state yet and gets the
+        // image's, exactly as it did.
+        const state = await readBundleState(id);
+        if (state && state.image === ref.digest && state.current.digest !== ref.digest) {
+            const pinned = bundleDir(id, state.current.digest);
+            if (existsSync(join(pinned, "manifest.json"))) return pinned;
+        }
+        const target = await ensureImageBundle(index, id, ref);
+        if (state?.current.digest !== ref.digest || state.image !== ref.digest) {
+            const manifest = await readManifest(target);
+            const kept = state?.current.digest === ref.digest ? state.previous : state?.current;
+            await writeBundleState(id, {
+                current: {
+                    digest: ref.digest,
+                    source: "image",
+                    ...(manifest.version ? { version: manifest.version } : {})
+                },
+                previous: kept ?? null,
+                image: ref.digest
+            });
+        }
         // The previous build's folder is the one the dashboard this one replaces is
         // still loading the app's code from while it serves, so it goes once that
         // dashboard has been retired rather than from under it.
         void afterPredecessor()
-            .then(() => dropOthers(id, hexOf(ref.digest)))
+            .then(() => dropOthers(id))
             .catch(() => undefined);
         return target;
     })().finally(() => inflight.delete(id));

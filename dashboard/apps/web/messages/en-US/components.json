@@ -34,7 +34,15 @@
         "partFailed": "Part of this page did not load. Reload the page to try again.",
         "unavailable": "{name} is not available right now",
         "thisApp": "This app",
-        "stillDownloading": "Polaris is still downloading it. Try again in a moment."
+        "stillDownloading": "Polaris is still downloading it. Try again in a moment.",
+        "needsUpdate": "{name} needs an update",
+        "polarisTooOld": "This version of {name} needs a newer Polaris.",
+        "appTooOld": "This version of {name} was made for an older Polaris.",
+        "askAdmin": "Ask an administrator to update it.",
+        "updateApp": "Update {name}",
+        "updatePolaris": "Update Polaris",
+        "updatingNow": "Updating {name}",
+        "updatingBody": "This takes a moment. The page reloads when it is ready."
     },
     "presence": {
         "online": "Online",
@@ -1657,5 +1665,35 @@
         "clear": "Clear",
         "previousMonth": "Previous month",
         "nextMonth": "Next month"
+    },
+    "appUpdates": {
+        "title": "Apps",
+        "body": "Each app updates on its own, without restarting Polaris.",
+        "check": "Check for app updates",
+        "loadFailed": "The apps could not be read. Reload the page to try again.",
+        "none": "No apps are installed.",
+        "notHere": "Not downloaded yet",
+        "installed": "Installed {version}",
+        "available": "{version} available",
+        "needsPolaris": "{version} needs a newer Polaris",
+        "checkFailed": "Could not check for updates",
+        "upToDate": "Up to date",
+        "update": "Update now",
+        "updating": "Updating...",
+        "rollback": "Go back to {version}",
+        "phase": {
+            "checking": "Checking...",
+            "downloading": "Downloading...",
+            "starting": "Starting the new version..."
+        },
+        "refused": {
+            "unknown": "That app is not part of this Polaris.",
+            "notInstalled": "{name} is not installed.",
+            "busy": "{name} is already being updated.",
+            "unreachable": "The update could not be downloaded. Check the connection and try again.",
+            "needsPolaris": "This version of {name} needs a newer Polaris. Update Polaris first.",
+            "failed": "The new version did not start, so {name} stays on the one it had.",
+            "noPrevious": "There is no earlier version of {name} to go back to."
+        }
     }
 }

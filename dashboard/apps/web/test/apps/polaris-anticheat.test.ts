@@ -130,7 +130,7 @@ describe("the image", () => {
             "COPY --from=minecraft-anticheat /out ./apps/game-servers/.assets/minecraft-mods"
         );
         expect(dockerfile.indexOf("COPY --from=minecraft-anticheat")).toBeLessThan(
-            dockerfile.indexOf("RUN node packages/app-host/bundler/build.mjs")
+            dockerfile.indexOf("node packages/app-host/bundler/build.mjs /build/app-bundles")
         );
     });
 

@@ -16,7 +16,7 @@
 
 import { knownApps } from "./code";
 import { findApp } from "@/lib/apps/catalog";
-import { BundleUnavailable, removeBundle } from "./store";
+import { BundleIncompatible, BundleUnavailable, removeBundle } from "./store";
 import { loadBundle, loadedBundle, unloadBundle } from "./loader";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { afterPredecessor, predecessorRetired } from "@/lib/deploy/dashboard-peers";
@@ -28,7 +28,13 @@ const BOOT_WAIT_MS = 60_000;
 /** How often a bundle that could not be had is tried again. */
 const RETRY_MS = 5 * 60_000;
 
-type State = { failures: Map<string, string>; retrying: Set<string> };
+/** Why an installed app is not running, and which update would fix it. */
+export interface AppFailure {
+    readonly reason: string;
+    readonly update?: "dashboard" | "app";
+}
+
+type State = { failures: Map<string, AppFailure>; retrying: Set<string> };
 
 const state: State = ((globalThis as Record<symbol, unknown>)[
     Symbol.for("polaris.app-bundles.lifecycle")
@@ -37,13 +43,29 @@ const state: State = ((globalThis as Record<symbol, unknown>)[
     retrying: new Set()
 }) as State;
 
+/** Why an installed app's code is not running, for its screen. */
+export function appFailure(id: string): AppFailure | null {
+    return loadedBundle(id) ? null : (state.failures.get(id) ?? null);
+}
+
+/** An app is running again: whatever kept it from running is past. */
+export function clearAppFailure(id: string): void {
+    state.failures.delete(id);
+}
+
 /** Why an installed app's code is not here, in words for its screen. */
 export function appUnavailableReason(id: string): string | null {
-    return loadedBundle(id) ? null : (state.failures.get(id) ?? null);
+    return appFailure(id)?.reason ?? null;
 }
 
 function reasonOf(error: unknown): string {
     return error instanceof BundleUnavailable ? error.message : "Its code could not be started.";
+}
+
+function failureOf(error: unknown): AppFailure {
+    return error instanceof BundleIncompatible
+        ? { reason: error.message, update: error.update }
+        : { reason: reasonOf(error) };
 }
 
 /** Load an app's bundle, and start what it runs from boot. */
@@ -70,7 +92,7 @@ function retryLater(id: string): void {
             await bring(id);
             state.retrying.delete(id);
         } catch (error) {
-            state.failures.set(id, reasonOf(error));
+            state.failures.set(id, failureOf(error));
             console.error(`polaris: ${id} is still unavailable:`, error);
             setTimeout(() => void attempt(), RETRY_MS).unref();
         }
@@ -90,7 +112,7 @@ export async function prepareAppBundles(): Promise<void> {
             await loadBundle(id);
             state.failures.delete(id);
         } catch (error) {
-            state.failures.set(id, reasonOf(error));
+            state.failures.set(id, failureOf(error));
             console.error(`polaris: ${id} could not be loaded:`, error);
             retryLater(id);
         }
@@ -127,7 +149,7 @@ export async function retryApp(id: string): Promise<{ error?: string }> {
         await bring(id);
         return {};
     } catch (error) {
-        state.failures.set(id, reasonOf(error));
+        state.failures.set(id, failureOf(error));
         console.error(`polaris: ${id} could not be loaded:`, error);
         return { error: reasonOf(error) };
     }
