@@ -23,7 +23,6 @@ import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import { TaskRefusal } from "./refusal";
 import { requireTask } from "./access";
-import { anyListening, emitAppEvent } from "@/lib/automations/app-events";
 
 export interface AutomationEventInput {
     readonly trigger: core.AutomationTrigger;
@@ -182,7 +181,10 @@ async function announceToAutomations(
     actorId: string | null
 ): Promise<void> {
     const name = POLARIS_TASK_EVENTS[trigger];
-    if (!name || !(await anyListening(name).catch(() => false))) return;
+    if (!name) return;
+    // Loaded when it runs: the automations engine pulls in session and auth.
+    const { anyListening, emitAppEvent } = await import("@/lib/automations/app-events");
+    if (!(await anyListening(name).catch(() => false))) return;
     const tasks = await prisma.task.findMany({
         where: { id: { in: [...taskIds] } },
         select: { id: true, name: true, listId: true, spaceId: true }

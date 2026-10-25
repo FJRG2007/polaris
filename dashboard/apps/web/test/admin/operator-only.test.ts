@@ -105,11 +105,15 @@ describe("game servers", () => {
         // Hands straight to `invitePlayer`, whose first line asks for
         // games.manage on the server named.
         "invitePlayerAccountAction",
-        // All three hand straight to `keptRun`, whose first read asks for
+        // All four hand straight to `keptRun`, whose first read asks for
         // games.console on the server named.
         "runKeptCommandAction",
         "keptStepsAction",
-        "scheduleKeptCommandAction"
+        "scheduleKeptCommandAction",
+        "repeatKeptCommandAction",
+        // Names no server: lists only the ones `reachableInstallIds` grants the
+        // reader the permission asked for, for an automation step's picker.
+        "automationServersAction"
     ]);
 
     it("asks about the server named in every action on one", () => {

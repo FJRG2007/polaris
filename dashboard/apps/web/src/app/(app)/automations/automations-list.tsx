@@ -905,7 +905,7 @@ export function CreateDialog({ onClose }: { onClose: () => void }) {
 
     return (
         <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
-            <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto">
+            <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>{t("create.title")}</DialogTitle>
                     <DialogDescription>{t("create.hint")}</DialogDescription>

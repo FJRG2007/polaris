@@ -35,7 +35,6 @@ import { relativeTime } from "@/lib/relative-time";
 import { IntegrationLogo } from "@/components/logos";
 import { TpLinkMark } from "@/components/brand-icons";
 import { CopyButton } from "@/components/copy-button";
-import { RefInput } from "@/app/(app)/automations/[id]/references";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { subscribeSharedStream } from "@/lib/shared-stream";
@@ -64,6 +63,12 @@ const NoticeDeliveryFields = dynamic(
         import("@/components/automations/notice-delivery-fields").then(
             (module) => module.NoticeDeliveryFields
         ),
+    { ssr: false }
+);
+
+/** A text field of an app's automation node that takes `{{ }}` values. */
+const RefInput = dynamic(
+    () => import("@/app/(app)/automations/[id]/references").then((module) => module.RefInput),
     { ssr: false }
 );
 
@@ -172,7 +177,6 @@ export const clientHost = {
     appAppsInstalledIdUseRuntimeLog: { useRuntimeLog },
     appFavorites: { refreshAppFavorites },
     automationsList: { AutomationsList },
-    // A text field of an app's automation node that takes `{{ }}` values.
     automationsReferences: { RefInput },
     automationsNotice: { NoticeDeliveryFields },
     avatar: { Avatar },

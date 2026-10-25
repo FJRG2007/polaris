@@ -34,8 +34,6 @@ import { ACCOUNT_COLUMNS } from "./access";
 import { decodePart, unflow } from "./decode";
 import { rememberContacts } from "./contacts";
 import { applyRulesToMessage, filterHeaderNames } from "./rules";
-import { anyListening } from "@/lib/automations/app-events";
-import { announceMail } from "@/lib/automations/mail-events";
 import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
@@ -801,7 +799,10 @@ async function storeMessages(
     const toAutomations =
         arrivals &&
         folder.role === "inbox" &&
-        (await anyListening("mail.received").catch(() => false));
+        // Loaded when it runs: the automations engine pulls in session and auth.
+        (await import("@/lib/automations/app-events")
+            .then(({ anyListening }) => anyListening("mail.received"))
+            .catch(() => false));
 
     for (const message of fetched) {
         const envelope = message.envelope;
@@ -959,7 +960,9 @@ async function storeMessages(
                     await replyIfAway(account.id, row.id);
                     // Junk starts no automation, for the reason it gets no away reply.
                     if (toAutomations)
-                        await announceMail({
+                        await (
+                            await import("@/lib/automations/mail-events")
+                        ).announceMail({
                             messageId: row.id,
                             account,
                             from,

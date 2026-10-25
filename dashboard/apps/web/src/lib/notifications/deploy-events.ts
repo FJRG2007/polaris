@@ -13,7 +13,6 @@
  */
 
 import { notify } from "./dispatch";
-import { emitAppEvent } from "../automations/app-events";
 import { prisma } from "@polaris/db";
 import * as follow from "../follow/follow";
 import { dispatchProjectWebhooks } from "../deploy-project-service";
@@ -159,6 +158,8 @@ export async function notifyDeployFinished(input: {
 
         // Automations listening for deploys, run as somebody this alert was for:
         // the owner, whoever triggered it, a follower, or an administrator.
+        // Loaded when it runs: the automations engine pulls in session and auth.
+        const { emitAppEvent } = await import("../automations/app-events");
         await emitAppEvent(
             event,
             {
