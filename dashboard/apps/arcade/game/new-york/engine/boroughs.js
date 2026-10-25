@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { SharedInstances } from './shared-instances.js';
 import {
   Fn,
   float,
@@ -1851,7 +1852,7 @@ function generateBoroughBuildings() {
   return { list, stats };
 }
 
-// Spatially chunked InstancedMeshes (frustum culled per chunk) sharing one facade material
+// Spatially chunked instances (frustum culled per chunk) sharing one facade material and shader (shared-instances.js)
 function buildBuildingChunks(list, material, chunkSize, name) {
   const chunks = new Map();
   for (const b of list) {
@@ -1873,12 +1874,12 @@ function buildBuildingChunks(list, material, chunkSize, name) {
     geo.setAttribute('normal', BOX_GEO.attributes.normal);
     const info = new Float32Array(arr.length * 4);
     const tint = new Float32Array(arr.length * 4);
-    const mesh = new THREE.InstancedMesh(geo, material, arr.length);
+    const matrices = new Float32Array(arr.length * 16);
     for (let i = 0; i < arr.length; i++) {
       const b = arr[i];
       q.setFromAxisAngle(yAxis, b.rot);
       m.compose(p.set(b.x, b.y, b.z), q, s.set(b.w, b.h, b.d));
-      mesh.setMatrixAt(i, m);
+      m.toArray(matrices, i * 16);
       info[i * 4] = b.w;
       info[i * 4 + 1] = b.h;
       info[i * 4 + 2] = b.d;
@@ -1890,8 +1891,7 @@ function buildBuildingChunks(list, material, chunkSize, name) {
     }
     geo.setAttribute('bInfo', new THREE.InstancedBufferAttribute(info, 4));
     geo.setAttribute('bTint', new THREE.InstancedBufferAttribute(tint, 4));
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
+    const mesh = new SharedInstances(geo, material, matrices);
     mesh.castShadow = false;
     mesh.receiveShadow = false;
     mesh.name = name + ':' + key;
