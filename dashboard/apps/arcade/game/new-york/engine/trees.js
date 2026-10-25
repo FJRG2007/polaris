@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { createTreeMaterial } from './tsl-materials.js';
+import { SharedInstances } from './shared-instances.js';
 
 // js/trees.js
 // Procedural NYC street & park trees, planted by street-details.js (section 7):
@@ -924,11 +925,10 @@ function createTreeField(scene, sites) {
     // Static usage on purpose: three.js re-uploads a DynamicDrawUsage attribute in every render pass of every frame
     // (both shadow cascades + the scene pass, ~7 MB/frame here). rebuild() uploads just the instances in use, and only
     // when the levels change.
-    const treeData = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
-    geo.setAttribute('aTreeData', treeData);
-    const mesh = new THREE.InstancedMesh(geo, material, cap);
+    geo.setAttribute('aTreeData', new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4));
+    // Every cell of a tree type shares one shader (shared-instances.js)
+    const mesh = new SharedInstances(geo, material, new Float32Array(cap * 16), null, 0);
     mesh.name = m.name;
-    mesh.count = 0;
     mesh.visible = false;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -956,18 +956,16 @@ function createTreeField(scene, sites) {
       for (const mi of cell.meshes.values()) {
         const mesh = instanced[mi];
         const n = counts[mi];
-        mesh.count = n;
         mesh.visible = n > 0;
         if (n > 0) {
           visible = true;
-          // main.js swaps instanceMatrix for a storage attribute: look it up here on every changed cell.
-          for (const attr of [mesh.instanceMatrix, mesh.geometry.attributes.aTreeData]) {
+          for (const [attr, size] of [[mesh.instanceMatrix, 16], [mesh.geometry.attributes.aTreeData, 4]]) {
             attr.clearUpdateRanges();
-            attr.addUpdateRange(0, n * attr.itemSize);
+            attr.addUpdateRange(0, n * size);
             attr.needsUpdate = true;
           }
-          mesh.computeBoundingSphere();
-          mesh.boundingSphere.radius += meshes[mi].type.windPadding;
+          mesh.setCount(n);
+          mesh.geometry.boundingSphere.radius += meshes[mi].type.windPadding;
         }
       }
       // Hidden cells avoid traversing all their dormant species/variant/LOD meshes in every render pass.

@@ -1,8 +1,10 @@
 import * as THREE from 'three/webgpu';
-import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, smoothstep } from 'three/tsl';
+import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, vec4, smoothstep } from 'three/tsl';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
 import { createPostProcessing } from './post-processing.js';
-import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
+import { ClusteredSpotLighting } from './clustered-lights.js';
+import { drawOnlyCompiled } from './async-pipelines.js';
+import { PRESETS, learnAutoQuality, readQualitySetting, resolveQuality, saveQualitySetting } from './quality.js';
 import { getLocationLabel, isTypingInField, ROADS, NYC_LANDMARKS, TELEPORT_LOCATIONS } from './city-config.js';
 import { buildCityGrid } from './city-grid.js';
 import { buildBoroughs } from './boroughs.js';
@@ -26,7 +28,11 @@ import { reportFailure, reportProgress, reportReady, shareState } from './embed.
 // Main entry point for New York City (Midtown Manhattan) in Three.js WebGPURenderer & TSL (three.js, bundled by the app build)
 
 // The start-up phases the host's progress bar counts while the city is built (`markInit` labels)
-const BUILD_STEPS = ['renderer', 'lighting', 'cityGrid', 'boroughs', 'landmarks', 'blocks', 'streetDetails', 'traffic', 'roadPaint', 'controllers', 'culling', 'ui', 'postFX'];
+// Milliseconds of pipeline building per frame (async-pipelines.js): behind the loading screen, then while playing
+const LOADING_BUILD_BUDGET = 45;
+const PLAYING_BUILD_BUDGET = 6;
+
+const BUILD_STEPS = ['renderer', 'lighting', 'cityGrid', 'boroughs', 'landmarks', 'blocks', 'streetDetails', 'traffic', 'roadPaint', 'controllers', 'culling', 'postFX', 'ui'];
 
 async function initApp() {
   const container = document.getElementById('canvas-container');
@@ -54,7 +60,8 @@ async function initApp() {
   renderer.setPixelRatio(1.0);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.lighting = new ClusteredLighting(256, 32, 28, 48);
+  // Point and spot lights alike are clustered (clustered-lights.js): no lit shader unrolls the city's light pools
+  renderer.lighting = new ClusteredSpotLighting(256, 32, 28, 48);
   container.appendChild(renderer.domElement);
 
   // Start-up phase timings (logged once as "[init] ...") to keep load-time regressions traceable
@@ -62,10 +69,18 @@ async function initApp() {
   let initMark = performance.now();
   const markInit = (label) => {
     const now = performance.now();
-    initTimings.push(`${label} ${Math.round(now - initMark)}ms`);
+    if (initTimings) initTimings.push(`${label} ${Math.round(now - initMark)}ms`);
+    performance.mark(`init:${label}`);
     initMark = now;
     const step = BUILD_STEPS.indexOf(label);
     if (step >= 0) reportProgress('build', (step + 1) / BUILD_STEPS.length);
+  };
+  // Hands the main thread back between start-up phases: the game shares it with the page that frames it, so without
+  // this the whole tab (and the host's progress bar) froze until the city was built (a plain task, not
+  // scheduler.yield(), whose continuation would run ahead of the host's progress messages)
+  const stepDone = (label) => {
+    markInit(label);
+    return new Promise((resolve) => setTimeout(resolve, 0));
   };
 
   try {
@@ -74,12 +89,22 @@ async function initApp() {
     reportFailure('graphics');
     throw e;
   }
-  markInit('renderer');
+  // From here on a draw whose pipeline is not built yet waits for it instead of stalling the frame (async-pipelines.js)
+  const viewPosition = new THREE.Vector3();
+  const pipelineGate = drawOnlyCompiled(renderer, { near: () => viewPosition });
+  pipelineGate.setBudget(LOADING_BUILD_BUDGET);
+  const qualitySetting = readQualitySetting();
+  const quality = resolveQuality(qualitySetting, renderer);
+  const preset = PRESETS[quality];
+  renderer.shadowMap.enabled = preset.shadows;
+  console.log(`[init] quality ${quality} (${qualitySetting}), ${renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL2'}`);
+  await stepDone('renderer');
 
   // 2. Build Scene & Physical Atmospheric Sky / PMREM IBL / 4096x4096 Shadow Lighting
   const scene = new THREE.Scene();
   const lightingSystem = new LightingSystem(scene, renderer);
-  markInit('lighting');
+  lightingSystem.sunLight.castShadow = preset.shadows;
+  await stepDone('lighting');
 
   if (loadingStatus) {
     loadingStatus.textContent = 'Constructing Manhattan Grid, Landmarks & Streetscape...';
@@ -87,17 +112,17 @@ async function initApp() {
 
   // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
   const cityGrid = buildCityGrid(scene);
-  markInit('cityGrid');
+  await stepDone('cityGrid');
   const boroughs = buildBoroughs(scene, { sidewalks: cityGrid.sidewalks });
-  markInit('boroughs');
+  await stepDone('boroughs');
   const { colliders: landmarkColliders } = buildLandmarks(scene);
-  markInit('landmarks');
+  await stepDone('landmarks');
   const cityBlocks = buildCityBlocks(scene);
-  markInit('blocks');
+  await stepDone('blocks');
   const allColliders = [...landmarkColliders, ...cityBlocks.colliders, ...boroughs.colliders, ...(cityGrid.colliders || [])];
 
   const streetDetails = buildStreetDetails(scene);
-  markInit('streetDetails');
+  await stepDone('streetDetails');
   // Buildings turned along non-grid streets have oriented colliders whose world bounds reach past their lots: they stay
   // inside the property line anyway, so the road network (lanes & sidewalks) doesn't need them.
   // Elevated building sections that clear even a bus don't obstruct ground traffic.
@@ -106,10 +131,10 @@ async function initApp() {
     ...streetDetails.footprints,
     ...allColliders.filter((c) => !c.obb && (c.minY ?? 0) < 3.5)
   ]);
-  markInit('traffic');
+  await stepDone('traffic');
   const highwayTraffic = createHighwayTraffic(scene, cityGrid.highwayLanes);
   buildRoadPaint(scene, trafficSystem.network);
-  markInit('roadPaint');
+  await stepDone('roadPaint');
 
   // 4. Initialize Third-Person Controllers (Person, Car, Cyclist, Helicopter) & Multi-Camera System
   const controllerManager = new ThirdPersonControllerManager(scene, allColliders);
@@ -159,7 +184,7 @@ async function initApp() {
     if (!event.persisted) audioSystem.dispose();
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) savePlayerState(); });
-  markInit('controllers');
+  await stepDone('controllers');
 
   // Island-wide static geometry: chunk & distance-cull the small props, shadow stand-ins for the big casters
   // (scene-culling.js)
@@ -167,7 +192,7 @@ async function initApp() {
     .map((name) => scene.getObjectByName(name))
     .filter(Boolean);
   setupSceneCulling(scene, cullingRoots, lightingSystem.sunLight.shadow);
-  markInit('culling');
+  await stepDone('culling');
 
   // On WebGPU, small InstancedMeshes (<= 1000 instances) keep their matrices in uniform buffers that three.js
   // re-uploads on every draw of every pass (~2.5 MB/frame with the shadow cascades, stalling the GPU queue).
@@ -187,42 +212,54 @@ async function initApp() {
   // them spares the GPU writing 3 x 4 samples per pixel to memory every frame (transient, memoryless attachments where
   // the browser supports them). The multisampled depth stays stored: SSR reads it.
   scenePass.renderTarget.storeMultisampledColorBuffer = false;
-  const ssrFade = smoothstep(360.0, 180.0, positionView.z.negate());
-  const maxSSRRoughness = 0.75;
-  const sceneMRT = mrt({
-    output: output,
-    normal: normalView,
-    metalRough: vec2(roughness.lessThan(maxSSRRoughness).select(metalness.mul(ssrFade), 0), roughness)
-  });
-  sceneMRT.setBlendMode('normal', new THREE.BlendMode(THREE.MaterialBlending));
-  sceneMRT.setBlendMode('metalRough', new THREE.BlendMode(THREE.MaterialBlending));
-  scenePass.setMRT(sceneMRT);
-
+  // The reflections (High) need the scene's normals and roughness as well: the other levels draw colour alone
   const scenePassColor = scenePass.getTextureNode('output');
-  const scenePassDepth = scenePass.getTextureNode('depth');
-  const scenePassNormal = scenePass.getTextureNode('normal');
-  const scenePassMetalRough = scenePass.getTextureNode('metalRough');
+  let sceneMRT = null;
+  let reflections = vec4(0);
+  if (preset.reflections) {
+    const ssrFade = smoothstep(360.0, 180.0, positionView.z.negate());
+    const maxSSRRoughness = 0.75;
+    sceneMRT = mrt({
+      output: output,
+      normal: normalView,
+      metalRough: vec2(roughness.lessThan(maxSSRRoughness).select(metalness.mul(ssrFade), 0), roughness)
+    });
+    sceneMRT.setBlendMode('normal', new THREE.BlendMode(THREE.MaterialBlending));
+    sceneMRT.setBlendMode('metalRough', new THREE.BlendMode(THREE.MaterialBlending));
+    scenePass.setMRT(sceneMRT);
 
-  const ssrPass = ssr(scenePassColor, scenePassDepth, scenePassNormal, {
-    metalnessNode: scenePassMetalRough.r,
-    roughnessNode: scenePassMetalRough.g,
-    camera: cameraSystem.camera
-  });
-  ssrPass.resolutionScale = 0.5;
-  ssrPass.blurQuality = 1;
-  ssrPass.maxDistance.value = 42;
-  ssrPass.thickness.value = 0.85;
-  // Fewer coarse steps, then refine detected hits to keep reflection edges precise.
-  ssrPass.quality.value = 0.25;
-  ssrPass.binaryRefine = true;
-  ssrPass.intensity.value = 0.50;
-  ssrPass.screenEdgeFadeBlack = true;
+    const scenePassDepth = scenePass.getTextureNode('depth');
+    const scenePassNormal = scenePass.getTextureNode('normal');
+    const scenePassMetalRough = scenePass.getTextureNode('metalRough');
 
-  // Roughness mip blur must not spread reflections back onto matte or nonreflective surfaces.
-  const reflectionMask = scenePassMetalRough.r.greaterThan(0).select(smoothstep(maxSSRRoughness, 0.55, scenePassMetalRough.g), 0);
-  const reflections = ssrPass.mul(reflectionMask);
-  const colorGrade = createPostProcessing(renderer, scenePassColor, reflections);
+    const ssrPass = ssr(scenePassColor, scenePassDepth, scenePassNormal, {
+      metalnessNode: scenePassMetalRough.r,
+      roughnessNode: scenePassMetalRough.g,
+      camera: cameraSystem.camera
+    });
+    ssrPass.resolutionScale = 0.5;
+    ssrPass.blurQuality = 1;
+    ssrPass.maxDistance.value = 42;
+    ssrPass.thickness.value = 0.85;
+    // Fewer coarse steps, then refine detected hits to keep reflection edges precise.
+    ssrPass.quality.value = 0.25;
+    ssrPass.binaryRefine = true;
+    ssrPass.intensity.value = 0.50;
+    ssrPass.screenEdgeFadeBlack = true;
+
+    // Roughness mip blur must not spread reflections back onto matte or nonreflective surfaces.
+    const reflectionMask = scenePassMetalRough.r.greaterThan(0).select(smoothstep(maxSSRRoughness, 0.55, scenePassMetalRough.g), 0);
+    reflections = ssrPass.mul(reflectionMask);
+  } else {
+    // Without reflections the pass draws colour alone, but the decal, lamp-pool and flare materials still carry an MRT
+    // of their own (normal, metalRough). Without a scene MRT three would use it in place of the colour output, find
+    // none of its targets in the pass and emit an empty WGSL output struct, so those pipelines failed to compile.
+    // Merged into this one, their colour is kept and the targets the pass does not have are dropped.
+    scenePass.setMRT(mrt({ output }));
+  }
+  const colorGrade = createPostProcessing(renderer, scenePassColor, reflections, { bloom: preset.bloom });
   const renderPipeline = new THREE.RenderPipeline(renderer, colorGrade.outputNode);
+  await stepDone('postFX');
 
   // 6. Wire UI Controls (Strictly using safe DOM APIs: textContent, classList, addEventListener)
   const modeButtons = document.querySelectorAll('[data-mode]');
@@ -391,6 +428,27 @@ async function initApp() {
   timeButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       selectTime(btn.getAttribute('data-time'));
+    });
+  });
+
+  // Graphics quality: the chosen level is saved for this device and the city restarts at it (every shader depends on
+  // it). Auto shows the level it picked.
+  const qualityNames = { low: 'Low', medium: 'Medium', high: 'High' };
+  const qualityButtons = document.querySelectorAll('[data-quality]');
+  const qualityAutoSub = document.getElementById('quality-auto-sub');
+  if (qualityAutoSub && qualitySetting === 'auto') qualityAutoSub.textContent = `${qualityNames[quality]} on this device`;
+  qualityButtons.forEach((btn) => {
+    const value = btn.getAttribute('data-quality');
+    btn.classList.toggle('active', value === qualitySetting);
+    btn.setAttribute('aria-pressed', String(value === qualitySetting));
+    btn.addEventListener('click', () => {
+      closePopovers();
+      if (value === qualitySetting) return;
+      saveQualitySetting(value);
+      savePlayerState();
+      const url = new URL(location.href);
+      url.searchParams.delete('quality');
+      location.replace(url.href);
     });
   });
 
@@ -566,95 +624,44 @@ async function initApp() {
   selectTime('golden');
   // the web fonts change the buttons' widths once they arrive
   if (document.fonts) document.fonts.ready.then(placeModeIndicator);
-  markInit('ui');
+  await stepDone('ui');
 
-  // The loading screen stays up while the shaders compile (precompileShaders() & the warm-up frame, see the loop) and
+  // The loading screen stays up while the first frame's shaders compile (precompileShaders(), see the loop) and
   // until the first frame is on screen
   if (loadingStatus) {
     loadingStatus.textContent = 'Compiling Shaders & Render Pipelines...';
   }
 
-  // 6b. Shader pre-compilation behind the loading screen. compileAsync() builds the node graphs in slices and has the GPU
-  //     process compile the pipelines in parallel, but after every 8 ms slice it waits for a rendered frame, which
-  //     leaves the main thread idle about half the time while nothing else animates; several calls side by side keep
-  //     it busy (warm cache: 2.1 s instead of 4.0 s). (Rendering straight away compiled ~500 pipelines one after
-  //     another: ~25 s with a cold shader cache.)
-  const COMPILE_POOL = 16;
-  const nextTask = () => (globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise((resolve) => setTimeout(resolve, 0)));
-  async function precompileShaders() {
-    // An empty frame first: it sets up the post-processing chain, which configures the scene pass's render target
-    // (MSAA samples, depth format), so the pipelines compiled below are the very ones the scene pass asks for
-    scene.visible = false;
-    renderPipeline.render();
-    scene.visible = true;
-    markInit('postFX');
+  // 6b. Pipelines. The city draws with several hundred: each needs its node graph built on the main thread (tens of
+  //     milliseconds, once per instanced mesh, since three.js keys an instanced mesh's graph by the mesh) and its GPU
+  //     pipeline compiled (up to seconds under the WebGL2 fallback). None is built in advance or inside a frame:
+  //     async-pipelines.js skips a draw until its pipeline exists, builds a few graphs per frame and has the GPU
+  //     process compile the pipelines in parallel. The opaque pass draws nearest first, so the street around the
+  //     player fills in first; the loading screen stays up until everything within FIRST_FRAME_RADIUS is drawn, and
+  //     the far side of the city appears while playing.
+  const FIRST_FRAME_RADIUS = 80; // metres
 
-    // Every visible object with frustum culling off (like the warm-up frame, see the loop). Plain meshes that share
-    // a material share its shader, so one job compiles them in turn (the first build serves the rest); every
-    // instanced mesh gets a build of its own unless its chunks share a pipeline
-    const culled = [];
-    const jobs = [];
-    const jobByMaterial = new Map();
-    const pipelines = new Set();
-    scene.traverseVisible((o) => {
-      if (o.frustumCulled) {
-        culled.push(o);
-        o.frustumCulled = false;
-      }
-      if (!o.isMesh && !o.isLine && !o.isPoints && !o.isSprite) return;
-      // Use the first visible chunk: the original representative may be in an inactive tree cell. Shadow stand-ins
-      // only draw in the shadow maps (the warm-up frame compiles those).
-      if (o.userData.shadowProxy) return;
-      const pipeline = o.userData.sharesPipelineWith || o;
-      if (pipelines.has(pipeline)) return;
-      pipelines.add(pipeline);
-      if (o.isInstancedMesh || Array.isArray(o.material)) {
-        jobs.push([o]);
-        return;
-      }
-      let job = jobByMaterial.get(o.material);
-      if (!job) {
-        job = [];
-        jobByMaterial.set(o.material, job);
-        jobs.push(job);
-      }
-      job.push(o);
-    });
-
-    renderer.setRenderTarget(scenePass.renderTarget);
-    renderer.setMRT(sceneMRT);
-    const compile = async (object) => {
-      // Each compile starts in a task of its own: compileAsync() keeps one precompilation state on the renderer,
-      // which must not be mid-step for two of them in the same microtask checkpoint
-      await nextTask();
-      try {
-        await renderer.compileAsync(object, cameraSystem.camera, scene);
-      } catch (e) {
-        console.warn('[compile]', e); // the warm-up frame compiles it instead
-      }
-    };
-    let next = 0;
-    let done = 0;
-    const worker = async () => {
-      while (next < jobs.length) {
-        const job = jobs[next++];
-        for (const object of job) await compile(object);
-        done++;
-        if (loadingStatus) {
-          loadingStatus.textContent = `Compiling Shaders & Render Pipelines... ${Math.round((done / jobs.length) * 100)}%`;
+  // Auto quality learns from how the game runs here: the frame rate over 20 s of play, once the far pipelines had
+  // 10 s to compile, decides whether the next visit starts a level lower (quality.js)
+  function measureAutoQuality() {
+    setTimeout(() => {
+      let frames = 0;
+      let hiddenMeanwhile = false;
+      const started = performance.now();
+      const onHide = () => { hiddenMeanwhile = true; };
+      document.addEventListener('visibilitychange', onHide);
+      const count = () => {
+        frames++;
+        if (performance.now() - started < 20000) {
+          requestAnimationFrame(count);
+          return;
         }
-        setLoadingProgress(done / jobs.length);
-        reportProgress('compile', done / jobs.length);
-      }
-    };
-    await Promise.all(Array.from({ length: COMPILE_POOL }, worker));
-    renderer.setMRT(null);
-    renderer.setRenderTarget(null);
-    for (const o of culled) o.frustumCulled = true;
+        document.removeEventListener('visibilitychange', onHide);
+        if (!hiddenMeanwhile) learnAutoQuality(quality, (frames * 1000) / (performance.now() - started));
+      };
+      requestAnimationFrame(count);
+    }, 10000);
   }
-
-  await precompileShaders();
-  markInit('compile');
 
   // 6. Animation Loop
   let lastTime = performance.now();
@@ -663,10 +670,14 @@ async function initApp() {
   let fpsTimer = 0;
   let nextPlayerSave = 0;
   let warmedUp = false; // see the first frame below
+  const STALL_MS = 4000;
+  let lastBuiltNear = -1;
+  let lastProgressAt = performance.now();
 
   if (elFps) elFps.textContent = '60';
 
   renderer.setAnimationLoop((now) => {
+    pipelineGate.beginFrame();
     const rawDt = (now - lastTime) * 0.001;
     lastTime = now;
     const dt = Math.min(Math.max(rawDt, 0.001), 0.05);
@@ -697,45 +708,44 @@ async function initApp() {
     lightingSystem.update(cameraSystem.currentPos);
     mapSystem.update();
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
-    if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk
+    updateSceneCulling(cameraSystem.camera.position);
     remotePlayers.update(dt, cameraSystem.camera);
     shareState(now, controllerManager.getActiveEntity(), controllerManager.activeMode);
 
     // Render frame via TSL RenderPipeline (SSR + Bloom)
-    if (!warmedUp) {
-      // First frame = pipeline warm-up behind the loading screen, for what precompileShaders() can't reach (the shadow
-      // map passes): with frustum culling off, every visible material's pipelines compile now instead of stalling the
-      // first time the camera turns towards it (one chunk / shadow stand-in per shared pipeline is enough)
-      const culled = [];
-      const pipelines = new Set();
-      scene.traverseVisible((o) => {
-        const pipeline = o.userData.sharesPipelineWith || o;
-        if (pipelines.has(pipeline)) return;
-        pipelines.add(pipeline);
-        if (o.frustumCulled) {
-          culled.push(o);
-          o.frustumCulled = false;
-        }
-      });
-      renderPipeline.render();
-      for (const o of culled) o.frustumCulled = true;
-      markInit('warmup');
-    }
+    viewPosition.copy(cameraSystem.camera.position);
+    pipelineGate.setNearRadius(warmedUp ? 0 : FIRST_FRAME_RADIUS);
     renderPipeline.render();
-    if (!warmedUp) {
+    // A pipeline that never turns up (a driver that fails it without an error) must not hold the loading screen: no
+    // progress for STALL_MS and the game starts with what it has
+    if (pipelineGate.stats.builtNear !== lastBuiltNear) {
+      lastBuiltNear = pipelineGate.stats.builtNear;
+      lastProgressAt = now;
+    }
+    if (!warmedUp && pipelineGate.stats.waitingNear > 0 && now - lastProgressAt < STALL_MS) {
+      // The loading screen stays up while the pipelines of the view around the player are created between frames;
+      // the bar shows how many of those it has (the count of the ones still missing only grows while it is found)
+      const { builtNear, waitingNear } = pipelineGate.stats;
+      const share = builtNear / (builtNear + waitingNear);
+      if (loadingStatus) loadingStatus.textContent = `Compiling Shaders & Render Pipelines... ${Math.round(share * 100)}%`;
+      setLoadingProgress(share);
+      reportProgress('compile', share);
+    } else if (!warmedUp) {
       warmedUp = true;
       markInit('firstFrame');
-      // The loading screen stays up until the GPU has got through the first frame (and the pipelines its warm-up
-      // compiled), i.e. until the city is actually on screen
+      // The loading screen stays up until the GPU has got through the first frame (and the pipelines it compiled),
+      // i.e. until the city is actually on screen; the rest of the city's pipelines compile after that
       const device = renderer.backend.device;
       Promise.resolve(device && device.queue.onSubmittedWorkDone()).catch(() => {}).then(() => {
         markInit('gpu');
-        console.log(`[init] ${initTimings.join(', ')}`);
+        console.log(`[init] ${initTimings.join(', ')}; first frame waited on ${pipelineGate.stats.built} pipelines (${pipelineGate.stats.failed} failed)`);
         initTimings = null;
         if (loadingOverlay) loadingOverlay.classList.add('hidden');
+        pipelineGate.setBudget(PLAYING_BUILD_BUDGET);
         audioSystem.ready = true;
         setLoadingProgress(1);
         reportReady();
+        if (qualitySetting === 'auto') measureAutoQuality();
       });
     }
 

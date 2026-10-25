@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { SharedInstances } from './shared-instances.js';
 
 // js/scene-culling.js
 // Spatial culling for the island-wide static geometry. Most of Manhattan's street furniture and building massing is
@@ -73,8 +74,9 @@ function copyObjectState(dst, src) {
   if (Object.prototype.hasOwnProperty.call(src, 'onAfterRender')) dst.onAfterRender = src.onAfterRender;
 }
 
-// One InstancedMesh per `cell` x `cell` m square of the instances' positions, sharing the source's vertex data and
-// material (so the same shader pipeline) with its per-instance data split up
+// One SharedInstances per `cell` x `cell` m square of the instances' positions, sharing the source's vertex data and
+// material - and so one node graph and pipeline for all of them (shared-instances.js) - with its per-instance data
+// split up
 function chunkInstancedMesh(mesh, cell) {
   const n = mesh.count;
   const src = mesh.instanceMatrix.array;
@@ -108,16 +110,16 @@ function chunkInstancedMesh(mesh, cell) {
     geo.boundingSphere = geo0.boundingSphere;
     geo.boundingBox = geo0.boundingBox;
 
-    const chunk = new THREE.InstancedMesh(geo, mesh.material, ids.length);
-    ids.forEach((id, j) => chunk.instanceMatrix.array.set(src.subarray(id * 16, id * 16 + 16), j * 16));
+    const matrices = new Float32Array(ids.length * 16);
+    ids.forEach((id, j) => matrices.set(src.subarray(id * 16, id * 16 + 16), j * 16));
+    let colors = null;
     if (mesh.instanceColor) {
       const c = mesh.instanceColor.array;
-      const arr = new Float32Array(ids.length * 3);
-      ids.forEach((id, j) => arr.set(c.subarray(id * 3, id * 3 + 3), j * 3));
-      chunk.instanceColor = new THREE.InstancedBufferAttribute(arr, 3);
+      colors = new Float32Array(ids.length * 3);
+      ids.forEach((id, j) => colors.set(c.subarray(id * 3, id * 3 + 3), j * 3));
     }
+    const chunk = new SharedInstances(geo, mesh.material, matrices, colors);
     copyObjectState(chunk, mesh);
-    chunk.computeBoundingSphere();
     chunks.push(chunk);
   }
   return chunks;
@@ -134,12 +136,10 @@ function replaceWithChunks(mesh, cell) {
   const parent = mesh.parent;
   const chunks = chunkInstancedMesh(mesh, cell);
   parent.remove(mesh);
-  chunks.forEach((chunk, k) => {
+  for (const chunk of chunks) {
     parent.add(chunk);
-    // Shader precompile: every chunk shares the first chunk's pipeline (main.js).
-    if (k > 0) chunk.userData.sharesPipelineWith = chunks[0];
     chunk.updateMatrixWorld(true);
-  });
+  }
   return chunks;
 }
 
@@ -173,7 +173,7 @@ function setupSceneCulling(scene, roots, shadow = null) {
     }
     const cell = Math.min(600, Math.max(250, cullDist * 0.5));
     for (const chunk of replaceWithChunks(mesh, cell)) {
-      const sphere = chunk.boundingSphere.clone().applyMatrix4(chunk.matrixWorld);
+      const sphere = chunk.geometry.boundingSphere.clone().applyMatrix4(chunk.matrixWorld);
       culled.push({ mesh: chunk, x: sphere.center.x, y: sphere.center.y, z: sphere.center.z, r: sphere.radius, d: cullDist });
     }
   }
@@ -213,7 +213,7 @@ function setupSceneCulling(scene, roots, shadow = null) {
     const sources = [];
     for (const root of roots) {
       root.traverse((o) => {
-        if (!o.castShadow || !isStaticMesh(o) || !proxyableMaterial(o.material)) return;
+        if (!o.castShadow || !isStaticMesh(o) || o.isSharedInstances || !proxyableMaterial(o.material)) return;
         if (o.isInstancedMesh && o.count !== o.instanceMatrix.count) return;
         const tris = triangleCount(o.geometry) * (o.isInstancedMesh ? o.count : 1);
         if (tris < 20000) return;
@@ -276,7 +276,6 @@ function setupSceneCulling(scene, roots, shadow = null) {
       o.castShadow = false;
     }
 
-    const firstProxy = new Map(); // material + kind -> the stand-in that compiles their shared pipeline
     const addProxy = (mesh) => {
       mesh.name = 'ShadowProxy';
       mesh.layers.set(SHADOW_PROXY_LAYER);
@@ -284,18 +283,11 @@ function setupSceneCulling(scene, roots, shadow = null) {
       mesh.receiveShadow = false;
       mesh.frustumCulled = true;
       mesh.userData.shadowProxy = true;
-      const kind = mesh.material.uuid + (mesh.isInstancedMesh ? ':i' : ':m');
-      if (firstProxy.has(kind)) mesh.userData.sharesPipelineWith = firstProxy.get(kind);
-      else firstProxy.set(kind, mesh);
       scene.add(mesh);
     };
     for (const entry of instancedBySig.values()) {
       for (const list of entry.cells.values()) {
-        const n = list.length / 16;
-        const mesh = new THREE.InstancedMesh(entry.geometry, entry.material, n);
-        mesh.instanceMatrix.array.set(list);
-        mesh.computeBoundingSphere();
-        addProxy(mesh);
+        addProxy(new SharedInstances(entry.geometry, entry.material, new Float32Array(list)));
       }
     }
     for (const [side, bySide] of triCells) {
