@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { host } from "@polaris/app-host";
 import * as service from "../../lib/minecraft/ranks-service";
+import { searchKnownPlayers } from "../../lib/games-activity-service";
 import { gameWords, issueText, messageText } from "../game-words";
 import { ranksSchema, type Rank } from "../../lib/minecraft/ranks";
 import { editionOf, type MinecraftEdition } from "../../lib/minecraft/service";
@@ -35,9 +36,14 @@ async function allowed(userId: string): Promise<boolean> {
     return result.ok;
 }
 
+/** How many of the server's players the picker offers, most recent first. */
+const PLAYER_SUGGESTIONS = 100;
+
 export interface RanksView {
     readonly ranks: readonly Rank[];
     readonly edition: MinecraftEdition;
+    /** The server's players, online and seen before, for the picker. */
+    readonly players: readonly { readonly name: string; readonly online: boolean }[];
 }
 
 export async function readRanksAction(
@@ -48,8 +54,15 @@ export async function readRanksAction(
     if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
         const { access } = await requireGameServer("games.console", parsed.data);
-        const state = await service.readServerRanks(parsed.data);
-        return { view: { ranks: state.ranks, edition: editionOf(access.install.catalogId) } };
+        const [state, known] = await Promise.all([
+            service.readServerRanks(parsed.data),
+            // Suggestions only: a picker with none still takes a typed name.
+            searchKnownPlayers([parsed.data], "", PLAYER_SUGGESTIONS).catch(() => [])
+        ]);
+        const players = known.map((one) => ({ name: one.name, online: one.online }));
+        return {
+            view: { ranks: state.ranks, edition: editionOf(access.install.catalogId), players }
+        };
     } catch (caught) {
         return { error: await failure(caught, words("ranks.readFailed")) };
     }

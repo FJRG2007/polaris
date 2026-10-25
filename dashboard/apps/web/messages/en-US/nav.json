@@ -372,7 +372,8 @@
         "Email & SMS": "Email & SMS",
         "People & access": "People & access",
         "Platform": "Platform",
-        "Areas": "Areas"
+        "Areas": "Areas",
+        "Ranks": "Ranks"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

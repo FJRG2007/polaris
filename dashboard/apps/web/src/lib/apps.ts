@@ -66,6 +66,7 @@ import {
     MessageCircle,
     MessageSquare,
     MessageSquareWarning,
+    Crown,
     MessagesSquare,
     MonitorSmartphone,
     Network,
@@ -2917,6 +2918,22 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
             "fly hack",
             "teleport",
             "diamonds"
+        ]
+    },
+    ranks: {
+        label: "Ranks", // i18n-ignore
+        icon: Crown,
+        group: TALKING_GROUP,
+        keywords: [
+            "rank",
+            "rangos",
+            "prefix",
+            "tag",
+            "team",
+            "tab list",
+            "chat colour",
+            "admin",
+            "vip"
         ]
     },
     moderation: {

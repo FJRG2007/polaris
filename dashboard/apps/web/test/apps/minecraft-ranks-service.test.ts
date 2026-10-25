@@ -115,6 +115,11 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     }
 }));
 
+vi.mock("@polaris-app/game-servers/src/lib/games-activity-service", () => ({
+    searchKnownPlayers: async () =>
+        catalogId === "minecraft" ? [{ name: "Alex", online: true, playerId: null }] : []
+}));
+
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/world", () => ({
     levelEnvKey: () => "LEVEL",
     isLevelName: (value: string) => /^[A-Za-z0-9_-]+$/.test(value),
@@ -334,11 +339,20 @@ describe("the actions", () => {
         expect(config.ranks).toBeUndefined();
     });
 
+    it("read the ranks with the server's players for the picker", async () => {
+        expect((await actions.readRanksAction(INSTALL)).view).toEqual({
+            ranks: [],
+            edition: "java",
+            players: [{ name: "Alex", online: true }]
+        });
+    });
+
     it("read the edition, so the screen can say why Bedrock has none", async () => {
         catalogId = "minecraft-bedrock";
         expect((await actions.readRanksAction(INSTALL)).view).toEqual({
             ranks: [],
-            edition: "bedrock"
+            edition: "bedrock",
+            players: []
         });
     });
 });

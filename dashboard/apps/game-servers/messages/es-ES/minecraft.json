@@ -3142,7 +3142,7 @@
         "intro": "El símbolo y la etiqueta delante del nombre del jugador, en el chat y en la lista de jugadores.",
         "reapplied": "Se vuelven a aplicar al arrancar el servidor y cuando entra un jugador con rango.",
         "bedrock": "Bedrock no tiene equipos: los rangos solo funcionan en servidores Java.",
-        "empty": "Aún no hay rangos",
+        "empty": "Sin rangos aún",
         "emptyHint": "Crea uno o importa los equipos que ya tiene el servidor.",
         "add": "Nuevo rango",
         "import": "Importar del servidor",
@@ -3151,10 +3151,12 @@
         "saving": "Aplicando...",
         "discard": "Descartar cambios",
         "unsaved": "Cambios sin guardar",
+        "invalid": "Corrige los rangos marcados para guardar.",
         "readFailed": "No se pudieron cargar los rangos.",
         "retry": "Reintentar",
         "name": "Nombre",
-        "tag": "Etiqueta",
+        "tag": "Tag",
+        "tagPlaceholder": "VIP",
         "symbol": "Símbolo",
         "noSymbol": "Ninguno",
         "color": "Color",
@@ -3166,7 +3168,7 @@
         "players": "Jugadores",
         "playerCount": "{count, plural, one {# jugador} other {# jugadores}}",
         "addPlayer": "Añadir",
-        "playerPlaceholder": "Nombre del jugador",
+        "playerPlaceholder": "Jugador",
         "suggestions": "Jugadores de este servidor",
         "online": "En línea",
         "noPlayers": "Nadie tiene este rango aún.",
@@ -3184,7 +3186,7 @@
         "replaceBody": "Al guardar se eliminan estos equipos del servidor y sus jugadores pasan al rango equivalente:",
         "replaceConfirm": "Reemplazar y aplicar",
         "importTitle": "Equipos del servidor",
-        "importBody": "Elige qué equipos editar como rangos. Nada cambia en el servidor hasta que guardes.",
+        "importBody": "Elige qué equipos editar como rangos. Al guardar, cada uno sustituye a su equipo en el servidor; antes no cambia nada.",
         "importNone": "El servidor no tiene otros equipos.",
         "importAdd": "Añadir {count, plural, one {# rango} other {# rangos}}",
         "importFailed": "No se pudieron leer los equipos. Arranca el servidor y reintenta.",
@@ -3202,7 +3204,8 @@
             "duplicate": "Dos rangos comparten id",
             "twice": "{player} ya tiene el rango {rank}",
             "tooMany": "Máximo {max} rangos",
-            "tooManyPlayers": "Máximo {max} jugadores con rango"
+            "tooManyPlayers": "Máximo {max} jugadores con rango",
+            "taken": "{player} ya tiene otro rango"
         }
     }
 }

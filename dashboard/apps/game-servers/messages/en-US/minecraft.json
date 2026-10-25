@@ -3151,10 +3151,12 @@
         "saving": "Applying...",
         "discard": "Discard changes",
         "unsaved": "Unsaved changes",
+        "invalid": "Fix the marked ranks to save.",
         "readFailed": "Could not load the ranks.",
         "retry": "Try again",
         "name": "Name",
         "tag": "Tag",
+        "tagPlaceholder": "VIP",
         "symbol": "Symbol",
         "noSymbol": "None",
         "color": "Color",
@@ -3184,7 +3186,7 @@
         "replaceBody": "Saving removes these teams from the server and moves their players to the matching rank:",
         "replaceConfirm": "Replace and apply",
         "importTitle": "Teams on this server",
-        "importBody": "Pick the teams to edit as ranks. Nothing changes on the server until you save.",
+        "importBody": "Pick the teams to edit as ranks. When you save, each one replaces its team on the server; nothing changes before that.",
         "importNone": "This server has no other teams.",
         "importAdd": "Add {count, plural, one {# rank} other {# ranks}}",
         "importFailed": "Could not read the server's teams. Start the server and try again.",
@@ -3202,7 +3204,8 @@
             "duplicate": "Two ranks share an id",
             "twice": "{player} already has the rank {rank}",
             "tooMany": "At most {max} ranks",
-            "tooManyPlayers": "At most {max} ranked players"
+            "tooManyPlayers": "At most {max} ranked players",
+            "taken": "{player} already has another rank"
         }
     }
 }

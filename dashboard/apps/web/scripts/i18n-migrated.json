@@ -1757,6 +1757,8 @@
         "game-servers/src/screens/installed/minecraft-chat-moderation.tsx",
         "game-servers/src/screens/installed/minecraft-loader.tsx",
         "game-servers/src/screens/installed/minecraft-moderation.tsx",
+        "game-servers/src/screens/installed/minecraft-ranks.tsx",
+        "game-servers/src/screens/installed/ranks-actions.ts",
         "game-servers/src/screens/installed/minecraft-setting-fields.tsx",
         "game-servers/src/screens/installed/minecraft-spigot-plugins.tsx",
         "game-servers/src/screens/installed/restart-planner.tsx",
