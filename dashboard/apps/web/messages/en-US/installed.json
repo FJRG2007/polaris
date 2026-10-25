@@ -48,10 +48,10 @@
         "copying": "This server is being copied. It can be started once the copy is done."
     },
     "deployGap": {
-        "none": "Redeploy has no downtime: the new version takes over once it answers.",
-        "hostPort": "Redeploy restarts it: it binds port {port}/{protocol} on the server, which two versions cannot share.",
-        "volumes": "Redeploy restarts it: it keeps data on {names}, which two copies must not write at once.",
-        "other": "Redeploy restarts it. Its service settings in Deploy say why."
+        "none": "Redeploying causes no outage: the new version takes over once it is ready.",
+        "hostPort": "Redeploying cuts it for a moment: it uses port {port}/{protocol}, so the old version stops before the new one starts.",
+        "volumes": "Redeploying cuts it for a moment: the old version stops first, so two copies never write to {names} at once.",
+        "other": "Redeploying cuts it for a moment. Its service settings in Deploy show why."
     },
     "duplicate": "Duplicate",
     "duplicateCannotCreate": "You can't create servers, so you can't duplicate this one.",
