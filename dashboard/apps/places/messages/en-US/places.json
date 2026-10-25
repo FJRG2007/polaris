@@ -720,6 +720,7 @@
         "tapoRefused": "The camera would not do that",
         "tapoNotOffered": "This camera does not offer that",
         "talkElsewhere": "Somebody else is talking through this camera",
+        "talkStarting": "Your talk through this camera is already starting",
         "talkEnded": "This talk has ended",
         "talkCannot": "This camera cannot play a voice from Polaris",
         "cameraOff": "This camera is switched off",

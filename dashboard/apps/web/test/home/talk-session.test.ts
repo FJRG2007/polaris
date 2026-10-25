@@ -123,6 +123,14 @@ describe("starting a talk", () => {
         expect(endTalk).toHaveBeenCalledTimes(1);
     });
 
+    it("tells the same person their own start is still on its way", async () => {
+        const first = talk.startTalk("install-1", CAMERA, "user-1").catch((caught: unknown) => caught);
+        await expect(talk.startTalk("install-1", CAMERA, "user-1")).rejects.toThrow(talk.ALREADY_STARTING);
+        await expect(talk.startTalk("install-1", CAMERA, "user-2")).rejects.toThrow(talk.TALKING_ELSEWHERE);
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(await first).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
     it("refuses a camera reached over RTSP, or a make with no way to its speaker", async () => {
         row = { vendor: "tapo", reachVia: "local", enabled: true, privacy: false };
         await expect(started()).rejects.toThrow(talk.CANNOT_TALK);
@@ -208,6 +216,25 @@ describe("feeding and ending a talk", () => {
         await started();
         pushes[0]!.resolve();
         await vi.advanceTimersByTimeAsync(0);
+        expect(talk.talking(CAMERA)).toBe(false);
+    });
+
+    it("ends a live talk when the camera may no longer be talked through", async () => {
+        const id = await started();
+        await talk.endCameraTalk(CAMERA);
+        expect(talk.talking(CAMERA)).toBe(false);
+        expect(endTalk).toHaveBeenCalledTimes(1);
+        expect(() => talk.feedTalk(CAMERA, "user-1", id, new Uint8Array(2))).toThrow(talk.NOT_TALKING);
+    });
+
+    it("ends a talk that was still starting when the camera was made private", async () => {
+        const pending = talk.startTalk("install-1", CAMERA, "user-1").catch((caught: unknown) => caught);
+        await vi.advanceTimersByTimeAsync(100);
+        await talk.endCameraTalk(CAMERA);
+        await vi.advanceTimersByTimeAsync(1500);
+        const result = await pending;
+        expect(result).toBeInstanceOf(HomeError);
+        expect((result as Error).message).toBe(talk.NOT_TALKING);
         expect(talk.talking(CAMERA)).toBe(false);
     });
 

@@ -20,11 +20,19 @@ import { ViewerControl } from "./viewer-control";
 import type { TalkSupport } from "../lib/vendors";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MAX_CHUNK_BYTES, TalkResampler } from "../lib/talk-audio";
+import { MAX_CHUNK_BYTES, TALK_RATE, TalkResampler } from "../lib/talk-audio";
 
 /** How often what the microphone heard is sent. Short enough to sound live,
  *  long enough not to be a request per word. */
 const SEND_EVERY_MS = 250;
+
+/** A piece still on its way after this long is given up on, so one stalled
+ *  request does not hold every piece behind it. */
+const SEND_TIMEOUT_MS = 5000;
+
+/** At most a second of voice waits to be sent. Older than that is dropped: a
+ *  voice heard seconds late is worse than a gap. */
+const MAX_QUEUED_BYTES = TALK_RATE * 2;
 
 interface Live {
     readonly talkId: string;
@@ -56,6 +64,12 @@ function joined(parts: Uint8Array[]): Uint8Array {
         }
     }
     return out;
+}
+
+function dropStale(parts: Uint8Array[]): void {
+    let size = 0;
+    for (const part of parts) size += part.byteLength;
+    while (size > MAX_QUEUED_BYTES && parts.length > 1) size -= (parts.shift() as Uint8Array).byteLength;
 }
 
 export function TalkControl({ cameraId, support }: { cameraId: string; support: TalkSupport }) {
@@ -100,7 +114,8 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
         fetch(url, {
             method: "POST",
             headers: { "content-type": "application/octet-stream" },
-            body: body.slice().buffer
+            body: body.slice().buffer,
+            signal: AbortSignal.timeout(SEND_TIMEOUT_MS)
         })
             .then((response) => {
                 // Over on the server: ended by the camera, by the relay, or by a
@@ -118,12 +133,15 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
 
     const start = useCallback(async () => {
         setState("starting");
+        const context = new AudioContext();
+        void context.resume().catch(() => undefined);
         let stream: MediaStream;
         try {
             stream = await navigator.mediaDevices.getUserMedia({
                 audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
             });
         } catch {
+            void context.close().catch(() => undefined);
             if (mounted.current) setState("idle");
             toast.show({ key, title: t("talk.noMic") });
             return;
@@ -131,6 +149,7 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
         const result = await actions.startTalkAction(cameraId).catch(() => null);
         if (!result?.talkId || !mounted.current) {
             for (const track of stream.getTracks()) track.stop();
+            void context.close().catch(() => undefined);
             if (result?.talkId) void actions.stopTalkAction(cameraId, result.talkId).catch(() => undefined);
             if (mounted.current) {
                 setState("idle");
@@ -138,7 +157,6 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
             }
             return;
         }
-        const context = new AudioContext();
         const source = context.createMediaStreamSource(stream);
         // Deprecated in favour of a worklet, and still in every browser; a
         // worklet would need a script file of its own served next to the page.
@@ -147,6 +165,7 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
         const pending: Uint8Array[] = [];
         node.onaudioprocess = (event) => {
             pending.push(resampler.push(event.inputBuffer.getChannelData(0)));
+            dropStale(pending);
             // Nothing is played back: the output stays silent.
             event.outputBuffer.getChannelData(0).fill(0);
         };

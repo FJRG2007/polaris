@@ -27,6 +27,7 @@ const { TalkControl } = await import("@polaris-app/places/src/screens/talk-contr
 
 const trackStop = vi.fn();
 let processor: { onaudioprocess: ((event: unknown) => void) | null } | null = null;
+let contexts: FakeAudioContext[] = [];
 
 class FakeAudioContext {
     sampleRate = 48_000;
@@ -38,9 +39,11 @@ class FakeAudioContext {
         processor = { onaudioprocess: null, connect: vi.fn(), disconnect: vi.fn() } as never;
         return processor;
     }
-    close() {
-        return Promise.resolve();
+    constructor() {
+        contexts.push(this);
     }
+    resume = vi.fn(() => Promise.resolve());
+    close = vi.fn(() => Promise.resolve());
 }
 
 let getUserMedia: ReturnType<typeof vi.fn>;
@@ -54,6 +57,7 @@ beforeEach(() => {
     trackStop.mockClear();
     fetchMock.mockClear();
     processor = null;
+    contexts = [];
     getUserMedia = vi.fn(async () => ({ getTracks: () => [{ stop: trackStop }] }));
     vi.stubGlobal("navigator", { ...navigator, mediaDevices: { getUserMedia } });
     vi.stubGlobal("AudioContext", FakeAudioContext);
@@ -101,6 +105,37 @@ describe("the Talk button", () => {
         expect(screen.getByRole("button", { name: "Talk" })).toBeTruthy();
     });
 
+    it("opens the audio inside the press, before anything is awaited", () => {
+        render(withMessages(<TalkControl cameraId={CAMERA} support="yes" />));
+        fireEvent.click(screen.getByRole("button", { name: "Talk" }));
+        expect(contexts).toHaveLength(1);
+        expect(contexts[0]!.resume).toHaveBeenCalled();
+    });
+
+    it("keeps at most a second of voice waiting behind a stalled send", async () => {
+        let release: () => void = () => undefined;
+        fetchMock.mockImplementationOnce(
+            () => new Promise<Response>((resolve) => (release = () => resolve(new Response(null, { status: 204 }))))
+        );
+        render(withMessages(<TalkControl cameraId={CAMERA} support="yes" />));
+        fireEvent.click(screen.getByRole("button", { name: "Talk" }));
+        await settle();
+        const frame = {
+            inputBuffer: { getChannelData: () => new Float32Array(4800) },
+            outputBuffer: { getChannelData: () => new Float32Array(4800) }
+        };
+        processor!.onaudioprocess!(frame);
+        await settle(300);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect((fetchMock.mock.calls[0]![1] as RequestInit).signal).toBeInstanceOf(AbortSignal);
+        for (let i = 0; i < 50; i++) processor!.onaudioprocess!(frame);
+        release();
+        await settle(1000);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(((fetchMock.mock.calls[1]![1] as RequestInit).body as ArrayBuffer).byteLength).toBeLessThanOrEqual(16000);
+        fireEvent.click(screen.getByRole("button", { name: "Stop talking" }));
+    });
+
     it("starts no talk when the microphone is refused", async () => {
         getUserMedia.mockImplementation(async () => {
             throw new Error("NotAllowedError");
@@ -109,6 +144,7 @@ describe("the Talk button", () => {
         fireEvent.click(screen.getByRole("button", { name: "Talk" }));
         await settle();
         expect(startTalkAction).not.toHaveBeenCalled();
+        expect(contexts[0]!.close).toHaveBeenCalled();
         expect(screen.getByRole("button", { name: "Talk" })).toBeTruthy();
     });
 

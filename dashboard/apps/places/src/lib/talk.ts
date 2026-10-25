@@ -55,6 +55,7 @@ const AHEAD_SECONDS = 2;
 const PRIMER = new Uint8Array(TALK_RATE / 4).fill(0xd5);
 
 export const TALKING_ELSEWHERE = "Somebody else is talking through this camera";
+export const ALREADY_STARTING = "Your talk through this camera is already starting";
 export const NOT_TALKING = "This talk has ended";
 export const CANNOT_TALK = "This camera cannot play a voice from Polaris";
 
@@ -71,17 +72,24 @@ interface Talk {
     ended: boolean;
 }
 
+interface Starting {
+    readonly userId: string;
+    cancelled: boolean;
+}
+
+interface Registry {
+    talks: Map<string, Talk>;
+    starts: Map<string, Starting>;
+}
+
 const REGISTRY = Symbol.for("polaris.places.talk");
 
 /** Held on the process rather than the module: the action that starts a talk
  *  and the route that feeds it are bundled apart, and each would otherwise
  *  hold its own empty map. */
-function registry(): { talks: Map<string, Talk>; starting: Set<string> } {
-    const holder = globalThis as unknown as Record<
-        symbol,
-        { talks: Map<string, Talk>; starting: Set<string> } | undefined
-    >;
-    holder[REGISTRY] ??= { talks: new Map(), starting: new Set() };
+function registry(): Registry {
+    const holder = globalThis as unknown as Record<symbol, Registry | undefined>;
+    holder[REGISTRY] ??= { talks: new Map(), starts: new Map() };
     return holder[REGISTRY];
 }
 
@@ -156,16 +164,20 @@ export async function startTalk(
     cameraId: string,
     userId: string
 ): Promise<string> {
-    const { talks, starting } = registry();
+    const { talks, starts } = registry();
     const current = talks.get(cameraId);
     if (current && current.userId !== userId) throw new HomeError(TALKING_ELSEWHERE);
-    if (starting.has(cameraId)) throw new HomeError(TALKING_ELSEWHERE);
-    starting.add(cameraId);
+    const pending = starts.get(cameraId);
+    if (pending)
+        throw new HomeError(pending.userId === userId ? ALREADY_STARTING : TALKING_ELSEWHERE);
+    const starting: Starting = { userId, cancelled: false };
+    starts.set(cameraId, starting);
     try {
         if (current) await finish(current);
         const { endpoint, serverId } = await talkTarget(installedAppId, cameraId);
         await assertReady(endpoint, serverId);
         await prepareTalk(endpoint, cameraId);
+        if (starting.cancelled) throw new HomeError(NOT_TALKING);
 
         let write!: ReadableStreamDefaultController<Uint8Array>;
         const body = new ReadableStream<Uint8Array>({
@@ -201,13 +213,13 @@ export async function startTalk(
             await wait(PLAY_RETRY_MS);
             playing = !talk.ended && (await playTalk(endpoint, cameraId));
         }
-        if (!playing) {
+        if (!playing || starting.cancelled) {
             await finish(talk);
-            throw new HomeError("The camera would not play a voice");
+            throw new HomeError(starting.cancelled ? NOT_TALKING : "The camera would not play a voice");
         }
         return talk.id;
     } finally {
-        starting.delete(cameraId);
+        if (starts.get(cameraId) === starting) starts.delete(cameraId);
     }
 }
 
@@ -238,6 +250,17 @@ export async function stopTalk(cameraId: string, userId: string, talkId: string)
     if (!talk || talk.id !== talkId || talk.userId !== userId) return false;
     await finish(talk);
     return true;
+}
+
+/** End whatever is being said through a camera, and any talk still starting on
+ *  it, whoever it belongs to: for a camera just made private, switched off,
+ *  changed or removed, which a talk may no longer reach. */
+export async function endCameraTalk(cameraId: string): Promise<void> {
+    const { talks, starts } = registry();
+    const starting = starts.get(cameraId);
+    if (starting) starting.cancelled = true;
+    const talk = talks.get(cameraId);
+    if (talk) await finish(talk);
 }
 
 /** Whether somebody is talking through a camera now. For the test. */

@@ -58,6 +58,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["The camera would not do that", "refusals.tapoRefused"],
     ["This camera does not offer that", "refusals.tapoNotOffered"],
     ["Somebody else is talking through this camera", "refusals.talkElsewhere"],
+    ["Your talk through this camera is already starting", "refusals.talkStarting"],
     ["This talk has ended", "refusals.talkEnded"],
     ["This camera cannot play a voice from Polaris", "refusals.talkCannot"],
     ["This camera is switched off", "refusals.cameraOff"],

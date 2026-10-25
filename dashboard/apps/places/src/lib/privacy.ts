@@ -21,6 +21,7 @@ import { HomeError } from "./home-error";
 import { hasNativePrivacy } from "./vendors";
 import { askTapo } from "./tapo-controls";
 import { cameraTarget } from "./cameras";
+import { endCameraTalk } from "./talk";
 import type { CameraPrivacy, PrivacyFailure, PrivacyTarget } from "./privacy-kinds";
 import { lensMaskOn, type TapoTransport } from "./integrations/tapo-camera";
 
@@ -126,6 +127,7 @@ async function store(row: Row, isPrivate: boolean): Promise<void> {
         where: { id: row.id },
         data: { privacy: isPrivate, privacyChangedAt: new Date() }
     });
+    if (isPrivate) await endCameraTalk(row.id);
 }
 
 /**

@@ -36,6 +36,9 @@ vi.mock("@polaris/app-host", () => ({
         auditService: { recordAudit }
     }
 }));
+vi.mock("@polaris-app/places/src/lib/talk", () => ({
+    endCameraTalk: async () => undefined
+}));
 vi.mock("@polaris/db", () => ({
     prisma: { place: { findUnique: async () => AT_DOOR } }
 }));

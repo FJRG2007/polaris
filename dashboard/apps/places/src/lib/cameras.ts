@@ -27,6 +27,7 @@ import { detectionSettingsSchema, type CameraInput, type CameraSwitch } from "./
 import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "./detection";
 import { host } from "@polaris/app-host";
 import * as rooms from "./rooms";
+import { endCameraTalk } from "./talk";
 
 const { dropGrantsFor } = host.accessGrants;
 
@@ -343,7 +344,7 @@ export async function updateCamera(
 ): Promise<CameraView> {
     const existing = await prisma.camera.findFirst({
         where: { id, installedAppId },
-        select: { id: true, placeId: true, address: true, vendor: true }
+        select: { id: true, placeId: true, address: true, vendor: true, reachVia: true }
     });
     if (!existing) throw new HomeError("Camera not found");
     const moved = existing.address !== input.address || existing.vendor !== input.vendor;
@@ -394,6 +395,7 @@ export async function updateCamera(
             ...(secretColumns(input.password) ?? {})
         }
     });
+    if (!input.enabled || moved || existing.reachVia !== input.reachVia) await endCameraTalk(id);
     return toView(row);
 }
 
@@ -410,6 +412,7 @@ export async function deleteCamera(installedAppId: string, id: string): Promise<
     // than by foreign key, so nothing takes them away on the camera's behalf.
     await dropGrantsFor("place.camera", id);
     await prisma.camera.delete({ where: { id } });
+    await endCameraTalk(id);
 }
 
 /** Flip a camera on or off, or change what it keeps, leaving the rest of it as
@@ -431,6 +434,7 @@ export async function switchCamera(
             ...(change.recording !== undefined ? { recording: change.recording } : {})
         }
     });
+    if (change.enabled === false) await endCameraTalk(id);
     return toView(row);
 }
 
