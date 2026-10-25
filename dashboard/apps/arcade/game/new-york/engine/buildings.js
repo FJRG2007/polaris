@@ -429,6 +429,8 @@ function buildCityBlocks(scene) {
   }
   // ... nor under the South Street Viaduct and its Battery Park Underpass portal (laid out by city-grid.js)
   for (const o of (fdrViaduct && fdrViaduct.boxes) || []) bridgeCorridors.push(o);
+  // Each box's bounding radius: a rect farther than both radii from a box cannot touch it (most lots are nowhere near one)
+  const corridorRadius = bridgeCorridors.map((o) => Math.hypot(o.hl, o.hw));
   // Separating-axis test of the rect [x0, x1] x [z0, z1] (of the current frame) against every corridor box
   function hitsBridgeCorridor(x0, x1, z0, z1) {
     const hx = (x1 - x0) * 0.5;
@@ -437,9 +439,13 @@ function buildCityBlocks(scene) {
     // the rect's axes in the world (R_y(θ) of local x and z)
     const ax = xf ? xf.cs : 1, az = xf ? -xf.sn : 0;
     const bx = xf ? xf.sn : 0, bz = xf ? xf.cs : 1;
-    for (const o of bridgeCorridors) {
+    const rectRadius = Math.hypot(hx, hz);
+    for (let i = 0; i < bridgeCorridors.length; i++) {
+      const o = bridgeCorridors[i];
       const dx = cx - o.cx;
       const dz = cz - o.cz;
+      const reach = rectRadius + corridorRadius[i];
+      if (dx * dx + dz * dz >= reach * reach) continue;
       const vx = -o.uz, vz = o.ux;
       let apart = false;
       for (const [nx, nz] of [[ax, az], [bx, bz], [o.ux, o.uz], [vx, vz]]) {

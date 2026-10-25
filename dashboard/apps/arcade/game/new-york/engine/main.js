@@ -640,6 +640,10 @@ async function initApp() {
   //     player fills in first; the loading screen stays up until everything within FIRST_FRAME_RADIUS is drawn, and
   //     the far side of the city appears while playing.
   const FIRST_FRAME_RADIUS = 80; // metres
+  // Nothing is built for the shadow maps until then (async-pipelines.js), so drawing them would only walk the city
+  // twice per frame for nothing: they start with the game
+  const sunShadow = lightingSystem.sunLight.shadow;
+  sunShadow.autoUpdate = false;
 
   // Auto quality learns from how the game runs here: the frame rate over 20 s of play, once the far pipelines had
   // 10 s to compile, decides whether the next visit starts a level lower (quality.js)
@@ -742,6 +746,7 @@ async function initApp() {
         initTimings = null;
         if (loadingOverlay) loadingOverlay.classList.add('hidden');
         pipelineGate.setBudget(PLAYING_BUILD_BUDGET);
+        sunShadow.autoUpdate = true;
         audioSystem.ready = true;
         setLoadingProgress(1);
         reportReady();
