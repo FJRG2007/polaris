@@ -17,6 +17,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     POLAR_THREAD_PAGE,
     threadPlace,
+    type PolarBulkAction,
     type PolarProjectRow,
     type PolarThreadRow
 } from "@/lib/polar/shared";
@@ -275,6 +276,34 @@ export function usePolarSidebar({
         onRemoved(id);
     };
 
+    /** One action on a selection, in one request: the rows change at once and
+     *  all come back, with a toast, when the server refuses. */
+    const bulk = async (action: PolarBulkAction): Promise<boolean> => {
+        const ids = new Set(action.ids);
+        const before = (rowsRef.current ?? []).filter((row) => ids.has(row.id));
+        const change: Partial<PolarThreadRow> =
+            action.action === "archive"
+                ? { archivedAt: now(), pinnedAt: null }
+                : action.action === "move"
+                  ? { projectId: action.projectId }
+                  : {};
+        setRows((current) =>
+            action.action === "delete"
+                ? (current?.filter((row) => !ids.has(row.id)) ?? null)
+                : (current?.map((row) => (ids.has(row.id) ? { ...row, ...change } : row)) ?? null)
+        );
+        const response = await send("/api/polar/threads/bulk", "POST", action);
+        if (response?.ok) {
+            if (action.action === "delete") for (const id of action.ids) onRemoved(id);
+            return true;
+        }
+        setRows((current) => mergeRows(current, before));
+        toast.show({
+            title: t(action.action === "delete" ? "history.deleteFailed" : "history.actionFailed")
+        });
+        return false;
+    };
+
     /** Shows a project's chats, read the first time. */
     const openProject = (id: string) => {
         setOpenProjects((current) => (current.has(id) ? current : new Set(current).add(id)));
@@ -362,6 +391,7 @@ export function usePolarSidebar({
         know,
         retitle,
         remove,
+        bulk,
         toggleProject,
         openProject,
         createProject,

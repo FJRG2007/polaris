@@ -107,7 +107,18 @@
         "projectNewChat": "New chat in {name}",
         "projectEmpty": "No chats in this project yet.",
         "projectTooMany": "You have too many projects. Delete one first.",
-        "shareCopy": "Copy link"
+        "shareCopy": "Copy link",
+        "open": "Open",
+        "openNewTab": "Open in new tab",
+        "select": "Select chat",
+        "selectRow": "Select \"{title}\"",
+        "selected": "{count, plural, one {# selected} other {# selected}}",
+        "clearSelection": "Clear selection",
+        "exportSelection": "Export",
+        "bulkDeleteTitle": "Delete {count, plural, one {# conversation} other {# conversations}}?",
+        "bulkDeleteQuestion": "{count, plural, one {# conversation and its messages} other {# conversations and their messages}} will be deleted for good.",
+        "bulkKind": "conversations",
+        "selectionActions": "Selected conversations"
     },
     "actions": {
         "new": "New chat",

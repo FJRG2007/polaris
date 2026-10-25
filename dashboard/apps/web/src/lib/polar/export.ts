@@ -211,13 +211,14 @@ function textStream(text: string): ReadableStream<Uint8Array> {
  *  creation so a chat touched while the zip is written is neither skipped nor
  *  repeated. */
 async function* savedThreads(
-    userId: string
+    userId: string,
+    ids: readonly string[] | null
 ): AsyncGenerator<{ id: string; title: string; updatedAt: Date }> {
     let cursor: string | null = null;
     for (;;) {
         const page: { id: string; title: string; updatedAt: Date }[] =
             await prisma.polarThread.findMany({
-                where: { userId, temporary: false },
+                where: { userId, temporary: false, ...(ids ? { id: { in: [...ids] } } : {}) },
                 select: { id: true, title: true, updatedAt: true },
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 take: EXPORT_THREADS_PAGE,
@@ -229,16 +230,18 @@ async function* savedThreads(
     }
 }
 
-/** Every saved chat of the person as a zip: a Markdown and a JSON file each.
- *  Each chat is read only when the archive reaches it. */
+/** Every saved chat of the person as a zip (or only `ids`, a selection): a
+ *  Markdown and a JSON file each. Each chat is read only when the archive
+ *  reaches it. */
 export async function exportAllThreads(
     userId: string,
-    names: ExportNames
+    names: ExportNames,
+    ids: readonly string[] | null = null
 ): Promise<ReadableStream<Uint8Array>> {
     async function* sources(): AsyncGenerator<ZipSource> {
         yield { name: "markdown/", kind: "dir", size: 0n };
         yield { name: "json/", kind: "dir", size: 0n };
-        for await (const row of savedThreads(userId)) {
+        for await (const row of savedThreads(userId, ids)) {
             const thread = await readExportThread(userId, row.id);
             if (!thread) continue;
             const markdown = threadMarkdown(thread, names);

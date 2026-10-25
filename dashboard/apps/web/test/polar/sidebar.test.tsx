@@ -247,6 +247,9 @@ describe("the row menu", () => {
             .getAllByRole("menuitem")
             .map((entry) => entry.textContent);
         expect(names).toEqual([
+            "Open",
+            "Open in new tab",
+            "Select chat",
             "Rename",
             "Pin",
             "Share",
@@ -358,5 +361,167 @@ describe("the sidebar's state", () => {
             expect(result.current.rows?.some((entry) => entry.id === FILED.id)).toBe(true)
         );
         expect(result.current.openProjects.has(PROJECT.id)).toBe(true);
+    });
+});
+
+describe("the right-click menu", () => {
+    it("opens on a right-click with the same options as the ... menu", async () => {
+        await mountPage();
+        fireEvent.contextMenu(screen.getByTitle("Recent chat"));
+        const menu = await screen.findByRole("menu");
+        const names = within(menu)
+            .getAllByRole("menuitem")
+            .map((entry) => entry.textContent);
+        expect(names).toEqual([
+            "Open",
+            "Open in new tab",
+            "Select chat",
+            "Rename",
+            "Pin",
+            "Share",
+            "Export as Markdown",
+            "Export as JSON",
+            "Archive",
+            "Delete",
+            "Move to project"
+        ]);
+        const tab = within(menu).getByRole("menuitem", { name: "Open in new tab" });
+        expect(tab.getAttribute("href")).toBe(`/polar?thread=${RECENT.id}`);
+        expect(tab.getAttribute("target")).toBe("_blank");
+    });
+
+    it("acts on the whole selection when the row is one of several chosen", async () => {
+        await mountPage();
+        fireEvent.click(screen.getByTitle("Recent chat"), { ctrlKey: true });
+        fireEvent.click(screen.getByTitle("Pinned chat"), { ctrlKey: true });
+        fireEvent.contextMenu(screen.getByTitle("Pinned chat"));
+        const menu = await screen.findByRole("menu");
+        const names = within(menu)
+            .getAllByRole("menuitem")
+            .map((entry) => entry.textContent);
+        expect(names).toEqual([
+            "Move to project",
+            "Archive",
+            "Export",
+            "Delete",
+            "Clear selection"
+        ]);
+        const exported = within(menu).getByRole("menuitem", { name: "Export" });
+        expect(exported.getAttribute("href")).toBe(
+            `/api/polar/export?ids=${RECENT.id},${PINNED.id}`
+        );
+    });
+});
+
+describe("choosing several chats", () => {
+    const toolbar = () => screen.queryByRole("toolbar", { name: "Selected conversations" });
+
+    it("toggles with Ctrl, shows the count, and lets go on Escape", async () => {
+        await mountPage();
+        fireEvent.click(screen.getByTitle("Recent chat"), { ctrlKey: true });
+        expect(within(toolbar()!).getByText("1 selected")).toBeTruthy();
+        fireEvent.click(screen.getByTitle("Pinned chat"), { metaKey: true });
+        expect(within(toolbar()!).getByText("2 selected")).toBeTruthy();
+        // Choosing does not open the chat.
+        expect(screen.getByTitle("Recent chat").getAttribute("aria-current")).toBeNull();
+        fireEvent.keyDown(screen.getByTitle("Pinned chat"), { key: "Escape" });
+        expect(toolbar()).toBeNull();
+    });
+
+    it("takes every chat on screen with Ctrl+A", async () => {
+        await mountPage();
+        fireEvent.keyDown(screen.getByTitle("Recent chat"), { key: "a", ctrlKey: true });
+        expect(within(toolbar()!).getByText("2 selected")).toBeTruthy();
+    });
+
+    it("deletes the selection in one request after one dialog", async () => {
+        await mountPage();
+        fireEvent.click(screen.getByTitle("Recent chat"), { ctrlKey: true });
+        fireEvent.click(screen.getByTitle("Pinned chat"), { ctrlKey: true });
+        fireEvent.keyDown(screen.getByTitle("Pinned chat"), { key: "Delete" });
+        const dialog = await screen
+            .findByRole("alertdialog")
+            .catch(() => screen.getByRole("dialog"));
+        expect(within(dialog).getByText("Delete 2 conversations?")).toBeTruthy();
+        fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+        await waitFor(() => expect(screen.queryByText("Recent chat")).toBeNull());
+        expect(screen.queryByText("Pinned chat")).toBeNull();
+        const bulk = calls.filter((call) => call.url === "/api/polar/threads/bulk");
+        expect(bulk).toEqual([
+            {
+                url: "/api/polar/threads/bulk",
+                method: "POST",
+                body: { action: "delete", ids: [RECENT.id, PINNED.id] }
+            }
+        ]);
+        expect(calls.some((call) => call.method === "DELETE")).toBe(false);
+    });
+
+    it("puts the chats back when the server refuses", async () => {
+        refuse = true;
+        await mountPage();
+        fireEvent.click(screen.getByTitle("Recent chat"), { ctrlKey: true });
+        fireEvent.click(within(toolbar()!).getByRole("button", { name: "Archive" }));
+        await waitFor(() =>
+            expect(calls.some((call) => call.url === "/api/polar/threads/bulk")).toBe(true)
+        );
+        expect(await screen.findByText("Recent chat")).toBeTruthy();
+    });
+
+    it("files the selection under a project from the bar", async () => {
+        await mountPage();
+        fireEvent.click(screen.getByTitle("Recent chat"), { ctrlKey: true });
+        fireEvent.pointerDown(within(toolbar()!).getByRole("button", { name: "Move to project" }), {
+            button: 0,
+            ctrlKey: false,
+            pointerType: "mouse"
+        });
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Homelab" }));
+        await waitFor(() =>
+            expect(calls.find((call) => call.url === "/api/polar/threads/bulk")?.body).toEqual({
+                action: "move",
+                ids: [RECENT.id],
+                projectId: PROJECT.id
+            })
+        );
+    });
+
+    it("moves the selection onto a project it is dropped on", async () => {
+        await mountPage();
+        fireEvent.click(screen.getByTitle("Recent chat"), { ctrlKey: true });
+        const data = new Map<string, string>();
+        const dataTransfer = {
+            types: [] as string[],
+            setData: (type: string, value: string) => {
+                data.set(type, value);
+                dataTransfer.types.push(type);
+            },
+            getData: (type: string) => data.get(type) ?? "",
+            effectAllowed: "",
+            dropEffect: ""
+        };
+        fireEvent.dragStart(screen.getByTitle("Recent chat").parentElement as HTMLElement, {
+            dataTransfer
+        });
+        const target = screen.getByRole("button", { name: "Homelab" }).parentElement as HTMLElement;
+        fireEvent.dragOver(target, { dataTransfer });
+        fireEvent.drop(target, { dataTransfer });
+        await waitFor(() =>
+            expect(calls.find((call) => call.url === "/api/polar/threads/bulk")?.body).toEqual({
+                action: "move",
+                ids: [RECENT.id],
+                projectId: PROJECT.id
+            })
+        );
+    });
+
+    it("moves the focus with the arrows and stretches it with Shift", async () => {
+        await mountPage();
+        const pinnedChat = screen.getByTitle("Pinned chat");
+        pinnedChat.focus();
+        fireEvent.keyDown(pinnedChat, { key: "ArrowDown" });
+        expect(document.activeElement).toBe(screen.getByTitle("Recent chat"));
+        fireEvent.keyDown(screen.getByTitle("Recent chat"), { key: "ArrowUp", shiftKey: true });
+        expect(within(toolbar()!).getByText("2 selected")).toBeTruthy();
     });
 });
