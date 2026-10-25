@@ -221,11 +221,14 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
  * offers something, and it stops offering it as soon as there is a habit to show
  * instead.
  */
-const DEFAULT_QUICK_EMOJI = ["👍", "❤️", "😄"] as const;
+const DEFAULT_QUICK_EMOJI = ["👍", "❤️", "😄", "🎉"] as const;
 
 /** How many the bar shows. Discord shows three and so does everything else that
  *  put them on the hover rather than behind a picker. */
 const QUICK_COUNT = 3;
+
+/** How many the right-click menu shows, which has the width for one more. */
+const MENU_QUICK_COUNT = 4;
 
 /**
  * The last few, padded from the defaults so there are always three.
@@ -234,14 +237,18 @@ const QUICK_COUNT = 3;
  * exists: anywhere else it cannot be reacted with, and the server would refuse
  * the press.
  */
-function quickEmoji(recent: readonly string[], scope: SpaceEmojiScope | null): string[] {
+function quickEmoji(
+    recent: readonly string[],
+    scope: SpaceEmojiScope | null,
+    count: number = QUICK_COUNT
+): string[] {
     const usable = recent.filter((emoji) => {
         const ref = core.parseCustomEmojiToken(emoji);
         return ref === null || (scope?.set.entries.has(ref.id) ?? false);
     });
-    const chosen = [...usable.slice(0, QUICK_COUNT)];
+    const chosen = [...usable.slice(0, count)];
     for (const fallback of DEFAULT_QUICK_EMOJI) {
-        if (chosen.length >= QUICK_COUNT) break;
+        if (chosen.length >= count) break;
         if (!chosen.includes(fallback)) chosen.push(fallback);
     }
     return chosen;
@@ -367,7 +374,11 @@ export function MessageList({
      */
     const [recent, setRecent] = useState<readonly string[]>([]);
     useEffect(() => setRecent(recentEmoji()), []);
-    const quick = useMemo(() => quickEmoji(recent, emoji), [recent, emoji]);
+    // Four, for the menu; the hover bar shows the first three of them.
+    const quick = useMemo(
+        () => quickEmoji(recent, emoji, MENU_QUICK_COUNT),
+        [recent, emoji]
+    );
 
     /** React, and remember it. The picker records what is chosen through it; the
      *  hover row did not, so pressing the same emoji forty times never made it
@@ -775,8 +786,9 @@ function Message({
     onMention?: (text: string) => void;
     onNickname: (person: MenuPerson) => void;
     onError: (message: string) => void;
-    /** The three the hover offers, decided once by the list so every row's bar
-     *  shows the same ones and they all change together. */
+    /** The faces on offer, decided once by the list so every row shows the
+     *  same ones and they all change together. The hover bar shows the first
+     *  three, the right-click menu all four. */
     quick: readonly string[];
     /** The space's own emoji - see `MessageListProps`. */
     emoji: SpaceEmojiScope | null;
@@ -790,6 +802,8 @@ function Message({
     // is not a decision to start reading them again, and a reveal that outlived
     // the scroll would quietly undo the block one line at a time.
     const [revealed, setRevealed] = useState(false);
+    /** The hover bar's picker, opened from the menu's "Add reaction" too. */
+    const [picking, setPicking] = useState(false);
     const direct = useOpenDirect(onError);
     const author = message.authorName ?? "Somebody who has left";
     /** What pressing a name or a face does here: their card, where the screen
@@ -883,7 +897,11 @@ function Message({
                     onEdit: rewrite,
                     onDelete,
                     onReport,
-                    onExplain
+                    onExplain,
+                    onReact,
+                    quick,
+                    emoji,
+                    onAddReaction: () => setPicking(true)
                 }}
             >
                 {/* `data-state` arrives from the right-click menu's trigger, which this
@@ -1129,7 +1147,10 @@ function Message({
                         {message.attachments.length > 0 && (
                             <ul className="mt-1 flex flex-col gap-1">
                                 {message.attachments.map((file) => (
-                                    <li key={file.id}>
+                                    // Named for the message menu, which offers
+                                    // this one file's download only when the
+                                    // right-click was on it - see `messageTarget`.
+                                    <li key={file.id} data-attachment={file.id}>
                                         {/* Covered where the sender said so. The
                                         file is drawn underneath either way, so
                                         uncovering it is the cover coming off
@@ -1279,7 +1300,7 @@ function Message({
 
                     {canPost && !message.deleted && (
                         <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex has-[[aria-expanded=true]]:flex">
-                            {quick.map((choice) => {
+                            {quick.slice(0, QUICK_COUNT).map((choice) => {
                                 const ref = core.parseCustomEmojiToken(choice);
                                 const named = ref ? core.customEmojiFallback(ref) : choice;
                                 return (
@@ -1309,6 +1330,8 @@ function Message({
                                 }
                                 label={t("messageList.addReaction")}
                                 icon={<SmilePlus className="size-3.5" />}
+                                open={picking}
+                                onOpenChange={setPicking}
                                 onEmoji={(choice) => onReact(message.id, choice)}
                             />
                             {/* The reactions are one kind of thing and everything to

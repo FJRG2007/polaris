@@ -219,7 +219,9 @@ export function EmojiPicker({
     triggerClassName,
     onEmoji,
     onMedia,
-    onSaved
+    onSaved,
+    open: openAsked,
+    onOpenChange
 }: {
     disabled: boolean;
     /** The space's own emoji, offered in a section of their own. */
@@ -246,9 +248,22 @@ export function EmojiPicker({
     /** One the reader kept, by its id. Sent through its own path, since a stored
      *  one is copied rather than fetched back off this Polaris. */
     onSaved?: (savedId: string) => void;
+    /** Whether it is open, for a caller that opens it from elsewhere - the
+     *  message menu's "Add reaction". Left out, the button alone decides. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }) {
     const t = useTranslations("chat");
-    const [open, setOpen] = useState(false);
+    const [openOwn, setOpenOwn] = useState(false);
+    const open = openAsked ?? openOwn;
+    const setOpen = useCallback(
+        (next: boolean | ((current: boolean) => boolean)) => {
+            const value = typeof next === "function" ? next(open) : next;
+            if (openAsked === undefined) setOpenOwn(value);
+            onOpenChange?.(value);
+        },
+        [open, openAsked, onOpenChange]
+    );
     const [tab, setTab] = useState<Tab>("emoji");
     const [query, setQuery] = useState("");
     const [tenorReady, setTenorReady] = useState<boolean | null>(null);

@@ -25,12 +25,20 @@ import { useChat } from "../chat-context";
 import { Avatar } from "@/components/avatar";
 import { Button, ConfirmDeleteDialog, EmptyState, Select, Skeleton } from "@polaris/ui";
 import { PersonName } from "@/components/person-name";
-import { starAction, starredAction, unstarAllAction } from "../actions";
+import { useDisplayFormat } from "@/components/display-format";
+import type { ChatReminderView } from "@/lib/chat/reminders";
+import {
+    cancelReminderAction,
+    remindersAction,
+    starAction,
+    starredAction,
+    unstarAllAction
+} from "../actions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageTime } from "@/components/message-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
-import { ArrowLeft, Hash, Star, Users } from "lucide-react";
+import { AlarmClock, ArrowLeft, Hash, Star, Users, X } from "lucide-react";
 import { useChatStream } from "../use-chat-stream";
 
 /** The filter's value for "every conversation". Radix refuses an empty item. */
@@ -46,6 +54,27 @@ export function SavedView() {
     const [clearing, setClearing] = useState(false);
     const [busy, setBusy] = useState(false);
     const onlyChannel = only ? channels.find((entry) => entry.id === only) : undefined;
+    const format = useDisplayFormat();
+    /** What this reader asked to be reminded of, soonest first. Shown above the
+     *  saved messages because both are "come back to this". */
+    const [reminders, setReminders] = useState<readonly ChatReminderView[]>([]);
+    useEffect(() => {
+        void remindersAction().then((result) => setReminders(result.reminders ?? []));
+    }, []);
+    const shownReminders = only
+        ? reminders.filter((entry) => entry.channelId === only)
+        : reminders;
+
+    /** Optimistic, and put back if the server refuses. */
+    const cancelReminder = async (reminder: ChatReminderView) => {
+        setReminders((current) => current.filter((entry) => entry.id !== reminder.id));
+        const result = await cancelReminderAction(reminder.id).catch(() => ({ error: "failed" }));
+        if (result.error) {
+            setReminders((current) =>
+                [...current, reminder].sort((a, b) => a.dueAt.localeCompare(b.dueAt))
+            );
+        }
+    };
 
     const load = useCallback(() => {
         setMessages(null);
@@ -140,6 +169,65 @@ export function SavedView() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+                {shownReminders.length > 0 && (
+                    <section className="mb-4">
+                        <h2 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                            <AlarmClock className="size-3.5" />
+                            {t("reminders.yourReminders")}
+                        </h2>
+                        <ul className="flex flex-col gap-1">
+                            {shownReminders.map((reminder) => {
+                                const due = new Date(reminder.dueAt);
+                                const channel = channels.find(
+                                    (entry) => entry.id === reminder.channelId
+                                );
+                                return (
+                                    <li
+                                        key={reminder.id}
+                                        className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                                    >
+                                        <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                                            {t("reminders.due", {
+                                                date: format.date(due),
+                                                time: format.time(due)
+                                            })}
+                                        </span>
+                                        {reminder.deleted ? (
+                                            <span className="min-w-0 flex-1 truncate italic text-muted-foreground">
+                                                {t("reminders.deleted")}
+                                            </span>
+                                        ) : (
+                                            <Link
+                                                href={`/chat/c/${reminder.channelId}/${reminder.messageId}`}
+                                                title={reminder.excerpt}
+                                                className="min-w-0 flex-1 truncate rounded hover:underline"
+                                            >
+                                                {reminder.excerpt || t("saved.openInConversation")}
+                                            </Link>
+                                        )}
+                                        {channel && (
+                                            <span
+                                                title={channel.name}
+                                                className="hidden max-w-[10rem] shrink-0 truncate text-xs text-muted-foreground sm:inline"
+                                            >
+                                                {channel.name}
+                                            </span>
+                                        )}
+                                        <button
+                                            type="button"
+                                            aria-label={t("reminders.cancelReminder")}
+                                            title={t("reminders.cancelReminder")}
+                                            onClick={() => void cancelReminder(reminder)}
+                                            className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                            <X className="size-3.5" />
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </section>
+                )}
                 {messages === null ? (
                     <div className="flex flex-col gap-2" aria-hidden="true">
                         {[0, 1, 2].map((row) => (

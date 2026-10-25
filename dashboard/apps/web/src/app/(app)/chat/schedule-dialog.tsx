@@ -24,6 +24,7 @@ import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useMemo, useState } from "react";
 import { CalendarClock } from "lucide-react";
+import { MORNING, plusDays, weekdayOf, type Reading } from "./reminder-times";
 import { useDisplayFormat, useDisplayPreferences } from "@/components/display-format";
 import {
     Button,
@@ -35,18 +36,6 @@ import {
     DialogTitle,
     DateInput
 } from "@polaris/ui";
-
-/** The hour "morning" means. Nine, which is what every client that offers this
- *  settled on and what an office day starts at. */
-const MORNING = 9;
-
-interface Reading {
-    year: number;
-    month: number;
-    day: number;
-    hours: number;
-    minutes: number;
-}
 
 /** `2026-09-08`, as a date input wants it. */
 function toDateValue(reading: Reading): string {
@@ -73,30 +62,14 @@ function fromFields(date: string, time: string): Reading | null {
     };
 }
 
-/** The day after this one, in the zone the reading is written in. Built through
- *  UTC so the month and the year roll over on their own rather than here. */
-function plusDays(reading: Reading, days: number): Reading {
-    const walked = new Date(Date.UTC(reading.year, reading.month - 1, reading.day + days));
-    return {
-        year: walked.getUTCFullYear(),
-        month: walked.getUTCMonth() + 1,
-        day: walked.getUTCDate(),
-        hours: reading.hours,
-        minutes: reading.minutes
-    };
-}
-
-/** Which day of the week a reading falls on, 0 for Sunday. */
-function weekdayOf(reading: Reading): number {
-    return new Date(Date.UTC(reading.year, reading.month - 1, reading.day)).getUTCDay();
-}
-
 export function ScheduleDialog({
     open,
     onOpenChange,
     onConfirm,
     busy = false,
-    error
+    error,
+    words,
+    presets = true
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -106,6 +79,18 @@ export function ScheduleDialog({
     busy?: boolean;
     /** What the server said, when it refused one this dialog thought was fine. */
     error?: string;
+    /** The dialog's own copy, for a caller choosing a time for something other
+     *  than sending - a reminder. Left out, it reads as scheduling a message. */
+    words?: {
+        readonly title: string;
+        readonly description: string;
+        readonly confirm: string;
+        readonly busy: string;
+        readonly summary: (date: string, time: string) => string;
+    };
+    /** The three quick answers above the fields. Off where the caller already
+     *  offered its own, so the same choice is not asked twice. */
+    presets?: boolean;
 }) {
     const t = useTranslations("chat");
     const format = useDisplayFormat();
@@ -141,41 +126,45 @@ export function ScheduleDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{t("schedule.sendThisLater")}</DialogTitle>
-                    <DialogDescription>{t("schedule.itStaysOutOfThe")}</DialogDescription>
+                    <DialogTitle>{words?.title ?? t("schedule.sendThisLater")}</DialogTitle>
+                    <DialogDescription>
+                        {words?.description ?? t("schedule.itStaysOutOfThe")}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busy}
-                            onClick={() => take(new Date(Date.now() + 30 * 60 * 1000))}
-                        >
-                            {t("schedule.in30Minutes")}
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busy}
-                            onClick={() => take(core.zonedInstant(tomorrowMorning, timeZone))}
-                        >
-                            {t("schedule.tomorrowAt", {
-                                time: format.time(core.zonedInstant(tomorrowMorning, timeZone))
-                            })}
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busy}
-                            onClick={() => take(core.zonedInstant(mondayMorning, timeZone))}
-                        >
-                            {t("schedule.mondayAt", {
-                                time: format.time(core.zonedInstant(mondayMorning, timeZone))
-                            })}
-                        </Button>
-                    </div>
+                    {presets && (
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => take(new Date(Date.now() + 30 * 60 * 1000))}
+                            >
+                                {t("schedule.in30Minutes")}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => take(core.zonedInstant(tomorrowMorning, timeZone))}
+                            >
+                                {t("schedule.tomorrowAt", {
+                                    time: format.time(core.zonedInstant(tomorrowMorning, timeZone))
+                                })}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => take(core.zonedInstant(mondayMorning, timeZone))}
+                            >
+                                {t("schedule.mondayAt", {
+                                    time: format.time(core.zonedInstant(mondayMorning, timeZone))
+                                })}
+                            </Button>
+                        </div>
+                    )}
 
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1 text-sm">
@@ -202,7 +191,9 @@ export function ScheduleDialog({
                             onClick={() => at && take(at)}
                         >
                             <CalendarClock className="size-4" />
-                            {busy ? t("schedule.scheduling") : t("schedule.schedule")}
+                            {busy
+                                ? (words?.busy ?? t("schedule.scheduling"))
+                                : (words?.confirm ?? t("schedule.schedule"))}
                         </Button>
                     </div>
 
@@ -216,10 +207,12 @@ export function ScheduleDialog({
                         {error ??
                             refusal ??
                             (at
-                                ? t("schedule.sendsOn", {
-                                      date: format.date(at),
-                                      time: format.time(at)
-                                  })
+                                ? words
+                                    ? words.summary(format.date(at), format.time(at))
+                                    : t("schedule.sendsOn", {
+                                          date: format.date(at),
+                                          time: format.time(at)
+                                      })
                                 : "")}
                         {!refusal && !error && timeZone !== core.AUTOMATIC_TIME_ZONE
                             ? ` ${timeZone.replace(/_/g, " ")}.`
