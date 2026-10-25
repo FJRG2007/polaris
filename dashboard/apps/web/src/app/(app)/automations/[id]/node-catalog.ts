@@ -158,7 +158,7 @@ export function catalogGroups(options: {
             ].map(plain)
         },
         { id: "timing", items: ["core.wait", "core.waitEvent", "core.waitCondition"].map(plain) },
-        { id: "data", items: ["core.set", "core.answer"].map(plain) },
+        { id: "data", items: ["core.set", "core.code", "core.answer"].map(plain) },
         {
             id: "send",
             items: ["core.notify", "core.message", "core.chat", "core.http"].map(plain)

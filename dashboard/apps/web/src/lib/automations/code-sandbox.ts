@@ -76,7 +76,7 @@ const jsonValue: z.ZodType<Json> = z.lazy(() =>
         z.boolean(),
         z.null(),
         z.array(jsonValue),
-        z.record(jsonValue)
+        z.record(z.string(), jsonValue)
     ])
 );
 /** What the code must give back: a list of JSON values, one per item. */
