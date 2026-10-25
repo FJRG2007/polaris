@@ -80,7 +80,10 @@ describe("the timers", () => {
         vi.useRealTimers();
     });
 
-    function start(run: RepeatRun, patch: { total?: number; gapMs?: number; server?: string } = {}) {
+    function start(
+        run: RepeatRun,
+        patch: { total?: number; gapMs?: number; server?: string } = {}
+    ) {
         return startRepeat({
             installedAppId: patch.server ?? SERVER,
             label: "Spawn piglin",

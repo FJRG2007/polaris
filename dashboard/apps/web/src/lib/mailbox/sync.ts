@@ -799,7 +799,9 @@ async function storeMessages(
     let stored = 0;
     /** Asked once a page: nobody listening is the common case, and costs one read. */
     const toAutomations =
-        arrivals && folder.role === "inbox" && (await anyListening("mail.received").catch(() => false));
+        arrivals &&
+        folder.role === "inbox" &&
+        (await anyListening("mail.received").catch(() => false));
 
     for (const message of fetched) {
         const envelope = message.envelope;
@@ -899,7 +901,7 @@ async function storeMessages(
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
                     message.headers["disposition-notification-to"] ??
-                        message.headers["return-receipt-to"]
+                    message.headers["return-receipt-to"]
                 ),
                 headers: message.headers,
                 attachments: {

@@ -89,9 +89,8 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { adoptAnticheatDefaults, adoptPolarisComponent } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/polaris-anticheat-service"
-);
+const { adoptAnticheatDefaults, adoptPolarisComponent } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/polaris-anticheat-service");
 
 const server = (id: string, env: Record<string, string>) => {
     fake.installs.push({

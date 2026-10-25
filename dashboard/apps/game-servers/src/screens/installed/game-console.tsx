@@ -1022,7 +1022,10 @@ export function GameConsole({
                         disabled={!running || queue !== null || line.trim().length === 0}
                         onClick={() => {
                             setRepeatError("");
-                            setRepeating({ line: line.trim(), draft: { ...REPEAT_DRAFT, on: true } });
+                            setRepeating({
+                                line: line.trim(),
+                                draft: { ...REPEAT_DRAFT, on: true }
+                            });
                         }}
                     >
                         <Repeat className="size-4" />

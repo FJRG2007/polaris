@@ -17,7 +17,10 @@ import { getInstalledApp } from "@/lib/apps/install-service";
 import { emitAppEvent } from "./app-events";
 
 type GameServerEvent =
-    "game-server.started" | "game-server.stopped" | "game-server.crashed" | "game-server.player-joined";
+    | "game-server.started"
+    | "game-server.stopped"
+    | "game-server.crashed"
+    | "game-server.player-joined";
 
 /** What each event carries beyond the server itself. */
 type Extra<Name extends GameServerEvent> = Omit<

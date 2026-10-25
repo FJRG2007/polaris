@@ -41,7 +41,8 @@ export async function serverBoot(server: RunServer): Promise<Boot | null> {
         .catch(() => null);
     if (app?.desiredState !== "running") return null;
     const state = await host.appContainerMetrics
-        .readAppContainerRuntime(applicationId, server.ownerId).catch(() => null);
+        .readAppContainerRuntime(applicationId, server.ownerId)
+        .catch(() => null);
     if (state && state.status !== "running") return null;
     return { startedAt: state?.startedAt ?? null };
 }
@@ -50,7 +51,9 @@ export async function serverBoot(server: RunServer): Promise<Boot | null> {
  *  is not a change: nothing is ended on a reading nobody has. */
 export function sameBoot(started: Boot, now: Boot | null): boolean {
     if (!now) return false;
-    return started.startedAt === null || now.startedAt === null || started.startedAt === now.startedAt;
+    return (
+        started.startedAt === null || now.startedAt === null || started.startedAt === now.startedAt
+    );
 }
 
 function problemOf(caught: unknown): string {

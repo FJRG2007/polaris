@@ -243,9 +243,7 @@ describe("permission", () => {
         const id = ok.repeats![0]!.id;
         consoleUsers = new Set();
         expect((await actions.listConsoleRepeatsAction(INSTALL)).repeats).toEqual([]);
-        expect((await actions.stopConsoleRepeatAction(INSTALL, id)).error).toBe(
-            "Server not found"
-        );
+        expect((await actions.stopConsoleRepeatAction(INSTALL, id)).error).toBe("Server not found");
         expect(jobs.listRepeats(INSTALL)[0]?.ended).toBeNull();
     });
 

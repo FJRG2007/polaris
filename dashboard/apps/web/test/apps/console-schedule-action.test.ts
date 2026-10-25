@@ -55,9 +55,8 @@ vi.mock("@polaris-app/game-servers/src/lib/console-run-service", () => ({
     runKeptCommand: async () => []
 }));
 
-const { scheduleKeptCommandAction } = await import(
-    "@polaris-app/game-servers/src/screens/installed/console-actions"
-);
+const { scheduleKeptCommandAction } =
+    await import("@polaris-app/game-servers/src/screens/installed/console-actions");
 
 beforeEach(() => {
     added.length = 0;

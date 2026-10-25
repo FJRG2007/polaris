@@ -123,8 +123,10 @@ export function startRepeat(input: {
 }): ConsoleRepeatView | null {
     const running = active();
     if (running.length >= MAX_REPEATS_OVERALL) return null;
-    if (running.filter((job) => job.installedAppId === input.installedAppId).length >=
-        MAX_REPEATS_PER_SERVER) {
+    if (
+        running.filter((job) => job.installedAppId === input.installedAppId).length >=
+        MAX_REPEATS_PER_SERVER
+    ) {
         return null;
     }
     const job: Job = {
@@ -169,7 +171,9 @@ export function endRepeatsOn(installedAppId: string, why: RepeatEnd = "serverSto
 export async function pause(ms: number, over: () => boolean): Promise<void> {
     const until = Date.now() + ms;
     while (!over() && Date.now() < until) {
-        await new Promise((resolve) => later(() => resolve(undefined), Math.min(250, until - Date.now())));
+        await new Promise((resolve) =>
+            later(() => resolve(undefined), Math.min(250, until - Date.now()))
+        );
     }
 }
 

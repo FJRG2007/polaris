@@ -87,7 +87,8 @@ const worlds = join(staged, "minecraft-worlds");
 rmSync(worlds, { recursive: true, force: true });
 mkdirSync(worlds, { recursive: true });
 for (const name of readdirSync(join(resources, "minecraft-worlds"))) {
-    if (name.endsWith(".zip")) copyFileSync(join(resources, "minecraft-worlds", name), join(worlds, name));
+    if (name.endsWith(".zip"))
+        copyFileSync(join(resources, "minecraft-worlds", name), join(worlds, name));
 }
 console.log(`Staged the Minecraft worlds in ${worlds}`);
 

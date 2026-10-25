@@ -56,7 +56,11 @@ import {
     type SavedCommand
 } from "../../lib/console-commands";
 import { MAX_CONSOLE_LINE, type QueueStep } from "../../lib/console-queue";
-import { repeatPlanSchema, type ConsoleRepeatView, type RepeatPlan } from "../../lib/console-repeat";
+import {
+    repeatPlanSchema,
+    type ConsoleRepeatView,
+    type RepeatPlan
+} from "../../lib/console-repeat";
 import { listRepeats, stopRepeat } from "../../lib/console-repeat-jobs";
 import { startConsoleRepeat } from "../../lib/console-repeat-service";
 import { gameMessage } from "../../lib/game-message";
@@ -448,11 +452,9 @@ export type RepeatKeptCommandInput = RunKeptCommandInput & { repeat: RepeatPlan 
 /** The carried refusal for a person starting repeats faster than anybody would
  *  by hand, or null. */
 async function tooFast(userId: string): Promise<string | null> {
-    const allowed = await host.rateLimitService.rateLimit(
-        `games-console-repeat:${userId}`,
-        REPEAT_STARTS_PER_MINUTE,
-        60_000
-    ).catch(() => ({ ok: true }));
+    const allowed = await host.rateLimitService
+        .rateLimit(`games-console-repeat:${userId}`, REPEAT_STARTS_PER_MINUTE, 60_000)
+        .catch(() => ({ ok: true }));
     return allowed.ok ? null : gameMessage("games", "consoleRepeat.errors.slowDown");
 }
 

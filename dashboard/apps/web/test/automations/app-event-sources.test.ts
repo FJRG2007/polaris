@@ -58,7 +58,7 @@ vi.mock("@polaris/app-host", () => ({
                 ) => Promise<boolean>;
                 return announce(...args);
             }
-        },
+        }
     })
 }));
 vi.mock("../../../calendar/src/lib/access", async (load) => ({
@@ -158,9 +158,8 @@ describe("game servers", () => {
     });
 
     it("says each player who arrived, once per player", async () => {
-        const { announceArrivals } = await import(
-            "../../../game-servers/src/lib/games-activity-service"
-        );
+        const { announceArrivals } =
+            await import("../../../game-servers/src/lib/games-activity-service");
         await announceArrivals(
             INSTALL,
             [
@@ -180,9 +179,8 @@ describe("game servers", () => {
 
     it("asks nothing more when nobody listens for a player joining", async () => {
         listening.mockResolvedValueOnce(false);
-        const { announceArrivals } = await import(
-            "../../../game-servers/src/lib/games-activity-service"
-        );
+        const { announceArrivals } =
+            await import("../../../game-servers/src/lib/games-activity-service");
         await announceArrivals(INSTALL, [{ name: "FixturePlayerA", id: null }], new Date());
         expect(sent).toEqual([]);
     });

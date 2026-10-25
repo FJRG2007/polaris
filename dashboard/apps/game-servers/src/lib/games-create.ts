@@ -314,7 +314,9 @@ export async function minecraftShapeEnv(
     // Last, over the blueprint's own: where the two disagree the map is the one
     // that has to be right, because it is the thing people will be standing in.
     for (const [key, value] of Object.entries(map?.env ?? {})) env.set(key, value);
-    for (const [key, value] of Object.entries(resourcePackEnv(map, served, env.get("RESOURCE_PACK"))))
+    for (const [key, value] of Object.entries(
+        resourcePackEnv(map, served, env.get("RESOURCE_PACK"))
+    ))
         env.set(key, value);
     return env;
 }

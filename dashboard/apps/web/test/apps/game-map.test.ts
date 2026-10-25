@@ -19,7 +19,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { isLevelName } from "@polaris-app/game-servers/src/lib/minecraft/world";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { blueprintFor, minecraftShapeEnv } from "@polaris-app/game-servers/src/lib/games-create";
-import { GAME_BLUEPRINTS, findBlueprint } from "@polaris-app/game-servers/src/lib/minecraft/blueprints";
+import {
+    GAME_BLUEPRINTS,
+    findBlueprint
+} from "@polaris-app/game-servers/src/lib/minecraft/blueprints";
 import {
     MAP_CATEGORIES,
     WORLD_MAPS,
@@ -45,13 +48,18 @@ beforeEach(() => {
         }
         return {
             ok: true,
-            json: async () => RELEASES.map((version) => ({ game_versions: [version], version_type: "release" }))
+            json: async () =>
+                RELEASES.map((version) => ({ game_versions: [version], version_type: "release" }))
         } as unknown as Response;
     });
 });
 
 /** Where the archives are served from on an instance with a public address. */
-const PUBLIC: MapAddresses = { world: "https://polaris.example", pack: "https://polaris.example", key: "key" };
+const PUBLIC: MapAddresses = {
+    world: "https://polaris.example",
+    pack: "https://polaris.example",
+    key: "key"
+};
 
 /** And on one without: the world through the edge inside the network, no pack. */
 const LOCAL: MapAddresses = { world: "http://traefik", pack: null, key: "key" };
@@ -91,13 +99,18 @@ describe("the map catalog", () => {
         // that does not match.
         for (const map of WORLD_MAPS.filter((entry) => entry.resourcePack)) {
             const bytes = readFileSync(join(WORLDS_DIR, map.resourcePack!.archive));
-            expect(createHash("sha1").update(bytes).digest("hex"), map.id).toBe(map.resourcePack!.sha1);
+            expect(createHash("sha1").update(bytes).digest("hex"), map.id).toBe(
+                map.resourcePack!.sha1
+            );
         }
     });
 
     it("carries no archive no map names", () => {
         const named = new Set(
-            WORLD_MAPS.flatMap((map) => [map.archive, ...(map.resourcePack ? [map.resourcePack.archive] : [])])
+            WORLD_MAPS.flatMap((map) => [
+                map.archive,
+                ...(map.resourcePack ? [map.resourcePack.archive] : [])
+            ])
         );
         for (const file of readdirSync(WORLDS_DIR).filter((name) => name.endsWith(".zip")))
             expect(named.has(file), file).toBe(true);
@@ -160,7 +173,9 @@ describe("building a server on a map", () => {
         // `polaris.local` does not resolve inside a container; the edge's own
         // name on the proxy network does.
         const env = await envFor("bedwars", "bedwars-treasure-island", {}, "LATEST", LOCAL);
-        expect(env.get("WORLD")).toBe("http://traefik/api/minecraft/world/key/bedwars-treasure-island.zip");
+        expect(env.get("WORLD")).toBe(
+            "http://traefik/api/minecraft/world/key/bedwars-treasure-island.zip"
+        );
     });
 
     it("writes the world blank when there is no map, so a reset stops fetching one", async () => {
@@ -171,7 +186,12 @@ describe("building a server on a map", () => {
             "java",
             blueprintFor("java", "survival"),
             { blueprintId: "survival", version: "LATEST", concurrentPlayers: 8, crossplay: false },
-            new Map([["WORLD", "https://polaris.example/api/minecraft/world/key/bedwars-treasure-island.zip"]]),
+            new Map([
+                [
+                    "WORLD",
+                    "https://polaris.example/api/minecraft/world/key/bedwars-treasure-island.zip"
+                ]
+            ]),
             PUBLIC
         );
         expect(env.get("WORLD")).toBe("");
@@ -228,22 +248,29 @@ describe("building a server on a map", () => {
     it("writes no pack when no client could reach one", async () => {
         const env = await envFor("luckyblock", "luckyblock-towers", {}, "LATEST", LOCAL);
         expect(env.get("RESOURCE_PACK") ?? "").toBe("");
-        expect(env.get("WORLD")).toBe("http://traefik/api/minecraft/world/key/luckyblock-towers.zip");
+        expect(env.get("WORLD")).toBe(
+            "http://traefik/api/minecraft/world/key/luckyblock-towers.zip"
+        );
     });
 
     it("clears a map's pack when the new map has none, and leaves anybody else's alone", async () => {
-        const previous = "https://polaris.example/api/minecraft/map-pack/luckyblock-towers-resources.zip";
+        const previous =
+            "https://polaris.example/api/minecraft/map-pack/luckyblock-towers-resources.zip";
         const cleared = await envFor("skyblock", "skyblock-2-1", { RESOURCE_PACK: previous });
         expect(cleared.get("RESOURCE_PACK")).toBe("");
 
         // An operator who set their own under Settings did so deliberately, and a
         // change of map is not them asking for it to be removed.
-        const kept = await envFor("skyblock", "skyblock-2-1", { RESOURCE_PACK: "https://example.test/mine.zip" });
+        const kept = await envFor("skyblock", "skyblock-2-1", {
+            RESOURCE_PACK: "https://example.test/mine.zip"
+        });
         expect(kept.get("RESOURCE_PACK")).toBe("https://example.test/mine.zip");
     });
 
     it("refuses a map that is not this game's", async () => {
-        expect(await rejection(envFor("skyblock", "bedwars-treasure-island"))).toMatch(/not one this game/);
+        expect(await rejection(envFor("skyblock", "bedwars-treasure-island"))).toMatch(
+            /not one this game/
+        );
     });
 
     it("refuses a map nothing knows about", async () => {
@@ -293,7 +320,13 @@ describe("building a server on a map", () => {
         const env = await minecraftShapeEnv(
             "java",
             blueprintFor("java", "survival"),
-            { blueprintId: "survival", version: "LATEST", seed: "hello", concurrentPlayers: 8, crossplay: false },
+            {
+                blueprintId: "survival",
+                version: "LATEST",
+                seed: "hello",
+                concurrentPlayers: 8,
+                crossplay: false
+            },
             new Map()
         );
         expect(env.get("SEED")).toBe("hello");
@@ -311,7 +344,8 @@ describe("moving a server's map to where Polaris serves it", () => {
         ]);
         expect(mapUrlRewrites(env, PUBLIC)).toEqual({
             WORLD: "https://polaris.example/api/minecraft/world/key/luckyblock-towers.zip",
-            RESOURCE_PACK: "https://polaris.example/api/minecraft/map-pack/luckyblock-towers-resources.zip",
+            RESOURCE_PACK:
+                "https://polaris.example/api/minecraft/map-pack/luckyblock-towers-resources.zip",
             RESOURCE_PACK_SHA1: findMap("luckyblock-towers")?.resourcePack?.sha1
         });
     });
@@ -319,7 +353,10 @@ describe("moving a server's map to where Polaris serves it", () => {
     it("follows a rotated key and a changed address, and clears a pack nobody can reach", () => {
         const env = new Map([
             ["WORLD", "https://old.example/api/minecraft/world/stale/skyblock-2-1.zip"],
-            ["RESOURCE_PACK", "https://old.example/api/minecraft/map-pack/luckyblock-towers-resources.zip"]
+            [
+                "RESOURCE_PACK",
+                "https://old.example/api/minecraft/map-pack/luckyblock-towers-resources.zip"
+            ]
         ]);
         expect(mapUrlRewrites(env, LOCAL)).toEqual({
             WORLD: "http://traefik/api/minecraft/world/key/skyblock-2-1.zip",
@@ -337,7 +374,8 @@ describe("moving a server's map to where Polaris serves it", () => {
         expect(mapUrlRewrites(env, LOCAL)).toEqual({});
         expect(mapUrlRewrites(env, PUBLIC)).toEqual({
             WORLD: "https://polaris.example/api/minecraft/world/key/luckyblock-towers.zip",
-            RESOURCE_PACK: "https://polaris.example/api/minecraft/map-pack/luckyblock-towers-resources.zip",
+            RESOURCE_PACK:
+                "https://polaris.example/api/minecraft/map-pack/luckyblock-towers-resources.zip",
             RESOURCE_PACK_SHA1: findMap("luckyblock-towers")?.resourcePack?.sha1
         });
     });
@@ -345,7 +383,9 @@ describe("moving a server's map to where Polaris serves it", () => {
     it("changes nothing already right, and nothing somebody else set", () => {
         expect(
             mapUrlRewrites(
-                new Map([["WORLD", "https://polaris.example/api/minecraft/world/key/skyblock-2-1.zip"]]),
+                new Map([
+                    ["WORLD", "https://polaris.example/api/minecraft/world/key/skyblock-2-1.zip"]
+                ]),
                 PUBLIC
             )
         ).toEqual({});

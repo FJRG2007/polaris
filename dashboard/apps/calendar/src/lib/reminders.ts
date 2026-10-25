@@ -179,7 +179,13 @@ export async function fireDueReminders(
         const occurrenceKey = `${reminder.objectId}:${reminder.occurrence.toISOString()}:${reminder.alarmKey}`;
         if (listening && !told.has(occurrenceKey)) {
             told.add(occurrenceKey);
-            await announceStarting(reminder.objectId, item, reminder.occurrence, calendar, occurrenceKey);
+            await announceStarting(
+                reminder.objectId,
+                item,
+                reminder.occurrence,
+                calendar,
+                occurrenceKey
+            );
         }
         const key = `${reminder.userId}:${calendar.id}`;
         if (!levels.has(key))

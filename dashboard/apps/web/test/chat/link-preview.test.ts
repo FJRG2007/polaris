@@ -433,13 +433,23 @@ describe("a share-button short link", () => {
             author: { uniqueId: "somebody", nickname: "Somebody" },
             video: { cover: "https://p16-sign.tiktokcdn-eu.com/page-cover.image?x-expires=9" }
         };
-        const data = { __DEFAULT_SCOPE__: { "webapp.video-detail": { itemInfo: { itemStruct: item } } } };
+        const data = {
+            __DEFAULT_SCOPE__: { "webapp.video-detail": { itemInfo: { itemStruct: item } } }
+        };
         responses.set(video, {
             status: 200,
             headers: { "content-type": "text/html" },
             body: `<html><head><title>TikTok - Make Your Day</title></head><body><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">${JSON.stringify(data)}</script></body></html>`
         });
-        responses.set(askTikTok, oembed({ version: "1.0", type: "video", html: "<iframe></iframe>", provider_name: "TikTok" }));
+        responses.set(
+            askTikTok,
+            oembed({
+                version: "1.0",
+                type: "video",
+                html: "<iframe></iframe>",
+                provider_name: "TikTok"
+            })
+        );
         await unfurl(share);
         expect(stored[0]?.ok).toBe(true);
         expect(stored[0]?.title).toBe("A caption");

@@ -274,7 +274,10 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         // terrain around the towers and put spawn under it.
         generator: {
             levelType: FLAT_LEVEL_TYPE,
-            settings: JSON.stringify({ layers: [{ block: "minecraft:air", height: 1 }], biome: "minecraft:desert" })
+            settings: JSON.stringify({
+                layers: [{ block: "minecraft:air", height: 1 }],
+                biome: "minecraft:desert"
+            })
         },
         // The lucky blocks are sponges wearing the pack. Without it the map plays
         // exactly the same and looks like a sponge farm.
@@ -305,8 +308,12 @@ export function isWorldMap(id: string): boolean {
 }
 
 /** Every map a blueprint can be built on, which is every map of its category. */
-export function mapsFor(blueprint: Pick<GameBlueprint, "mapCategory"> | undefined): readonly WorldMap[] {
-    return blueprint?.mapCategory ? WORLD_MAPS.filter((map) => map.category === blueprint.mapCategory) : [];
+export function mapsFor(
+    blueprint: Pick<GameBlueprint, "mapCategory"> | undefined
+): readonly WorldMap[] {
+    return blueprint?.mapCategory
+        ? WORLD_MAPS.filter((map) => map.category === blueprint.mapCategory)
+        : [];
 }
 
 /** Whether this blueprint could be built on a map at all. */
@@ -324,7 +331,8 @@ export function hasMaps(blueprint: Pick<GameBlueprint, "mapCategory"> | undefine
 export function mapFor(blueprint: GameBlueprint, id: string | undefined): WorldMap | undefined {
     if (!id) return undefined;
     const map = findMap(id);
-    if (!map || map.category !== blueprint.mapCategory) throw new Error(gameMessage("games", "lib.notMapForGame"));
+    if (!map || map.category !== blueprint.mapCategory)
+        throw new Error(gameMessage("games", "lib.notMapForGame"));
     return map;
 }
 

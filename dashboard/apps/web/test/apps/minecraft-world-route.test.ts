@@ -40,10 +40,10 @@ vi.mock("@polaris/app-host", () => ({
 
 beforeEach(() => counted.clear());
 
-const world = await import(
-    "@polaris-app/game-servers/src/routes/api/minecraft/world/[token]/[file]/route"
-);
-const pack = await import("@polaris-app/game-servers/src/routes/api/minecraft/map-pack/[file]/route");
+const world =
+    await import("@polaris-app/game-servers/src/routes/api/minecraft/world/[token]/[file]/route");
+const pack =
+    await import("@polaris-app/game-servers/src/routes/api/minecraft/map-pack/[file]/route");
 const request = (method: string) => new Request("https://polaris.example/x", { method });
 const worldParams = (file: string, token = "key") => ({ params: Promise.resolve({ token, file }) });
 const packParams = (file: string) => ({ params: Promise.resolve({ file }) });
@@ -59,7 +59,9 @@ describe("a world, for a server's container", () => {
     });
 
     it("answers a wrong key, a file no map names, and a pack the same: not found", async () => {
-        expect((await world.GET(request("GET"), worldParams("skyblock-2-1.zip", "nope"))).status).toBe(404);
+        expect(
+            (await world.GET(request("GET"), worldParams("skyblock-2-1.zip", "nope"))).status
+        ).toBe(404);
         expect((await world.GET(request("GET"), worldParams("stray.zip"))).status).toBe(404);
         expect((await world.GET(request("GET"), worldParams("../stray.zip"))).status).toBe(404);
         expect(

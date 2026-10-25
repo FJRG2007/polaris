@@ -53,7 +53,9 @@ async function archiveFor(
     const location = path.join(worldDir(), file);
     const info = await stat(location).catch(() => null);
     if (!info?.isFile()) {
-        console.error(`[minecraft-world] ${file} is not in ${worldDir()}; this bundle was built without it`);
+        console.error(
+            `[minecraft-world] ${file} is not in ${worldDir()}; this bundle was built without it`
+        );
         return null;
     }
     return { location, size: info.size };
@@ -74,7 +76,11 @@ async function head(file: string, known: readonly string[]): Promise<Response> {
     return new Response(null, { headers: headersFor(file, archive.size) });
 }
 
-async function get(file: string, known: readonly string[], limit: DownloadLimit): Promise<Response> {
+async function get(
+    file: string,
+    known: readonly string[],
+    limit: DownloadLimit
+): Promise<Response> {
     const archive = await archiveFor(file, known);
     if (!archive) return new Response("Not found", { status: 404 });
     if (!(await withinLimit(limit))) {
