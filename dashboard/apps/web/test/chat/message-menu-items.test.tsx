@@ -108,9 +108,7 @@ describe("the message menu by target", () => {
         menu();
         await open("zip");
         const item = await screen.findByText("Download");
-        expect(item.closest("a")?.getAttribute("href")).toBe(
-            "/api/chat/attachments/f2?download=1"
-        );
+        expect(item.closest("a")?.getAttribute("href")).toBe("/api/chat/attachments/f2?download=1");
         expect(screen.getAllByText("Download")).toHaveLength(1);
         expect(screen.queryByText("Download the audio")).toBeNull();
         // The message's own items are still there underneath.

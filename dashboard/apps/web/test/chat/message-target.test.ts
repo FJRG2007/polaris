@@ -107,9 +107,7 @@ describe("a link somebody wrote", () => {
 
 describe("a picture in the message", () => {
     it("takes its name from the alt text, which is the file's own name", () => {
-        const { root, at } = row(
-            '<img src="/api/chat/attachments/9" alt="the roof.jpg" />'
-        );
+        const { root, at } = row('<img src="/api/chat/attachments/9" alt="the roof.jpg" />');
         expect(messageTarget(at("img"), root, BASE).image).toEqual({
             url: "/api/chat/attachments/9",
             name: "the roof.jpg"

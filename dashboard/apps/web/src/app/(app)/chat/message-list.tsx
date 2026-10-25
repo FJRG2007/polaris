@@ -375,10 +375,7 @@ export function MessageList({
     const [recent, setRecent] = useState<readonly string[]>([]);
     useEffect(() => setRecent(recentEmoji()), []);
     // Four, for the menu; the hover bar shows the first three of them.
-    const quick = useMemo(
-        () => quickEmoji(recent, emoji, MENU_QUICK_COUNT),
-        [recent, emoji]
-    );
+    const quick = useMemo(() => quickEmoji(recent, emoji, MENU_QUICK_COUNT), [recent, emoji]);
 
     /** React, and remember it. The picker records what is chosen through it; the
      *  hover row did not, so pressing the same emoji forty times never made it

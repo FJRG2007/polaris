@@ -14,9 +14,7 @@ describe("reminder presets", () => {
         expect(reminderMoment("in15Minutes", NOW, ZONE).toISOString()).toBe(
             "2026-09-02T13:25:00.000Z"
         );
-        expect(reminderMoment("in1Hour", NOW, ZONE).toISOString()).toBe(
-            "2026-09-02T14:10:00.000Z"
-        );
+        expect(reminderMoment("in1Hour", NOW, ZONE).toISOString()).toBe("2026-09-02T14:10:00.000Z");
         expect(reminderMoment("in3Hours", NOW, ZONE).toISOString()).toBe(
             "2026-09-02T16:10:00.000Z"
         );
