@@ -21,6 +21,7 @@ import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { AppSlot } from "@/lib/app-extensions/types";
 import { callActivityGames } from "@/lib/app-extensions/registry";
 import { activityPass, readActivityPass } from "@/lib/chat/activity-pass";
+import { leavePlay, recordPlay, touchPlay } from "@/lib/chat/activity-sessions";
 import { activityClaimSchema, MAX_PLAYERS, type ActivityClaim } from "@/lib/chat/call-activity";
 
 /** Why the games button cannot be used, in a word the screen turns into a sentence. */
@@ -43,7 +44,22 @@ const gameIdSchema = activityClaimSchema.shape.game;
 
 /** What the reader may do with games in this call, and which games there are. */
 async function access(meetingId: string): Promise<CallGamesAnswer> {
+    return (await accessOf(meetingId)).answer;
+}
+
+/** The same, with whose answer it is - for the record the conversation's card
+ *  is read from. */
+async function accessOf(
+    meetingId: string
+): Promise<{ readonly answer: CallGamesAnswer; readonly userId: string }> {
     const user = await requireUser();
+    return { answer: await decide(user, meetingId), userId: user.id };
+}
+
+async function decide(
+    user: Awaited<ReturnType<typeof requireUser>>,
+    meetingId: string
+): Promise<CallGamesAnswer> {
     if (!(await isAppInstalled("arcade"))) return { ok: false, reason: "missing" };
     if (!(await sessionCan(user, "arcade.calls"))) return { ok: false, reason: "denied" };
     const seat = await seatForUser(user.id, meetingId);
@@ -72,12 +88,15 @@ export async function claimCallGame(
     const id = meetingIdSchema.safeParse(meetingId);
     const wanted = gameIdSchema.safeParse(game);
     if (!id.success || !wanted.success) return { reason: "missing" };
-    const answer = await access(id.data);
+    const { answer, userId } = await accessOf(id.data);
     if (!answer.ok) return { reason: answer.reason };
     if (!answer.games.some((offered) => offered.id === wanted.data)) return { reason: "missing" };
     const at = Date.now();
     const facts = { meetingId: id.data, seat: answer.seat, game: wanted.data, at };
-    return { claim: { game: wanted.data, at, pass: activityPass(facts) } };
+    const pass = activityPass(facts);
+    // The card in the call's conversation follows who plays.
+    await recordPlay(id.data, userId, wanted.data);
+    return { claim: { game: wanted.data, at, pass } };
 }
 
 /** How long after a pass ran out it may still be renewed: a laptop that slept
@@ -100,13 +119,27 @@ export async function renewCallGame(
     const id = meetingIdSchema.safeParse(meetingId);
     const held = activityClaimSchema.safeParse(claim);
     if (!id.success || !held.success) return { reason: "missing" };
-    const answer = await access(id.data);
+    const { answer, userId } = await accessOf(id.data);
     if (!answer.ok) return { reason: answer.reason };
     const { game, at, pass } = held.data;
     if (!answer.games.some((offered) => offered.id === game)) return { reason: "missing" };
     const facts = { meetingId: id.data, seat: answer.seat, game, at };
     if (!readActivityPass(pass, facts, Date.now() - RENEW_GRACE_MS)) return { reason: "seat" };
+    await touchPlay(id.data, userId, game);
     return { claim: { game, at, pass: activityPass(facts) } };
+}
+
+/**
+ * The reader stopped playing this call's game, so the card stops counting
+ * them - and says the game is over once nobody is left. Their claim is taken
+ * back by their own browser; this is only the record. Needs no permission:
+ * anybody may stop playing.
+ */
+export async function leaveCallGame(meetingId: unknown): Promise<void> {
+    const id = meetingIdSchema.safeParse(meetingId);
+    if (!id.success) return;
+    const user = await requireUser();
+    await leavePlay(id.data, user.id);
 }
 
 const vouchSchema = z

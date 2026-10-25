@@ -1973,7 +1973,11 @@
         "playing": "{count, plural, one {# jugando} other {# jugando}}",
         "denied": "Un administrador ha desactivado los juegos en llamadas para tu cuenta.",
         "missing": "Juegos no está instalado en este Polaris. Un administrador puede añadirlo desde la tienda.",
-        "seat": "Únete a la llamada para jugar."
+        "seat": "Únete a la llamada para jugar.",
+        "focus": "Agrandar el juego",
+        "unfocus": "Volver a ver la llamada",
+        "fullscreen": "Pantalla total",
+        "exitFullscreen": "Volver al tamaño"
     },
     "deleteMessage": {
         "title": "Borrar mensaje",
@@ -1998,5 +2002,15 @@
         "remindsOn": "Te avisa el {date} a las {time}.",
         "couldNotLoad": "No se pudieron cargar tus recordatorios",
         "cancelFailed": "No se pudo anular el recordatorio"
+    },
+    "activityCard": {
+        "started": "{name} ha empezado {game}",
+        "players": "{count, plural, one {# de {max} jugando} other {# de {max} jugando}}",
+        "ended": "Acabado",
+        "playing": "Jugando",
+        "full": "Esta partida está llena.",
+        "otherCall": "Sal de tu llamada actual para unirte.",
+        "whoIsPlaying": "Quién juega",
+        "invited": "{name} te ha invitado a jugar a {game}"
     }
 }

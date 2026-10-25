@@ -41,6 +41,8 @@ import { useComposerEmoji, useSpaceEmojiScope } from "./space-emoji";
 import { runAction } from "@/lib/run-action";
 import { useMessageDelete } from "./delete-message";
 import { useCallHold } from "./call-session";
+import { readActivityCard } from "./activity-card-actions";
+import { requestActivityJoin } from "./activity-join";
 import { useCallHidden } from "./call-hidden";
 import { CallRosterList } from "./call-roster";
 import type { PollDraft } from "./poll-dialog";
@@ -1225,6 +1227,51 @@ export function ChannelView({
             checkCall();
         });
     }, [callTitle, callsOff, channel, channelId, checkCall, enter, pressed, router, session]);
+
+    // Joining a game from its card or an invitation: into this conversation's
+    // call first, through the call's own checks, then the game is handed to the
+    // call to claim a seat in - see `activity-join`. Never walks out of another
+    // call: the card says so instead.
+    const activityAsked = params.get("activity");
+    const activityTaken = useRef<string | null>(null);
+    useEffect(() => {
+        if (!activityAsked || !channel || activityTaken.current === activityAsked) return;
+        activityTaken.current = activityAsked;
+        router.replace(`/chat/c/${channelId}`, { scroll: false });
+        void readActivityCard(activityAsked)
+            .then((found) => {
+                if (!found || found.channelId !== channelId || found.refusal || callsOff) return;
+                if (session) {
+                    if (session.meetingId === found.meetingId)
+                        requestActivityJoin(found.meetingId, found.game);
+                    return;
+                }
+                setJoining(true);
+                void runAction(() => callRequests.startCall(channelId), setError).then(
+                    (result) => {
+                        setJoining(false);
+                        if (!result) return;
+                        if (result.error) {
+                            setError(result.error);
+                            return;
+                        }
+                        if (!result.meetingId) return;
+                        requestActivityJoin(result.meetingId, found.game);
+                        enter(
+                            {
+                                meetingId: result.meetingId,
+                                channelId,
+                                title: callTitle,
+                                ...placed(result)
+                            },
+                            false
+                        );
+                        checkCall();
+                    }
+                );
+            })
+            .catch(() => undefined);
+    }, [activityAsked, callTitle, callsOff, channel, channelId, checkCall, enter, router, session]);
 
     const shown = useMemo(() => [...(messages ?? []), ...pending], [messages, pending]);
 

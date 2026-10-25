@@ -40,6 +40,18 @@ vi.mock("@/lib/chat/meeting-seat", () => ({
 vi.mock("@/lib/apps/install-presence", () => ({ isAppInstalled: async () => state.installed }));
 vi.mock("@/lib/i18n/locale-service", () => ({ getUserLocale: async () => "en-US" }));
 vi.mock("@/lib/app-extensions/registry", () => ({ callActivityGames: async () => state.games }));
+const recorded = vi.hoisted(() => ({ plays: [] as string[], touches: [] as string[], leaves: [] as string[] }));
+vi.mock("@/lib/chat/activity-sessions", () => ({
+    recordPlay: async (meetingId: string, userId: string, game: string) => {
+        recorded.plays.push(`${meetingId}|${userId}|${game}`);
+    },
+    touchPlay: async (meetingId: string, userId: string) => {
+        recorded.touches.push(`${meetingId}|${userId}`);
+    },
+    leavePlay: async (meetingId: string, userId: string) => {
+        recorded.leaves.push(`${meetingId}|${userId}`);
+    }
+}));
 
 const actions = await import("@/app/(app)/chat/call-activity-actions");
 const passes = await import("@/lib/chat/activity-pass");
@@ -200,5 +212,24 @@ describe("the server's clock", () => {
         expect(answer.now).toBeGreaterThanOrEqual(before);
         expect(answer.now).toBeLessThanOrEqual(Date.now());
         expect((await actions.vouchCallGames(MEETING, "nope")).now).toBeGreaterThanOrEqual(before);
+    });
+});
+
+describe("the conversation's card follows the server's decision", () => {
+    it("records a player only once a pass is minted", async () => {
+        recorded.plays = [];
+        state.can = new Set();
+        await actions.claimCallGame(MEETING, "new-york");
+        expect(recorded.plays).toEqual([]);
+        state.can = new Set(["arcade.calls"]);
+        await actions.claimCallGame(MEETING, "new-york");
+        expect(recorded.plays).toEqual([`${MEETING}|user-1|new-york`]);
+    });
+
+    it("records leaving for a valid call only", async () => {
+        recorded.leaves = [];
+        await actions.leaveCallGame("not-a-uuid");
+        await actions.leaveCallGame(MEETING);
+        expect(recorded.leaves).toEqual([`${MEETING}|user-1`]);
     });
 });

@@ -15,5 +15,10 @@
             "name": "Nueva York",
             "summary": "Recorre Manhattan a pie, en coche, en bici o en helicóptero."
         }
-    }
+    },
+    "invite": "Invitar a jugar",
+    "inviteDenied": "Un administrador ha desactivado los juegos en llamadas para tu cuenta.",
+    "inviteMissing": "Este juego no se puede jugar en grupo aquí.",
+    "fullscreen": "Pantalla total",
+    "exitFullscreen": "Volver al tamaño"
 }
