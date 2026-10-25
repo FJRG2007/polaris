@@ -328,6 +328,20 @@ describe("moving a server's map to where Polaris serves it", () => {
         });
     });
 
+    it("gives a cleared pack back once the instance has an address a client can reach", () => {
+        const env = new Map([
+            ["WORLD", "http://traefik/api/minecraft/world/key/luckyblock-towers.zip"],
+            ["RESOURCE_PACK", ""],
+            ["RESOURCE_PACK_SHA1", ""]
+        ]);
+        expect(mapUrlRewrites(env, LOCAL)).toEqual({});
+        expect(mapUrlRewrites(env, PUBLIC)).toEqual({
+            WORLD: "https://polaris.example/api/minecraft/world/key/luckyblock-towers.zip",
+            RESOURCE_PACK: "https://polaris.example/api/minecraft/map-pack/luckyblock-towers-resources.zip",
+            RESOURCE_PACK_SHA1: findMap("luckyblock-towers")?.resourcePack?.sha1
+        });
+    });
+
     it("changes nothing already right, and nothing somebody else set", () => {
         expect(
             mapUrlRewrites(

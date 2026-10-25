@@ -198,7 +198,10 @@ async function announceToAutomations(
                 actorId
             },
             {
-                key: task.id,
+                key:
+                    name === "task.completed"
+                        ? `${task.id}:${Math.floor(Date.now() / 60_000)}`
+                        : task.id,
                 mayReceive: (runner) =>
                     requireTask(runner, task.id, "guest").then(
                         () => true,

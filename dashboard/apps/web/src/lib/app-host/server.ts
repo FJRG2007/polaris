@@ -531,6 +531,7 @@ export const serverHost = {
     },
     // An app's own triggers firing runs, a move of its automations, its waits woken.
     automations: {
+        announceGameServer: later(load.automationsGameServerEvents, "announceGameServer"),
         announceGameServerEvent: later(
             load.automationsGameServerEvents,
             "announceGameServerEvent"

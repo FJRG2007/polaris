@@ -54,6 +54,7 @@ const deploy = {
 function armed(...ids: string[]) {
     findMany.mockResolvedValue(
         ids.map((id) => ({
+            id: `t-${id}`,
             automation: { id, enabled: true, orgId: null, userId: `u-${id}`, runAsId: `u-${id}` }
         }))
     );
@@ -207,6 +208,28 @@ describe("emitAppEvent", () => {
                 }
             }
         ]);
+    });
+
+    it("reads every listener past one page, and asks each runner once", async () => {
+        const page = core.AUTOMATION_LIMITS.perShelf;
+        const shelf = { enabled: true, orgId: null, userId: "u-shared", runAsId: "u-shared" };
+        const rows = Array.from({ length: page + 1 }, (_, index) => ({
+            id: `t-${index}`,
+            automation: { id: `a${index}`, ...shelf }
+        }));
+        findMany.mockImplementation(async (query: { cursor?: { id: string } }) => {
+            const from = query.cursor
+                ? rows.findIndex((row) => row.id === query.cursor!.id) + 1
+                : 0;
+            return rows.slice(from, from + page);
+        });
+        runners.set("u-shared", { id: "u-shared", isAdmin: false });
+        const mayReceive = vi.fn(async () => true);
+        const audience = await events.audienceFor("deploy.succeeded", mayReceive);
+        expect(audience).toHaveLength(page + 1);
+        expect(audience).toContain(`a${page}`);
+        expect(findMany).toHaveBeenCalledTimes(2);
+        expect(mayReceive).toHaveBeenCalledTimes(1);
     });
 
     it("sends nothing when no runner may see the thing", async () => {

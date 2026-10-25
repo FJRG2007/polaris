@@ -23,6 +23,13 @@ import { isAppInstalled } from "@/lib/apps/install-presence";
 /** Whether the account an automation runs as may know about this one thing. */
 export type MayReceive = (runner: RunActor) => Promise<boolean>;
 
+interface AudienceAutomation {
+    readonly id: string;
+    readonly orgId: string | null;
+    readonly userId: string | null;
+    readonly runAsId: string | null;
+}
+
 /** Whether any automation listens for `name`: a write touching many things asks once. */
 export async function anyListening(name: string): Promise<boolean> {
     const found = await prisma.automationTrigger.findFirst({
@@ -32,24 +39,43 @@ export async function anyListening(name: string): Promise<boolean> {
     return found !== null;
 }
 
-/** The automations listening for `name` whose runner may receive it. Bounded by the shelf limit. */
+/** The automations listening for `name` whose runner may receive it, read a page at a time. */
 export async function audienceFor(name: string, mayReceive: MayReceive): Promise<string[]> {
-    const armed = await prisma.automationTrigger.findMany({
-        where: { eventType: "core.event", subjectKey: name },
-        take: core.AUTOMATION_LIMITS.perShelf,
-        select: {
-            automation: {
-                select: { id: true, enabled: true, orgId: true, userId: true, runAsId: true }
-            }
+    const out = new Set<string>();
+    const decided = new Map<string, Promise<boolean>>();
+    const decide = (automation: AudienceAutomation): Promise<boolean> => {
+        const shelf = `${automation.runAsId}:${automation.orgId}:${automation.userId}`;
+        let answer = decided.get(shelf);
+        if (!answer) {
+            answer = automationRunner(automation)
+                .then((runner) => (runner ? mayReceive(runner) : false))
+                .catch(() => false);
+            decided.set(shelf, answer);
         }
-    });
-    const out: string[] = [];
-    for (const { automation } of armed) {
-        if (!automation.enabled || out.includes(automation.id)) continue;
-        const runner = await automationRunner(automation);
-        if (runner && (await mayReceive(runner).catch(() => false))) out.push(automation.id);
+        return answer;
+    };
+    let cursor: string | undefined;
+    for (;;) {
+        const page = await prisma.automationTrigger.findMany({
+            where: { eventType: "core.event", subjectKey: name, automation: { enabled: true } },
+            orderBy: { id: "asc" },
+            take: core.AUTOMATION_LIMITS.perShelf,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+            select: {
+                id: true,
+                automation: { select: { id: true, orgId: true, userId: true, runAsId: true } }
+            }
+        });
+        const fresh = page.filter(({ automation }) => !out.has(automation.id));
+        const answers = await Promise.all(fresh.map(({ automation }) => decide(automation)));
+        fresh.forEach(({ automation }, index) => {
+            if (answers[index]) out.add(automation.id);
+        });
+        const last = page.at(-1);
+        if (!last || page.length < core.AUTOMATION_LIMITS.perShelf) break;
+        cursor = last.id;
     }
-    return out;
+    return [...out];
 }
 
 /**

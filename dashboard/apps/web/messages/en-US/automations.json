@@ -325,6 +325,7 @@
         "commandTooLong": "The command is longer than the console takes",
         "deployForbidden": "The account it runs as cannot deploy that service",
         "deployFailed": "The deploy did not start",
+        "deployLoop": "A deploy an automation started cannot redeploy again",
         "serviceGone": "That service is gone or out of reach"
     },
     "secrets": {

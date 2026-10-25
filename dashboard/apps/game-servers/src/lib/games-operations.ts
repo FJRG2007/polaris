@@ -65,6 +65,9 @@ export async function setServerRunning(
         targetType: "installedApp",
         targetId: access.install.id
     });
+    await Promise.resolve()
+        .then(() => host.automations.announceGameServer(access.ownerId, access.install.id, running))
+        .catch(() => undefined);
 }
 
 /** Save the world and restart the server now. */

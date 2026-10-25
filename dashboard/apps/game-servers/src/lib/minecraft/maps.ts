@@ -439,7 +439,8 @@ export function mapUrlRewrites(
         if (wanted !== world) changes.WORLD = wanted;
     }
     const pack = env.get("RESOURCE_PACK") ?? "";
-    const packMap = mapOfPackUrl(pack);
+    const packMap =
+        mapOfPackUrl(pack) ?? (env.has("RESOURCE_PACK") && pack === "" ? worldMap : undefined);
     const packEnv = packMap ? mapPackEnv(packMap, addresses) : null;
     if (packEnv && packEnv.RESOURCE_PACK !== pack) Object.assign(changes, packEnv);
     return changes;

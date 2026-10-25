@@ -5,6 +5,10 @@
  * run: may it manage deployments at all (`deploy.manage`), and may it deploy
  * this service (`deploy.run` on its project). Either answered no refuses the
  * step; a service that is gone fails it.
+ *
+ * A deploy this step starts is marked as an automation's, and a run that a
+ * deploy like that set off may not redeploy again: "deploy finished -> Redeploy"
+ * would otherwise deploy forever.
  */
 
 import * as core from "@polaris/core";
@@ -12,11 +16,22 @@ import { StepError, StepRefusal, type ServerNode } from "../types";
 
 type RedeployConfig = ReturnType<(typeof core.CORE_NODE_CONFIGS)["core.redeploy"]["parse"]>;
 
+/** Whether the run was set off by a deploy that an automation started. */
+function causedByAutomationDeploy(trigger: Record<string, unknown>): boolean {
+    if (trigger.name !== "deploy.succeeded" && trigger.name !== "deploy.failed") return false;
+    const payload = trigger.payload;
+    return (
+        typeof payload === "object" &&
+        payload !== null &&
+        (payload as Record<string, unknown>).trigger === "automation"
+    );
+}
+
 export const redeployNode: ServerNode<RedeployConfig> = {
     type: "core.redeploy",
     meta: core.CORE_NODE_META["core.redeploy"],
     config: core.CORE_NODE_CONFIGS["core.redeploy"],
-    run: async (config, _context, io) => {
+    run: async (config, context, io) => {
         const [{ actingUser }, { sessionCan }, access, deployService, activity] = await Promise.all(
             [
                 import("@/lib/mcp/acting-user"),
@@ -27,6 +42,7 @@ export const redeployNode: ServerNode<RedeployConfig> = {
             ]
         );
         io.recordInput({ applicationId: config.applicationId });
+        if (causedByAutomationDeploy(context.trigger)) throw new StepRefusal("deployLoop");
         const user = await actingUser(io.actor.id);
         if (!user) throw new StepRefusal("runAsGone");
         if (!(await sessionCan(user, "deploy.manage"))) throw new StepRefusal("deployForbidden");
@@ -53,7 +69,11 @@ export const redeployNode: ServerNode<RedeployConfig> = {
             deploymentId = await deployService.deployApplication(
                 config.applicationId,
                 granted.ownerId,
-                user.id
+                user.id,
+                {
+                    trigger: "automation",
+                    audit: { automationId: io.automationId, runId: io.runId }
+                }
             );
         } catch (caught) {
             console.error("polaris: an automation's redeploy did not start:", caught);

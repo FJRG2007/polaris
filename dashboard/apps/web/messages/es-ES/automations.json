@@ -325,6 +325,7 @@
         "commandTooLong": "El comando es más largo de lo que admite la consola",
         "deployForbidden": "La cuenta con la que se ejecuta no puede desplegar ese servicio",
         "deployFailed": "El despliegue no empezó",
+        "deployLoop": "Un despliegue que inició una automatización no puede volver a desplegar",
         "serviceGone": "Ese servicio ya no existe o no está a su alcance"
     },
     "secrets": {

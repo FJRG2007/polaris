@@ -87,7 +87,12 @@ const { gameServerAutomationNodes } =
     await import("../../../game-servers/src/lib/automation-nodes");
 const [power, command] = gameServerAutomationNodes() as unknown as TestNode[];
 
-const io = (actor = "runner") => ({ actor: { id: actor, isAdmin: false }, recordInput: vi.fn() });
+const io = (actor = "runner") => ({
+    actor: { id: actor, isAdmin: false },
+    automationId: "auto-1",
+    runId: "run-1",
+    recordInput: vi.fn()
+});
 const context = { trigger: { payload: { player: "Steve" } }, steps: {} };
 
 beforeEach(() => {
@@ -179,13 +184,34 @@ describe("game server command step", () => {
 });
 
 describe("redeploy step", () => {
-    const run = (actor = "runner") =>
-        redeployNode.run!({ applicationId: SERVICE }, context as never, io(actor) as never);
+    const run = (actor = "runner", ctx: unknown = context) =>
+        redeployNode.run!({ applicationId: SERVICE }, ctx as never, io(actor) as never);
 
     it("deploys the service as the runner, under its owner", async () => {
         const result = await run();
-        expect(state.calls).toEqual([["deploy", SERVICE, "owner", "runner"]]);
+        expect(state.calls).toEqual([
+            [
+                "deploy",
+                SERVICE,
+                "owner",
+                "runner",
+                { trigger: "automation", audit: { automationId: "auto-1", runId: "run-1" } }
+            ]
+        ]);
         expect(result).toEqual({ output: { deploymentId: "dep-1", applicationId: SERVICE } });
+    });
+
+    it("never redeploys from a deploy an automation started", async () => {
+        for (const name of ["deploy.succeeded", "deploy.failed"])
+            await expect(
+                run("runner", { trigger: { name, payload: { trigger: "automation" } }, steps: {} })
+            ).rejects.toMatchObject({ code: "deployLoop", name: "StepRefusal" });
+        expect(state.calls).toEqual([]);
+        await run("runner", {
+            trigger: { name: "deploy.succeeded", payload: { trigger: "push" } },
+            steps: {}
+        });
+        expect(state.calls).toHaveLength(1);
     });
 
     it("is refused without deploy.manage", async () => {

@@ -236,6 +236,7 @@ const RUN_ERRORS = [
     "commandTooLong",
     "deployForbidden",
     "deployFailed",
+    "deployLoop",
     "serviceGone"
 ] as const;
 
