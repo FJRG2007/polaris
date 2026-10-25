@@ -15,7 +15,7 @@ import { Avatar } from "@/components/avatar";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ActivityCardView, JoinRefusal } from "@/lib/chat/activity-card";
-import { joinHref } from "@/lib/chat/activity-card";
+import { formatElapsed } from "@polaris/core";
 import { readActivityCard } from "./activity-card-actions";
 import { requestActivityJoin } from "./activity-join";
 import { useCallHold } from "./call-hold";
@@ -57,7 +57,9 @@ export function ActivityCard({
     }, [sessionId, message]);
 
     if (view === null) return null;
-    const otherCall = Boolean(view && session && session.meetingId !== view.meetingId);
+    const otherCall = Boolean(
+        view && view.meetingId !== null && session && session.meetingId !== view.meetingId
+    );
     const reason: string | null = !view
         ? null
         : view.refusal
@@ -70,8 +72,11 @@ export function ActivityCard({
 
     const join = () => {
         if (!view) return;
-        if (session?.meetingId === view.meetingId) requestActivityJoin(view.meetingId, view.game);
-        else router.push(joinHref(view.channelId, view.sessionId));
+        // A lobby has no call: straight in, nothing rings.
+        if (view.meetingId === null) router.push(view.href);
+        else if (session?.meetingId === view.meetingId)
+            requestActivityJoin(view.meetingId, view.game);
+        else router.push(view.href);
     };
 
     return (
@@ -90,7 +95,7 @@ export function ActivityCard({
                     {view && (
                         <p className="truncate text-xs text-muted-foreground">
                             {view.ended
-                                ? t("activityCard.ended")
+                                ? endedLine(t, view)
                                 : t("activityCard.players", {
                                       count: view.playing,
                                       max: view.max
@@ -144,6 +149,20 @@ export function ActivityCard({
             </div>
         </div>
     );
+}
+
+/** "Ended - 12:04 - played by A, B", or "Invitation expired" for a session
+ *  nobody ever joined. */
+function endedLine(t: ReturnType<typeof useTranslations<"chat">>, view: ActivityCardView): string {
+    if (view.played.length === 0) return t("activityCard.expired");
+    const names = view.played
+        .map((person) => person.name)
+        .filter(Boolean)
+        .join(", ");
+    return t("activityCard.endedPlayed", {
+        time: formatElapsed(view.durationMs ?? 0),
+        names
+    });
 }
 
 function refusalText(t: ReturnType<typeof useTranslations<"chat">>, reason: JoinRefusal): string {

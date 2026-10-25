@@ -1240,10 +1240,16 @@ export function ChannelView({
         router.replace(`/chat/c/${channelId}`, { scroll: false });
         void readActivityCard(activityAsked)
             .then((found) => {
-                if (!found || found.channelId !== channelId || found.refusal || callsOff) return;
+                if (!found || found.channelId !== channelId || found.refusal) return;
+                // A lobby has no call to start: its own page.
+                if (found.meetingId === null) {
+                    router.push(found.href);
+                    return;
+                }
+                if (callsOff) return;
+                const meetingId = found.meetingId;
                 if (session) {
-                    if (session.meetingId === found.meetingId)
-                        requestActivityJoin(found.meetingId, found.game);
+                    if (session.meetingId === meetingId) requestActivityJoin(meetingId, found.game);
                     return;
                 }
                 setJoining(true);

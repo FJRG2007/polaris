@@ -20,7 +20,10 @@ const state = vi.hoisted(() => ({
     member: true,
     notified: [] as string[],
     limitKeys: [] as string[],
-    session: null as null | Record<string, unknown>
+    session: null as null | Record<string, unknown>,
+    lobbies: [] as string[],
+    invited: [] as string[][],
+    calls: 0
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -49,7 +52,12 @@ vi.mock("@/lib/chat/access", () => ({
         return {};
     }
 }));
-vi.mock("@/lib/chat/meetings", () => ({ startOrJoin: async () => ({ meetingId: MEETING }) }));
+vi.mock("@/lib/chat/meetings", () => ({
+    startOrJoin: async () => {
+        state.calls += 1;
+        return { meetingId: MEETING };
+    }
+}));
 vi.mock("@/lib/chat/chat-service", () => ({
     openDirect: async () => CHANNEL,
     listChannels: async () => []
@@ -74,6 +82,14 @@ vi.mock("@/lib/chat/activity-sessions", () => ({
         game: "new-york",
         messageId: null
     }),
+    openLobby: async (channelId: string) => {
+        state.lobbies.push(channelId);
+        return { id: SESSION, channelId, game: "new-york", messageId: null };
+    },
+    inviteTo: async (_session: unknown, _inviter: string, ids: string[]) => {
+        state.invited.push(ids);
+    },
+    holdsInvite: async () => false,
     sessionForCard: async () => state.session
 }));
 
@@ -86,6 +102,9 @@ beforeEach(() => {
     state.member = true;
     state.notified = [];
     state.limitKeys = [];
+    state.lobbies = [];
+    state.invited = [];
+    state.calls = 0;
     state.session = {
         id: SESSION,
         channelId: CHANNEL,
@@ -100,9 +119,12 @@ beforeEach(() => {
 });
 
 describe("inviting people to play", () => {
-    it("opens the session and tells the people picked", async () => {
+    it("opens a lobby with no call and invites the people picked", async () => {
         const answer = await actions.inviteToGame({ game: "new-york", userIds: [FRIEND] });
-        expect(answer).toEqual({ ok: true, href: `/chat/c/${CHANNEL}?activity=${SESSION}` });
+        expect(answer).toEqual({ ok: true, href: `/chat/play/${SESSION}` });
+        expect(state.calls).toBe(0);
+        expect(state.lobbies).toEqual([CHANNEL]);
+        expect(state.invited).toEqual([[FRIEND]]);
         expect(state.notified).toEqual([FRIEND]);
         expect(state.limitKeys).toEqual(["arcade-invite:user-1"]);
     });

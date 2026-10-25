@@ -1959,7 +1959,7 @@
     "callDoNotDisturb": "{name} is in Do Not Disturb",
     "callDoNotDisturbBody": "They see the call, but it does not ring for them.",
     "callGames": {
-        "button": "Games",
+        "button": "Activities",
         "title": "Play a game together",
         "synced": "Everyone in the call can join. Players see where each other are and what they are driving; each browser runs its own city.",
         "checking": "Checking...",
@@ -1977,7 +1977,8 @@
         "focus": "Make the game bigger",
         "unfocus": "Show the call again",
         "fullscreen": "Full screen",
-        "exitFullscreen": "Exit full screen"
+        "exitFullscreen": "Exit full screen",
+        "invite": "Invite friends"
     },
     "deleteMessage": {
         "title": "Delete message",
@@ -2011,6 +2012,25 @@
         "full": "This game is full.",
         "otherCall": "Leave your current call to join.",
         "whoIsPlaying": "Who is playing",
-        "invited": "{name} invited you to play {game}"
+        "invited": "{name} invited you to play {game}",
+        "expired": "Invitation expired",
+        "endedPlayed": "Ended - {time} - {names}"
+    },
+    "gameInvites": {
+        "label": "Game invitations",
+        "noCall": "No call - just the game",
+        "decline": "Decline"
+    },
+    "lobby": {
+        "title": "Game",
+        "back": "Back",
+        "refused": {
+            "missing": "This game is not installed here.",
+            "denied": "You do not have permission to play games.",
+            "ended": "This game has ended.",
+            "full": "This game is full.",
+            "access": "This invitation is not for you, or it has expired.",
+            "server": "Could not reach the game server. Try again in a moment."
+        }
     }
 }

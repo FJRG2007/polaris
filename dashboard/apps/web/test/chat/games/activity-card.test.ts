@@ -115,3 +115,35 @@ describe("the invitation's input", () => {
         }
     });
 });
+
+describe("lobbies and invitations", () => {
+    const at = (ms: number) => new Date(ms);
+
+    it("counts a finished session from the first player in to the last one out", () => {
+        const players = [
+            { userId: "a", joinedAt: at(1_000), seenAt: at(5_000), leftAt: at(61_000) },
+            { userId: "b", joinedAt: at(10_000), seenAt: at(30_000), leftAt: null }
+        ];
+        expect(card.sessionDuration(players, null)).toBe(60_000);
+        expect(card.sessionDuration(players, at(31_000))).toBe(30_000);
+        expect(card.sessionDuration([], null)).toBeNull();
+    });
+
+    it("offers an invitation only while it is open, not declined and its session runs", () => {
+        const open = { expiresAt: at(10_000), declinedAt: null };
+        expect(card.inviteOpen(open, false, 5_000)).toBe(true);
+        expect(card.inviteOpen(open, false, 10_000)).toBe(false);
+        expect(card.inviteOpen(open, true, 5_000)).toBe(false);
+        expect(card.inviteOpen({ ...open, declinedAt: at(1) }, false, 5_000)).toBe(false);
+    });
+
+    it("keeps a lobby's room, page and passes apart from any call's", () => {
+        const id = "0192f6a0-0000-7000-8000-0000000000bb";
+        expect(card.lobbyHref(id)).toBe(`/chat/play/${id}`);
+        expect(card.lobbyRoom(id)).not.toBe(id);
+        expect(card.lobbyPassScope(id)).not.toBe(id);
+        expect(card.sessionInviteSchema.safeParse({ sessionId: id, userIds: [] }).success).toBe(
+            false
+        );
+    });
+});

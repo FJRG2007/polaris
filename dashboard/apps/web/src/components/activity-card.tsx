@@ -18,6 +18,7 @@
  * card is mounted, and once a second only on a card that shows seconds.
  */
 
+import Link from "next/link";
 import { Button, cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { useState, type ComponentType, type ReactNode } from "react";
@@ -148,6 +149,8 @@ export function ActivityCards({
                             ) : (
                                 <ListenAlongButton hostId={personId} />
                             )
+                        ) : one.joinUrl && personId !== viewer ? (
+                            <JoinGameButton href={one.joinUrl} />
                         ) : (
                             actions?.(one)
                         )
@@ -155,6 +158,20 @@ export function ActivityCards({
                 />
             ))}
         </div>
+    );
+}
+
+/** A friend's "Join game", the launcher's: straight into their game, with no
+ *  call. Only drawn when the server said this reader may join it. */
+function JoinGameButton({ href }: { href: string }) {
+    const t = useTranslations("components");
+    return (
+        <Button asChild size="sm">
+            <Link href={href}>
+                <Gamepad2 className="size-3.5" aria-hidden />
+                {t("activity.joinGame")}
+            </Link>
+        </Button>
     );
 }
 

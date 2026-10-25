@@ -8,5 +8,9 @@ vi.mock("@/app/(app)/chat/activity-card-actions", () => ({
     readActivityCard: async () => null,
     gameInviteAccess: async () => ({ ok: false, reason: "denied" }),
     gameInviteTargets: async () => [],
-    inviteToGame: async () => ({ ok: false, reason: "denied" })
+    inviteToGame: async () => ({ ok: false, reason: "denied" }),
+    inviteToSession: async () => ({ ok: false, reason: "denied" }),
+    callSessionId: async () => null,
+    pendingGameInvites: async () => [],
+    declineGameInvite: async () => undefined
 }));

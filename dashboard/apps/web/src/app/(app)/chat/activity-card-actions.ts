@@ -168,7 +168,8 @@ async function mayInvite(
     user: Inviter,
     game: string
 ): Promise<
-    { readonly ok: true; readonly name: string } | { readonly ok: false; readonly reason: InviteRefusal }
+    | { readonly ok: true; readonly name: string }
+    | { readonly ok: false; readonly reason: InviteRefusal }
 > {
     if (!(await isAppInstalled("arcade"))) return { ok: false, reason: "missing" };
     if (!(await sessionCan(user, "arcade.calls"))) return { ok: false, reason: "denied" };

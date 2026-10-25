@@ -23,7 +23,8 @@
             "playing": "Playing {name}"
         },
         "openInSpotify": "Play in Spotify",
-        "fromStart": "Starts from the beginning, not in step with them."
+        "fromStart": "Starts from the beginning, not in step with them.",
+        "joinGame": "Join game"
     },
     "activityTable": {
         "when": "When",
@@ -1698,7 +1699,7 @@
     },
     "gameInvite": {
         "title": "Invite to {game}",
-        "intro": "They see a Join button in the conversation, and people you pick get a notification. You play in a call with them.",
+        "intro": "They get an invitation to join. No call starts.",
         "people": "People",
         "peopleHint": "Add someone by name",
         "remove": "Remove {name}",
@@ -1714,6 +1715,10 @@
             "limited": "You sent a lot of invites. Try again in a few minutes.",
             "conversation": "You cannot invite to that conversation.",
             "call": "A call could not be started there. Try again."
-        }
+        },
+        "introSession": "Pick people to invite to this game.",
+        "sent": "{count, plural, one {# invited.} other {# invited.}}",
+        "skipped": "{count, plural, one {# is not in this call's conversation.} other {# are not in this call's conversation.}}",
+        "done": "Done"
     }
 }

@@ -81,7 +81,10 @@ export const gameNameSchema = z
     .trim()
     .min(1, "Give the game a name")
     .max(100, "Keep the name under 100 characters")
-    .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), "That name has characters it cannot show");
+    .refine(
+        (value) => !/[\u0000-\u001f\u007f]/.test(value),
+        "That name has characters it cannot show"
+    );
 
 /** A program somebody told the desktop app is a game. */
 export const customGameSchema = z.object({
@@ -201,6 +204,9 @@ export interface ActivityView {
     /** The game catalog's id (`minecraft`) for somebody playing on a server here,
      *  so the card can draw the game's mark beside the server's picture. */
     readonly gameId?: string | null;
+    /** Where "Join game" takes this reader - a game played together here that
+     *  has room and that they may join - or absent when they cannot. */
+    readonly joinUrl?: string | null;
 }
 
 /** The one line a crowded row has room for: "Playing Hollow Knight", "Listening
