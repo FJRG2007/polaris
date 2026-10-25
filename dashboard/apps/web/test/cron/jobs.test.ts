@@ -110,6 +110,9 @@ describe("the work Polaris runs on a schedule", () => {
             "calendar-housekeeping",
             "calendar-reminders",
             "calendar-sync",
+            // Two passes would each fire the same reminder; each row is also
+            // claimed before it fires.
+            "chat-reminders",
             "chat-scheduled",
             "connection-health",
             // Two samplers would each announce the same outage.
