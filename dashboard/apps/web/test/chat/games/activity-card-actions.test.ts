@@ -12,6 +12,9 @@ const SESSION = "0192f6a0-0000-7000-8000-0000000000bb";
 const CHANNEL = "0192f6a0-0000-7000-8000-0000000000cc";
 const MEETING = "0192f6a0-0000-7000-8000-0000000000aa";
 const FRIEND = "0192f6a0-0000-7000-8000-0000000000dd";
+const BLOCKED = "0192f6a0-0000-7000-8000-0000000000ee";
+const NO_CHAT = "0192f6a0-0000-7000-8000-0000000000ff";
+const GONE = "0192f6a0-0000-7000-8000-000000000011";
 
 const state = vi.hoisted(() => ({
     can: new Set<string>(),
@@ -23,14 +26,23 @@ const state = vi.hoisted(() => ({
     session: null as null | Record<string, unknown>,
     lobbies: [] as string[],
     invited: [] as string[][],
-    calls: 0
+    calls: 0,
+    blocked: new Set<string>(),
+    noChat: new Set<string>(),
+    gone: new Set<string>()
 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         meeting: { findUnique: async () => ({ endedAt: null }) },
         user: {
-            findMany: async () => [{ id: "user-1", name: "Fixture Host" }]
+            findMany: async (query: { where: { id: { in: string[] } } }) =>
+                query.where.id.in
+                    .filter((id) => !state.gone.has(id))
+                    .map((id) => ({
+                        id,
+                        name: id === "user-1" ? "Fixture Host" : "Fixture Friend"
+                    }))
         },
         arcadeSession: { update: async () => ({}) },
         chatChannel: { findUnique: async () => ({ kind: "group", members: [] }) }
@@ -50,7 +62,12 @@ vi.mock("@/lib/chat/access", () => ({
     requireChannel: async () => {
         if (!state.member) throw new Error("not a member");
         return {};
-    }
+    },
+    messageable: async (ids: string[]) => new Set(ids.filter((id) => !state.noChat.has(id)))
+}));
+vi.mock("@/lib/blocks", () => ({
+    blockedBetween: async (_actor: string, ids: string[]) =>
+        new Set(ids.filter((id) => state.blocked.has(id)))
 }));
 vi.mock("@/lib/chat/meetings", () => ({
     startOrJoin: async () => {
@@ -105,6 +122,9 @@ beforeEach(() => {
     state.lobbies = [];
     state.invited = [];
     state.calls = 0;
+    state.blocked = new Set();
+    state.noChat = new Set();
+    state.gone = new Set();
     state.session = {
         id: SESSION,
         channelId: CHANNEL,
@@ -207,5 +227,36 @@ describe("reading the card", () => {
         expect(await actions.readActivityCard(SESSION)).toBeNull();
         state.member = true;
         expect(await actions.readActivityCard("nope")).toBeNull();
+    });
+});
+
+describe("inviting more people to a lobby", () => {
+    beforeEach(() => {
+        state.session = { ...state.session, meetingId: null };
+    });
+
+    it("skips whoever blocked or was blocked, has no chat, or does not exist", async () => {
+        state.blocked = new Set([BLOCKED]);
+        state.noChat = new Set([NO_CHAT]);
+        state.gone = new Set([GONE]);
+        const answer = await actions.inviteToSession({
+            sessionId: SESSION,
+            userIds: [FRIEND, BLOCKED, NO_CHAT, GONE]
+        });
+        expect(answer).toEqual({ ok: true, invited: 1, skipped: 3 });
+        expect(state.invited).toEqual([[FRIEND]]);
+        expect(state.notified).toEqual([FRIEND]);
+    });
+
+    it("says the game ended once the reader is no longer playing", async () => {
+        state.session = {
+            ...state.session,
+            players: [{ userId: "user-1", seenAt: new Date(), leftAt: new Date() }]
+        };
+        expect(await actions.inviteToSession({ sessionId: SESSION, userIds: [FRIEND] })).toEqual({
+            ok: false,
+            reason: "ended"
+        });
+        expect(state.notified).toEqual([]);
     });
 });

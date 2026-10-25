@@ -94,7 +94,7 @@ export function GameInviteDialog({
                     setPeople([]);
                     setSent({ invited: answer.invited, skipped: answer.skipped });
                 })
-                .catch(() => setFailed("call"))
+                .catch(() => setFailed("failed"))
                 .finally(() => setBusy(false));
             return;
         }
@@ -108,7 +108,7 @@ export function GameInviteDialog({
                     router.push(answer.href);
                 } else setFailed(answer.reason);
             })
-            .catch(() => setFailed("call"))
+            .catch(() => setFailed("failed"))
             .finally(() => setBusy(false));
     };
 

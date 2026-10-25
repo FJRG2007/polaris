@@ -94,7 +94,7 @@ export function GameInviteToasts() {
                             </p>
                             <p className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Joystick className="size-3" aria-hidden />
-                                {t("gameInvites.noCall")}
+                                {t(invite.inCall ? "gameInvites.inCall" : "gameInvites.noCall")}
                             </p>
                             <div className="mt-2 flex gap-2">
                                 <Button

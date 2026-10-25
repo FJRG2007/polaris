@@ -15,7 +15,8 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as card from "@/lib/chat/activity-card";
-import { requireChannel } from "@/lib/chat/access";
+import { blockedBetween } from "@/lib/blocks";
+import { requireChannel, messageable } from "@/lib/chat/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { translatorFor } from "@/lib/i18n/translate";
 import { MAX_PLAYERS } from "@/lib/chat/call-activity";
@@ -151,7 +152,8 @@ export async function gameInviteTargets(): Promise<readonly InviteTarget[]> {
 }
 
 /** Why an invitation was not sent, in a word the dialog turns into a sentence. */
-export type InviteRefusal = "invalid" | "denied" | "missing" | "limited" | "conversation" | "call";
+export type InviteRefusal =
+    "invalid" | "denied" | "missing" | "limited" | "conversation" | "ended" | "failed";
 
 export type InviteAnswer =
     | { readonly ok: true; readonly href: string }
@@ -186,16 +188,31 @@ async function mayInvite(
     return { ok: true, name: offered.name };
 }
 
-/** Offer the invitation in each invitee's toast and bell. */
+/** Of these people, the ones an invitation may reach: an account that exists,
+ *  has the chat, and has no block with the inviter either way. */
+async function reachableBy(inviterId: string, userIds: readonly string[]): Promise<string[]> {
+    const wanted = [...new Set(userIds)].filter((id) => id !== inviterId).slice(0, NOTIFY_MAX);
+    if (wanted.length === 0) return [];
+    const [present, chatting, blocked] = await Promise.all([
+        prisma.user.findMany({ where: { id: { in: wanted } }, select: { id: true } }),
+        messageable(wanted),
+        blockedBetween(inviterId, wanted)
+    ]);
+    const exists = new Set(present.map((row) => row.id));
+    return wanted.filter((id) => exists.has(id) && chatting.has(id) && !blocked.has(id));
+}
+
+/** Offer the invitation in each invitee's toast and bell, and answer how many
+ *  it reached. */
 async function tell(
     session: { readonly id: string; readonly channelId: string },
     user: Inviter,
     gameName: string,
     userIds: readonly string[],
     href: string
-): Promise<void> {
-    const audience = [...new Set(userIds)].filter((id) => id !== user.id).slice(0, NOTIFY_MAX);
-    if (audience.length === 0) return;
+): Promise<number> {
+    const audience = await reachableBy(user.id, userIds);
+    if (audience.length === 0) return 0;
     await sessions.inviteTo(session, user.id, audience);
     for (const userId of audience) {
         const t = translatorFor(await getUserLocale(userId), "chat");
@@ -206,6 +223,7 @@ async function tell(
             href
         });
     }
+    return audience.length;
 }
 
 /**
@@ -237,7 +255,7 @@ export async function inviteToGame(input: unknown): Promise<InviteAnswer> {
     try {
         session = await sessions.openLobby(channelId, parsed.data.game, user.id);
     } catch {
-        return { ok: false, reason: "call" };
+        return { ok: false, reason: "failed" };
     }
     const href = card.lobbyHref(session.id);
     // The people picked, or everybody in a direct message or group. A channel
@@ -270,7 +288,7 @@ export async function inviteToSession(input: unknown): Promise<SessionInviteAnsw
         session.endedAt ||
         !session.players.some((row) => row.userId === user.id && card.stillPlaying(row, now))
     )
-        return { ok: false, reason: "call" };
+        return { ok: false, reason: "ended" };
     const allowed = await mayInvite(user, session.game);
     if (!allowed.ok) return allowed;
 
@@ -288,8 +306,8 @@ export async function inviteToSession(input: unknown): Promise<SessionInviteAnsw
         session.meetingId === null
             ? card.lobbyHref(session.id)
             : card.joinHref(session.channelId, session.id);
-    await tell(session, user, allowed.name, reachable, href);
-    return { ok: true, invited: reachable.length, skipped: wanted.length - reachable.length };
+    const invited = await tell(session, user, allowed.name, reachable, href);
+    return { ok: true, invited, skipped: wanted.length - invited };
 }
 
 /** The session a call is playing, for its game panel's Invite button: the
@@ -319,6 +337,7 @@ export interface PendingInvite {
     readonly gameName: string;
     readonly from: { readonly id: string; readonly name: string };
     readonly href: string;
+    readonly inCall: boolean;
     readonly expiresAt: string;
 }
 
@@ -369,6 +388,7 @@ export async function pendingGameInvites(): Promise<readonly PendingInvite[]> {
                 row.session.meetingId === null
                     ? card.lobbyHref(row.session.id)
                     : card.joinHref(row.session.channelId, row.session.id),
+            inCall: row.session.meetingId !== null,
             expiresAt: row.expiresAt.toISOString()
         }));
 }

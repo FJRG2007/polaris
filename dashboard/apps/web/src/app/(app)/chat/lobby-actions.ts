@@ -93,6 +93,7 @@ export type LobbyEntry =
           readonly seat: string;
           readonly game: string;
           readonly channelId: string;
+          readonly member: boolean;
       }
     | { readonly ok: false; readonly reason: LobbyRefusal };
 
@@ -105,14 +106,21 @@ export async function enterLobby(sessionId: unknown): Promise<LobbyEntry> {
     if (!admitted.ok) return admitted;
     const endpoint = await callServer();
     if (!endpoint) return { ok: false, reason: "server" };
-    const token = await lobbyToken(endpoint, card.lobbyRoom(id.data), user.id, user.name);
+    const [token, member] = await Promise.all([
+        lobbyToken(endpoint, card.lobbyRoom(id.data), user.id, user.name),
+        requireChannel({ id: user.id }, admitted.session.channelId).then(
+            () => true,
+            () => false
+        )
+    ]);
     return {
         ok: true,
         url: endpoint.url,
         token,
         seat: user.id,
         game: admitted.session.game,
-        channelId: admitted.session.channelId
+        channelId: admitted.session.channelId,
+        member
     };
 }
 

@@ -1714,7 +1714,8 @@
             "missing": "Este juego no se puede jugar en grupo aquí.",
             "limited": "Has enviado muchas invitaciones. Prueba de nuevo en unos minutos.",
             "conversation": "No puedes invitar a esa conversación.",
-            "call": "No se pudo iniciar una llamada ahí. Inténtalo de nuevo."
+            "ended": "Esta partida ha terminado.",
+            "failed": "No se pudo abrir el juego. Inténtalo de nuevo."
         },
         "introSession": "Elige a quién invitar a esta partida.",
         "sent": "{count, plural, one {# invitado.} other {# invitados.}}",

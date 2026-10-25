@@ -1714,7 +1714,8 @@
             "missing": "This game cannot be played together here.",
             "limited": "You sent a lot of invites. Try again in a few minutes.",
             "conversation": "You cannot invite to that conversation.",
-            "call": "A call could not be started there. Try again."
+            "ended": "This game has ended.",
+            "failed": "Could not open the game. Try again."
         },
         "introSession": "Pick people to invite to this game.",
         "sent": "{count, plural, one {# invited.} other {# invited.}}",

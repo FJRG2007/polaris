@@ -65,7 +65,7 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
         activity.play(game);
     }, [game, left, activity]);
 
-    const back = entry?.ok ? `/chat/c/${entry.channelId}` : "/chat";
+    const back = entry?.ok && entry.member ? `/chat/c/${entry.channelId}` : "/chat";
     const leave = () => {
         activity.leave();
         setLeft(true);

@@ -2019,6 +2019,7 @@
     "gameInvites": {
         "label": "Game invitations",
         "noCall": "No call - just the game",
+        "inCall": "Played in a call",
         "decline": "Decline"
     },
     "lobby": {

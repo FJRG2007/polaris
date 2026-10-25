@@ -2019,6 +2019,7 @@
     "gameInvites": {
         "label": "Invitaciones",
         "noCall": "Sin llamada, solo el juego",
+        "inCall": "En una llamada",
         "decline": "Rechazar"
     },
     "lobby": {
