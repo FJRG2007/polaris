@@ -180,7 +180,7 @@ function MessagePreview({
     return (
         <div
             data-testid="delete-preview"
-            className="flex max-h-60 min-w-0 gap-3 overflow-y-auto rounded-md bg-muted/50 px-3 py-2.5"
+            className="flex max-h-60 min-w-0 gap-3 overflow-y-auto overscroll-contain rounded-md bg-muted/50 px-3 py-2.5"
         >
             <span className="shrink-0 pt-0.5">
                 <Avatar person={{ id: message.authorId, name: author }} size={28} />
