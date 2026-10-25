@@ -141,9 +141,14 @@ const store = new Map<string, string>();
 
 beforeEach(() => {
     store.clear();
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation((key) => store.get(key) ?? null);
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation((key, value) => {
-        store.set(key, String(value));
+    // This environment has no storage of its own, so the browser's is stood in.
+    Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        value: {
+            getItem: (key: string) => store.get(key) ?? null,
+            setItem: (key: string, value: string) => void store.set(key, value),
+            removeItem: (key: string) => void store.delete(key)
+        }
     });
 });
 
@@ -168,7 +173,11 @@ describe("nesting subtasks under their parents", () => {
 
     it("leaves a subtask whose parent is not on screen where it was", () => {
         const orphan = taskRow("t4", "Answer the ticket", { parentId: "elsewhere" });
-        const nested = nestSubtasks([{ key: "st1", label: "To do", tasks: [orphan] }], "collapsed", true);
+        const nested = nestSubtasks(
+            [{ key: "st1", label: "To do", tasks: [orphan] }],
+            "collapsed",
+            true
+        );
         expect(nested.groups[0]?.tasks.map((task) => task.id)).toEqual(["t4"]);
     });
 
@@ -219,7 +228,9 @@ describe("the List view", () => {
 
     it("adds a subtask from the row under an open parent", () => {
         const onQuickCreate = vi.fn();
-        const view = render(withMessages(<Screen view="list" mode="expanded" onQuickCreate={onQuickCreate} />));
+        const view = render(
+            withMessages(<Screen view="list" mode="expanded" onQuickCreate={onQuickCreate} />)
+        );
         fireEvent.click(view.getByRole("button", { name: "Add a subtask to Ship the release" }));
         const input = view.getByRole("textbox", { name: "Add a subtask to Ship the release" });
         fireEvent.change(input, { target: { value: "Tag the build" } });
@@ -232,7 +243,10 @@ describe("the List view", () => {
     it("adds a task to a group from the composer at its foot", () => {
         const onQuickCreate = vi.fn();
         const view = render(withMessages(<Screen view="list" onQuickCreate={onQuickCreate} />));
-        fireEvent.click(view.getByRole("button", { name: "Add a task to To do" }));
+        // The header's "+" and the row at the foot of the group both open it.
+        const [, foot] = view.getAllByRole("button", { name: "Add a task to To do" });
+        if (!foot) throw new Error("No add row");
+        fireEvent.click(foot);
         const input = view.getByRole("textbox", { name: "Add a task to To do" });
         fireEvent.change(input, { target: { value: "Plan the sprint" } });
         fireEvent.click(view.getByRole("button", { name: "Save" }));
@@ -244,7 +258,9 @@ describe("the List view", () => {
     it("lists a subtask as a task of its own only in that mode", () => {
         const view = render(withMessages(<Screen view="list" mode="separate" />));
         expect(view.getByText("Write the notes")).toBeTruthy();
-        expect(view.queryByRole("button", { name: "Show subtasks of Ship the release" })).toBeNull();
+        expect(
+            view.queryByRole("button", { name: "Show subtasks of Ship the release" })
+        ).toBeNull();
     });
 });
 
@@ -252,7 +268,8 @@ describe("the Board view", () => {
     it("keeps a subtask off the columns until its parent's footer opens it", () => {
         const view = render(withMessages(<Screen view="board" />));
         expect(view.queryByText("Write the notes")).toBeNull();
-        const footer = view.getByRole("button", { name: /1 subtask/ });
+        const footer = view.getByText("1 subtask").closest("button");
+        if (!footer) throw new Error("No subtask footer");
         expect(footer.getAttribute("aria-expanded")).toBe("false");
         fireEvent.click(footer);
         const child = view.getByText("Write the notes");
@@ -260,7 +277,7 @@ describe("the Board view", () => {
         const column = view.getByText("Ship the release").closest("section");
         expect(column?.contains(child)).toBe(true);
         expect(child.closest("li")?.getAttribute("style")).toContain("margin-left: 0.75rem");
-        fireEvent.click(view.getByRole("button", { name: /1 subtask/ }));
+        fireEvent.click(footer);
         expect(view.queryByText("Write the notes")).toBeNull();
     });
 });

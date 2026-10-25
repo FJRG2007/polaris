@@ -885,8 +885,8 @@ export function ListScreen({
             // you are now - copying text out of a task name still works, since a
             // field has the keyboard then.
             "tasks.selectAll": () => {
-                if (visible.length === 0) return false;
-                hold(new Set(visible.map((task) => task.id)));
+                if (topLevel.length === 0) return false;
+                hold(new Set(topLevel.map((task) => task.id)));
                 setAnchor(null);
             },
             "tasks.copy": () => {
@@ -936,6 +936,23 @@ export function ListScreen({
         () => nestSubtasks(groups, subtaskMode, groupBy === "status"),
         [groups, subtaskMode, groupBy]
     );
+    /**
+     * What the screen counts and what "select all" takes: on a list or a board
+     * a subtask is part of its parent, so only the work at the top is counted -
+     * "To do 1" for a parent with three subtasks, as ClickUp says it.
+     */
+    const nests = (viewType === "list" || viewType === "board") && subtaskMode !== "separate";
+    const topLevel = useMemo(() => {
+        if (!nests) return visible;
+        const shown = new Set(nested.groups.flatMap((group) => group.tasks.map((task) => task.id)));
+        return visible.filter((task) => shown.has(task.id));
+    }, [nests, visible, nested.groups]);
+    const totalCount = useMemo(() => {
+        if (!nests) return rows.length;
+        const ids = new Set(rows.map((task) => task.id));
+        return rows.filter((task) => !task.parentId || !ids.has(task.parentId)).length;
+    }, [nests, rows]);
+
     const subtaskView = useMemo<SubtaskView>(
         () => ({
             mode: subtaskMode,
@@ -1208,7 +1225,7 @@ export function ListScreen({
                 />
 
                 <span className="text-xs tabular-nums text-muted-foreground">
-                    {t("toolbar.count", { shown: visible.length, total: rows.length })}
+                    {t("toolbar.count", { shown: topLevel.length, total: totalCount })}
                 </span>
             </div>
 
@@ -1223,9 +1240,9 @@ export function ListScreen({
 
             <SelectionBar
                 count={selected.length}
-                total={visible.length}
+                total={topLevel.length}
                 onSelectAll={() => {
-                    hold(new Set(visible.map((task) => task.id)));
+                    hold(new Set(topLevel.map((task) => task.id)));
                     setAnchor(null);
                 }}
                 onClear={clearSelection}
