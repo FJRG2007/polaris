@@ -7,14 +7,27 @@
  * reach the model; and Recents under a header that folds (remembered), grouped
  * by when each chat was last touched. A row is its title; hovering, focusing or
  * opening it draws the pill with its pin and its "..." menu: Rename, Pin,
- * Share, Archive, Delete, Move to project.
+ * Share, Archive, Delete, Move to project. A right-click (a long press on a
+ * touch screen) opens the same menu where the pointer is.
+ *
+ * Chats are chosen as in a file explorer (`thread-selection`): Ctrl/Cmd and
+ * Shift with a press, the boxes, Ctrl+A, the arrows. With some chosen, a bar
+ * acts on all of them in one request, and a drag carries them onto a project.
  *
  * Used twice - as the /polar page's sidebar (and its drawer on a phone), and as
  * the side panel's history view - so the two never drift apart. The state and
  * the actions are `usePolarSidebar`'s.
  */
 
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ComponentType,
+    type KeyboardEvent,
+    type ReactNode
+} from "react";
 import {
     FileDown,
     FileJson,
@@ -29,23 +42,35 @@ import {
     FolderPlus,
     Link2,
     Loader2,
+    MessageSquare,
     MoreHorizontal,
     Pencil,
     Pin,
     PinOff,
     Search,
     Share2,
+    SquareCheck,
     SquarePen,
     Trash2,
     Code2,
     Copy,
     ExternalLink,
-    Users
+    Users,
+    X
 } from "lucide-react";
 import {
     Button,
+    Checkbox,
     cn,
     ConfirmDeleteDialog,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
+    ContextMenuTrigger,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -78,6 +103,15 @@ import {
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
 import { StateDot, type PolarCodeHistory } from "@/components/polar/polar-code";
 import dynamic from "next/dynamic";
+import {
+    actedOn,
+    keepVisible,
+    NO_SELECTION,
+    pressThread,
+    threadListKey,
+    type SelectKeys,
+    type ThreadSelection
+} from "@/components/polar/thread-selection";
 
 /** Loaded when a project is shared, not with every sidebar. */
 const ShareDialog = dynamic(
@@ -168,9 +202,93 @@ export function PolarThreads({
     const [sharingProject, setSharingProject] = useState<PolarProjectRow | null>(null);
     const [folded, setFolded] = useState(false);
     useEffect(() => setFolded(readFolded()), []);
+    const [selection, setSelection] = useState<ThreadSelection>(NO_SELECTION);
+    const [deletingMany, setDeletingMany] = useState<string[] | null>(null);
+    const [dropProject, setDropProject] = useState<string | null>(null);
+    // A drag only where there is a mouse: on a touch screen a long press is
+    // the row's menu, and a drag starting under it would take its place.
+    const [finePointer, setFinePointer] = useState(false);
+    useEffect(() => {
+        const query = window.matchMedia?.("(pointer: fine)");
+        if (!query) return;
+        setFinePointer(query.matches);
+        const change = () => setFinePointer(query.matches);
+        query.addEventListener?.("change", change);
+        return () => query.removeEventListener?.("change", change);
+    }, []);
+    const list = useRef<HTMLDivElement>(null);
     const HideIcon = hide.icon;
     const { rows, projects } = sidebar;
     const sections = polarShared.threadSections(rows ?? []);
+    const recentGroups = polarShared.groupThreads(sections.recents);
+    /** The chats as the list draws them, top to bottom: what a stretch and the
+     *  arrows walk. A closed project or folded Recents is not on screen. */
+    const orderKey = [
+        ...sections.pinned.map((row) => row.id),
+        ...(projects ?? []).flatMap((project) =>
+            sidebar.openProjects.has(project.id)
+                ? (sections.projects.get(project.id) ?? []).map((row) => row.id)
+                : []
+        ),
+        ...(folded ? [] : recentGroups.flatMap((group) => group.rows.map((row) => row.id)))
+    ].join(",");
+    const order = useMemo(
+        () => [...new Set(orderKey === "" ? [] : orderKey.split(","))],
+        [orderKey]
+    );
+    useEffect(() => setSelection((current) => keepVisible(order, current)), [order]);
+    const chosen = selection.chosen;
+    const byId = new Map((rows ?? []).map((row) => [row.id, row]));
+
+    const runBulk = (action: polarShared.PolarBulkAction) => {
+        setSelection(NO_SELECTION);
+        void sidebar.bulk(action);
+    };
+    const moveMany = (ids: string[], projectId: string | null) => {
+        const moving = ids.filter((id) => byId.get(id)?.projectId !== projectId);
+        if (moving.length > 0) runBulk({ action: "move", ids: moving, projectId });
+    };
+    const selectionActions = (ids: string[]): SelectionActions => ({
+        projects: (projects ?? []).filter((project) => !project.shared),
+        filed: ids.some((id) => (byId.get(id)?.projectId ?? null) !== null),
+        exportHref: `/api/polar/export?ids=${ids.join(",")}`,
+        onMove: (projectId) => moveMany(ids, projectId),
+        onArchive: () => runBulk({ action: "archive", ids }),
+        onDelete: () => setDeletingMany(ids),
+        onClear: () => setSelection(NO_SELECTION)
+    });
+    const chosenActions = selectionActions([...chosen]);
+
+    /** Focuses a row's own button, scrolling it into view. */
+    const focusRow = (id: string) => {
+        const target = list.current?.querySelector<HTMLElement>(
+            `[data-thread-id="${CSS.escape(id)}"] [data-thread-open]`
+        );
+        target?.focus();
+        target?.scrollIntoView?.({ block: "nearest" });
+    };
+
+    /** The keys the list hears: Ctrl+A, Escape, the arrows, Delete. A key typed
+     *  into a field (renaming) or a menu is left alone. */
+    const onListKey = (event: KeyboardEvent<HTMLDivElement>) => {
+        const target = event.target as HTMLElement;
+        if (target.closest("input, textarea, [role='menu'], [role='dialog']")) return;
+        const focused = target.closest<HTMLElement>("[data-thread-id]")?.dataset.threadId ?? null;
+        const result = threadListKey(order, selection, focused, event.key, event);
+        if (!result) return;
+        event.preventDefault();
+        if (result.kind === "delete") {
+            if (chosen.length > 0) setDeletingMany([...chosen]);
+            else if (focused) {
+                const row = byId.get(focused);
+                if (row) setDeleting(row);
+            }
+            return;
+        }
+        if (result.kind === "select") setSelection(result.selection);
+        const focus = result.focus;
+        if (focus) focusRow(focus);
+    };
 
     const actions: RowActions = {
         // A chat is filed only under a project of the person's own.
@@ -184,15 +302,37 @@ export function PolarThreads({
         onMove: (row, projectId) => void sidebar.move(row.id, projectId),
         onMoveToNew: (row) => setProjectForm({ project: null, moving: row })
     };
-    const item = (row: PolarThreadRow) => (
-        <ThreadItem
-            key={row.id}
-            row={row}
-            active={row.id === activeId}
-            run={runs[row.id] ?? null}
-            actions={actions}
-        />
-    );
+    const item = (row: PolarThreadRow) => {
+        const many = actedOn(selection, row.id);
+        return (
+            <ThreadItem
+                key={row.id}
+                row={row}
+                active={row.id === activeId}
+                run={runs[row.id] ?? null}
+                actions={actions}
+                selection={selectionActions(many)}
+                pick={{
+                    chosen: chosen.includes(row.id),
+                    selecting: chosen.length > 0,
+                    many: many.length,
+                    draggable: finePointer,
+                    dragged: () => many,
+                    press: (keys, toggle) => {
+                        const next = pressThread(order, selection, row.id, keys, toggle);
+                        if (next !== "open") {
+                            setSelection(next);
+                            return;
+                        }
+                        // A plain press opens the chat and lets the selection
+                        // go; it is where the next Shift press stretches from.
+                        setSelection({ chosen: [], anchor: row.id });
+                        onOpen(row.id);
+                    }
+                }}
+            />
+        );
+    };
     const codeSection = code ? <CodeSection code={code} /> : null;
 
     return (
@@ -208,7 +348,14 @@ export function PolarThreads({
                     <HideIcon className="size-4" />
                 </IconButton>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
+            {chosen.length > 0 ? (
+                <SelectionBar count={chosen.length} actions={chosenActions} />
+            ) : null}
+            <div
+                ref={list}
+                onKeyDown={onListKey}
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2"
+            >
                 <NavRow icon={SquarePen} onClick={() => onNew(null)}>
                     {newLabel ?? t("actions.new")}
                 </NavRow>
@@ -251,6 +398,20 @@ export function PolarThreads({
                                     onEdit={() => setProjectForm({ project, moving: null })}
                                     onDelete={() => setDeletingProject(project)}
                                     onShare={() => setSharingProject(project)}
+                                    dropping={dropProject === project.id}
+                                    onDragTarget={(on) =>
+                                        setDropProject((current) =>
+                                            on
+                                                ? project.id
+                                                : current === project.id
+                                                  ? null
+                                                  : current
+                                        )
+                                    }
+                                    onDropThreads={(ids) => {
+                                        setDropProject(null);
+                                        moveMany(ids, project.id);
+                                    }}
                                     onCopy={() =>
                                         void sidebar.createProject({
                                             name: project.name,
@@ -303,23 +464,21 @@ export function PolarThreads({
                                             {t("history.empty")}
                                         </p>
                                     ) : (
-                                        polarShared
-                                            .groupThreads(sections.recents)
-                                            .map(({ group, rows: list }) => (
-                                                <div
-                                                    key={group}
-                                                    role="group"
-                                                    aria-labelledby={`polar-group-${group}`}
+                                        recentGroups.map(({ group, rows: list }) => (
+                                            <div
+                                                key={group}
+                                                role="group"
+                                                aria-labelledby={`polar-group-${group}`}
+                                            >
+                                                <p
+                                                    id={`polar-group-${group}`}
+                                                    className="px-2 pb-1 pt-2 text-[0.6875rem] text-foreground-subtle"
                                                 >
-                                                    <p
-                                                        id={`polar-group-${group}`}
-                                                        className="px-2 pb-1 pt-2 text-[0.6875rem] text-foreground-subtle"
-                                                    >
-                                                        {t(`history.groups.${group}`)}
-                                                    </p>
-                                                    {list.map(item)}
-                                                </div>
-                                            ))
+                                                    {t(`history.groups.${group}`)}
+                                                </p>
+                                                {list.map(item)}
+                                            </div>
+                                        ))
                                     )}
                                     <MoreButton sidebar={sidebar} list="recent" />
                                 </div>
@@ -388,6 +547,22 @@ export function PolarThreads({
                     onConfirm={() => {
                         void sidebar.remove(deleting.id);
                         setDeleting(null);
+                    }}
+                />
+            ) : null}
+            {deletingMany ? (
+                <ConfirmDeleteDialog
+                    open
+                    onOpenChange={(open) => (open ? undefined : setDeletingMany(null))}
+                    name={t("history.bulkKind")}
+                    requireTyping={false}
+                    kind={t("history.bulkKind")}
+                    title={t("history.bulkDeleteTitle", { count: deletingMany.length })}
+                    question={t("history.bulkDeleteQuestion", { count: deletingMany.length })}
+                    confirmLabel={t("history.deleteConfirm")}
+                    onConfirm={() => {
+                        runBulk({ action: "delete", ids: deletingMany });
+                        setDeletingMany(null);
                     }}
                 />
             ) : null}
@@ -567,6 +742,9 @@ function ProjectItem({
     onDelete,
     onShare,
     onCopy,
+    dropping,
+    onDragTarget,
+    onDropThreads,
     children
 }: {
     project: PolarProjectRow;
@@ -577,6 +755,11 @@ function ProjectItem({
     onDelete: () => void;
     onShare: () => void;
     onCopy: () => void;
+    /** Chats are being dragged over it. */
+    dropping: boolean;
+    onDragTarget: (on: boolean) => void;
+    /** Chats dropped on it, to file under it. */
+    onDropThreads: (ids: string[]) => void;
     children: ReactNode;
 }) {
     const t = useTranslations("polar");
@@ -584,7 +767,30 @@ function ProjectItem({
     const Icon = open ? FolderOpen : Folder;
     return (
         <div>
-            <div className="group/row flex min-w-0 items-center rounded-md hover:bg-card-hover">
+            <div
+                onDragOver={(event) => {
+                    if (project.shared || !event.dataTransfer.types.includes(DRAG_TYPE)) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    onDragTarget(true);
+                }}
+                onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                        onDragTarget(false);
+                }}
+                onDrop={(event) => {
+                    if (project.shared) return;
+                    const ids = draggedThreads(event.dataTransfer.getData(DRAG_TYPE));
+                    onDragTarget(false);
+                    if (!ids) return;
+                    event.preventDefault();
+                    onDropThreads(ids);
+                }}
+                className={cn(
+                    "group/row flex min-w-0 items-center rounded-md hover:bg-card-hover",
+                    dropping && "bg-primary/15 ring-1 ring-inset ring-primary"
+                )}
+            >
                 <button
                     type="button"
                     aria-expanded={open}
@@ -709,16 +915,274 @@ function RunMark({ run, active }: { run: PolarRunView | null; active: boolean })
     );
 }
 
+/** The pieces a chat's menu is drawn with: the "..." dropdown and the
+ *  right-click (or long-press) menu list the same options. */
+interface MenuParts {
+    readonly Item: ComponentType<{
+        children?: ReactNode;
+        onSelect?: (event: Event) => void;
+        variant?: "default" | "danger";
+        disabled?: boolean;
+        asChild?: boolean;
+    }>;
+    readonly Separator: ComponentType<{ className?: string }>;
+    readonly Sub: ComponentType<{ children?: ReactNode }>;
+    readonly SubTrigger: ComponentType<{ children?: ReactNode }>;
+    readonly SubContent: ComponentType<{ children?: ReactNode; className?: string }>;
+    /** How tall a long list of projects may grow before it scrolls. */
+    readonly listHeight: string;
+}
+
+const DROPDOWN_PARTS: MenuParts = {
+    Item: DropdownMenuItem,
+    Separator: DropdownMenuSeparator,
+    Sub: DropdownMenuSub,
+    SubTrigger: DropdownMenuSubTrigger,
+    SubContent: DropdownMenuSubContent,
+    listHeight:
+        "max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain"
+};
+
+const CONTEXT_PARTS: MenuParts = {
+    Item: ContextMenuItem,
+    Separator: ContextMenuSeparator,
+    Sub: ContextMenuSub,
+    SubTrigger: ContextMenuSubTrigger,
+    SubContent: ContextMenuSubContent,
+    listHeight:
+        "max-h-[min(20rem,var(--radix-context-menu-content-available-height))] overflow-y-auto overscroll-contain"
+};
+
+/** The drag of one or more chats onto a project. */
+const DRAG_TYPE = "application/x-polar-threads";
+
+/** The ids a drop carries, or null when it is not chats from this list. */
+export function draggedThreads(data: string): string[] | null {
+    try {
+        const ids = polarShared.bulkThreadIdsSchema.safeParse(JSON.parse(data));
+        return ids.success ? ids.data : null;
+    } catch {
+        return null;
+    }
+}
+
+/** How a row takes part in the selection. */
+type RowPick = {
+    chosen: boolean;
+    /** Something is chosen, so every box stays on screen. */
+    selecting: boolean;
+    /** How many chats the row's menu acts on: the whole selection when the row
+     *  is one of several chosen. */
+    many: number;
+    /** A press on the row (`toggle` for its box). */
+    press: (keys: SelectKeys, toggle: boolean) => void;
+    /** The ids a drag from this row carries. */
+    dragged: () => string[];
+    /** Whether a drag can start here: never on a touch screen, where a long
+     *  press is the menu. */
+    draggable: boolean;
+};
+
+/** What a menu on a selection does. */
+type SelectionActions = {
+    projects: PolarProjectRow[];
+    /** Some chosen chat is filed under a project. */
+    filed: boolean;
+    exportHref: string;
+    onMove: (projectId: string | null) => void;
+    onArchive: () => void;
+    onDelete: () => void;
+    onClear: () => void;
+};
+
+function SelectionMenuItems({
+    parts,
+    selection,
+    take
+}: {
+    parts: MenuParts;
+    selection: SelectionActions;
+    take: (action: () => void) => () => void;
+}) {
+    const t = useTranslations("polar");
+    const { Item, Separator, Sub, SubTrigger, SubContent } = parts;
+    return (
+        <>
+            <Sub>
+                <SubTrigger>
+                    <FolderInput />
+                    {t("history.move")}
+                </SubTrigger>
+                <SubContent className={parts.listHeight}>
+                    {selection.projects.map((project) => (
+                        <Item key={project.id} onSelect={() => selection.onMove(project.id)}>
+                            <Folder />
+                            <span className="min-w-0 truncate" title={project.name}>
+                                {project.name}
+                            </span>
+                        </Item>
+                    ))}
+                    {selection.filed ? (
+                        <>
+                            {selection.projects.length > 0 ? <Separator /> : null}
+                            <Item onSelect={() => selection.onMove(null)}>
+                                <FolderMinus />
+                                {t("history.removeFromProject")}
+                            </Item>
+                        </>
+                    ) : null}
+                </SubContent>
+            </Sub>
+            <Item onSelect={selection.onArchive}>
+                <Archive />
+                {t("history.archive")}
+            </Item>
+            <Item asChild>
+                <a href={selection.exportHref} download>
+                    <FileDown />
+                    {t("history.exportSelection")}
+                </a>
+            </Item>
+            <Separator />
+            <Item variant="danger" onSelect={take(selection.onDelete)}>
+                <Trash2 />
+                {t("history.delete")}
+            </Item>
+            <Separator />
+            <Item onSelect={selection.onClear}>
+                <X />
+                {t("history.clearSelection")}
+            </Item>
+        </>
+    );
+}
+
+function RowMenuItems({
+    parts,
+    row,
+    actions,
+    take,
+    onRename,
+    onSelectRow
+}: {
+    parts: MenuParts;
+    row: PolarThreadRow;
+    actions: RowActions;
+    take: (action: () => void) => () => void;
+    onRename: () => void;
+    onSelectRow: () => void;
+}) {
+    const t = useTranslations("polar");
+    const { Item, Separator, Sub, SubTrigger, SubContent } = parts;
+    const pinned = row.pinnedAt !== null;
+    const PinIcon = pinned ? PinOff : Pin;
+    return (
+        <>
+            <Item onSelect={() => actions.onOpen(row)}>
+                <MessageSquare />
+                {t("history.open")}
+            </Item>
+            <Item asChild>
+                <a
+                    href={`/polar?thread=${encodeURIComponent(row.id)}`}
+                    target="_blank"
+                    rel="noopener"
+                >
+                    <ExternalLink />
+                    {t("history.openNewTab")}
+                </a>
+            </Item>
+            <Item onSelect={onSelectRow}>
+                <SquareCheck />
+                {t("history.select")}
+            </Item>
+            <Separator />
+            <Item onSelect={take(onRename)}>
+                <Pencil />
+                {t("history.rename")}
+            </Item>
+            <Item onSelect={() => actions.onPin(row, !pinned)}>
+                <PinIcon />
+                {t(pinned ? "history.unpin" : "history.pin")}
+            </Item>
+            <Separator />
+            <Item onSelect={take(() => actions.onShare(row))}>
+                <Share2 />
+                {t("history.share")}
+            </Item>
+            <Item asChild>
+                <a href={`/api/polar/threads/${row.id}/export?format=markdown`} download>
+                    <FileDown />
+                    {t("export.markdown")}
+                </a>
+            </Item>
+            <Item asChild>
+                <a href={`/api/polar/threads/${row.id}/export?format=json`} download>
+                    <FileJson />
+                    {t("export.json")}
+                </a>
+            </Item>
+            <Separator />
+            <Item onSelect={() => actions.onArchive(row)}>
+                <Archive />
+                {t("history.archive")}
+            </Item>
+            <Item variant="danger" onSelect={take(() => actions.onDelete(row))}>
+                <Trash2 />
+                {t("history.delete")}
+            </Item>
+            <Separator />
+            <Sub>
+                <SubTrigger>
+                    <FolderInput />
+                    {t("history.move")}
+                </SubTrigger>
+                <SubContent className={parts.listHeight}>
+                    {actions.projects.map((project) => (
+                        <Item
+                            key={project.id}
+                            disabled={project.id === row.projectId}
+                            onSelect={() => actions.onMove(row, project.id)}
+                        >
+                            <Folder />
+                            <span className="min-w-0 truncate" title={project.name}>
+                                {project.name}
+                            </span>
+                        </Item>
+                    ))}
+                    <Item onSelect={take(() => actions.onMoveToNew(row))}>
+                        <FolderPlus />
+                        {t("history.newProject")}
+                    </Item>
+                    {row.projectId ? (
+                        <>
+                            <Separator />
+                            <Item onSelect={() => actions.onMove(row, null)}>
+                                <FolderMinus />
+                                {t("history.removeFromProject")}
+                            </Item>
+                        </>
+                    ) : null}
+                </SubContent>
+            </Sub>
+        </>
+    );
+}
+
 function ThreadItem({
     row,
     active,
     run,
-    actions
+    actions,
+    pick,
+    selection
 }: {
     row: PolarThreadRow;
     active: boolean;
     run: PolarRunView | null;
     actions: RowActions;
+    pick: RowPick;
+    selection: SelectionActions;
 }) {
     const t = useTranslations("polar");
     const [renaming, setRenaming] = useState(false);
@@ -734,6 +1198,26 @@ function ThreadItem({
         chose.current = true;
         action();
     };
+    const closeFocus = (event: Event) => {
+        if (chose.current) keepFocusOnClose(event);
+        chose.current = false;
+    };
+    const items = (parts: MenuParts) =>
+        pick.many > 1 ? (
+            <SelectionMenuItems parts={parts} selection={selection} take={take} />
+        ) : (
+            <RowMenuItems
+                parts={parts}
+                row={row}
+                actions={actions}
+                take={take}
+                onRename={() => {
+                    setDraft(row.title);
+                    setRenaming(true);
+                }}
+                onSelectRow={() => pick.press({ ctrlKey: true }, true)}
+            />
+        );
 
     const finish = (save: boolean) => {
         setRenaming(false);
@@ -743,170 +1227,223 @@ function ThreadItem({
     };
 
     return (
-        <div
-            className={cn(
-                "group/row flex min-w-0 items-center rounded-md",
-                active ? "bg-primary/15" : "hover:bg-card-hover focus-within:bg-card-hover"
-            )}
-        >
-            {renaming ? (
-                <Input
-                    ref={field}
-                    value={draft}
-                    maxLength={polarShared.POLAR_TITLE_MAX}
-                    aria-label={t("history.name")}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onBlur={() => finish(true)}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                            event.preventDefault();
-                            finish(true);
-                        } else if (event.key === "Escape") {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            finish(false);
-                        }
+        <ContextMenu>
+            <ContextMenuTrigger asChild disabled={renaming}>
+                <div
+                    data-thread-id={row.id}
+                    draggable={pick.draggable && !renaming}
+                    onDragStart={(event) => {
+                        event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(pick.dragged()));
+                        event.dataTransfer.effectAllowed = "move";
                     }}
-                    className="h-8 min-w-0 flex-1"
-                />
-            ) : (
-                <button
-                    type="button"
-                    onClick={() => actions.onOpen(row)}
-                    aria-current={active ? "page" : undefined}
-                    title={row.title}
                     className={cn(
-                        "min-w-0 flex-1 truncate px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none",
-                        active && "font-medium text-foreground"
+                        "group/row flex min-w-0 items-center rounded-md",
+                        pick.chosen
+                            ? "bg-primary/10 ring-1 ring-inset ring-primary/40"
+                            : active
+                              ? "bg-primary/15"
+                              : "hover:bg-card-hover focus-within:bg-card-hover"
                     )}
                 >
-                    {row.title}
-                </button>
-            )}
-            {renaming ? null : <RunMark run={run} active={active} />}
-            {renaming ? null : (
-                <span className="mr-1 flex shrink-0 items-center">
-                    <button
-                        type="button"
-                        aria-label={pinLabel}
-                        title={pinLabel}
-                        aria-pressed={pinned}
-                        onClick={() => actions.onPin(row, !pinned)}
-                        className={cn(ROW_ACTION, active && "opacity-100")}
-                    >
-                        <PinIcon className="size-3.5" />
-                    </button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                    {renaming ? null : (
+                        <span
+                            className={cn(
+                                "flex w-6 shrink-0 items-center justify-center pl-1 transition-opacity duration-fast [@media(pointer:coarse)]:w-10",
+                                pick.selecting
+                                    ? "opacity-100"
+                                    : "opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:hidden"
+                            )}
+                        >
+                            <Checkbox
+                                checked={pick.chosen}
+                                tabIndex={-1}
+                                aria-label={t("history.selectRow", { title: row.title })}
+                                onChange={() => undefined}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    pick.press(event, true);
+                                }}
+                            />
+                        </span>
+                    )}
+                    {renaming ? (
+                        <Input
+                            ref={field}
+                            value={draft}
+                            maxLength={polarShared.POLAR_TITLE_MAX}
+                            aria-label={t("history.name")}
+                            onChange={(event) => setDraft(event.target.value)}
+                            onBlur={() => finish(true)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    finish(true);
+                                } else if (event.key === "Escape") {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    finish(false);
+                                }
+                            }}
+                            className="h-8 min-w-0 flex-1"
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            data-thread-open=""
+                            onClick={(event) => pick.press(event, false)}
+                            aria-current={active ? "page" : undefined}
+                            aria-pressed={pick.selecting ? pick.chosen : undefined}
+                            title={row.title}
+                            className={cn(
+                                "min-w-0 flex-1 truncate py-1.5 pl-1 pr-2 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none [@media(hover:none)]:pl-2",
+                                active && "font-medium text-foreground"
+                            )}
+                        >
+                            {row.title}
+                        </button>
+                    )}
+                    {renaming ? null : <RunMark run={run} active={active} />}
+                    {renaming ? null : (
+                        <span className="mr-1 flex shrink-0 items-center">
                             <button
                                 type="button"
-                                aria-label={t("history.options")}
-                                title={t("history.options")}
+                                aria-label={pinLabel}
+                                title={pinLabel}
+                                aria-pressed={pinned}
+                                onClick={() => actions.onPin(row, !pinned)}
                                 className={cn(ROW_ACTION, active && "opacity-100")}
                             >
-                                <MoreHorizontal className="size-4" />
+                                <PinIcon className="size-3.5" />
                             </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                            align="end"
-                            onCloseAutoFocus={(event) => {
-                                if (chose.current) keepFocusOnClose(event);
-                                chose.current = false;
-                            }}
-                        >
-                            <DropdownMenuItem
-                                onSelect={take(() => {
-                                    setDraft(row.title);
-                                    setRenaming(true);
-                                })}
-                            >
-                                <Pencil />
-                                {t("history.rename")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => actions.onPin(row, !pinned)}>
-                                <PinIcon />
-                                {pinLabel}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={take(() => actions.onShare(row))}>
-                                <Share2 />
-                                {t("history.share")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <a
-                                    href={`/api/polar/threads/${row.id}/export?format=markdown`}
-                                    download
-                                >
-                                    <FileDown />
-                                    {t("export.markdown")}
-                                </a>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <a
-                                    href={`/api/polar/threads/${row.id}/export?format=json`}
-                                    download
-                                >
-                                    <FileJson />
-                                    {t("export.json")}
-                                </a>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={() => actions.onArchive(row)}>
-                                <Archive />
-                                {t("history.archive")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                variant="danger"
-                                onSelect={take(() => actions.onDelete(row))}
-                            >
-                                <Trash2 />
-                                {t("history.delete")}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                    <FolderInput />
-                                    {t("history.move")}
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain">
-                                    {actions.projects.map((project) => (
-                                        <DropdownMenuItem
-                                            key={project.id}
-                                            disabled={project.id === row.projectId}
-                                            onSelect={() => actions.onMove(row, project.id)}
-                                        >
-                                            <Folder />
-                                            <span className="min-w-0 truncate" title={project.name}>
-                                                {project.name}
-                                            </span>
-                                        </DropdownMenuItem>
-                                    ))}
-                                    <DropdownMenuItem
-                                        onSelect={take(() => actions.onMoveToNew(row))}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label={t("history.options")}
+                                        title={t("history.options")}
+                                        className={cn(ROW_ACTION, active && "opacity-100")}
                                     >
-                                        <FolderPlus />
-                                        {t("history.newProject")}
-                                    </DropdownMenuItem>
-                                    {row.projectId ? (
-                                        <>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onSelect={() => actions.onMove(row, null)}
-                                            >
-                                                <FolderMinus />
-                                                {t("history.removeFromProject")}
-                                            </DropdownMenuItem>
-                                        </>
-                                    ) : null}
-                                </DropdownMenuSubContent>
-                            </DropdownMenuSub>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </span>
-            )}
+                                        <MoreHorizontal className="size-4" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" onCloseAutoFocus={closeFocus}>
+                                    {items(DROPDOWN_PARTS)}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </span>
+                    )}
+                </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent onCloseAutoFocus={closeFocus}>
+                {items(CONTEXT_PARTS)}
+            </ContextMenuContent>
+        </ContextMenu>
+    );
+}
+/** What is chosen, and what can be done to all of it at once. */
+function SelectionBar({ count, actions }: { count: number; actions: SelectionActions }) {
+    const t = useTranslations("polar");
+    const label =
+        count >= polarShared.POLAR_BULK_MAX
+            ? t("history.selectedMost", { count })
+            : t("history.selected", { count });
+    return (
+        <div
+            role="toolbar"
+            aria-label={t("history.selectionActions")}
+            className="mx-2 mb-1 flex min-w-0 shrink-0 items-center gap-0.5 rounded-md bg-primary/10 py-0.5 pl-2 pr-0.5"
+        >
+            <span
+                className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground"
+                aria-live="polite"
+                title={label}
+            >
+                {label}
+            </span>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        aria-label={t("history.move")}
+                        title={t("history.move")}
+                        className={BAR_ACTION}
+                    >
+                        <FolderInput className="size-4" />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                    align="end"
+                    className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain"
+                >
+                    {actions.projects.map((project) => (
+                        <DropdownMenuItem
+                            key={project.id}
+                            onSelect={() => actions.onMove(project.id)}
+                        >
+                            <Folder />
+                            <span className="min-w-0 truncate" title={project.name}>
+                                {project.name}
+                            </span>
+                        </DropdownMenuItem>
+                    ))}
+                    {actions.filed ? (
+                        <>
+                            {actions.projects.length > 0 ? <DropdownMenuSeparator /> : null}
+                            <DropdownMenuItem onSelect={() => actions.onMove(null)}>
+                                <FolderMinus />
+                                {t("history.removeFromProject")}
+                            </DropdownMenuItem>
+                        </>
+                    ) : null}
+                    {actions.projects.length === 0 && !actions.filed ? (
+                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {t("history.projectEmpty")}
+                        </p>
+                    ) : null}
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <button
+                type="button"
+                aria-label={t("history.archive")}
+                title={t("history.archive")}
+                onClick={actions.onArchive}
+                className={BAR_ACTION}
+            >
+                <Archive className="size-4" />
+            </button>
+            <a
+                href={actions.exportHref}
+                download
+                aria-label={t("history.exportSelection")}
+                title={t("history.exportSelection")}
+                className={BAR_ACTION}
+            >
+                <FileDown className="size-4" />
+            </a>
+            <button
+                type="button"
+                aria-label={t("history.delete")}
+                title={t("history.delete")}
+                onClick={actions.onDelete}
+                className={cn(BAR_ACTION, "hover:text-danger")}
+            >
+                <Trash2 className="size-4" />
+            </button>
+            <button
+                type="button"
+                aria-label={t("history.clearSelection")}
+                title={t("history.clearSelection")}
+                onClick={actions.onClear}
+                className={BAR_ACTION}
+            >
+                <X className="size-4" />
+            </button>
         </div>
     );
 }
+
+const BAR_ACTION =
+    "inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-11";
 
 /**
  * Search over every chat's title and message text, on the server, twenty at a

@@ -52,6 +52,7 @@ import { GithubAppGapNotice } from "@/components/github-app-gap";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import {
     AgentPicker,
+    CodeBranchChip,
     CodeRepoBar,
     CodeSessionBar,
     NO_REPO
@@ -355,9 +356,11 @@ export function PolarCodeView({
             fullPage={fullPage}
             choices={picks.choices}
             repoId={picks.repoId}
-            onRepo={picks.setRepoId}
-            branch={baseRef}
-            onBranch={setBaseRef}
+            onRepo={(id) => {
+                // A branch belongs to the repository it was picked in.
+                if (id !== picks.repoId) setBaseRef("");
+                picks.setRepoId(id);
+            }}
             onRefresh={picks.load}
             refreshing={picks.refreshing}
             disabled={false}
@@ -371,6 +374,7 @@ export function PolarCodeView({
             choicesError={picks.error}
             repoId={picks.repoId}
             baseRef={baseRef}
+            onBaseRef={setBaseRef}
             agentKey={picks.agentKey}
             onAgent={picks.setAgentKey}
             voiceKit={voiceKit}
@@ -448,6 +452,7 @@ function CodeStart({
     choicesError,
     repoId,
     baseRef,
+    onBaseRef,
     agentKey,
     onAgent,
     voiceKit,
@@ -459,6 +464,7 @@ function CodeStart({
     choicesError: string | null;
     repoId: string;
     baseRef: string;
+    onBaseRef: (branch: string) => void;
     agentKey: string;
     onAgent: (key: string) => void;
     voiceKit: PolarVoiceKit;
@@ -556,6 +562,16 @@ function CodeStart({
                     onStop: () => undefined
                 }}
             />
+            {canStart && repoId && repoId !== NO_REPO ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-1">
+                    <CodeBranchChip
+                        repoId={repoId}
+                        branch={baseRef}
+                        onBranch={onBaseRef}
+                        disabled={busy}
+                    />
+                </div>
+            ) : null}
             {!canStart && !pending ? <Notice>{t("code.readOnly")}</Notice> : null}
             {unlinked ? (
                 <Notice>

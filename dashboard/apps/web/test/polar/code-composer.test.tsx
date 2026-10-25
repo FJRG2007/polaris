@@ -2,9 +2,9 @@
 /**
  * Code types into Chat's own composer: the same attach, microphone, picker and
  * voice buttons in the same places, with what an agent session cannot take
- * switched off and the reason on the button. The repository and branch sit in
- * a bar above the task, whose menu offers GitHub's page for granting more
- * repositories. Nothing on either picker is written twice.
+ * switched off and the reason on the button. The repository sits in a bar
+ * above the task, whose menu offers GitHub's page for granting more
+ * repositories; the branch is a chip under the composer. Nothing on either picker is written twice.
  *
  * `useChat` is replaced by a still store; everything else is real.
  */
@@ -104,6 +104,8 @@ beforeEach(() => {
                 });
             if (url.startsWith("/api/polar/code/thread")) return answer(null);
             if (url.startsWith("/api/polar/code/choices")) return answer(CHOICES);
+            if (url.startsWith("/api/polar/code/branches"))
+                return answer({ defaultBranch: "main", branches: ["main", "dev", "release/2.0"] });
             if (url.startsWith("/api/polar/code"))
                 return answer({ access: "manage", sessions: [], next: null });
             if (url === "/api/polar/threads") return Response.json({ threads: [] });
@@ -191,22 +193,8 @@ describe("the repository bar", () => {
         expect(add.getAttribute("target")).toBe("_blank");
         expect(screen.getByRole("menuitem", { name: /No repository/ })).toBeTruthy();
         expect(screen.getByRole("menuitem", { name: "Refresh the list" })).toBeTruthy();
-        expect(screen.getByRole("textbox", { name: "Branch" })).toBeTruthy();
-    });
-
-    it("carries the branch typed in its menu into the bar", async () => {
-        render(<PolarChat />, { wrapper: MessagesWrapper });
-        await openCode();
-        press(screen.getByRole("button", { name: /^Where the agent works/ }));
-        const branch = await screen.findByRole("textbox", { name: "Branch" });
-        fireEvent.change(branch, { target: { value: "release/2.0" } });
-        expect(
-            // The menu hides the rest of the page from a screen reader while it is open.
-            screen.getByRole("button", {
-                name: "Where the agent works: acme/web - release/2.0",
-                hidden: true
-            })
-        ).toBeTruthy();
+        // The branch is the chip's, not the bar's.
+        expect(screen.queryByRole("textbox", { name: "Branch" })).toBeNull();
     });
 
     it("says why there is nothing to add where no GitHub App is set up", async () => {
@@ -241,5 +229,42 @@ describe("the repository bar", () => {
         press(bar);
         fireEvent.click(await screen.findByRole("menuitem", { name: "Refresh the list" }));
         expect(await screen.findByRole("menuitem", { name: /acme\/web/ })).toBeTruthy();
+    });
+});
+
+describe("the branch chip", () => {
+    it("names the default branch and lists the branches, the default one first", async () => {
+        render(<PolarChat />, { wrapper: MessagesWrapper });
+        await openCode();
+        const chip = await screen.findByRole("button", { name: "Branch: main" });
+        press(chip);
+        const items = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+        expect(items).toEqual(["maindefault", "dev", "release/2.0"]);
+        fireEvent.click(screen.getByRole("menuitem", { name: "release/2.0" }));
+        expect(await screen.findByRole("button", { name: "Branch: release/2.0" })).toBeTruthy();
+    });
+
+    it("searches the branches and takes one that is not listed", async () => {
+        render(<PolarChat />, { wrapper: MessagesWrapper });
+        await openCode();
+        press(await screen.findByRole("button", { name: "Branch: main" }));
+        const search = await screen.findByPlaceholderText("Search branches");
+        fireEvent.change(search, { target: { value: "rel" } });
+        expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+            "release/2.0",
+            'Use "rel"'
+        ]);
+        fireEvent.change(search, { target: { value: "feat/new" } });
+        fireEvent.click(screen.getByRole("menuitem", { name: 'Use "feat/new"' }));
+        expect(await screen.findByRole("button", { name: "Branch: feat/new" })).toBeTruthy();
+    });
+
+    it("is not there without a repository", async () => {
+        render(<PolarChat />, { wrapper: MessagesWrapper });
+        await openCode();
+        await screen.findByRole("button", { name: "Branch: main" });
+        press(screen.getByRole("button", { name: /^Where the agent works/ }));
+        fireEvent.click(await screen.findByRole("menuitem", { name: /No repository/ }));
+        await waitFor(() => expect(screen.queryByRole("button", { name: /^Branch:/ })).toBeNull());
     });
 });

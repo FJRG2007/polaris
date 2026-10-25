@@ -355,6 +355,32 @@ export function fenceSite(site: SiteContext): string {
 export const POLAR_TITLE_MAX = 120;
 export const threadTitleSchema = z.string().trim().min(1).max(POLAR_TITLE_MAX);
 
+/** Most chats one action on a selection takes, so a request stays one bounded
+ *  statement. */
+export const POLAR_BULK_MAX = 200;
+
+/** A selection of chats: each id once, at most `POLAR_BULK_MAX`. */
+export const bulkThreadIdsSchema = z
+    .array(z.string().uuid())
+    .min(1)
+    .max(POLAR_BULK_MAX)
+    .refine((ids) => new Set(ids).size === ids.length, "duplicate");
+
+/** One action on several chats: delete, archive, or file them under a project
+ *  (`projectId: null` takes them out of theirs). */
+export const polarBulkSchema = z.discriminatedUnion("action", [
+    z.object({ action: z.literal("delete"), ids: bulkThreadIdsSchema }).strict(),
+    z.object({ action: z.literal("archive"), ids: bulkThreadIdsSchema }).strict(),
+    z
+        .object({
+            action: z.literal("move"),
+            ids: bulkThreadIdsSchema,
+            projectId: z.string().uuid().nullable()
+        })
+        .strict()
+]);
+export type PolarBulkAction = z.infer<typeof polarBulkSchema>;
+
 /** The recency groups of the conversation list, newest first. */
 export const THREAD_GROUPS = ["today", "yesterday", "week", "month", "older"] as const;
 export type ThreadGroup = (typeof THREAD_GROUPS)[number];

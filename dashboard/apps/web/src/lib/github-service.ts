@@ -1730,6 +1730,39 @@ export async function readPullRequest(
     }
 }
 
+/** Most pages of a repository's branches read for a picker: 300 names. */
+const BRANCH_PAGES = 3;
+
+/**
+ * A repository's branch names, as GitHub lists them, at most
+ * `BRANCH_PAGES` pages of a hundred. Null when GitHub would not say.
+ */
+export async function listRepoBranches(
+    owner: string,
+    repo: string,
+    token: string | null
+): Promise<string[] | null> {
+    const names: string[] = [];
+    try {
+        for (let page = 1; page <= BRANCH_PAGES; page += 1) {
+            const res = await fetch(`${repoPath(owner, repo)}/branches?per_page=100&page=${page}`, {
+                headers: optionalAuthHeaders(token),
+                cache: "no-store"
+            });
+            if (!res.ok) return null;
+            const data = (await res.json()) as Array<{ name?: unknown }>;
+            if (!Array.isArray(data)) return null;
+            for (const branch of data) {
+                if (typeof branch.name === "string" && branch.name) names.push(branch.name);
+            }
+            if (data.length < 100) break;
+        }
+        return names;
+    } catch {
+        return null;
+    }
+}
+
 /** The branch a repository's pull requests go to by default, or null. */
 export async function repoDefaultBranch(
     owner: string,

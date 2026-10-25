@@ -549,6 +549,61 @@ export async function deletePolarThread(userId: string, id: string): Promise<boo
     return count > 0;
 }
 
+/**
+ * Files, takes out of a project, or archives several of the person's chats in
+ * one statement. Written in SQL because Prisma's `@updatedAt` would mark every
+ * one as just touched, and none of these counts as activity (as with
+ * `changePolarThread`). Null when the project is not this person's; otherwise
+ * how many chats changed - another person's id is simply not among them.
+ */
+export async function changePolarThreads(
+    userId: string,
+    ids: readonly string[],
+    change: { kind: "move"; projectId: string | null } | { kind: "archive" }
+): Promise<number | null> {
+    if (ids.length === 0) return 0;
+    const list = [...ids];
+    if (change.kind === "archive") {
+        return prisma.$executeRaw(Prisma.sql`
+            UPDATE "PolarThread"
+            SET "archivedAt" = COALESCE("archivedAt", NOW()), "pinnedAt" = NULL
+            WHERE "userId" = ${userId}::uuid AND "id" = ANY(${list}::uuid[])
+        `);
+    }
+    if (change.projectId && !(await ownsProject(userId, change.projectId))) return null;
+    return prisma.$executeRaw(Prisma.sql`
+        UPDATE "PolarThread"
+        SET "projectId" = ${change.projectId}::uuid
+        WHERE "userId" = ${userId}::uuid AND "id" = ANY(${list}::uuid[])
+    `);
+}
+
+/**
+ * Deletes several of the person's chats. The ones with no files go in one
+ * statement; a chat with files goes through `deletePolarThread`, which hands a
+ * file a branch still carries to that branch. The plain ones go first, so a
+ * file is never handed to a chat that is about to be deleted with it.
+ */
+export async function deletePolarThreads(userId: string, ids: readonly string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const filed = await prisma.polarAttachment.findMany({
+        where: { userId, threadId: { in: [...ids] } },
+        select: { threadId: true },
+        distinct: ["threadId"]
+    });
+    const withFiles = new Set(filed.map((row) => row.threadId).filter((id) => id !== null));
+    const plain = ids.filter((id) => !withFiles.has(id));
+    let removed = 0;
+    if (plain.length > 0) {
+        removed += (await prisma.polarThread.deleteMany({ where: { userId, id: { in: plain } } }))
+            .count;
+    }
+    for (const id of withFiles) {
+        if (await deletePolarThread(userId, id)) removed += 1;
+    }
+    return removed;
+}
+
 /** How long a temporary chat outlives its last message when its tab never said
  *  it was done with it. */
 export const TEMPORARY_TTL_MS = 24 * 60 * 60 * 1000;

@@ -3,12 +3,15 @@
 /**
  * Where a Code task works, and who works on it.
  *
- * The repository and the branch sit in a bar at the top of the task, the way
- * the coding agents' own web apps show "repo - branch" above a task, so the
- * composer keeps only what Chat's has. The bar opens a menu (a portal with
- * collision handling) to search the connected repositories, set the branch,
- * pick an empty workspace, and give Polaris's GitHub App more repositories on
- * GitHub - with a refresh for when the person comes back.
+ * The repository sits in a bar at the top of the task, so the composer keeps
+ * only what Chat's has. The bar opens a menu (a portal with collision
+ * handling) to search the connected repositories, pick an empty workspace, and
+ * give Polaris's GitHub App more repositories on GitHub - with a refresh for
+ * when the person comes back.
+ *
+ * The branch is a chip under the composer, as the coding agents' own web apps
+ * draw it: it opens a searchable list of the repository's branches, the
+ * default one first, and takes a name that is not listed yet.
  *
  * The agent is picked on the composer, in the model picker's place and look.
  */
@@ -17,7 +20,8 @@ import Link from "next/link";
 import type { PolarCodeChoices } from "@/lib/polar/code";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useState, type ReactNode, type KeyboardEvent } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import type { PolarCodeBranches } from "@/lib/polar/code";
 import { MODEL_TRIGGER } from "@/components/polar/elements/model-selector";
 import {
     Bot,
@@ -61,7 +65,7 @@ function BarRow({ fullPage, children }: { fullPage: boolean; children: ReactNode
 }
 
 /** "owner/repo" and the branch, each cut to the room there is. */
-function Where({ repo, branch }: { repo: string; branch: string }) {
+function Where({ repo, branch }: { repo: string; branch?: string }) {
     return (
         <>
             <FolderGit2 className="size-3.5 shrink-0" aria-hidden />
@@ -114,8 +118,6 @@ export function CodeRepoBar({
     choices,
     repoId,
     onRepo,
-    branch,
-    onBranch,
     onRefresh,
     refreshing,
     disabled
@@ -125,8 +127,6 @@ export function CodeRepoBar({
     choices: PolarCodeChoices | null;
     repoId: string;
     onRepo: (id: string) => void;
-    branch: string;
-    onBranch: (branch: string) => void;
     onRefresh: () => void;
     refreshing: boolean;
     disabled: boolean;
@@ -139,18 +139,6 @@ export function CodeRepoBar({
     const name = repo?.name ?? t("code.workspace");
     const shown = repos.filter((entry) => menuSearchMatches(entry.name, query));
     const searching = query.trim().length > 0;
-    const full = repo && branch.trim() ? `${name} - ${branch.trim()}` : name;
-
-    /** The branch field keeps its typing from the menu, which would read each
-     *  letter as a jump to an option; escape still closes and enter is done. */
-    const branchKeys = (event: KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === "Escape") return;
-        event.stopPropagation();
-        if (event.key === "Enter") {
-            event.preventDefault();
-            setOpen(false);
-        }
-    };
 
     return (
         <BarRow fullPage={fullPage}>
@@ -167,14 +155,11 @@ export function CodeRepoBar({
                 >
                     <button
                         type="button"
-                        aria-label={`${t("code.where")}: ${full}`}
-                        title={full}
+                        aria-label={`${t("code.where")}: ${name}`}
+                        title={name}
                         className="-mx-2 flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 hover:bg-card-hover hover:text-foreground disabled:opacity-60"
                     >
-                        <Where
-                            repo={name}
-                            branch={repo ? branch.trim() || t("code.branchPlaceholder") : ""}
-                        />
+                        <Where repo={name} />
                         <ChevronDown className="size-3.5 shrink-0" aria-hidden />
                     </button>
                 </DropdownMenuTrigger>
@@ -219,26 +204,6 @@ export function CodeRepoBar({
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                             {t("code.noRepoMatch")}
                         </p>
-                    ) : null}
-                    {repo ? (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>{t("code.branch")}</DropdownMenuLabel>
-                            <div className="flex items-center gap-2 px-2 pb-1">
-                                <GitBranch className="size-3.5 shrink-0 text-muted-foreground" />
-                                <input
-                                    aria-label={t("code.branch")}
-                                    value={branch}
-                                    onChange={(event) => onBranch(event.target.value)}
-                                    onKeyDown={branchKeys}
-                                    placeholder={t("code.branchPlaceholder")}
-                                    autoCapitalize="none"
-                                    autoCorrect="off"
-                                    spellCheck={false}
-                                    className="h-7 w-full min-w-0 rounded-md border border-border bg-field px-2 text-sm outline-none placeholder:text-foreground-subtle focus:border-border-strong"
-                                />
-                            </div>
-                        </>
                     ) : null}
                     <DropdownMenuSeparator />
                     {choices?.installUrl ? (
@@ -288,6 +253,177 @@ export function CodeRepoBar({
                 </DropdownMenuContent>
             </DropdownMenu>
         </BarRow>
+    );
+}
+
+/** Branch lists already read, by repository, so reopening the chip is instant. */
+const branchCache = new Map<string, { value: PolarCodeBranches; at: number }>();
+
+/** How long a cached list is shown without asking GitHub again. */
+const BRANCH_TTL_MS = 30_000;
+
+function sameBranches(a: PolarCodeBranches, b: PolarCodeBranches): boolean {
+    return (
+        a.defaultBranch === b.defaultBranch &&
+        a.branches.length === b.branches.length &&
+        a.branches.every((name, at) => name === b.branches[at])
+    );
+}
+
+/** The chip's list for one repository: the cached one at once, read again in
+ *  the background once it is older than `BRANCH_TTL_MS`. */
+function useBranches(repoId: string, enabled: boolean) {
+    const [state, setState] = useState<{
+        repoId: string;
+        value: PolarCodeBranches | null;
+        failed: boolean;
+    }>(() => ({ repoId, value: branchCache.get(repoId)?.value ?? null, failed: false }));
+    useEffect(() => {
+        if (!enabled) return;
+        const cached = branchCache.get(repoId) ?? null;
+        setState({ repoId, value: cached?.value ?? null, failed: false });
+        if (cached && Date.now() - cached.at < BRANCH_TTL_MS) return;
+        let live = true;
+        fetch(`/api/polar/code/branches?repo=${encodeURIComponent(repoId)}`)
+            .then(async (response) => {
+                const body = response.ok
+                    ? ((await response.json()) as { value?: PolarCodeBranches | null })
+                    : null;
+                if (!live) return;
+                if (body?.value && Array.isArray(body.value.branches)) {
+                    const value = body.value;
+                    branchCache.set(repoId, { value, at: Date.now() });
+                    setState((current) =>
+                        current.repoId === repoId &&
+                        current.value !== null &&
+                        sameBranches(current.value, value)
+                            ? current
+                            : { repoId, value, failed: false }
+                    );
+                } else if (!cached) setState({ repoId, value: null, failed: true });
+            })
+            .catch(() => {
+                if (live && !cached) setState({ repoId, value: null, failed: true });
+            });
+        return () => {
+            live = false;
+        };
+    }, [repoId, enabled]);
+    return state.repoId === repoId ? state : { repoId, value: null, failed: false };
+}
+
+/** Most branches the list draws at once; a search reaches the rest. */
+const BRANCHES_SHOWN = 100;
+
+/**
+ * The branch a new task starts from, as a chip under the composer. Empty means
+ * the repository's default branch, which the chip names once it is known.
+ */
+export function CodeBranchChip({
+    repoId,
+    branch,
+    onBranch,
+    disabled
+}: {
+    repoId: string;
+    /** The branch typed or chosen; empty for the default one. */
+    branch: string;
+    onBranch: (branch: string) => void;
+    disabled: boolean;
+}) {
+    const t = useTranslations("polar");
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const { value, failed } = useBranches(repoId, true);
+    const fallback = value?.defaultBranch ?? null;
+    const chosen = branch.trim();
+    const shownName = chosen || fallback || t("code.branchPlaceholder");
+    const typed = query.trim();
+    const matches = (value?.branches ?? []).filter((name) => menuSearchMatches(name, query));
+    const listed = value?.branches.includes(typed) ?? false;
+    const choose = (name: string) => {
+        onBranch(name === fallback ? "" : name);
+        setOpen(false);
+    };
+
+    return (
+        <DropdownMenu
+            open={open}
+            onOpenChange={(next) => {
+                if (!next) setQuery("");
+                setOpen(next);
+            }}
+        >
+            <DropdownMenuTrigger asChild disabled={disabled}>
+                <button
+                    type="button"
+                    aria-label={`${t("code.branch")}: ${shownName}`}
+                    title={shownName}
+                    className="flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-60 [@media(pointer:coarse)]:h-11"
+                >
+                    <GitBranch className="size-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 truncate">{shownName}</span>
+                    <ChevronDown className="size-3.5 shrink-0" aria-hidden />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+                align="start"
+                className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2"
+                onEscapeKeyDown={(event) => {
+                    if (!query) return;
+                    event.preventDefault();
+                    setQuery("");
+                }}
+            >
+                <MenuSearch
+                    value={query}
+                    onChange={setQuery}
+                    placeholder={t("code.searchBranches")}
+                />
+                {value === null && !failed ? (
+                    <div className="space-y-1.5 px-2 py-1.5" aria-hidden>
+                        {[0, 1, 2].map((key) => (
+                            <div
+                                key={key}
+                                className="h-5 rounded bg-muted motion-safe:animate-pulse"
+                            />
+                        ))}
+                    </div>
+                ) : null}
+                {failed ? (
+                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                        {t("code.branchesFailed")}
+                    </p>
+                ) : null}
+                {matches.slice(0, BRANCHES_SHOWN).map((name) => (
+                    <DropdownMenuItem key={name} onSelect={() => choose(name)}>
+                        <GitBranch className="size-3.5 shrink-0" />
+                        <span className="min-w-0 truncate" title={name}>
+                            {name}
+                        </span>
+                        {name === fallback ? (
+                            <span className="shrink-0 rounded bg-muted px-1 text-[0.6875rem] text-muted-foreground">
+                                {t("code.branchDefault")}
+                            </span>
+                        ) : null}
+                        <Mark on={chosen ? name === chosen : name === fallback} />
+                    </DropdownMenuItem>
+                ))}
+                {value !== null && typed && matches.length === 0 && listed === false ? (
+                    <p className="px-2 py-1.5 text-center text-xs text-muted-foreground">
+                        {t("code.noBranchMatch")}
+                    </p>
+                ) : null}
+                {typed && !listed ? (
+                    <DropdownMenuItem onSelect={() => choose(typed)}>
+                        <Plus className="size-3.5 shrink-0" />
+                        <span className="min-w-0 truncate" title={typed}>
+                            {t("code.branchUse", { name: typed })}
+                        </span>
+                    </DropdownMenuItem>
+                ) : null}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 

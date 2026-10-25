@@ -107,7 +107,19 @@
         "projectNewChat": "New chat in {name}",
         "projectEmpty": "No chats in this project yet.",
         "projectTooMany": "You have too many projects. Delete one first.",
-        "shareCopy": "Copy link"
+        "shareCopy": "Copy link",
+        "open": "Open",
+        "openNewTab": "Open in new tab",
+        "select": "Select chat",
+        "selectRow": "Select \"{title}\"",
+        "selected": "{count, plural, one {# selected} other {# selected}}",
+        "selectedMost": "{count} selected, the most at once",
+        "clearSelection": "Clear selection",
+        "exportSelection": "Export",
+        "bulkDeleteTitle": "Delete {count, plural, one {# conversation} other {# conversations}}?",
+        "bulkDeleteQuestion": "{count, plural, one {# conversation and its messages} other {# conversations and their messages}} will be deleted for good.",
+        "bulkKind": "conversations",
+        "selectionActions": "Selected conversations"
     },
     "actions": {
         "new": "New chat",
@@ -789,7 +801,12 @@
         "searchAgents": "Find an agent",
         "noAgentMatch": "No agents match",
         "noFiles": "An agent session can't take attached files yet",
-        "noVoice": "Voice talks to Polar's chat, not to an agent"
+        "noVoice": "Voice talks to Polar's chat, not to an agent",
+        "searchBranches": "Search branches",
+        "branchDefault": "default",
+        "branchUse": "Use \"{name}\"",
+        "noBranchMatch": "No branch matches",
+        "branchesFailed": "Couldn't read the branches. Type one to use it."
     },
     "compare": {
         "open": "Ask several models",
