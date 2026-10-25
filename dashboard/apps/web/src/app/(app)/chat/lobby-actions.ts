@@ -199,13 +199,13 @@ export async function vouchLobbyGames(
     const user = await requireUser();
     const session = await prisma.arcadeSession.findFirst({
         where: { id: id.data, meetingId: null },
-        select: { channelId: true, players: { where: { userId: user.id }, select: { userId: true } } }
+        select: {
+            channelId: true,
+            players: { where: { userId: user.id }, select: { userId: true } }
+        }
     });
     if (!session) return { seats: [], now };
-    if (
-        session.players.length === 0 &&
-        !(await mayReach(user.id, session.channelId, id.data, now))
-    )
+    if (session.players.length === 0 && !(await mayReach(user.id, session.channelId, id.data, now)))
         return { seats: [], now };
     const scope = card.lobbyPassScope(id.data);
     const seats = parsed.data
