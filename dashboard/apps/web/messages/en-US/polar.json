@@ -113,6 +113,7 @@
         "select": "Select chat",
         "selectRow": "Select \"{title}\"",
         "selected": "{count, plural, one {# selected} other {# selected}}",
+        "selectedMost": "{count} selected, the most at once",
         "clearSelection": "Clear selection",
         "exportSelection": "Export",
         "bulkDeleteTitle": "Delete {count, plural, one {# conversation} other {# conversations}}?",

@@ -65,7 +65,7 @@ function BarRow({ fullPage, children }: { fullPage: boolean; children: ReactNode
 }
 
 /** "owner/repo" and the branch, each cut to the room there is. */
-function Where({ repo, branch }: { repo: string; branch: string }) {
+function Where({ repo, branch }: { repo: string; branch?: string }) {
     return (
         <>
             <FolderGit2 className="size-3.5 shrink-0" aria-hidden />
@@ -139,7 +139,6 @@ export function CodeRepoBar({
     const name = repo?.name ?? t("code.workspace");
     const shown = repos.filter((entry) => menuSearchMatches(entry.name, query));
     const searching = query.trim().length > 0;
-    const full = name;
 
     return (
         <BarRow fullPage={fullPage}>
@@ -156,11 +155,11 @@ export function CodeRepoBar({
                 >
                     <button
                         type="button"
-                        aria-label={`${t("code.where")}: ${full}`}
-                        title={full}
+                        aria-label={`${t("code.where")}: ${name}`}
+                        title={name}
                         className="-mx-2 flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 hover:bg-card-hover hover:text-foreground disabled:opacity-60"
                     >
-                        <Where repo={name} branch="" />
+                        <Where repo={name} />
                         <ChevronDown className="size-3.5 shrink-0" aria-hidden />
                     </button>
                 </DropdownMenuTrigger>
@@ -258,20 +257,32 @@ export function CodeRepoBar({
 }
 
 /** Branch lists already read, by repository, so reopening the chip is instant. */
-const branchCache = new Map<string, PolarCodeBranches>();
+const branchCache = new Map<string, { value: PolarCodeBranches; at: number }>();
 
-/** The chip's list for one repository: read once, then served from memory. */
+/** How long a cached list is shown without asking GitHub again. */
+const BRANCH_TTL_MS = 30_000;
+
+function sameBranches(a: PolarCodeBranches, b: PolarCodeBranches): boolean {
+    return (
+        a.defaultBranch === b.defaultBranch &&
+        a.branches.length === b.branches.length &&
+        a.branches.every((name, at) => name === b.branches[at])
+    );
+}
+
+/** The chip's list for one repository: the cached one at once, read again in
+ *  the background once it is older than `BRANCH_TTL_MS`. */
 function useBranches(repoId: string, enabled: boolean) {
     const [state, setState] = useState<{
         repoId: string;
         value: PolarCodeBranches | null;
         failed: boolean;
-    }>(() => ({ repoId, value: branchCache.get(repoId) ?? null, failed: false }));
+    }>(() => ({ repoId, value: branchCache.get(repoId)?.value ?? null, failed: false }));
     useEffect(() => {
         if (!enabled) return;
         const cached = branchCache.get(repoId) ?? null;
-        setState({ repoId, value: cached, failed: false });
-        if (cached) return;
+        setState({ repoId, value: cached?.value ?? null, failed: false });
+        if (cached && Date.now() - cached.at < BRANCH_TTL_MS) return;
         let live = true;
         fetch(`/api/polar/code/branches?repo=${encodeURIComponent(repoId)}`)
             .then(async (response) => {
@@ -280,12 +291,19 @@ function useBranches(repoId: string, enabled: boolean) {
                     : null;
                 if (!live) return;
                 if (body?.value && Array.isArray(body.value.branches)) {
-                    branchCache.set(repoId, body.value);
-                    setState({ repoId, value: body.value, failed: false });
-                } else setState({ repoId, value: null, failed: true });
+                    const value = body.value;
+                    branchCache.set(repoId, { value, at: Date.now() });
+                    setState((current) =>
+                        current.repoId === repoId &&
+                        current.value !== null &&
+                        sameBranches(current.value, value)
+                            ? current
+                            : { repoId, value, failed: false }
+                    );
+                } else if (!cached) setState({ repoId, value: null, failed: true });
             })
             .catch(() => {
-                if (live) setState({ repoId, value: null, failed: true });
+                if (live && !cached) setState({ repoId, value: null, failed: true });
             });
         return () => {
             live = false;

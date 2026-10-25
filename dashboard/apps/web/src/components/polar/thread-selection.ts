@@ -12,9 +12,14 @@
  *
  * `order` is the chats as the list draws them, top to bottom: a folded section
  * or a closed project is not in it, so a stretch never takes a chat nobody saw.
+ *
+ * A selection holds at most `POLAR_BULK_MAX` chats, what one action on it can
+ * take: past that, a stretch keeps the end nearest its anchor and anything else
+ * keeps what was chosen first.
  */
 
 import { allChosen, pressedSelection } from "@polaris/ui";
+import { POLAR_BULK_MAX } from "@/lib/polar/shared";
 
 export interface ThreadSelection {
     readonly chosen: readonly string[];
@@ -30,12 +35,19 @@ export interface SelectKeys {
     readonly shiftKey?: boolean;
 }
 
-/** The stretch of `order` between two ids, both included. */
+/** The chosen ids cut to what one action can take. */
+function capped(chosen: readonly string[]): string[] {
+    return chosen.slice(0, POLAR_BULK_MAX);
+}
+
+/** The stretch of `order` between two ids, both included, at most
+ *  `POLAR_BULK_MAX` of them counted from `from`. */
 function stretch(order: readonly string[], from: string, to: string): string[] {
     const a = order.indexOf(from);
     const b = order.indexOf(to);
     if (a < 0 || b < 0) return [to];
-    return order.slice(Math.min(a, b), Math.max(a, b) + 1);
+    const taken = order.slice(Math.min(a, b), Math.max(a, b) + 1);
+    return a <= b ? taken.slice(0, POLAR_BULK_MAX) : taken.slice(-POLAR_BULK_MAX);
 }
 
 /**
@@ -57,14 +69,16 @@ export function pressThread(
     if (shift && anchor !== null) {
         if (ctrl || toggle) {
             return {
-                chosen: pressedSelection(order, current.chosen, id, anchor, { shiftKey: true }),
+                chosen: capped(
+                    pressedSelection(order, current.chosen, id, anchor, { shiftKey: true })
+                ),
                 anchor
             };
         }
         return { chosen: stretch(order, anchor, id), anchor };
     }
     if (ctrl || shift || toggle) {
-        return { chosen: pressedSelection(order, current.chosen, id, null), anchor: id };
+        return { chosen: capped(pressedSelection(order, current.chosen, id, null)), anchor: id };
     }
     return "open";
 }
@@ -74,7 +88,10 @@ export function selectAllThreads(
     order: readonly string[],
     current: ThreadSelection
 ): ThreadSelection {
-    return { chosen: allChosen(order, current.chosen), anchor: current.anchor ?? order[0] ?? null };
+    return {
+        chosen: capped(allChosen(order, current.chosen)),
+        anchor: current.anchor ?? order[0] ?? null
+    };
 }
 
 /** What a key heard by the list does; null when the list leaves it alone. */

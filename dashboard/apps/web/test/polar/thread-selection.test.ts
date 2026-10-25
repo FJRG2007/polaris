@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { POLAR_BULK_MAX } from "@/lib/polar/shared";
 import {
     actedOn,
     keepVisible,
@@ -166,5 +167,35 @@ describe("the rest", () => {
             "c",
             "e"
         ]);
+    });
+});
+
+describe("a selection one action can take", () => {
+    const LONG = Array.from({ length: POLAR_BULK_MAX + 50 }, (_, at) => `t${at}`);
+
+    it("Ctrl+A keeps what was chosen and stops at the limit", () => {
+        const all = selectAllThreads(LONG, { chosen: ["t240"], anchor: "t240" });
+        expect(all.chosen).toHaveLength(POLAR_BULK_MAX);
+        expect(all.chosen[0]).toBe("t240");
+    });
+
+    it("a stretch keeps the end at its anchor, either way", () => {
+        const down = pressThread(LONG, { chosen: [], anchor: "t0" }, "t249", { shiftKey: true });
+        expect(down).not.toBe("open");
+        const downChosen = (down as { chosen: string[] }).chosen;
+        expect(downChosen).toHaveLength(POLAR_BULK_MAX);
+        expect(downChosen[0]).toBe("t0");
+        const up = threadListKey(LONG, { chosen: [], anchor: "t249" }, "t249", "Home", {
+            shiftKey: true
+        });
+        const upChosen = up?.kind === "select" ? up.selection.chosen : [];
+        expect(upChosen).toHaveLength(POLAR_BULK_MAX);
+        expect(upChosen.at(-1)).toBe("t249");
+    });
+
+    it("Ctrl adds nothing past the limit", () => {
+        const full = { chosen: LONG.slice(0, POLAR_BULK_MAX), anchor: "t0" };
+        const more = pressThread(LONG, full, "t249", { ctrlKey: true });
+        expect((more as { chosen: string[] }).chosen).toEqual(full.chosen);
     });
 });

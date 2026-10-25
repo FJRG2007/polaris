@@ -113,6 +113,7 @@
         "select": "Seleccionar",
         "selectRow": "Seleccionar \"{title}\"",
         "selected": "{count, plural, one {# seleccionada} other {# seleccionadas}}",
+        "selectedMost": "{count} seleccionadas, el máximo a la vez",
         "clearSelection": "Quitar selección",
         "exportSelection": "Exportar",
         "bulkDeleteTitle": "¿Eliminar {count, plural, one {# conversación} other {# conversaciones}}?",

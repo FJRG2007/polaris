@@ -1343,6 +1343,10 @@ function ThreadItem({
 /** What is chosen, and what can be done to all of it at once. */
 function SelectionBar({ count, actions }: { count: number; actions: SelectionActions }) {
     const t = useTranslations("polar");
+    const label =
+        count >= polarShared.POLAR_BULK_MAX
+            ? t("history.selectedMost", { count })
+            : t("history.selected", { count });
     return (
         <div
             role="toolbar"
@@ -1352,8 +1356,9 @@ function SelectionBar({ count, actions }: { count: number; actions: SelectionAct
             <span
                 className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground"
                 aria-live="polite"
+                title={label}
             >
-                {t("history.selected", { count })}
+                {label}
             </span>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>

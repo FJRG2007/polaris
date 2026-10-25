@@ -1730,7 +1730,6 @@ export async function readPullRequest(
     }
 }
 
-/** The branch a repository's pull requests go to by default, or null. */
 /** Most pages of a repository's branches read for a picker: 300 names. */
 const BRANCH_PAGES = 3;
 
@@ -1764,6 +1763,7 @@ export async function listRepoBranches(
     }
 }
 
+/** The branch a repository's pull requests go to by default, or null. */
 export async function repoDefaultBranch(
     owner: string,
     repo: string,
