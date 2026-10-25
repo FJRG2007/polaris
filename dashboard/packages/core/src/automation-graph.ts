@@ -88,7 +88,15 @@ export const AUTOMATION_LIMITS = {
     conditionRecheckMinSeconds: 60,
     conditionRecheckMaxSeconds: 24 * 60 * 60,
     /** Waiting conditions one automation event checks again. */
-    conditionWaitsPerEvent: 200
+    conditionWaitsPerEvent: 200,
+    /** A Code step: its source, how long and how much memory one run may take, and how
+     *  many runs one account may start a minute. Its output is capped as any step's. */
+    codeLength: 20_000,
+    codeTimeMs: 1_000,
+    codeMemoryBytes: 32 * 1024 * KB,
+    codeStackBytes: 512 * KB,
+    codeLogLines: 100,
+    codeRunsPerMinute: 120
 } as const;
 
 /** The event every live run sends when it ends, whatever the outcome. */
@@ -851,7 +859,20 @@ export const CORE_NODE_CONFIGS = {
     "core.threshold": thresholdConfigSchema,
     "core.connectivity": connectivityTriggerConfigSchema,
     /** Deploy a service again, as Redeploy on its page does. */
-    "core.redeploy": z.object({ applicationId: z.string().uuid("serviceRequired") })
+    "core.redeploy": z.object({ applicationId: z.string().uuid("serviceRequired") }),
+    /**
+     * JavaScript the person wrote, run in a sandbox with no network, files or
+     * secrets: it takes `items` and returns the items for the next step.
+     * `items` is a whole reference to a list; empty, the step reads the output
+     * of the step wired into it.
+     */
+    "core.code": z.object({
+        code: text(AUTOMATION_LIMITS.codeLength).refine(
+            (value) => value.trim().length > 0,
+            "codeRequired"
+        ),
+        items: text(500).default("")
+    })
 } as const;
 export type CoreNodeType = keyof typeof CORE_NODE_CONFIGS;
 export const CORE_NODE_TYPES = Object.keys(CORE_NODE_CONFIGS) as CoreNodeType[];
@@ -897,6 +918,8 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     // The event's dedupe key is the step's idempotency key.
     "core.announce": { role: "action", ports: [], idempotent: true },
     "core.redeploy": { role: "action", ports: [], idempotent: false },
+    // Reads its input and nothing else: the same items give the same answer.
+    "core.code": { role: "action", ports: [], idempotent: true },
     "core.try": {
         role: "flow",
         ports: ["body", "then", "catch", "always"],
