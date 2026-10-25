@@ -29,7 +29,11 @@ vi.mock("@/lib/deploy/dashboard-peers", () => ({
 }));
 
 let root = "";
-const saved = { data: process.env.POLARIS_DATA_DIR, bundles: process.env.POLARIS_APP_BUNDLES_DIR, phase: process.env.NEXT_PHASE };
+const saved = {
+    data: process.env.POLARIS_DATA_DIR,
+    bundles: process.env.POLARIS_APP_BUNDLES_DIR,
+    phase: process.env.NEXT_PHASE
+};
 
 beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), "polaris-compat-"));

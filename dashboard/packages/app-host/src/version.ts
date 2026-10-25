@@ -34,8 +34,7 @@ export function parseHostApi(text: unknown): readonly [number, number] | null {
  * app is newer than it, the app when the dashboard has moved past what it needs.
  */
 export type HostApiVerdict =
-    | { readonly ok: true }
-    | { readonly ok: false; readonly update: "dashboard" | "app" };
+    { readonly ok: true } | { readonly ok: false; readonly update: "dashboard" | "app" };
 
 export function hostApiVerdict(required: unknown, provided: string = HOST_API): HostApiVerdict {
     const host = parseHostApi(provided);

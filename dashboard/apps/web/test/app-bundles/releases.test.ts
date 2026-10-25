@@ -50,7 +50,14 @@ const saved = {
 };
 
 /** What the stub registry publishes on the app's channel now. */
-const channel: { bundle?: TinyBundle; hostApi?: string; blob?: Buffer; manifest?: string; hold?: Promise<void>; requests: string[] } = {
+const channel: {
+    bundle?: TinyBundle;
+    hostApi?: string;
+    blob?: Buffer;
+    manifest?: string;
+    hold?: Promise<void>;
+    requests: string[];
+} = {
     requests: []
 };
 
@@ -74,7 +81,8 @@ beforeAll(async () => {
     ociManifest = ((await import(/* @vite-ignore */ BUNDLER)) as { ociManifest: OciManifest })
         .ociManifest;
     builds.bootFails = await tinyBundle("tiny", { label: "boot", bootFails: true });
-    for (const label of ["one", "two", "three"]) builds[label] = await tinyBundle("tiny", { label, version: `0.${label.length}.0` });
+    for (const label of ["one", "two", "three"])
+        builds[label] = await tinyBundle("tiny", { label, version: `0.${label.length}.0` });
     builds.broken = await tinyBundle("tiny", { label: "broken", broken: true });
     writeIndex(builds.one!);
     process.env.POLARIS_APP_BUNDLES_DIR = join(root, "image");
@@ -93,7 +101,14 @@ beforeAll(async () => {
         const bundle = channel.bundle;
         if (url.endsWith("/manifests/latest-app-tiny") && channel.manifest !== undefined) {
             const body = channel.manifest;
-            return new Response(new ReadableStream({ start: (stream) => { stream.enqueue(new TextEncoder().encode(body)); stream.close(); } }));
+            return new Response(
+                new ReadableStream({
+                    start: (stream) => {
+                        stream.enqueue(new TextEncoder().encode(body));
+                        stream.close();
+                    }
+                })
+            );
         }
         if (url.endsWith("/manifests/latest-app-tiny") && bundle) {
             const oci = ociManifest("tiny", bundle.digest, bundle.size, {
@@ -129,7 +144,10 @@ beforeEach(() => {
 });
 
 const label = async () =>
-    ((await import("@/lib/app-bundles/loader")).loadedBundle("tiny")?.server.extension as unknown as { label?: string } | undefined)?.label;
+    (
+        (await import("@/lib/app-bundles/loader")).loadedBundle("tiny")?.server
+            .extension as unknown as { label?: string } | undefined
+    )?.label;
 
 const stateFile = () => join(root, "data", "apps", "tiny", "state.json");
 const readState = () => JSON.parse(readFileSync(stateFile(), "utf8"));
@@ -163,7 +181,9 @@ describe("a release on an app's channel", () => {
     it("is refused when it is not what the registry named, or not an app", async () => {
         const { readRelease } = await import("@/lib/app-bundles/releases");
         const oci = ociManifest("tiny", builds.two!.digest, builds.two!.size);
-        expect(() => readRelease(Buffer.from(oci.bytes), `sha256:${"0".repeat(64)}`)).toThrow(/other than what it named/);
+        expect(() => readRelease(Buffer.from(oci.bytes), `sha256:${"0".repeat(64)}`)).toThrow(
+            /other than what it named/
+        );
         expect(() => readRelease(Buffer.from("{}"))).toThrow(/not an app/);
         expect(() => readRelease(Buffer.from("nope"))).toThrow(/not an app/);
     });
@@ -264,7 +284,8 @@ describe("an app's own updates", () => {
     });
 
     it("refuses an app that is not installed, and one already being updated", async () => {
-        const { updateApp, rollbackApp, anyAppUpdating, appUpdating } = await import("@/lib/app-bundles/releases");
+        const { updateApp, rollbackApp, anyAppUpdating, appUpdating } =
+            await import("@/lib/app-bundles/releases");
         installed.delete("tiny");
         expect(await updateApp("tiny")).toEqual({ ok: false, code: "notInstalled" });
         installed.add("tiny");

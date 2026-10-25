@@ -61,12 +61,13 @@ export async function GET(
     const [area] = file;
     // The build an update just replaced is still served to the pages opened
     // before it, so they keep working until they are reloaded.
-    const dir =
-        version === bundle?.previous?.version ? bundle.previous.dir : bundle?.dir;
+    const dir = version === bundle?.previous?.version ? bundle.previous.dir : bundle?.dir;
     if (
         !bundle ||
         !dir ||
-        (version !== bundle.version && version !== "current" && version !== bundle.previous?.version) ||
+        (version !== bundle.version &&
+            version !== "current" &&
+            version !== bundle.previous?.version) ||
         (area !== "client" && area !== "assets") ||
         file.some((part) => !PART.test(part) || part === "." || part === "..")
     ) {

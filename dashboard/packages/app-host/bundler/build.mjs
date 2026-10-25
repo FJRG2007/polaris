@@ -35,7 +35,15 @@ import { builtinModules } from "node:module";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+    existsSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    statSync,
+    writeFileSync
+} from "node:fs";
 
 /** The libraries a bundle takes from the dashboard instead of carrying. */
 export const SHARED = /^(react|react-dom|next|zod|@polaris\/[a-z0-9-]+)(\/.*)?$/;
@@ -47,7 +55,8 @@ export const BUNDLE_FORMAT = 1;
 /** A zip's entries carry a date; a fixed one keeps two builds byte-identical. */
 const ZIP_DATE = new Date("2000-01-01T00:00:00Z");
 
-const DIRECTIVE = (kind) => new RegExp(`^(?:\\s*(?://[^\\n]*|/\\*[\\s\\S]*?\\*/))*\\s*["']use ${kind}["']`);
+const DIRECTIVE = (kind) =>
+    new RegExp(`^(?:\\s*(?://[^\\n]*|/\\*[\\s\\S]*?\\*/))*\\s*["']use ${kind}["']`);
 const USE_CLIENT = DIRECTIVE("client");
 const USE_SERVER = DIRECTIVE("server");
 
@@ -72,7 +81,9 @@ function readApp(dir) {
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
     const app = pkg.polaris;
     if (!app || typeof app.id !== "string" || typeof app.extension !== "string") {
-        throw new Error(`${pkg.name}: package.json has no "polaris" section with an id and an extension`);
+        throw new Error(
+            `${pkg.name}: package.json has no "polaris" section with an id and an extension`
+        );
     }
     const [extensionFile, extensionExport] = app.extension.split("#");
     return {
@@ -109,7 +120,9 @@ function hostApiOf(name, declared) {
         throw new Error(`${name}: polaris.hostApi "${value}" is not MAJOR.MINOR`);
     }
     if (major !== hostMajor || minor > hostMinor) {
-        throw new Error(`${name}: needs host API ${value}, and this dashboard provides ${provided}`);
+        throw new Error(
+            `${name}: needs host API ${value}, and this dashboard provides ${provided}`
+        );
     }
     return value;
 }
@@ -175,7 +188,11 @@ function clientRefPlugin(app, clients) {
                 const lines = [`const ref = globalThis[Symbol.for("polaris.app-client-ref")];`];
                 for (const name of entry.exports) {
                     const value = `ref(${JSON.stringify(app.id)}, ${JSON.stringify(entry.id)}, ${JSON.stringify(name)})`;
-                    lines.push(name === "default" ? `export default ${value};` : `export const ${name} = ${value};`);
+                    lines.push(
+                        name === "default"
+                            ? `export default ${value};`
+                            : `export const ${name} = ${value};`
+                    );
                 }
                 return { contents: lines.join("\n"), loader: "js" };
             });
@@ -218,7 +235,8 @@ export async function buildAppBundle(dir, out, build = "") {
     actions.names = new Map();
     for (const file of actionFiles) {
         const names = await exportsOf(file);
-        if (names.includes("default")) throw new Error(`${moduleId(src, file)}: a server action module has no default export`);
+        if (names.includes("default"))
+            throw new Error(`${moduleId(src, file)}: a server action module has no default export`);
         actions.names.set(file, names);
     }
 
@@ -256,23 +274,40 @@ export async function buildAppBundle(dir, out, build = "") {
     }
 
     const routes = files
-        .filter((file) => file.startsWith(routesDir + sep) && /[/\\](page\.tsx|route\.ts)$/.test(file))
-        .map((file) => ({ file, path: routePath(routesDir, file), kind: file.endsWith("page.tsx") ? "page" : "route" }));
+        .filter(
+            (file) => file.startsWith(routesDir + sep) && /[/\\](page\.tsx|route\.ts)$/.test(file)
+        )
+        .map((file) => ({
+            file,
+            path: routePath(routesDir, file),
+            kind: file.endsWith("page.tsx") ? "page" : "route"
+        }));
 
     const entry = [
         `export { ${app.extensionExport} as extension } from ${JSON.stringify(app.extensionFile)};`,
         "export const routes = {",
-        ...routes.map((route) => `  ${JSON.stringify(`${route.kind} ${route.path}`)}: () => import(${JSON.stringify(route.file)}),`),
+        ...routes.map(
+            (route) =>
+                `  ${JSON.stringify(`${route.kind} ${route.path}`)}: () => import(${JSON.stringify(route.file)}),`
+        ),
         "};",
         "export const actions = {",
-        ...actionFiles.map((file) => `  ${JSON.stringify(moduleId(src, file))}: () => import(${JSON.stringify(file)}),`),
+        ...actionFiles.map(
+            (file) =>
+                `  ${JSON.stringify(moduleId(src, file))}: () => import(${JSON.stringify(file)}),`
+        ),
         "};"
     ].join("\n");
 
     const serverShared = new Set();
     const server = await esbuild.build({
         absWorkingDir: dir,
-        stdin: { contents: entry, resolveDir: src, sourcefile: "polaris-app-entry.js", loader: "js" },
+        stdin: {
+            contents: entry,
+            resolveDir: src,
+            sourcefile: "polaris-app-entry.js",
+            loader: "js"
+        },
         bundle: true,
         format: "cjs",
         platform: "node",
@@ -294,7 +329,9 @@ export async function buildAppBundle(dir, out, build = "") {
         // Something only the image build makes (the login mod's jars need a JDK)
         // is absent from a bundle built anywhere else, and said so.
         if (!existsSync(source)) {
-            process.stderr.write(`[app-bundles] ${app.id}: no ${name} at ${source}; built without it\n`);
+            process.stderr.write(
+                `[app-bundles] ${app.id}: no ${name} at ${source}; built without it\n`
+            );
             continue;
         }
         for (const file of statSync(source).isDirectory() ? walkAll(source) : [source]) {
@@ -314,18 +351,28 @@ export async function buildAppBundle(dir, out, build = "") {
         hostApi: app.hostApi,
         server: "server/index.cjs",
         routes: routes.map((route) => `${route.kind} ${route.path}`),
-        actions: Object.fromEntries(actionFiles.map((file) => [moduleId(src, file), actions.names.get(file)])),
+        actions: Object.fromEntries(
+            actionFiles.map((file) => [moduleId(src, file), actions.names.get(file)])
+        ),
         client: Object.fromEntries(
-            [...clients.values()].map((entry) => [entry.id, { file: entry.file, exports: entry.exports }])
+            [...clients.values()].map((entry) => [
+                entry.id,
+                { file: entry.file, exports: entry.exports }
+            ])
         ),
         shared: { server: [...serverShared].sort(), client: [...clientShared].sort() },
-        ...(app.slot ? { slot: { module: moduleId(src, resolve(dir, app.slot[0])), name: app.slot[1] } } : {})
+        ...(app.slot
+            ? { slot: { module: moduleId(src, resolve(dir, app.slot[0])), name: app.slot[1] } }
+            : {})
     };
     writeFileSync(join(target, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
     const zip = new JSZip();
     for (const file of walkAll(target).sort()) {
-        zip.file(posix(relative(target, file)), readFileSync(file), { date: ZIP_DATE, createFolders: false });
+        zip.file(posix(relative(target, file)), readFileSync(file), {
+            date: ZIP_DATE,
+            createFolders: false
+        });
     }
     const bytes = await zip.generateAsync({
         type: "nodebuffer",
@@ -358,7 +405,12 @@ export function changeLine(dir) {
     const line = readFileSync(file, "utf8")
         .split(/\r?\n/)
         .find((text) => /^\s*[-*]\s+\S/.test(text));
-    return line ? line.replace(/^\s*[-*]\s+/, "").trim().slice(0, 300) : undefined;
+    return line
+        ? line
+              .replace(/^\s*[-*]\s+/, "")
+              .trim()
+              .slice(0, 300)
+        : undefined;
 }
 
 /** The app packages in this workspace: every one with a `polaris` section. */
@@ -377,7 +429,11 @@ export function appPackages(dashboard) {
 }
 
 /** The empty JSON object an OCI artifact carries as its config. */
-const EMPTY_CONFIG = { mediaType: "application/vnd.oci.empty.v1+json", digest: `sha256:${createHash("sha256").update("{}").digest("hex")}`, size: 2 };
+const EMPTY_CONFIG = {
+    mediaType: "application/vnd.oci.empty.v1+json",
+    digest: `sha256:${createHash("sha256").update("{}").digest("hex")}`,
+    size: 2
+};
 
 /**
  * The OCI manifest a bundle is published under: the zip as its one layer.
@@ -438,8 +494,15 @@ async function main() {
             notes: changeLine(dir)
         });
         writeFileSync(join(resolve(out), `${manifest.id}.oci.json`), oci.bytes);
-        index.apps[manifest.id] = { file: `${manifest.id}.zip`, digest, size, manifest: oci.digest };
-        process.stdout.write(`[app-bundles] ${manifest.id}: ${(size / 1024).toFixed(0)} KiB ${digest}\n`);
+        index.apps[manifest.id] = {
+            file: `${manifest.id}.zip`,
+            digest,
+            size,
+            manifest: oci.digest
+        };
+        process.stdout.write(
+            `[app-bundles] ${manifest.id}: ${(size / 1024).toFixed(0)} KiB ${digest}\n`
+        );
     }
     writeFileSync(join(resolve(out), "index.json"), `${JSON.stringify(index, null, 2)}\n`);
 }

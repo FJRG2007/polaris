@@ -88,13 +88,7 @@ export interface UpdateProgress {
 
 /** Why an update or a rollback did not happen, as a code the screen words. */
 export type UpdateRefusal =
-    | "unknown"
-    | "notInstalled"
-    | "busy"
-    | "unreachable"
-    | "needsPolaris"
-    | "failed"
-    | "noPrevious";
+    "unknown" | "notInstalled" | "busy" | "unreachable" | "needsPolaris" | "failed" | "noPrevious";
 
 export type UpdateOutcome =
     | { readonly ok: true; readonly changed: boolean }
@@ -115,10 +109,13 @@ const short = (text: string | undefined, max: number) =>
  * registry answered it under; bytes that hash to anything else are refused.
  */
 export function readRelease(bytes: Buffer, named?: string | null): AppRelease {
-    if (bytes.length > MAX_MANIFEST_BYTES) throw new store.BundleUnavailable("The registry answered something that is not an app.");
+    if (bytes.length > MAX_MANIFEST_BYTES)
+        throw new store.BundleUnavailable("The registry answered something that is not an app.");
     const actual = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
     if (named && named !== actual) {
-        throw new store.BundleUnavailable("The registry answered something other than what it named.");
+        throw new store.BundleUnavailable(
+            "The registry answered something other than what it named."
+        );
     }
     let json: unknown;
     try {
@@ -127,7 +124,8 @@ export function readRelease(bytes: Buffer, named?: string | null): AppRelease {
         throw new store.BundleUnavailable("The registry answered something that is not an app.");
     }
     const parsed = OciManifest.safeParse(json);
-    if (!parsed.success) throw new store.BundleUnavailable("The registry answered something that is not an app.");
+    if (!parsed.success)
+        throw new store.BundleUnavailable("The registry answered something that is not an app.");
     // Exactly one, by the schema.
     const layer = parsed.data.layers[0]!;
     const notes = parsed.data.annotations ?? {};
@@ -153,7 +151,9 @@ async function readBounded(response: Response, max: number): Promise<Buffer> {
         received += value.byteLength;
         if (received > max) {
             await reader.cancel().catch(() => undefined);
-            throw new store.BundleUnavailable("The registry answered something that is not an app.");
+            throw new store.BundleUnavailable(
+                "The registry answered something that is not an app."
+            );
         }
         chunks.push(value);
     }
@@ -169,21 +169,28 @@ export async function latestRelease(
     const cached = state.checks.get(id);
     if (!force && cached?.release && Date.now() - cached.at < CHECK_TTL_MS) return cached.release;
     const index = store.bundleIndex();
-    if (!index) throw new store.BundleUnavailable("This version of Polaris was built without apps.");
+    if (!index)
+        throw new store.BundleUnavailable("This version of Polaris was built without apps.");
     const { host, repository } = store.registryOf(index);
     const signal = AbortSignal.timeout(CHECK_TIMEOUT_MS);
     try {
         const token = await store.pullToken(host, repository, signal);
-        const response = await fetch(`https://${host}/v2/${repository}/manifests/latest-app-${id}`, {
-            headers: {
-                accept: MANIFEST_TYPE,
-                ...(token ? { authorization: `Bearer ${token}` } : {})
-            },
-            signal
-        });
+        const response = await fetch(
+            `https://${host}/v2/${repository}/manifests/latest-app-${id}`,
+            {
+                headers: {
+                    accept: MANIFEST_TYPE,
+                    ...(token ? { authorization: `Bearer ${token}` } : {})
+                },
+                signal
+            }
+        );
         if (!response.ok) throw new store.BundleUnavailable(`${host} answered ${response.status}.`);
         const length = Number(response.headers.get("content-length") ?? 0);
-        if (length > MAX_MANIFEST_BYTES) throw new store.BundleUnavailable("The registry answered something that is not an app.");
+        if (length > MAX_MANIFEST_BYTES)
+            throw new store.BundleUnavailable(
+                "The registry answered something that is not an app."
+            );
         const bytes = await readBounded(response, MAX_MANIFEST_BYTES);
         const release = readRelease(bytes, response.headers.get("docker-content-digest"));
         state.checks.set(id, { at: Date.now(), release });
@@ -284,7 +291,8 @@ export function updateApp(id: string): Promise<UpdateOutcome> {
             return { ok: true, changed: false };
         }
         const verdict = hostApiVerdict(release.hostApi, HOST_API);
-        if (!verdict.ok) return { ok: false, code: verdict.update === "dashboard" ? "needsPolaris" : "failed" };
+        if (!verdict.ok)
+            return { ok: false, code: verdict.update === "dashboard" ? "needsPolaris" : "failed" };
 
         const index = store.bundleIndex();
         if (!index) return { ok: false, code: "unknown" };
@@ -313,7 +321,10 @@ export function updateApp(id: string): Promise<UpdateOutcome> {
             return refused;
         }
         const manifest = await store.readManifest(target).catch(() => null);
-        const previous = pinned && pinned.current.digest !== release.digest ? pinned.current : (pinned?.previous ?? null);
+        const previous =
+            pinned && pinned.current.digest !== release.digest
+                ? pinned.current
+                : (pinned?.previous ?? null);
         await store.writeBundleState(id, {
             current: pinOf(release, manifest?.version),
             previous,
@@ -335,7 +346,11 @@ export function rollbackApp(id: string): Promise<UpdateOutcome> {
         state.updating.set(id, { phase: "starting", received: 0, total: 0 });
         const refused = await serve(id, dir);
         if (refused) return refused;
-        await store.writeBundleState(id, { current: previous, previous: pinned.current, image: pinned.image });
+        await store.writeBundleState(id, {
+            current: previous,
+            previous: pinned.current,
+            image: pinned.image
+        });
         return { ok: true, changed: true };
     });
 }
@@ -365,7 +380,9 @@ export async function appReleaseStatuses({
         ids.map(async (id): Promise<AppReleaseStatus> => {
             const [pinned, release] = await Promise.all([
                 store.readBundleState(id),
-                check ? latestRelease(id).catch(() => null) : Promise.resolve(state.checks.get(id)?.release ?? null)
+                check
+                    ? latestRelease(id).catch(() => null)
+                    : Promise.resolve(state.checks.get(id)?.release ?? null)
             ]);
             const loaded = loadedBundle(id);
             const installed =
@@ -378,7 +395,8 @@ export async function appReleaseStatuses({
                       }
                     : null);
             const previous =
-                pinned?.previous && existsSync(join(store.bundleDir(id, pinned.previous.digest), "manifest.json"))
+                pinned?.previous &&
+                existsSync(join(store.bundleDir(id, pinned.previous.digest), "manifest.json"))
                     ? pinned.previous
                     : null;
             return {
@@ -386,7 +404,9 @@ export async function appReleaseStatuses({
                 running: Boolean(loaded),
                 installed,
                 previous,
-                available: release ? { ...release, runs: hostApiVerdict(release.hostApi, HOST_API).ok } : null,
+                available: release
+                    ? { ...release, runs: hostApiVerdict(release.hostApi, HOST_API).ok }
+                    : null,
                 checkFailed: check && !release,
                 progress: appUpdating(id)
             };

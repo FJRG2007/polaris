@@ -36,8 +36,7 @@ export function appRouteHandler(method: (typeof METHODS)[number]) {
         }
         const module = await hit.load();
         const handler = (module[method] ?? (method === "HEAD" ? module.GET : undefined)) as
-            | Handler
-            | undefined;
+            Handler | undefined;
         if (typeof handler !== "function") {
             const allow = METHODS.filter((name) => typeof module[name] === "function");
             return new Response(null, { status: 405, headers: { allow: allow.join(", ") } });

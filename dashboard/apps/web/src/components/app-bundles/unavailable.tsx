@@ -76,7 +76,9 @@ export function AppUnavailable({
     }
 
     if (update) {
-        const why = t(update === "app" ? "appBundles.appTooOld" : "appBundles.polarisTooOld", { name });
+        const why = t(update === "app" ? "appBundles.appTooOld" : "appBundles.polarisTooOld", {
+            name
+        });
         const description = error ?? (canUpdate ? why : `${why} ${t("appBundles.askAdmin")}`);
         return (
             <EmptyState

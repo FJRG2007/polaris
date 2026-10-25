@@ -62,7 +62,9 @@ export function AppUpdatesCard() {
             if (!parsed.success) return;
             const progress = parsed.data[id];
             if (!progress || !poll.current) return;
-            setRows((all) => all?.map((row) => (row.id === id ? { ...row, progress } : row)) ?? all);
+            setRows(
+                (all) => all?.map((row) => (row.id === id ? { ...row, progress } : row)) ?? all
+            );
         } catch {
             return;
         }
@@ -162,7 +164,8 @@ function AppRow({
 
     let status: string;
     if (!row.installed) status = t("appUpdates.notHere");
-    else if (newer && !newer.runs) status = t("appUpdates.needsPolaris", { version: buildLabel(newer) });
+    else if (newer && !newer.runs)
+        status = t("appUpdates.needsPolaris", { version: buildLabel(newer) });
     else if (newer) status = t("appUpdates.available", { version: buildLabel(newer) });
     else if (row.checkFailed) status = t("appUpdates.checkFailed");
     else status = t("appUpdates.upToDate");
@@ -182,7 +185,9 @@ function AppRow({
                         {status}
                     </p>
                     {newer?.notes ? (
-                        <p className="mt-1 break-words text-xs text-muted-foreground">{newer.notes}</p>
+                        <p className="mt-1 break-words text-xs text-muted-foreground">
+                            {newer.notes}
+                        </p>
                     ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -190,7 +195,9 @@ function AppRow({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={t("appUpdates.rollback", { version: buildLabel(row.previous) })}
+                            aria-label={t("appUpdates.rollback", {
+                                version: buildLabel(row.previous)
+                            })}
                             title={t("appUpdates.rollback", { version: buildLabel(row.previous) })}
                             disabled={locked}
                             onClick={() => onChange("rollback")}

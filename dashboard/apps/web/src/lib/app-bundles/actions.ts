@@ -49,7 +49,9 @@ export async function changeAppBuildAction(
     change: unknown
 ): Promise<{ rows: AppUpdateRow[]; refused?: UpdateRefusal }> {
     await requireAdmin();
-    const parsed = z.object({ id: AppId, change: z.enum(["update", "rollback"]) }).safeParse({ id, change });
+    const parsed = z
+        .object({ id: AppId, change: z.enum(["update", "rollback"]) })
+        .safeParse({ id, change });
     if (!parsed.success) return { rows: await rows(false), refused: "unknown" };
     const outcome =
         parsed.data.change === "update"

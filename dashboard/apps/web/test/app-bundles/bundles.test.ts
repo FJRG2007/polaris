@@ -170,7 +170,11 @@ describe("app bundles", () => {
 
     it("leave only this build's copy on the volume", () => {
         for (const id of ["home", "game-servers"]) {
-            expect(readdirSync(join(root, "data", "apps", id)).filter((entry) => entry !== "state.json")).toHaveLength(1);
+            expect(
+                readdirSync(join(root, "data", "apps", id)).filter(
+                    (entry) => entry !== "state.json"
+                )
+            ).toHaveLength(1);
         }
     });
 });
@@ -300,7 +304,9 @@ describe("the previous build of an app", () => {
 
         retire();
         await vi.waitFor(() => expect(existsSync(previous)).toBe(false));
-        expect(readdirSync(join(root, "data", "apps", id!)).filter((entry) => entry !== "state.json")).toHaveLength(1);
+        expect(
+            readdirSync(join(root, "data", "apps", id!)).filter((entry) => entry !== "state.json")
+        ).toHaveLength(1);
         predecessor.gate = Promise.resolve();
     });
 });

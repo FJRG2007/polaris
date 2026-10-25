@@ -87,7 +87,9 @@ export function checkCompatible(manifest: BundleManifest, provided = sharedServe
     }
     const missing = (manifest.shared?.server ?? []).filter((spec) => !provided.has(spec));
     if (missing.length > 0) {
-        console.error(`polaris: ${manifest.id} needs what this Polaris does not provide: ${missing.join(", ")}`);
+        console.error(
+            `polaris: ${manifest.id} needs what this Polaris does not provide: ${missing.join(", ")}`
+        );
         throw new BundleIncompatible("It needs a newer version of Polaris.", "dashboard");
     }
 }
