@@ -239,7 +239,8 @@
             "add": "Añadir cámara",
             "more": "{count, plural, one {# cámara más} other {# cámaras más}}",
             "watch": "Ver {name}",
-            "noPicture": "Sin imagen"
+            "noPicture": "Sin imagen",
+            "connecting": "Conectando..."
         },
         "routines": {
             "title": "Rutinas",
