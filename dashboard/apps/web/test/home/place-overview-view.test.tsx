@@ -268,9 +268,7 @@ describe("the Overview", () => {
         // was a card saying "No picture" for a camera that was fine.
         served = {
             ...HOUSE,
-            cameras: [
-                { id: "cam-1", name: "Garden", enabled: true, power: "mains" } as never
-            ]
+            cameras: [{ id: "cam-1", name: "Garden", enabled: true, power: "mains" } as never]
         };
         vi.useFakeTimers({ shouldAdvanceTime: true });
         try {

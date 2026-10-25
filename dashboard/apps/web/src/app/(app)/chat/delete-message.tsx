@@ -27,7 +27,12 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { ConfirmDeleteDialog, matchShortcut, useShortcutBindings, useShortcutText } from "@polaris/ui";
+import {
+    ConfirmDeleteDialog,
+    matchShortcut,
+    useShortcutBindings,
+    useShortcutText
+} from "@polaris/ui";
 
 /** Ask to delete a message. `immediately` is Shift held: no question. */
 export type DeleteMessage = (message: ChatMessageView, immediately?: boolean) => void;
@@ -201,7 +206,11 @@ function MessagePreview({
                         />
                     </div>
                 )}
-                {files && <p className="mt-1 truncate text-xs text-muted-foreground" title={files}>{files}</p>}
+                {files && (
+                    <p className="mt-1 truncate text-xs text-muted-foreground" title={files}>
+                        {files}
+                    </p>
+                )}
             </div>
         </div>
     );

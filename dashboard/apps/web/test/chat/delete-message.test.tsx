@@ -212,7 +212,9 @@ describe("without Shift", () => {
 
         const dialog = await screen.findByRole("dialog");
         expect(deleteMessageAction).not.toHaveBeenCalled();
-        expect(within(dialog).getByText("Are you sure you want to delete this message?")).toBeTruthy();
+        expect(
+            within(dialog).getByText("Are you sure you want to delete this message?")
+        ).toBeTruthy();
         const preview = within(dialog).getByTestId("delete-preview");
         expect(within(preview).getByText("ada")).toBeTruthy();
         // Rendered, not the stored markup.

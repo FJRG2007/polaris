@@ -84,14 +84,7 @@ import {
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import {
-    Button,
-    EmptyState,
-    ResizeHandle,
-    Skeleton,
-    cn,
-    useToast
-} from "@polaris/ui";
+import { Button, EmptyState, ResizeHandle, Skeleton, cn, useToast } from "@polaris/ui";
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
