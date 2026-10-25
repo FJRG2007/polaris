@@ -38,7 +38,11 @@ export interface PredefinedRuleRow {
      * instance. The switch then shows what is actually being enforced and refuses to
      * move, rather than showing this scope's own unused value.
      */
-    readonly decidedElsewhere?: { readonly on: boolean; readonly label: string; readonly why: string };
+    readonly decidedElsewhere?: {
+        readonly on: boolean;
+        readonly label: string;
+        readonly why: string;
+    };
     /** Said instead of "Off" when this scope's switch is off but something narrower
      *  already enforces the rule for part of what it covers. The switch stays live. */
     readonly below?: { readonly label: string; readonly why: string };
@@ -77,10 +81,18 @@ export function PredefinedRuleList({
                     <thead>
                         <tr className="text-left text-xs text-muted-foreground">
                             <th className="px-4 py-2.5 font-medium">{t("list.columns.name")}</th>
-                            <th className="px-4 py-2.5 font-medium">{t("list.columns.description")}</th>
-                            <th className="w-24 px-3 py-2.5 font-medium">{t("list.columns.action")}</th>
-                            <th className="w-32 px-3 py-2.5 font-medium">{t("list.columns.matches")}</th>
-                            <th className="w-32 px-3 py-2.5 font-medium">{t("list.columns.status")}</th>
+                            <th className="px-4 py-2.5 font-medium">
+                                {t("list.columns.description")}
+                            </th>
+                            <th className="w-24 px-3 py-2.5 font-medium">
+                                {t("list.columns.action")}
+                            </th>
+                            <th className="w-32 px-3 py-2.5 font-medium">
+                                {t("list.columns.matches")}
+                            </th>
+                            <th className="w-32 px-3 py-2.5 font-medium">
+                                {t("list.columns.status")}
+                            </th>
                             <th className="w-10 px-2 py-2.5" aria-label={t("predefined.open")} />
                         </tr>
                     </thead>
@@ -89,84 +101,103 @@ export function PredefinedRuleList({
                             const decided = row.decidedElsewhere;
                             const on = decided ? decided.on : row.enabled;
                             return (
-                            <tr
-                                key={row.id}
-                                className={`border-t border-border transition-colors hover:bg-muted/40 ${
-                                    on === false && !row.below ? "opacity-60" : ""
-                                }`}
-                            >
-                                <td className="min-w-[10rem] px-4 py-3.5 pr-6 align-top">
-                                    <button
-                                        type="button"
-                                        onClick={() => onOpen(row.id)}
-                                        className="rounded text-left font-medium underline-offset-2 hover:underline "
-                                    >
-                                        {row.name}
-                                    </button>
-                                </td>
-                                <td className="w-full max-w-0 px-4 py-3.5 align-top text-muted-foreground">
-                                    <span className="line-clamp-2 [overflow-wrap:anywhere]" title={row.description}>
-                                        {row.description}
-                                    </span>
-                                    {row.caution && on !== false ? (
-                                        <span className="mt-1 flex items-start gap-1.5 text-xs text-warning">
-                                            <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-                                            {row.caution}
+                                <tr
+                                    key={row.id}
+                                    className={`border-t border-border transition-colors hover:bg-muted/40 ${
+                                        on === false && !row.below ? "opacity-60" : ""
+                                    }`}
+                                >
+                                    <td className="min-w-[10rem] px-4 py-3.5 pr-6 align-top">
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpen(row.id)}
+                                            className="rounded text-left font-medium underline-offset-2 hover:underline "
+                                        >
+                                            {row.name}
+                                        </button>
+                                    </td>
+                                    <td className="w-full max-w-0 px-4 py-3.5 align-top text-muted-foreground">
+                                        <span
+                                            className="line-clamp-2 [overflow-wrap:anywhere]"
+                                            title={row.description}
+                                        >
+                                            {row.description}
                                         </span>
-                                    ) : null}
-                                </td>
-                                <td className="px-3 py-3.5 align-top">
-                                    <Badge variant={row.action.variant}>{row.action.label}</Badge>
-                                </td>
-                                <td className="px-3 py-3.5 align-top">
-                                    {row.activity === null ? (
-                                        <span className="text-xs text-muted-foreground">-</span>
-                                    ) : (
-                                        <MatchesCell name={row.name} activity={row.activity} />
-                                    )}
-                                </td>
-                                <td className="px-3 py-3.5 align-top">
-                                    {row.enabled === null && !decided ? (
-                                        <span className="text-xs text-muted-foreground">{row.state}</span>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <Switch
-                                                checked={on === true}
-                                                disabled={!canEdit || decided !== undefined}
-                                                onChange={(next) => onToggle(row.id, next)}
-                                                aria-label={on ? t("list.disable", { name: row.name }) : t("list.enable", { name: row.name })}
-                                            />
-                                            <span
-                                                className="min-w-0 truncate text-xs text-muted-foreground"
-                                                title={
-                                                    decided
-                                                        ? decided.why
+                                        {row.caution && on !== false ? (
+                                            <span className="mt-1 flex items-start gap-1.5 text-xs text-warning">
+                                                <TriangleAlert
+                                                    className="mt-0.5 size-3 shrink-0"
+                                                    aria-hidden="true"
+                                                />
+                                                {row.caution}
+                                            </span>
+                                        ) : null}
+                                    </td>
+                                    <td className="px-3 py-3.5 align-top">
+                                        <Badge variant={row.action.variant}>
+                                            {row.action.label}
+                                        </Badge>
+                                    </td>
+                                    <td className="px-3 py-3.5 align-top">
+                                        {row.activity === null ? (
+                                            <span className="text-xs text-muted-foreground">-</span>
+                                        ) : (
+                                            <MatchesCell name={row.name} activity={row.activity} />
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-3.5 align-top">
+                                        {row.enabled === null && !decided ? (
+                                            <span className="text-xs text-muted-foreground">
+                                                {row.state}
+                                            </span>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <Switch
+                                                    checked={on === true}
+                                                    disabled={!canEdit || decided !== undefined}
+                                                    onChange={(next) => onToggle(row.id, next)}
+                                                    aria-label={
+                                                        on
+                                                            ? t("list.disable", { name: row.name })
+                                                            : t("list.enable", { name: row.name })
+                                                    }
+                                                />
+                                                <span
+                                                    className="min-w-0 truncate text-xs text-muted-foreground"
+                                                    title={
+                                                        decided
+                                                            ? decided.why
+                                                            : on
+                                                              ? t("list.active")
+                                                              : (row.below?.why ?? t("list.off"))
+                                                    }
+                                                >
+                                                    {decided
+                                                        ? decided.label
                                                         : on
                                                           ? t("list.active")
-                                                          : (row.below?.why ?? t("list.off"))
-                                                }
-                                            >
-                                                {decided
-                                                    ? decided.label
-                                                    : on
-                                                      ? t("list.active")
-                                                      : (row.below?.label ?? t("list.off"))}
-                                            </span>
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="px-2 py-3.5 align-top text-right">
-                                    <button
-                                        type="button"
-                                        onClick={() => onOpen(row.id)}
-                                        aria-label={t("predefined.openNamed", { name: row.name })}
-                                        title={t("predefined.open")}
-                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
-                                    >
-                                        <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
-                                    </button>
-                                </td>
-                            </tr>
+                                                          : (row.below?.label ?? t("list.off"))}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-2 py-3.5 align-top text-right">
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpen(row.id)}
+                                            aria-label={t("predefined.openNamed", {
+                                                name: row.name
+                                            })}
+                                            title={t("predefined.open")}
+                                            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
+                                        >
+                                            <ChevronRight
+                                                className="size-4 shrink-0"
+                                                aria-hidden="true"
+                                            />
+                                        </button>
+                                    </td>
+                                </tr>
                             );
                         })}
                     </tbody>

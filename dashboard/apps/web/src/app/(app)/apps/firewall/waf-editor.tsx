@@ -136,7 +136,9 @@ const BELOW_NAMED = 5;
 function belowNames(below: WafLoginBelowView, t: Words): string {
     const names = below.services.slice(0, BELOW_NAMED).map((service) => service.name);
     const rest = below.count - names.length;
-    return rest > 0 ? t("scope.loginBelowMore", { names: names.join(", "), count: rest }) : names.join(", ");
+    return rest > 0
+        ? t("scope.loginBelowMore", { names: names.join(", "), count: rest })
+        : names.join(", ");
 }
 const instanceFeed = (t: Words) => ({
     label: t("scope.instanceWide"),

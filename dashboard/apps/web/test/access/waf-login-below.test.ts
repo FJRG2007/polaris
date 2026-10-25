@@ -29,15 +29,23 @@ vi.mock("@polaris/db", () => ({
         hostGroup: { count: vi.fn(async () => 1) },
         application: {
             count: vi.fn(async () => 1),
-            findMany: vi.fn(async (args: { take: number; cursor?: { id: string } } & Record<string, unknown>) => {
-                asked.push(args);
-                const from = args.cursor ? apps.findIndex((row) => row.id === args.cursor!.id) + 1 : 0;
-                return apps.slice(from, from + args.take);
-            })
+            findMany: vi.fn(
+                async (
+                    args: { take: number; cursor?: { id: string } } & Record<string, unknown>
+                ) => {
+                    asked.push(args);
+                    const from = args.cursor
+                        ? apps.findIndex((row) => row.id === args.cursor!.id) + 1
+                        : 0;
+                    return apps.slice(from, from + args.take);
+                }
+            )
         },
         wafRule: {
             findMany: vi.fn(
-                async (args: { where: { OR: { scopeType: string; scopeId: { in: string[] } }[] } }) =>
+                async (args: {
+                    where: { OR: { scopeType: string; scopeId: { in: string[] } }[] };
+                }) =>
                     args.where.OR.flatMap((clause) =>
                         clause.scopeId.in
                             .filter((id) => login.includes(`${clause.scopeType}:${id}`))
@@ -50,13 +58,20 @@ vi.mock("@polaris/db", () => ({
         }
     }
 }));
-vi.mock("@/lib/setting-store", () => ({ getSetting: vi.fn(async () => null), setSetting: vi.fn(async () => undefined) }));
-vi.mock("@/lib/restore-points/service", () => ({ capture: vi.fn(async () => undefined), restoreKeys: {} }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: vi.fn(async () => null),
+    setSetting: vi.fn(async () => undefined)
+}));
+vi.mock("@/lib/restore-points/service", () => ({
+    capture: vi.fn(async () => undefined),
+    restoreKeys: {}
+}));
 
 const { getWafLoginBelow } = await import("@/lib/waf-service");
 
 /** The services named, which is what most of these cases are about. */
-const below = async (...args: Parameters<typeof getWafLoginBelow>) => (await getWafLoginBelow(...args)).services;
+const below = async (...args: Parameters<typeof getWafLoginBelow>) =>
+    (await getWafLoginBelow(...args)).services;
 
 function app(id: string, environmentId: string, extra: Partial<App> = {}): App {
     return {
@@ -137,14 +152,18 @@ describe("services behind a login set below a scope", () => {
 
     it("marks a service someone else owns, so the list does not link to rules the caller cannot open", async () => {
         login = ["application:api"];
-        apps[1] = app("api", "env-1", { environment: { projectId: "project-2", project: { ownerId: "someone" } } });
+        apps[1] = app("api", "env-1", {
+            environment: { projectId: "project-2", project: { ownerId: "someone" } }
+        });
         expect(await below("owner", "global", "")).toEqual([
             { id: "api", name: "api", via: "application", owned: false }
         ]);
     });
 
     it("counts every service past the first page, and names only the first page", async () => {
-        apps = Array.from({ length: 1201 }, (_, index) => app(`app-${String(index).padStart(4, "0")}`, "env-1"));
+        apps = Array.from({ length: 1201 }, (_, index) =>
+            app(`app-${String(index).padStart(4, "0")}`, "env-1")
+        );
         login = ["environment:env-1"];
         const view = await getWafLoginBelow("owner", "global", "");
         expect(view.count).toBe(1201);

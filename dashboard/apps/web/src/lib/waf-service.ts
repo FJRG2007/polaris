@@ -693,7 +693,8 @@ export async function getWafInherited(
 }
 
 /** Where a service under a scope gets its login from, when it is not this scope. */
-export type WafLoginSource = "application" | "environment" | "project" | "server" | "server-group" | "private";
+export type WafLoginSource =
+    "application" | "environment" | "project" | "server" | "server-group" | "private";
 
 /** A service under this scope that already sits behind a Polaris login. */
 export interface WafLoginBelow {
@@ -773,9 +774,14 @@ export async function getWafLoginBelow(
                 id: true,
                 name: true,
                 environmentId: true,
-                environment: { select: { projectId: true, project: { select: { ownerId: true } } } },
+                environment: {
+                    select: { projectId: true, project: { select: { ownerId: true } } }
+                },
                 target: { select: { hostId: true } },
-                domains: { where: { privateAccess: { not: null } }, select: { privateAccess: true } }
+                domains: {
+                    where: { privateAccess: { not: null } },
+                    select: { privateAccess: true }
+                }
             },
             orderBy: [{ name: "asc" }, { id: "asc" }],
             take: BELOW_MAX,
@@ -807,7 +813,9 @@ async function loginBelowIn(
 ): Promise<WafLoginBelow[]> {
     const groups =
         scopeType === "global"
-            ? await groupsOfHosts(apps.flatMap((app) => (app.target.hostId ? [app.target.hostId] : [])))
+            ? await groupsOfHosts(
+                  apps.flatMap((app) => (app.target.hostId ? [app.target.hostId] : []))
+              )
             : new Map<string, string[]>();
     const idsOf: Record<WafScopeType, string[]> = {
         polaris: [],
@@ -825,7 +833,10 @@ async function loginBelowIn(
             : await prisma.wafRule.findMany({
                   where: {
                       requireLogin: true,
-                      OR: narrower.map((type) => ({ scopeType: type, scopeId: { in: idsOf[type] } }))
+                      OR: narrower.map((type) => ({
+                          scopeType: type,
+                          scopeId: { in: idsOf[type] }
+                      }))
                   },
                   select: { scopeType: true, scopeId: true }
               });
@@ -840,7 +851,10 @@ async function loginBelowIn(
             ["environment", app.environmentId],
             ["project", app.environment.projectId],
             ["server", hostId],
-            ...(groups.get(hostId ?? "") ?? []).map((id): ["server-group", string] => ["server-group", id])
+            ...(groups.get(hostId ?? "") ?? []).map((id): ["server-group", string] => [
+                "server-group",
+                id
+            ])
         ];
         const found = candidates.find(
             ([type, id]) => id !== null && narrower.includes(type) && on.has(`${type}:${id}`)
