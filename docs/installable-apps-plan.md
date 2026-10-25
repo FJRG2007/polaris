@@ -331,4 +331,8 @@ false` only when it only adds (creating, sending, starting a run);
    they arrive with its code. `npm run dev:up` builds the bundles into
    `dashboard/.app-bundles` for a local dashboard.
 
-5. **Places** went through the same phases with Game servers.
+5. **Updates of their own.** An app updates alone from Settings -> Apps, with no
+   restart, against a versioned host API: see
+   [app-bundles-contract.md](app-bundles-contract.md).
+
+6. **Places** went through the same phases with Game servers.

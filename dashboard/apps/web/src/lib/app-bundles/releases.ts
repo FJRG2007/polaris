@@ -128,7 +128,8 @@ export function readRelease(bytes: Buffer, named?: string | null): AppRelease {
     }
     const parsed = OciManifest.safeParse(json);
     if (!parsed.success) throw new store.BundleUnavailable("The registry answered something that is not an app.");
-    const [layer] = parsed.data.layers as [{ digest: string; size: number }];
+    // Exactly one, by the schema.
+    const layer = parsed.data.layers[0]!;
     const notes = parsed.data.annotations ?? {};
     return {
         digest: layer.digest,

@@ -348,6 +348,19 @@ function walkAll(directory, found = []) {
     return found;
 }
 
+/**
+ * The newest line of an app's CHANGELOG.md - its first list item - which the
+ * updates screen shows beside an available build. None when there is no file.
+ */
+export function changeLine(dir) {
+    const file = join(dir, "CHANGELOG.md");
+    if (!existsSync(file)) return undefined;
+    const line = readFileSync(file, "utf8")
+        .split(/\r?\n/)
+        .find((text) => /^\s*[-*]\s+\S/.test(text));
+    return line ? line.replace(/^\s*[-*]\s+/, "").trim().slice(0, 300) : undefined;
+}
+
 /** The app packages in this workspace: every one with a `polaris` section. */
 export function appPackages(dashboard) {
     const apps = join(dashboard, "apps");
@@ -373,7 +386,18 @@ const EMPTY_CONFIG = { mediaType: "application/vnd.oci.empty.v1+json", digest: `
  * pushed, so its digest is known before anything is published - which is what
  * lets the registry keep exactly the bundles the latest dashboard names.
  */
-export function ociManifest(id, digest, size) {
+export function ociManifest(id, digest, size, about = {}) {
+    // What a dashboard reads off the app's channel before it downloads anything
+    // (`lib/app-bundles/releases.ts`). On the manifest rather than in the zip, so
+    // a new commit that leaves the app alone leaves its bundle's digest alone.
+    const annotations = Object.fromEntries(
+        [
+            ["org.opencontainers.image.version", about.version],
+            ["org.opencontainers.image.revision", about.revision],
+            ["vnd.polaris.app.host-api", about.hostApi],
+            ["vnd.polaris.app.notes", about.notes]
+        ].filter(([, value]) => typeof value === "string" && value.length > 0)
+    );
     const bytes = JSON.stringify({
         schemaVersion: 2,
         mediaType: "application/vnd.oci.image.manifest.v1+json",
@@ -386,7 +410,8 @@ export function ociManifest(id, digest, size) {
                 size,
                 annotations: { "org.opencontainers.image.title": `${id}.zip` }
             }
-        ]
+        ],
+        ...(Object.keys(annotations).length > 0 ? { annotations } : {})
     });
     return { bytes, digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` };
 }
@@ -406,7 +431,12 @@ async function main() {
     const index = { format: BUNDLE_FORMAT, build, apps: {} };
     for (const dir of dirs.length > 0 ? dirs : appPackages(dashboard)) {
         const { manifest, digest, size } = await buildAppBundle(dir, resolve(out), build);
-        const oci = ociManifest(manifest.id, digest, size);
+        const oci = ociManifest(manifest.id, digest, size, {
+            version: manifest.version,
+            hostApi: manifest.hostApi,
+            revision: process.env.POLARIS_BUILD_SHA || undefined,
+            notes: changeLine(dir)
+        });
         writeFileSync(join(resolve(out), `${manifest.id}.oci.json`), oci.bytes);
         index.apps[manifest.id] = { file: `${manifest.id}.zip`, digest, size, manifest: oci.digest };
         process.stdout.write(`[app-bundles] ${manifest.id}: ${(size / 1024).toFixed(0)} KiB ${digest}\n`);

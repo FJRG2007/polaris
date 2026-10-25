@@ -1678,8 +1678,8 @@
         "needsPolaris": "{version} needs a newer Polaris",
         "checkFailed": "Could not check for updates",
         "upToDate": "Up to date",
-        "update": "Update",
-        "updating": "Updating",
+        "update": "Update now",
+        "updating": "Updating...",
         "rollback": "Go back to {version}",
         "phase": {
             "checking": "Checking...",
