@@ -14,8 +14,8 @@ import { MeshBasicNodeMaterial, MeshStandardNodeMaterial, Sphere } from 'three/w
 
 const _sphere = new Sphere();
 
-// How far an object is from `position`: 0 for what has no bounds to measure (the post-processing passes), and never
-// near in a shadow map (orthographic cascades), which fills in once the game is on screen
+// How far an object is from `position`: 0 for the post-processing passes and what has no bounds to measure, and never
+// near in a shadow map (orthographic cascades) or the minimap, which fill in once the game is on screen
 const _fallbacks = new WeakMap();
 const FALLBACK_COPY = ['color', 'map', 'alphaMap', 'opacity', 'alphaTest', 'side', 'depthWrite', 'depthTest', 'vertexColors', 'fog',
   'roughness', 'metalness', 'positionNode'];
@@ -45,6 +45,8 @@ function fallbackFor(material) {
 }
 
 function distanceTo(object, camera, position) {
+  // A post-processing pass draws the frame itself (its own orthographic camera is no shadow map)
+  if (object.isQuadMesh) return 0;
   let bounds = null;
   if (object.isInstancedMesh) {
     if (!object.boundingSphere) object.computeBoundingSphere();
@@ -86,9 +88,15 @@ function drawOnlyCompiled(renderer, { budgetMs = 6, near = null } = {}) {
       return;
     }
     stats.waiting++;
-    if (nearRadius > 0 && near && distanceTo(object, camera, near()) <= nearRadius) {
+    const isNear = nearRadius > 0 && near && distanceTo(object, camera, near()) <= nearRadius;
+    if (isNear) {
       stats.waitingNear++;
       nearOnes.add(renderObject);
+    } else if (nearRadius > 0 && !building.has(renderObject)) {
+      // While the loading screen waits on the view around the player, nothing else is started: the far side of the
+      // city and the shadow maps would take their share of the build time and only delay the first frame. They are
+      // built once the game is on screen.
+      return;
     }
     if (building.has(renderObject)) {
       // What it draws from still has to be drawn meanwhile: the post-processing quad's scene pass renders the city in
