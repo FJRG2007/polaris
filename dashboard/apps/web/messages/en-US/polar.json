@@ -800,7 +800,12 @@
         "searchAgents": "Find an agent",
         "noAgentMatch": "No agents match",
         "noFiles": "An agent session can't take attached files yet",
-        "noVoice": "Voice talks to Polar's chat, not to an agent"
+        "noVoice": "Voice talks to Polar's chat, not to an agent",
+        "searchBranches": "Search branches",
+        "branchDefault": "default",
+        "branchUse": "Use \"{name}\"",
+        "noBranchMatch": "No branch matches",
+        "branchesFailed": "Couldn't read the branches. Type one to use it."
     },
     "compare": {
         "open": "Ask several models",

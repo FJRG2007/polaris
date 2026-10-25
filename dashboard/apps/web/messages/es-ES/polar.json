@@ -800,7 +800,12 @@
         "searchAgents": "Buscar agente",
         "noAgentMatch": "Ningún agente",
         "noFiles": "Una sesión de agente aún no admite adjuntos",
-        "noVoice": "La voz va al chat de Polar, no a un agente"
+        "noVoice": "La voz va al chat de Polar, no a un agente",
+        "searchBranches": "Buscar ramas",
+        "branchDefault": "principal",
+        "branchUse": "Usar \"{name}\"",
+        "noBranchMatch": "Ninguna rama",
+        "branchesFailed": "No se pudieron leer las ramas. Escribe una para usarla."
     },
     "compare": {
         "open": "Preguntar a varios",

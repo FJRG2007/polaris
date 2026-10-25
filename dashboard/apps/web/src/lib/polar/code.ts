@@ -14,7 +14,14 @@
 
 import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
-import { githubAppInstallUrl } from "@/lib/github-service";
+import { prisma } from "@polaris/db";
+import {
+    githubApiToken,
+    githubAppInstallationToken,
+    githubAppInstallUrl,
+    listRepoBranches,
+    repoDefaultBranch
+} from "@/lib/github-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
@@ -182,6 +189,51 @@ export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoi
         githubAppInstallUrl().catch(() => null)
     ]);
     return { ...choices, installUrl };
+}
+
+/** A repository's branches for the composer's branch chip. */
+export interface PolarCodeBranches {
+    /** Null when GitHub would not say which one it is. */
+    readonly defaultBranch: string | null;
+    /** The default branch first, then the rest by name. */
+    readonly branches: readonly string[];
+}
+
+/**
+ * The branches of one of the person's connected repositories, read with the
+ * GitHub App's installation (or the connected token when there is no App).
+ * Null for a repository that is not theirs or not enabled, or when GitHub
+ * would not list them.
+ */
+export async function polarCodeBranches(
+    user: SessionUser,
+    repoId: string
+): Promise<PolarCodeBranches | null> {
+    if ((await accessOf(user)) !== "manage") return null;
+    const repo = await prisma.agentRepo.findFirst({
+        where: { id: repoId, ownerId: user.id, enabled: true },
+        select: { repoFullName: true }
+    });
+    if (!repo) return null;
+    const [owner, name] = repo.repoFullName.split("/");
+    if (!owner || !name) return null;
+    const token =
+        (await githubAppInstallationToken(owner).catch(() => null)) ??
+        (await githubApiToken(owner).catch(() => null));
+    const [defaultBranch, listed] = await Promise.all([
+        repoDefaultBranch(owner, name, token),
+        listRepoBranches(owner, name, token)
+    ]);
+    if (listed === null) return null;
+    return { defaultBranch, branches: orderBranches(listed, defaultBranch) };
+}
+
+/** The default branch first, then the rest by name, each once. */
+export function orderBranches(names: readonly string[], defaultBranch: string | null): string[] {
+    const rest = [...new Set(names)]
+        .filter((name) => name !== defaultBranch)
+        .sort((a, b) => a.localeCompare(b));
+    return defaultBranch ? [defaultBranch, ...rest] : rest;
 }
 
 /** Start a session: the Agents app's own start, with its own validation. */
