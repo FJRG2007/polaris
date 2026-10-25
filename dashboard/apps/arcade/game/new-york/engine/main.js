@@ -32,7 +32,7 @@ import { reportFailure, reportProgress, reportReady, shareState } from './embed.
 const LOADING_BUILD_BUDGET = 45;
 const PLAYING_BUILD_BUDGET = 6;
 
-const BUILD_STEPS = ['renderer', 'lighting', 'cityGrid', 'boroughs', 'landmarks', 'blocks', 'streetDetails', 'traffic', 'roadPaint', 'controllers', 'culling', 'ui', 'postFX'];
+const BUILD_STEPS = ['renderer', 'lighting', 'cityGrid', 'boroughs', 'landmarks', 'blocks', 'streetDetails', 'traffic', 'roadPaint', 'controllers', 'culling', 'postFX', 'ui'];
 
 async function initApp() {
   const container = document.getElementById('canvas-container');
@@ -76,9 +76,8 @@ async function initApp() {
     if (step >= 0) reportProgress('build', (step + 1) / BUILD_STEPS.length);
   };
   // Hands the main thread back between start-up phases: the game shares it with the page that frames it, so without
-  // this the whole tab (and the host's progress bar) froze until the city was built
-  const nextTask = () => (globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise((resolve) => setTimeout(resolve, 0)));
-  // (a plain task, not scheduler.yield(), whose continuation would run ahead of the host's progress messages)
+  // this the whole tab (and the host's progress bar) froze until the city was built (a plain task, not
+  // scheduler.yield(), whose continuation would run ahead of the host's progress messages)
   const stepDone = (label) => {
     markInit(label);
     return new Promise((resolve) => setTimeout(resolve, 0));
@@ -260,6 +259,7 @@ async function initApp() {
   }
   const colorGrade = createPostProcessing(renderer, scenePassColor, reflections, { bloom: preset.bloom });
   const renderPipeline = new THREE.RenderPipeline(renderer, colorGrade.outputNode);
+  await stepDone('postFX');
 
   // 6. Wire UI Controls (Strictly using safe DOM APIs: textContent, classList, addEventListener)
   const modeButtons = document.querySelectorAll('[data-mode]');
@@ -640,7 +640,6 @@ async function initApp() {
   //     player fills in first; the loading screen stays up until everything within FIRST_FRAME_RADIUS is drawn, and
   //     the far side of the city appears while playing.
   const FIRST_FRAME_RADIUS = 80; // metres
-  markInit('compile');
 
   // Auto quality learns from how the game runs here: the frame rate over 20 s of play, once the far pipelines had
   // 10 s to compile, decides whether the next visit starts a level lower (quality.js)
