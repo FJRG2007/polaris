@@ -25,14 +25,14 @@ import { setReminderAction } from "./actions";
 import { ScheduleDialog } from "./schedule-dialog";
 import type { SpaceEmojiScope } from "./space-emoji";
 import { EmojiFace } from "@/components/rich-text/custom-emoji";
-import { browserCanSpeak, speakInBrowser } from "@/lib/polar/browser-voice";
+import { browserCanSpeak, speakInBrowser, type BrowserSpeech } from "@/lib/polar/browser-voice";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat, useDisplayPreferences } from "@/components/display-format";
 import { REMINDER_PRESETS, reminderMoment, type ReminderPreset } from "./reminder-times";
 import { copyText, messageLink } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { imageItems } from "@/components/image-actions";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { plainText } from "@/components/rich-text/excerpt";
 import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
@@ -57,8 +57,43 @@ import {
     SmilePlus,
     Star,
     Trash2,
-    Volume2
+    Volume2,
+    VolumeX
 } from "lucide-react";
+
+/** The one message being read aloud, page-wide: reading another stops it. */
+let reading: { messageId: string; speech: BrowserSpeech } | null = null;
+const readers = new Set<() => void>();
+const readingChanged = () => readers.forEach((listener) => listener());
+
+function readAloud(messageId: string, text: string, locale: string): void {
+    stopReading();
+    const speech = speakInBrowser(text, locale);
+    reading = { messageId, speech };
+    readingChanged();
+    void speech.done.then(() => {
+        if (reading?.speech !== speech) return;
+        reading = null;
+        readingChanged();
+    });
+}
+
+function stopReading(): void {
+    reading?.speech.cancel();
+    reading = null;
+    readingChanged();
+}
+
+function useReadingMessage(): string | null {
+    return useSyncExternalStore(
+        (listener) => {
+            readers.add(listener);
+            return () => readers.delete(listener);
+        },
+        () => reading?.messageId ?? null,
+        () => null
+    );
+}
 import {
     ContextMenu,
     ContextMenuContent,
@@ -198,10 +233,10 @@ export function MessageMenu({
         : null;
     const recording = pointedFile && isPlayable(pointedFile.contentType) ? pointedFile : null;
     const loose = pointedFile && !recording && !picture && !clip ? pointedFile : null;
-    const reactable =
-        canPost && !message.deleted && message.kind !== "system" && actions.onReact;
+    const reactable = canPost && !message.deleted && message.kind !== "system" && actions.onReact;
     const remindable = !message.deleted && message.kind !== "system";
     const speakable = !message.deleted && Boolean(message.body.trim()) && browserCanSpeak();
+    const readingThis = useReadingMessage() === message.id;
 
     /** Set the reminder, and say back when it is for. */
     const remind = async (dueAt: Date): Promise<boolean> => {
@@ -383,7 +418,9 @@ export function MessageMenu({
                                 tab's own origin, which is the hostname known to
                                 work from here. */}
                             <ContextMenuItem
-                                onSelect={() => window.open(link.open, "_blank", "noopener,noreferrer")}
+                                onSelect={() =>
+                                    window.open(link.open, "_blank", "noopener,noreferrer")
+                                }
                             >
                                 <ExternalLink className="size-3.5" />
                                 {link.kind === "email"
@@ -411,7 +448,9 @@ export function MessageMenu({
                                                     emoji: named
                                                 })}
                                                 title={t("messageList.reactWith", { emoji: named })}
-                                                onSelect={() => actions.onReact?.(message.id, choice)}
+                                                onSelect={() =>
+                                                    actions.onReact?.(message.id, choice)
+                                                }
                                                 className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted p-0 text-lg"
                                             >
                                                 <EmojiFace
@@ -459,7 +498,9 @@ export function MessageMenu({
                                 here, and what they get is these words quoted in the
                                 conversation the two of you would have had anyway. */}
                             {!mine && message.authorId && actions.onReplyPrivately && (
-                                <ContextMenuItem onSelect={() => actions.onReplyPrivately?.(message)}>
+                                <ContextMenuItem
+                                    onSelect={() => actions.onReplyPrivately?.(message)}
+                                >
                                     <MessageCircleReply className="size-3.5" />
                                     {t("messageMenu.replyPrivately")}
                                 </ContextMenuItem>
@@ -567,14 +608,22 @@ export function MessageMenu({
                     </ContextMenuItem>
                     {/* Read by the browser's own voice, in the reader's language.
                         Only where the browser has one. */}
-                    {speakable && (
-                        <ContextMenuItem
-                            onSelect={() => void speakInBrowser(plainText(message.body), locale)}
-                        >
-                            <Volume2 className="size-3.5" />
-                            {t("messageMenu.speak")}
-                        </ContextMenuItem>
-                    )}
+                    {speakable &&
+                        (readingThis ? (
+                            <ContextMenuItem onSelect={stopReading}>
+                                <VolumeX className="size-3.5" />
+                                {t("messageMenu.stopSpeaking")}
+                            </ContextMenuItem>
+                        ) : (
+                            <ContextMenuItem
+                                onSelect={() =>
+                                    readAloud(message.id, plainText(message.body), locale)
+                                }
+                            >
+                                <Volume2 className="size-3.5" />
+                                {t("messageMenu.speak")}
+                            </ContextMenuItem>
+                        ))}
 
                     {/* Only where there are ticks to explain, which is exactly a
                         one-to-one conversation, your own message, and both people

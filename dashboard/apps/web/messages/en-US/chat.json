@@ -862,7 +862,8 @@
         "nextMonday": "Next Monday",
         "custom": "Custom...",
         "reminderSet": "Reminder set for {date} at {time}",
-        "speak": "Speak message"
+        "speak": "Speak message",
+        "stopSpeaking": "Stop reading"
     },
     "poll": {
         "createAPoll": "Create a poll",
@@ -1994,6 +1995,8 @@
         "youGetANotification": "You get a notification that opens the message.",
         "setReminder": "Set reminder",
         "setting": "Setting...",
-        "remindsOn": "Reminds you on {date} at {time}."
+        "remindsOn": "Reminds you on {date} at {time}.",
+        "couldNotLoad": "Your reminders could not be loaded",
+        "cancelFailed": "The reminder could not be canceled"
     }
 }

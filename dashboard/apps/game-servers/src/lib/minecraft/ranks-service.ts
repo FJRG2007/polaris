@@ -87,6 +87,11 @@ async function send(server: ServerContainer, lines: readonly string[]): Promise<
     return answers.filter((answer) => answer !== null && ranksLib.refusedAnswer(answer)).length;
 }
 
+/** Whether two reads of the stored ranks are the same ranks. */
+function sameRanks(left: readonly Rank[], right: readonly Rank[]): boolean {
+    return JSON.stringify(left) === JSON.stringify(right);
+}
+
 /** Make the server match the saved ranks, and record what was sent. */
 export async function applyRanks(ownerId: string, installedAppId: string): Promise<RankApply> {
     const install = await installOf(installedAppId);
@@ -106,10 +111,18 @@ export async function applyRanks(ownerId: string, installedAppId: string): Promi
         // Off, starting, or not answering: the ranks wait for the next start.
         return { applied: false, sent: 0, refused: 0 };
     }
-    const next: RanksState = {
-        ranks: ranksLib.withoutSources(state.ranks),
-        applied: ranksLib.appliedBy(state.ranks)
-    };
+    const sent = ranksLib.appliedBy(state.ranks);
+    const fresh = await installOf(installedAppId);
+    const stored = fresh ? ranksLib.readRanks(fresh.config) : state;
+    const next: RanksState = sameRanks(stored.ranks, state.ranks)
+        ? { ranks: ranksLib.withoutSources(state.ranks), applied: sent }
+        : {
+              ranks: stored.ranks,
+              applied: {
+                  teams: [...new Set([...stored.applied.teams, ...sent.teams])],
+                  players: [...new Set([...stored.applied.players, ...sent.players])]
+              }
+          };
     await patchInstallConfig(installedAppId, { [ranksLib.RANKS_KEY]: next });
     return { applied: true, sent: lines.length, refused };
 }

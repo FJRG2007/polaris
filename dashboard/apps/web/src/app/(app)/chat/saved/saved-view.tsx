@@ -23,7 +23,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "../chat-context";
 import { Avatar } from "@/components/avatar";
-import { Button, ConfirmDeleteDialog, EmptyState, Select, Skeleton } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, EmptyState, Select, Skeleton, useToast } from "@polaris/ui";
 import { PersonName } from "@/components/person-name";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ChatReminderView } from "@/lib/chat/reminders";
@@ -58,21 +58,31 @@ export function SavedView() {
     /** What this reader asked to be reminded of, soonest first. Shown above the
      *  saved messages because both are "come back to this". */
     const [reminders, setReminders] = useState<readonly ChatReminderView[]>([]);
+    const toast = useToast();
     useEffect(() => {
-        void remindersAction().then((result) => setReminders(result.reminders ?? []));
+        let live = true;
+        void remindersAction()
+            .catch(() => ({ reminders: undefined, error: undefined }))
+            .then((result) => {
+                if (!live) return;
+                if (result.reminders) setReminders(result.reminders);
+                else toast.show({ title: t("reminders.couldNotLoad"), body: result.error });
+            });
+        return () => {
+            live = false;
+        };
     }, []);
-    const shownReminders = only
-        ? reminders.filter((entry) => entry.channelId === only)
-        : reminders;
+    const shownReminders = only ? reminders.filter((entry) => entry.channelId === only) : reminders;
 
     /** Optimistic, and put back if the server refuses. */
     const cancelReminder = async (reminder: ChatReminderView) => {
         setReminders((current) => current.filter((entry) => entry.id !== reminder.id));
-        const result = await cancelReminderAction(reminder.id).catch(() => ({ error: "failed" }));
-        if (result.error) {
+        const result = await cancelReminderAction(reminder.id).catch(() => ({ error: "" }));
+        if (result.error !== undefined) {
             setReminders((current) =>
                 [...current, reminder].sort((a, b) => a.dueAt.localeCompare(b.dueAt))
             );
+            toast.show({ title: t("reminders.cancelFailed"), body: result.error || undefined });
         }
     };
 

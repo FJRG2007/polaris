@@ -73,9 +73,7 @@ export async function setReminder(
     });
     // Moving one that is already waiting adds nothing to the count.
     if (!existing || existing.firedAt) {
-        const pending = await prisma.chatReminder.count({
-            where: { userId: actor.id, firedAt: null }
-        });
+        const pending = await prisma.chatReminder.count({ where: await pendingWhere(actor) });
         if (pending >= core.MAX_PENDING_REMINDERS) {
             throw new ChatAccessError({
                 key: "errors.tooManyReminders",
@@ -93,15 +91,29 @@ export async function setReminder(
 }
 
 /**
+ * The reminders this person has waiting in rooms they still reach - the ones the
+ * list can show and they can cancel, so the only ones the bound counts. One in a
+ * room they have since left stays a row until it fires (and fires nothing).
+ */
+async function pendingWhere(actor: ChatActor) {
+    const reachable = await reachableChannelIds(actor);
+    return {
+        userId: actor.id,
+        firedAt: null,
+        message: { channelId: { in: [...reachable] } }
+    };
+}
+
+/**
  * Everything this person has waiting, soonest first.
  *
  * Re-checked against the rooms on the way out, like the saved list: a reminder
- * in a room they have since left stays a row until it fires (and fires
- * nothing), but it is not listed, because listing it would quote the room.
+ * in a room they have since left is not listed, because listing it would quote
+ * the room.
  */
 export async function listReminders(actor: ChatActor): Promise<ChatReminderView[]> {
     const rows = await prisma.chatReminder.findMany({
-        where: { userId: actor.id, firedAt: null },
+        where: await pendingWhere(actor),
         orderBy: { dueAt: "asc" },
         take: core.MAX_PENDING_REMINDERS,
         select: {
@@ -115,14 +127,12 @@ export async function listReminders(actor: ChatActor): Promise<ChatReminderView[
     });
     if (rows.length === 0) return [];
 
-    const reachable = await reachableChannelIds(actor);
-    const visible = rows.filter((row) => reachable.has(row.message.channelId));
     // One floor per room rather than one question per reminder.
     const floors = new Map<string, Date | null>();
-    for (const channelId of new Set(visible.map((row) => row.message.channelId))) {
+    for (const channelId of new Set(rows.map((row) => row.message.channelId))) {
         floors.set(channelId, await history.readableSince(actor, channelId));
     }
-    return visible
+    return rows
         .filter((row) =>
             history.isReadable(floors.get(row.message.channelId), row.message.createdAt)
         )

@@ -24,6 +24,8 @@ let reachable = true;
 let consoleHolder = true;
 let rateOk = true;
 let scoreboard: Buffer | null = null;
+/** Runs while the server is being sent an apply's commands. */
+let whileSending: (() => void) | null = null;
 const said: string[] = [];
 const audits: { action: string; metadata: Record<string, string> }[] = [];
 const rateKeys: string[] = [];
@@ -93,13 +95,16 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
             sayAll: async (lines: string[]) => {
                 said.push(...lines);
             },
-            sayEach: async (commands: string[][]) =>
-                commands.map(([line]) => {
+            sayEach: async (commands: string[][]) => {
+                whileSending?.();
+                whileSending = null;
+                return commands.map(([line]) => {
                     said.push(line!);
                     return line!.startsWith("team modify pr01_admin color")
                         ? "Unknown or incomplete command"
                         : "ok";
-                }),
+                });
+            },
             readFile: async (path: string) => {
                 readPaths.push(path);
                 if (!scoreboard) throw new Error("No such file");
@@ -190,6 +195,7 @@ beforeEach(() => {
     consoleHolder = true;
     rateOk = true;
     scoreboard = null;
+    whileSending = null;
     said.length = 0;
     audits.length = 0;
     rateKeys.length = 0;
@@ -236,6 +242,20 @@ describe("saving and applying", () => {
         ]);
         // Once applied, the adopted team is gone and the rank no longer names it.
         expect((config.ranks as { ranks: Rank[] }).ranks).toEqual([VIP]);
+    });
+
+    it("keeps ranks saved while an apply was talking to the server", async () => {
+        config = { ranks: { ranks: [ADMIN], applied: { teams: [], players: [] } } };
+        whileSending = () => {
+            config = {
+                ranks: { ranks: [VIP], applied: { teams: [], players: [] } }
+            };
+        };
+        expect((await service.applyRanks("owner", INSTALL)).applied).toBe(true);
+        expect(config.ranks).toEqual({
+            ranks: [VIP],
+            applied: { teams: ["pr01_admin"], players: ["Steve"] }
+        });
     });
 
     it("refuses Bedrock, which has no teams", async () => {

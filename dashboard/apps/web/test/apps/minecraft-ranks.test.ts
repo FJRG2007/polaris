@@ -250,6 +250,24 @@ function scoreboard(teams: Record<string, Tag>[]): Buffer {
 }
 
 describe("importing the server's teams", () => {
+    it("strips every unsafe character from an imported prefix and name, not only the first", () => {
+        const [rank] = ranksFromTeams(
+            [
+                {
+                    name: "staff",
+                    displayName: "St​af​f",
+                    prefix: "[STAFF] ",
+                    color: null,
+                    players: []
+                }
+            ],
+            []
+        );
+        expect(rank?.name).toBe("Staff");
+        expect(rank?.tag).toBe("STAFF");
+        expect(ranksSchema.safeParse([rank]).success).toBe(true);
+    });
+
     it("reads a 1.20 scoreboard, where components are JSON strings", () => {
         const file = scoreboard([
             {

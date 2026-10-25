@@ -85,6 +85,7 @@ const TEAM_NAME = /^[A-Za-z0-9_.+-]{1,16}$/;
 /** Nothing a line of text in the game cannot hold, and no section sign, which
  *  older clients read as formatting. */
 const UNSAFE_TEXT = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}§]/u;
+const UNSAFE_TEXT_ALL = new RegExp(UNSAFE_TEXT.source, "gu");
 
 /** One normalizer for the screen and the server: trimmed, single spaces. */
 export function cleanText(value: unknown): string {
@@ -449,14 +450,14 @@ export function rankFromTeam(team: ServerTeam, taken: readonly string[]): Rank |
     const plain = runs
         .map((run) => run.text)
         .join("")
-        .replace(UNSAFE_TEXT, "")
+        .replace(UNSAFE_TEXT_ALL, "")
         .replace(/\s+/g, " ")
         .trim();
     const displayName = cleanText(
         componentRuns(team.displayName)
             .map((run) => run.text)
             .join("")
-    ).replace(UNSAFE_TEXT, "");
+    ).replace(UNSAFE_TEXT_ALL, "");
     let symbol = "";
     let tag = plain;
     const bracketed = /^(?:(\S{1,2})\s+)?[[(](.+?)[\])]$/u.exec(plain);

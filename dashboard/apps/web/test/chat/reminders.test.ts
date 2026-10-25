@@ -15,6 +15,8 @@ interface Row {
     messageId: string;
     dueAt: Date;
     firedAt: Date | null;
+    /** The room its message is in, when not the one `message` names. */
+    channelId?: string;
 }
 
 let rows: Row[] = [];
@@ -85,8 +87,17 @@ vi.mock("@polaris/db", () => ({
                         row.userId === where.userId_messageId.userId &&
                         row.messageId === where.userId_messageId.messageId
                 ) ?? null,
-            count: async ({ where }: { where: { userId: string } }) =>
-                rows.filter((row) => row.userId === where.userId && row.firedAt === null).length,
+            count: async ({
+                where
+            }: {
+                where: { userId: string; message: { channelId: { in: string[] } } };
+            }) =>
+                rows.filter(
+                    (row) =>
+                        row.userId === where.userId &&
+                        row.firedAt === null &&
+                        where.message.channelId.in.includes(row.channelId ?? "c1")
+                ).length,
             upsert: async ({
                 where,
                 create,
@@ -106,7 +117,9 @@ vi.mock("@polaris/db", () => ({
             },
             deleteMany: async () => ({ count: 0 }),
             findMany: async () =>
-                rows.filter((row) => row.firedAt === null && row.dueAt <= NOW).map((row) => ({ ...row })),
+                rows
+                    .filter((row) => row.firedAt === null && row.dueAt <= NOW)
+                    .map((row) => ({ ...row })),
             updateMany: async ({ where, data }: { where: { id: string }; data: Partial<Row> }) => {
                 const found = rows.find((row) => row.id === where.id && row.firedAt === null);
                 if (!found) return { count: 0 };
@@ -141,8 +154,7 @@ describe("the reminder schema", () => {
             core.chatReminderSchema.safeParse({ messageId: "nope", dueAt: inMinutes(5) }).success
         ).toBe(false);
         expect(
-            core.chatReminderSchema.safeParse({ messageId: MESSAGE_ID, dueAt: "tomorrow" })
-                .success
+            core.chatReminderSchema.safeParse({ messageId: MESSAGE_ID, dueAt: "tomorrow" }).success
         ).toBe(false);
     });
 });
@@ -189,6 +201,21 @@ describe("setting a reminder", () => {
         await expect(
             setReminder(ME, { messageId: MESSAGE_ID, dueAt: inMinutes(15) })
         ).rejects.toThrow();
+    });
+
+    it("does not count reminders left behind in rooms the reader no longer reaches", async () => {
+        for (let index = 0; index < core.MAX_PENDING_REMINDERS; index++) {
+            rows.push({
+                id: `p${index}`,
+                userId: ME.id,
+                messageId: `other-${index}`,
+                dueAt: new Date(inMinutes(30)),
+                firedAt: null,
+                channelId: "c2"
+            });
+        }
+        await setReminder(ME, { messageId: MESSAGE_ID, dueAt: inMinutes(15) });
+        expect(rows.filter((row) => row.messageId === MESSAGE_ID)).toHaveLength(1);
     });
 });
 

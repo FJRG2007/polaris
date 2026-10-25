@@ -862,7 +862,8 @@
         "nextMonday": "Próximo lunes",
         "custom": "Personalizado...",
         "reminderSet": "Recordatorio para el {date} a las {time}",
-        "speak": "Leer en voz alta"
+        "speak": "Leer en voz alta",
+        "stopSpeaking": "Dejar de leer"
     },
     "poll": {
         "createAPoll": "Crear encuesta",
@@ -1994,6 +1995,8 @@
         "youGetANotification": "Recibirás una notificación que abre el mensaje.",
         "setReminder": "Programar aviso",
         "setting": "Guardando...",
-        "remindsOn": "Te avisa el {date} a las {time}."
+        "remindsOn": "Te avisa el {date} a las {time}.",
+        "couldNotLoad": "No se pudieron cargar tus recordatorios",
+        "cancelFailed": "No se pudo anular el recordatorio"
     }
 }
