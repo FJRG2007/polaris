@@ -24,9 +24,11 @@ import { getWafJails, setWafJails, type WafJailSettings } from "@/lib/waf-ban-se
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
 import {
     getWafInherited,
+    getWafLoginBelow,
     getWafRule,
     setWafRule,
     type WafInheritedView,
+    type WafLoginBelow,
     type WafRuleView
 } from "@/lib/waf-service";
 import {
@@ -109,18 +111,21 @@ export async function getWafRuleAction(input: {
 }): Promise<{
     rule?: WafRuleView;
     inherited?: WafInheritedView;
+    /** Services under this scope already behind a login this scope does not show. */
+    loginBelow?: WafLoginBelow[];
     tor?: WafFeedView;
     error?: string;
 }> {
     const user = await requirePermission("deploy.manage");
     if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
-        const [rule, inherited, tor] = await Promise.all([
+        const [rule, inherited, loginBelow, tor] = await Promise.all([
             getWafRule(user.id, input.scopeType, input.scopeId),
             getWafInherited(user.id, input.scopeType, input.scopeId),
+            getWafLoginBelow(user.id, input.scopeType, input.scopeId),
             torFeedView(await userHasManage(user, "system.manage"))
         ]);
-        return { rule, inherited, tor };
+        return { rule, inherited, loginBelow, tor };
     } catch (caught) {
         return {
             error: await failure(caught, "errors.load")

@@ -39,6 +39,9 @@ export interface PredefinedRuleRow {
      * move, rather than showing this scope's own unused value.
      */
     readonly decidedElsewhere?: { readonly on: boolean; readonly label: string; readonly why: string };
+    /** Said instead of "Off" when this scope's switch is off but something narrower
+     *  already enforces the rule for part of what it covers. The switch stays live. */
+    readonly below?: { readonly label: string; readonly why: string };
     /** What arming it costs, shown as a warning next to the row. */
     readonly caution?: string;
     /** What it matches over recent traffic. Absent for a row that is not a rule -
@@ -89,7 +92,7 @@ export function PredefinedRuleList({
                             <tr
                                 key={row.id}
                                 className={`border-t border-border transition-colors hover:bg-muted/40 ${
-                                    on === false ? "opacity-60" : ""
+                                    on === false && !row.below ? "opacity-60" : ""
                                 }`}
                             >
                                 <td className="min-w-[10rem] px-4 py-3.5 pr-6 align-top">
@@ -140,10 +143,14 @@ export function PredefinedRuleList({
                                                         ? decided.why
                                                         : on
                                                           ? t("list.active")
-                                                          : t("list.off")
+                                                          : (row.below?.why ?? t("list.off"))
                                                 }
                                             >
-                                                {decided ? decided.label : on ? t("list.active") : t("list.off")}
+                                                {decided
+                                                    ? decided.label
+                                                    : on
+                                                      ? t("list.active")
+                                                      : (row.below?.label ?? t("list.off"))}
                                             </span>
                                         </div>
                                     )}

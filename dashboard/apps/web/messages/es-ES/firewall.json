@@ -313,7 +313,8 @@
         "setByOperator": "Lo decide quien gestiona esta instancia.",
         "loginAboveWhy": "Un ámbito por encima de este exige iniciar sesión, y uno más estrecho no puede eximirlo.",
         "polarisNote": "Se aplica a los dominios públicos en los que responde Polaris. El nombre de la red local se sirve aparte y sigue accesible.",
-        "remoteNote": "El edge local aplica los cambios al momento; un servicio en un servidor remoto los recoge en su siguiente despliegue."
+        "remoteNote": "El edge local aplica los cambios al momento; un servicio en un servidor remoto los recoge en su siguiente despliegue.",
+        "loginBelow": "Activo en {count, plural, one {# servicio} other {# servicios}}"
     },
     "access": {
         "addressesTitle": "Acceso por IP",
@@ -413,7 +414,17 @@
         "notRequired": "No hace falta sesión",
         "aboveNote": "Un ámbito por encima de este exige iniciar sesión, y uno más estrecho no puede eximirlo. Las listas de abajo siguen aplicándose: cada ámbito que indica a quién admite tiene voz.",
         "admits": "A quién admite",
-        "admitsHint": "Sin nadie nombrado, entra cualquiera con cuenta en Polaris."
+        "admitsHint": "Sin nadie nombrado, entra cualquiera con cuenta en Polaris.",
+        "belowTitle": "Servicios que ya lo piden",
+        "belowHint": "Este ámbito no exige iniciar sesión, pero estos servicios ya lo hacen. Abre uno para ver dónde está activado.",
+        "via": {
+            "application": "Su propia regla",
+            "environment": "Su entorno",
+            "project": "Su proyecto",
+            "server": "Su servidor",
+            "server-group": "Su grupo",
+            "private": "Una dirección privada"
+        }
     },
     "page": {
         "backToList": "Volver a la lista de reglas",

@@ -16,6 +16,7 @@
 
 import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
+import { parsePrivateAccess } from "@/lib/deploy/private-domain";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     cleanFrameAncestors,
@@ -689,6 +690,127 @@ export async function getWafInherited(
         frameProtection: merged.frameProtection,
         frameAncestors: [...merged.frameAncestors]
     };
+}
+
+/** Where a service under a scope gets its login from, when it is not this scope. */
+export type WafLoginSource = "application" | "environment" | "project" | "server" | "server-group" | "private";
+
+/** A service under this scope that already sits behind a Polaris login. */
+export interface WafLoginBelow {
+    readonly id: string;
+    readonly name: string;
+    readonly via: WafLoginSource;
+}
+
+/** The scopes strictly narrower than each one, which is where a login this scope does
+ *  not show can still be switched on. */
+const NARROWER: Record<WafScopeType, readonly WafScopeType[]> = {
+    polaris: [],
+    global: ["server-group", "server", "project", "environment", "application"],
+    "server-group": ["server", "project", "environment", "application"],
+    server: ["project", "environment", "application"],
+    project: ["environment", "application"],
+    environment: ["application"],
+    application: []
+};
+
+/** Services read for the list, at most. A scope wider than this is an instance where
+ *  the count is what matters and the names would not fit on the page anyway. */
+const BELOW_MAX = 500;
+
+/**
+ * The services under this scope that already require a Polaris login although this
+ * scope does not: a narrower rule turned it on, or one of their addresses was made
+ * private. Without it a project whose every service demands a login reads "Off" on
+ * its own row, which is true of the project's rule and false of every request.
+ */
+export async function getWafLoginBelow(
+    ownerId: string,
+    scopeType: WafScopeType,
+    scopeId: string
+): Promise<WafLoginBelow[]> {
+    await assertScopeOwner(ownerId, scopeType, scopeId);
+    if (scopeType === "polaris") return [];
+
+    const hostIds =
+        scopeType === "server-group"
+            ? (
+                  await prisma.hostGroupMember.findMany({
+                      where: { groupId: scopeId },
+                      select: { hostId: true }
+                  })
+              ).map((row) => row.hostId)
+            : scopeType === "server"
+              ? [scopeId]
+              : null;
+    const apps = await prisma.application.findMany({
+        where:
+            scopeType === "application"
+                ? { id: scopeId }
+                : scopeType === "environment"
+                  ? { environmentId: scopeId }
+                  : scopeType === "project"
+                    ? { environment: { projectId: scopeId } }
+                    : hostIds
+                      ? { target: { hostId: { in: hostIds } } }
+                      : {},
+        select: {
+            id: true,
+            name: true,
+            environmentId: true,
+            environment: { select: { projectId: true } },
+            target: { select: { hostId: true } },
+            domains: { where: { privateAccess: { not: null } }, select: { privateAccess: true } }
+        },
+        orderBy: { name: "asc" },
+        take: BELOW_MAX
+    });
+    if (apps.length === 0) return [];
+
+    const groups =
+        scopeType === "global"
+            ? await groupsOfHosts(apps.flatMap((app) => (app.target.hostId ? [app.target.hostId] : [])))
+            : new Map<string, string[]>();
+    const idsOf: Record<WafScopeType, string[]> = {
+        polaris: [],
+        global: [],
+        "server-group": [...new Set([...groups.values()].flat())],
+        server: [...new Set(apps.flatMap((app) => (app.target.hostId ? [app.target.hostId] : [])))],
+        project: [...new Set(apps.map((app) => app.environment.projectId))],
+        environment: [...new Set(apps.map((app) => app.environmentId))],
+        application: apps.map((app) => app.id)
+    };
+    const narrower = NARROWER[scopeType];
+    const rows =
+        narrower.length === 0
+            ? []
+            : await prisma.wafRule.findMany({
+                  where: {
+                      requireLogin: true,
+                      OR: narrower.map((type) => ({ scopeType: type, scopeId: { in: idsOf[type] } }))
+                  },
+                  select: { scopeType: true, scopeId: true }
+              });
+    const on = new Set(rows.map((row) => `${row.scopeType}:${row.scopeId}`));
+
+    return apps.flatMap((app): WafLoginBelow[] => {
+        const hostId = app.target.hostId;
+        // Narrowest first: the rule somebody would open to change it is the closest one.
+        const candidates: [Exclude<WafLoginSource, "private">, string | null][] = [
+            ["application", app.id],
+            ["environment", app.environmentId],
+            ["project", app.environment.projectId],
+            ["server", hostId],
+            ...(groups.get(hostId ?? "") ?? []).map((id): ["server-group", string] => ["server-group", id])
+        ];
+        const found = candidates.find(
+            ([type, id]) => id !== null && narrower.includes(type) && on.has(`${type}:${id}`)
+        );
+        if (found) return [{ id: app.id, name: app.name, via: found[0] }];
+        return app.domains.some((domain) => parsePrivateAccess(domain.privateAccess))
+            ? [{ id: app.id, name: app.name, via: "private" }]
+            : [];
+    });
 }
 
 /** Set once the dashboard's scope has been brought up to the full pack list, so it is

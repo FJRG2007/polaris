@@ -36,7 +36,7 @@ import { ChipList } from "./chip-list";
 import { Frame, Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { WafInheritedView } from "@/lib/waf-service";
+import type { WafInheritedView, WafLoginBelow } from "@/lib/waf-service";
 import { Input, Select, Skeleton, Switch } from "@polaris/ui";
 import { AddressRulesPage, LoginRulePage } from "./access-rules";
 import { emptyRule, RuleEditor, type RulePosition } from "./rule-editor";
@@ -212,6 +212,9 @@ export function WafEditor({
     // What the scopes above this one already enforce, and the instance-wide feeds.
     // Read with the rule because a row cannot be drawn honestly without them.
     const [inherited, setInherited] = useState<WafInheritedView | null>(null);
+    // Services under this scope already behind a login a narrower rule or a private
+    // address switched on, so this scope's own "off" is not read as "nobody signs in".
+    const [loginBelow, setLoginBelow] = useState<WafLoginBelow[]>([]);
     const [tor, setTor] = useState<WafFeedView | null>(null);
     const [view, setView] = useState<View>({ kind: "list" });
     const [error, setError] = useState<string | null>(null);
@@ -237,6 +240,7 @@ export function WafEditor({
         let active = true;
         setSaved(null);
         setInherited(null);
+        setLoginBelow([]);
         setTor(null);
         setError(null);
         setView({ kind: "list" });
@@ -249,6 +253,7 @@ export function WafEditor({
             onScreen.current = rule;
             setSaved(rule);
             setInherited(result.inherited ?? null);
+            setLoginBelow(result.loginBelow ?? []);
             setTor(result.tor ?? null);
             if (result.error) setError(result.error);
         });
@@ -437,6 +442,7 @@ export function WafEditor({
                 scope={{ scopeType, scopeId }}
                 required={saved.requireLogin}
                 requiredAbove={inherited?.requireLogin ?? false}
+                below={loginBelow}
                 admitted={saved.loginAllowPrincipals}
                 refused={saved.loginDenyPrincipals}
                 onBack={backToList}
@@ -488,6 +494,13 @@ export function WafEditor({
                                     on: true,
                                     label: armedAbove(t).label,
                                     why: t("scope.loginAboveWhy")
+                                }
+                              : undefined,
+                      below:
+                          !saved.requireLogin && loginBelow.length > 0
+                              ? {
+                                    label: t("scope.loginBelow", { count: loginBelow.length }),
+                                    why: loginBelow.map((service) => service.name).join(", ")
                                 }
                               : undefined,
                       activity: null
@@ -640,7 +653,14 @@ export function WafEditor({
                     setView(id === "addresses" ? { kind: "addresses" } : { kind: "login" })
                 }
                 onToggle={(_, on) => persist({ requireLogin: on })}
-                rows={accessRows.filter((row) => shown(`row:${row.id}`, row.enabled))}
+                rows={accessRows.filter((row) =>
+                    shown(
+                        `row:${row.id}`,
+                        row.enabled === null
+                            ? null
+                            : Boolean(row.decidedElsewhere?.on || row.enabled || row.below)
+                    )
+                )}
             />
 
             <PredefinedRuleList
