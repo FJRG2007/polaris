@@ -41,8 +41,16 @@ vi.mock("@/lib/chat/live", () => ({
         db.woken.push(...(change.messageIds ?? ["new"]));
     }
 }));
-vi.mock("@polaris/db", () => ({
-    prisma: {
+vi.mock("@polaris/db", () => {
+    let turn: Promise<unknown> = Promise.resolve();
+    const prisma = {
+        // One transaction at a time, as the advisory lock makes it per call.
+        $transaction: <T>(work: (tx: typeof prisma) => Promise<T>) => {
+            const run = turn.then(() => work(prisma));
+            turn = run.catch(() => undefined);
+            return run;
+        },
+        $executeRaw: async () => 0,
         meeting: {
             findUnique: async () => ({
                 channelId: CHANNEL,
@@ -108,8 +116,9 @@ vi.mock("@polaris/db", () => ({
             },
             findMany: async ({ where }: { where: { sessionId: string } }) => playersOf(where.sessionId)
         }
-    }
-}));
+    };
+    return { prisma };
+});
 
 const sessions = await import("@/lib/chat/activity-sessions");
 
@@ -134,6 +143,16 @@ describe("a session's life", () => {
             "fixture-user-b"
         ]);
         expect(db.woken).toContain("message-1");
+    });
+
+    it("posts one card when two people start the call's game at once", async () => {
+        await Promise.all([
+            sessions.recordPlay(MEETING, "fixture-user-a", "new-york"),
+            sessions.recordPlay(MEETING, "fixture-user-b", "new-york")
+        ]);
+        expect(db.sessions).toHaveLength(1);
+        expect(db.messages).toHaveLength(1);
+        expect(playersOf("session-1")).toHaveLength(2);
     });
 
     it("closes a session of another game: one game per call", async () => {

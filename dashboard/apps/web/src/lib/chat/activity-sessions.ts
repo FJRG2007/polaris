@@ -52,7 +52,9 @@ async function callChannel(meetingId: string): Promise<string | null> {
 /**
  * The session this call is playing, opened - with its card posted - when there
  * is none. A session of another game is closed first: one game per call, the
- * same rule every browser applies to the claims.
+ * same rule every browser applies to the claims. Two people starting the call's
+ * game at once take turns, so the second finds the first one's session instead
+ * of posting a second card.
  */
 export async function openSession(
     meetingId: string,
@@ -62,46 +64,55 @@ export async function openSession(
 ): Promise<SessionRow | null> {
     const channelId = await callChannel(meetingId);
     if (!channelId) return null;
-    const open = await prisma.arcadeSession.findMany({
-        where: { meetingId, endedAt: null },
-        select: {
-            ...ROW,
-            createdAt: true,
-            endedAt: true,
-            players: { select: { userId: true, seenAt: true, leftAt: true } }
-        },
-        orderBy: { createdAt: "desc" },
-        take: 5
-    });
-    let kept: SessionRow | null = null;
-    for (const session of open) {
-        const over = sessionEnded({ ...session, callEnded: false }, now);
-        if (!kept && session.game === game && !over) {
-            kept = session;
-            continue;
-        }
-        await prisma.arcadeSession.update({
-            where: { id: session.id },
-            data: { endedAt: new Date(now) }
-        });
-        wake(session, startedById);
-    }
-    if (kept) return kept;
+    const { kept, closed, posted } = await prisma.$transaction(
+        async (tx) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`polaris.arcade.session:${meetingId}`}))`;
+            const open = await tx.arcadeSession.findMany({
+                where: { meetingId, endedAt: null },
+                select: {
+                    ...ROW,
+                    createdAt: true,
+                    endedAt: true,
+                    players: { select: { userId: true, seenAt: true, leftAt: true } }
+                },
+                orderBy: { createdAt: "desc" },
+                take: 5
+            });
+            let kept: SessionRow | null = null;
+            const closed: SessionRow[] = [];
+            for (const session of open) {
+                const over = sessionEnded({ ...session, callEnded: false }, now);
+                if (!kept && session.game === game && !over) {
+                    kept = session;
+                    continue;
+                }
+                await tx.arcadeSession.update({
+                    where: { id: session.id },
+                    data: { endedAt: new Date(now) }
+                });
+                closed.push(session);
+            }
+            if (kept) return { kept, closed, posted: false };
 
-    const created = await prisma.arcadeSession.create({
-        data: { meetingId, channelId, game, startedById },
-        select: ROW
-    });
-    const message = await prisma.chatMessage.create({
-        data: { channelId, kind: "system", authorId: null, body: activityMark(created.id) },
-        select: { id: true }
-    });
-    await prisma.arcadeSession.update({
-        where: { id: created.id },
-        data: { messageId: message.id }
-    });
-    publishChatChange({ channelId, kind: "posted", actorId: startedById });
-    return { ...created, messageId: message.id };
+            const created = await tx.arcadeSession.create({
+                data: { meetingId, channelId, game, startedById },
+                select: ROW
+            });
+            const message = await tx.chatMessage.create({
+                data: { channelId, kind: "system", authorId: null, body: activityMark(created.id) },
+                select: { id: true }
+            });
+            await tx.arcadeSession.update({
+                where: { id: created.id },
+                data: { messageId: message.id }
+            });
+            return { kept: { ...created, messageId: message.id }, closed, posted: true };
+        },
+        { timeout: 15_000 }
+    );
+    for (const session of closed) wake(session, startedById);
+    if (posted) publishChatChange({ channelId, kind: "posted", actorId: startedById });
+    return kept;
 }
 
 /** Somebody started or joined the call's game. Best effort: the game is

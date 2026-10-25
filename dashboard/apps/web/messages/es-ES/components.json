@@ -1698,7 +1698,7 @@
     },
     "gameInvite": {
         "title": "Invitar a {game}",
-        "intro": "Recibirán una notificación y un mensaje con un botón Unirse. Jugáis en una llamada.",
+        "intro": "Verán un botón Unirse en la conversación, y las personas que elijas recibirán una notificación. Jugáis en una llamada.",
         "people": "Personas",
         "peopleHint": "Busca a alguien",
         "remove": "Quitar a {name}",

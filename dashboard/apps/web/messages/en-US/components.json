@@ -1698,7 +1698,7 @@
     },
     "gameInvite": {
         "title": "Invite to {game}",
-        "intro": "They get a notification and a message with a Join button. You play in a call with them.",
+        "intro": "They see a Join button in the conversation, and people you pick get a notification. You play in a call with them.",
         "people": "People",
         "peopleHint": "Add someone by name",
         "remove": "Remove {name}",

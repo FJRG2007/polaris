@@ -37,12 +37,17 @@ export function ActivityCard({
 
     useEffect(() => {
         let live = true;
+        let timer: number | undefined;
         const read = () =>
             void readActivityCard(sessionId)
-                .then((found) => live && setView(found))
+                .then((found) => {
+                    if (!live) return;
+                    setView(found);
+                    if (!found || found.ended) window.clearInterval(timer);
+                    else if (timer === undefined) timer = window.setInterval(read, REFRESH_MS);
+                })
                 .catch(() => undefined);
         read();
-        const timer = window.setInterval(read, REFRESH_MS);
         return () => {
             live = false;
             window.clearInterval(timer);
