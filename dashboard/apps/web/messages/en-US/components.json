@@ -1695,5 +1695,25 @@
             "failed": "The new version did not start, so {name} stays on the one it had.",
             "noPrevious": "There is no earlier version of {name} to go back to."
         }
+    },
+    "gameInvite": {
+        "title": "Invite to {game}",
+        "intro": "They see a Join button in the conversation, and people you pick get a notification. You play in a call with them.",
+        "people": "People",
+        "peopleHint": "Add someone by name",
+        "remove": "Remove {name}",
+        "conversation": "Or a conversation",
+        "search": "Search conversations",
+        "none": "No conversations found.",
+        "cancel": "Cancel",
+        "send": "Invite and play",
+        "failed": {
+            "invalid": "Pick people or a conversation.",
+            "denied": "An admin has turned off games in calls for your account.",
+            "missing": "This game cannot be played together here.",
+            "limited": "You sent a lot of invites. Try again in a few minutes.",
+            "conversation": "You cannot invite to that conversation.",
+            "call": "A call could not be started there. Try again."
+        }
     }
 }

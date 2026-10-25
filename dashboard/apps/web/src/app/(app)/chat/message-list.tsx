@@ -60,6 +60,8 @@ import { LinkCard } from "./link-card";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { MessageTime } from "@/components/message-time";
+import { ActivityCard } from "./activity-card";
+import { activityIdIn } from "@/lib/chat/activity-card";
 import { MessageInfoDialog } from "./message-info-dialog";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatMessageView, ChatQuoteView } from "@/lib/chat/messages";
@@ -834,6 +836,9 @@ function Message({
     // so a room reads as one column of sentences with the occasional quiet one
     // among them - the gutter is for faces, and this line has none.
     if (message.kind === "system") {
+        // A game played in this conversation's call: drawn as its card.
+        const activity = activityIdIn(message.body);
+        if (activity) return <ActivityCard sessionId={activity} message={message} />;
         return (
             <p className="py-1 pl-14 pr-4 text-xs text-muted-foreground">
                 <NoticeText message={message} /> <MessageTime iso={message.createdAt} />

@@ -1,4 +1,6 @@
 // Touch input stays separate from the keyboard, so releasing a finger never releases a held key.
+import { t } from './i18n.js';
+
 const DEAD_ZONE = 0.15;
 const MAX_RADIUS = 44;
 
@@ -98,7 +100,11 @@ class TouchControls {
     this.reset();
     if (!this.root) return;
     this.mode = mode;
-    const labels = { boost: mode === 'person' || mode === 'cyclist' ? 'Sprint' : 'Boost', up: mode === 'helicopter' ? 'Ascend' : 'Jump', down: 'Descend' };
+    const labels = {
+      boost: t(mode === 'person' || mode === 'cyclist' ? 'touch.sprint' : 'touch.boost'),
+      up: t(mode === 'helicopter' ? 'touch.ascend' : 'touch.jump'),
+      down: t('touch.descend')
+    };
     for (const button of this.buttons) {
       const action = button.getAttribute('data-touch-action');
       button.hidden = (action === 'up' && mode !== 'person' && mode !== 'helicopter') || (action === 'down' && mode !== 'helicopter');

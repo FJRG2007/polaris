@@ -37,24 +37,32 @@
       <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.4"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><path d="M12 2.5v3.1M12 18.4v3.1M2.5 12h3.1M18.4 12h3.1"/></symbol>
       <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
       <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m20 20-4.6-4.6"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4.5 7h15M4.5 12h15M4.5 17h15"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4.2 4.2 8.8-9.4"/></symbol>
+      <symbol id="i-exit" viewBox="0 0 24 24"><path d="M14 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H14M10 12h10M16.5 8.5 20 12l-3.5 3.5"/></symbol>
       <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></symbol>
     </defs>
   </svg>
 
   <!-- Loading Screen -->
-  <div id="loading-overlay" role="status" aria-live="polite">
+  <div id="loading-overlay" class="is-pending">
     <div class="loader">
       <span class="mta-bullet loader-bullet" aria-hidden="true">NY</span>
       <div class="loader-title">New York</div>
-      <div class="loader-track is-indeterminate" aria-hidden="true"><span id="loading-progress" class="loader-fill"></span></div>
-      <div id="loading-status">Initializing WebGPURenderer &amp; TSL Shaders...</div>
+      <div id="loading-bar" class="loader-steps" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="loader-step" data-stage="data"><span class="loader-track"><span class="loader-fill"></span></span><span class="loader-step-label" data-t="loading.step.data"></span></div>
+        <div class="loader-step" data-stage="build"><span class="loader-track"><span class="loader-fill"></span></span><span class="loader-step-label" data-t="loading.step.build"></span></div>
+        <div class="loader-step" data-stage="compile"><span class="loader-track"><span class="loader-fill"></span></span><span class="loader-step-label" data-t="loading.step.compile"></span></div>
+      </div>
+      <div id="loading-status" class="loader-status" role="status"><span id="loading-stage"></span><span id="loading-percent"></span></div>
+      <p class="loader-tip"><span class="loader-tip-label" data-t="loading.tip"></span><span id="loading-tip"></span></p>
     </div>
   </div>
 
-  <!-- 3D WebGPU Viewport Container -->
-  <main id="canvas-container" aria-label="3D Interactive New York Viewport"></main>
+  <!-- 3D viewport -->
+  <main id="canvas-container" data-t-aria="view"></main>
 
-  <!-- Top-Left: Brand & Renderer Telemetry -->
+  <!-- Top-Left: Brand -->
   <header class="hud hud-top-left">
     <div class="panel brand">
       <span class="mta-bullet" aria-hidden="true">NY</span>
@@ -62,7 +70,6 @@
         <div class="brand-heading">
           <h1>New York</h1>
         </div>
-        <div class="brand-subtitle">three.js · WebGPU · TSL · <span id="hud-fps" class="fps-ok">60</span> fps</div>
       </div>
     </div>
   </header>
@@ -70,43 +77,46 @@
   <!-- Top-Right Toolbar: Time of Day, Teleport, Map & Clean View -->
   <div class="hud hud-top-right">
     <div id="hud-toolbar" class="panel toolbar">
-      <div class="time-switch" role="group" aria-label="Atmosphere &amp; time of day">
-        <button id="time-golden" class="time-btn active" data-time="golden" type="button" title="Golden Hour">
-          <svg class="icon" aria-hidden="true"><use href="#i-golden"/></svg><span class="seg-label">Golden Hour</span>
+      <div class="time-switch" role="group" data-t-aria="time.group">
+        <button id="time-golden" class="time-btn active" data-time="golden" type="button" data-t-title="time.golden">
+          <svg class="icon" aria-hidden="true"><use href="#i-golden"/></svg><span class="seg-label" data-t="time.golden"></span>
         </button>
-        <button id="time-midday" class="time-btn" data-time="midday" type="button" title="Sunny Midday">
-          <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg><span class="seg-label">Midday</span>
+        <button id="time-midday" class="time-btn" data-time="midday" type="button" data-t-title="time.midday">
+          <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg><span class="seg-label" data-t="time.midday"></span>
         </button>
-        <button id="time-twilight" class="time-btn" data-time="twilight" type="button" title="Blue Hour">
-          <svg class="icon" aria-hidden="true"><use href="#i-twilight"/></svg><span class="seg-label">Blue Hour</span>
+        <button id="time-twilight" class="time-btn" data-time="twilight" type="button" data-t-title="time.twilight">
+          <svg class="icon" aria-hidden="true"><use href="#i-twilight"/></svg><span class="seg-label" data-t="time.twilight"></span>
         </button>
-        <button id="time-midnight" class="time-btn" data-time="midnight" type="button" title="Night 23:00">
-          <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><span class="seg-label">Night</span>
+        <button id="time-midnight" class="time-btn" data-time="midnight" type="button" data-t-title="time.midnight">
+          <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><span class="seg-label" data-t="time.midnight"></span>
         </button>
       </div>
       <span class="toolbar-divider" aria-hidden="true"></span>
-      <button id="btn-teleport" class="tool-btn" type="button" popovertarget="teleport-popover" title="Teleport the active player">
-        <svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><span class="tool-label">Teleport</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      <button id="btn-teleport" class="tool-btn" type="button" popovertarget="teleport-popover" data-t-title="toolbar.teleportHint">
+        <svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><span class="tool-label" data-t="toolbar.teleport"></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
       </button>
-      <button id="btn-open-map" class="tool-btn" type="button" title="Full New York City street map [M]">
-        <svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><span class="tool-label">Map</span><kbd>M</kbd>
+      <button id="btn-open-map" class="tool-btn" type="button" data-t-title="toolbar.mapHint" data-t-key="M">
+        <svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><span class="tool-label" data-t="toolbar.map"></span><kbd>M</kbd>
       </button>
-      <button id="btn-quality" class="tool-btn icon-only" type="button" popovertarget="quality-popover" title="Graphics quality" aria-label="Graphics quality">
+      <button id="btn-quality" class="tool-btn icon-only" type="button" popovertarget="quality-popover" data-t-title="toolbar.graphics" data-t-aria="toolbar.graphics">
         <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>
       </button>
       <span class="toolbar-divider" aria-hidden="true"></span>
-      <button id="btn-sound" class="tool-btn icon-only" type="button" title="Mute sound [N]" aria-label="Mute sound" aria-pressed="true">
+      <button id="btn-sound" class="tool-btn icon-only" type="button" aria-pressed="true">
         <svg class="icon" aria-hidden="true"><use href="#i-sound"/></svg>
       </button>
-      <button id="btn-toggle-hud" class="tool-btn icon-only" type="button" title="Clean view: hide the HUD [H]" aria-label="Hide HUD" aria-pressed="false">
+      <button id="btn-toggle-hud" class="tool-btn icon-only" type="button" aria-pressed="false">
         <svg class="icon icon-hide" aria-hidden="true"><use href="#i-eye"/></svg><svg class="icon icon-show" aria-hidden="true"><use href="#i-eye-off"/></svg>
+      </button>
+      <button id="btn-menu" class="tool-btn icon-only" type="button" aria-haspopup="dialog" data-t-aria="toolbar.menu">
+        <svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg>
       </button>
     </div>
   </div>
 
   <!-- Teleport Destinations (native popover: light-dismiss & Esc) -->
-  <div id="teleport-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" aria-label="Teleport the active player">
-    <div class="pop-title">Teleport to</div>
+  <div id="teleport-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-t-aria="toolbar.teleportHint">
+    <div class="pop-title" data-t="teleport.title"></div>
     <button id="tp-empire" class="pop-item tp-btn" data-teleport="empire" type="button"><span class="pop-name">Empire State Building</span><span class="pop-sub">5th Ave · Midtown</span></button>
     <button id="tp-timessq" class="pop-item tp-btn" data-teleport="timessq" type="button"><span class="pop-name">Times Square</span><span class="pop-sub">7th Ave · Theater District</span></button>
     <button id="tp-chrysler" class="pop-item tp-btn" data-teleport="chrysler" type="button"><span class="pop-name">Chrysler Building</span><span class="pop-sub">Lexington Ave · Midtown East</span></button>
@@ -118,18 +128,18 @@
   </div>
 
   <!-- Graphics quality: a change restarts the city at the new level -->
-  <div id="quality-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="hud-toolbar" aria-label="Graphics quality">
-    <div class="pop-title">Graphics</div>
-    <button class="pop-item tp-btn" data-quality="auto" type="button"><span class="pop-name">Auto</span><span id="quality-auto-sub" class="pop-sub">Picked for this device</span></button>
-    <button class="pop-item tp-btn" data-quality="low" type="button"><span class="pop-name">Low</span><span class="pop-sub">Fastest start, no shadows</span></button>
-    <button class="pop-item tp-btn" data-quality="medium" type="button"><span class="pop-name">Medium</span><span class="pop-sub">Shadows and glow</span></button>
-    <button class="pop-item tp-btn" data-quality="high" type="button"><span class="pop-name">High</span><span class="pop-sub">Shadows, reflections and glow</span></button>
+  <div id="quality-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="hud-toolbar" data-t-aria="quality.title">
+    <div class="pop-title" data-t="quality.title"></div>
+    <button class="pop-item tp-btn" data-quality="auto" type="button"><span class="pop-name" data-t="quality.auto"></span><span class="pop-sub quality-auto-sub"></span></button>
+    <button class="pop-item tp-btn" data-quality="low" type="button"><span class="pop-name" data-t="quality.low"></span><span class="pop-sub" data-t="quality.lowHint"></span></button>
+    <button class="pop-item tp-btn" data-quality="medium" type="button"><span class="pop-name" data-t="quality.medium"></span><span class="pop-sub" data-t="quality.mediumHint"></span></button>
+    <button class="pop-item tp-btn" data-quality="high" type="button"><span class="pop-name" data-t="quality.high"></span><span class="pop-sub" data-t="quality.highHint"></span></button>
   </div>
 
   <!-- Bottom-Left: Street-Name Signs & Live GPS Radar Minimap -->
   <div class="hud hud-bottom-left">
     <div id="hud-location" class="location" aria-live="off"></div>
-    <aside id="minimap-card" class="panel radar" aria-label="Live NYC Street Radar Minimap" title="Open the full New York City street map [M]">
+    <aside id="minimap-card" class="panel radar" data-t-aria="minimap" data-t-title="minimap" data-t-key="M">
       <canvas id="minimap-canvas"></canvas>
       <span class="radar-north" aria-hidden="true">N</span>
       <kbd class="radar-key">M</kbd>
@@ -139,42 +149,42 @@
   <!-- Bottom-Center: Third-Person Mode Switcher & Controls Guide -->
   <footer class="hud hud-bottom-center">
     <div id="hud-controls-hint" class="controls-hint"></div>
-    <nav id="mode-switch" class="panel mode-switch" aria-label="Third-Person Navigation Mode">
+    <nav id="mode-switch" class="panel mode-switch" data-t-aria="modes.group">
       <span class="mode-indicator" aria-hidden="true"></span>
-      <button id="mode-person" class="mode-btn" data-mode="person" type="button" title="Person [1]">
-        <svg class="icon" aria-hidden="true"><use href="#i-walk"/></svg><span class="mode-label">Walk</span><kbd>1</kbd>
+      <button id="mode-person" class="mode-btn" data-mode="person" type="button" data-t-title="modes.person" data-t-key="1">
+        <svg class="icon" aria-hidden="true"><use href="#i-walk"/></svg><span class="mode-label" data-t="modes.person"></span><kbd>1</kbd>
       </button>
-      <button id="mode-car" class="mode-btn active" data-mode="car" type="button" title="Car · Yellow Cab [2]">
-        <svg class="icon" aria-hidden="true"><use href="#i-car"/></svg><span class="mode-label">Drive</span><kbd>2</kbd>
+      <button id="mode-car" class="mode-btn active" data-mode="car" type="button" data-t-title="modes.car" data-t-key="2">
+        <svg class="icon" aria-hidden="true"><use href="#i-car"/></svg><span class="mode-label" data-t="modes.car"></span><kbd>2</kbd>
       </button>
-      <button id="mode-cyclist" class="mode-btn" data-mode="cyclist" type="button" title="Cyclist [3]">
-        <svg class="icon" aria-hidden="true"><use href="#i-bike"/></svg><span class="mode-label">Cycle</span><kbd>3</kbd>
+      <button id="mode-cyclist" class="mode-btn" data-mode="cyclist" type="button" data-t-title="modes.cyclist" data-t-key="3">
+        <svg class="icon" aria-hidden="true"><use href="#i-bike"/></svg><span class="mode-label" data-t="modes.cyclist"></span><kbd>3</kbd>
       </button>
-      <button id="mode-helicopter" class="mode-btn" data-mode="helicopter" type="button" title="Helicopter [4]">
-        <svg class="icon" aria-hidden="true"><use href="#i-heli"/></svg><span class="mode-label">Fly</span><kbd>4</kbd>
+      <button id="mode-helicopter" class="mode-btn" data-mode="helicopter" type="button" data-t-title="modes.helicopter" data-t-key="4">
+        <svg class="icon" aria-hidden="true"><use href="#i-heli"/></svg><span class="mode-label" data-t="modes.helicopter"></span><kbd>4</kbd>
       </button>
     </nav>
   </footer>
 
   <!-- Bottom-Right: Speed Cluster & Camera Switcher -->
   <div class="hud hud-bottom-right">
-    <section id="hud-cluster" class="panel cluster" aria-label="Vehicle telemetry and camera">
+    <section id="hud-cluster" class="panel cluster" data-t-aria="cluster.label">
       <div class="gauge">
         <div class="gauge-top">
-          <span id="hud-active-mode" class="gauge-label">NYC Yellow Taxi</span>
-          <span class="gauge-alt"><span class="gauge-alt-label">Alt</span> <span id="hud-altitude">0</span> ft</span>
+          <span id="hud-active-mode" class="gauge-label"></span>
+          <span class="gauge-alt"><span class="gauge-alt-label" data-t="cluster.altitude"></span> <span id="hud-altitude">0</span> <span data-t="cluster.feet"></span></span>
         </div>
-        <div class="gauge-speed"><span id="hud-speed">0</span><span class="gauge-unit">mph</span></div>
+        <div class="gauge-speed"><span id="hud-speed">0</span><span class="gauge-unit" data-t="cluster.mph"></span></div>
         <div class="gauge-meter" aria-hidden="true"><span id="hud-speed-meter"></span></div>
       </div>
       <div id="camera-switch" class="camera-switch">
-        <button id="cam-prev" class="icon-btn" type="button" title="Previous camera" aria-label="Previous camera">
+        <button id="cam-prev" class="icon-btn" type="button" data-t-title="cluster.prevCamera" data-t-aria="cluster.prevCamera">
           <svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg>
         </button>
-        <button id="cam-menu-btn" class="camera-current" type="button" popovertarget="camera-popover" title="All cameras [V cycles]">
-          <svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg><span id="hud-active-camera">3rd-Person Chase</span><kbd>V</kbd>
+        <button id="cam-menu-btn" class="camera-current" type="button" popovertarget="camera-popover" data-t-title="cluster.allCameras">
+          <svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg><span id="hud-active-camera"></span><kbd>V</kbd>
         </button>
-        <button id="cam-next" class="icon-btn" type="button" title="Next camera [V]" aria-label="Next camera">
+        <button id="cam-next" class="icon-btn" type="button" data-t-title="cluster.nextCamera" data-t-key="V" data-t-aria="cluster.nextCamera">
           <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg>
         </button>
       </div>
@@ -182,47 +192,47 @@
   </div>
 
   <!-- Touch input stays available in clean view; the map temporarily suspends it. -->
-  <section id="touch-controls" aria-label="Touch controls" hidden>
+  <section id="touch-controls" data-t-aria="touch.group" hidden>
     <div class="touch-movement">
-      <div id="touch-stick" role="group" aria-label="Movement joystick: drag up or down to move, left or right to turn">
+      <div id="touch-stick" role="group" data-t-aria="touch.stick">
         <span class="touch-stick-axis" aria-hidden="true"></span>
         <span id="touch-stick-knob" aria-hidden="true"></span>
       </div>
-      <span class="touch-caption">Move &amp; steer</span>
+      <span class="touch-caption" data-t="touch.move"></span>
     </div>
-    <p class="touch-look-hint">Drag to look · Pinch to zoom</p>
-    <div class="touch-actions" role="group" aria-label="Hold to perform an action">
-      <button class="touch-action" data-touch-action="up" type="button" aria-label="Jump" aria-pressed="false" hidden>
-        <span aria-hidden="true">↑</span><span data-touch-label="up">Jump</span>
+    <p class="touch-look-hint" data-t="touch.look"></p>
+    <div class="touch-actions" role="group" data-t-aria="touch.actions">
+      <button class="touch-action" data-touch-action="up" type="button" aria-pressed="false" hidden>
+        <span aria-hidden="true">↑</span><span data-touch-label="up"></span>
       </button>
-      <button class="touch-action" data-touch-action="down" type="button" aria-label="Descend" aria-pressed="false" hidden>
-        <span aria-hidden="true">↓</span><span data-touch-label="down">Descend</span>
+      <button class="touch-action" data-touch-action="down" type="button" aria-pressed="false" hidden>
+        <span aria-hidden="true">↓</span><span data-touch-label="down"></span>
       </button>
-      <button class="touch-action touch-boost" data-touch-action="boost" type="button" aria-label="Boost" aria-pressed="false">
-        <span aria-hidden="true">↟</span><span data-touch-label="boost">Boost</span>
+      <button class="touch-action touch-boost" data-touch-action="boost" type="button" aria-pressed="false">
+        <span aria-hidden="true">↟</span><span data-touch-label="boost"></span>
       </button>
     </div>
   </section>
 
   <!-- All Cameras: 3 Follow Cameras + 7 Iconic NYC Vantage Cameras + Auto-Director Drone -->
-  <div id="camera-popover" class="popover" popover data-side="above" data-anchor="hud-cluster" data-align="hud-cluster" aria-label="Multiple Camera Angles">
-    <div class="pop-title">Follow</div>
-    <button id="cam-chase" class="pop-item cam-btn active" data-camera="chase" type="button"><span class="pop-name">3rd-Person Chase</span><kbd>5</kbd></button>
-    <button id="cam-action" class="pop-item cam-btn" data-camera="action" type="button"><span class="pop-name">Low-Angle Action</span><kbd>6</kbd></button>
-    <button id="cam-pov" class="pop-item cam-btn" data-camera="pov" type="button"><span class="pop-name">First-Person / Cockpit</span><kbd>7</kbd></button>
-    <div class="pop-title">Scenic</div>
-    <button id="cam-centralPark" class="pop-item cam-btn" data-camera="centralPark" type="button"><span class="pop-name">Central Park Oasis</span></button>
-    <button id="cam-fifthAve" class="pop-item cam-btn" data-camera="fifthAve" type="button"><span class="pop-name">5th Ave &amp; Empire State</span><kbd>8</kbd></button>
-    <button id="cam-timesSquare" class="pop-item cam-btn" data-camera="timesSquare" type="button"><span class="pop-name">Times Square Crossroads</span><kbd>9</kbd></button>
-    <button id="cam-chryslerGCT" class="pop-item cam-btn" data-camera="chryslerGCT" type="button"><span class="pop-name">42nd St · Chrysler &amp; GCT</span><kbd>0</kbd></button>
-    <button id="cam-observatory" class="pop-item cam-btn" data-camera="observatory" type="button"><span class="pop-name">Empire State 86th Deck</span></button>
-    <button id="cam-bryantPark" class="pop-item cam-btn" data-camera="bryantPark" type="button"><span class="pop-name">Bryant Park &amp; NYPL</span></button>
-    <button id="cam-waterfront" class="pop-item cam-btn" data-camera="waterfront" type="button"><span class="pop-name">East River &amp; Skyline</span></button>
-    <button id="cam-drone" class="pop-item cam-btn" data-camera="drone" type="button"><span class="pop-name">Auto-Director Aerial</span></button>
+  <div id="camera-popover" class="popover" popover data-side="above" data-anchor="hud-cluster" data-align="hud-cluster" data-t-aria="cameras.group">
+    <div class="pop-title" data-t="cameras.follow"></div>
+    <button id="cam-chase" class="pop-item cam-btn active" data-camera="chase" type="button"><span class="pop-name" data-t="cameras.chase"></span><kbd>5</kbd></button>
+    <button id="cam-action" class="pop-item cam-btn" data-camera="action" type="button"><span class="pop-name" data-t="cameras.action"></span><kbd>6</kbd></button>
+    <button id="cam-pov" class="pop-item cam-btn" data-camera="pov" type="button"><span class="pop-name" data-t="cameras.pov"></span><kbd>7</kbd></button>
+    <div class="pop-title" data-t="cameras.scenic"></div>
+    <button id="cam-centralPark" class="pop-item cam-btn" data-camera="centralPark" type="button"><span class="pop-name" data-t="cameras.centralPark"></span></button>
+    <button id="cam-fifthAve" class="pop-item cam-btn" data-camera="fifthAve" type="button"><span class="pop-name" data-t="cameras.fifthAve"></span><kbd>8</kbd></button>
+    <button id="cam-timesSquare" class="pop-item cam-btn" data-camera="timesSquare" type="button"><span class="pop-name" data-t="cameras.timesSquare"></span><kbd>9</kbd></button>
+    <button id="cam-chryslerGCT" class="pop-item cam-btn" data-camera="chryslerGCT" type="button"><span class="pop-name" data-t="cameras.chryslerGCT"></span><kbd>0</kbd></button>
+    <button id="cam-observatory" class="pop-item cam-btn" data-camera="observatory" type="button"><span class="pop-name" data-t="cameras.observatory"></span></button>
+    <button id="cam-bryantPark" class="pop-item cam-btn" data-camera="bryantPark" type="button"><span class="pop-name" data-t="cameras.bryantPark"></span></button>
+    <button id="cam-waterfront" class="pop-item cam-btn" data-camera="waterfront" type="button"><span class="pop-name" data-t="cameras.waterfront"></span></button>
+    <button id="cam-drone" class="pop-item cam-btn" data-camera="drone" type="button"><span class="pop-name" data-t="cameras.drone"></span></button>
   </div>
 
   <!-- Full-Screen Interactive New York City Street Map ([M]) -->
-  <section id="fullmap-modal" class="fullmap-modal hidden" role="dialog" aria-modal="true" aria-label="Full New York City Interactive Street Map">
+  <section id="fullmap-modal" class="fullmap-modal hidden" role="dialog" aria-modal="true" data-t-aria="map.label">
     <div id="fullmap-canvas-wrap" class="fullmap-canvas-wrap">
       <canvas id="fullmap-canvas"></canvas>
     </div>
@@ -231,21 +241,21 @@
       <div class="panel fullmap-title">
         <span class="mta-bullet" aria-hidden="true">NY</span>
         <div>
-          <h2>Manhattan Street Atlas</h2>
-          <p id="fullmap-player-info" class="fullmap-subtitle">You are at 5th Ave &amp; 35th St</p>
+          <h2 data-t="map.title"></h2>
+          <p id="fullmap-player-info" class="fullmap-subtitle"></p>
         </div>
       </div>
       <label class="panel fullmap-search-wrap">
         <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
-        <input id="fullmap-search" class="fullmap-search" type="text" placeholder="Search streets &amp; landmarks — Broadway, Canal, Wall St…" aria-label="Search street or landmark" autocomplete="off" spellcheck="false" />
+        <input id="fullmap-search" class="fullmap-search" type="text" data-t-placeholder="map.searchHint" data-t-aria="map.search" autocomplete="off" spellcheck="false" />
       </label>
-      <button id="close-fullmap-btn" class="panel tool-btn fullmap-close" type="button" title="Close map [M / Esc]">
-        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg><span class="tool-label">Close</span><kbd>Esc</kbd>
+      <button id="close-fullmap-btn" class="panel tool-btn fullmap-close" type="button" data-t-title="map.closeMap" data-t-key="Esc">
+        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg><span class="tool-label" data-t="map.close"></span><kbd>Esc</kbd>
       </button>
     </div>
 
     <div class="map-controls">
-      <div class="panel map-compass" title="True north · Manhattan's street grid runs 29° east of it">
+      <div class="panel map-compass" data-t-title="map.compass">
         <svg viewBox="0 0 44 44" aria-hidden="true">
           <g id="map-compass-needle">
             <path d="M22 9.5 25.6 22h-7.2z" fill="#f05a4f"/>
@@ -255,29 +265,68 @@
         </svg>
       </div>
       <div class="panel map-zoom">
-        <button id="map-zoom-in" class="icon-btn" type="button" title="Zoom in" aria-label="Zoom in"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
-        <button id="map-zoom-out" class="icon-btn" type="button" title="Zoom out" aria-label="Zoom out"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
+        <button id="map-zoom-in" class="icon-btn" type="button" data-t-title="map.zoomIn" data-t-aria="map.zoomIn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
+        <button id="map-zoom-out" class="icon-btn" type="button" data-t-title="map.zoomOut" data-t-aria="map.zoomOut"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
       </div>
       <div class="panel map-zoom">
-        <button id="map-center-player" class="icon-btn" type="button" title="Street view around you" aria-label="Center on player"><svg class="icon" aria-hidden="true"><use href="#i-locate"/></svg></button>
-        <button id="map-view-all" class="icon-btn" type="button" title="All of Manhattan (125th St to Battery Park)" aria-label="Fit all of Manhattan"><svg class="icon" aria-hidden="true"><use href="#i-fit"/></svg></button>
+        <button id="map-center-player" class="icon-btn" type="button" data-t-title="map.center" data-t-aria="map.center"><svg class="icon" aria-hidden="true"><use href="#i-locate"/></svg></button>
+        <button id="map-view-all" class="icon-btn" type="button" data-t-title="map.fit" data-t-aria="map.fit"><svg class="icon" aria-hidden="true"><use href="#i-fit"/></svg></button>
       </div>
     </div>
 
     <div class="fullmap-footer">
       <div class="panel fullmap-status">
-        <span id="fullmap-hover-info">Click anywhere to teleport &amp; set your GPS route · Drag to pan · Scroll to zoom</span>
+        <span id="fullmap-hover-info"></span>
       </div>
     </div>
 
     <div class="panel fullmap-legend">
-      <span class="legend-item"><span class="legend-swatch player-swatch"></span>You</span>
-      <span class="legend-item"><span class="legend-swatch landmark-swatch"></span>Landmark</span>
-      <span class="legend-item"><span class="legend-swatch gps-swatch"></span>GPS route</span>
-      <span class="legend-item"><span class="legend-swatch bridge-swatch"></span>Bridge / Hwy</span>
+      <span class="legend-item"><span class="legend-swatch player-swatch"></span><span data-t="map.legend.you"></span></span>
+      <span class="legend-item"><span class="legend-swatch landmark-swatch"></span><span data-t="map.legend.landmark"></span></span>
+      <span class="legend-item"><span class="legend-swatch gps-swatch"></span><span data-t="map.legend.route"></span></span>
+      <span class="legend-item"><span class="legend-swatch bridge-swatch"></span><span data-t="map.legend.bridge"></span></span>
       <span id="fullmap-counts" class="legend-counts"></span>
     </div>
   </section>
+
+  <!-- Game menu (Esc): the game pauses while it is open -->
+  <dialog id="game-menu" class="game-menu" aria-labelledby="menu-title">
+    <div class="panel menu-panel">
+      <header class="menu-head">
+        <button class="icon-btn menu-back" type="button" data-menu-back hidden data-t-aria="menu.back" data-t-title="menu.back"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
+        <h2 id="menu-title"></h2>
+      </header>
+      <div class="menu-view" data-view="main">
+        <button class="menu-item" type="button" data-menu-action="resume"><span class="menu-name" data-t="menu.resume"></span><kbd>Esc</kbd></button>
+        <button class="menu-item" type="button" data-menu-open="graphics"><span class="menu-name" data-t="menu.graphics"></span><span class="menu-value" data-menu-value="graphics"></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+        <button class="menu-item" type="button" data-menu-open="controls"><span class="menu-name" data-t="menu.controls"></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+        <button class="menu-item" type="button" data-menu-open="sound"><span class="menu-name" data-t="menu.sound"></span><span class="menu-value" data-menu-value="sound"></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+        <button class="menu-item" type="button" data-menu-open="mode"><span class="menu-name" data-t="menu.mode"></span><span class="menu-value" data-menu-value="mode"></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+        <button class="menu-item menu-exit" type="button" data-menu-action="exit" hidden><svg class="icon" aria-hidden="true"><use href="#i-exit"/></svg><span class="menu-name" data-t="menu.exit"></span></button>
+      </div>
+      <div class="menu-view" data-view="graphics" hidden>
+        <button class="menu-item menu-option" data-quality="auto" type="button"><span class="menu-option-text"><span class="menu-name" data-t="quality.auto"></span><span class="menu-sub quality-auto-sub"></span></span><svg class="icon menu-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+        <button class="menu-item menu-option" data-quality="low" type="button"><span class="menu-option-text"><span class="menu-name" data-t="quality.low"></span><span class="menu-sub" data-t="quality.lowHint"></span></span><svg class="icon menu-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+        <button class="menu-item menu-option" data-quality="medium" type="button"><span class="menu-option-text"><span class="menu-name" data-t="quality.medium"></span><span class="menu-sub" data-t="quality.mediumHint"></span></span><svg class="icon menu-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+        <button class="menu-item menu-option" data-quality="high" type="button"><span class="menu-option-text"><span class="menu-name" data-t="quality.high"></span><span class="menu-sub" data-t="quality.highHint"></span></span><svg class="icon menu-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+        <p class="menu-note" data-t="quality.restart"></p>
+      </div>
+      <div class="menu-view" data-view="controls" hidden>
+        <div id="menu-controls" class="menu-controls"></div>
+      </div>
+      <div class="menu-view" data-view="sound" hidden>
+        <button id="menu-sound-toggle" class="menu-item menu-option" type="button" role="switch" aria-checked="true"><span class="menu-name" data-t="menu.soundOn"></span><span class="menu-switch" aria-hidden="true"></span></button>
+        <label class="menu-range"><span class="menu-name" data-t="menu.volume"></span><input id="menu-volume" type="range" min="0" max="100" step="5" value="100" /><output id="menu-volume-value" for="menu-volume"></output></label>
+        <p id="menu-sound-unavailable" class="menu-note" data-t="menu.noAudio" hidden></p>
+      </div>
+      <div class="menu-view" data-view="mode" hidden>
+        <button class="menu-item menu-option" data-mode="person" data-menu-close type="button"><svg class="icon" aria-hidden="true"><use href="#i-walk"/></svg><span class="menu-name" data-t="modes.person"></span><kbd>1</kbd><svg class="icon menu-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+        <button class="menu-item menu-option" data-mode="car" data-menu-close type="button"><svg class="icon" aria-hidden="true"><use href="#i-car"/></svg><span class="menu-name" data-t="modes.car"></span><kbd>2</kbd><svg class="icon menu-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+        <button class="menu-item menu-option" data-mode="cyclist" data-menu-close type="button"><svg class="icon" aria-hidden="true"><use href="#i-bike"/></svg><span class="menu-name" data-t="modes.cyclist"></span><kbd>3</kbd><svg class="icon menu-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+        <button class="menu-item menu-option" data-mode="helicopter" data-menu-close type="button"><svg class="icon" aria-hidden="true"><use href="#i-heli"/></svg><span class="menu-name" data-t="modes.helicopter"></span><kbd>4</kbd><svg class="icon menu-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+      </div>
+    </div>
+  </dialog>
 
 </body>
 </html>

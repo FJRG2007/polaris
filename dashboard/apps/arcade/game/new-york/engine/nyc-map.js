@@ -1,4 +1,5 @@
 import { GEO } from './nyc-geodata.js';
+import { formatNumber, onLocaleChange, t } from './i18n.js';
 import {
   ROADS,
   BLOCKS,
@@ -449,7 +450,14 @@ class NYCMapSystem {
     this.miniScale = RADAR_SCALE;
     this.miniCache = null; // { canvas, cx, cz, s, version }: the radar's ground layers, twice the radar's size
     const elCounts = document.getElementById('fullmap-counts');
-    if (elCounts) elCounts.textContent = `${ROAD_NAME_COUNT} streets · ${BLOCKS.length.toLocaleString('en-US')} blocks`;
+    const drawCounts = () => {
+      if (elCounts) elCounts.textContent = t('map.counts', { streets: formatNumber(ROAD_NAME_COUNT), blocks: formatNumber(BLOCKS.length) });
+    };
+    drawCounts();
+    onLocaleChange(() => {
+      drawCounts();
+      this.playerInfoText = '';
+    });
 
     // The map is drawn grid north up; the compass needle points to true north, 29° to its left
     const needle = document.getElementById('map-compass-needle');
@@ -595,7 +603,7 @@ class NYCMapSystem {
           const wPos = this.screenToWorld(mx, my, rect.width, rect.height);
           this.hoverWorld = wPos;
           if (this.elHoverInfo) {
-            this.elHoverInfo.textContent = `${getLocationLabel(wPos.x, wPos.z)} · Click to teleport here`;
+            this.elHoverInfo.textContent = t('map.hover', { place: getLocationLabel(wPos.x, wPos.z) });
           }
         }
       });
@@ -1106,7 +1114,7 @@ class NYCMapSystem {
 
     const ent = this.controllerManager.getActiveEntity();
     if (this.elPlayerInfo) {
-      const text = `You are at ${getLocationLabel(ent.position.x, ent.position.z)}`;
+      const text = t('map.youAreAt', { place: getLocationLabel(ent.position.x, ent.position.z) });
       if (text !== this.playerInfoText) {
         this.playerInfoText = text;
         this.elPlayerInfo.textContent = text;

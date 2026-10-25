@@ -36,6 +36,7 @@ class GamepadControls {
     this.suppressedButtons = [];
     this.syncButtons = true;
     this.revision = 0;
+    this.navDirection = 0; // the left stick's last up/down step through the menu
     this.focused = typeof document.hasFocus !== 'function' || document.hasFocus();
 
     window.addEventListener('blur', () => {
@@ -111,7 +112,9 @@ class GamepadControls {
     const edge = (i) => pressed[i] && !this.previousButtons[i] && !this.suppressedButtons[i];
     const held = (i) => pressed[i] && !this.suppressedButtons[i];
     // Capture edges before callbacks: changing mode or opening the map may synchronously call reset().
-    const toggleMap = edge(9), closeMap = edge(1);
+    // Start (9) is the game menu, Back (8) the map.
+    const toggleMenu = edge(9), toggleMap = edge(8), closeMap = edge(1);
+    const menuKeys = { up: edge(12), down: edge(13), left: edge(14), right: edge(15), accept: edge(0), back: edge(1) };
     const cycleMode = Number(Boolean(edge(5))) - Number(Boolean(edge(4)));
     const cycleCamera = edge(3), recenter = edge(11);
     this.previousButtons = pressed;
@@ -124,6 +127,27 @@ class GamepadControls {
       return;
     }
 
+    const menu = this.callbacks.menu;
+    if (menu?.isOpen) {
+      this.controller.clearGamepadInput();
+      const y = stick(pad, 0).y;
+      const direction = y > 0.6 ? 1 : y < -0.6 ? -1 : 0;
+      const stepped = direction !== this.navDirection ? direction : 0;
+      this.navDirection = direction;
+      if (toggleMenu) menu.close();
+      else if (menuKeys.back) menu.goBack();
+      else if (menuKeys.accept) menu.activate();
+      else if (menuKeys.up || stepped < 0) menu.move(-1);
+      else if (menuKeys.down || stepped > 0) menu.move(1);
+      else if (menuKeys.left || menuKeys.right) menu.adjust(menuKeys.right ? 1 : -1);
+      return;
+    }
+    if (toggleMenu && this.enabled) {
+      this.controller.clearGamepadInput();
+      menu?.open();
+      return;
+    }
+
     const revision = this.revision;
     if (toggleMap) {
       this.controller.clearGamepadInput();
@@ -132,7 +156,7 @@ class GamepadControls {
     }
     if (!this.enabled) {
       this.controller.clearGamepadInput();
-      for (let i = 0; i < BUTTON_COUNT; i++) if (i !== 1 && i !== 9) this.suppressedButtons[i] = pressed[i];
+      for (let i = 0; i < BUTTON_COUNT; i++) if (i !== 1 && i !== 8) this.suppressedButtons[i] = pressed[i];
       if (closeMap) this.callbacks.onCloseMap?.();
       return;
     }

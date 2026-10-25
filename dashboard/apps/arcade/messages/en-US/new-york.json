@@ -1,0 +1,212 @@
+{
+    "loading": {
+        "stage": {
+            "data": "Downloading the map",
+            "build": "Building the city",
+            "compile": "Preparing the graphics"
+        },
+        "step": {
+            "data": "Map",
+            "build": "City",
+            "compile": "Graphics"
+        },
+        "tip": "Tip",
+        "tips": {
+            "menu": "Press Esc for the menu: graphics, controls and sound.",
+            "modes": "Press 1 to 4 to walk, drive, cycle or fly.",
+            "map": "Press M for the map, then click a street to go there.",
+            "camera": "Press V to switch cameras.",
+            "boost": "Hold Shift to go faster.",
+            "hud": "Press H to hide everything but the city.",
+            "gamepad": "With a gamepad, Start opens the menu."
+        },
+        "touchTips": {
+            "stick": "Drag the stick to move and steer.",
+            "look": "Drag anywhere else to look around, pinch to zoom.",
+            "map": "Open the map and tap a street to go there.",
+            "menu": "The menu button at the top has graphics and sound."
+        }
+    },
+    "view": "New York city view",
+    "time": {
+        "group": "Time of day",
+        "golden": "Golden Hour",
+        "midday": "Midday",
+        "twilight": "Blue Hour",
+        "midnight": "Night"
+    },
+    "toolbar": {
+        "teleport": "Teleport",
+        "teleportHint": "Move the player to a landmark",
+        "map": "Map",
+        "mapHint": "Street map",
+        "graphics": "Graphics",
+        "mute": "Mute sound",
+        "unmute": "Turn sound on",
+        "noAudio": "Sound is not available in this browser.",
+        "hideHud": "Hide HUD",
+        "showHud": "Show HUD",
+        "menu": "Menu"
+    },
+    "teleport": {
+        "title": "Teleport to"
+    },
+    "quality": {
+        "title": "Graphics",
+        "auto": "Auto",
+        "autoHint": "Picked for this device",
+        "autoPicked": "{level} on this device",
+        "low": "Low",
+        "lowHint": "Fastest start, no shadows",
+        "medium": "Medium",
+        "mediumHint": "Shadows and glow",
+        "high": "High",
+        "highHint": "Shadows, reflections and glow",
+        "restart": "Changing it restarts the city where you are."
+    },
+    "modes": {
+        "group": "Way of getting around",
+        "person": "Walk",
+        "car": "Drive",
+        "cyclist": "Cycle",
+        "helicopter": "Fly"
+    },
+    "player": {
+        "person": "Pedestrian",
+        "car": "Yellow Taxi",
+        "cyclist": "Cyclist",
+        "helicopter": "Sightseeing Helicopter"
+    },
+    "cluster": {
+        "label": "Speed and camera",
+        "altitude": "Alt",
+        "feet": "ft",
+        "mph": "mph",
+        "prevCamera": "Previous camera",
+        "nextCamera": "Next camera",
+        "allCameras": "All cameras"
+    },
+    "cameras": {
+        "group": "Cameras",
+        "follow": "Follow",
+        "scenic": "Scenic",
+        "chase": "3rd-Person Chase",
+        "action": "Low-Angle Action",
+        "pov": "First-Person / Cockpit",
+        "centralPark": "Central Park Oasis",
+        "fifthAve": "5th Ave & Empire State",
+        "timesSquare": "Times Square Crossroads",
+        "chryslerGCT": "42nd St · Chrysler & GCT",
+        "observatory": "Empire State 86th Deck",
+        "bryantPark": "Bryant Park & NYPL",
+        "waterfront": "East River & Skyline",
+        "drone": "Auto-Director Aerial"
+    },
+    "minimap": "Street radar, opens the map",
+    "location": {
+        "near": "near"
+    },
+    "touch": {
+        "group": "Touch controls",
+        "stick": "Movement stick: drag up or down to move, left or right to turn",
+        "move": "Move and steer",
+        "look": "Drag to look · Pinch to zoom",
+        "actions": "Hold to perform an action",
+        "jump": "Jump",
+        "ascend": "Ascend",
+        "descend": "Descend",
+        "boost": "Boost",
+        "sprint": "Sprint"
+    },
+    "map": {
+        "label": "Street map",
+        "title": "Manhattan street map",
+        "youAreAt": "You are at {place}",
+        "search": "Search streets and landmarks",
+        "searchHint": "Broadway, Canal, Wall St…",
+        "close": "Close",
+        "closeMap": "Close the map",
+        "compass": "True north. Manhattan's street grid runs 29° east of it.",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "center": "Center on you",
+        "fit": "All of Manhattan",
+        "hint": "Click anywhere to go there · Drag to pan · Scroll to zoom",
+        "touchHint": "Tap to go there · Drag to pan · Use + and − to zoom",
+        "hover": "{place} · Click to go here",
+        "legend": {
+            "you": "You",
+            "landmark": "Landmark",
+            "route": "GPS route",
+            "bridge": "Bridge or highway"
+        },
+        "counts": "{streets} streets · {blocks} blocks"
+    },
+    "controls": {
+        "person": {
+            "move": "Walk",
+            "turn": "Turn",
+            "boost": "Sprint",
+            "up": "Jump",
+            "orbit": "Look around"
+        },
+        "car": {
+            "move": "Drive / Reverse",
+            "turn": "Steer",
+            "boost": "Boost",
+            "horn": "Horn",
+            "orbit": "Look around"
+        },
+        "cyclist": {
+            "move": "Pedal / Brake",
+            "turn": "Turn",
+            "boost": "Sprint",
+            "orbit": "Look around"
+        },
+        "helicopter": {
+            "move": "Pitch",
+            "turn": "Yaw",
+            "up": "Ascend",
+            "down": "Descend",
+            "boost": "Boost"
+        },
+        "drag": "Drag",
+        "general": "Everywhere",
+        "modes": "Change mode",
+        "camera": "Switch camera",
+        "cameraBack": "Previous camera",
+        "map": "Street map",
+        "hud": "Hide HUD",
+        "sound": "Sound on or off",
+        "menu": "Menu",
+        "gamepad": "Gamepad",
+        "leftStick": "Left stick",
+        "rightStick": "Right stick",
+        "padMove": "Move and steer",
+        "padLook": "Look around",
+        "padThrottle": "Throttle and brake",
+        "padLift": "Up and down",
+        "padJump": "Jump",
+        "padBoost": "Boost",
+        "padCamera": "Switch camera",
+        "padModes": "Change mode",
+        "padZoom": "Zoom",
+        "padMap": "Street map",
+        "padMenu": "Menu"
+    },
+    "menu": {
+        "title": "Paused",
+        "resume": "Resume",
+        "graphics": "Graphics",
+        "controls": "Controls",
+        "sound": "Sound",
+        "mode": "Mode",
+        "exit": "Exit game",
+        "back": "Back",
+        "on": "On",
+        "off": "Off",
+        "volume": "Volume",
+        "soundOn": "Play sound",
+        "noAudio": "Sound is not available in this browser."
+    }
+}

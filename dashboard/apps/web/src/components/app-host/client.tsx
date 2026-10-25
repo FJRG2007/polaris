@@ -87,6 +87,14 @@ const ShareDialog = dynamic(
 
 /** A face: its module brings the presence store, the photo viewer and the
  *  profile styles, which a screen that draws no face should not load. */
+const GameInviteDialog = dynamic(
+    () =>
+        import("@/components/arcade/game-invite-dialog").then((module) => module.GameInviteDialog),
+    { ssr: false }
+);
+const gameInviteAccess = () =>
+    import("@/app/(app)/chat/activity-card-actions").then((module) => module.gameInviteAccess());
+
 const Avatar = dynamic(() => import("@/components/avatar").then((module) => module.Avatar), {
     ssr: false
 });
@@ -162,6 +170,7 @@ const shareInstallAction = (...args: Parameters<AccessActions["shareInstallActio
 export const clientHost = {
     accessShareDialog: { ShareDialog },
     accountInput: { AccountInput },
+    arcadeInvite: { GameInviteDialog, gameInviteAccess },
     appAppsInstalledIdAccessActions: {
         installAccessAction,
         revokeInstallAccessAction,

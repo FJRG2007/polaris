@@ -6,7 +6,6 @@
     "multiplayer": "Para jugar en llamadas",
     "solo": "En solitario",
     "loading": "Cargando {game}",
-    "loadingCity": "Construyendo la ciudad",
     "failed": "El juego no pudo arrancar.",
     "retry": "Reintentar",
     "noGpu": "Este navegador no puede dibujar 3D. Prueba un Chrome, Edge, Firefox o Safari recientes.",
@@ -16,5 +15,10 @@
             "name": "Nueva York",
             "summary": "Recorre Manhattan a pie, en coche, en bici o en helicóptero."
         }
-    }
+    },
+    "invite": "Invitar a jugar",
+    "inviteDenied": "Un administrador ha desactivado los juegos en llamadas para tu cuenta.",
+    "inviteMissing": "Este juego no se puede jugar en grupo aquí.",
+    "fullscreen": "Pantalla total",
+    "exitFullscreen": "Volver al tamaño"
 }

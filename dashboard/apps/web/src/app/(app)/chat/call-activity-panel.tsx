@@ -16,7 +16,8 @@
  */
 
 import type { CallState } from "./call-state";
-import { Joystick, LogOut } from "lucide-react";
+import { Expand, Joystick, LogOut, Maximize2, Minimize2, Shrink } from "lucide-react";
+import { onActivityJoin, takeActivityJoin } from "./activity-join";
 import * as actions from "./call-activity-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallActivityHost } from "@/lib/app-extensions/types";
@@ -46,6 +47,9 @@ export interface CallActivity {
     readonly leave: () => void;
     /** What the game is handed while the reader plays. */
     readonly host: CallActivityHost | null;
+    /** Whether the game has the call's big place, the faces a strip under it. */
+    readonly focused: boolean;
+    readonly setFocused: (focused: boolean) => void;
 }
 
 /** How far the server's clock is ahead of this browser's, read off a pass it
@@ -191,10 +195,16 @@ export function useCallActivity(
         if (running) ask();
     }, [running, ask]);
 
+    // The card in the conversation stops counting the reader. Best effort:
+    // their pass running out does the same a few minutes later.
+    const held = useRef(false);
+    held.current = mine !== null;
     const leave = useCallback(() => {
+        if (held.current) void actions.leaveCallGame(meetingId).catch(() => undefined);
+        held.current = false;
         setMine(null);
         setActivity("");
-    }, [setActivity]);
+    }, [meetingId, setActivity]);
 
     const play = useCallback(
         (game: string) => {
@@ -223,7 +233,32 @@ export function useCallActivity(
     }, [mine, session, leave]);
 
     // Leaving the call, or closing it, ends taking part.
-    useEffect(() => () => setActivity(""), [setActivity]);
+    useEffect(
+        () => () => {
+            if (held.current) void actions.leaveCallGame(meetingId).catch(() => undefined);
+            setActivity("");
+        },
+        [meetingId, setActivity]
+    );
+
+    // A game asked for from its card, a notification or an invitation: played
+    // once the server has said whether the reader may.
+    const answered = answer?.ok === true;
+    useEffect(() => {
+        if (!enabled || !self) return;
+        const take = () => {
+            if (!answered) {
+                ask();
+                return;
+            }
+            const game = takeActivityJoin(meetingId);
+            if (game && !held.current) play(game);
+        };
+        take();
+        return onActivityJoin(take);
+    }, [enabled, self, answered, meetingId, ask, play]);
+
+    const [focused, setFocused] = useState(false);
 
     const nameOf = useCallback(
         (seat: string) =>
@@ -249,7 +284,9 @@ export function useCallActivity(
         ask,
         play,
         leave,
-        host
+        host,
+        focused: focused && playing,
+        setFocused
     };
 }
 
@@ -488,6 +525,7 @@ function refusal(
 export function CallGamesPanel({ activity }: { activity: CallActivity }) {
     const t = useTranslations("chat");
     const { session, playing, answer, host } = activity;
+    const [frame, setFrame] = useState<HTMLElement | null>(null);
     if (!session) return null;
     const game = activity.gameName(session.game) ?? t("callGames.someGame");
     const offer = answer?.ok ? answer.games.find((entry) => entry.id === session.game) : undefined;
@@ -526,8 +564,12 @@ export function CallGamesPanel({ activity }: { activity: CallActivity }) {
 
     return (
         <section
+            ref={setFrame}
             aria-label={game}
-            className="flex min-h-[16rem] min-w-0 flex-[2] flex-col overflow-hidden rounded-md border"
+            className={cn(
+                "flex min-h-[16rem] min-w-0 flex-col overflow-hidden rounded-md border bg-background",
+                activity.focused ? "flex-[6]" : "flex-[2]"
+            )}
         >
             <div className="flex min-w-0 shrink-0 items-center gap-2 border-b px-3 py-1.5 text-sm">
                 <Joystick className="size-4 shrink-0 text-muted-foreground" />
@@ -537,6 +579,21 @@ export function CallGamesPanel({ activity }: { activity: CallActivity }) {
                 <span className="shrink-0 text-xs text-muted-foreground">
                     {t("callGames.playing", { count: session.players.length })}
                 </span>
+                <button
+                    type="button"
+                    onClick={() => activity.setFocused(!activity.focused)}
+                    aria-pressed={activity.focused}
+                    aria-label={activity.focused ? t("callGames.unfocus") : t("callGames.focus")}
+                    title={activity.focused ? t("callGames.unfocus") : t("callGames.focus")}
+                    className="hidden shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:block"
+                >
+                    {activity.focused ? (
+                        <Minimize2 className="size-4" />
+                    ) : (
+                        <Maximize2 className="size-4" />
+                    )}
+                </button>
+                <FullscreenButton target={frame} />
                 <Button size="sm" variant="ghost" onClick={activity.leave}>
                     <LogOut className="size-4" />
                     {t("callGames.leave")}
@@ -548,5 +605,41 @@ export function CallGamesPanel({ activity }: { activity: CallActivity }) {
                 </div>
             </div>
         </section>
+    );
+}
+
+/** Whether this element is what the browser is showing full screen. */
+function useFullscreen(target: HTMLElement | null): boolean {
+    const [on, setOn] = useState(false);
+    useEffect(() => {
+        const read = () => setOn(target !== null && document.fullscreenElement === target);
+        read();
+        document.addEventListener("fullscreenchange", read);
+        return () => document.removeEventListener("fullscreenchange", read);
+    }, [target]);
+    return on;
+}
+
+/** Full screen for the game, and back. Escape leaves it too, as the browser
+ *  always allows; hidden where the browser offers no full screen. */
+function FullscreenButton({ target }: { target: HTMLElement | null }) {
+    const t = useTranslations("chat");
+    const on = useFullscreen(target);
+    if (!target || typeof document === "undefined" || !document.fullscreenEnabled) return null;
+    const label = on ? t("callGames.exitFullscreen") : t("callGames.fullscreen");
+    return (
+        <button
+            type="button"
+            onClick={() => {
+                if (on) void document.exitFullscreen().catch(() => undefined);
+                else void target.requestFullscreen().catch(() => undefined);
+            }}
+            aria-pressed={on}
+            aria-label={label}
+            title={label}
+            className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+            {on ? <Shrink className="size-4" /> : <Expand className="size-4" />}
+        </button>
     );
 }

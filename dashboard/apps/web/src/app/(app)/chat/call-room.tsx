@@ -537,7 +537,14 @@ export function CallRoom({
     const inlineStreams = place === "direct" && live === null ? stages : [];
     /** What the room is built around right now - see `stagingOf`, which is where
      *  the reasoning lives. */
-    const { showing, staged, enlarged } = stagingOf(inlineStreams.length > 0 ? [] : stages, live);
+    const {
+        showing,
+        staged: shareStaged,
+        enlarged
+    } = stagingOf(inlineStreams.length > 0 ? [] : stages, live);
+    // A game somebody pulled up to the big place takes it the way a screen
+    // does: the faces become the strip under it.
+    const staged = shareStaged || activity.focused;
 
     /**
      * Whether there is a camera sending anywhere in this call, this browser's

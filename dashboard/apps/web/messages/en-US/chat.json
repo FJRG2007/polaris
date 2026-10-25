@@ -1973,7 +1973,11 @@
         "playing": "{count, plural, one {# playing} other {# playing}}",
         "denied": "An admin has turned off games in calls for your account.",
         "missing": "Games is not installed on this Polaris. An admin can add it from the app store.",
-        "seat": "Join the call to play."
+        "seat": "Join the call to play.",
+        "focus": "Make the game bigger",
+        "unfocus": "Show the call again",
+        "fullscreen": "Full screen",
+        "exitFullscreen": "Exit full screen"
     },
     "deleteMessage": {
         "title": "Delete message",
@@ -1998,5 +2002,15 @@
         "remindsOn": "Reminds you on {date} at {time}.",
         "couldNotLoad": "Your reminders could not be loaded",
         "cancelFailed": "The reminder could not be canceled"
+    },
+    "activityCard": {
+        "started": "{name} started {game}",
+        "players": "{count, plural, one {# of {max} playing} other {# of {max} playing}}",
+        "ended": "Ended",
+        "playing": "Playing",
+        "full": "This game is full.",
+        "otherCall": "Leave your current call to join.",
+        "whoIsPlaying": "Who is playing",
+        "invited": "{name} invited you to play {game}"
     }
 }

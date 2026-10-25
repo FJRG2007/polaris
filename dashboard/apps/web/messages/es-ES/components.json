@@ -1695,5 +1695,25 @@
             "failed": "La nueva versión no ha arrancado, así que {name} sigue con la que tenía.",
             "noPrevious": "No hay una versión anterior de {name} a la que volver."
         }
+    },
+    "gameInvite": {
+        "title": "Invitar a {game}",
+        "intro": "Verán un botón Unirse en la conversación, y las personas que elijas recibirán una notificación. Jugáis en una llamada.",
+        "people": "Personas",
+        "peopleHint": "Busca a alguien",
+        "remove": "Quitar a {name}",
+        "conversation": "O una conversación",
+        "search": "Buscar conversaciones",
+        "none": "No hay conversaciones.",
+        "cancel": "Cancelar",
+        "send": "Invitar y jugar",
+        "failed": {
+            "invalid": "Elige personas o una conversación.",
+            "denied": "Un administrador ha desactivado los juegos en llamadas para tu cuenta.",
+            "missing": "Este juego no se puede jugar en grupo aquí.",
+            "limited": "Has enviado muchas invitaciones. Prueba de nuevo en unos minutos.",
+            "conversation": "No puedes invitar a esa conversación.",
+            "call": "No se pudo iniciar una llamada ahí. Inténtalo de nuevo."
+        }
     }
 }

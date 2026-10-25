@@ -6,7 +6,6 @@
     "multiplayer": "Play together in calls",
     "solo": "On your own",
     "loading": "Loading {game}",
-    "loadingCity": "Building the city",
     "failed": "The game could not start.",
     "retry": "Try again",
     "noGpu": "This browser cannot draw 3D. Try a recent Chrome, Edge, Firefox or Safari.",
@@ -16,5 +15,10 @@
             "name": "New York",
             "summary": "Explore Manhattan on foot, by car, by bike or by helicopter."
         }
-    }
+    },
+    "invite": "Invite to play",
+    "inviteDenied": "An admin has turned off games in calls for your account.",
+    "inviteMissing": "This game cannot be played together here.",
+    "fullscreen": "Full screen",
+    "exitFullscreen": "Exit full screen"
 }
