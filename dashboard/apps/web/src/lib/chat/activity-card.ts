@@ -37,8 +37,26 @@ export const INVITE_WAIT_MS = 3 * 60 * 1000;
 /** One player row as stored. */
 export interface PlayerRow {
     readonly userId: string;
+    readonly joinedAt?: Date;
     readonly seenAt: Date;
     readonly leftAt: Date | null;
+}
+
+/**
+ * How long a finished session was played: from the first player in to the last
+ * one out (or last seen, for somebody whose pass ran out), and never past the
+ * moment it was closed. Null when nobody ever played.
+ */
+export function sessionDuration(
+    players: readonly PlayerRow[],
+    endedAt: Date | null
+): number | null {
+    const starts = players.map((row) => (row.joinedAt ?? row.seenAt).getTime());
+    if (starts.length === 0) return null;
+    const start = Math.min(...starts);
+    let end = Math.max(...players.map((row) => (row.leftAt ?? row.seenAt).getTime()));
+    if (endedAt) end = Math.min(end, endedAt.getTime());
+    return Math.max(0, end - start);
 }
 
 /** Whether a player still counts: renewed within a pass's life, and not gone. */
@@ -90,7 +108,10 @@ export function joinRefusal(facts: JoinFacts): JoinRefusal | null {
 export interface ActivityCardView {
     readonly sessionId: string;
     readonly channelId: string;
-    readonly meetingId: string;
+    /** The call it is played in, or null for a lobby, which has none. */
+    readonly meetingId: string | null;
+    /** Where Join takes the reader: the lobby, or the call's conversation. */
+    readonly href: string;
     readonly game: string;
     readonly gameName: string;
     readonly startedBy: { readonly id: string; readonly name: string };
@@ -101,6 +122,10 @@ export interface ActivityCardView {
     readonly ended: boolean;
     readonly inGame: boolean;
     readonly refusal: JoinRefusal | null;
+    /** Once ended: who played (earliest first, at most what the card draws)
+     *  and for how long, or null when nobody ever did. */
+    readonly played: readonly { readonly id: string; readonly name: string }[];
+    readonly durationMs: number | null;
 }
 
 /** The input the invite action takes. One destination: a conversation the
@@ -123,9 +148,49 @@ export const inviteInputSchema = z.union([
 
 export type InviteInput = z.infer<typeof inviteInputSchema>;
 
+/** Inviting more people to a session already running: from its lobby or its
+ *  call's game panel. */
+export const sessionInviteSchema = z
+    .object({
+        sessionId: z.string().uuid(),
+        userIds: z.array(z.string().uuid()).min(1).max(9)
+    })
+    .strict();
+
+/** How long an invitation is offered for, at most. It also ends with the
+ *  session, whichever comes first. */
+export const INVITE_TTL_MS = 15 * 60 * 1000;
+
+/** Whether an invitation is still offered: not declined, not expired, and its
+ *  session still running. */
+export function inviteOpen(
+    invite: { readonly expiresAt: Date; readonly declinedAt: Date | null },
+    sessionOver: boolean,
+    now: number
+): boolean {
+    return !sessionOver && invite.declinedAt === null && invite.expiresAt.getTime() > now;
+}
+
 /** How many invitations one person may send, and in what window. */
 export const INVITE_LIMIT = 10;
 export const INVITE_WINDOW_MS = 10 * 60 * 1000;
+
+/** Where a lobby is played: its own page, with no call around it. */
+export function lobbyHref(sessionId: string): string {
+    return `/chat/play/${sessionId}`;
+}
+
+/** The media server room a lobby's players meet in - data only, nobody
+ *  publishes a microphone or a camera there. */
+export function lobbyRoom(sessionId: string): string {
+    return `arcade-${sessionId}`;
+}
+
+/** What a lobby's passes are signed for, in place of a call: never the id of a
+ *  meeting, so a pass for a lobby is worth nothing in a call and back. */
+export function lobbyPassScope(sessionId: string): string {
+    return `lobby:${sessionId}`;
+}
 
 /** Where joining from a card or a notification takes the reader. */
 export function joinHref(channelId: string, sessionId: string): string {

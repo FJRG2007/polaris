@@ -61,6 +61,7 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/chat/c/[channelId]/[[...section]]", kind: "chat channel", id: "channelId" },
     { route: "/chat/i/[code]", kind: null },
     { route: "/chat/meetings/[meetingId]", kind: "meeting", id: "meetingId" },
+    { route: "/chat/play/[sessionId]", kind: "game lobby", id: "sessionId" },
     { route: "/chat/s/[spaceId]/[[...section]]", kind: "chat space", id: "spaceId" },
     { route: "/chat/with/[userId]", kind: "direct conversation", id: "userId" },
     { route: "/crm/[[...path]]", kind: null },

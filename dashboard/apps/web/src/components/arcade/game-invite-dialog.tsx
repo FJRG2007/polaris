@@ -2,10 +2,15 @@
 
 /**
  * Invite people to play a game: a conversation the reader is in, or people to
- * play with. Sending it opens the game in that conversation's call, posts its
- * card there and tells the people invited; the reader is taken to the call,
- * where the game starts. Lent to the Games app through the host's client
- * pieces, because the Games page cannot reach chat on its own.
+ * play with. Sending it opens a lobby for the game - no call starts and nothing
+ * rings - posts its card in the conversation and offers the invitation to the
+ * people invited; the reader is taken to the lobby. Lent to the Games app
+ * through the host's client pieces, because the Games page cannot reach chat on
+ * its own.
+ *
+ * Given a `sessionId`, it invites people into that running session instead -
+ * the "Invite friends" of a lobby or of a call's game panel - and stays where
+ * the reader is.
  */
 
 import { useRouter } from "next/navigation";
@@ -27,6 +32,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     gameInviteTargets,
     inviteToGame,
+    inviteToSession,
     type InviteRefusal,
     type InviteTarget
 } from "@/app/(app)/chat/activity-card-actions";
@@ -37,10 +43,13 @@ const PEOPLE_MAX = 9;
 export function GameInviteDialog({
     game,
     gameName,
+    sessionId,
     onClose
 }: {
     game: string;
     gameName: string;
+    /** A running session to invite people into, instead of a new lobby. */
+    sessionId?: string;
     onClose: () => void;
 }) {
     const t = useTranslations("components");
@@ -52,6 +61,7 @@ export function GameInviteDialog({
     const [typed, setTyped] = useState("");
     const [busy, setBusy] = useState(false);
     const [failed, setFailed] = useState<InviteRefusal | null>(null);
+    const [sent, setSent] = useState<{ invited: number; skipped: number } | null>(null);
 
     useEffect(() => {
         let live = true;
@@ -72,11 +82,22 @@ export function GameInviteDialog({
         return found.slice(0, 50);
     }, [targets, search]);
 
-    const ready = channelId !== null || people.length > 0;
+    const ready = sessionId ? people.length > 0 : channelId !== null || people.length > 0;
     const send = () => {
         if (!ready || busy) return;
         setBusy(true);
         setFailed(null);
+        if (sessionId) {
+            void inviteToSession({ sessionId, userIds: people.map((person) => person.id) })
+                .then((answer) => {
+                    if (!answer.ok) return setFailed(answer.reason);
+                    setPeople([]);
+                    setSent({ invited: answer.invited, skipped: answer.skipped });
+                })
+                .catch(() => setFailed("failed"))
+                .finally(() => setBusy(false));
+            return;
+        }
         const input = channelId
             ? { game, channelId }
             : { game, userIds: people.map((person) => person.id) };
@@ -87,7 +108,7 @@ export function GameInviteDialog({
                     router.push(answer.href);
                 } else setFailed(answer.reason);
             })
-            .catch(() => setFailed("call"))
+            .catch(() => setFailed("failed"))
             .finally(() => setBusy(false));
     };
 
@@ -96,7 +117,9 @@ export function GameInviteDialog({
             <DialogContent className="flex max-h-[85vh] max-w-md flex-col">
                 <DialogHeader>
                     <DialogTitle>{t("gameInvite.title", { game: gameName })}</DialogTitle>
-                    <DialogDescription>{t("gameInvite.intro")}</DialogDescription>
+                    <DialogDescription>
+                        {sessionId ? t("gameInvite.introSession") : t("gameInvite.intro")}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain">
@@ -153,68 +176,83 @@ export function GameInviteDialog({
                         )}
                     </div>
 
-                    <div className="flex min-h-0 flex-col gap-1.5">
-                        <span className="text-sm font-medium">{t("gameInvite.conversation")}</span>
-                        <Input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder={t("gameInvite.search")}
-                            aria-label={t("gameInvite.search")}
-                        />
-                        {targets === null ? (
-                            <ul className="flex flex-col gap-1" aria-hidden>
-                                {[0, 1, 2].map((row) => (
-                                    <li
-                                        key={row}
-                                        className="h-9 animate-pulse rounded-md bg-muted"
-                                    />
-                                ))}
-                            </ul>
-                        ) : shown.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("gameInvite.none")}</p>
-                        ) : (
-                            <ul
-                                className="flex flex-col gap-0.5"
-                                role="listbox"
-                                aria-label={t("gameInvite.conversation")}
-                            >
-                                {shown.map((target) => {
-                                    const Icon =
-                                        target.kind === "voice"
-                                            ? Volume2
-                                            : target.kind === "text"
-                                              ? Hash
-                                              : Users;
-                                    const picked = channelId === target.id;
-                                    return (
-                                        <li key={target.id} role="option" aria-selected={picked}>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setPeople([]);
-                                                    setChannelId(picked ? null : target.id);
-                                                }}
-                                                className={cn(
-                                                    "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted",
-                                                    picked && "bg-primary/10 text-primary"
-                                                )}
+                    {!sessionId && (
+                        <div className="flex min-h-0 flex-col gap-1.5">
+                            <span className="text-sm font-medium">
+                                {t("gameInvite.conversation")}
+                            </span>
+                            <Input
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder={t("gameInvite.search")}
+                                aria-label={t("gameInvite.search")}
+                            />
+                            {targets === null ? (
+                                <ul className="flex flex-col gap-1" aria-hidden>
+                                    {[0, 1, 2].map((row) => (
+                                        <li
+                                            key={row}
+                                            className="h-9 animate-pulse rounded-md bg-muted"
+                                        />
+                                    ))}
+                                </ul>
+                            ) : shown.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    {t("gameInvite.none")}
+                                </p>
+                            ) : (
+                                <ul
+                                    className="flex flex-col gap-0.5"
+                                    role="listbox"
+                                    aria-label={t("gameInvite.conversation")}
+                                >
+                                    {shown.map((target) => {
+                                        const Icon =
+                                            target.kind === "voice"
+                                                ? Volume2
+                                                : target.kind === "text"
+                                                  ? Hash
+                                                  : Users;
+                                        const picked = channelId === target.id;
+                                        return (
+                                            <li
+                                                key={target.id}
+                                                role="option"
+                                                aria-selected={picked}
                                             >
-                                                <Icon className="size-4 shrink-0 text-muted-foreground" />
-                                                <span
-                                                    className="min-w-0 flex-1 truncate"
-                                                    title={target.name}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPeople([]);
+                                                        setChannelId(picked ? null : target.id);
+                                                    }}
+                                                    className={cn(
+                                                        "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted",
+                                                        picked && "bg-primary/10 text-primary"
+                                                    )}
                                                 >
-                                                    {target.name}
-                                                </span>
-                                            </button>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        )}
-                    </div>
+                                                    <Icon className="size-4 shrink-0 text-muted-foreground" />
+                                                    <span
+                                                        className="min-w-0 flex-1 truncate"
+                                                        title={target.name}
+                                                    >
+                                                        {target.name}
+                                                    </span>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+                    )}
                 </div>
-
+                {sent && (
+                    <p role="status" className="text-sm text-muted-foreground">
+                        {t("gameInvite.sent", { count: sent.invited })}
+                        {sent.skipped > 0 && ` ${t("gameInvite.skipped", { count: sent.skipped })}`}
+                    </p>
+                )}
                 {failed && (
                     <p role="alert" className="text-sm text-danger">
                         {t(`gameInvite.failed.${failed}`)}
@@ -222,7 +260,7 @@ export function GameInviteDialog({
                 )}
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        {t("gameInvite.cancel")}
+                        {sent ? t("gameInvite.done") : t("gameInvite.cancel")}
                     </Button>
                     <Button onClick={send} disabled={!ready || busy}>
                         {busy && <Loader2 className="size-4 animate-spin" />}

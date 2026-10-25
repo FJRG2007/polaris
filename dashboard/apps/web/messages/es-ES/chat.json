@@ -1959,7 +1959,7 @@
     "callDoNotDisturb": "{name} está en No molestar",
     "callDoNotDisturbBody": "Ve la llamada, pero no le suena.",
     "callGames": {
-        "button": "Juegos",
+        "button": "Actividades",
         "title": "Jugar juntos",
         "synced": "Todos en la llamada pueden unirse. Los jugadores ven dónde está cada uno y qué conduce; cada navegador ejecuta su propia ciudad.",
         "checking": "Comprobando...",
@@ -1977,7 +1977,8 @@
         "focus": "Agrandar el juego",
         "unfocus": "Volver a ver la llamada",
         "fullscreen": "Pantalla total",
-        "exitFullscreen": "Volver al tamaño"
+        "exitFullscreen": "Volver al tamaño",
+        "invite": "Invitar amigos"
     },
     "deleteMessage": {
         "title": "Borrar mensaje",
@@ -2011,6 +2012,26 @@
         "full": "Esta partida está llena.",
         "otherCall": "Sal de tu llamada actual para unirte.",
         "whoIsPlaying": "Quién juega",
-        "invited": "{name} te ha invitado a jugar a {game}"
+        "invited": "{name} te ha invitado a jugar a {game}",
+        "expired": "Invitación caducada",
+        "endedPlayed": "Terminado - {time} - {names}"
+    },
+    "gameInvites": {
+        "label": "Invitaciones",
+        "noCall": "Sin llamada, solo el juego",
+        "inCall": "En una llamada",
+        "decline": "Rechazar"
+    },
+    "lobby": {
+        "title": "Juego",
+        "back": "Volver",
+        "refused": {
+            "missing": "Este juego no está instalado aquí.",
+            "denied": "No tienes permiso para jugar.",
+            "ended": "Esta partida ha terminado.",
+            "full": "Esta partida está llena.",
+            "access": "Esta invitación no es para ti o ha caducado.",
+            "server": "No se pudo conectar con el servidor del juego. Inténtalo en un momento."
+        }
     }
 }

@@ -70,6 +70,8 @@ import { LiveBadge } from "./call-roster";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
 import { CallGamesButton, CallGamesPanel, useCallActivity } from "./call-activity-panel";
+import { callSessionId } from "./activity-card-actions";
+import { GameInviteDialog } from "@/components/arcade/game-invite-dialog";
 import { useCallVolume } from "./call-volumes";
 import { MicLevelMeter } from "./mic-level-meter";
 import { GAIN_MAX, GAIN_MIN, useMicGain } from "./mic-gain";
@@ -240,6 +242,8 @@ export function CallRoom({
     const ts = useTranslations("shortcuts");
     // Games played together in this call - see `call-activity-panel`.
     const activity = useCallActivity(meetingId, call, Boolean(viewerId));
+    // Inviting more people to the call's game, from its panel.
+    const [gameInvite, setGameInvite] = useState<{ id: string; game: string } | null>(null);
     // The key in force for deafening, named in its control's title.
     const deafenKey = useShortcutHint("chat.toggleDeafen");
     const withKey = (label: string) =>
@@ -814,7 +818,26 @@ export function CallRoom({
 
             {/* A game somebody started in the call: offered to the others, and
                 played here by whoever joined. */}
-            {viewerId && <CallGamesPanel activity={activity} />}
+            {viewerId && (
+                <CallGamesPanel
+                    activity={activity}
+                    onInvite={() => {
+                        const game = activity.session?.game;
+                        if (!game) return;
+                        void callSessionId(meetingId, game)
+                            .then((id) => id && setGameInvite({ id, game }))
+                            .catch(() => undefined);
+                    }}
+                />
+            )}
+            {gameInvite && (
+                <GameInviteDialog
+                    sessionId={gameInvite.id}
+                    game={gameInvite.game}
+                    gameName={activity.gameName(gameInvite.game) ?? ""}
+                    onClose={() => setGameInvite(null)}
+                />
+            )}
 
             {waiting && waiting.length > 0 && (
                 <ul className="flex flex-col gap-1">

@@ -23,7 +23,8 @@
             "playing": "Jugando a {name}"
         },
         "openInSpotify": "Abrir en Spotify",
-        "fromStart": "Empieza desde el principio, no sincronizada."
+        "fromStart": "Empieza desde el principio, no sincronizada.",
+        "joinGame": "Unirse"
     },
     "activityTable": {
         "when": "Cuándo",
@@ -1698,7 +1699,7 @@
     },
     "gameInvite": {
         "title": "Invitar a {game}",
-        "intro": "Verán un botón Unirse en la conversación, y las personas que elijas recibirán una notificación. Jugáis en una llamada.",
+        "intro": "Reciben una invitación para unirse. No se inicia ninguna llamada.",
         "people": "Personas",
         "peopleHint": "Busca a alguien",
         "remove": "Quitar a {name}",
@@ -1713,7 +1714,12 @@
             "missing": "Este juego no se puede jugar en grupo aquí.",
             "limited": "Has enviado muchas invitaciones. Prueba de nuevo en unos minutos.",
             "conversation": "No puedes invitar a esa conversación.",
-            "call": "No se pudo iniciar una llamada ahí. Inténtalo de nuevo."
-        }
+            "ended": "Esta partida ha terminado.",
+            "failed": "No se pudo abrir el juego. Inténtalo de nuevo."
+        },
+        "introSession": "Elige a quién invitar a esta partida.",
+        "sent": "{count, plural, one {# invitado.} other {# invitados.}}",
+        "skipped": "{count, plural, one {# no está en la conversación de esta llamada.} other {# no están en la conversación de esta llamada.}}",
+        "done": "Hecho"
     }
 }

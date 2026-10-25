@@ -157,6 +157,15 @@ export async function GET(request: Request): Promise<Response> {
                 //
                 // Their own browser is skipped: it changed it, and it already
                 // redrew.
+                // An invitation to play: to the people invited and nobody else,
+                // with the session's id alone - the toast reads the invitation
+                // through the check that decides whether it is theirs.
+                if (change.kind === "game-invite") {
+                    if (!change.sessionId || !change.audience?.includes(actor.id)) return;
+                    send({ kind: "game-invite", sessionId: change.sessionId });
+                    return;
+                }
+
                 if (change.kind === "appearance") {
                     if (change.actorId === actor.id) return;
                     if (!change.channels?.some((id) => scope.reachable().has(id))) return;

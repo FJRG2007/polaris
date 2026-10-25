@@ -22,7 +22,12 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { announceActivity } from "./live";
 import { allowedBy } from "@/lib/privacy-service";
-import { playingNowFor } from "@/lib/app-extensions/registry";
+import { can } from "@polaris/auth";
+import { callActivityGames, playingNowFor } from "@/lib/app-extensions/registry";
+import { getUserLocale } from "@/lib/i18n/locale-service";
+import { isAppInstalled } from "@/lib/apps/install-presence";
+import { joinHref, lobbyHref } from "@/lib/chat/activity-card";
+import { MAX_PLAYERS, PASS_TTL_MS } from "@/lib/chat/call-activity";
 import { activitySettingsFor, activitySettingsOf, rememberSeenGame } from "./settings";
 
 /** The sources that are stored here rather than looked up. */
@@ -249,7 +254,7 @@ export async function activitiesFor(
         core.activitySourceOn(settings.get(id) ?? core.DEFAULT_ACTIVITY_SETTINGS, "minecraft")
     );
 
-    const [rows, playing] = await Promise.all([
+    const [rows, playing, together] = await Promise.all([
         prisma.userActivity.findMany({
             where: { userId: { in: sharing }, expiresAt: { gt: now } },
             select: {
@@ -265,8 +270,16 @@ export async function activitiesFor(
                 endsAt: true
             }
         }),
-        playingNowFor(onMinecraft).catch(() => new Map())
+        playingNowFor(onMinecraft).catch(() => new Map()),
+        playingTogetherFor(
+            viewer,
+            sharing.filter((id) =>
+                core.activitySourceOn(settings.get(id) ?? core.DEFAULT_ACTIVITY_SETTINGS, "game")
+            ),
+            now
+        ).catch(() => new Map<string, core.ActivityView>())
     ]);
+    for (const [userId, view] of together) push(answer, userId, view);
 
     for (const row of rows) {
         const source = row.source as core.ActivitySource;
@@ -316,6 +329,93 @@ export async function activitiesFor(
         answer.set(userId, kept);
     }
     return answer;
+}
+
+/**
+ * Games played together here (the Games app's sessions, in a lobby or a call):
+ * "Playing New York", with "Join game" for a reader who may join it - holding
+ * `arcade.calls`, in the session's conversation or invited to it, and while it
+ * has room. One query for the players, one for the reader's memberships.
+ */
+async function playingTogetherFor(
+    viewer: { id: string; isAdmin: boolean },
+    ids: readonly string[],
+    now: Date
+): Promise<Map<string, core.ActivityView>> {
+    const found = new Map<string, core.ActivityView>();
+    if (ids.length === 0 || !(await isAppInstalled("arcade"))) return found;
+    const since = new Date(now.getTime() - PASS_TTL_MS);
+    const rows = await prisma.arcadeSessionPlayer.findMany({
+        where: {
+            userId: { in: [...ids] },
+            leftAt: null,
+            seenAt: { gt: since },
+            session: { endedAt: null }
+        },
+        select: {
+            userId: true,
+            joinedAt: true,
+            session: {
+                select: {
+                    id: true,
+                    meetingId: true,
+                    channelId: true,
+                    game: true,
+                    _count: {
+                        select: { players: { where: { leftAt: null, seenAt: { gt: since } } } }
+                    },
+                    invites: {
+                        where: { userId: viewer.id, declinedAt: null, expiresAt: { gt: now } },
+                        select: { userId: true },
+                        take: 1
+                    }
+                }
+            }
+        },
+        take: 200
+    });
+    if (rows.length === 0) return found;
+    const [games, mayPlay, memberships] = await Promise.all([
+        callActivityGames(await getUserLocale(viewer.id)),
+        can(viewer.id, "arcade.calls"),
+        prisma.chatChannelMember.findMany({
+            where: {
+                userId: viewer.id,
+                channelId: { in: [...new Set(rows.map((row) => row.session.channelId))] }
+            },
+            select: { channelId: true }
+        })
+    ]);
+    const member = new Set(memberships.map((row) => row.channelId));
+    for (const row of rows) {
+        const game = games.find((entry) => entry.id === row.session.game);
+        if (!game || found.has(row.userId)) continue;
+        const lobby = row.session.meetingId === null;
+        const reachable =
+            member.has(row.session.channelId) || (lobby && row.session.invites.length > 0);
+        const joinable =
+            row.userId !== viewer.id &&
+            mayPlay &&
+            reachable &&
+            row.session._count.players < MAX_PLAYERS;
+        found.set(row.userId, {
+            source: "game",
+            key: `arcade:${row.session.id}`,
+            name: game.name,
+            details: "",
+            state: "",
+            imageUrl: null,
+            linkUrl: null,
+            startedAt: row.joinedAt.toISOString(),
+            endsAt: null,
+            joinUrl: joinable
+                ? lobby
+                    ? lobbyHref(row.session.id)
+                    : joinHref(row.session.channelId, row.session.id)
+                : null
+        });
+    }
+    return found;
 }
 
 function push(
