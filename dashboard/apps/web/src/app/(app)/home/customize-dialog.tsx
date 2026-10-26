@@ -12,14 +12,28 @@
  * Every change applies to the grid behind the panel as it is made, so the effect
  * of a choice is visible while the choice is being made rather than after
  * closing a modal.
+ *
+ * The rows are every card on the grid, the Overview's own and the apps', in the
+ * one order the grid draws them in.
  */
 
+/** One card as the panel lists it. */
+export interface CustomizeRow {
+    key: OverviewCardKey;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    /** The widths it can be drawn at; one or none means it has no choice. */
+    sizes: readonly OverviewWidgetSize[];
+    size: OverviewWidgetSize;
+    hidden: boolean;
+}
+
 import { useState } from "react";
-import { overviewWidget } from "@/lib/overview/catalog";
-import { sizeLabel, widgetDescription, widgetLabel } from "./widget-names";
+import { sizeLabel } from "./widget-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ArrowDown, ArrowUp, GripVertical, RotateCcw } from "lucide-react";
-import type { OverviewWidgetId, OverviewWidgetPreference, OverviewWidgetSize } from "@polaris/core";
+import { ArrowDown, ArrowUp, GripVertical, RotateCcw, type LucideIcon } from "lucide-react";
+import type { OverviewCardKey, OverviewWidgetSize } from "@polaris/core";
 import {
     Button,
     Dialog,
@@ -46,13 +60,13 @@ export function CustomizeDialog({
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    layout: readonly OverviewWidgetPreference[];
+    layout: readonly CustomizeRow[];
     greeting: boolean;
-    onMove: (id: OverviewWidgetId, direction: -1 | 1) => void;
+    onMove: (key: OverviewCardKey, direction: -1 | 1) => void;
     /** Put one card where another one is, for a row that was dragged onto it. */
-    onMoveOnto: (id: OverviewWidgetId, target: OverviewWidgetId) => void;
-    onToggle: (id: OverviewWidgetId, visible: boolean) => void;
-    onResize: (id: OverviewWidgetId, size: OverviewWidgetSize) => void;
+    onMoveOnto: (key: OverviewCardKey, target: OverviewCardKey) => void;
+    onToggle: (key: OverviewCardKey, visible: boolean) => void;
+    onResize: (key: OverviewCardKey, size: OverviewWidgetSize) => void;
     onGreetingChange: (greeting: boolean) => void;
     onReset: () => void;
     /** More to choose from under the Overview's own cards - the installed
@@ -60,8 +74,8 @@ export function CustomizeDialog({
     extra?: React.ReactNode;
 }) {
     const t = useTranslations("home");
-    const [dragged, setDragged] = useState<OverviewWidgetId | null>(null);
-    const [over, setOver] = useState<OverviewWidgetId | null>(null);
+    const [dragged, setDragged] = useState<OverviewCardKey | null>(null);
+    const [over, setOver] = useState<OverviewCardKey | null>(null);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -72,33 +86,30 @@ export function CustomizeDialog({
 
                 <ul className="-mx-1 max-h-[min(60vh,26rem)] overflow-y-auto overscroll-contain px-1">
                     {layout.map((widget, index) => {
-                        const entry = overviewWidget(widget.id);
-                        const Icon = entry.icon;
-                        const label = widgetLabel(t, widget.id, entry.label);
-                        const description = widgetDescription(t, widget.id, entry.description);
+                        const { icon: Icon, label, description } = widget;
                         return (
                             <li
-                                key={widget.id}
+                                key={widget.key}
                                 className={cn(
                                     "flex items-center gap-3 border-b border-border/60 py-3 last:border-b-0",
                                     widget.hidden && "opacity-60",
-                                    dragged === widget.id && "opacity-40",
-                                    over === widget.id &&
-                                        dragged !== widget.id &&
+                                    dragged === widget.key && "opacity-40",
+                                    over === widget.key &&
+                                        dragged !== widget.key &&
                                         "rounded-md ring-2 ring-primary"
                                 )}
                                 onDragOver={(event) => {
                                     if (!dragged) return;
                                     event.preventDefault();
                                     event.dataTransfer.dropEffect = "move";
-                                    setOver(widget.id);
+                                    setOver(widget.key);
                                 }}
                                 onDragLeave={() =>
-                                    setOver((held) => (held === widget.id ? null : held))
+                                    setOver((held) => (held === widget.key ? null : held))
                                 }
                                 onDrop={(event) => {
                                     event.preventDefault();
-                                    if (dragged) onMoveOnto(dragged, widget.id);
+                                    if (dragged) onMoveOnto(dragged, widget.key);
                                     setDragged(null);
                                     setOver(null);
                                 }}
@@ -108,9 +119,9 @@ export function CustomizeDialog({
                                     title={t("card.drag", { name: label })}
                                     aria-hidden="true"
                                     onDragStart={(event) => {
-                                        event.dataTransfer.setData("text/plain", widget.id);
+                                        event.dataTransfer.setData("text/plain", widget.key);
                                         event.dataTransfer.effectAllowed = "move";
-                                        setDragged(widget.id);
+                                        setDragged(widget.key);
                                     }}
                                     onDragEnd={() => {
                                         setDragged(null);
@@ -136,15 +147,15 @@ export function CustomizeDialog({
                                     </span>
                                 </div>
 
-                                {entry.sizes.length > 1 && !widget.hidden ? (
+                                {widget.sizes.length > 1 && !widget.hidden ? (
                                     <Select
                                         value={widget.size}
                                         onValueChange={(value) =>
-                                            onResize(widget.id, value as OverviewWidgetSize)
+                                            onResize(widget.key, value as OverviewWidgetSize)
                                         }
                                         aria-label={t("customize.width", { name: label })}
                                         className="h-8 w-28 shrink-0"
-                                        options={entry.sizes.map((size) => ({
+                                        options={widget.sizes.map((size) => ({
                                             value: size,
                                             label: sizeLabel(t, size)
                                         }))}
@@ -155,7 +166,7 @@ export function CustomizeDialog({
                                     <button
                                         type="button"
                                         disabled={index === 0}
-                                        onClick={() => onMove(widget.id, -1)}
+                                        onClick={() => onMove(widget.key, -1)}
                                         title={t("customize.moveUp", { name: label })}
                                         aria-label={t("customize.moveUp", { name: label })}
                                         className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
@@ -165,7 +176,7 @@ export function CustomizeDialog({
                                     <button
                                         type="button"
                                         disabled={index === layout.length - 1}
-                                        onClick={() => onMove(widget.id, 1)}
+                                        onClick={() => onMove(widget.key, 1)}
                                         title={t("customize.moveDown", { name: label })}
                                         aria-label={t("customize.moveDown", { name: label })}
                                         className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
@@ -176,7 +187,7 @@ export function CustomizeDialog({
 
                                 <Switch
                                     checked={!widget.hidden}
-                                    onChange={(checked) => onToggle(widget.id, checked)}
+                                    onChange={(checked) => onToggle(widget.key, checked)}
                                     aria-label={t("customize.show", { name: label })}
                                 />
                             </li>

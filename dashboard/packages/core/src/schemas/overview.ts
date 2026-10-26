@@ -106,20 +106,49 @@ export const appWidgetSchema = z.object({
     app: appSlug,
     kind: appSlug,
     size: z.enum(OVERVIEW_WIDGET_SIZES).default("md"),
-    targets: z.array(z.string().trim().min(1).max(64)).max(MAX_APP_WIDGET_TARGETS).default([])
+    targets: z.array(z.string().trim().min(1).max(64)).max(MAX_APP_WIDGET_TARGETS).default([]),
+    /** Turned off by the reader, like an Overview card: kept, with what it
+     *  watches, so turning it back on returns it as it was. */
+    hidden: z.boolean().default(false)
 });
 
 export type AppWidgetPreference = z.infer<typeof appWidgetSchema>;
+
+/**
+ * A card's place in the Overview's one order: an Overview card by its own id, an
+ * app's card as `app:` and the card's id. Both kinds are arranged together, so
+ * the order cannot be written in either list alone.
+ */
+export type OverviewCardKey = OverviewWidgetId | `app:${string}`;
+
+export function appCardKey(id: string): `app:${string}` {
+    return `app:${id}`;
+}
+
+export const overviewCardKeySchema = z.union([
+    z.enum(OVERVIEW_WIDGET_IDS),
+    z.custom<`app:${string}`>(
+        (value) => typeof value === "string" && /^app:[a-z0-9]{8,32}$/.test(value)
+    )
+]);
 
 export const overviewPreferencesSchema = z.object({
     widgets: z
         .array(overviewWidgetSchema)
         .max(OVERVIEW_WIDGET_IDS.length * 2)
         .default([]),
-    /** The installed apps' cards, in the order they are drawn after the
-     *  Overview's own. Absent from every layout saved before apps could add
-     *  cards, which reads as none. */
+    /** The installed apps' cards. Where each is drawn among the Overview's own
+     *  is `order`'s; without one they follow them, in this order. Absent from
+     *  every layout saved before apps could add cards, which reads as none. */
     appWidgets: z.array(appWidgetSchema).max(MAX_APP_WIDGETS).default([]),
+    /** Every card, both kinds, in the order the reader put them in (see
+     *  `orderOverviewCards`). Absent until they first move a card after apps
+     *  could add them, which reads as the Overview's own cards first and the
+     *  apps' after, in their own order - where they always were. */
+    order: z
+        .array(overviewCardKeySchema)
+        .max((OVERVIEW_WIDGET_IDS.length + MAX_APP_WIDGETS) * 2)
+        .optional(),
     shortcuts: z.array(overviewShortcutSchema).max(MAX_OVERVIEW_SHORTCUTS).default([]),
     /** The line above the grid. Off for somebody who would rather not be greeted
      *  by their own software every morning. */
@@ -293,6 +322,64 @@ export function rankOverviewLayout(
     const sinks = (widget: OverviewWidgetPreference): boolean =>
         options.empty.has(widget.id) && (!options.arranged || !options.placed.has(widget.id));
     return [...layout.filter((widget) => !sinks(widget)), ...layout.filter(sinks)];
+}
+
+/**
+ * Every card on the grid, both kinds, in one order.
+ *
+ * `builtIns` is the Overview's own cards as resolved and ranked, `apps` the apps'
+ * cards in their stored order, and `order` what the reader arranged. Without an
+ * order - every layout saved before the two kinds could be arranged together -
+ * the apps' cards follow the Overview's own, which is where they were drawn.
+ *
+ * A key in the order that names no card here is skipped: the card was removed,
+ * or is not drawn for this reader right now. A card the order does not name yet
+ * is never lost: an Overview card added to the catalogue since sits after the
+ * one it follows in its own order (first, when nothing before it is placed), and
+ * an app card added since goes at the end, where it was put.
+ */
+export function orderOverviewCards(
+    builtIns: readonly OverviewCardKey[],
+    apps: readonly OverviewCardKey[],
+    order: readonly OverviewCardKey[] | undefined
+): OverviewCardKey[] {
+    if (!order) return [...new Set([...builtIns, ...apps])];
+    const present = new Set<OverviewCardKey>([...builtIns, ...apps]);
+    const ordered: OverviewCardKey[] = [];
+    const held = new Set<OverviewCardKey>();
+    const place = (key: OverviewCardKey, at: number): void => {
+        ordered.splice(at, 0, key);
+        held.add(key);
+    };
+    for (const key of order) {
+        if (present.has(key) && !held.has(key)) place(key, ordered.length);
+    }
+    for (const [at, key] of builtIns.entries()) {
+        if (held.has(key)) continue;
+        const before = builtIns
+            .slice(0, at)
+            .reverse()
+            .find((other) => held.has(other));
+        place(key, before ? ordered.indexOf(before) + 1 : 0);
+    }
+    for (const key of apps) if (!held.has(key)) place(key, ordered.length);
+    return ordered;
+}
+
+/** One card put where another one is, whichever kind either is. Unchanged when
+ *  either is not in the order or they are the same card. */
+export function moveOverviewCard(
+    keys: readonly OverviewCardKey[],
+    key: OverviewCardKey,
+    target: OverviewCardKey
+): OverviewCardKey[] {
+    const from = keys.indexOf(key);
+    const to = keys.indexOf(target);
+    if (from < 0 || to < 0 || from === to) return [...keys];
+    const next = [...keys];
+    next.splice(from, 1);
+    next.splice(to, 0, key);
+    return next;
 }
 
 /** A page somebody opened, as the browser remembers it. */

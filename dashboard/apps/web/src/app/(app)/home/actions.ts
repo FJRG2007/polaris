@@ -30,10 +30,16 @@ export async function saveOverviewPreferencesAction(input: unknown): Promise<{ e
     // from a screen that does not send them - which is every save of the grid,
     // and every tab opened before apps could add cards - keeps the stored ones
     // rather than writing them away.
-    const sent = typeof input === "object" && input !== null && "appWidgets" in input;
-    const appWidgets = sent
-        ? parsed.data.appWidgets
-        : (await getOverviewPreferences(user.id)).appWidgets;
-    await saveOverviewPreferences(user.id, { ...parsed.data, appWidgets });
+    // The same for the order both kinds share: a tab opened before the two could
+    // be arranged together does not send it, and must not undo it.
+    const sends = (key: string): boolean =>
+        typeof input === "object" && input !== null && key in input;
+    const stored =
+        sends("appWidgets") && sends("order") ? null : await getOverviewPreferences(user.id);
+    await saveOverviewPreferences(user.id, {
+        ...parsed.data,
+        appWidgets: stored && !sends("appWidgets") ? stored.appWidgets : parsed.data.appWidgets,
+        order: stored && !sends("order") ? stored.order : parsed.data.order
+    });
     return {};
 }

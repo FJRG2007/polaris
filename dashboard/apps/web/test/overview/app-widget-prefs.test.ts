@@ -50,11 +50,31 @@ describe("the stored layout", () => {
         expect(stored.greeting).toBe(false);
     });
 
+    it("keeps the shared order when a save does not send it, and replaces it when one does", async () => {
+        stored = { ...stored, order: ["app:a1b2c3d4e5f60718", "usage"] };
+        await saveOverviewPreferencesAction({ widgets: [], shortcuts: [], greeting: true });
+        expect(stored.order).toEqual(["app:a1b2c3d4e5f60718", "usage"]);
+        expect(await saveAppWidgetsAction([CARD])).toEqual({});
+        expect(stored.order).toEqual(["app:a1b2c3d4e5f60718", "usage"]);
+        await saveOverviewPreferencesAction({
+            widgets: [],
+            order: ["usage", "app:a1b2c3d4e5f60718"]
+        });
+        expect(stored.order).toEqual(["usage", "app:a1b2c3d4e5f60718"]);
+        expect(stored.appWidgets.map((card) => card.id)).toEqual([CARD.id]);
+    });
+
+    it("refuses an order naming something that is not a card", async () => {
+        const answer = await saveOverviewPreferencesAction({ widgets: [], order: ["app:../x"] });
+        expect(answer.error).toBeTruthy();
+        expect(save).not.toHaveBeenCalled();
+    });
+
     it("saves the apps' cards on their own, leaving the rest", async () => {
         stored = { ...stored, greeting: false };
         const moved = { ...CARD, size: "lg" as const, targets: ["dev-2"] };
         expect(await saveAppWidgetsAction([moved])).toEqual({});
-        expect(stored.appWidgets).toEqual([moved]);
+        expect(stored.appWidgets).toEqual([{ ...moved, hidden: false }]);
         expect(stored.greeting).toBe(false);
     });
 

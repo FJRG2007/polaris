@@ -48,7 +48,8 @@ export async function readAppWidgetsAction(): Promise<{
 }> {
     const user = await requireUser();
     const preferences = await getOverviewPreferences(user.id);
-    return { cards: await readAppWidgets(preferences.appWidgets) };
+    // A hidden card shows nothing, so nothing is asked of its app.
+    return { cards: await readAppWidgets(preferences.appWidgets.filter((card) => !card.hidden)) };
 }
 
 /**
