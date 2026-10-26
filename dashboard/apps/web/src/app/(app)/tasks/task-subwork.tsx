@@ -12,8 +12,9 @@
 
 import * as actions from "./actions";
 import * as core from "@polaris/core";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { schemaMessage } from "./schema-message";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { settleTagIds, withCreatedTags } from "./tag-creation";
 import type { TaskBulkEdit, TaskEdit } from "./views/shared";
@@ -23,7 +24,8 @@ import { TaskMenu, type TaskCommands } from "./views/task-actions";
 import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
 import { AvatarStack, ProgressBar, StatusDot, StatusMarker } from "./pickers";
 import type { ChecklistView, DependencyView } from "@/lib/tasks/task-service";
-import { ArrowUpRight, Ban, Check, Link2, Plus, Trash2, X } from "lucide-react";
+import * as order from "./subwork-order";
+import { ArrowUpRight, Ban, Check, ChevronDown, ChevronUp, Link2, Plus, Trash2, X } from "lucide-react";
 import { Button, Card, CardBody, Checkbox, cn, ConfirmDeleteDialog, Input } from "@polaris/ui";
 
 /**
@@ -405,6 +407,175 @@ export function SubtaskSection({
 // Checklists
 // ---------------------------------------------------------------------------
 
+/**
+ * A list as the screen shows it while a change to it is on its way.
+ *
+ * Kept beside the rows it was made from and used only while those are still
+ * the rows on screen: when the reload that follows a write brings fresh ones,
+ * the overlay is simply no longer theirs, the same "dropped rather than merged"
+ * the board's overlay keeps. A refused write puts the server's rows back.
+ */
+function useOverlay<Row>(
+    rows: readonly Row[],
+    onChanged: () => void,
+    onError: (message: string) => void
+) {
+    const [overlay, setOverlay] = useState<{
+        source: readonly Row[];
+        view: readonly Row[];
+    } | null>(null);
+    const shown = overlay && overlay.source === rows ? overlay.view : rows;
+
+    const apply = async (next: readonly Row[], call: () => Promise<{ error?: string }>) => {
+        setOverlay({ source: rows, view: next });
+        onError("");
+        const result = await runAction(call, onError);
+        if (!result || result.error) {
+            setOverlay(null);
+            if (result?.error) onError(result.error);
+        }
+        onChanged();
+    };
+
+    return { shown, apply };
+}
+
+/**
+ * One place up or down: the drag, for somebody on a keyboard, and for a phone,
+ * where holding a row until it lifts is not something anybody discovers.
+ */
+function MoveButtons({
+    name,
+    index,
+    count,
+    onMove
+}: {
+    name: string;
+    index: number;
+    count: number;
+    onMove: (delta: -1 | 1) => void;
+}) {
+    const t = useTranslations("tasksDetail");
+    if (count < 2) return null;
+    const style =
+        "rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
+    return (
+        <>
+            <button
+                type="button"
+                disabled={index === 0}
+                aria-label={t("subwork.moveUpNamed", { name })}
+                title={t("subwork.moveUp")}
+                onClick={() => onMove(-1)}
+                className={style}
+            >
+                <ChevronUp className="size-3.5" />
+            </button>
+            <button
+                type="button"
+                disabled={index === count - 1}
+                aria-label={t("subwork.moveDownNamed", { name })}
+                title={t("subwork.moveDown")}
+                onClick={() => onMove(1)}
+                className={style}
+            >
+                <ChevronDown className="size-3.5" />
+            </button>
+        </>
+    );
+}
+
+/**
+ * A name that becomes a field when it is clicked. Enter or leaving the field
+ * saves, Escape puts it back. Checked against the rule the server uses while it
+ * is typed, and a name that ends up where it started is not a write.
+ */
+export function InlineName({
+    name,
+    rule,
+    disabled,
+    className,
+    onRename
+}: {
+    name: string;
+    /** Which name rule applies: a checklist's, which is a container's, or a step's. */
+    rule: "checklist" | "step";
+    disabled?: boolean;
+    className?: string;
+    onRename: (name: string) => void;
+}) {
+    const t = useTranslations("tasksDetail");
+    const tt = useTranslations("tasks");
+    const [draft, setDraft] = useState<string | null>(null);
+    // Escape closes the field, and the browser may still report it losing focus
+    // on the way out; that blur must not save what Escape just threw away.
+    const closed = useRef(false);
+    const schema = rule === "checklist" ? core.checklistSchema.shape.name : core.taskName;
+
+    if (draft === null) {
+        if (disabled) return <span className={cn("min-w-0 truncate", className)}>{name}</span>;
+        return (
+            <button
+                type="button"
+                title={t("subwork.rename")}
+                aria-label={t("subwork.renameNamed", { name })}
+                onClick={() => {
+                    closed.current = false;
+                    setDraft(name);
+                }}
+                className={cn("min-w-0 cursor-text truncate text-left hover:underline", className)}
+            >
+                {name}
+            </button>
+        );
+    }
+
+    const parsed = schema.safeParse(draft);
+    // An emptied field is unfinished rather than wrong: it saves nothing and says
+    // nothing, and the rule only speaks up about something actually typed.
+    const issue =
+        draft.trim() && !parsed.success
+            ? schemaMessage(tt, parsed.error.issues[0]?.message, "") || null
+            : null;
+
+    const finish = (save: boolean) => {
+        if (closed.current) return;
+        // Enter on a name the rule refuses keeps the field open beside the reason.
+        if (save && issue) return;
+        closed.current = true;
+        if (save && parsed.success && parsed.data !== name) onRename(parsed.data);
+        setDraft(null);
+    };
+
+    return (
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <Input
+                autoFocus
+                value={draft}
+                data-keeps-escape=""
+                aria-label={t("subwork.renameNamed", { name })}
+                aria-invalid={issue ? true : undefined}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                        event.preventDefault();
+                        finish(true);
+                    } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        finish(false);
+                    }
+                }}
+                // Leaving with something the rule refuses puts the old name back
+                // rather than holding the reader in a field they have left.
+                onBlur={() => finish(!issue)}
+                className="h-7 text-sm"
+            />
+            {issue && <span className="text-xs text-danger">{issue}</span>}
+        </span>
+    );
+}
+
 export function ChecklistSection({
     taskId,
     checklists,
@@ -427,19 +598,34 @@ export function ChecklistSection({
     const [draggingStep, setDraggingStep] = useState<{ id: string; checklistId: string } | null>(
         null
     );
+    const { shown, apply } = useOverlay(checklists, onChanged, onError);
 
-    const moveChecklist = async (targetId: string, edge: DropEdge) => {
-        if (!draggingList || draggingList === targetId) return;
-        const position = neighbours(checklists, targetId, draggingList, edge);
-        if (!position) return;
-        const moved = draggingList;
-        setDraggingList(null);
-        onError("");
-        await runAction(() => actions.moveChecklistAction(taskId, moved, position), onError);
-        onChanged();
+    const placeChecklist = (checklistId: string, position: order.DropPosition) => {
+        const next = order.placeRow(shown, checklistId, position);
+        if (order.samePlace(shown, next)) return;
+        void apply(next, () => actions.moveChecklistAction(taskId, checklistId, position));
     };
 
-    const moveStep = async (
+    const moveChecklist = (targetId: string, edge: DropEdge) => {
+        if (!draggingList || draggingList === targetId) return;
+        const position = neighbours(shown, targetId, draggingList, edge);
+        const moved = draggingList;
+        setDraggingList(null);
+        if (position) placeChecklist(moved, position);
+    };
+
+    const placeStepAt = (itemId: string, checklistId: string, position: order.DropPosition) => {
+        const next = order.placeStep(shown, itemId, checklistId, position);
+        const unchanged = shown.every((checklist, index) =>
+            order.samePlace(checklist.items, next[index]?.items ?? [])
+        );
+        if (unchanged) return;
+        void apply(next, () =>
+            actions.moveChecklistItemAction(taskId, itemId, { checklistId, ...position })
+        );
+    };
+
+    const moveStep = (
         checklistId: string,
         items: readonly { id: string }[],
         target: { id: string; edge: DropEdge } | null
@@ -456,14 +642,25 @@ export function ChecklistSection({
         setDraggingStep(null);
         // The step it landed on is gone: no place was named, and the end of the
         // checklist is not a stand-in for one.
-        if (!position) return;
-        onError("");
-        await runAction(
-            () => actions.moveChecklistItemAction(taskId, moved, { checklistId, ...position }),
-            onError
-        );
-        onChanged();
+        if (position) placeStepAt(moved, checklistId, position);
     };
+
+    const rename = (checklistId: string, name: string) =>
+        void apply(
+            shown.map((checklist) =>
+                checklist.id === checklistId ? { ...checklist, name } : checklist
+            ),
+            () => actions.renameChecklistAction(taskId, checklistId, name)
+        );
+
+    const renameStep = (itemId: string, name: string) =>
+        void apply(
+            shown.map((checklist) => ({
+                ...checklist,
+                items: checklist.items.map((item) => (item.id === itemId ? { ...item, name } : item))
+            })),
+            () => actions.renameChecklistItemAction(taskId, itemId, name)
+        );
 
     return (
         <section className="flex flex-col gap-3">
@@ -492,14 +689,14 @@ export function ChecklistSection({
                 />
             )}
 
-            {checklists.length === 0 && !adding && (
+            {shown.length === 0 && !adding && (
                 <p className="text-xs text-muted-foreground">
                     {t("subwork.checklistsEmpty")}
                 </p>
             )}
 
             <ul className="flex flex-col gap-3">
-                {checklists.map((checklist) => {
+                {shown.map((checklist, checklistIndex) => {
                     const done = checklist.items.filter((item) => item.done).length;
                     return (
                         <Sortable
@@ -509,36 +706,58 @@ export function ChecklistSection({
                             disabled={!canEdit}
                             onDragStart={() => setDraggingList(checklist.id)}
                             onDragEnd={() => setDraggingList(null)}
-                            onDropAt={(edge) => void moveChecklist(checklist.id, edge)}
+                            onDropAt={(edge) => moveChecklist(checklist.id, edge)}
                         >
                             <Card>
                                 <CardBody className="flex flex-col gap-2 p-3">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <h4 className="text-sm font-medium">{checklist.name}</h4>
-                                        <div className="flex items-center gap-2">
+                                    <div className="group/checklist flex items-center justify-between gap-2">
+                                        <InlineName
+                                            name={checklist.name}
+                                            rule="checklist"
+                                            disabled={!canEdit}
+                                            onRename={(name) => rename(checklist.id, name)}
+                                            className="text-sm font-medium"
+                                        />
+                                        <div className="flex shrink-0 items-center gap-2">
                                             <span className="text-xs text-muted-foreground">
                                                 {done}/{checklist.items.length}
                                             </span>
                                             {canEdit && (
-                                                <button
-                                                    type="button"
-                                                    aria-label={t("subwork.removeNamed", { name: checklist.name })}
-                                                    title={t("subwork.removeChecklist")}
-                                                    onClick={async () => {
-                                                        await runAction(
-                                                            () =>
-                                                                actions.deleteChecklistAction(
-                                                                    taskId,
-                                                                    checklist.id
-                                                                ),
-                                                            onError
-                                                        );
-                                                        onChanged();
-                                                    }}
-                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                                >
-                                                    <Trash2 className="size-3.5" />
-                                                </button>
+                                                <span className="flex items-center gap-0.5 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover/checklist:opacity-100">
+                                                    <MoveButtons
+                                                        name={checklist.name}
+                                                        index={checklistIndex}
+                                                        count={shown.length}
+                                                        onMove={(delta) => {
+                                                            const position = order.shiftPosition(
+                                                                shown,
+                                                                checklist.id,
+                                                                delta
+                                                            );
+                                                            if (position)
+                                                                placeChecklist(checklist.id, position);
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        aria-label={t("subwork.removeNamed", { name: checklist.name })}
+                                                        title={t("subwork.removeChecklist")}
+                                                        onClick={async () => {
+                                                            await runAction(
+                                                                () =>
+                                                                    actions.deleteChecklistAction(
+                                                                        taskId,
+                                                                        checklist.id
+                                                                    ),
+                                                                onError
+                                                            );
+                                                            onChanged();
+                                                        }}
+                                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                                    >
+                                                        <Trash2 className="size-3.5" />
+                                                    </button>
+                                                </span>
                                             )}
                                         </div>
                                     </div>
@@ -558,10 +777,10 @@ export function ChecklistSection({
                                         onDrop={(event) => {
                                             if (!draggingStep) return;
                                             event.preventDefault();
-                                            void moveStep(checklist.id, checklist.items, null);
+                                            moveStep(checklist.id, checklist.items, null);
                                         }}
                                     >
-                                        {checklist.items.map((item) => (
+                                        {checklist.items.map((item, itemIndex) => (
                                             <Sortable
                                                 key={item.id}
                                                 id={item.id}
@@ -575,7 +794,7 @@ export function ChecklistSection({
                                                 }
                                                 onDragEnd={() => setDraggingStep(null)}
                                                 onDropAt={(edge) =>
-                                                    void moveStep(checklist.id, checklist.items, {
+                                                    moveStep(checklist.id, checklist.items, {
                                                         id: item.id,
                                                         edge
                                                     })
@@ -598,16 +817,36 @@ export function ChecklistSection({
                                                         onChanged();
                                                     }}
                                                 />
-                                                <span
+                                                <InlineName
+                                                    name={item.name}
+                                                    rule="step"
+                                                    disabled={!canEdit}
+                                                    onRename={(name) => renameStep(item.id, name)}
                                                     className={cn(
                                                         "flex-1 text-sm",
                                                         item.done && "text-muted-foreground"
                                                     )}
-                                                >
-                                                    {item.name}
-                                                </span>
+                                                />
                                                 {canEdit && (
-                                                    <span className="flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                                                    <span className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                                                        <MoveButtons
+                                                            name={item.name}
+                                                            index={itemIndex}
+                                                            count={checklist.items.length}
+                                                            onMove={(delta) => {
+                                                                const position = order.shiftPosition(
+                                                                    checklist.items,
+                                                                    item.id,
+                                                                    delta
+                                                                );
+                                                                if (position)
+                                                                    placeStepAt(
+                                                                        item.id,
+                                                                        checklist.id,
+                                                                        position
+                                                                    );
+                                                            }}
+                                                        />
                                                         <button
                                                             type="button"
                                                             aria-label={t("subwork.promoteNamed", { name: item.name })}
@@ -705,6 +944,13 @@ export function DependencySection({
     const t = useTranslations("tasksDetail");
     const [query, setQuery] = useState("");
     const [direction, setDirection] = useState<"blocking" | "waitingOn">("waitingOn");
+    // Each list is arranged on its own, so a link is only ever dropped inside the
+    // list it was picked up from.
+    const [dragging, setDragging] = useState<{
+        id: string;
+        direction: core.DependencyDirection;
+    } | null>(null);
+    const { shown, apply } = useOverlay(dependencies, onChanged, onError);
 
     const matches = query.trim()
         ? candidates
@@ -717,52 +963,96 @@ export function DependencySection({
               .slice(0, 6)
         : [];
 
-    const waitingOn = dependencies.filter((edge) => edge.direction === "waitingOn");
-    const blocking = dependencies.filter((edge) => edge.direction === "blocking");
+    const waitingOn = shown.filter((edge) => edge.direction === "waitingOn");
+    const blocking = shown.filter((edge) => edge.direction === "blocking");
 
-    const row = (edge: DependencyView) => (
-        <li key={edge.id} className="flex items-center gap-2 px-3 py-2">
-            {edge.finished ? (
-                <Check className="size-3.5 shrink-0 text-success" />
-            ) : (
-                <Ban className="size-3.5 shrink-0 text-warning" />
-            )}
-            <button
-                type="button"
-                onClick={() => onOpen(edge.taskId)}
-                className="flex-1 truncate text-left text-sm hover:underline"
-            >
-                <span className="mr-2 font-mono text-[0.6875rem] text-muted-foreground">
-                    {edge.reference}
-                </span>
-                {edge.name}
-            </button>
-            <StatusDot color={edge.statusColor} />
-            {canEdit && (
-                <button
-                    type="button"
-                    aria-label={t("subwork.unlinkNamed", { name: edge.name })}
-                    title={t("subwork.removeLink")}
-                    onClick={async () => {
-                        await runAction(
-                            () => actions.removeDependencyAction(taskId, edge.id),
-                            onError
-                        );
-                        onChanged();
+    const place = (
+        edges: readonly DependencyView[],
+        edgeId: string,
+        side: core.DependencyDirection,
+        position: order.DropPosition
+    ) => {
+        if (order.samePlace(edges, order.placeRow(edges, edgeId, position))) return;
+        void apply(order.placeDependency(shown, edgeId, side, position), () =>
+            actions.moveDependencyAction(taskId, edgeId, { direction: side, ...position })
+        );
+    };
+
+    const list = (side: core.DependencyDirection, edges: readonly DependencyView[]) => (
+        <ul className="divide-y divide-border rounded-md border border-border">
+            {edges.map((edge, index) => (
+                <Sortable
+                    key={edge.id}
+                    id={edge.id}
+                    dragging={dragging?.direction === side ? dragging.id : null}
+                    disabled={!canEdit}
+                    onDragStart={() => setDragging({ id: edge.id, direction: side })}
+                    onDragEnd={() => setDragging(null)}
+                    onDropAt={(dropped) => {
+                        if (!dragging || dragging.direction !== side) return;
+                        const moved = dragging.id;
+                        setDragging(null);
+                        const position = neighbours(edges, edge.id, moved, dropped);
+                        if (position) place(edges, moved, side, position);
                     }}
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                    className="group flex items-center gap-2 px-3 py-2"
                 >
-                    <X className="size-3.5" />
-                </button>
-            )}
-        </li>
+                    {edge.finished ? (
+                        <Check className="size-3.5 shrink-0 text-success" />
+                    ) : (
+                        <Ban className="size-3.5 shrink-0 text-warning" />
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => onOpen(edge.taskId)}
+                        className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                    >
+                        <span className="mr-2 font-mono text-[0.6875rem] text-muted-foreground">
+                            {edge.reference}
+                        </span>
+                        {edge.name}
+                    </button>
+                    <StatusDot color={edge.statusColor} />
+                    {canEdit && (
+                        <span className="flex shrink-0 items-center gap-0.5">
+                            <span className="flex items-center gap-0.5 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                                <MoveButtons
+                                    name={edge.name}
+                                    index={index}
+                                    count={edges.length}
+                                    onMove={(delta) => {
+                                        const position = order.shiftPosition(edges, edge.id, delta);
+                                        if (position) place(edges, edge.id, side, position);
+                                    }}
+                                />
+                            </span>
+                            <button
+                                type="button"
+                                aria-label={t("subwork.unlinkNamed", { name: edge.name })}
+                                title={t("subwork.removeLink")}
+                                onClick={async () => {
+                                    await runAction(
+                                        () => actions.removeDependencyAction(taskId, edge.id),
+                                        onError
+                                    );
+                                    onChanged();
+                                }}
+                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                            >
+                                <X className="size-3.5" />
+                            </button>
+                        </span>
+                    )}
+                </Sortable>
+            ))}
+        </ul>
     );
 
     return (
         <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">{t("subwork.dependencies")}</h3>
 
-            {dependencies.length === 0 && (
+            {shown.length === 0 && (
                 <p className="text-xs text-muted-foreground">
                     {t("subwork.dependenciesEmpty")}
                 </p>
@@ -771,17 +1061,13 @@ export function DependencySection({
             {waitingOn.length > 0 && (
                 <div>
                     <p className="mb-1 text-xs font-medium text-muted-foreground">{t("subwork.waitingOn")}</p>
-                    <ul className="divide-y divide-border rounded-md border border-border">
-                        {waitingOn.map(row)}
-                    </ul>
+                    {list("waitingOn", waitingOn)}
                 </div>
             )}
             {blocking.length > 0 && (
                 <div>
                     <p className="mb-1 text-xs font-medium text-muted-foreground">{t("subwork.blocking")}</p>
-                    <ul className="divide-y divide-border rounded-md border border-border">
-                        {blocking.map(row)}
-                    </ul>
+                    {list("blocking", blocking)}
                 </div>
             )}
 

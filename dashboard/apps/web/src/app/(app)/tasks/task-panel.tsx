@@ -442,7 +442,16 @@ export function TaskPanel({
                 caps the width otherwise, and the panel renders at half the size
                 its two columns were laid out for. The header keeps clear of the
                 dialog's close button rather than sliding under it. */}
-            <DialogContent className="flex max-h-[92vh] w-[min(72rem,96vw)] max-w-[min(72rem,96vw)] flex-col gap-0 overflow-hidden p-0">
+            <DialogContent
+                className="flex max-h-[92vh] w-[min(72rem,96vw)] max-w-[min(72rem,96vw)] flex-col gap-0 overflow-hidden p-0"
+                // A field being renamed in place takes its own Escape - it puts the
+                // old name back - and the dialog hears the key before the field
+                // does, so without this the same press also closed the task.
+                onEscapeKeyDown={(event) => {
+                    if (event.target instanceof Element && event.target.closest("[data-keeps-escape]"))
+                        event.preventDefault();
+                }}
+            >
                 {!task &&
                     (loading || !error ? (
                         <>

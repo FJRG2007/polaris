@@ -183,6 +183,12 @@
         "blocking": "Blocking",
         "thisWaitsOn": "This waits on",
         "thisBlocks": "This blocks",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "moveUpNamed": "Move {name} up",
+        "moveDownNamed": "Move {name} down",
+        "rename": "Rename",
+        "renameNamed": "Rename {name}",
         "find": "Find a task by name or reference"
     },
     "panel": {

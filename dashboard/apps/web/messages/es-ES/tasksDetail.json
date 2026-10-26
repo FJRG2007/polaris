@@ -183,6 +183,12 @@
         "blocking": "Bloqueando",
         "thisWaitsOn": "Esta espera a",
         "thisBlocks": "Esta bloquea",
+        "moveUp": "Subir",
+        "moveDown": "Bajar",
+        "moveUpNamed": "Subir {name}",
+        "moveDownNamed": "Bajar {name}",
+        "rename": "Renombrar",
+        "renameNamed": "Renombrar {name}",
         "find": "Busca una tarea por nombre o referencia"
     },
     "panel": {

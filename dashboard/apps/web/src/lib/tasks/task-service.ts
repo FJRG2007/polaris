@@ -367,10 +367,12 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
         }),
         prisma.taskDependency.findMany({
             where: { blockerId: taskId },
+            orderBy: [{ blockingOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
             select: { id: true, type: true, blocked: { select: DEPENDENCY_SELECT } }
         }),
         prisma.taskDependency.findMany({
             where: { blockedId: taskId },
+            orderBy: [{ waitingOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
             select: { id: true, type: true, blocker: { select: DEPENDENCY_SELECT } }
         }),
         prisma.activity.findMany({
