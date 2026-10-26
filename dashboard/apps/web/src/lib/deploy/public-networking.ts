@@ -358,6 +358,8 @@ export interface DomainReading {
         readonly daysLeft: number | null;
         readonly supplied: boolean;
     } | null;
+    /** The same name's address on the operator's tailnet, when remote access is on. */
+    readonly tailnet?: string | null;
 }
 
 async function lookup(hostname: string): Promise<{ addresses: string[]; cnames: string[] }> {
@@ -461,7 +463,12 @@ export async function domainReadings(
     });
     const now = Date.now();
     const domains = app.domains.filter((domain) => domain.enabled).slice(0, DETAIL_LIMIT);
-    return Promise.all(
+    // Read outside the per-domain cache: it changes when remote access does, not
+    // when DNS does.
+    const tailnet = await import("@/lib/tailscale/tailscale-service")
+        .then((module) => module.tailnetAppUrls())
+        .catch(() => new Map<string, string>());
+    const readings = await Promise.all(
         domains.map((domain) =>
             cached(`reading:${domain.id}:${domain.hostname}`, async (): Promise<DomainReading> => {
                 const wildcard = isWildcardHostname(domain.hostname);
@@ -549,6 +556,10 @@ export async function domainReadings(
             })
         )
     );
+    return readings.map((reading) => ({
+        ...reading,
+        tailnet: tailnet.get(reading.hostname.toLowerCase()) ?? null
+    }));
 }
 
 /** A service's TCP proxies and where they are reached from. */

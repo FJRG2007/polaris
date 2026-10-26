@@ -1753,6 +1753,23 @@ async function publishAppRoutes(
         }
     }
     await new LocalRouter(await deployZoneHosts(), force).sync(localRoutes);
+    // Every name this edge now routes gets its address on the tailnet too, through
+    // the same routers. Quick-tunnel names are internal and get none. Best-effort and
+    // not awaited: it is not this sync's failure, and never holds it up.
+    const tailnetNames = localRoutes
+        .filter((route) => !route.id.startsWith("qtunnel-"))
+        .map((route) => route.hostname);
+    // Without the server's own address nothing was routed this pass, which says
+    // nothing about which names are gone.
+    if (localIp)
+        void import("@/lib/tailscale/tailscale-service")
+            .then((module) => module.syncTailscaleApps(tailnetNames))
+            .catch((error: unknown) =>
+                console.error(
+                    "polaris: publishing apps on the tailnet failed:",
+                    error instanceof Error ? error.message : error
+                )
+            );
     // After the local edge, and never able to take it down with them: a server that
     // is asleep, moved or refusing a connection is a server whose own edge goes on
     // serving whatever it was already serving, and no reason for the routes on this

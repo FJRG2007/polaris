@@ -10,10 +10,15 @@
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
-import { connectInputSchema, togglesInputSchema } from "@/lib/tailscale/tailscale-model";
+import {
+    appPublicInputSchema,
+    connectInputSchema,
+    togglesInputSchema
+} from "@/lib/tailscale/tailscale-model";
 import {
     connectTailscale,
     disconnectTailscale,
+    setTailnetAppPublic,
     setTailscaleToggles,
     tailscaleView,
     TailscaleRefusal,
@@ -78,4 +83,20 @@ export async function setTailscaleTogglesAction(input: unknown): Promise<Tailsca
 export async function disconnectTailscaleAction(): Promise<TailscaleResult> {
     const actor = await requireAdmin();
     return settle(actor.id, "domains.tailscale.disconnect", () => disconnectTailscale());
+}
+
+/** Open one app's tailnet address to the internet through Funnel, or close it. */
+export async function setTailnetAppPublicAction(input: unknown): Promise<TailscaleResult> {
+    const actor = await requireAdmin();
+    const t = await getTranslations("admin");
+    const parsed = appPublicInputSchema.safeParse(input);
+    if (!parsed.success) return { view: null, error: t("domains.tailscale.appPublicUnknown") };
+    const { hostname, public: open } = parsed.data;
+    return settle(actor.id, "domains.tailscale.appPublic", (limited) =>
+        setTailnetAppPublic(hostname, open, {
+            limited,
+            unknown: t("domains.tailscale.appPublicUnknown"),
+            "no-port": t("domains.tailscale.appPublicFull")
+        })
+    );
 }
