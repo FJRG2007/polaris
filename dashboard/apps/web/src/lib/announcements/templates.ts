@@ -18,6 +18,9 @@ import type { Phase } from "./phase";
 import type { Locale } from "@polaris/core";
 import { translatorFor } from "@/lib/i18n/translate";
 import { PLACEHOLDERS, type Placeholder, type TemplateId } from "./schema";
+import { fillPlaceholders, formatDuration } from "./placeholders";
+
+export { fillPlaceholders, formatDuration };
 
 export interface Reader {
     locale: Locale;
@@ -60,22 +63,6 @@ function safeZone(zone: string): string {
     }
 }
 
-/** "2 hours, 30 minutes" in the reader's language, from Intl alone. */
-export function formatDuration(ms: number, locale: Locale): string {
-    const minutes = Math.max(1, Math.round(ms / 60_000));
-    const days = Math.floor(minutes / 1440);
-    const hours = Math.floor((minutes % 1440) / 60);
-    const rest = minutes % 60;
-    const unit = (value: number, name: "day" | "hour" | "minute") =>
-        new Intl.NumberFormat(locale, { style: "unit", unit: name, unitDisplay: "long" }).format(value);
-    const parts = [
-        days > 0 ? unit(days, "day") : null,
-        hours > 0 ? unit(hours, "hour") : null,
-        rest > 0 ? unit(rest, "minute") : null
-    ].filter((part): part is string => part !== null);
-    return new Intl.ListFormat(locale, { type: "unit", style: "long" }).format(parts);
-}
-
 /** What each placeholder stands for, for this reader. */
 export function placeholderValues(item: RenderInput, reader: Reader): Record<Placeholder, string> {
     const t = translatorFor(reader.locale, "announcements");
@@ -95,13 +82,6 @@ export function placeholderValues(item: RenderInput, reader: Reader): Record<Pla
                 ? new Intl.ListFormat(reader.locale, { type: "conjunction" }).format([...item.affected])
                 : t("vars.everything")
     };
-}
-
-/** Put the reader's values in. Anything that is not one of the four is left alone. */
-export function fillPlaceholders(text: string, values: Record<Placeholder, string>): string {
-    return text.replace(/\{(\w+)\}/g, (whole, name: string) =>
-        (PLACEHOLDERS as readonly string[]).includes(name) ? values[name as Placeholder] : whole
-    );
 }
 
 /** A template's words with the placeholders still in, for the compose form to start from. */

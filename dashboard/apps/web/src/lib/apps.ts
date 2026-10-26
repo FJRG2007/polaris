@@ -690,6 +690,7 @@ const ADMIN_AREAS: AppSubapp[] = [
         base: "/admin/users",
         match: [
             "/admin/groups",
+            "/admin/announcements",
             "/admin/organizations",
             "/admin/roles",
             "/admin/policies",
@@ -705,6 +706,13 @@ const ADMIN_AREAS: AppSubapp[] = [
                 adminOnly: true,
                 icon: Users,
                 keywords: ["accounts", "invites"]
+            },
+            {
+                label: "Announcements", // i18n-ignore
+                href: "/admin/announcements",
+                adminOnly: true,
+                icon: Megaphone,
+                keywords: ["maintenance", "banner", "broadcast", "notify everyone", "outage", "notice"]
             },
             {
                 label: "Groups", // i18n-ignore

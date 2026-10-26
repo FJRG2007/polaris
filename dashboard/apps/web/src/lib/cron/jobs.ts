@@ -30,6 +30,7 @@ import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { appJobs } from "@/lib/app-extensions/registry";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
+import { runAnnouncementClock } from "@/lib/announcements/service";
 import { compactOutages } from "@/lib/connectivity/outage-tracker";
 import { sampleConnectivity } from "@/lib/connectivity/line-sampler";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
@@ -178,6 +179,16 @@ export interface ScheduledJob {
  * choose, and a deletion scheduled for a date does not care about ten.
  */
 export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
+    {
+        key: "announcements",
+        // Every minute: a maintenance window starts at a minute somebody wrote,
+        // and "in progress" a minute late is the one notice that matters.
+        everyMs: MINUTE,
+        // Leased as well as claimed row by row: a send fans out to every reader,
+        // and one runner doing it is the whole point.
+        leaseMs: 5 * MINUTE,
+        run: () => runAnnouncementClock()
+    },
     {
         key: "retention",
         // Hourly. What this removes is a record nobody is waiting on, and the

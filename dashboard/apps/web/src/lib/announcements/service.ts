@@ -19,7 +19,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { renderFor, type Reader, type RenderInput } from "./templates";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
-import { audiencePages, audienceWhere, countAudience, inAudience } from "./audience";
+import { audiencePages, countAudience, inAudience } from "./audience";
 import {
     bannerDismissible,
     bannerHidden,
@@ -454,4 +454,4 @@ export async function findAnnouncement(id: string) {
     return prisma.announcement.findUnique({ where: { id } });
 }
 
-export { audienceWhere, countAudience };
+export { countAudience };
