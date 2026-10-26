@@ -917,7 +917,14 @@ async function rescheduleIfRecurring(taskId: string, actorId: string): Promise<v
     const occurrences = await prisma.activity.count({
         where: { subjectType: "task", subjectId: taskId, action: "recurred" }
     });
-    const nextDue = core.nextOccurrence(rule, anchor, occurrences);
+    // "Every Monday" and "the 26th" are days on the calendar of whoever closed it,
+    // not of this server: an all-day due date is that person's local midnight,
+    // which in UTC is often the day before.
+    // Loaded here rather than at the top: it pulls the session module in, which
+    // nothing else on this path needs.
+    const { resolveDisplayPreferencesFor } = await import("@/lib/display-prefs-service");
+    const zone = (await resolveDisplayPreferencesFor(actorId)).timeZone;
+    const nextDue = core.nextOccurrence(rule, anchor, occurrences, zone);
     if (!nextDue) return;
 
     // Keep the gap between start and due, so a three-day job stays three days.

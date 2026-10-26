@@ -16,6 +16,7 @@
  */
 
 import * as work from "./schemas/tasks.js";
+import { AUTOMATIC_TIME_ZONE, wallClock, zonedInstant } from "./schemas/display.js";
 
 // ---------------------------------------------------------------------------
 // The shape everything here reasons about
@@ -168,7 +169,8 @@ export function parseDurationMinutes(input: string): number | null {
 
 /** Minutes as the estimate box shows them back: "2h 30m", "3d", "45m". */
 export function formatDurationMinutes(minutes: number | null | undefined): string {
-    if (minutes === null || minutes === undefined || !Number.isFinite(minutes) || minutes <= 0) return "";
+    if (minutes === null || minutes === undefined || !Number.isFinite(minutes) || minutes <= 0)
+        return "";
     let left = Math.round(minutes);
     const parts: string[] = [];
     for (const [unit, size] of [
@@ -207,19 +209,79 @@ export function formatTrackedSeconds(seconds: number | null | undefined): string
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function startOfDay(date: Date): Date {
+/*
+ * Every helper below takes an optional `zone`: the IANA zone whose calendar the
+ * day is read in. Left out, or `auto`, it is the clock of the process asking,
+ * which in a browser is the reader's own and is what every screen has always
+ * used. A server has no reader, and its clock is usually UTC, so server code
+ * passes the zone of the person the answer is for. Without it an all-day task
+ * due today - stored as the reader's local midnight - is a day early for anyone
+ * east of Greenwich: "today" ended at 23:59 UTC, which in Madrid is one in the
+ * morning of the very day it was due.
+ */
+
+/** Whether a day boundary has to be read in a named zone rather than locally. */
+function zoned(zone: string | undefined): zone is string {
+    return zone !== undefined && zone !== "" && zone !== AUTOMATIC_TIME_ZONE;
+}
+
+/** The calendar day an instant falls on in a zone, as a UTC midnight - a plain
+ *  number to count days with, never an instant to show anyone. */
+function calendarDay(date: Date, zone: string): number {
+    const wall = wallClock(date, zone);
+    return Date.UTC(wall.year, wall.month - 1, wall.day);
+}
+
+/** The first moment of a calendar day (as `calendarDay` counts them) in a zone. */
+function midnightOf(day: number, zone: string): Date {
+    const parts = new Date(day);
+    return zonedInstant(
+        {
+            year: parts.getUTCFullYear(),
+            month: parts.getUTCMonth() + 1,
+            day: parts.getUTCDate(),
+            hours: 0,
+            minutes: 0
+        },
+        zone
+    );
+}
+
+export function startOfDay(date: Date, zone?: string): Date {
+    if (zoned(zone)) return midnightOf(calendarDay(date, zone), zone);
     const copy = new Date(date);
     copy.setHours(0, 0, 0, 0);
     return copy;
 }
 
-export function endOfDay(date: Date): Date {
+export function endOfDay(date: Date, zone?: string): Date {
+    // The moment before the next midnight, so a day that daylight saving made
+    // 23 or 25 hours long still ends where it does.
+    if (zoned(zone))
+        return new Date(midnightOf(calendarDay(date, zone) + DAY_MS, zone).getTime() - 1);
     const copy = new Date(date);
     copy.setHours(23, 59, 59, 999);
     return copy;
 }
 
-export function addDays(date: Date, days: number): Date {
+export function addDays(date: Date, days: number, zone?: string): Date {
+    if (zoned(zone)) {
+        // The same time of day, that many calendar days on - not that many
+        // 24-hour spans, which drift an hour across a daylight saving change.
+        const wall = wallClock(date, zone);
+        const target = new Date(Date.UTC(wall.year, wall.month - 1, wall.day + days));
+        const at = zonedInstant(
+            {
+                year: target.getUTCFullYear(),
+                month: target.getUTCMonth() + 1,
+                day: target.getUTCDate(),
+                hours: wall.hours,
+                minutes: wall.minutes
+            },
+            zone
+        );
+        return new Date(at.getTime() + wall.seconds * 1000 + date.getUTCMilliseconds());
+    }
     const copy = new Date(date);
     copy.setDate(copy.getDate() + days);
     return copy;
@@ -237,24 +299,31 @@ export function addDays(date: Date, days: number): Date {
  *
  * @param weekStartsOn - A `Date.getDay()` index: 0 Sunday, 1 Monday, 6 Saturday.
  */
-export function startOfWeek(date: Date, weekStartsOn = 1): Date {
-    const copy = startOfDay(date);
-    const weekday = (copy.getDay() - weekStartsOn + 7) % 7;
-    return addDays(copy, -weekday);
+export function startOfWeek(date: Date, weekStartsOn = 1, zone?: string): Date {
+    const copy = startOfDay(date, zone);
+    const day = zoned(zone) ? new Date(calendarDay(date, zone)).getUTCDay() : copy.getDay();
+    const weekday = (day - weekStartsOn + 7) % 7;
+    return addDays(copy, -weekday, zone);
 }
 
-export function startOfMonth(date: Date): Date {
+export function startOfMonth(date: Date, zone?: string): Date {
+    if (zoned(zone)) {
+        const day = new Date(calendarDay(date, zone));
+        return midnightOf(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), 1), zone);
+    }
     const copy = startOfDay(date);
     copy.setDate(1);
     return copy;
 }
 
 /** Whole days between two instants, ignoring the time of day. */
-export function daysBetween(from: Date, to: Date): number {
+export function daysBetween(from: Date, to: Date, zone?: string): number {
+    if (zoned(zone)) return Math.round((calendarDay(to, zone) - calendarDay(from, zone)) / DAY_MS);
     return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / DAY_MS);
 }
 
-export function isSameDay(left: Date, right: Date): boolean {
+export function isSameDay(left: Date, right: Date, zone?: string): boolean {
+    if (zoned(zone)) return calendarDay(left, zone) === calendarDay(right, zone);
     return startOfDay(left).getTime() === startOfDay(right).getTime();
 }
 
@@ -263,38 +332,38 @@ export function isSameDay(left: Date, right: Date): boolean {
 export function resolveRelativeDate(
     token: work.RelativeDate,
     now: Date,
-    weekStartsOn = 1
+    weekStartsOn = 1,
+    zone?: string
 ): { from: Date; to: Date } {
-    const today = startOfDay(now);
+    const today = startOfDay(now, zone);
+    const day = (offset: number) => {
+        const at = addDays(today, offset, zone);
+        return { from: at, to: endOfDay(at, zone) };
+    };
+    const week = (offset: number) => {
+        const from = addDays(startOfWeek(now, weekStartsOn, zone), offset, zone);
+        return { from, to: endOfDay(addDays(from, 6, zone), zone) };
+    };
+    // A first of the month plus 32 days is always somewhere in the next one.
+    const nextMonthOf = (first: Date) => startOfMonth(addDays(first, 32, zone), zone);
+    const month = (from: Date) => ({ from, to: new Date(nextMonthOf(from).getTime() - 1) });
     switch (token) {
         case "today":
-            return { from: today, to: endOfDay(now) };
+            return { from: today, to: endOfDay(now, zone) };
         case "tomorrow":
-            return { from: addDays(today, 1), to: endOfDay(addDays(today, 1)) };
+            return day(1);
         case "yesterday":
-            return { from: addDays(today, -1), to: endOfDay(addDays(today, -1)) };
-        case "thisWeek": {
-            const from = startOfWeek(now, weekStartsOn);
-            return { from, to: endOfDay(addDays(from, 6)) };
-        }
-        case "nextWeek": {
-            const from = addDays(startOfWeek(now, weekStartsOn), 7);
-            return { from, to: endOfDay(addDays(from, 6)) };
-        }
-        case "lastWeek": {
-            const from = addDays(startOfWeek(now, weekStartsOn), -7);
-            return { from, to: endOfDay(addDays(from, 6)) };
-        }
-        case "thisMonth": {
-            const from = startOfMonth(now);
-            const to = new Date(from.getFullYear(), from.getMonth() + 1, 0, 23, 59, 59, 999);
-            return { from, to };
-        }
-        case "nextMonth": {
-            const from = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-            const to = new Date(from.getFullYear(), from.getMonth() + 1, 0, 23, 59, 59, 999);
-            return { from, to };
-        }
+            return day(-1);
+        case "thisWeek":
+            return week(0);
+        case "nextWeek":
+            return week(7);
+        case "lastWeek":
+            return week(-7);
+        case "thisMonth":
+            return month(startOfMonth(now, zone));
+        case "nextMonth":
+            return month(nextMonthOf(startOfMonth(now, zone)));
         case "overdue":
             // Everything up to this instant. The lower bound is the epoch rather
             // than a guess at how old a task can be.
@@ -372,34 +441,42 @@ export function taskIsBlocked(input: BlockedInput, now: Date): boolean {
 
 /** What counts as the deadline. A task with no time of day is due at the end of
  *  its day, so an all-day task set for today is not overdue at breakfast. */
-function deadlineOf(task: Pick<TaskFacts, "dueDate" | "timed">): Date | null {
+function deadlineOf(task: Pick<TaskFacts, "dueDate" | "timed">, zone?: string): Date | null {
     if (!task.dueDate) return null;
-    return task.timed === true ? task.dueDate : endOfDay(task.dueDate);
+    return task.timed === true ? task.dueDate : endOfDay(task.dueDate, zone);
 }
 
 /**
  * Which pile a task belongs in on the home screen. A finished task is never
  * overdue: the date has stopped mattering once the work is done, and colouring
  * it red is how a done list ends up looking like a crisis.
+ *
+ * `zone` is the reader's, for a caller on a server (see the Dates section).
  */
 export function dueBucket(
     task: Pick<TaskFacts, "dueDate" | "statusType" | "timed">,
     now: Date,
-    weekStartsOn = 1
+    weekStartsOn = 1,
+    zone?: string
 ): DueBucket {
     const { dueDate } = task;
     if (!dueDate) return "none";
-    const deadline = deadlineOf(task) as Date;
-    if (!work.isFinishedStatus(task.statusType) && deadline.getTime() < now.getTime()) return "overdue";
-    if (isSameDay(dueDate, now)) return "today";
-    if (isSameDay(dueDate, addDays(now, 1))) return "tomorrow";
-    const weekEnd = endOfDay(addDays(startOfWeek(now, weekStartsOn), 6));
-    return dueDate >= startOfDay(now) && dueDate <= weekEnd ? "thisWeek" : "later";
+    const deadline = deadlineOf(task, zone) as Date;
+    if (!work.isFinishedStatus(task.statusType) && deadline.getTime() < now.getTime())
+        return "overdue";
+    if (isSameDay(dueDate, now, zone)) return "today";
+    if (isSameDay(dueDate, addDays(now, 1, zone), zone)) return "tomorrow";
+    const weekEnd = endOfDay(addDays(startOfWeek(now, weekStartsOn, zone), 6, zone), zone);
+    return dueDate >= startOfDay(now, zone) && dueDate <= weekEnd ? "thisWeek" : "later";
 }
 
 /** Whether a task is past its due date and still unfinished. */
-export function isOverdue(task: Pick<TaskFacts, "dueDate" | "statusType" | "timed">, now: Date): boolean {
-    return dueBucket(task, now) === "overdue";
+export function isOverdue(
+    task: Pick<TaskFacts, "dueDate" | "statusType" | "timed">,
+    now: Date,
+    zone?: string
+): boolean {
+    return dueBucket(task, now, 1, zone) === "overdue";
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +531,11 @@ function factDate(task: TaskFacts, field: work.TaskFilterCondition["field"]): Da
     return null;
 }
 
-const DATE_FIELDS = new Set<work.TaskFilterCondition["field"]>(["dueDate", "startDate", "createdAt"]);
+const DATE_FIELDS = new Set<work.TaskFilterCondition["field"]>([
+    "dueDate",
+    "startDate",
+    "createdAt"
+]);
 const NUMBER_FIELDS = new Set<work.TaskFilterCondition["field"]>(["points", "timeEstimate"]);
 
 /** A condition value that names a relative window, or null when it is an
@@ -479,11 +560,12 @@ function conditionDate(
     value: string | undefined,
     now: Date,
     edge: "from" | "to",
-    weekStartsOn: number
+    weekStartsOn: number,
+    zone?: string
 ): Date | null {
     if (!value) return null;
     const relative = asRelative(value);
-    if (relative) return resolveRelativeDate(relative, now, weekStartsOn)[edge];
+    if (relative) return resolveRelativeDate(relative, now, weekStartsOn, zone)[edge];
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -492,7 +574,8 @@ function matchesDateCondition(
     date: Date | null,
     condition: work.TaskFilterCondition,
     now: Date,
-    weekStartsOn: number
+    weekStartsOn: number,
+    zone?: string
 ): boolean {
     switch (condition.operator) {
         case "isSet":
@@ -506,29 +589,32 @@ function matchesDateCondition(
 
     const first = condition.values[0];
     if (condition.operator === "between") {
-        const from = conditionDate(first, now, "from", weekStartsOn);
-        const to = conditionDate(condition.values[1] ?? first, now, "to", weekStartsOn);
+        const from = conditionDate(first, now, "from", weekStartsOn, zone);
+        const to = conditionDate(condition.values[1] ?? first, now, "to", weekStartsOn, zone);
         if (!from || !to) return false;
         return date >= from && date <= to;
     }
     if (condition.operator === "before" || condition.operator === "lt") {
-        const to = conditionDate(first, now, "from", weekStartsOn);
+        const to = conditionDate(first, now, "from", weekStartsOn, zone);
         return to !== null && date < to;
     }
     if (condition.operator === "after" || condition.operator === "gt") {
-        const from = conditionDate(first, now, "to", weekStartsOn);
+        const from = conditionDate(first, now, "to", weekStartsOn, zone);
         return from !== null && date > from;
     }
     // "is" on a date means "falls within that window", which is the only reading
     // that makes "due is today" behave the way a person expects.
-    const from = conditionDate(first, now, "from", weekStartsOn);
-    const to = conditionDate(first, now, "to", weekStartsOn);
+    const from = conditionDate(first, now, "from", weekStartsOn, zone);
+    const to = conditionDate(first, now, "to", weekStartsOn, zone);
     if (!from || !to) return false;
     const inside = date >= from && date <= to;
     return condition.operator === "isNot" ? !inside : inside;
 }
 
-function matchesNumberCondition(value: number | null, condition: work.TaskFilterCondition): boolean {
+function matchesNumberCondition(
+    value: number | null,
+    condition: work.TaskFilterCondition
+): boolean {
     if (condition.operator === "isSet") return value !== null;
     if (condition.operator === "isNotSet") return value === null;
     if (value === null) return false;
@@ -557,15 +643,22 @@ export function matchesCondition(
     task: TaskFacts,
     condition: work.TaskFilterCondition,
     now: Date,
-    weekStartsOn = 1
+    weekStartsOn = 1,
+    zone?: string
 ): boolean {
     if (DATE_FIELDS.has(condition.field)) {
         // "due date is overdue" is a question about the status too, so it routes
         // through the same bucket logic the home screen uses.
         if (condition.values.includes("overdue") && condition.operator === "is") {
-            return isOverdue(task, now);
+            return isOverdue(task, now, zone);
         }
-        return matchesDateCondition(factDate(task, condition.field), condition, now, weekStartsOn);
+        return matchesDateCondition(
+            factDate(task, condition.field),
+            condition,
+            now,
+            weekStartsOn,
+            zone
+        );
     }
     if (NUMBER_FIELDS.has(condition.field)) {
         return matchesNumberCondition(
@@ -590,9 +683,13 @@ export function matchesCondition(
         case "noneOf":
             return wanted.length === 0 || !values.some((value) => wanted.includes(value));
         case "contains":
-            return values.some((value) => value.toLowerCase().includes((wanted[0] ?? "").toLowerCase()));
+            return values.some((value) =>
+                value.toLowerCase().includes((wanted[0] ?? "").toLowerCase())
+            );
         case "notContains":
-            return !values.some((value) => value.toLowerCase().includes((wanted[0] ?? "").toLowerCase()));
+            return !values.some((value) =>
+                value.toLowerCase().includes((wanted[0] ?? "").toLowerCase())
+            );
         default:
             return true;
     }
@@ -604,25 +701,34 @@ export function matchesFilter(
     task: TaskFacts,
     filter: work.TaskFilter,
     now: Date,
-    weekStartsOn = 1
+    weekStartsOn = 1,
+    zone?: string
 ): boolean {
     if (filter.conditions.length === 0) return true;
     return filter.match === "all"
-        ? filter.conditions.every((condition) => matchesCondition(task, condition, now, weekStartsOn))
-        : filter.conditions.some((condition) => matchesCondition(task, condition, now, weekStartsOn));
+        ? filter.conditions.every((condition) =>
+              matchesCondition(task, condition, now, weekStartsOn, zone)
+          )
+        : filter.conditions.some((condition) =>
+              matchesCondition(task, condition, now, weekStartsOn, zone)
+          );
 }
 
 export function applyFilter<T extends TaskFacts>(
     tasks: readonly T[],
     filter: work.TaskFilter,
     now: Date,
-    weekStartsOn = 1
+    weekStartsOn = 1,
+    zone?: string
 ): T[] {
-    return tasks.filter((task) => matchesFilter(task, filter, now, weekStartsOn));
+    return tasks.filter((task) => matchesFilter(task, filter, now, weekStartsOn, zone));
 }
 
 /** Free-text search over the fields a person types into a search box. */
-export function searchTasks<T extends TaskFacts & { reference?: string }>(tasks: readonly T[], query: string): T[] {
+export function searchTasks<T extends TaskFacts & { reference?: string }>(
+    tasks: readonly T[],
+    query: string
+): T[] {
     const needle = query.trim().toLowerCase();
     if (!needle) return [...tasks];
     return tasks.filter(
@@ -707,13 +813,16 @@ export function compareTasks(
         // not asking for the furthest deadline first within each band.
         case "priority":
             return (
-                (work.priorityRank(left.priority) - work.priorityRank(right.priority)) * direction ||
-                byDeadlineThenEffort(left, right)
+                (work.priorityRank(left.priority) - work.priorityRank(right.priority)) *
+                    direction || byDeadlineThenEffort(left, right)
             );
         case "dueDate":
             return (
-                compareNullable(left.dueDate?.getTime() ?? null, right.dueDate?.getTime() ?? null, direction) ||
-                byUrgency(left, right)
+                compareNullable(
+                    left.dueDate?.getTime() ?? null,
+                    right.dueDate?.getTime() ?? null,
+                    direction
+                ) || byUrgency(left, right)
             );
         case "startDate":
             return compareNullable(
@@ -827,13 +936,21 @@ export function statusColumns(
     const columns: StatusColumn[] = [];
     const byName = new Map<string, StatusColumn>();
     for (const status of statuses) {
-        const key = status.name.trim().toLowerCase().replace(/cancelled/g, "canceled");
+        const key = status.name
+            .trim()
+            .toLowerCase()
+            .replace(/cancelled/g, "canceled");
         const existing = byName.get(key);
         if (existing) {
             existing.ids.push(status.id);
             continue;
         }
-        const column: StatusColumn = { id: status.id, name: status.name, color: status.color, ids: [status.id] };
+        const column: StatusColumn = {
+            id: status.id,
+            name: status.name,
+            color: status.color,
+            ids: [status.id]
+        };
         byName.set(key, column);
         columns.push(column);
     }
@@ -933,36 +1050,63 @@ export function groupTasks<T extends TaskFacts>(
 
     if (groupBy === "status") {
         for (const column of columns) {
-            groups.push({ key: column.id, label: column.name, color: column.color, tasks: consume(column.id) });
+            groups.push({
+                key: column.id,
+                label: column.name,
+                color: column.color,
+                tasks: consume(column.id)
+            });
         }
     } else if (groupBy === "priority") {
         for (const priority of ["urgent", "high", "normal", "low", "none"] as const) {
             groups.push({
                 key: priority,
-                label: priority === "none" ? "No priority" : priority[0]!.toUpperCase() + priority.slice(1),
+                label:
+                    priority === "none"
+                        ? "No priority"
+                        : priority[0]!.toUpperCase() + priority.slice(1),
                 tasks: consume(priority)
             });
         }
     } else if (groupBy === "dueDate") {
         for (const bucket of DUE_BUCKETS) {
             const found = consume(bucket);
-            if (found.length > 0) groups.push({ key: bucket, label: DUE_BUCKET_LABELS[bucket], tasks: found });
+            if (found.length > 0)
+                groups.push({ key: bucket, label: DUE_BUCKET_LABELS[bucket], tasks: found });
         }
     } else if (groupBy === "blocked") {
         // Both columns always, even when one is empty: an empty Blocked column is
         // the answer somebody grouped this way to see.
-        groups.push({ key: "blocked", label: "Blocked", color: "#ef4444", tasks: consume("blocked") });
+        groups.push({
+            key: "blocked",
+            label: "Blocked",
+            color: "#ef4444",
+            tasks: consume("blocked")
+        });
         groups.push({ key: "clear", label: "Not blocked", tasks: consume("clear") });
     } else {
         const source =
             groupBy === "assignee"
-                ? (context.people ?? []).map((person) => ({ id: person.id, name: person.name, color: undefined }))
+                ? (context.people ?? []).map((person) => ({
+                      id: person.id,
+                      name: person.name,
+                      color: undefined
+                  }))
                 : groupBy === "tag"
-                  ? (context.tags ?? []).map((tag) => ({ id: tag.id, name: tag.name, color: tag.color }))
-                  : (context.lists ?? []).map((list) => ({ id: list.id, name: list.name, color: undefined }));
+                  ? (context.tags ?? []).map((tag) => ({
+                        id: tag.id,
+                        name: tag.name,
+                        color: tag.color
+                    }))
+                  : (context.lists ?? []).map((list) => ({
+                        id: list.id,
+                        name: list.name,
+                        color: undefined
+                    }));
         for (const entry of source) {
             const found = consume(entry.id);
-            if (found.length > 0) groups.push({ key: entry.id, label: entry.name, color: entry.color, tasks: found });
+            if (found.length > 0)
+                groups.push({ key: entry.id, label: entry.name, color: entry.color, tasks: found });
         }
     }
 
@@ -970,7 +1114,11 @@ export function groupTasks<T extends TaskFacts>(
     // no longer on the space) still has to appear, or its tasks vanish.
     for (const [key, found] of buckets) {
         if (found.length === 0) continue;
-        groups.push({ key, label: key === "" ? (UNSET_LABELS[groupBy] ?? "Other") : "Other", tasks: found });
+        groups.push({
+            key,
+            label: key === "" ? (UNSET_LABELS[groupBy] ?? "Other") : "Other",
+            tasks: found
+        });
     }
     return groups;
 }
@@ -1037,7 +1185,10 @@ export interface TaskNode<T> {
  * as a root, so filtering to "my tasks" shows the subtask assigned to you rather
  * than dropping it because its parent belongs to somebody else.
  */
-export function buildTaskTree<T extends TaskFacts>(tasks: readonly T[], maxDepth = 7): TaskNode<T>[] {
+export function buildTaskTree<T extends TaskFacts>(
+    tasks: readonly T[],
+    maxDepth = 7
+): TaskNode<T>[] {
     const byId = new Map(tasks.map((task) => [task.id, task]));
     const children = new Map<string, T[]>();
     const roots: T[] = [];
@@ -1054,7 +1205,9 @@ export function buildTaskTree<T extends TaskFacts>(tasks: readonly T[], maxDepth
         task,
         depth,
         children:
-            depth >= maxDepth ? [] : (children.get(task.id) ?? []).map((child) => build(child, depth + 1))
+            depth >= maxDepth
+                ? []
+                : (children.get(task.id) ?? []).map((child) => build(child, depth + 1))
     });
     return roots.map((task) => build(task, 0));
 }
@@ -1136,7 +1289,10 @@ export function folderAncestors<T extends FolderRow>(folders: readonly T[], fold
 
 /** A folder and everything under it. The folder itself is included, because
  *  every caller either moves it or checks access to the whole branch. */
-export function folderBranch<T extends FolderRow>(folders: readonly T[], folderId: string): Set<string> {
+export function folderBranch<T extends FolderRow>(
+    folders: readonly T[],
+    folderId: string
+): Set<string> {
     const children = new Map<string, string[]>();
     for (const folder of folders) {
         if (!folder.parentId) continue;
@@ -1206,7 +1362,11 @@ export interface DependencyEdge {
  * chart unsolvable and a scheduler spin, so it is refused at the point of entry
  * rather than detected later.
  */
-export function wouldCycle(edges: readonly DependencyEdge[], blockerId: string, blockedId: string): boolean {
+export function wouldCycle(
+    edges: readonly DependencyEdge[],
+    blockerId: string,
+    blockedId: string
+): boolean {
     if (blockerId === blockedId) return true;
     const forward = new Map<string, string[]>();
     for (const edge of edges) {
@@ -1269,8 +1429,37 @@ function withDayOfMonth(date: Date, day: number): Date {
  * Returns null once the rule has run out (past its end date), so the caller
  * stops regenerating instead of looping forever.
  */
-export function nextOccurrence(recurrence: work.Recurrence, from: Date, occurrencesSoFar = 0): Date | null {
+export function nextOccurrence(
+    recurrence: work.Recurrence,
+    from: Date,
+    occurrencesSoFar = 0,
+    zone?: string
+): Date | null {
     if (recurrence.endsAfter !== undefined && occurrencesSoFar >= recurrence.endsAfter) return null;
+    if (zoned(zone)) {
+        // The weekday and the day of the month are the zone's, not the server's:
+        // an all-day task due Monday in Madrid is stored on Sunday evening UTC,
+        // and counted on the server's calendar "every Monday" would land on a
+        // Tuesday. So the calendar step is taken on that day's own date (noon,
+        // clear of any local daylight saving edge) and the result read back as
+        // the same wall-clock time in the zone.
+        const wall = wallClock(from, zone);
+        const local = new Date(wall.year, wall.month - 1, wall.day, 12, 0, 0, 0);
+        const step = nextOccurrence({ ...recurrence, endsOn: undefined }, local, 0);
+        if (!step) return null;
+        const next = zonedInstant(
+            {
+                year: step.getFullYear(),
+                month: step.getMonth() + 1,
+                day: step.getDate(),
+                hours: wall.hours,
+                minutes: wall.minutes
+            },
+            zone
+        );
+        next.setTime(next.getTime() + wall.seconds * 1000);
+        return pastEnd(recurrence, next) ? null : next;
+    }
 
     const interval = Math.max(1, recurrence.interval);
     let next: Date;
@@ -1314,12 +1503,14 @@ export function nextOccurrence(recurrence: work.Recurrence, from: Date, occurren
     // Keep the time of day of the original due date: a stand-up that recurs is
     // still at 09:30.
     next.setHours(from.getHours(), from.getMinutes(), from.getSeconds(), 0);
+    return pastEnd(recurrence, next) ? null : next;
+}
 
-    if (recurrence.endsOn) {
-        const endsOn = new Date(recurrence.endsOn);
-        if (!Number.isNaN(endsOn.getTime()) && next > endsOn) return null;
-    }
-    return next;
+/** Whether an occurrence falls after the date a rule was set to stop on. */
+function pastEnd(recurrence: work.Recurrence, next: Date): boolean {
+    if (!recurrence.endsOn) return false;
+    const endsOn = new Date(recurrence.endsOn);
+    return !Number.isNaN(endsOn.getTime()) && next > endsOn;
 }
 
 // ---------------------------------------------------------------------------
@@ -1354,14 +1545,15 @@ export interface AutomationRule {
 export function selectAutomations(
     rules: readonly AutomationRule[],
     event: AutomationEvent,
-    now: Date
+    now: Date,
+    zone?: string
 ): AutomationRule[] {
     return rules.filter(
         (rule) =>
             rule.enabled &&
             rule.trigger === event.trigger &&
             (rule.listId === null || rule.listId === event.task.listId) &&
-            matchesFilter(event.task, rule.conditions, now)
+            matchesFilter(event.task, rule.conditions, now, 1, zone)
     );
 }
 
@@ -1458,23 +1650,25 @@ export function burndown(
         readonly end: Date;
         readonly tasks: readonly Pick<TaskFacts, "points" | "completedAt" | "statusType">[];
     },
-    now: Date
+    now: Date,
+    zone?: string
 ): BurndownPoint[] {
     const usePoints = input.tasks.some((task) => (task.points ?? 0) > 0);
     const weight = (task: Pick<TaskFacts, "points">) => (usePoints ? (task.points ?? 0) : 1);
     const total = input.tasks.reduce((sum, task) => sum + weight(task), 0);
 
-    const days = Math.max(1, daysBetween(input.start, input.end));
+    const days = Math.max(1, daysBetween(input.start, input.end, zone));
     const points: BurndownPoint[] = [];
     for (let index = 0; index <= days; index += 1) {
-        const date = endOfDay(addDays(startOfDay(input.start), index));
+        const date = endOfDay(addDays(startOfDay(input.start, zone), index, zone), zone);
         const ideal = Math.max(0, total - (total / days) * index);
-        if (startOfDay(date) > startOfDay(now)) {
+        if (startOfDay(date, zone) > startOfDay(now, zone)) {
             points.push({ date, ideal, remaining: null });
             continue;
         }
         const burned = input.tasks.reduce(
-            (sum, task) => (task.completedAt && task.completedAt <= date ? sum + weight(task) : sum),
+            (sum, task) =>
+                task.completedAt && task.completedAt <= date ? sum + weight(task) : sum,
             0
         );
         points.push({ date, ideal, remaining: Math.max(0, total - burned) });

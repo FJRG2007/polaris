@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { optionLabel } from "./option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDisplayPreferences } from "@/components/display-format";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { Ban, CalendarPlus, Check, ChevronDown, Plus, Settings2, UserPlus, X } from "lucide-react";
@@ -799,6 +800,19 @@ export function DurationField({
 // Small shared bits
 // ---------------------------------------------------------------------------
 
+/**
+ * The zone a due date's day is read in from a component.
+ *
+ * In the browser it is the device's own, which is the zone `fromDateInput` wrote
+ * the day in. While the page is rendered on the server it is the reader's
+ * resolved zone instead: the server's clock is usually UTC, and read against it a
+ * task due today in Madrid is already "overdue" in the first HTML - a red the
+ * browser never repaints, since hydration keeps the server's attributes.
+ */
+export function dayZone(preferences: { readonly timeZone: string }): string | undefined {
+    return typeof window === "undefined" ? preferences.timeZone : undefined;
+}
+
 /** A due date rendered with the urgency it actually has. */
 export function DueBadge({
     dueDate,
@@ -812,8 +826,14 @@ export function DueBadge({
     format: (iso: string) => string;
 }) {
     const t = useTranslations("tasks");
+    const zone = dayZone(useDisplayPreferences());
     if (!dueDate) return null;
-    const bucket = core.dueBucket({ dueDate: new Date(dueDate), statusType, timed }, new Date());
+    const bucket = core.dueBucket(
+        { dueDate: new Date(dueDate), statusType, timed },
+        new Date(),
+        1,
+        zone
+    );
     const tone =
         bucket === "overdue"
             ? "text-danger"

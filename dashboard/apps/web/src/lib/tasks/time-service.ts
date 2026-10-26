@@ -138,10 +138,13 @@ export async function weeklyTimesheet(
     userId: string,
     anchor: Date,
     scope: TaskScope,
-    weekStartsOn = 1
+    weekStartsOn = 1,
+    zone?: string
 ): Promise<Timesheet> {
-    const from = core.startOfWeek(anchor, weekStartsOn);
-    const to = core.endOfDay(core.addDays(from, 6));
+    // `zone` is the person's own, so a day's column holds that day's work and not
+    // the server's: an hour logged at 00:30 in Madrid is on that day, not the last.
+    const from = core.startOfWeek(anchor, weekStartsOn, zone);
+    const to = core.endOfDay(core.addDays(from, 6, zone), zone);
 
     const entries = await prisma.taskTimeEntry.findMany({
         where: {
@@ -184,7 +187,7 @@ export async function weeklyTimesheet(
                 total: 0
             } as TimesheetEntry & { days: number[] });
 
-        const index = Math.min(6, Math.max(0, core.daysBetween(from, entry.startedAt)));
+        const index = Math.min(6, Math.max(0, core.daysBetween(from, entry.startedAt, zone)));
         row.days[index] = (row.days[index] ?? 0) + entry.seconds;
         rows.set(key, { ...row, total: row.total + entry.seconds });
         dayTotals[index] = (dayTotals[index] ?? 0) + entry.seconds;

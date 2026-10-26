@@ -10,6 +10,7 @@
 import * as core from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
 import { scopeSpaceIds, scopeTaskWhere, type TaskScope } from "./access";
+import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 
 export interface ReportSummary {
     readonly total: number;
@@ -49,11 +50,24 @@ export interface TaskReport {
     readonly completion: CompletionPoint[];
 }
 
-/** The whole reporting page for everything the reader can reach, in one pass. */
+/**
+ * The zone a person's days are counted in, for the counts drawn for them.
+ *
+ * This runs on the server, whose clock is usually UTC, and an all-day task is
+ * stored as the reader's own midnight: counted against the server's day, a task
+ * due today in Madrid is "overdue" from one in the morning.
+ */
+export async function readerZone(userId: string): Promise<string> {
+    return (await resolveDisplayPreferencesFor(userId)).timeZone;
+}
+
+/** The whole reporting page for everything the reader can reach, in one pass.
+ *  `zone` is the reader's (`readerZone`), so "overdue" and "this week" are theirs. */
 export async function buildReport(
     scope: TaskScope,
     now = new Date(),
-    weekStartsOn = 1
+    weekStartsOn = 1,
+    zone?: string
 ): Promise<TaskReport> {
     const spaceIds = scopeSpaceIds(scope);
     if (spaceIds.length === 0) {
@@ -74,8 +88,9 @@ export async function buildReport(
         };
     }
 
-    const weekStart = core.startOfWeek(now, weekStartsOn);
-    const weekEnd = core.endOfDay(core.addDays(weekStart, 6));
+    const weekStart = core.startOfWeek(now, weekStartsOn, zone);
+    const weekEnd = core.endOfDay(core.addDays(weekStart, 6, zone), zone);
+    const today = core.startOfDay(now, zone);
     // The reach clause is itself an OR, so anything else that needs one is
     // nested under AND rather than spread beside it, where it would overwrite it
     // and quietly widen every count on the page.
@@ -104,7 +119,7 @@ export async function buildReport(
         prisma.task.count({ where: base }),
         prisma.task.count({ where: { ...base, ...finishedTypes } }),
         prisma.task.count({
-            where: { ...base, AND: [unfinished], dueDate: { lt: core.startOfDay(now) } }
+            where: { ...base, AND: [unfinished], dueDate: { lt: today } }
         }),
         prisma.task.count({ where: { ...base, dueDate: { gte: weekStart, lte: weekEnd } } }),
         prisma.task.count({ where: { ...base, completedAt: { gte: weekStart, lte: weekEnd } } }),
@@ -119,7 +134,7 @@ export async function buildReport(
             _count: { _all: true }
         }),
         prisma.task.findMany({
-            where: { ...base, completedAt: { gte: core.addDays(core.startOfDay(now), -29) } },
+            where: { ...base, completedAt: { gte: core.addDays(today, -29, zone) } },
             select: { completedAt: true }
         })
     ]);
@@ -148,11 +163,11 @@ export async function buildReport(
 
     const days = new Map<string, number>();
     for (let index = 29; index >= 0; index -= 1) {
-        days.set(core.startOfDay(core.addDays(now, -index)).toISOString(), 0);
+        days.set(core.addDays(today, -index, zone).toISOString(), 0);
     }
     for (const task of completion) {
         if (!task.completedAt) continue;
-        const key = core.startOfDay(task.completedAt).toISOString();
+        const key = core.startOfDay(task.completedAt, zone).toISOString();
         if (days.has(key)) days.set(key, (days.get(key) ?? 0) + 1);
     }
 
@@ -173,14 +188,14 @@ export async function buildReport(
                 (left, right) =>
                     core.priorityRank(left.priority) - core.priorityRank(right.priority)
             ),
-        load: await workload(scope, now),
+        load: await workload(scope, now, zone),
         completion: [...days.entries()].map(([date, completed]) => ({ date, completed }))
     };
 }
 
 /** Who is carrying what, counted from the assignee table so a task with two
  *  owners appears on both of their rows. */
-async function workload(scope: TaskScope, now: Date): Promise<PersonLoad[]> {
+async function workload(scope: TaskScope, now: Date, zone?: string): Promise<PersonLoad[]> {
     const assignments = await prisma.taskAssignee.findMany({
         where: {
             task: {
@@ -204,7 +219,7 @@ async function workload(scope: TaskScope, now: Date): Promise<PersonLoad[]> {
     });
 
     const rows = new Map<string, PersonLoad>();
-    const today = core.startOfDay(now);
+    const today = core.startOfDay(now, zone);
     for (const assignment of assignments) {
         const current = rows.get(assignment.userId) ?? {
             userId: assignment.userId,
@@ -225,11 +240,13 @@ async function workload(scope: TaskScope, now: Date): Promise<PersonLoad[]> {
     return [...rows.values()].sort((left, right) => right.open - left.open);
 }
 
-/** What one person has on right now, for the home screen headline. */
+/** What one person has on right now, for the home screen headline. Counted
+ *  against that person's day unless the caller already knows their zone. */
 export async function myWorkCounts(
     userId: string,
     scope: TaskScope,
-    now = new Date()
+    now = new Date(),
+    zone?: string
 ): Promise<{
     assigned: number;
     overdue: number;
@@ -250,11 +267,13 @@ export async function myWorkCounts(
         ]
     };
 
+    const day = zone ?? (await readerZone(userId));
+    const today = core.startOfDay(now, day);
     const [assigned, overdue, dueToday] = await Promise.all([
         prisma.task.count({ where: mine }),
-        prisma.task.count({ where: { ...mine, dueDate: { lt: core.startOfDay(now) } } }),
+        prisma.task.count({ where: { ...mine, dueDate: { lt: today } } }),
         prisma.task.count({
-            where: { ...mine, dueDate: { gte: core.startOfDay(now), lte: core.endOfDay(now) } }
+            where: { ...mine, dueDate: { gte: today, lte: core.endOfDay(now, day) } }
         })
     ]);
     return { assigned, overdue, dueToday };
@@ -294,7 +313,8 @@ export async function myUrgentTasks(
     userId: string,
     scope: TaskScope,
     limit: number,
-    now = new Date()
+    now = new Date(),
+    zone?: string
 ): Promise<MyWorkTask[]> {
     if (scopeSpaceIds(scope).length === 0) return [];
     const mine: Prisma.TaskWhereInput = {
@@ -340,7 +360,7 @@ export async function myUrgentTasks(
         })
     ]);
 
-    const startOfToday = core.startOfDay(now);
+    const startOfToday = core.startOfDay(now, zone ?? (await readerZone(userId)));
     const byId = new Map([...dated, ...prioritized].map((task) => [task.id, task]));
     return [...byId.values()]
         .map((task) => ({

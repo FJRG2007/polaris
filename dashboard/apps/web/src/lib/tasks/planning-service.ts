@@ -191,7 +191,8 @@ export async function setTaskSprint(
 /** The burndown for one sprint, ready to chart. */
 export async function sprintBurndown(
     sprintId: string,
-    now = new Date()
+    now = new Date(),
+    zone?: string
 ): Promise<core.BurndownPoint[]> {
     const sprint = await prisma.taskSprint.findUnique({
         where: { id: sprintId },
@@ -214,7 +215,8 @@ export async function sprintBurndown(
                 statusType: (task.status?.type as core.TaskStatusType) ?? "open"
             }))
         },
-        now
+        now,
+        zone
     );
 }
 

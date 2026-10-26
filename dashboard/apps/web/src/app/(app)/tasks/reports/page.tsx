@@ -24,13 +24,15 @@ export default async function ReportsPage() {
     const scope = await shelfScope(actor);
 
     const now = new Date();
-    const weekStartsOn = weekStartIndex((await resolveDisplayPreferencesFor(user.id)).weekStart);
-    const weekStart = startOfWeek(now, weekStartsOn);
+    const prefs = await resolveDisplayPreferencesFor(user.id);
+    const weekStartsOn = weekStartIndex(prefs.weekStart);
+    // The reader's week, not the server's: this page is drawn where the clock is UTC.
+    const weekStart = startOfWeek(now, weekStartsOn, prefs.timeZone);
 
     const [tree, report, byPerson] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),
-        buildReport(scope, now, weekStartsOn),
-        timeByPerson(scope, weekStart, addDays(weekStart, 7))
+        buildReport(scope, now, weekStartsOn, prefs.timeZone),
+        timeByPerson(scope, weekStart, addDays(weekStart, 7, prefs.timeZone))
     ]);
 
     return (

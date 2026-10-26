@@ -31,7 +31,7 @@ import { TaskCreateDialog } from "./task-create-dialog";
 import { affected, undoSteps } from "./bulk-edits";
 import { BarButton, SelectionBar } from "./selection-bar";
 import { downloadCsv, tasksToCsv } from "./export-csv";
-import { AssigneePicker, PriorityPicker, StatusPicker } from "./pickers";
+import { AssigneePicker, dayZone, PriorityPicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { nestSubtasks, useOpenParents, type SubtaskView } from "./views/subtasks";
@@ -302,7 +302,15 @@ export function ListScreen({
         const working = rows
             .filter((task) => !hidesClosed || task.statusType !== "closed")
             .map(toFacts)
-            .filter((facts) => core.matchesFilter(facts, filter, now, format.weekStartsOn));
+            .filter((facts) =>
+                core.matchesFilter(
+                    facts,
+                    filter,
+                    now,
+                    format.weekStartsOn,
+                    dayZone(format.preferences)
+                )
+            );
         const sorted = core.sortTasks(working, sort, statusOrder);
         if (!needle) return sorted;
         // Searched in the screen's own order, so the tasks that matched equally
