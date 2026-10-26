@@ -25,6 +25,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgRoleView } from "@/lib/orgs/role-service";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { HeldPermissionSections } from "@/components/permission-sections";
 import {
     createOrgRoleAction,
     deleteOrgRoleAction,
@@ -37,7 +38,6 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
-    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -216,7 +216,12 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                     <p className="text-muted-foreground text-sm">{t("roles.locked")}</p>
                 ) : (
                     <>
-                        <PermissionGrid held={held} disabled={busy} onChange={setHeld} />
+                        <PermissionGrid
+                            held={held}
+                            disabled={busy}
+                            storageKey={`org.roles.${role.id}`}
+                            onChange={setHeld}
+                        />
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-muted-foreground text-xs">
                                 {role.restricted
@@ -265,45 +270,46 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
 function PermissionGrid({
     held,
     disabled,
+    storageKey,
     onChange
 }: {
     held: Set<string>;
     disabled: boolean;
+    storageKey?: string;
     onChange: (next: Set<string>) => void;
 }) {
     const t = useTranslations("accountOrgs");
-    const areaLabel = (area: string) => {
-        const key = AREA_LABELS[area];
-        return key ? t(key) : area;
-    };
+    const sections = useMemo(
+        () =>
+            AREAS.map(({ area, permissions }) => {
+                const key = AREA_LABELS[area];
+                return {
+                    id: area,
+                    label: key ? t(key) : area,
+                    items: permissions.map((permission) => ({
+                        id: permission,
+                        label: t(PERMISSION_LABELS[permission])
+                    }))
+                };
+            }),
+        [t]
+    );
+
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {AREAS.map(({ area, permissions }) => (
-                <div key={area} className="flex flex-col gap-1.5">
-                    <p className="text-muted-foreground text-xs font-medium">{areaLabel(area)}</p>
-                    {permissions.map((permission) => (
-                        <label
-                            key={permission}
-                            className="flex cursor-pointer items-start gap-2 text-sm"
-                        >
-                            <Checkbox
-                                className="mt-0.5"
-                                checked={held.has(permission)}
-                                disabled={disabled}
-                                aria-label={t(PERMISSION_LABELS[permission])}
-                                onChange={(event) => {
-                                    const next = new Set(held);
-                                    if (event.target.checked) next.add(permission);
-                                    else next.delete(permission);
-                                    onChange(next);
-                                }}
-                            />
-                            <span className="min-w-0">{t(PERMISSION_LABELS[permission])}</span>
-                        </label>
-                    ))}
-                </div>
-            ))}
-        </div>
+        <HeldPermissionSections
+            sections={sections}
+            held={held}
+            disabled={disabled}
+            storageKey={storageKey}
+            onToggle={(ids, on) => {
+                const next = new Set(held);
+                for (const id of ids) {
+                    if (on) next.add(id);
+                    else next.delete(id);
+                }
+                onChange(next);
+            }}
+        />
     );
 }
 

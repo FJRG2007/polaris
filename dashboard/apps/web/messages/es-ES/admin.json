@@ -3263,7 +3263,15 @@
             "allow": "Sí",
             "allowTitle": "Siempre activado para esta cuenta",
             "deny": "No",
-            "denyTitle": "Siempre desactivado, diga lo que diga su rol"
+            "denyTitle": "Siempre desactivado, diga lo que diga su rol",
+            "onlyOverridden": "Solo cambiados",
+            "overriddenCount": "{count, plural, one {# cambiado} other {# cambiados}}",
+            "reset": {
+                "button": "Volver al rol",
+                "title": "¿Devolver {area} al rol?",
+                "description": "{count, plural, one {# cambio vuelve} other {# cambios vuelven}} a seguir su rol.",
+                "confirm": "Volver"
+            }
         },
         "errors": {
             "unknownAccount": "Cuenta desconocida.",

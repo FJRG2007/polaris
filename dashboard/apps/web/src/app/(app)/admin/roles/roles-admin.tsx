@@ -20,10 +20,12 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Plus, Trash2 } from "lucide-react";
 import type { RoleView } from "@/lib/role-service";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useConfirm } from "@/components/confirm-dialog";
 import { viewAsRoleAction } from "@/app/(app)/view-as-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { HeldPermissionSections } from "@/components/permission-sections";
+import { groupByArea } from "@/lib/permission-sections";
+import { areaLabel, permissionLabel } from "@/lib/permission-labels";
 import { createRoleAction, deleteRoleAction, setRolePermissionsAction } from "./actions";
 import {
     impliedBy,
@@ -39,7 +41,6 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
-    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -49,33 +50,10 @@ import {
 } from "@polaris/ui";
 
 /** The permissions of each area, in the order the areas were declared. */
-const AREAS: { area: string; permissions: Permission[] }[] = (() => {
-    const grouped = new Map<string, Permission[]>();
-    for (const permission of PERMISSIONS) {
-        const area = PERMISSION_META[permission].area;
-        const list = grouped.get(area);
-        if (list) list.push(permission);
-        else grouped.set(area, [permission]);
-    }
-    return [...grouped].map(([area, permissions]) => ({ area, permissions }));
-})();
-
-type Translate = NamespaceTranslator<"admin">;
-
-/** An area's name in the reader's language. Keyed by the English name made
- *  camelCase ("Game servers" -> "gameServers"); an area added to the core list
- *  before the catalog knows it keeps its English name rather than a key. */
-function areaLabel(t: Translate, area: string): string {
-    const key = `roles.areas.${area.toLowerCase().replace(/\s+(\w)/g, (_, next: string) => next.toUpperCase())}`;
-    return t.has(key) ? t(key) : area;
-}
-
-/** A permission's name in the reader's language, falling back to the core's
- *  English for one the catalog does not know yet. */
-function permissionLabel(t: Translate, permission: Permission): string {
-    const key = `roles.permissions.${permission}`;
-    return t.has(key) ? t(key) : PERMISSION_META[permission].label;
-}
+const AREAS: { area: string; permissions: Permission[] }[] = groupByArea(
+    PERMISSIONS,
+    (permission) => PERMISSION_META[permission].area
+).map(([area, permissions]) => ({ area, permissions }));
 
 /** Everything that cannot be held without `permission`. */
 function dependents(permission: Permission): Permission[] {
@@ -200,7 +178,12 @@ function RoleCard({ role }: { role: RoleView }) {
                     <p className="text-sm text-muted-foreground">{t("roles.locked")}</p>
                 ) : (
                     <>
-                        <PermissionGrid held={held} disabled={busy} onChange={setHeld} />
+                        <PermissionGrid
+                            held={held}
+                            disabled={busy}
+                            storageKey={`admin.roles.${role.id}`}
+                            onChange={setHeld}
+                        />
                         <div className="flex items-center justify-between gap-2">
                             <p className="text-xs text-muted-foreground">
                                 {held.size === 0
@@ -236,38 +219,36 @@ function RoleCard({ role }: { role: RoleView }) {
 function PermissionGrid({
     held,
     disabled,
+    storageKey,
     onChange
 }: {
     held: Set<Permission>;
     disabled: boolean;
+    storageKey?: string;
     onChange: (next: Set<Permission>) => void;
 }) {
     const t = useTranslations("admin");
+    const sections = useMemo(
+        () =>
+            AREAS.map(({ area, permissions }) => ({
+                id: area,
+                label: areaLabel(t, area),
+                items: permissions.map((permission) => ({
+                    id: permission,
+                    label: permissionLabel(t, permission)
+                }))
+            })),
+        [t]
+    );
+
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {AREAS.map(({ area, permissions }) => (
-                <div key={area} className="flex flex-col gap-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">{areaLabel(t, area)}</p>
-                    {permissions.map((permission) => (
-                        <label
-                            key={permission}
-                            className="flex cursor-pointer items-start gap-2 text-sm"
-                        >
-                            <Checkbox
-                                className="mt-0.5"
-                                checked={held.has(permission)}
-                                disabled={disabled}
-                                aria-label={permissionLabel(t, permission)}
-                                onChange={(event) =>
-                                    onChange(toggle(held, permission, event.target.checked))
-                                }
-                            />
-                            <span className="min-w-0">{permissionLabel(t, permission)}</span>
-                        </label>
-                    ))}
-                </div>
-            ))}
-        </div>
+        <HeldPermissionSections
+            sections={sections}
+            held={held}
+            disabled={disabled}
+            storageKey={storageKey}
+            onToggle={(ids, on) => onChange(ids.reduce((next, id) => toggle(next, id, on), held))}
+        />
     );
 }
 

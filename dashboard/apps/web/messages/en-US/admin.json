@@ -3263,7 +3263,15 @@
             "allow": "On",
             "allowTitle": "Always on for this account",
             "deny": "Off",
-            "denyTitle": "Always off, whatever their role says"
+            "denyTitle": "Always off, whatever their role says",
+            "onlyOverridden": "Only overridden",
+            "overriddenCount": "{count} overridden",
+            "reset": {
+                "button": "Reset to role",
+                "title": "Reset {area} to role?",
+                "description": "{count, plural, one {# override goes} other {# overrides go}} back to following their role.",
+                "confirm": "Reset"
+            }
         },
         "errors": {
             "unknownAccount": "Unknown account.",
