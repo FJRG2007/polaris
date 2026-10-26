@@ -253,9 +253,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
         ? null
         : arkAccess.JOIN_PASSWORD_HINT;
     const modsError =
-        mods.trim().length === 0 || isModIdList(mods)
-            ? null
-            : t("create.errors.workshopIds");
+        mods.trim().length === 0 || isModIdList(mods) ? null : t("create.errors.workshopIds");
     const licenseError =
         licenseKey.trim().length === 0 || isLicenseKey(licenseKey) ? null : LICENSE_KEY_HINT;
     const identifierError =
@@ -300,51 +298,54 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                       memory: hytaleMemory.trim() || undefined
                   }
                 : game === "fivem"
-                ? {
-                      game: "fivem" as const,
-                      ...common,
-                      licenseKey: licenseKey.trim(),
-                      sessionName: sessionName.trim() || name.trim(),
-                      ownerIdentifier: ownerIdentifier.trim() || undefined,
-                      ownerLabel: ownerPlayer.trim() || undefined,
-                      exclusiveJoin: exclusiveJoin && ownerIdentifier.trim().length > 0,
-                      onesync
-                  }
-                : game === "ark"
                   ? {
-                        game: "ark" as const,
+                        game: "fivem" as const,
                         ...common,
-                        map,
+                        licenseKey: licenseKey.trim(),
                         sessionName: sessionName.trim() || name.trim(),
-                        joinPassword: joinPassword.trim(),
-                        ownerSteamId: ownerSteamId.trim(),
+                        ownerIdentifier: ownerIdentifier.trim() || undefined,
                         ownerLabel: ownerPlayer.trim() || undefined,
-                        exclusiveJoin,
-                        mods: mods.trim() || undefined
+                        exclusiveJoin: exclusiveJoin && ownerIdentifier.trim().length > 0,
+                        onesync
                     }
-                  : {
-                        game: "minecraft" as const,
-                        ...common,
-                        ownerPlayer: ownerPlayer.trim(),
-                        ownerAddress: ownerAddress.trim(),
-                        edition,
-                        crossplay,
-                        templateId: templateId || undefined,
-                        blueprintId: shape.blueprintId,
-                        mapId: shape.mapId || undefined,
-                        software: edition === "java" ? shape.software : undefined,
-                        softwareSource: edition === "java" ? shape.source || undefined : undefined,
-                        version: shape.version.trim() || LATEST,
-                        seed: shape.seed.trim() || undefined,
-                        levelType: edition === "java" ? shape.levelType : undefined,
-                        biome:
-                            edition === "java" && world.usesBiome(shape.levelType)
-                                ? shape.biome
-                                : undefined
-                    }
+                  : game === "ark"
+                    ? {
+                          game: "ark" as const,
+                          ...common,
+                          map,
+                          sessionName: sessionName.trim() || name.trim(),
+                          joinPassword: joinPassword.trim(),
+                          ownerSteamId: ownerSteamId.trim(),
+                          ownerLabel: ownerPlayer.trim() || undefined,
+                          exclusiveJoin,
+                          mods: mods.trim() || undefined
+                      }
+                    : {
+                          game: "minecraft" as const,
+                          ...common,
+                          ownerPlayer: ownerPlayer.trim(),
+                          ownerAddress: ownerAddress.trim(),
+                          edition,
+                          crossplay,
+                          templateId: templateId || undefined,
+                          blueprintId: shape.blueprintId,
+                          mapId: shape.mapId || undefined,
+                          software: edition === "java" ? shape.software : undefined,
+                          softwareSource:
+                              edition === "java" ? shape.source || undefined : undefined,
+                          version: shape.version.trim() || LATEST,
+                          seed: shape.seed.trim() || undefined,
+                          levelType: edition === "java" ? shape.levelType : undefined,
+                          biome:
+                              edition === "java" && world.usesBiome(shape.levelType)
+                                  ? shape.biome
+                                  : undefined
+                      }
         );
         if (!parsed.success) {
-            setError(schemaText(parsed.error.issues[0]?.message) ?? t("create.errors.checkDetails"));
+            setError(
+                schemaText(parsed.error.issues[0]?.message) ?? t("create.errors.checkDetails")
+            );
             return;
         }
         startTransition(async () => {
@@ -391,11 +392,11 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             onChange={(event) => setName(event.target.value)}
                             placeholder={
                                 game === "ark"
-                                    // i18n-ignore: a map's own name
-                                    ? "The Island"
+                                    ? // i18n-ignore: a map's own name
+                                      "The Island"
                                     : game === "fivem"
-                                      // i18n-ignore: the game's city, a proper name
-                                      ? "Los Santos"
+                                      ? // i18n-ignore: the game's city, a proper name
+                                        "Los Santos"
                                       : t("create.exampleName")
                             }
                         />
@@ -404,7 +405,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                     {game === "minecraft" ? (
                         <>
                             <div className="flex flex-col gap-2">
-                                <span className="text-sm font-medium">{t("create.whoPlaysOnIt")}</span>
+                                <span className="text-sm font-medium">
+                                    {t("create.whoPlaysOnIt")}
+                                </span>
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                     <Choice
                                         selected={edition === "java" && !crossplay}
@@ -439,7 +442,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 they can all still be changed. */}
                             {templates.length > 0 && (
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">{t("create.buildItLikeOneYou")}</span>
+                                    <span className="font-medium">
+                                        {t("create.buildItLikeOneYou")}
+                                    </span>
                                     <Select
                                         value={templateId}
                                         onValueChange={(id) => {
@@ -462,18 +467,23 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             });
                                         }}
                                         options={[
-                                            { value: "", label: t("create.startFromABlueprintInstead") },
+                                            {
+                                                value: "",
+                                                label: t("create.startFromABlueprintInstead")
+                                            },
                                             ...templates.map((entry) => ({
                                                 value: entry.id,
-                                                label: t("create.blueprintOption", { name: entry.name, count: entry.settings })
+                                                label: t("create.blueprintOption", {
+                                                    name: entry.name,
+                                                    count: entry.settings
+                                                })
                                             }))
                                         ]}
                                         aria-label={t("create.aServerYouSavedTo")}
                                     />
                                     <span className="text-xs text-muted-foreground">
                                         {templates.find((entry) => entry.id === templateId)
-                                            ?.summary ||
-                                            t("create.itsSettingsAreAppliedOn")}
+                                            ?.summary || t("create.itsSettingsAreAppliedOn")}
                                     </span>
                                 </label>
                             )}
@@ -550,7 +560,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">{t("create.nameInTheServerBrowser")}</span>
+                                    <span className="font-medium">
+                                        {t("create.nameInTheServerBrowser")}
+                                    </span>
                                     <Input
                                         value={sessionName}
                                         onChange={(event) => setSessionName(event.target.value)}
@@ -583,8 +595,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             onesyncError ? "text-danger" : "text-muted-foreground"
                                         )}
                                     >
-                                        {onesyncError ??
-                                            t("create.whatEverythingAbove32Slots")}
+                                        {onesyncError ?? t("create.whatEverythingAbove32Slots")}
                                     </span>
                                 </label>
                             </div>
@@ -609,7 +620,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     </span>
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">{t("create.nameInTheServerBrowser")}</span>
+                                    <span className="font-medium">
+                                        {t("create.nameInTheServerBrowser")}
+                                    </span>
                                     <Input
                                         value={sessionName}
                                         onChange={(event) => setSessionName(event.target.value)}
@@ -635,8 +648,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         modsError ? "text-danger" : "text-muted-foreground"
                                     )}
                                 >
-                                    {modsError ??
-                                        t("create.optionalEveryPlayerNeedsThe")}
+                                    {modsError ?? t("create.optionalEveryPlayerNeedsThe")}
                                 </span>
                             </label>
                         </>
@@ -675,10 +687,10 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             count: concurrentPlayers,
                                             memory: memory ?? "",
                                             strong: (chunks) => (
-                                            <strong key="memory" className="text-foreground">
-                                                {chunks}
-                                            </strong>
-                                        )
+                                                <strong key="memory" className="text-foreground">
+                                                    {chunks}
+                                                </strong>
+                                            )
                                         })}
                                     </>
                                 ) : game === "fivem" ? (
@@ -687,10 +699,10 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             count: concurrentPlayers,
                                             memory: memory ?? "",
                                             strong: (chunks) => (
-                                            <strong key="memory" className="text-foreground">
-                                                {chunks}
-                                            </strong>
-                                        )
+                                                <strong key="memory" className="text-foreground">
+                                                    {chunks}
+                                                </strong>
+                                            )
                                         })}
                                     </>
                                 ) : (
@@ -699,9 +711,15 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             count: concurrentPlayers,
                                             amount: () =>
                                                 memory === undefined ? (
-                                                    <Skeleton key="memory" className="inline-block h-3 w-10 align-middle" />
+                                                    <Skeleton
+                                                        key="memory"
+                                                        className="inline-block h-3 w-10 align-middle"
+                                                    />
                                                 ) : (
-                                                    <strong key="memory" className="text-foreground">
+                                                    <strong
+                                                        key="memory"
+                                                        className="text-foreground"
+                                                    >
                                                         {memory}
                                                     </strong>
                                                 )
@@ -730,7 +748,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Users className="size-3" />
                                 {machine.committedMb > 0
-                                    ? t("create.committed", { memory: formatMemory(machine.committedMb) })
+                                    ? t("create.committed", {
+                                          memory: formatMemory(machine.committedMb)
+                                      })
                                     : t("create.noOtherGameServerOn")}
                             </span>
                         )}
@@ -834,7 +854,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         ) : game === "ark" ? (
                             <>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="text-muted-foreground">{t("create.joinPassword")}</span>
+                                    <span className="text-muted-foreground">
+                                        {t("create.joinPassword")}
+                                    </span>
                                     <div className="flex items-center gap-1">
                                         <Input
                                             value={joinPassword}
@@ -863,13 +885,14 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             passwordError ? "text-danger" : "text-muted-foreground"
                                         )}
                                     >
-                                        {passwordError ??
-                                            t("create.everyoneWhoJoinsTypesThis")}
+                                        {passwordError ?? t("create.everyoneWhoJoinsTypesThis")}
                                     </span>
                                 </label>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="text-muted-foreground">{t("create.yourSteamId")}</span>
+                                        <span className="text-muted-foreground">
+                                            {t("create.yourSteamId")}
+                                        </span>
                                         <Input
                                             value={ownerSteamId}
                                             onChange={(event) =>
@@ -886,8 +909,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                                     : "text-muted-foreground"
                                             )}
                                         >
-                                            {steamIdError ??
-                                                t("create.the17DigitNumberOn")}
+                                            {steamIdError ?? t("create.the17DigitNumberOn")}
                                         </span>
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
@@ -932,14 +954,18 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         value={ownerPlayer}
                                         onChange={(event) => setOwnerPlayer(event.target.value)}
                                         // i18n-ignore: the game's default player name
-                                        placeholder={edition === "bedrock" ? t("create.gamertag") : "Steve"}
+                                        placeholder={
+                                            edition === "bedrock" ? t("create.gamertag") : "Steve"
+                                        }
                                     />
                                     {playerError && (
                                         <span className="text-xs text-danger">{playerError}</span>
                                     )}
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="text-muted-foreground">{t("create.connectingFrom")}</span>
+                                    <span className="text-muted-foreground">
+                                        {t("create.connectingFrom")}
+                                    </span>
                                     <Input
                                         value={ownerAddress}
                                         onChange={(event) => setOwnerAddress(event.target.value)}
@@ -951,8 +977,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             addressError ? "text-danger" : "text-muted-foreground"
                                         )}
                                     >
-                                        {addressError ??
-                                            t("create.addressHint")}
+                                        {addressError ?? t("create.addressHint")}
                                     </span>
                                 </label>
                             </div>
@@ -992,11 +1017,14 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 }
 
 /** A machine with what it has left, so the choice is made on the figures. */
-function machineLabel(t: GameText<"games">, machine: {
-    name: string;
-    memoryFreeBytes: number | null;
-    memoryTotalBytes: number | null;
-}): string {
+function machineLabel(
+    t: GameText<"games">,
+    machine: {
+        name: string;
+        memoryFreeBytes: number | null;
+        memoryTotalBytes: number | null;
+    }
+): string {
     if (machine.memoryFreeBytes === null || machine.memoryTotalBytes === null) return machine.name;
     const free = Math.round(machine.memoryFreeBytes / (1024 * 1024 * 1024));
     const total = Math.round(machine.memoryTotalBytes / (1024 * 1024 * 1024));
