@@ -162,6 +162,7 @@
             "edit": "Editar tu mensaje",
             "delete": "Borrar el mensaje",
             "copy": "Copiar el mensaje",
+            "dictate": "Dictar en el mensaje",
             "toggleMic": "Callar o hablar",
             "toggleDeafen": "Ensordecer o no"
         },
@@ -245,6 +246,7 @@
         "viewerSlides": "Presentaciones",
         "viewerPictures": "Imágenes",
         "chatMessages": "Mensajes",
+        "chatComposer": "Escribir",
         "chatCalls": "Llamadas",
         "placesClips": "Clips",
         "databasesQuery": "Consultas",

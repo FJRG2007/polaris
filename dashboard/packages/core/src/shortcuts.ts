@@ -399,6 +399,8 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
         ["edit", "chatMessages", "chat", ["F2"]],
         ["delete", "chatMessages", "chat", ["Delete"]],
         ["copy", "chatMessages", "chat", ["Mod+c"]],
+        // Alt+M rather than Alt+D, which is the address bar in Chrome and Edge.
+        ["dictate", "chatComposer", "chat", ["Alt+m"]],
         ["toggleMic", "chatCalls", "call", ["F9"]],
         ["toggleDeafen", "chatCalls", "call", ["F10"]]
     ]),

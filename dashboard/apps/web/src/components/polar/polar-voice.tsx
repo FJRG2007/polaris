@@ -12,6 +12,7 @@
  */
 
 import type { Payer } from "@/lib/polar/shared";
+import { transcribeAudio, type TranscribeError } from "@/lib/polar/transcribe-audio";
 import type { ChatStatus, UIMessage } from "ai";
 import { isWebTool, webStepOf } from "@/lib/polar/web-sources";
 import { micConstraints } from "@/app/(app)/chat/mic-cleanup";
@@ -63,50 +64,7 @@ import {
     type CallError
 } from "@/lib/polar/voice-call";
 
-/** Why a transcription did not come back, as a code the screen has words for. */
-export type TranscribeError =
-    "transcribe_failed" | "rate_limited" | "too_large" | "no_voice_provider" | "usage_limit";
-
-const TRANSCRIBE_ERRORS: readonly TranscribeError[] = [
-    "rate_limited",
-    "too_large",
-    "no_voice_provider",
-    "usage_limit"
-];
-
-/** Send a recording to be read; the text, or why not. */
-export async function transcribeAudio(
-    audio: Blob,
-    durationMs: number,
-    payer: Payer | null = null,
-    signal?: AbortSignal,
-    /** The model picked in the mic menu; absent, the server's stored pick. */
-    model?: string | null
-): Promise<{ text: string } | { error: TranscribeError }> {
-    const capped = Math.min(Math.max(0, Math.round(durationMs)), VOICE_MAX_SECONDS * 1000);
-    const query = new URLSearchParams({ durationMs: String(capped) });
-    if (payer) query.set("payer", payer);
-    if (model) query.set("model", model);
-    try {
-        const response = await fetch(`/api/polar/transcribe?${query}`, {
-            method: "POST",
-            headers: { "Content-Type": audio.type || "audio/webm" },
-            body: audio,
-            signal
-        });
-        const data = (await response.json().catch(() => null)) as {
-            text?: unknown;
-            error?: unknown;
-        } | null;
-        if (response.ok && typeof data?.text === "string") return { text: data.text };
-        const code = data?.error;
-        return {
-            error: TRANSCRIBE_ERRORS.find((known) => known === code) ?? "transcribe_failed"
-        };
-    } catch {
-        return { error: "transcribe_failed" };
-    }
-}
+export { transcribeAudio, type TranscribeError };
 
 /** What a voice button says when it is pressed but cannot work. */
 export type VoiceNotice =
