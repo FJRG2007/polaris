@@ -573,7 +573,6 @@ function SubtaskCard({
     selected: boolean;
     onSelect: (mode: SelectMode) => void;
 }) {
-    const format = useDisplayFormat();
     const { task, onOpen } = commands;
     return (
         <TaskMenu commands={commands}>
@@ -622,13 +621,6 @@ function SubtaskCard({
                         role="presentation"
                         className="flex min-w-0 flex-wrap items-center gap-0.5 text-[0.6875rem] text-muted-foreground"
                     >
-                        <AvatarStack people={task.assignees} size={16} />
-                        <DueBadge
-                            dueDate={task.dueDate}
-                            statusType={task.statusType}
-                            timed={task.timed}
-                            format={format.date}
-                        />
                         <TaskControls commands={commands} />
                     </span>
                 </div>

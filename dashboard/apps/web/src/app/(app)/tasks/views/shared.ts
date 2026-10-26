@@ -183,6 +183,33 @@ export interface QuickCreateExtra {
     readonly tagIds?: string[];
 }
 
+/**
+ * Where a composer's task goes and what it starts as. A subtask lives in its
+ * parent's list and starts in the space's default status, never in whichever
+ * group its parent happens to be drawn in. `listId` is null when the screen
+ * spans several lists and has none to put it in.
+ */
+export function quickCreatePlacement(
+    groupKey: string,
+    groupBy: TaskGroupField,
+    extra: QuickCreateExtra,
+    listId: string | null
+) {
+    // The key says what it is rather than being read off the current view: a
+    // calendar hands back "date:<iso>", every other view hands back the group
+    // it was added to. Guessing from the view type puts a status id in the
+    // due date the moment somebody uses the header button on a calendar.
+    const dueDate = groupKey.startsWith("date:") ? groupKey.slice(5) : null;
+    const statusId =
+        !dueDate && !extra.parent && groupBy === "status" && groupKey ? groupKey : null;
+    return {
+        listId: extra.parent?.listId ?? listId,
+        statusId,
+        dueDate: extra.dueDate ?? dueDate,
+        parentId: extra.parent?.id ?? null
+    };
+}
+
 export interface ViewProps {
     readonly rows: readonly TaskRow[];
     readonly groups: readonly TaskGroup<TaskRow>[];

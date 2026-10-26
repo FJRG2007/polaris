@@ -35,7 +35,12 @@ import { AssigneePicker, PriorityPicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { nestSubtasks, useOpenParents, type SubtaskView } from "./views/subtasks";
-import { holdSelection, shortfallMessage, type QuickCreateExtra } from "./views/shared";
+import {
+    holdSelection,
+    quickCreatePlacement,
+    shortfallMessage,
+    type QuickCreateExtra
+} from "./views/shared";
 import { groupLabel, optionLabel } from "./option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
@@ -604,22 +609,15 @@ export function ListScreen({
     };
 
     const quickCreate = async (groupKey: string, name: string, extra: QuickCreateExtra = {}) => {
-        // The key says what it is rather than being read off the current view: a
-        // calendar hands back "date:<iso>", every other view hands back the group
-        // it was added to. Guessing from the view type puts a status id in the
-        // due date the moment somebody uses the header button on a calendar.
-        const dueDate = groupKey.startsWith("date:") ? groupKey.slice(5) : null;
-        const statusId = !dueDate && groupBy === "status" && groupKey ? groupKey : null;
-
-        // A subtask lives in its parent's list, whichever screen it was typed on.
-        const target = extra.parent?.listId ?? listId ?? defaultListId;
+        const placement = quickCreatePlacement(groupKey, groupBy, extra, listId ?? defaultListId);
+        const target = placement.listId;
         if (!target) {
             // A screen spanning several lists has nowhere to put a typed-in name,
             // and the column it was typed into is a status belonging to whichever
             // space defined it first. So the dialog opens carrying what is known -
             // the name, and the day if that is what was clicked - and asks for the
             // list, rather than refusing what was just typed.
-            setCreating({ name, dueDate });
+            setCreating({ name, dueDate: placement.dueDate });
             return;
         }
 
@@ -629,9 +627,9 @@ export function ListScreen({
                 actions.createTaskAction({
                     listId: target,
                     name,
-                    statusId,
-                    dueDate: extra.dueDate ?? dueDate,
-                    parentId: extra.parent?.id ?? null,
+                    statusId: placement.statusId,
+                    dueDate: placement.dueDate,
+                    parentId: placement.parentId,
                     ...(extra.priority ? { priority: extra.priority } : {}),
                     ...(extra.assigneeIds ? { assigneeIds: extra.assigneeIds } : {}),
                     // A tag made in the composer a moment ago still carries

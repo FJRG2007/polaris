@@ -17,6 +17,7 @@
 import * as core from "@polaris/core";
 import { useMemo, useRef, useState } from "react";
 import { useAppUrl } from "@/components/app-url";
+import { useDisplayFormat } from "@/components/display-format";
 import { optionLabel } from "../option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TaskRow } from "@/lib/tasks/facts";
@@ -26,6 +27,8 @@ import type { TaskBulkEdit, TaskEdit, TaskListRef, ViewProps } from "./shared";
 import {
     AssigneePicker,
     Avatar,
+    AvatarStack,
+    DueBadge,
     DuePicker,
     PriorityPicker,
     preloadAvatars,
@@ -150,6 +153,9 @@ async function copy(value: string): Promise<void> {
  * only the empty affordances fade in on hover.
  */
 export function TaskControls({ commands }: { commands: TaskCommands }) {
+    const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
+    const tp = useTranslations("tasks");
     const { task, context, canEdit } = commands;
     const assigned = context.people.filter((person) =>
         task.assignees.some((entry) => entry.id === person.id)
@@ -167,12 +173,39 @@ export function TaskControls({ commands }: { commands: TaskCommands }) {
                 timed={task.timed}
                 disabled={!canEdit}
                 onChange={(dueDate) => commands.onEdit({ dueDate })}
+                trigger={
+                    task.dueDate ? (
+                        <button
+                            type="button"
+                            aria-label={tp("pickers.dueDate")}
+                            className="inline-flex min-w-0 items-center rounded-md px-1 py-0.5 transition-colors hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
+                        >
+                            <DueBadge
+                                dueDate={task.dueDate}
+                                statusType={task.statusType}
+                                timed={task.timed}
+                                format={format.date}
+                            />
+                        </button>
+                    ) : undefined
+                }
             />
             <AssigneePicker
                 people={context.people}
                 selected={assigned.map((person) => person.id)}
                 disabled={!canEdit}
                 onChange={(assigneeIds) => commands.onEdit({ assigneeIds })}
+                trigger={
+                    task.assignees.length > 0 ? (
+                        <button
+                            type="button"
+                            aria-label={t("table.assignees")}
+                            className="flex items-center rounded-full transition-opacity hover:opacity-75 disabled:cursor-default"
+                        >
+                            <AvatarStack people={task.assignees} size={16} />
+                        </button>
+                    ) : undefined
+                }
             />
             <TagPicker
                 tags={context.tags}

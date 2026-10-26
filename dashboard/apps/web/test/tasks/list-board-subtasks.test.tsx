@@ -22,6 +22,7 @@ vi.mock("@/app/(app)/tasks/actions", () => ({}));
 const { ListView } = await import("@/app/(app)/tasks/views/rows");
 const { BoardView } = await import("@/app/(app)/tasks/views/board");
 const { nestSubtasks, useOpenParents } = await import("@/app/(app)/tasks/views/subtasks");
+const shared = await import("@/app/(app)/tasks/views/shared");
 type ViewProps = import("@/app/(app)/tasks/views/shared").ViewProps;
 type SubtaskMode = import("@/app/(app)/tasks/views/subtasks").SubtaskMode;
 
@@ -286,5 +287,52 @@ describe("the List screen", () => {
     it("fills the row it shares with the space tree, like every other Tasks screen", () => {
         const source = readFileSync("src/app/(app)/tasks/list-view.tsx", "utf8");
         expect(source).toContain('cn("flex min-w-0 flex-1 flex-col gap-4"');
+    });
+});
+
+describe("where a composer's task goes", () => {
+    const { quickCreatePlacement } = shared;
+
+    it("starts a task typed into a status group in that status", () => {
+        expect(quickCreatePlacement("st2", "status", {}, "l1")).toEqual({
+            listId: "l1",
+            statusId: "st2",
+            dueDate: null,
+            parentId: null
+        });
+    });
+
+    it("starts a subtask in the space default, in its parent's list, whatever group the parent is in", () => {
+        const placement = quickCreatePlacement(
+            "st-closed",
+            "status",
+            { parent: { id: "p1", listId: "l2" } },
+            "l1"
+        );
+        expect(placement).toEqual({ listId: "l2", statusId: null, dueDate: null, parentId: "p1" });
+    });
+
+    it("finds the parent's list on a screen that spans lists", () => {
+        expect(
+            quickCreatePlacement("st2", "status", { parent: { id: "p1", listId: "l2" } }, null).listId
+        ).toBe("l2");
+        expect(quickCreatePlacement("st2", "status", {}, null).listId).toBeNull();
+    });
+
+    it("reads a calendar day as a due date, never as a status", () => {
+        expect(quickCreatePlacement("date:2026-10-26", "status", {}, "l1")).toMatchObject({
+            statusId: null,
+            dueDate: "2026-10-26"
+        });
+    });
+
+    it("keeps a due date chosen in the composer over the group's", () => {
+        expect(
+            quickCreatePlacement("date:2026-10-26", "status", { dueDate: "2026-11-01" }, "l1").dueDate
+        ).toBe("2026-11-01");
+    });
+
+    it("sets no status when the groups are not statuses", () => {
+        expect(quickCreatePlacement("high", "priority", {}, "l1").statusId).toBeNull();
     });
 });

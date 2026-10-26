@@ -100,7 +100,7 @@
         "columnAssignee": "Assignee",
         "columnDue": "Due date",
         "columnPriority": "Priority",
-        "addTask": "Add Task",
+        "addTask": "Add task",
         "addSubtask": "Add a subtask to {name}",
         "taskName": "Task name",
         "cancel": "Cancel",
