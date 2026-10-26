@@ -543,7 +543,9 @@ export function TaskMenu({
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
                 <ContextMenuContent className="w-56">
                     {many ? (
-                        <ContextMenuLabel>{t("menu.selected", { count: targets.length })}</ContextMenuLabel>
+                        <ContextMenuLabel>
+                            {t("menu.selected", { count: targets.length })}
+                        </ContextMenuLabel>
                     ) : (
                         <>
                             <ContextMenuItem onSelect={commands.onOpen}>
@@ -800,7 +802,9 @@ export function TaskMenu({
                                             >
                                                 <Plus className="size-3.5" />
                                                 <span className="flex-1 truncate">
-                                                    {tt("pickers.createTag", { name: tagQuery.trim() })}
+                                                    {tt("pickers.createTag", {
+                                                        name: tagQuery.trim()
+                                                    })}
                                                 </span>
                                                 <span className="text-[0.625rem] text-muted-foreground">
                                                     {tt("pickers.enterKey")}
@@ -891,7 +895,9 @@ export function TaskMenu({
                                 // which is the same as it not existing.
                                 <ContextMenuItem onSelect={commands.onCopy}>
                                     <ClipboardCopy className="size-3.5" />
-                                    {many ? t("menu.copyMany", { count: targets.length }) : t("menu.copy")}
+                                    {many
+                                        ? t("menu.copyMany", { count: targets.length })
+                                        : t("menu.copy")}
                                     <MenuShortcut keys="Mod+C" />
                                 </ContextMenuItem>
                             )}
@@ -911,7 +917,9 @@ export function TaskMenu({
                             <ContextMenuSeparator />
                             <ContextMenuItem variant="danger" onSelect={commands.onDelete}>
                                 <Trash2 className="size-3.5" />
-                                {many ? t("menu.deleteMany", { count: targets.length }) : t("bulk.delete")}
+                                {many
+                                    ? t("menu.deleteMany", { count: targets.length })
+                                    : t("bulk.delete")}
                                 {/* The key that does the same thing to the same
                                     selection, said out loud - the way chat says
                                     it, and drawn by the same component. */}

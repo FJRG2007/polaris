@@ -75,9 +75,7 @@ export interface TaskBulkEdit {
 /** What happens to the work on a column that is being removed. Mirrors
  *  `ColumnWorkFate` in lib/tasks/space-service, which is what enforces it. */
 export type ColumnWorkFate =
-    | { kind: "move"; replacementId: string }
-    | { kind: "archive" }
-    | { kind: "delete" };
+    { kind: "move"; replacementId: string } | { kind: "archive" } | { kind: "delete" };
 
 export interface TaskListRef {
     readonly id: string;

@@ -45,7 +45,8 @@ export function useDeferredFocus<T extends HTMLElement>(active = true) {
             node = ref.current;
             if (!node) return;
             node.focus();
-            if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) node.select();
+            if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement)
+                node.select();
         };
         // Listening on the field itself, so stopping the event here keeps it from
         // ever reaching the root where React dispatches `onBlur`.

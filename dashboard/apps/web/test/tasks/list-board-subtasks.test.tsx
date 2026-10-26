@@ -314,7 +314,8 @@ describe("where a composer's task goes", () => {
 
     it("finds the parent's list on a screen that spans lists", () => {
         expect(
-            quickCreatePlacement("st2", "status", { parent: { id: "p1", listId: "l2" } }, null).listId
+            quickCreatePlacement("st2", "status", { parent: { id: "p1", listId: "l2" } }, null)
+                .listId
         ).toBe("l2");
         expect(quickCreatePlacement("st2", "status", {}, null).listId).toBeNull();
     });
@@ -328,7 +329,8 @@ describe("where a composer's task goes", () => {
 
     it("keeps a due date chosen in the composer over the group's", () => {
         expect(
-            quickCreatePlacement("date:2026-10-26", "status", { dueDate: "2026-11-01" }, "l1").dueDate
+            quickCreatePlacement("date:2026-10-26", "status", { dueDate: "2026-11-01" }, "l1")
+                .dueDate
         ).toBe("2026-11-01");
     });
 
