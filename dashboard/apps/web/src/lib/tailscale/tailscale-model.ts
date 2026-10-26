@@ -330,7 +330,8 @@ export const appPublicInputSchema = z.object({
     public: z.boolean()
 });
 
-const APP_HOST = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const APP_HOST =
+    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
 /** An app hostname that can have a tailnet address: an exact name, not a wildcard,
  *  and not a tailnet name itself. */
@@ -367,9 +368,7 @@ export function allocateAppPorts(
             }
         }
         if (port === null) {
-            const gone = apps.findIndex(
-                (app) => !app.live && !FUNNEL_APP_PORTS.includes(app.port)
-            );
+            const gone = apps.findIndex((app) => !app.live && !FUNNEL_APP_PORTS.includes(app.port));
             if (gone === -1) continue;
             port = apps[gone]!.port;
             apps.splice(gone, 1);

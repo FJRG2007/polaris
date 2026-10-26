@@ -607,7 +607,7 @@
         "certUntrusted": "Sirviendo un certificado en el que los navegadores aún no confían mientras se emite el real.",
         "certValid": "Certificado válido {days} días más. Se renueva solo 30 días antes de caducar.",
         "tailnetAddress": "En tu tailnet",
-        "tailnetCopy": "Copiar la dirección de la tailnet",
+        "tailnetCopy": "Copiar dirección de tailnet",
         "certValidIssuer": "Certificado de {issuer}, válido {days} días más. Se renueva solo 30 días antes de caducar.",
         "tcpAdd": "Añadir proxy TCP",
         "tcpTo": "TCP a :{port}",

@@ -421,9 +421,7 @@ function AppRow(props: {
                         <CopyButton value={app.url} />
                     </div>
                 ) : null}
-                {app.public ? (
-                    <Notice>{t("domains.tailscale.appPublicWarning")}</Notice>
-                ) : null}
+                {app.public ? <Notice>{t("domains.tailscale.appPublicWarning")}</Notice> : null}
             </div>
             <div className="shrink-0 sm:w-56">
                 <Toggle

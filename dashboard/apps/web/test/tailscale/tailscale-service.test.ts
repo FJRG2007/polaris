@@ -28,6 +28,8 @@ vi.mock("@/lib/deploy/ports-hostd", () => ({
     }
 }));
 vi.mock("@/lib/traefik-dynamic", () => ({ writeDynamicFile }));
+const findDomains = vi.fn(async (..._args: unknown[]): Promise<unknown[]> => []);
+vi.mock("@polaris/db", () => ({ prisma: { domain: { findMany: findDomains } } }));
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async (key: string) => settings.get(key) ?? null,
     setSetting: async (key: string, value: string | null) => void settings.set(key, value)
@@ -125,5 +127,112 @@ describe("tailscale service", () => {
         await service.syncTailscaleRoute();
         expect(ports.inspect).not.toHaveBeenCalled();
         expect(writeDynamicFile).toHaveBeenLastCalledWith("polaris-tailscale.yml", "http: {}\n");
+    });
+});
+
+describe("tailscale apps", () => {
+    async function connected() {
+        await service.connectTailscale(null, "limited");
+        settings.set("tailscale.host", "polaris.tail1234.ts.net");
+        ports.runIn.mockClear();
+    }
+
+    function serveWrites() {
+        return ports.runIn.mock.calls.filter((call) => (call[1] as string[])[0] === "/bin/sh");
+    }
+
+    it("gives each routed name a port, publishes it, and keeps it on the next sync", async () => {
+        await connected();
+        await service.syncTailscaleApps(["shop.example.com", "*.example.com"]);
+        expect(await service.getTailnetApps()).toEqual([
+            { hostname: "shop.example.com", port: 10001, public: false, live: true }
+        ]);
+        expect(String(writeDynamicFile.mock.calls.at(-1)?.[1])).toContain(
+            "PathPrefix(`/.polaris-ts/10001/`)"
+        );
+        const written = serveWrites().at(-1)?.[1] as string[];
+        expect(JSON.parse(written[4]!).Web["${TS_CERT_DOMAIN}:10001"]).toBeDefined();
+        writeDynamicFile.mockClear();
+        await service.syncTailscaleApps(["shop.example.com"]);
+        expect(writeDynamicFile).not.toHaveBeenCalled();
+    });
+
+    it("does not rewrite a serve config the component already holds", async () => {
+        await connected();
+        await service.syncTailscaleApps(["shop.example.com"]);
+        const serve = (serveWrites().at(-1)?.[1] as string[])[4]!;
+        ports.runIn.mockImplementation(async (...args: unknown[]) => {
+            const argv = args[1] as string[];
+            if (argv[0] === "cat") return { code: 0, output: `${serve}\n` };
+            return { code: 0, output: CONNECTED };
+        });
+        ports.runIn.mockClear();
+        await service.syncTailscaleRoute();
+        await vi.waitFor(() =>
+            expect(ports.runIn.mock.calls.some((call) => (call[1] as string[])[0] === "cat")).toBe(
+                true
+            )
+        );
+        expect(serveWrites()).toHaveLength(0);
+        // A component restarted from an older spec holds an older file: it is replaced.
+        ports.runIn.mockImplementation(async (...args: unknown[]) => {
+            const argv = args[1] as string[];
+            if (argv[0] === "cat") return { code: 0, output: "{}" };
+            return { code: 0, output: CONNECTED };
+        });
+        await service.syncTailscaleRoute();
+        await vi.waitFor(() => expect(serveWrites()).toHaveLength(1));
+        expect((serveWrites()[0]?.[1] as string[])[4]).toBe(serve);
+    });
+
+    it("keeps the ports and the route file when the component is off", async () => {
+        await service.syncTailscaleApps(["shop.example.com"]);
+        expect(ports.runIn).not.toHaveBeenCalled();
+        expect(writeDynamicFile).toHaveBeenLastCalledWith("polaris-tailscale.yml", "http: {}\n");
+        expect((await service.getTailnetApps())[0]?.port).toBe(10001);
+    });
+
+    it("opens an app on a Funnel port and refuses a third", async () => {
+        await connected();
+        await service.syncTailscaleApps(["a.example.com", "b.example.com", "c.example.com"]);
+        const messages = { limited: "limited", unknown: "unknown", "no-port": "full" };
+        await service.setTailnetAppPublic("a.example.com", true, messages);
+        await service.setTailnetAppPublic("b.example.com", true, messages);
+        await expect(service.setTailnetAppPublic("c.example.com", true, messages)).rejects.toThrow(
+            "full"
+        );
+        const apps = await service.getTailnetApps();
+        expect(apps.filter((entry) => entry.public).map((entry) => entry.port)).toEqual([
+            8443, 10000
+        ]);
+        const serve = JSON.parse((serveWrites().at(-1)?.[1] as string[])[4]!);
+        expect(serve.AllowFunnel["${TS_CERT_DOMAIN}:8443"]).toBe(true);
+    });
+
+    it("lists each app with its address and the service it belongs to", async () => {
+        await connected();
+        await service.syncTailscaleApps(["shop.example.com"]);
+        findDomains.mockResolvedValueOnce([
+            {
+                hostname: "shop.example.com",
+                application: { id: "app-1", name: "Shop", environment: { projectId: "p-1" } }
+            }
+        ]);
+        ports.runIn.mockImplementation(async () => ({ code: 0, output: CONNECTED }));
+        const view = await service.tailscaleView();
+        expect(view.apps).toEqual([
+            {
+                hostname: "shop.example.com",
+                port: 10001,
+                public: false,
+                url: "https://polaris.tail1234.ts.net:10001",
+                appName: "Shop",
+                applicationId: "app-1",
+                projectId: "p-1"
+            }
+        ]);
+        expect(await service.tailnetAppUrls()).toEqual(
+            new Map([["shop.example.com", "https://polaris.tail1234.ts.net:10001"]])
+        );
     });
 });
