@@ -44,6 +44,13 @@ const requestAuth = createRequestAuth({
     sendTwoFactorCode: async (input) => {
         const { sendTwoFactorCode } = await import("./two-factor-delivery");
         return sendTwoFactorCode(input);
+    },
+    // A sign-in is the evidence a reputation provider's verdict lacked: somebody with
+    // an account is on that address. Lazily imported like the rest - the firewall
+    // service reaches the database and the edge snapshot.
+    onSessionCreated: async (session) => {
+        const { liftReputationBanOnSignIn } = await import("./waf-intel-service");
+        await liftReputationBanOnSignIn(session.ipAddress, session.userId);
     }
 });
 

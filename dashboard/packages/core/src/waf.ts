@@ -106,6 +106,13 @@ export interface GuardRule {
      * admits, for the rest of its life. A token with no `iat` is too old by definition.
      */
     readonly loginMaxAge?: number;
+    /**
+     * The route is Polaris's own dashboard. Lets the guard keep the way in open under a
+     * reputation verdict (see `reputationSparesPath`): a provider's opinion of a shared
+     * address describes other people, and the person on it must still be able to sign
+     * in. Left out of the header when false, which is every route but one.
+     */
+    readonly dashboard?: boolean;
     /** Managed rule-pack ids, expanded to rules on decode. Sending ids rather than
      *  their contents is what keeps this header small: a pack of forty user agents
      *  is four bytes here and is stamped onto every single request to the route.
@@ -132,7 +139,7 @@ export interface GuardRule {
  * login admits, `y` = the principals it refuses, `b` = browser integrity, `s` = SQL
  * injection protection, `x` = XSS protection, `e` = email obfuscation, `c` = the
  * browser challenge, `f` = the origins allowed to frame the route, present only while
- * framing protection is on, `k` = the login's public keys, `p` = pack ids, `r` = custom
+ * framing protection is on, `k` = the login's public keys, `o` = the route is the dashboard, `p` = pack ids, `r` = custom
  * rules).
  *
  * The login keys are left out entirely when they say nothing, which is the case on
@@ -161,6 +168,7 @@ export function encodeGuardRule(rule: GuardRule): string {
                 : {}),
             ...(rule.requireLogin && (rule.keys?.length ?? 0) > 0 ? { k: rule.keys } : {}),
             ...(rule.requireLogin && validMaxAge(rule.loginMaxAge) ? { m: rule.loginMaxAge } : {}),
+            ...(rule.dashboard === true ? { o: true } : {}),
             p: rule.presets ?? [],
             r: rule.rules
         })
@@ -315,6 +323,7 @@ function decodeUncached(header: string): GuardRule {
                 f?: unknown;
                 k?: unknown;
                 m?: unknown;
+                o?: unknown;
                 p?: unknown;
                 r?: unknown;
             };
@@ -350,6 +359,7 @@ function decodeUncached(header: string): GuardRule {
                           .slice(0, 4)
                     : undefined,
                 loginMaxAge: validMaxAge(obj.m) ? obj.m : undefined,
+                ...(obj.o === true ? { dashboard: true } : {}),
                 presets,
                 rules: parseRules(obj.r),
                 managedRules: expandWafPresets(presets)

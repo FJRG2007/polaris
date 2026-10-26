@@ -29,15 +29,64 @@ const DOMAIN_ANALYSIS = z.object({
     domain: z.object({ valid: z.boolean().optional(), fraud: z.boolean().optional() }).optional()
 });
 
-/** Verify an IP; `allow` is false when it matches any of the `deny` conditions. */
+/** The IP verdict with the part of the analysis that says the address is shared:
+ *  `vpn`, `proxy` and `mobile` (a carrier's NAT), as the SDK's
+ *  `DataIPValidationAnalysis` types them. Loose for the same reason as above. */
+const IP_VERDICT = VERDICT.extend({
+    response: z
+        .object({
+            vpn: z.boolean().optional(),
+            proxy: z.boolean().optional(),
+            mobile: z.boolean().optional()
+        })
+        .optional()
+});
+
+/** Verdicts that describe how an address has been used rather than what it is. On a
+ *  shared address they are about everybody else on it. */
+const BEHAVIOURAL_IP_RULES = new Set(["FRAUD", "HIGH_RISK_SCORE"]);
+
+/**
+ * Settle an IP verdict, treating a shared address softly.
+ *
+ * A VPN exit, WARP, a private relay or a carrier's NAT carries thousands of people,
+ * and a fraud or risk verdict on it is the sum of what they did. Banning on it turned
+ * away a new member accepting an invite. So on an address the analysis calls a VPN,
+ * a proxy or mobile, those two verdicts are dropped. The operator's own choice to
+ * deny VPN or PROXY traffic still stands, because that is a verdict about what the
+ * address is, and it is the one they asked for. Pure, so it can be tested without
+ * the network.
+ */
+export function settleIpVerdict(answer: z.infer<typeof IP_VERDICT>): {
+    allow: boolean;
+    reasons: string[];
+    shared: boolean;
+} {
+    const reasons = answer.reasons ?? [];
+    const shared =
+        answer.response?.vpn === true ||
+        answer.response?.proxy === true ||
+        answer.response?.mobile === true;
+    if (answer.allow || !shared) return { allow: answer.allow, reasons, shared };
+    const kept = reasons.filter((reason) => !BEHAVIOURAL_IP_RULES.has(reason));
+    // Nothing behavioural to drop: whatever refused it is not this function's to undo.
+    if (kept.length === reasons.length) return { allow: false, reasons, shared };
+    return { allow: kept.length === 0, reasons: kept, shared };
+}
+
+/** Verify an IP; `allow` is false when it matches any of the `deny` conditions,
+ *  with a shared address treated as `settleIpVerdict` describes. */
 export async function verifyIp(
     apiKey: string,
     ip: string,
     deny: string[]
 ): Promise<{ allow: boolean; reasons: string[] }> {
     const client = new DymoAPI({ apiKey });
-    const answer = VERDICT.parse(await client.isValidIP(ip, { deny: deny as NegativeIPRules[] }));
-    return { allow: answer.allow, reasons: answer.reasons ?? [] };
+    const answer = IP_VERDICT.parse(
+        await client.isValidIP(ip, { deny: deny as NegativeIPRules[] })
+    );
+    const { allow, reasons } = settleIpVerdict(answer);
+    return { allow, reasons };
 }
 
 /**

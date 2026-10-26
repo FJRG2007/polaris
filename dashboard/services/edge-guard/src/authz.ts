@@ -50,6 +50,7 @@ import {
     evaluateWafRules,
     injectionFailure,
     ipAllowed,
+    reputationSparesPath,
     type WafIntelIndex
 } from "@polaris/core";
 import {
@@ -260,7 +261,15 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // address should not be able to talk its way past with a well-chosen header.
     if (cfg.intel && cfg.intel.size > 0) {
         const hit = cfg.intel.match(clientIp(req.forwardedFor), cfg.now * 1000);
-        if (hit)
+        // A reputation verdict alone never closes the dashboard's way in: on a shared
+        // address it describes other people, and the person on it has to be able to
+        // sign in - which is what lifts the ban. Everything else on the route stays
+        // blocked, and every other kind of entry blocks everything.
+        const spared =
+            hit !== null &&
+            rule.dashboard === true &&
+            reputationSparesPath(hit, parseUri(req.forwardedUri, proto, host)?.pathname ?? null);
+        if (hit && !spared)
             return {
                 status: 403,
                 reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}`

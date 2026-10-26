@@ -70,7 +70,13 @@ export interface WafIntelSnapshot {
     readonly moved: Readonly<Record<string, number>>;
 }
 
-export const EMPTY_WAF_INTEL: WafIntelSnapshot = { v: WAF_INTEL_VERSION, at: 0, ips: {}, cidrs: [], moved: {} };
+export const EMPTY_WAF_INTEL: WafIntelSnapshot = {
+    v: WAF_INTEL_VERSION,
+    at: 0,
+    ips: {},
+    cidrs: [],
+    moved: {}
+};
 
 /**
  * The snapshot as the guard queries it. Built once per file read, then asked once
@@ -80,7 +86,8 @@ export const EMPTY_WAF_INTEL: WafIntelSnapshot = { v: WAF_INTEL_VERSION, at: 0, 
 export interface WafIntelIndex {
     readonly at: number;
     readonly size: number;
-    /** The entry blocking this address right now, or null. */
+    /** The entry blocking this address right now, or null. A reputation entry only
+     *  when nothing stricter - a ban, Tor, a manual range - covers the address too. */
     match(ip: string | null | undefined, now: number): WafIntelEntry | null;
     /** Epoch ms this user's groups or roles last moved, or null if nothing recent
      *  is known - which is the answer for almost everybody, almost always. */
@@ -107,11 +114,15 @@ export function indexWafIntel(snapshot: unknown): WafIntelIndex {
         match(ip, now) {
             if (!ip) return null;
             const exact = ips.get(ip);
-            if (exact && live(exact, now)) return exact;
+            const found = exact && live(exact, now) ? exact : null;
+            if (found && found.reason !== "reputation") return found;
+            let weakest: WafIntelEntry | null = found;
             for (const [range, entry] of cidrs) {
-                if (live(entry, now) && ipAllowed(ip, [range])) return entry;
+                if (!live(entry, now) || !ipAllowed(ip, [range])) continue;
+                if (entry.reason !== "reputation") return entry;
+                weakest ??= entry;
             }
-            return null;
+            return weakest;
         },
         movedAt(userId) {
             return moved.get(userId) ?? null;
@@ -162,6 +173,56 @@ function asEntry(value: unknown): WafIntelEntry | null {
     };
 }
 
+/**
+ * The paths a person needs to sign in, sign up or accept an invite on the dashboard,
+ * which a REPUTATION verdict alone never closes.
+ *
+ * A reputation provider describes an address, and a shared one - a VPN, WARP, iCloud
+ * Private Relay, a carrier's NAT - is described by what other people did from it. A
+ * ban on that evidence used to take the whole dashboard away, the sign-in page with it,
+ * from somebody who had never been seen before. Jail, probe, Tor and manual entries
+ * keep blocking everything: those are about the address's own behaviour or the
+ * operator's own decision. Once the person signs in, Polaris lifts the reputation ban
+ * itself, so the rest of the dashboard follows.
+ *
+ * Prefixes, matched against the path alone. `/api/auth/` is the sign-in API,
+ * `/oauth/` the sign-in, invite, enrolment and recovery pages (server actions post to
+ * the page's own path), `/edge/` the sign-in handoff for protected services.
+ */
+const SIGN_IN_PREFIXES = [
+    "/oauth/",
+    "/api/auth/",
+    "/edge/",
+    "/_next/static/",
+    "/backgrounds/",
+    "/logos/"
+] as const;
+const SIGN_IN_EXACT = new Set([
+    "/oauth",
+    "/api/version",
+    "/favicon.ico",
+    "/icon.svg",
+    "/apple-touch-icon.png",
+    "/manifest.webmanifest",
+    "/polaris-mark-128.png",
+    "/polaris-mark-192.png",
+    "/polaris-mark-512.png",
+    "/sw.js",
+    "/offline.html",
+    "/robots.txt"
+]);
+
+/** Whether a reputation entry is to be stepped over for this request path. Only
+ *  reputation, only these paths, and never a path that walks out of them with `..`. */
+export function reputationSparesPath(
+    entry: WafIntelEntry,
+    path: string | null | undefined
+): boolean {
+    if (entry.reason !== "reputation" || !path) return false;
+    if (path.includes("..") || path.includes("%2e") || path.includes("%2E")) return false;
+    return SIGN_IN_EXACT.has(path) || SIGN_IN_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 /** Assemble a snapshot, dropping anything that has already expired so the file does
  *  not grow without bound. */
 export function buildWafIntel(
@@ -174,7 +235,7 @@ export function buildWafIntel(
     for (const [address, entry] of entries) {
         if (!live(entry, now)) continue;
         if (address.includes("/")) cidrs.push([address, entry]);
-        else ips[address] = entry;
+        else if (entry.reason !== "reputation" || !ips[address]) ips[address] = entry;
     }
     return { v: WAF_INTEL_VERSION, at: now, ips, cidrs, moved: Object.fromEntries(moved) };
 }

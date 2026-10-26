@@ -131,7 +131,7 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
             `    ${WAF_CTX}:`,
             "      headers:",
             "        customRequestHeaders:",
-            `          X-Polaris-Waf: "${encodeGuardRule({ deny, presets, rules, requireLogin: false, browserIntegrity, sqlInjectionProtection, xssProtection })}"`,
+            `          X-Polaris-Waf: "${encodeGuardRule({ deny, presets, rules, requireLogin: false, browserIntegrity, sqlInjectionProtection, xssProtection, dashboard: true })}"`,
             `    ${WAF_GUARD}:`,
             "      forwardAuth:",
             `        address: "${guardUrl()}/authz"`

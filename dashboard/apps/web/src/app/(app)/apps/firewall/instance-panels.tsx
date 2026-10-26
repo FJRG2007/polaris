@@ -20,6 +20,7 @@ import { grouped } from "./grouped";
 import { ChipList, validAddress } from "./chip-list";
 import { AddressAccounts } from "./address-accounts";
 import { localizeJail } from "./waf-words";
+import { scopeKindLabel } from "./scope-kinds";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
@@ -40,6 +41,7 @@ import {
     getWafAddressActivityAction,
     getWafOverviewAction,
     liftWafBanAction,
+    setAddressListedAction,
     setWafAnomalySettingsAction,
     setWafIgnoreListAction,
     setWafJailsAction,
@@ -52,11 +54,14 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    CopyButton,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    Input,
+    Select,
     Skeleton,
     Switch,
     TimeSeriesChart
@@ -204,7 +209,13 @@ export function FirewallInstancePanels({
             <IntelPanel />
             {failure ? <p className="text-sm text-danger">{failure}</p> : null}
             {data?.error ? <p className="text-sm text-danger">{data.error}</p> : null}
-            <AddressDialog ip={inspecting} hours={hours} onClose={() => setInspecting(null)} />
+            <AddressDialog
+                ip={inspecting}
+                hours={hours}
+                callerIp={callerIp}
+                onClose={() => setInspecting(null)}
+                onChanged={() => load(hours)}
+            />
         </div>
     );
 }
@@ -622,15 +633,36 @@ function BansPanel({
 }) {
     const t = useTranslations("firewall");
     const format = useDisplayFormat();
+    const [query, setQuery] = useState("");
+    // An address in full, a prefix of one, or a word of the reason: the list is the
+    // instance's whole jail, and finding one person in it used to be a scroll.
+    const needle = query.trim().toLowerCase();
+    const shown = needle
+        ? (bans ?? []).filter((ban) =>
+              [ban.ip, ban.note ?? "", ban.source].some((field) =>
+                  field.toLowerCase().includes(needle)
+              )
+          )
+        : (bans ?? []);
 
     return (
         <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
                     <Ban className="size-4 text-muted-foreground" />
                     {t("bans.title")}
                     {bans && bans.length > 0 ? <Badge>{String(bans.length)}</Badge> : null}
                 </CardTitle>
+                {bans && bans.length > 0 ? (
+                    <Input
+                        type="search"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder={t("bans.search")}
+                        aria-label={t("bans.search")}
+                        className="h-8 w-full min-w-0 sm:w-64"
+                    />
+                ) : null}
             </CardHeader>
             <CardBody>
                 {loading ? (
@@ -638,6 +670,10 @@ function BansPanel({
                 ) : !bans || bans.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
                         {t("bans.none")}
+                    </p>
+                ) : shown.length === 0 ? (
+                    <p className="break-words py-4 text-center text-sm text-muted-foreground">
+                        {t("bans.noMatch", { query: query.trim() })}
                     </p>
                 ) : (
                     <div className="-mx-2 overflow-x-auto">
@@ -659,7 +695,7 @@ function BansPanel({
                                 </tr>
                             </thead>
                             <tbody>
-                                {bans.map((ban) => (
+                                {shown.map((ban) => (
                                     <tr key={ban.ip} className="border-t border-border">
                                         <td className="px-2 py-2 text-xs">
                                             <AddressLink
@@ -1075,14 +1111,123 @@ function BanReason({
     );
 }
 
+/** The two scopes an operator decides an address on from here: the dashboard, or
+ *  every service on the instance. Narrower scopes are the rule editor's. */
+const DECIDE_SCOPES = ["polaris", "global"] as const;
+type DecideScope = (typeof DECIDE_SCOPES)[number];
+
+/**
+ * What to do about the address being looked at, where it is being looked at: allow
+ * it, block it, or lift its ban. The dialog used to give evidence only, and acting on
+ * it was a trip to the rule editor to type the address back in.
+ */
+function AddressDecision({
+    ip,
+    banned,
+    callerIp,
+    onChanged
+}: {
+    ip: string;
+    banned: boolean;
+    callerIp?: string | null;
+    onChanged: () => void;
+}) {
+    const t = useTranslations("firewall");
+    const [scope, setScope] = useState<DecideScope>("polaris");
+    const [pending, start] = useTransition();
+    const [outcome, setOutcome] = useState<{ ok: boolean; text: string } | null>(null);
+
+    function run(action: () => Promise<{ error?: string }>, done: string) {
+        setOutcome(null);
+        start(async () => {
+            const result = await action().catch(() => ({ error: t("errors.save") }));
+            if (result.error) {
+                setOutcome({ ok: false, text: result.error });
+                return;
+            }
+            setOutcome({ ok: true, text: done });
+            onChanged();
+        });
+    }
+
+    const scopeName = scopeKindLabel(t, scope);
+    const mine = !!callerIp && callerIp === ip;
+    const list = (which: "allow" | "deny") =>
+        setAddressListedAction({ ip, list: which, scopeType: scope, scopeId: "" });
+    return (
+        <div className="mb-4 flex flex-col gap-2 rounded-md border border-border p-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <p className="mr-auto text-sm font-medium">{t("decide.title")}</p>
+                <CopyButton value={ip} label={t("decide.copy")} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <Select
+                    value={scope}
+                    aria-label={t("decide.scope")}
+                    className="h-8 w-full min-w-0 sm:w-48"
+                    options={DECIDE_SCOPES.map((entry) => ({
+                        value: entry,
+                        label: scopeKindLabel(t, entry)
+                    }))}
+                    onValueChange={(value) => setScope(value as DecideScope)}
+                />
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={pending}
+                    onClick={() =>
+                        run(() => list("allow"), t("decide.allowed", { scope: scopeName }))
+                    }
+                >
+                    <ShieldCheck className="size-3.5" />
+                    {t("decide.allow")}
+                </Button>
+                <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={pending || mine}
+                    title={mine ? t("decide.denySelf") : undefined}
+                    onClick={() =>
+                        run(() => list("deny"), t("decide.denied", { scope: scopeName }))
+                    }
+                >
+                    <Ban className="size-3.5" />
+                    {t("decide.deny")}
+                </Button>
+                {banned ? (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={pending}
+                        onClick={() => run(() => liftWafBanAction(ip), t("decide.lifted"))}
+                    >
+                        <ShieldOff className="size-3.5" />
+                        {t("decide.lift")}
+                    </Button>
+                ) : null}
+            </div>
+            {mine ? <p className="text-xs text-muted-foreground">{t("decide.denySelf")}</p> : null}
+            {outcome ? (
+                <p className={`text-xs ${outcome.ok ? "text-muted-foreground" : "text-danger"}`}>
+                    {outcome.text}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
 function AddressDialog({
     ip,
     hours,
-    onClose
+    callerIp,
+    onClose,
+    onChanged
 }: {
     ip: string | null;
     hours: number;
+    callerIp?: string | null;
     onClose: () => void;
+    onChanged: () => void;
 }) {
     const t = useTranslations("firewall");
     const format = useDisplayFormat();
@@ -1090,21 +1235,29 @@ function AddressDialog({
     const [error, setError] = useState<string | null>(null);
     const windowLabel = WINDOWS.find((entry) => entry.hours === hours)?.label ?? `${hours}h`;
     const activity = loaded?.activity ?? null;
+    const [revision, setRevision] = useState(0);
+
+    useEffect(() => {
+        if (!ip) return;
+        setLoaded(null);
+        setError(null);
+    }, [ip, hours]);
 
     useEffect(() => {
         if (!ip) return;
         let active = true;
-        setLoaded(null);
-        setError(null);
         void polls.addressActivity(ip, hours).then((result) => {
             if (!active) return;
             if (result.error) setError(result.error);
-            else setLoaded(result);
+            else {
+                setError(null);
+                setLoaded(result);
+            }
         });
         return () => {
             active = false;
         };
-    }, [ip, hours]);
+    }, [ip, hours, revision]);
 
     return (
         <Dialog open={ip !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -1121,6 +1274,20 @@ function AddressDialog({
                     behind them, and an operator looking at their own address is asking
                     this question first. */}
                 {loaded?.ban ? <BanReason ban={loaded.ban} format={format} /> : null}
+                {ip ? (
+                    <AddressDecision
+                        ip={ip}
+                        banned={
+                            !!loaded?.ban &&
+                            (loaded.ban.until === null || new Date(loaded.ban.until) > new Date())
+                        }
+                        callerIp={callerIp}
+                        onChanged={() => {
+                            setRevision((value) => value + 1);
+                            onChanged();
+                        }}
+                    />
+                ) : null}
 
                 {/* Who was signed in from here does not come from the log and does not
                     depend on the window, so it sits above the requests and is still

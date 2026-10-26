@@ -587,7 +587,9 @@
         "offences": "{count}x",
         "untilLifted": "Hasta que lo levantes",
         "liftNamed": "Levantar el bloqueo de {ip}",
-        "lift": "Levantar bloqueo"
+        "lift": "Desbloquear",
+        "search": "Buscar dirección o motivo",
+        "noMatch": "Ningún bloqueo coincide con \"{query}\"."
     },
     "trusted": {
         "title": "Direcciones fiables",
@@ -639,5 +641,17 @@
         "closing": "Cerrando. Cada servicio cambia en segundo plano.",
         "closeFailed": "No se pudo cerrar el puerto. El servicio sigue como estaba.",
         "noPermission": "Solo quien administra esta instancia puede cerrarlos."
+    },
+    "decide": {
+        "title": "Decidir sobre esta dirección",
+        "scope": "Se aplica a",
+        "allow": "Permitir",
+        "deny": "Bloquear",
+        "lift": "Desbloquear",
+        "copy": "Copiar IP",
+        "allowed": "Permitida en {scope}, y levantado cualquier bloqueo.",
+        "denied": "En la lista de bloqueadas de {scope}.",
+        "lifted": "Bloqueo levantado.",
+        "denySelf": "Es la dirección desde la que lees esto. Bloquearla te dejaría fuera."
     }
 }

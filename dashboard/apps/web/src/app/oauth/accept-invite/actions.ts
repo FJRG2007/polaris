@@ -9,7 +9,9 @@
  * client: it is half of what decides whether the invite may be claimed at all.
  */
 
+import { prisma } from "@polaris/db";
 import { clientIp } from "@/lib/request-context";
+import { liftReputationBanOnSignIn } from "@/lib/waf-intel-service";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { claimInvite, resolveInvite } from "@/lib/invite-service";
 import { getTranslations } from "@/lib/i18n/request";
@@ -29,20 +31,28 @@ export async function lookupInviteCodeAction(
     const parsed = inviteCodeField.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0]?.message;
-        return { error: issue === undefined ? t("invite.errors.invalidCode") : validationMessage(tv, issue) };
+        return {
+            error:
+                issue === undefined ? t("invite.errors.invalidCode") : validationMessage(tv, issue)
+        };
     }
     const { invite, refusal } = await resolveInvite({ code: parsed.data }, await clientIp());
     if (!invite) return { error: validationMessage(tv, INVITE_REFUSALS[refusal ?? "unavailable"]) };
     return { invite: { email: invite.email, needsPassword: invite.needsPassword } };
 }
 
-export async function acceptInviteAction(input: unknown): Promise<{ email?: string; error?: string }> {
+export async function acceptInviteAction(
+    input: unknown
+): Promise<{ email?: string; error?: string }> {
     const t = await getTranslations("auth");
     const tv = await getTranslations("validation");
     const parsed = claimInviteSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0]?.message;
-        return { error: issue === undefined ? t("invite.errors.invalidInput") : validationMessage(tv, issue) };
+        return {
+            error:
+                issue === undefined ? t("invite.errors.invalidInput") : validationMessage(tv, issue)
+        };
     }
     const { token, code, oneTimePassword, name, username, password } = parsed.data;
     if (!token && !code) return { error: t("invite.errors.missingToken") };
@@ -51,6 +61,7 @@ export async function acceptInviteAction(input: unknown): Promise<{ email?: stri
     // must never be the reason an invited person cannot join.
     if (await passwordIsBreached(password)) return { error: tv("passwordBreached") };
 
+    const ip = await clientIp();
     const result = await claimInvite({
         token: token || undefined,
         code: code || undefined,
@@ -58,9 +69,19 @@ export async function acceptInviteAction(input: unknown): Promise<{ email?: stri
         name,
         username,
         password,
-        ip: await clientIp()
+        ip
     });
     if (result.refusal) return { error: validationMessage(tv, INVITE_REFUSALS[result.refusal]) };
     if (result.error) return { error: result.error };
+    // An accepted invite is a person with an account on this address: a reputation
+    // verdict about it, which describes whoever else shares it, stops applying now
+    // rather than after the sign-in that follows.
+    if (result.email) {
+        const account = await prisma.user.findUnique({
+            where: { email: result.email },
+            select: { id: true }
+        });
+        if (account) await liftReputationBanOnSignIn(ip, account.id, "invite");
+    }
     return { email: result.email };
 }

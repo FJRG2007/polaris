@@ -647,6 +647,18 @@ export interface AuthOptions {
     readonly configuredHosts?: () => Promise<readonly string[]>;
 
     /**
+     * Told about every session that opens, whatever the method, after it is stored,
+     * except one still owed a second factor or held for another device's approval.
+     * Supplied by the app so it can act on a successful sign-in - lifting a reputation
+     * ban on the address it came from. Failures are logged and swallowed: a sign-in
+     * never fails because something listening to it did.
+     */
+    readonly onSessionCreated?: (session: {
+        userId: string;
+        ipAddress?: string | null;
+    }) => Promise<void>;
+
+    /**
      * How to send an account message. Supplied by the app, which owns the channel
      * that carries it; omitting it is what leaves the mail-backed sign-in methods
      * unregistered, so a build that cannot send never exposes their endpoints.
@@ -795,6 +807,19 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
                     before: async (session, context) => {
                         if (context?.path && bypassesIdentityProvider(context.path)) {
                             await refuseSessionForEnforcedDomain(session.userId);
+                        }
+                    },
+                    after: async (session, context) => {
+                        if (!options.onSessionCreated) return;
+                        try {
+                            if (await sessionUnproven(session, context?.path, context?.body))
+                                return;
+                            await options.onSessionCreated({
+                                userId: session.userId,
+                                ipAddress: session.ipAddress ?? null
+                            });
+                        } catch (error) {
+                            console.error("polaris: a sign-in listener failed:", error);
                         }
                     }
                 }
@@ -967,6 +992,26 @@ async function sessionHeldBack(
         select: { sessionId: true }
     });
     return approver !== null;
+}
+
+/**
+ * Whether a session that was just stored is still short of what the sign-in asks:
+ * the first-factor session the two-factor hook takes back before the second step,
+ * or one held for another device's approval. Neither is a sign-in yet, so neither is
+ * told to the app's listener.
+ */
+async function sessionUnproven(
+    session: { id: string; userId: string },
+    path: string | undefined,
+    body: unknown
+): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { twoFactorEnabled: true }
+    });
+    const twoFactorEnabled = user?.twoFactorEnabled === true;
+    if (twoFactorEnabled && challengedSignIn(path ?? "", body)) return true;
+    return sessionHeldBack(session.userId, session.id, twoFactorEnabled);
 }
 
 /** Registering a passkey is the one that also wants the password proved. The

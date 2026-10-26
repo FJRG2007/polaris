@@ -7,7 +7,12 @@ import {
     type HttpLogLike,
     type WafJail
 } from "../src/waf-jails.js";
-import { buildWafIntel, indexWafIntel, WAF_INTEL_VERSION, type WafIntelEntry } from "../src/waf-intel.js";
+import {
+    buildWafIntel,
+    indexWafIntel,
+    WAF_INTEL_VERSION,
+    type WafIntelEntry
+} from "../src/waf-intel.js";
 
 const NOW = Date.parse("2026-08-02T12:00:00.000Z");
 
@@ -65,7 +70,11 @@ describe("jail defaults", () => {
 
 describe("detectWafBans", () => {
     it("bans at the threshold and not before it", () => {
-        const below = detectWafBans({ entries: hits("203.0.113.7", 7), jails: [NOT_FOUND], now: NOW });
+        const below = detectWafBans({
+            entries: hits("203.0.113.7", 7),
+            jails: [NOT_FOUND],
+            now: NOW
+        });
         expect(below).toEqual([]);
 
         const at = detectWafBans({ entries: hits("203.0.113.7", 8), jails: [NOT_FOUND], now: NOW });
@@ -93,8 +102,14 @@ describe("detectWafBans", () => {
     it("does not count the assets of a build a tab outlived", () => {
         const stale = [
             ...hits("203.0.113.7", 5, { path: "/_next/static/chunks/9017-37194d2ed7f27aed.js" }),
-            ...hits("203.0.113.7", 5, { path: "/_next/static/chunks/app/(app)/loading-95a18046.js", agoSec: 10 }),
-            ...hits("203.0.113.7", 4, { path: "/_next/image?url=%2Flogo.png&w=64&q=75", agoSec: 20 })
+            ...hits("203.0.113.7", 5, {
+                path: "/_next/static/chunks/app/(app)/loading-95a18046.js",
+                agoSec: 10
+            }),
+            ...hits("203.0.113.7", 4, {
+                path: "/_next/image?url=%2Flogo.png&w=64&q=75",
+                agoSec: 20
+            })
         ];
         expect(detectWafBans({ entries: stale, jails: [NOT_FOUND], now: NOW })).toEqual([]);
     });
@@ -135,14 +150,18 @@ describe("detectWafBans", () => {
     // same way is.
     it("still counts a path that only borrows the asset prefix", () => {
         const enumerated = hits("203.0.113.7", 8, { path: "/_next/../.env" });
-        expect(detectWafBans({ entries: enumerated, jails: [NOT_FOUND], now: NOW })).toHaveLength(1);
+        expect(detectWafBans({ entries: enumerated, jails: [NOT_FOUND], now: NOW })).toHaveLength(
+            1
+        );
     });
 
     // The exclusion is for the query the framework adds, not for any path that
     // happens to carry those four letters.
     it("still counts a plain URL that only looks like one", () => {
         const enumerated = hits("203.0.113.7", 8, { path: "/_rsc/admin.php" });
-        expect(detectWafBans({ entries: enumerated, jails: [NOT_FOUND], now: NOW })).toHaveLength(1);
+        expect(detectWafBans({ entries: enumerated, jails: [NOT_FOUND], now: NOW })).toHaveLength(
+            1
+        );
     });
 
     it("still counts enumeration mixed in with the navigation", () => {
@@ -176,7 +195,9 @@ describe("detectWafBans", () => {
 
     it("ignores a disabled jail", () => {
         const off: WafJail = { ...NOT_FOUND, enabled: false };
-        expect(detectWafBans({ entries: hits("203.0.113.7", 40), jails: [off], now: NOW })).toEqual([]);
+        expect(detectWafBans({ entries: hits("203.0.113.7", 40), jails: [off], now: NOW })).toEqual(
+            []
+        );
     });
 
     it("skips entries with no usable time or address", () => {
@@ -213,8 +234,16 @@ describe("detectWafBans", () => {
     });
 
     it("treats the cloud metadata route and a private key the same way", () => {
-        for (const path of ["/latest/meta-data/iam/security-credentials/", "/.ssh/id_rsa", "/.git/config"]) {
-            const bans = detectWafBans({ entries: hits("198.51.100.5", 1, { path }), jails: [PROBES], now: NOW });
+        for (const path of [
+            "/latest/meta-data/iam/security-credentials/",
+            "/.ssh/id_rsa",
+            "/.git/config"
+        ]) {
+            const bans = detectWafBans({
+                entries: hits("198.51.100.5", 1, { path }),
+                jails: [PROBES],
+                now: NOW
+            });
             expect(bans[0]?.until).toBeNull();
         }
     });
@@ -264,8 +293,18 @@ describe("detectWafBans", () => {
     it("holds a repeat offender for longer, up to the cap", () => {
         const entries = hits("203.0.113.9", 8);
         const first = detectWafBans({ entries, jails: [NOT_FOUND], now: NOW })[0]!;
-        const third = detectWafBans({ entries, jails: [NOT_FOUND], priorBans: { "203.0.113.9": 2 }, now: NOW })[0]!;
-        const many = detectWafBans({ entries, jails: [NOT_FOUND], priorBans: { "203.0.113.9": 99 }, now: NOW })[0]!;
+        const third = detectWafBans({
+            entries,
+            jails: [NOT_FOUND],
+            priorBans: { "203.0.113.9": 2 },
+            now: NOW
+        })[0]!;
+        const many = detectWafBans({
+            entries,
+            jails: [NOT_FOUND],
+            priorBans: { "203.0.113.9": 99 },
+            now: NOW
+        })[0]!;
         expect(third.until! - NOW).toBe(4 * 1800 * 1000);
         expect(many.until! - NOW).toBe(8 * 1800 * 1000);
         expect(first.until!).toBeLessThan(third.until!);
@@ -279,17 +318,28 @@ describe("detectWafBans", () => {
  */
 describe("the subdomain sweep jail", () => {
     it("bans at its threshold in distinct names, and not before it", () => {
-        const below = detectWafBans({ entries: sweep("203.0.113.7", FIVE_NAMES.slice(0, 4)), jails: [SWEEP], now: NOW });
+        const below = detectWafBans({
+            entries: sweep("203.0.113.7", FIVE_NAMES.slice(0, 4)),
+            jails: [SWEEP],
+            now: NOW
+        });
         expect(below).toEqual([]);
 
-        const at = detectWafBans({ entries: sweep("203.0.113.7", FIVE_NAMES), jails: [SWEEP], now: NOW });
+        const at = detectWafBans({
+            entries: sweep("203.0.113.7", FIVE_NAMES),
+            jails: [SWEEP],
+            now: NOW
+        });
         expect(at).toHaveLength(1);
         expect(at[0]).toMatchObject({ ip: "203.0.113.7", jail: "subdomain-listing", hits: 5 });
         expect(at[0]!.note).toContain("5 names");
     });
 
     it("counts a name once however many times it is asked for", () => {
-        const entries = sweep("203.0.113.7", Array.from({ length: 40 }, () => "one.plr.example.com"));
+        const entries = sweep(
+            "203.0.113.7",
+            Array.from({ length: 40 }, () => "one.plr.example.com")
+        );
         expect(detectWafBans({ entries, jails: [SWEEP], now: NOW })).toEqual([]);
     });
 
@@ -331,7 +381,12 @@ describe("the subdomain sweep jail", () => {
 
     it("is on for a fresh instance, counted in names", () => {
         expect(SWEEP.enabled).toBe(true);
-        expect(SWEEP).toMatchObject({ counts: "hostnames", maxRetry: 5, findTimeSec: 300, banTimeSec: 1800 });
+        expect(SWEEP).toMatchObject({
+            counts: "hostnames",
+            maxRetry: 5,
+            findTimeSec: 300,
+            banTimeSec: 1800
+        });
     });
 });
 
@@ -352,6 +407,34 @@ describe("the intel snapshot", () => {
         expect(index.match("198.51.101.1", NOW)).toBeNull();
     });
 
+    it("never lets a reputation entry hide a stricter one", () => {
+        const reputation: WafIntelEntry = { reason: "reputation", until: null };
+        const tor: WafIntelEntry = { reason: "tor", until: null };
+        const manual: WafIntelEntry = { reason: "manual", until: null };
+        const both = indexWafIntel(
+            buildWafIntel(
+                [
+                    ["203.0.113.7", tor],
+                    ["203.0.113.7", reputation]
+                ],
+                NOW
+            )
+        );
+        expect(both.match("203.0.113.7", NOW)?.reason).toBe("tor");
+        const ranged = indexWafIntel(
+            buildWafIntel(
+                [
+                    ["203.0.113.7", reputation],
+                    ["203.0.113.0/24", manual]
+                ],
+                NOW
+            )
+        );
+        expect(ranged.match("203.0.113.7", NOW)?.reason).toBe("manual");
+        const alone = indexWafIntel(buildWafIntel([["203.0.113.7", reputation]], NOW));
+        expect(alone.match("203.0.113.7", NOW)?.reason).toBe("reputation");
+    });
+
     it("lets a ban lapse on its own", () => {
         const index = indexWafIntel(buildWafIntel([["203.0.113.7", ban]], NOW));
         expect(index.match("203.0.113.7", NOW + 59_000)).not.toBeNull();
@@ -360,7 +443,13 @@ describe("the intel snapshot", () => {
 
     it("drops entries that expired before it was written", () => {
         const stale: WafIntelEntry = { reason: "ban", until: NOW - 1 };
-        const snapshot = buildWafIntel([["203.0.113.7", stale], ["203.0.113.8", ban]], NOW);
+        const snapshot = buildWafIntel(
+            [
+                ["203.0.113.7", stale],
+                ["203.0.113.8", ban]
+            ],
+            NOW
+        );
         expect(Object.keys(snapshot.ips)).toEqual(["203.0.113.8"]);
     });
 
