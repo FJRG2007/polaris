@@ -27,7 +27,8 @@ vi.mock("@/app/(app)/chat/actions", () => ({
 
 // jsdom does no layout; ProseMirror asks for coordinates anyway.
 if (!document.elementFromPoint) document.elementFromPoint = () => null;
-if (!Range.prototype.getClientRects) Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+if (!Range.prototype.getClientRects)
+    Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
 if (!Range.prototype.getBoundingClientRect)
     Range.prototype.getBoundingClientRect = () =>
         ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 }) as DOMRect;
@@ -194,7 +195,9 @@ describe("dictation", () => {
     it("stops on Escape", async () => {
         withRecognizer();
         chatBox();
-        fireEvent.click(await screen.findByRole("button", { name: "Dictate (Alt+M)" }), { detail: 0 });
+        fireEvent.click(await screen.findByRole("button", { name: "Dictate (Alt+M)" }), {
+            detail: 0
+        });
         const recognizer = FakeRecognizer.last!;
         fireEvent.keyDown(window, { key: "Escape" });
         expect(recognizer.stopped).toBe(true);
@@ -219,9 +222,13 @@ describe("dictation", () => {
     it("says what to do when the microphone is blocked", async () => {
         withRecognizer();
         chatBox();
-        fireEvent.click(await screen.findByRole("button", { name: "Dictate (Alt+M)" }), { detail: 0 });
+        fireEvent.click(await screen.findByRole("button", { name: "Dictate (Alt+M)" }), {
+            detail: 0
+        });
         act(() => FakeRecognizer.last!.onerror?.({ error: "not-allowed" }));
-        expect(screen.getByRole("alert").textContent).toContain("Allow it in the browser's site settings");
+        expect(screen.getByRole("alert").textContent).toContain(
+            "Allow it in the browser's site settings"
+        );
     });
 });
 

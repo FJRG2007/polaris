@@ -1236,7 +1236,9 @@ export function Composer({
             )}
             {dictation.problem && (
                 <p role="alert" className="mb-2 flex items-start gap-2 text-xs text-danger">
-                    <span className="min-w-0 flex-1">{t(problemKey(dictation.problem, privateSwitch))}</span>
+                    <span className="min-w-0 flex-1">
+                        {t(problemKey(dictation.problem, privateSwitch))}
+                    </span>
                     <button
                         type="button"
                         onClick={dictation.clearProblem}
@@ -1407,26 +1409,28 @@ export function Composer({
                                 {/* Sending later and putting it aside are behind
                                     the chevron - see `SendButton`. */}
                                 {slot !== "mic" && (
-                                <SendButton
-                                    disabled={disabled || tooLong || (blank && files.length === 0)}
-                                    onSend={() => void submit(body)}
-                                    onSchedule={
-                                        onSchedule
-                                            ? () => {
-                                                  setScheduleError("");
-                                                  setScheduling(true);
-                                              }
-                                            : undefined
-                                    }
-                                    onSaveDraft={draftKey ? putAside : undefined}
-                                    draftRefusal={
-                                        files.length > 0
-                                            ? "Drafts keep text only. Send or remove the files first."
-                                            : blank
-                                              ? "Write something first."
-                                              : undefined
-                                    }
-                                />
+                                    <SendButton
+                                        disabled={
+                                            disabled || tooLong || (blank && files.length === 0)
+                                        }
+                                        onSend={() => void submit(body)}
+                                        onSchedule={
+                                            onSchedule
+                                                ? () => {
+                                                      setScheduleError("");
+                                                      setScheduling(true);
+                                                  }
+                                                : undefined
+                                        }
+                                        onSaveDraft={draftKey ? putAside : undefined}
+                                        draftRefusal={
+                                            files.length > 0
+                                                ? "Drafts keep text only. Send or remove the files first."
+                                                : blank
+                                                  ? "Write something first."
+                                                  : undefined
+                                        }
+                                    />
                                 )}
                             </>
                         )}

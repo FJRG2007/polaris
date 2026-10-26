@@ -404,7 +404,11 @@ export function useDictation(options: {
  *  site settings can fix. */
 function micProblem(error: unknown): DictationProblem {
     const name = error instanceof DOMException ? error.name : "";
-    if (name === "NotFoundError" || name === "NotReadableError" || name === "OverconstrainedError") {
+    if (
+        name === "NotFoundError" ||
+        name === "NotReadableError" ||
+        name === "OverconstrainedError"
+    ) {
         return "noMic";
     }
     if (name === "NotAllowedError" || name === "SecurityError") return "micBlocked";

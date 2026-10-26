@@ -125,7 +125,8 @@ export function MicSlot({
         current.done = true;
         if (!current.voiceAt) return;
         // A slip of the finger is not a message.
-        if (outcome === "cancel" || Date.now() - current.voiceAt < SHORTEST_VOICE_MS) onVoiceCancel();
+        if (outcome === "cancel" || Date.now() - current.voiceAt < SHORTEST_VOICE_MS)
+            onVoiceCancel();
         else onVoiceStop();
     };
 
@@ -282,7 +283,9 @@ export function MicSlot({
                         aria-describedby={undefined}
                         className="bottom-0 left-0 top-auto w-full max-w-full translate-x-0 translate-y-0 rounded-b-none pb-[max(1rem,env(safe-area-inset-bottom))] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
                     >
-                        <DialogTitle className="pb-2">{t("composer.microphoneSettings")}</DialogTitle>
+                        <DialogTitle className="pb-2">
+                            {t("composer.microphoneSettings")}
+                        </DialogTitle>
                         {body}
                     </DialogContent>
                 </Dialog>
@@ -351,7 +354,9 @@ function MicMenuBody({
             {privateChoice && (
                 <label className="flex items-start justify-between gap-3 px-2 py-1 text-xs">
                     <span className="flex min-w-0 flex-col">
-                        <span className="font-medium text-foreground">{t("dictation.private")}</span>
+                        <span className="font-medium text-foreground">
+                            {t("dictation.private")}
+                        </span>
                         <span className="text-muted-foreground">{t("dictation.privateHelp")}</span>
                     </span>
                     <Switch

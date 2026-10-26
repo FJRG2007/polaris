@@ -62,13 +62,19 @@ export type MicAction = "dictate" | "voice" | null;
 
 /** A tap: dictation where there is an engine, a voice message where there is
  *  not, so the mic is never a dead button. */
-export function tapAction(state: { engine: DictationEngine | null; voiceAllowed: boolean }): MicAction {
+export function tapAction(state: {
+    engine: DictationEngine | null;
+    voiceAllowed: boolean;
+}): MicAction {
     if (state.engine) return "dictate";
     return state.voiceAllowed ? "voice" : null;
 }
 
 /** A hold: a voice message, where one may be sent; otherwise the same as a tap. */
-export function holdAction(state: { engine: DictationEngine | null; voiceAllowed: boolean }): MicAction {
+export function holdAction(state: {
+    engine: DictationEngine | null;
+    voiceAllowed: boolean;
+}): MicAction {
     if (state.voiceAllowed) return "voice";
     return tapAction(state);
 }
@@ -145,7 +151,9 @@ export const PROBLEM_KEYS: Readonly<Record<DictationProblem, NamespaceKey<"chat"
 
 /** The sentences that point at the "Private dictation" switch, for a mic menu
  *  that has it. */
-export const PRIVATE_SWITCH_KEYS: Readonly<Partial<Record<DictationProblem, NamespaceKey<"chat">>>> = {
+export const PRIVATE_SWITCH_KEYS: Readonly<
+    Partial<Record<DictationProblem, NamespaceKey<"chat">>>
+> = {
     serviceBlocked: "dictation.problemWithPrivate.serviceBlocked",
     network: "dictation.problemWithPrivate.network",
     language: "dictation.problemWithPrivate.language",
@@ -153,7 +161,10 @@ export const PRIVATE_SWITCH_KEYS: Readonly<Partial<Record<DictationProblem, Name
 };
 
 /** The sentence for a problem, naming the switch only where it is on screen. */
-export function problemKey(problem: DictationProblem, privateSwitch: boolean): NamespaceKey<"chat"> {
+export function problemKey(
+    problem: DictationProblem,
+    privateSwitch: boolean
+): NamespaceKey<"chat"> {
     return (privateSwitch ? PRIVATE_SWITCH_KEYS[problem] : undefined) ?? PROBLEM_KEYS[problem];
 }
 

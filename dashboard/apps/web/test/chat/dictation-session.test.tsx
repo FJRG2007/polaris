@@ -71,7 +71,10 @@ class FakeMediaRecorder {
 
 function fakeStream() {
     const track = { stop: vi.fn(), kind: "audio" };
-    const stream = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream;
+    const stream = {
+        getTracks: () => [track],
+        getAudioTracks: () => [track]
+    } as unknown as MediaStream;
     return { stream, track };
 }
 
@@ -86,7 +89,8 @@ beforeEach(() => {
     recorders = 0;
     level.value = 0;
     transcribe.mockReset();
-    (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition = FakeRecognizer;
+    (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition =
+        FakeRecognizer;
     vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
 });
 
@@ -99,7 +103,9 @@ afterEach(() => {
 describe("browser dictation", () => {
     it("still hands over the last words after a stop", () => {
         const onText = vi.fn();
-        const { result } = renderHook(() => useDictation({ engine: "browser", locale: "en-US", onText }));
+        const { result } = renderHook(() =>
+            useDictation({ engine: "browser", locale: "en-US", onText })
+        );
         act(() => result.current.start());
         const recognizer = FakeRecognizer.last!;
         act(() => result.current.stop());
@@ -109,7 +115,9 @@ describe("browser dictation", () => {
 
     it("drops what arrives after a cancel, even after a stop", () => {
         const onText = vi.fn();
-        const { result } = renderHook(() => useDictation({ engine: "browser", locale: "en-US", onText }));
+        const { result } = renderHook(() =>
+            useDictation({ engine: "browser", locale: "en-US", onText })
+        );
         act(() => result.current.start());
         const recognizer = FakeRecognizer.last!;
         act(() => result.current.stop());
@@ -162,7 +170,9 @@ describe("private dictation", () => {
         let answer: (value: { text: string }) => void = () => undefined;
         transcribe.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
         const onText = vi.fn();
-        const { result } = renderHook(() => useDictation({ engine: "private", locale: "en-US", onText }));
+        const { result } = renderHook(() =>
+            useDictation({ engine: "private", locale: "en-US", onText })
+        );
         await act(async () => result.current.start());
         await speakOneChunk();
         act(() => result.current.cancel());

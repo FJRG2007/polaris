@@ -60,21 +60,37 @@ describe("tap and hold", () => {
 
 describe("the dictation engine", () => {
     it("prefers the browser, and Polaris when chosen or the only one", () => {
-        expect(logic.dictationEngine({ browser: true, private: true, preferPrivate: false })).toBe("browser");
-        expect(logic.dictationEngine({ browser: true, private: true, preferPrivate: true })).toBe("private");
-        expect(logic.dictationEngine({ browser: false, private: true, preferPrivate: false })).toBe("private");
+        expect(logic.dictationEngine({ browser: true, private: true, preferPrivate: false })).toBe(
+            "browser"
+        );
+        expect(logic.dictationEngine({ browser: true, private: true, preferPrivate: true })).toBe(
+            "private"
+        );
+        expect(logic.dictationEngine({ browser: false, private: true, preferPrivate: false })).toBe(
+            "private"
+        );
     });
 
     it("ignores the switch when Polaris cannot transcribe, and has none with neither", () => {
-        expect(logic.dictationEngine({ browser: true, private: false, preferPrivate: true })).toBe("browser");
-        expect(logic.dictationEngine({ browser: false, private: false, preferPrivate: true })).toBeNull();
+        expect(logic.dictationEngine({ browser: true, private: false, preferPrivate: true })).toBe(
+            "browser"
+        );
+        expect(
+            logic.dictationEngine({ browser: false, private: false, preferPrivate: true })
+        ).toBeNull();
     });
 
     it("sends a chunk at a pause after speech, or when it runs long", () => {
         expect(logic.chunkReady({ heard: false, quietMs: 5000, chunkMs: 5000 })).toBe(false);
-        expect(logic.chunkReady({ heard: true, quietMs: logic.PAUSE_MS - 1, chunkMs: 1000 })).toBe(false);
-        expect(logic.chunkReady({ heard: true, quietMs: logic.PAUSE_MS, chunkMs: 1000 })).toBe(true);
-        expect(logic.chunkReady({ heard: true, quietMs: 0, chunkMs: logic.LONGEST_CHUNK_MS })).toBe(true);
+        expect(logic.chunkReady({ heard: true, quietMs: logic.PAUSE_MS - 1, chunkMs: 1000 })).toBe(
+            false
+        );
+        expect(logic.chunkReady({ heard: true, quietMs: logic.PAUSE_MS, chunkMs: 1000 })).toBe(
+            true
+        );
+        expect(logic.chunkReady({ heard: true, quietMs: 0, chunkMs: logic.LONGEST_CHUNK_MS })).toBe(
+            true
+        );
     });
 });
 
@@ -105,7 +121,9 @@ describe("the attach menu", () => {
     it("hides what the room does not allow", () => {
         expect(logic.attachItems({ ...room, mayAttach: false })).toEqual(["poll"]);
         expect(logic.attachItems({ ...room, inCall: true })).toEqual(["file", "gallery", "poll"]);
-        expect(logic.attachItems({ ...room, mayAttach: false, poll: false, micMenu: false })).toEqual([]);
+        expect(
+            logic.attachItems({ ...room, mayAttach: false, poll: false, micMenu: false })
+        ).toEqual([]);
     });
 });
 
@@ -131,7 +149,9 @@ describe("dictation problems", () => {
         expect(logic.problemKey("notSetUp", false)).toBe("dictation.problem.notSetUp");
         expect(logic.problemKey("tooMany", true)).toBe("dictation.problem.tooMany");
         const t = webCatalogs.translator("en-US", "chat");
-        for (const problem of Object.keys(logic.PROBLEM_KEYS) as (keyof typeof logic.PROBLEM_KEYS)[]) {
+        for (const problem of Object.keys(
+            logic.PROBLEM_KEYS
+        ) as (keyof typeof logic.PROBLEM_KEYS)[]) {
             expect(t(logic.problemKey(problem, false))).not.toMatch(/Private dictation|set up/i);
         }
     });
@@ -139,7 +159,10 @@ describe("dictation problems", () => {
     it("has a sentence for each, in English and Spanish", () => {
         for (const locale of ["en-US", "es-ES"] as const) {
             const t = webCatalogs.translator(locale, "chat");
-            for (const key of [...Object.values(logic.PROBLEM_KEYS), ...Object.values(logic.PRIVATE_SWITCH_KEYS)]) {
+            for (const key of [
+                ...Object.values(logic.PROBLEM_KEYS),
+                ...Object.values(logic.PRIVATE_SWITCH_KEYS)
+            ]) {
                 const said = t(key);
                 expect(said).not.toBe(key);
                 expect(said.length).toBeGreaterThan(10);
