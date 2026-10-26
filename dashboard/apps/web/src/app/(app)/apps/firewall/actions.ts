@@ -728,6 +728,47 @@ export async function liftWafBanAction(ip: string): Promise<{ error?: string }> 
     }
 }
 
+const addressListingSchema = z.object({
+    ip: core.cidrOrIp,
+    list: z.enum(["allow", "deny"]),
+    scopeType: z.enum(core.WAF_SCOPE_TYPES),
+    scopeId: z.string().trim().max(200)
+});
+
+/**
+ * Put one address on a scope's allow or deny list, from wherever it was being looked
+ * at - the address panel or a row in the blocked list.
+ *
+ * Read, changed, and written back through `setWafRuleAction`, so it is the same
+ * permission check, the same audit line and the same edge republish as saving the
+ * rule by hand. An address is on at most one of the two lists: allowing one that was
+ * denied takes it off the denylist, and the other way round.
+ */
+export async function setAddressListedAction(input: {
+    ip: string;
+    list: "allow" | "deny";
+    scopeType: WafScopeType;
+    scopeId: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = addressListingSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.address") };
+    const { ip, list, scopeType, scopeId } = parsed.data;
+    try {
+        const rule = await getWafRule(user.id, scopeType, scopeId);
+        const without = (entries: readonly string[]) => entries.filter((entry) => entry !== ip);
+        const ipAllowlist =
+            list === "allow" ? [...without(rule.ipAllowlist), ip] : without(rule.ipAllowlist);
+        const ipDenylist =
+            list === "deny" ? [...without(rule.ipDenylist), ip] : without(rule.ipDenylist);
+        if (ipAllowlist.length > core.WAF_LIST_MAX || ipDenylist.length > core.WAF_LIST_MAX)
+            return { error: await say("errors.addresses") };
+        return await setWafRuleAction({ ...rule, ipAllowlist, ipDenylist, scopeType, scopeId });
+    } catch (caught) {
+        return { error: await failure(caught, "errors.save") };
+    }
+}
+
 /** Block or stop blocking the Tor network. Turning it on fetches the exit list
  *  immediately, so the count the panel shows is real rather than pending. */
 export async function setTorBlockedAction(enabled: boolean): Promise<{ error?: string }> {

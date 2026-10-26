@@ -8,6 +8,8 @@
  * account signs in or accepts an invite from it, and only reputation is ever lifted.
  */
 
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface BanRow {
@@ -24,7 +26,8 @@ let signedIn = new Set<string>();
 let audits: { action: string; targetId: string; actorId: string }[] = [];
 let asked: string[] = [];
 
-process.env.POLARIS_EDGE_INTEL_FILE = "";
+// Lifting a ban republishes the snapshot; it goes somewhere harmless.
+process.env.POLARIS_EDGE_INTEL_FILE = join(tmpdir(), `polaris-reputation-test-${process.pid}`, "waf-intel.json");
 
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async () => null,
