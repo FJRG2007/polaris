@@ -23,7 +23,10 @@ describe("parseStatus", () => {
         const status = parseStatus(
             JSON.stringify({
                 BackendState: "Running",
-                Self: { DNSName: "polaris.tail1234.ts.net.", CapMap: { https: null, funnel: null } },
+                Self: {
+                    DNSName: "polaris.tail1234.ts.net.",
+                    CapMap: { https: null, funnel: null }
+                },
                 CurrentTailnet: { Name: "fixture@example.test", MagicDNSSuffix: "tail1234.ts.net" },
                 Peer: { a: {}, b: {} }
             })

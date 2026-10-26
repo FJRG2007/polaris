@@ -79,4 +79,3 @@ export async function disconnectTailscaleAction(): Promise<TailscaleResult> {
     const actor = await requireAdmin();
     return settle(actor.id, "domains.tailscale.disconnect", () => disconnectTailscale());
 }
-
