@@ -162,6 +162,53 @@ function asEntry(value: unknown): WafIntelEntry | null {
     };
 }
 
+/**
+ * The paths a person needs to sign in, sign up or accept an invite on the dashboard,
+ * which a REPUTATION verdict alone never closes.
+ *
+ * A reputation provider describes an address, and a shared one - a VPN, WARP, iCloud
+ * Private Relay, a carrier's NAT - is described by what other people did from it. A
+ * ban on that evidence used to take the whole dashboard away, the sign-in page with it,
+ * from somebody who had never been seen before. Jail, probe, Tor and manual entries
+ * keep blocking everything: those are about the address's own behaviour or the
+ * operator's own decision. Once the person signs in, Polaris lifts the reputation ban
+ * itself, so the rest of the dashboard follows.
+ *
+ * Prefixes, matched against the path alone. `/api/auth/` is the sign-in API,
+ * `/oauth/` the sign-in, invite, enrolment and recovery pages (server actions post to
+ * the page's own path), `/edge/` the sign-in handoff for protected services.
+ */
+const SIGN_IN_PREFIXES = [
+    "/oauth/",
+    "/api/auth/",
+    "/edge/",
+    "/_next/static/",
+    "/backgrounds/",
+    "/logos/"
+] as const;
+const SIGN_IN_EXACT = new Set([
+    "/oauth",
+    "/api/version",
+    "/favicon.ico",
+    "/icon.svg",
+    "/apple-touch-icon.png",
+    "/manifest.webmanifest",
+    "/polaris-mark-128.png",
+    "/polaris-mark-192.png",
+    "/polaris-mark-512.png",
+    "/sw.js",
+    "/offline.html",
+    "/robots.txt"
+]);
+
+/** Whether a reputation entry is to be stepped over for this request path. Only
+ *  reputation, only these paths, and never a path that walks out of them with `..`. */
+export function reputationSparesPath(entry: WafIntelEntry, path: string | null | undefined): boolean {
+    if (entry.reason !== "reputation" || !path) return false;
+    if (path.includes("..") || path.includes("%2e") || path.includes("%2E")) return false;
+    return SIGN_IN_EXACT.has(path) || SIGN_IN_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 /** Assemble a snapshot, dropping anything that has already expired so the file does
  *  not grow without bound. */
 export function buildWafIntel(

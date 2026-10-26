@@ -647,6 +647,17 @@ export interface AuthOptions {
     readonly configuredHosts?: () => Promise<readonly string[]>;
 
     /**
+     * Told about every session that opens, whatever the method, after it is stored.
+     * Supplied by the app so it can act on a successful sign-in - lifting a reputation
+     * ban on the address it came from. Failures are logged and swallowed: a sign-in
+     * never fails because something listening to it did.
+     */
+    readonly onSessionCreated?: (session: {
+        userId: string;
+        ipAddress?: string | null;
+    }) => Promise<void>;
+
+    /**
      * How to send an account message. Supplied by the app, which owns the channel
      * that carries it; omitting it is what leaves the mail-backed sign-in methods
      * unregistered, so a build that cannot send never exposes their endpoints.
@@ -795,6 +806,17 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
                     before: async (session, context) => {
                         if (context?.path && bypassesIdentityProvider(context.path)) {
                             await refuseSessionForEnforcedDomain(session.userId);
+                        }
+                    },
+                    after: async (session) => {
+                        if (!options.onSessionCreated) return;
+                        try {
+                            await options.onSessionCreated({
+                                userId: session.userId,
+                                ipAddress: session.ipAddress ?? null
+                            });
+                        } catch (error) {
+                            console.error("polaris: a sign-in listener failed:", error);
                         }
                     }
                 }

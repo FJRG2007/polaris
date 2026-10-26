@@ -17,6 +17,8 @@ import { prisma } from "@polaris/db";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { verifyIp } from "@/lib/integrations/dymo";
+import { recordAudit } from "@/lib/audit-service";
+import { addressesSignedIn } from "@/lib/address-accounts";
 import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { getSetting, setSetting } from "@/lib/setting-store";
@@ -203,11 +205,16 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
             })
         ).map((row) => row.ip)
     );
+    // The same rule the jails follow: an address somebody is signed in from right now
+    // is not banned on a provider's say-so. A reputation verdict on a shared address -
+    // a VPN, WARP, a relay, a carrier's NAT - is about other people on it, and banning
+    // it took the instance away from the member using it.
+    const signedIn = await addressesSignedIn(candidates.filter((ip) => !banned.has(ip)));
 
     let asked = 0;
     for (const ip of candidates) {
         if (asked >= REPUTATION_BATCH) break;
-        if (banned.has(ip)) continue;
+        if (banned.has(ip) || signedIn.has(ip)) continue;
         for (const provider of providers) {
             const remembered = await rememberedVerdict(ip, provider.slug, provider.deny);
             if (remembered) {
@@ -317,6 +324,49 @@ export async function wafBanFor(ip: string) {
             createdAt: true
         }
     });
+}
+
+/**
+ * Lift a REPUTATION ban on the address an account just signed in from.
+ *
+ * Signing in is the evidence a provider's verdict lacked: somebody with an account is
+ * using the address. Only reputation is lifted. A jail, probe, Tor or manual entry names
+ * something the address itself did or an operator's decision, and a stolen password
+ * must not be a way to erase it. Recorded in the audit log against the account, so the
+ * operator can see why a ban disappeared. Never throws - signing in must not fail
+ * because the firewall could not be updated.
+ */
+export async function liftReputationBanOnSignIn(
+    ip: string | null | undefined,
+    userId: string,
+    via: "sign-in" | "invite" = "sign-in"
+): Promise<boolean> {
+    if (!ip) return false;
+    try {
+        const ban = await prisma.wafBan.findUnique({
+            where: { ip },
+            select: { reason: true, source: true, note: true, until: true }
+        });
+        if (!ban || ban.reason !== "reputation") return false;
+        if (ban.until !== null && ban.until <= new Date()) return false;
+        const { count } = await prisma.wafBan.deleteMany({ where: { ip, reason: "reputation" } });
+        if (count === 0) return false;
+        await publishWafIntel();
+        await recordAudit({
+            actorId: userId,
+            action: "waf.ban.lift.signin",
+            targetType: "ip",
+            targetId: ip,
+            metadata: { via, source: ban.source, note: ban.note }
+        });
+        return true;
+    } catch (caught) {
+        console.error(
+            "polaris: could not lift a reputation ban after a sign-in:",
+            caught instanceof Error ? caught.message : caught
+        );
+        return false;
+    }
 }
 
 /** Lift a ban by hand. */

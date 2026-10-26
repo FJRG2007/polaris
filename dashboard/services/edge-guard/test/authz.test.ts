@@ -436,6 +436,48 @@ describe("evaluate - address intelligence", () => {
         const empty: GuardConfig = { ...cfg, intel: indexWafIntel("corrupt") };
         expect(evaluate({ forwardedFor: "203.0.113.7" }, empty)).toEqual({ status: 200 });
     });
+
+    describe("a reputation verdict on the dashboard", () => {
+        const reputation: WafIntelEntry = { reason: "reputation", until: NOW * 1000 + 60_000, note: "FRAUD" };
+        const dashboard = encodeGuardRule({ deny: [], requireLogin: false, rules: [], dashboard: true });
+        const at = (uri: string, entry: WafIntelEntry, wafHeader = dashboard) =>
+            evaluate(
+                { wafHeader, forwardedFor: "203.0.113.7", forwardedHost: HOST, forwardedUri: uri },
+                withIntel([["203.0.113.7", entry]])
+            );
+
+        it("keeps the way in open: invite, sign-in API, version poll and assets", () => {
+            for (const uri of [
+                "/oauth/accept-invite?token=abc",
+                "/oauth/login",
+                "/api/auth/sign-in/email",
+                "/api/version",
+                "/_next/static/chunks/app.js",
+                "/favicon.ico",
+                "/manifest.webmanifest"
+            ]) {
+                expect(at(uri, reputation), uri).toEqual({ status: 200 });
+            }
+        });
+
+        it("still blocks every other path", () => {
+            for (const uri of ["/", "/drive", "/api/chat/stream", "/oauth/../drive", "/oauth/%2e%2e/drive"]) {
+                expect(at(uri, reputation).status, uri).toBe(403);
+            }
+        });
+
+        it("spares nothing on a route that is not the dashboard", () => {
+            const app = encodeGuardRule({ deny: [], requireLogin: false, rules: [] });
+            expect(at("/oauth/login", reputation, app).status).toBe(403);
+        });
+
+        it("spares nothing for a jail, Tor or manual entry", () => {
+            for (const entry of [ban, { reason: "tor", until: null } as const, { reason: "manual", until: null } as const]) {
+                expect(at("/oauth/login", entry).status).toBe(403);
+                expect(at("/api/auth/sign-in/email", entry).status).toBe(403);
+            }
+        });
+    });
 });
 
 /**

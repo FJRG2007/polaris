@@ -51,6 +51,8 @@ vi.mock("@/lib/integration-service", () => ({
     getIntegrationState: async (slug: string) =>
         slug === "dymo" ? { enabled: true, config: null } : null
 }));
+vi.mock("@/lib/address-accounts", () => ({ addressesSignedIn: async () => new Set<string>() }));
+vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/integrations/registry", () => ({
     readDymoConfig: () => ({ verifyAccessIp: true, deny })
 }));
