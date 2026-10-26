@@ -102,6 +102,12 @@ export function useAppWidgets(initial: readonly AppWidgetPreference[]) {
         remove: (id: string) => save(cards.filter((card) => card.id !== id)),
         hide: (id: string, hidden: boolean) =>
             save(cards.map((card) => (card.id === id ? { ...card, hidden } : card))),
+        reset: (kinds: readonly AppWidgetKind[]) => {
+            const shipped = (card: AppWidgetPreference) =>
+                appWidgetKindOf(card, kinds)?.defaultSize ?? card.size;
+            if (cards.every((card) => !card.hidden && card.size === shipped(card))) return;
+            save(cards.map((card) => ({ ...card, size: shipped(card), hidden: false })));
+        },
         full: cards.length >= MAX_APP_WIDGETS
     };
 }

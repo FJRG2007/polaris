@@ -16,12 +16,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 
 const saveLayout = vi.hoisted(() => vi.fn(async (_input: unknown) => ({})));
+const saveCards = vi.hoisted(() => vi.fn(async (_input: unknown) => ({})));
 
 vi.mock("@/app/(app)/home/actions", () => ({ saveOverviewPreferencesAction: saveLayout }));
 vi.mock("@/app/(app)/home/app-widget-actions", () => ({
     actOnAppWidgetAction: vi.fn(),
     appWidgetTargetsAction: vi.fn(async () => ({ targets: [] })),
-    saveAppWidgetsAction: vi.fn(async () => ({}))
+    saveAppWidgetsAction: saveCards
 }));
 vi.mock("@/app/(app)/home/home-polls", () => ({ appWidgets: vi.fn(async () => ({ cards: {} })) }));
 vi.mock("@/app/(app)/home/widgets/personal", () => ({
@@ -129,6 +130,7 @@ afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     saveLayout.mockClear();
+    saveCards.mockClear();
 });
 
 describe("an app card on the Overview", () => {
@@ -164,5 +166,19 @@ describe("an app card on the Overview", () => {
             order: ["apps", "app:card0001", "shortcuts"]
         });
         expect(drawn(container)).toEqual(["apps", "app:card0001", "shortcuts"]);
+    });
+
+    it("is shown again at its kind's size after Reset", async () => {
+        const { getAllByRole, getByRole } = draw({
+            ...PREFERENCES,
+            appWidgets: [{ ...PREFERENCES.appWidgets[0]!, size: "xl", hidden: true }]
+        });
+        fireEvent.click(getAllByRole("button", { name: "Customize" })[0]!);
+        fireEvent.click(getByRole("button", { name: "Reset" }));
+        await act(async () => vi.runAllTimers());
+        expect(saveCards).toHaveBeenCalledTimes(1);
+        expect(saveCards.mock.calls[0]![0]).toEqual([
+            { ...PREFERENCES.appWidgets[0]!, size: "md", hidden: false }
+        ]);
     });
 });

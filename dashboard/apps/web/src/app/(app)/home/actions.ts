@@ -14,7 +14,7 @@
 import { requireUser } from "@/lib/session";
 import { overviewPreferencesSchema } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
-import { getOverviewPreferences, saveOverviewPreferences } from "@/lib/overview/prefs-service";
+import { updateOverviewPreferences } from "@/lib/overview/prefs-service";
 
 export async function saveOverviewPreferencesAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -34,12 +34,10 @@ export async function saveOverviewPreferencesAction(input: unknown): Promise<{ e
     // be arranged together does not send it, and must not undo it.
     const sends = (key: string): boolean =>
         typeof input === "object" && input !== null && key in input;
-    const stored =
-        sends("appWidgets") && sends("order") ? null : await getOverviewPreferences(user.id);
-    await saveOverviewPreferences(user.id, {
+    await updateOverviewPreferences(user.id, (stored) => ({
         ...parsed.data,
-        appWidgets: stored && !sends("appWidgets") ? stored.appWidgets : parsed.data.appWidgets,
-        order: stored && !sends("order") ? stored.order : parsed.data.order
-    });
+        appWidgets: sends("appWidgets") ? parsed.data.appWidgets : stored.appWidgets,
+        order: sends("order") ? parsed.data.order : stored.order
+    }));
     return {};
 }

@@ -18,7 +18,10 @@ const save = vi.fn(async (_user: string, next: core.OverviewPreferences) => {
 vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "u1" }) }));
 vi.mock("@/lib/overview/prefs-service", () => ({
     getOverviewPreferences: async () => stored,
-    saveOverviewPreferences: save
+    updateOverviewPreferences: async (
+        user: string,
+        change: (current: core.OverviewPreferences) => core.OverviewPreferences
+    ) => save(user, change(stored))
 }));
 vi.mock("@/lib/overview/app-widgets", () => ({}));
 

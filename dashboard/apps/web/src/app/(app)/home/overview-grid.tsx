@@ -427,6 +427,7 @@ export function OverviewGrid({
     }
 
     function reset(): void {
+        appState.reset(appKinds);
         persist({
             widgets: resolveOverviewLayout({ ...preferences, widgets: [] }, available),
             shortcuts,
