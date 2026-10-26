@@ -116,6 +116,12 @@ export function shellScroller(element: Element): HTMLElement | null {
  * browser with its own panes. Everything else scrolls with the content area,
  * which is right for a page.
  *
+ * It clips: whatever does not fit is cut off, not scrolled to. So the screen
+ * inside must give itself a bounded pane that scrolls (`min-h-0` with
+ * `overflow-auto`); a page that just grows downwards - a list, a report, a long
+ * table - must not be wrapped in this at all, or nothing below the fold is ever
+ * reachable. `test/app-bundles/page-fill.test.ts` holds the apps to that.
+ *
  * The height is the viewport less the header less main's own padding, and that
  * last term is why this lives here: a page that did the arithmetic itself would
  * be silently a few pixels too tall the day the shell's padding changed, and the

@@ -8,7 +8,6 @@
  * in the browser, so the header is on screen before any request has left.
  */
 
-import { PAGE_FILL } from "@polaris/ui";
 import { notFound } from "next/navigation";
 import { host } from "@polaris/app-host";
 import * as access from "../../../lib/page-access";
@@ -39,9 +38,5 @@ export default async function StatusPagesPage({
         // Nobody shared anything: the same refusal as before.
         if (!reaches) await host.session.requirePermission("status.manage");
     }
-    return (
-        <div className={PAGE_FILL}>
-            <StatusPagesScreen key={id ?? "list"} pageId={id ?? null} manager={manager} />
-        </div>
-    );
+    return <StatusPagesScreen key={id ?? "list"} pageId={id ?? null} manager={manager} />;
 }
