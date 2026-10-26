@@ -2,7 +2,7 @@
     "templates": {
         "generic": {
             "title": "A message from your administrator",
-            "body": ""
+            "body": "Write your message here."
         },
         "maintenanceScheduled": {
             "title": "Scheduled maintenance on {start}",
@@ -65,7 +65,7 @@
             "severity": "Severity",
             "titleLabel": "Title",
             "bodyLabel": "Message",
-            "bodyHint": "Supports **bold**, *italic*, `code`, [links](https://example.com) and - bullets. {start}, {end}, {duration} and {affected} are filled in for each reader.",
+            "bodyHint": "Supports **bold**, *italic*, `code`, [links](https://example.com) and - bullets. '{start}', '{end}', '{duration}' and '{affected}' are filled in for each reader.",
             "linkUrl": "Button link",
             "linkLabel": "Button text",
             "linkHint": "A path in Polaris such as /drive, or an https address.",
@@ -87,14 +87,14 @@
             "endsAt": "Show until",
             "startsNow": "Leave empty to start now.",
             "noEnd": "Leave empty to keep it up until you end it.",
-            "windowStart": "Maintenance starts",
-            "windowEnd": "Maintenance ends",
+            "windowStart": "Starts",
+            "windowEnd": "Ends",
             "lead": "Announce ahead",
             "leadHours": "{count, plural, =0 {Only when it starts} one {# hour before} other {# hours before}}",
             "affected": "What is affected",
             "affectedHint": "Optional. Comma-separated, e.g. Mail, Drive.",
             "notifySteps": "Also notify when it starts and when it ends",
-            "preview": "Preview",
+            "preview": "Preview text",
             "previewHint": "Each reader sees the dates in their own language and time zone.",
             "send": "Send",
             "schedule": "Schedule",

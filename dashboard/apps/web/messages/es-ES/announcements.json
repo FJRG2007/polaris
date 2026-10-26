@@ -2,7 +2,7 @@
     "templates": {
         "generic": {
             "title": "Un mensaje de tu administrador",
-            "body": ""
+            "body": "Escribe aquí tu mensaje."
         },
         "maintenanceScheduled": {
             "title": "Mantenimiento programado el {start}",
@@ -21,7 +21,7 @@
             "body": "El {start} se instalará una nueva versión de Polaris. Puede no estar disponible durante unos minutos."
         },
         "updateApplied": {
-            "title": "Polaris se ha actualizado",
+            "title": "Polaris actualizado",
             "body": "Ya está instalada una nueva versión de Polaris. Recarga las pestañas abiertas para usarla."
         },
         "newFeature": {
@@ -60,22 +60,22 @@
             "editTitle": "Editar aviso",
             "kind": "Tipo",
             "kindAnnouncement": "Aviso",
-            "kindMaintenance": "Ventana de mantenimiento",
+            "kindMaintenance": "Mantenimiento",
             "template": "Empezar desde",
             "severity": "Gravedad",
             "titleLabel": "Título",
             "bodyLabel": "Mensaje",
-            "bodyHint": "Admite **negrita**, *cursiva*, `código`, [enlaces](https://example.com) y viñetas con -. {start}, {end}, {duration} y {affected} se rellenan para cada lector.",
-            "linkUrl": "Enlace del botón",
-            "linkLabel": "Texto del botón",
+            "bodyHint": "Admite **negrita**, *cursiva*, `código`, [enlaces](https://example.com) y viñetas con -. '{start}', '{end}', '{duration}' y '{affected}' se rellenan para cada lector.",
+            "linkUrl": "Enlace botón",
+            "linkLabel": "Texto botón",
             "linkHint": "Una ruta de Polaris como /drive, o una dirección https.",
-            "audience": "Quién lo recibe",
+            "audience": "Destinatarios",
             "everyone": "Todos",
             "roles": "Roles",
             "groups": "Grupos",
             "orgs": "Organizaciones",
             "people": "Personas",
-            "peopleLabel": "Añadir personas",
+            "peopleLabel": "Añadir gente",
             "reaches": "{count, plural, =0 {Aún no llega a nadie} one {Llega a # persona} other {Llega a # personas}}",
             "counting": "Contando...",
             "delivery": "Cómo",
@@ -83,13 +83,13 @@
             "sendNoticeHint": "En la campana, y por correo u otros canales donde cada persona los haya configurado. Los críticos siempre llegan a la campana.",
             "showBanner": "Banner",
             "showBannerHint": "Arriba en todas las pantallas mientras esté activo.",
-            "startsAt": "Mostrar desde",
+            "startsAt": "Desde",
             "endsAt": "Mostrar hasta",
             "startsNow": "Déjalo vacío para empezar ya.",
             "noEnd": "Déjalo vacío para mantenerlo hasta que lo termines.",
-            "windowStart": "Empieza el mantenimiento",
-            "windowEnd": "Termina el mantenimiento",
-            "lead": "Anunciar con antelación",
+            "windowStart": "Inicio",
+            "windowEnd": "Fin",
+            "lead": "Aviso previo",
             "leadHours": "{count, plural, =0 {Solo cuando empiece} one {# hora antes} other {# horas antes}}",
             "affected": "Qué se ve afectado",
             "affectedHint": "Opcional. Separado por comas, p. ej. Correo, Drive.",
@@ -104,21 +104,21 @@
             "edited": "El texto editado se muestra tal como lo escribiste, en todos los idiomas."
         },
         "severity": {
-            "info": "Información",
+            "info": "Info",
             "success": "Éxito",
-            "warning": "Advertencia",
+            "warning": "Aviso",
             "critical": "Crítico"
         },
         "template": {
-            "generic": "En blanco",
+            "generic": "Vacío",
             "maintenanceScheduled": "Mantenimiento programado",
             "maintenanceInProgress": "Mantenimiento en curso",
             "maintenanceFinished": "Mantenimiento terminado",
-            "updateAvailable": "Llega una actualización",
-            "updateApplied": "Actualización instalada",
+            "updateAvailable": "Actualización",
+            "updateApplied": "Actualizado",
             "newFeature": "Función nueva",
             "incident": "Incidencia o servicio degradado",
-            "policyChange": "Cambio de políticas"
+            "policyChange": "Cambio de normas"
         },
         "errors": {
             "audience": "Elige quién lo recibe.",
@@ -145,13 +145,13 @@
             "edit": "Editar",
             "duplicate": "Duplicar",
             "retract": "Retirar",
-            "end": "Terminar ya",
+            "end": "Terminar",
             "cancelMaintenance": "Cancelar mantenimiento",
             "retractTitle": "¿Retirar este aviso?",
             "retractBody": "Desaparece de todos los banners y su notificación se borra de todas las campanas.",
             "retractConfirm": "Retirar",
             "retracted": "Retirado",
-            "ended": "Terminado",
+            "ended": "Fin",
             "cancelled": "Cancelado",
             "sent": "Enviado",
             "saved": "Guardado"
@@ -162,7 +162,7 @@
             "upcoming": "Anunciado",
             "inProgress": "En curso",
             "finished": "Terminado",
-            "ended": "Terminado",
+            "ended": "Fin",
             "retracted": "Retirado"
         }
     }
