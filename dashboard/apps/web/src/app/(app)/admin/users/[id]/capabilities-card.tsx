@@ -24,7 +24,16 @@
 import type { CapabilityState } from "./actions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { setUserPermissionAction, userCapabilitiesAction } from "./actions";
-import { Badge, Button, Card, CardBody, Checkbox, SegmentedControl, Skeleton, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Checkbox,
+    SegmentedControl,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PermissionSections } from "@/components/permission-sections";
@@ -222,20 +231,28 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
                                                 {
                                                     value: "inherit",
                                                     label: t("usersDetail.capabilities.inherit"),
-                                                    title: t("usersDetail.capabilities.inheritTitle"),
-                                                    disabled: busy === capability.permission || busy === section.id
+                                                    title: t(
+                                                        "usersDetail.capabilities.inheritTitle"
+                                                    ),
+                                                    disabled:
+                                                        busy === capability.permission ||
+                                                        busy === section.id
                                                 },
                                                 {
                                                     value: "allow",
                                                     label: t("usersDetail.capabilities.allow"),
                                                     title: t("usersDetail.capabilities.allowTitle"),
-                                                    disabled: busy === capability.permission || busy === section.id
+                                                    disabled:
+                                                        busy === capability.permission ||
+                                                        busy === section.id
                                                 },
                                                 {
                                                     value: "deny",
                                                     label: t("usersDetail.capabilities.deny"),
                                                     title: t("usersDetail.capabilities.denyTitle"),
-                                                    disabled: busy === capability.permission || busy === section.id
+                                                    disabled:
+                                                        busy === capability.permission ||
+                                                        busy === section.id
                                                 }
                                             ]}
                                         />
