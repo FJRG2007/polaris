@@ -80,7 +80,8 @@ export const EMPTY_WAF_INTEL: WafIntelSnapshot = { v: WAF_INTEL_VERSION, at: 0, 
 export interface WafIntelIndex {
     readonly at: number;
     readonly size: number;
-    /** The entry blocking this address right now, or null. */
+    /** The entry blocking this address right now, or null. A reputation entry only
+     *  when nothing stricter - a ban, Tor, a manual range - covers the address too. */
     match(ip: string | null | undefined, now: number): WafIntelEntry | null;
     /** Epoch ms this user's groups or roles last moved, or null if nothing recent
      *  is known - which is the answer for almost everybody, almost always. */
@@ -107,11 +108,15 @@ export function indexWafIntel(snapshot: unknown): WafIntelIndex {
         match(ip, now) {
             if (!ip) return null;
             const exact = ips.get(ip);
-            if (exact && live(exact, now)) return exact;
+            const found = exact && live(exact, now) ? exact : null;
+            if (found && found.reason !== "reputation") return found;
+            let weakest: WafIntelEntry | null = found;
             for (const [range, entry] of cidrs) {
-                if (live(entry, now) && ipAllowed(ip, [range])) return entry;
+                if (!live(entry, now) || !ipAllowed(ip, [range])) continue;
+                if (entry.reason !== "reputation") return entry;
+                weakest ??= entry;
             }
-            return null;
+            return weakest;
         },
         movedAt(userId) {
             return moved.get(userId) ?? null;
@@ -221,7 +226,7 @@ export function buildWafIntel(
     for (const [address, entry] of entries) {
         if (!live(entry, now)) continue;
         if (address.includes("/")) cidrs.push([address, entry]);
-        else ips[address] = entry;
+        else if (entry.reason !== "reputation" || !ips[address]) ips[address] = entry;
     }
     return { v: WAF_INTEL_VERSION, at: now, ips, cidrs, moved: Object.fromEntries(moved) };
 }

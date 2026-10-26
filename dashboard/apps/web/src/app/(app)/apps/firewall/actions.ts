@@ -743,6 +743,11 @@ const addressListingSchema = z.object({
  * permission check, the same audit line and the same edge republish as saving the
  * rule by hand. An address is on at most one of the two lists: allowing one that was
  * denied takes it off the denylist, and the other way round.
+ *
+ * Allowing never turns an open scope into an allowlist-only one - a first entry there
+ * shuts out every other address, the operator's included. On an open scope it takes
+ * the address off the denylist and lifts its ban; only a scope that already admits a
+ * list of addresses gets it added to that list.
  */
 export async function setAddressListedAction(input: {
     ip: string;
@@ -758,12 +763,22 @@ export async function setAddressListedAction(input: {
         const rule = await getWafRule(user.id, scopeType, scopeId);
         const without = (entries: readonly string[]) => entries.filter((entry) => entry !== ip);
         const ipAllowlist =
-            list === "allow" ? [...without(rule.ipAllowlist), ip] : without(rule.ipAllowlist);
+            list === "allow" && rule.ipAllowlist.length > 0
+                ? [...without(rule.ipAllowlist), ip]
+                : without(rule.ipAllowlist);
         const ipDenylist =
             list === "deny" ? [...without(rule.ipDenylist), ip] : without(rule.ipDenylist);
         if (ipAllowlist.length > core.WAF_LIST_MAX || ipDenylist.length > core.WAF_LIST_MAX)
             return { error: await say("errors.addresses") };
-        return await setWafRuleAction({ ...rule, ipAllowlist, ipDenylist, scopeType, scopeId });
+        const saved = await setWafRuleAction({
+            ...rule,
+            ipAllowlist,
+            ipDenylist,
+            scopeType,
+            scopeId
+        });
+        if (saved.error || list === "deny") return saved;
+        return await liftWafBanAction(ip);
     } catch (caught) {
         return { error: await failure(caught, "errors.save") };
     }

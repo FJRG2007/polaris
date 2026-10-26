@@ -649,8 +649,9 @@
         "deny": "Bloquear",
         "lift": "Desbloquear",
         "copy": "Copiar IP",
-        "allowed": "En la lista de permitidas de {scope}.",
+        "allowed": "Permitida en {scope}, y levantado cualquier bloqueo.",
         "denied": "En la lista de bloqueadas de {scope}.",
-        "lifted": "Bloqueo levantado."
+        "lifted": "Bloqueo levantado.",
+        "denySelf": "Es la dirección desde la que lees esto. Bloquearla te dejaría fuera."
     }
 }

@@ -352,6 +352,20 @@ describe("the intel snapshot", () => {
         expect(index.match("198.51.101.1", NOW)).toBeNull();
     });
 
+    it("never lets a reputation entry hide a stricter one", () => {
+        const reputation: WafIntelEntry = { reason: "reputation", until: null };
+        const tor: WafIntelEntry = { reason: "tor", until: null };
+        const manual: WafIntelEntry = { reason: "manual", until: null };
+        const both = indexWafIntel(buildWafIntel([["203.0.113.7", tor], ["203.0.113.7", reputation]], NOW));
+        expect(both.match("203.0.113.7", NOW)?.reason).toBe("tor");
+        const ranged = indexWafIntel(
+            buildWafIntel([["203.0.113.7", reputation], ["203.0.113.0/24", manual]], NOW)
+        );
+        expect(ranged.match("203.0.113.7", NOW)?.reason).toBe("manual");
+        const alone = indexWafIntel(buildWafIntel([["203.0.113.7", reputation]], NOW));
+        expect(alone.match("203.0.113.7", NOW)?.reason).toBe("reputation");
+    });
+
     it("lets a ban lapse on its own", () => {
         const index = indexWafIntel(buildWafIntel([["203.0.113.7", ban]], NOW));
         expect(index.match("203.0.113.7", NOW + 59_000)).not.toBeNull();

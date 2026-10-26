@@ -477,6 +477,26 @@ describe("evaluate - address intelligence", () => {
                 expect(at("/api/auth/sign-in/email", entry).status).toBe(403);
             }
         });
+
+        it("spares nothing when a stricter entry covers the address too", () => {
+            const tor = { reason: "tor", until: null } as const;
+            const manual = { reason: "manual", until: null } as const;
+            for (const entries of [
+                [["203.0.113.7", tor], ["203.0.113.7", reputation]],
+                [["203.0.113.0/24", manual], ["203.0.113.7", reputation]]
+            ] as [string, WafIntelEntry][][]) {
+                const decision = evaluate(
+                    {
+                        wafHeader: dashboard,
+                        forwardedFor: "203.0.113.7",
+                        forwardedHost: HOST,
+                        forwardedUri: "/oauth/login"
+                    },
+                    withIntel(entries)
+                );
+                expect(decision.status).toBe(403);
+            }
+        });
     });
 });
 

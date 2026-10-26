@@ -649,8 +649,9 @@
         "deny": "Block",
         "lift": "Lift ban",
         "copy": "Copy IP",
-        "allowed": "On the allowlist for {scope}.",
+        "allowed": "Allowed on {scope}, and any ban on it lifted.",
         "denied": "On the denylist for {scope}.",
-        "lifted": "Ban lifted."
+        "lifted": "Ban lifted.",
+        "denySelf": "This is the address you are reading this over. Blocking it would shut you out."
     }
 }

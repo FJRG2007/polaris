@@ -212,6 +212,7 @@ export function FirewallInstancePanels({
             <AddressDialog
                 ip={inspecting}
                 hours={hours}
+                callerIp={callerIp}
                 onClose={() => setInspecting(null)}
                 onChanged={() => load(hours)}
             />
@@ -1123,10 +1124,12 @@ type DecideScope = (typeof DECIDE_SCOPES)[number];
 function AddressDecision({
     ip,
     banned,
+    callerIp,
     onChanged
 }: {
     ip: string;
     banned: boolean;
+    callerIp?: string | null;
     onChanged: () => void;
 }) {
     const t = useTranslations("firewall");
@@ -1148,6 +1151,7 @@ function AddressDecision({
     }
 
     const scopeName = scopeKindLabel(t, scope);
+    const mine = !!callerIp && callerIp === ip;
     const list = (which: "allow" | "deny") =>
         setAddressListedAction({ ip, list: which, scopeType: scope, scopeId: "" });
     return (
@@ -1181,7 +1185,8 @@ function AddressDecision({
                 <Button
                     size="sm"
                     variant="danger"
-                    disabled={pending}
+                    disabled={pending || mine}
+                    title={mine ? t("decide.denySelf") : undefined}
                     onClick={() =>
                         run(() => list("deny"), t("decide.denied", { scope: scopeName }))
                     }
@@ -1201,6 +1206,7 @@ function AddressDecision({
                     </Button>
                 ) : null}
             </div>
+            {mine ? <p className="text-xs text-muted-foreground">{t("decide.denySelf")}</p> : null}
             {outcome ? (
                 <p className={`text-xs ${outcome.ok ? "text-muted-foreground" : "text-danger"}`}>
                     {outcome.text}
@@ -1213,11 +1219,13 @@ function AddressDecision({
 function AddressDialog({
     ip,
     hours,
+    callerIp,
     onClose,
     onChanged
 }: {
     ip: string | null;
     hours: number;
+    callerIp?: string | null;
     onClose: () => void;
     onChanged: () => void;
 }) {
@@ -1227,21 +1235,29 @@ function AddressDialog({
     const [error, setError] = useState<string | null>(null);
     const windowLabel = WINDOWS.find((entry) => entry.hours === hours)?.label ?? `${hours}h`;
     const activity = loaded?.activity ?? null;
+    const [revision, setRevision] = useState(0);
+
+    useEffect(() => {
+        if (!ip) return;
+        setLoaded(null);
+        setError(null);
+    }, [ip, hours]);
 
     useEffect(() => {
         if (!ip) return;
         let active = true;
-        setLoaded(null);
-        setError(null);
         void polls.addressActivity(ip, hours).then((result) => {
             if (!active) return;
             if (result.error) setError(result.error);
-            else setLoaded(result);
+            else {
+                setError(null);
+                setLoaded(result);
+            }
         });
         return () => {
             active = false;
         };
-    }, [ip, hours]);
+    }, [ip, hours, revision]);
 
     return (
         <Dialog open={ip !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -1265,7 +1281,11 @@ function AddressDialog({
                             !!loaded?.ban &&
                             (loaded.ban.until === null || new Date(loaded.ban.until) > new Date())
                         }
-                        onChanged={onChanged}
+                        callerIp={callerIp}
+                        onChanged={() => {
+                            setRevision((value) => value + 1);
+                            onChanged();
+                        }}
                     />
                 ) : null}
 
