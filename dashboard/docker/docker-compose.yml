@@ -459,6 +459,10 @@ services:
         target: /mnt/polaris
         bind:
           propagation: rshared
+      # NUT and cifs-utils are installed on first use, not shipped in the
+      # image; their packages are kept here so a restart with no internet
+      # (a power cut that took the router down too) can install them again.
+      - polaris-hostd-cache:/var/cache/polaris-hostd
 
   # --- Edge proxy -----------------------------------------------------------
   # Traefik is the single edge for both the dashboard and deployed apps. It binds
@@ -744,6 +748,7 @@ networks:
 volumes:
   polaris-postgres:
   polaris-run:
+  polaris-hostd-cache:
   polaris-hostip:
   polaris-data:
   polaris-caddy-data:

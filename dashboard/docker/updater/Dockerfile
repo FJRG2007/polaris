@@ -7,9 +7,13 @@
 # the container, so it carries git (to pull), the Docker CLI + compose plugin (to
 # redeploy), and openssl (install.sh generates/reconciles secrets with it). It is
 # never long-running and holds no state.
-FROM alpine:3
+#
+# Pinned to the Alpine minor, as the hostd image is, so a rebuild never moves to
+# a new release on its own; `apk upgrade` picks up that branch's fixes.
+FROM alpine:3.24
 
-RUN apk add --no-cache docker-cli docker-cli-compose git openssl
+RUN apk upgrade --no-cache \
+    && apk add --no-cache docker-cli docker-cli-compose git openssl
 
 # The bind-mounted repo is owned by the host user, not root-in-container, which
 # would trip git's "dubious ownership" guard and abort the pull. This container

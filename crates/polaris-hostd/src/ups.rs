@@ -1,9 +1,9 @@
 //! The UPSes this host can reach, read and driven through Network UPS Tools.
 //!
-//! NUT (`usbhid-ups`, `snmp-ups` and `upsd`, installed in this daemon's image)
-//! is what speaks to the hardware: it already knows the HID Power Device and
-//! SNMP MIB dialects of every vendor, which a parser of our own would have to
-//! relearn one UPS at a time. This module only finds the devices, writes NUT's
+//! NUT (`usbhid-ups`, `snmp-ups` and `upsd`, installed the first time a UPS is
+//! found - see `packages`) is what speaks to the hardware: it already knows the
+//! HID Power Device and SNMP MIB dialects of every vendor, which a parser of our
+//! own would have to relearn one UPS at a time. This module only finds the devices, writes NUT's
 //! configuration into a private runtime directory, keeps one driver per UPS and
 //! one `upsd` (bound to 127.0.0.1 only) running, and talks to `upsd` over its
 //! line protocol.
@@ -26,6 +26,8 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+
+use crate::packages::{self, Status, Tool};
 
 /// Where NUT's configuration and state live; recreated on every start.
 pub const RUNTIME_DIR: &str = "/run/polaris-ups";
@@ -738,9 +740,20 @@ fn supervisor() -> &'static Mutex<Supervisor> {
     })
 }
 
-/// Whether NUT is in this image at all (an image built before it was added).
-pub fn nut_installed() -> bool {
-    Path::new(UPSD_BIN).exists()
+/// Whether `/v1/ups` can drive a UPS here: NUT is installed, or this image can
+/// install it the first time a UPS is found.
+pub fn nut_available() -> bool {
+    Tool::Nut.available()
+}
+
+/// Why a UPS has no reading: NUT still being installed, or failing to, says so;
+/// otherwise `fallback`.
+fn no_reading(fallback: &str) -> String {
+    match packages::start(Tool::Nut) {
+        Status::Ready => fallback.to_string(),
+        Status::Installing => Tool::Nut.installing_message(),
+        Status::Failed(why) => why,
+    }
 }
 
 fn nut_command(program: &Path) -> Command {
@@ -801,6 +814,11 @@ impl Supervisor {
     /// longer wanted is stopped, and `upsd` restarts to read a changed list.
     fn reconcile(&mut self) -> io::Result<()> {
         let wanted = sections(&self.usb, &self.snmp);
+        // NUT is installed on first need, in the background: nothing can run
+        // until it lands, and the next pass after it does starts everything.
+        if !wanted.is_empty() && packages::start(Tool::Nut) != Status::Ready {
+            return Ok(());
+        }
         let conf = render_ups_conf(&self.usb, &self.snmp);
         // Offering the service to the network changes upsd's own files too.
         let applied = format!("{conf}\n{:?}", self.netserver);
@@ -903,7 +921,7 @@ pub fn list_usb(sys_usb: &Path) -> io::Result<Vec<(UsbUps, Result<Reading, Strin
         .into_iter()
         .map(|ups| {
             let reading =
-                read_one(&ups.id).map_err(|_| "the UPS driver has no reading yet".to_string());
+                read_one(&ups.id).map_err(|_| no_reading("the UPS driver has no reading yet"));
             (ups, reading)
         })
         .collect())
@@ -915,14 +933,15 @@ pub fn read_snmp(source: SnmpSource) -> io::Result<Result<Reading, String>> {
     let name = source.name();
     {
         let mut sup = supervisor().lock().unwrap_or_else(|p| p.into_inner());
-        if !sup.snmp.contains(&source) {
+        // Nothing applied yet is a NUT still being installed: try again.
+        if !sup.snmp.contains(&source) || sup.applied_conf.is_none() {
             let mut snmp = sup.snmp.clone();
             snmp.push(source);
             sup.snmp = dedupe(snmp);
             sup.reconcile()?;
         }
     }
-    Ok(read_one(&name).map_err(|_| "the SNMP UPS has not answered yet".to_string()))
+    Ok(read_one(&name).map_err(|_| no_reading("the SNMP UPS has not answered yet")))
 }
 
 /// Make the SNMP UPSes this daemon drives exactly `sources`: one left out has
