@@ -39,9 +39,10 @@ export function useMapDownload(): {
     const prepare = useCallback(async (mapId: string) => {
         setStatus(null);
         for (;;) {
-            const answer = await prepareMapAction(mapId).catch(
-                (): MapDownload => ({ state: "failed", reason: "unreachable" })
-            );
+            const answer = await prepareMapAction(mapId).catch((): MapDownload => ({
+                state: "failed",
+                reason: "unreachable"
+            }));
             if (!alive.current) return false;
             if (answer.state === "ready") {
                 setStatus(null);
@@ -90,7 +91,8 @@ export function MapDownloadNotice({
             </div>
         );
     }
-    const percent = status.total > 0 ? Math.min(100, Math.round((status.received / status.total) * 100)) : 0;
+    const percent =
+        status.total > 0 ? Math.min(100, Math.round((status.received / status.total) * 100)) : 0;
     return (
         <div role="status" className="flex flex-col gap-1.5 text-sm">
             <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
@@ -102,11 +104,11 @@ export function MapDownloadNotice({
                     })}
                 </span>
             </span>
-            <div
-                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                aria-hidden
-            >
-                <div className="h-full bg-primary transition-[width]" style={{ width: `${percent}%` }} />
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+                <div
+                    className="h-full bg-primary transition-[width]"
+                    style={{ width: `${percent}%` }}
+                />
             </div>
         </div>
     );

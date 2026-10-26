@@ -25,6 +25,8 @@ writeFileSync(join(dir, "luckyblock-towers-resources.zip"), "pack-bytes");
 writeFileSync(join(dir, "stray.zip"), "not-a-map");
 process.env.POLARIS_MINECRAFT_WORLDS_DIR = dir;
 process.env.POLARIS_MINECRAFT_MAP_CACHE_DIR = cache;
+// The build's placeholders stand in for the secrets nothing here reads.
+process.env.NEXT_PHASE = "phase-production-build";
 process.env.POLARIS_APP_BUNDLES_DIR = join(dir, "no-index");
 
 const counted = new Map<string, number>();

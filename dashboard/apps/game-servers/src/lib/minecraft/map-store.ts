@@ -46,7 +46,10 @@ export type MapDownload =
     | { readonly state: "failed"; readonly reason: MapFailure };
 
 export class MapUnavailable extends Error {
-    constructor(readonly reason: MapFailure, options?: ErrorOptions) {
+    constructor(
+        readonly reason: MapFailure,
+        options?: ErrorOptions
+    ) {
         super(`map unavailable: ${reason}`, options);
     }
 }
@@ -230,7 +233,9 @@ async function download(map: WorldMap, entry: Entry): Promise<string> {
             if (reason !== "unreachable") break;
         }
     }
-    throw last instanceof MapUnavailable ? last : new MapUnavailable(failureOf(last), { cause: last });
+    throw last instanceof MapUnavailable
+        ? last
+        : new MapUnavailable(failureOf(last), { cause: last });
 }
 
 /** The download of this map, started unless one already is. Registered before
@@ -248,7 +253,10 @@ function start(map: WorldMap): Entry {
         .catch((error: unknown) => {
             const reason = failureOf(error);
             state.failed.set(map.id, reason);
-            console.error(`[minecraft-map] ${map.archive} could not be downloaded: ${reason}`, error);
+            console.error(
+                `[minecraft-map] ${map.archive} could not be downloaded: ${reason}`,
+                error
+            );
             throw error instanceof MapUnavailable ? error : new MapUnavailable(reason);
         })
         .finally(() => state.running.delete(map.id));
