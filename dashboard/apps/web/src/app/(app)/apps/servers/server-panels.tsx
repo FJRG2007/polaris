@@ -20,6 +20,7 @@ import { findLocalPathAction, renameServerAction, adoptLocalPathAction } from ".
 import { CopyButton } from "@/components/copy-button";
 import type { ServerRow, ServerStatus } from "./types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDisplayFormat } from "@/components/display-format";
 
 /** Name the server. Save stays disabled until the value actually differs, so a
  *  field touched and put back cannot write the name it already had. */
@@ -81,6 +82,7 @@ export function Reachability({
     status: ServerStatus | null;
 }) {
     const t = useTranslations("servers");
+    const format = useDisplayFormat();
     if (server.kind === "local") {
         return <p className="text-sm text-muted-foreground">{t("reach.local")}</p>;
     }
@@ -96,7 +98,12 @@ export function Reachability({
     }
     return (
         <p className="text-sm text-danger">
-            {t("reach.down", { reason: status.detail ?? t("reach.noReason") })}
+            {status.downSince
+                ? t("reach.downSince", {
+                      since: format.dateTime(status.downSince),
+                      reason: status.detail ?? t("reach.noReason")
+                  })
+                : t("reach.down", { reason: status.detail ?? t("reach.noReason") })}
         </p>
     );
 }

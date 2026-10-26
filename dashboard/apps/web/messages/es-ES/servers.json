@@ -46,6 +46,7 @@
         "up": "Activo",
         "checking": "Comprobando...",
         "noAnswer": "No responde",
+        "downSince": "Sin conexión desde {since}",
         "latency": "{ms} ms"
     },
     "shell": {
@@ -230,6 +231,7 @@
         "up": "Responde en el puerto {port}.",
         "upIn": "Responde en el puerto {port} en {ms} ms.",
         "down": "No responde: {reason}.",
+        "downSince": "Sin conexión desde {since}: {reason}.",
         "noReason": "sin motivo indicado"
     },
     "connect": {

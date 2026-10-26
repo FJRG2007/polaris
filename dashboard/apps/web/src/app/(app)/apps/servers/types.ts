@@ -40,6 +40,8 @@ export interface ServerStatus {
     /** Handshake round trip in milliseconds; null for the local box. */
     latencyMs: number | null;
     detail: string | null;
+    /** When it stopped answering, as ISO; null while it answers. */
+    downSince: string | null;
 }
 
 export interface ServerStatusPayload {

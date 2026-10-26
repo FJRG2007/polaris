@@ -6,12 +6,14 @@
  * sockets, and it would answer a question nobody is asking: a machine that pings
  * but refuses SSH is down as far as everything in Polaris is concerned.
  *
- * Nothing here is cached or persisted. It is read from a page that polls, and a
+ * The answer itself is never cached: it is read from a page that polls, and a
  * stale reachability answer is worse than a fresh one that costs a connection.
+ * Only the moment a server stopped answering is kept (`Host.offlineSince`),
+ * written when the answer changes, so the screen can say since when.
  */
 
 import { connect } from "node:net";
-import { listHosts } from "./host-service";
+import { prisma } from "@polaris/db";
 import { LOCAL_SERVER_ID } from "./local-server";
 
 /** Long enough for a busy machine on a slow link, short enough that a dead one
@@ -27,6 +29,8 @@ export interface ServerStatus {
     readonly latencyMs: number | null;
     /** Why it is not answering, in the words the connection used. */
     readonly detail: string | null;
+    /** When it stopped answering, as ISO; null while it answers. */
+    readonly downSince: string | null;
 }
 
 /**
@@ -71,17 +75,46 @@ function reason(error: NodeJS.ErrnoException): string {
  * server should not add its timeout to the next one's wait.
  */
 export async function serverStatuses(ownerId: string): Promise<ServerStatus[]> {
-    const hosts = await listHosts(ownerId);
+    const hosts = await prisma.host.findMany({
+        where: { ownerId },
+        select: { id: true, address: true, port: true, offlineSince: true },
+        orderBy: { createdAt: "asc" }
+    });
     const probed = await Promise.all(
         hosts.map(async (host) => {
             const { latencyMs, detail } = await probeTcp(host.address, host.port);
+            const up = detail === null;
+            const downSince = up ? null : await markDown(host.id, host.offlineSince);
+            if (up && host.offlineSince) await markUp(host.id);
             return {
                 id: host.id,
-                state: detail === null ? ("up" as const) : ("down" as const),
-                latencyMs: detail === null ? latencyMs : null,
-                detail
+                state: up ? ("up" as const) : ("down" as const),
+                latencyMs: up ? latencyMs : null,
+                detail,
+                downSince
             };
         })
     );
-    return [{ id: LOCAL_SERVER_ID, state: "up", latencyMs: null, detail: null }, ...probed];
+    return [
+        { id: LOCAL_SERVER_ID, state: "up", latencyMs: null, detail: null, downSince: null },
+        ...probed
+    ];
+}
+
+/** Start the clock on a server that just stopped answering, and say when it
+ *  started. Conditional, so two polls racing keep the earlier moment. A write
+ *  that fails still answers with now: the screen is not worth failing for it. */
+async function markDown(id: string, since: Date | null): Promise<string> {
+    if (since) return since.toISOString();
+    const now = new Date();
+    await prisma.host
+        .updateMany({ where: { id, offlineSince: null }, data: { offlineSince: now } })
+        .catch(() => undefined);
+    return now.toISOString();
+}
+
+async function markUp(id: string): Promise<void> {
+    await prisma.host
+        .updateMany({ where: { id, offlineSince: { not: null } }, data: { offlineSince: null } })
+        .catch(() => undefined);
 }

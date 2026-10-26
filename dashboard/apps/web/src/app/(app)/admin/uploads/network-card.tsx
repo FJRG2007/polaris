@@ -19,6 +19,7 @@ import { isLocalAddress } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
 import { Button, Card, CardBody, Input, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDisplayFormat } from "@/components/display-format";
 import { findStorageAgainAction, setStorageAddressAction } from "./actions";
 import type { SearchOutcome, WhereaboutsView } from "@/lib/storage-whereabouts/follow";
 
@@ -120,6 +121,7 @@ function Outcome({
 
 function StorageRow({ initial }: { initial: WhereaboutsView }) {
     const t = useTranslations("admin");
+    const format = useDisplayFormat();
     const tc = useTranslations("common");
     const [view, setView] = useState(initial);
     const [address, setAddress] = useState(initial.address);
@@ -176,6 +178,9 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
 
     const busy = searching || saving;
     const known = view.remembered;
+    // The last look found it nowhere: say since when it has not been seen,
+    // rather than a "last seen" that reads like nothing is wrong.
+    const unreachable = known !== null && view.last?.outcome.kind === "gone";
 
     return (
         <li className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
@@ -195,7 +200,18 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
                                     : t("uploads.network.knownAs", {
                                           device: known.label ?? known.mac ?? view.name
                                       })}{" "}
-                                {t("uploads.network.lastSeen")} <RelativeTime iso={known.seenAt} />
+                                {unreachable ? (
+                                    <span className="text-danger">
+                                        {t("uploads.network.unreachableSince", {
+                                            since: format.dateTime(known.seenAt)
+                                        })}
+                                    </span>
+                                ) : (
+                                    <>
+                                        {t("uploads.network.lastSeen")}{" "}
+                                        <RelativeTime iso={known.seenAt} />
+                                    </>
+                                )}
                             </>
                         ) : (
                             t("uploads.network.unknown")

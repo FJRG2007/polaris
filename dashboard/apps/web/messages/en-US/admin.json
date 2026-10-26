@@ -2969,6 +2969,7 @@
             "known": "Known as {device} ({mac}).",
             "knownAs": "Known as {device}.",
             "lastSeen": "Last seen",
+            "unreachableSince": "Not reachable since {since}",
             "unknown": "Not known yet: Polaris learns who it is the next time it answers.",
             "findAgain": "Find it again",
             "searching": "Looking for it on the network...",
