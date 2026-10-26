@@ -212,6 +212,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: sampleConnectivity
     },
     {
+        key: "lan-address-follow",
+        // Every minute, and first at boot: a server that comes back on another
+        // lease leaves its DNS server unable to start and every device in the
+        // house without names, so this sets how long that lasts. A quiet pass
+        // reads one file, one setting and two rows.
+        everyMs: MINUTE,
+        // Leased: two web containers during an update would both redeploy the
+        // DNS server and both announce the move.
+        leaseMs: 5 * MINUTE,
+        run: async () => (await import("@/lib/lan-address-follow")).followLanAddress()
+    },
+    {
         key: "dns-blocker-clock",
         // Every fifteen minutes, so a daylight-saving change has moved the ad
         // blocker's schedules within minutes of the clock moving. A pass that

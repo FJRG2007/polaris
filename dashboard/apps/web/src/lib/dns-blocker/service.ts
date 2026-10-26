@@ -21,7 +21,7 @@ import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { isPortTaken } from "@polaris/deploy";
 import { ENV_VALUE_MAX } from "@polaris/core";
-import { boundSource, dnsPublishSpec } from "./publish";
+import { boundAddress, boundSource, dnsPublishSpec } from "./publish";
 import { getHostLanIp } from "@/lib/host-address";
 import { setEnvVar } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
@@ -438,6 +438,43 @@ export async function turnOn(actorId: string): Promise<void> {
     if ((await engineRow())?.status !== "running") return;
     forgetEngineFiles();
     await syncRules(settings);
+}
+
+/**
+ * Move the DNS server to this machine's address when the machine has moved.
+ *
+ * Its port 53 is bound to one address (see `publish.ts`), and a server that comes
+ * back on another lease has no such address any more: the container cannot even
+ * start, and every device that asks this machine for names gets no answer. So a
+ * scheduled pass (`lan-address-follow`) compares the address the engine is bound
+ * to with the one the machine holds now, and deploys it again on the new one.
+ * Nothing at all when the blocker is off, the machine's address is unknown, or the
+ * engine already listens there - or listens everywhere, as one from before the
+ * binding did. Returns where it moved from, for the notice.
+ */
+export function followHostAddress(): Promise<{ from: string; to: string } | null> {
+    return serialized(async () => {
+        const engine = await engineRow();
+        if (!engine?.applicationId) return null;
+        const address = await getHostLanIp().catch(() => null);
+        if (!address) return null;
+        const app = await prisma.application.findUnique({
+            where: { id: engine.applicationId },
+            select: { sourceConfig: true }
+        });
+        const from = app ? boundAddress(app.sourceConfig) : null;
+        if (!from || from === address) return null;
+        const row = await appRow();
+        if (!row) return null;
+        const settings = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]);
+        const encoded = encodeBlockyConfig(settings);
+        if (encoded.length > ENV_VALUE_MAX) return null;
+        console.info(
+            `polaris: this machine moved from ${from} to ${address}; moving the network filter's DNS server with it`
+        );
+        await apply(engine, encoded, engine.ownerId, address, settings);
+        return { from, to: address };
+    });
 }
 
 /** Stop and remove the DNS server. The settings stay on the app. */

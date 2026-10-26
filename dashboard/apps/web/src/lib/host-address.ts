@@ -41,3 +41,21 @@ export async function getHostLanIp(): Promise<string | null> {
     const value = raw.trim();
     return IPV4.test(value) && isLanAddress(value) ? value : null;
 }
+
+/**
+ * Every LAN IPv4 this server answers on, the one `getHostLanIp` returns first. A
+ * machine on cable and WiFi holds two, and both are this machine. Read from the
+ * responder's list, which a responder from before the list existed never wrote:
+ * then the one address is all there is.
+ */
+export async function getHostLanIps(): Promise<string[]> {
+    const [primary, raw] = await Promise.all([
+        getHostLanIp(),
+        readFile(`${IP_FILE}s`, "utf8").catch(() => "")
+    ]);
+    const listed = raw
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => IPV4.test(line) && isLanAddress(line));
+    return [...new Set([...(primary ? [primary] : []), ...listed])];
+}

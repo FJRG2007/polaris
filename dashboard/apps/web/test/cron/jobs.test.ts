@@ -177,6 +177,9 @@ describe("the work Polaris runs on a schedule", () => {
             // relay told twice drops the camera and dials it again.
             "home-warm",
             "host-space",
+            // Two passes would each redeploy the DNS server on the new address
+            // and each announce that this machine moved.
+            "lan-address-follow",
             // Two passes would each remove the same volume, and the one that lost
             // would fail on a volume the other already took.
             "leftover-volumes",

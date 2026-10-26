@@ -15,7 +15,7 @@ const findMany = vi.fn(async () => [
     { hostname: "a.10-0-1-8.sslip.io" }
 ]);
 const access = vi.fn(async () => undefined);
-const hostLanIp = vi.fn(async () => "10.0.1.42" as string | null);
+const hostLanIps = vi.fn(async () => ["10.0.1.42"] as string[]);
 const interfaces = vi.fn(() => ({
     lo: [{ family: "IPv4", internal: true, address: "127.0.0.1" }],
     eth0: [{ family: "IPv4", internal: false, address: "172.18.0.8" }]
@@ -23,7 +23,7 @@ const interfaces = vi.fn(() => ({
 
 vi.mock("@polaris/db", () => ({ prisma: { domain: { findMany } } }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_DATA_DIR: "/var/lib/polaris" }) }));
-vi.mock("@/lib/host-address", () => ({ getHostLanIp: hostLanIp }));
+vi.mock("@/lib/host-address", () => ({ getHostLanIps: hostLanIps }));
 vi.mock("node:os", () => ({ networkInterfaces: interfaces }));
 vi.mock("node:fs/promises", () => ({
     access,
@@ -46,9 +46,21 @@ describe("the local certificate's names", () => {
         expect(names).toContain("DNS:polaris.local");
         expect(names).toContain("DNS:*.plr.local");
         expect(names).toContain("DNS:app.plr.local");
-        expect(names).toContain("IP:10.0.1.138");
         expect(names).toContain("IP:10.0.1.42");
         expect(names).toContain("IP:127.0.0.1");
+    });
+
+    it("names every address the machine holds now, not the one written at install", async () => {
+        hostLanIps.mockResolvedValueOnce(["192.168.50.7", "192.168.50.9"]);
+        const names = await subjectAltNames();
+        expect(names).toContain("IP:192.168.50.7");
+        expect(names).toContain("IP:192.168.50.9");
+        expect(names).not.toContain("IP:10.0.1.138");
+    });
+
+    it("falls back to the install-time address when none is known", async () => {
+        hostLanIps.mockResolvedValueOnce([]);
+        expect(await subjectAltNames()).toContain("IP:10.0.1.138");
     });
 
     it("leaves out the container's own docker address", async () => {

@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY responder.mjs ./
+COPY responder.mjs address.mjs ./
 
 # Where this process publishes the host's LAN address for the dashboard. Owned by
 # the runtime user here and in the web image, since Docker seeds a fresh named
