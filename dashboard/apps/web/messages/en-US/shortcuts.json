@@ -162,6 +162,7 @@
             "edit": "Edit your message",
             "delete": "Delete the message",
             "copy": "Copy the message",
+            "dictate": "Dictate into the message",
             "toggleMic": "Mute or unmute",
             "toggleDeafen": "Deafen or undeafen"
         },
@@ -245,6 +246,7 @@
         "viewerSlides": "Presentations",
         "viewerPictures": "Pictures",
         "chatMessages": "Messages",
+        "chatComposer": "Writing",
         "chatCalls": "Calls",
         "placesClips": "Clips",
         "databasesQuery": "Queries",

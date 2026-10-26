@@ -2033,5 +2033,35 @@
             "access": "Esta invitación no es para ti o ha caducado.",
             "server": "No se pudo conectar con el servidor del juego. Inténtalo en un momento."
         }
+    },
+    "attachMenu": {
+        "add": "Añadir"
+    },
+    "dictation": {
+        "start": "Dictar",
+        "startWithKey": "Dictar ({key})",
+        "stop": "Dejar de dictar",
+        "listening": "Escuchando...",
+        "transcribing": "Escribiéndolo...",
+        "escToStop": " - Esc para parar",
+        "dismiss": "Cerrar",
+        "hintPhone": "Toca para dictar. Mantén pulsado para un mensaje de voz.",
+        "hintComputer": "Haz clic para dictar. Mantén pulsado, o usa este menú, para un mensaje de voz.",
+        "gotIt": "Entendido",
+        "slideHint": "Suelta para enviar. Desliza a la izquierda para cancelar, arriba para bloquear.",
+        "voiceMessage": "Mensaje de voz",
+        "private": "Dictado privado",
+        "privateHelp": "Lo escribe Polaris en lugar de tu navegador.",
+        "problem": {
+            "micBlocked": "El micrófono está bloqueado. Permítelo en los ajustes del sitio del navegador y vuelve a intentarlo.",
+            "serviceBlocked": "Este navegador tiene el dictado desactivado. Prueba el dictado privado en el menú del micrófono o envía un mensaje de voz.",
+            "noSpeech": "No se ha oído nada. Toca el micrófono y habla.",
+            "network": "El dictado necesita conexión. Revísala o prueba el dictado privado en el menú del micrófono.",
+            "noMic": "No hay micrófono. Conecta uno o elígelo en el menú del micrófono.",
+            "language": "El dictado no está disponible en este idioma aquí. Prueba el dictado privado en el menú del micrófono.",
+            "notSetUp": "El dictado privado no está configurado. Desactívalo en el menú del micrófono.",
+            "tooMany": "Demasiados dictados por ahora. Espera un minuto y vuelve a intentarlo.",
+            "failed": "No se ha podido escribir. Vuelve a intentarlo."
+        }
     }
 }

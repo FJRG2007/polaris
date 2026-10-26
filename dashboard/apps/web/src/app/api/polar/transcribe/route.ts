@@ -1,4 +1,9 @@
 /**
+ * GET /api/polar/transcribe - whether this person can be heard at all:
+ * `{ available }`, which the chat composer asks before offering private
+ * dictation. A person Polar is closed to is answered `false`, not refused, so
+ * the composer has one shape to read.
+ *
  * POST /api/polar/transcribe?durationMs=<n> - what somebody said to Polar, as
  * text: dictation into the composer, and each turn of a voice call. The body is
  * the recording; its Content-Type says what it is. Answers `{ text }`.
@@ -15,7 +20,7 @@
 import { NextResponse } from "next/server";
 import { experimental_transcribe as transcribe } from "ai";
 import { polarCaller } from "@/lib/polar/access";
-import { polarTranscriber } from "@/lib/polar/voice";
+import { polarTranscriber, polarVoiceAvailability } from "@/lib/polar/voice";
 import { polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
@@ -30,6 +35,21 @@ export const dynamic = "force-dynamic";
 
 function refuse(code: string, status: number): NextResponse {
     return NextResponse.json({ error: code }, { status });
+}
+
+export async function GET(): Promise<Response> {
+    const user = await polarCaller();
+    if (user instanceof NextResponse) {
+        return user.status === 403 ? NextResponse.json({ available: false }) : user;
+    }
+    if (user.viewingAs) return NextResponse.json({ available: false });
+    const limited = await rateLimit(`polar-transcribe-check:${user.id}`, 60, 60_000);
+    if (!limited.ok) return refuse("rate_limited", 429);
+    const voice = await polarVoiceAvailability(user.id);
+    return NextResponse.json(
+        { available: voice.dictation },
+        { headers: { "Cache-Control": "private, max-age=60" } }
+    );
 }
 
 export async function POST(request: Request): Promise<Response> {
