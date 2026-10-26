@@ -858,6 +858,10 @@
             "tunnel": {
                 "label": "Túnel público",
                 "summary": "Publica Polaris sin redirigir puertos."
+            },
+            "tailscale": {
+                "label": "Acceso remoto",
+                "summary": "Abre Polaris desde tus dispositivos de Tailscale."
             }
         }
     },

@@ -39,7 +39,8 @@ const PART_KEYS: Readonly<Record<string, string>> = {
     "Local discovery": "mdns",
     "Minecraft router": "mcRouter",
     "Edge (legacy)": "caddy",
-    "Public tunnel": "tunnel"
+    "Public tunnel": "tunnel",
+    "Remote access": "tailscale"
 };
 
 function partWords(t: Words, part: FootprintPart): { label: string; summary: string } {

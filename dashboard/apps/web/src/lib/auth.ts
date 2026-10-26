@@ -17,18 +17,22 @@ import { createRequestAuth } from "@polaris/auth";
 
 const requestAuth = createRequestAuth({
     configuredHosts: async () => {
-        const [{ dashboardHosts, publicHostname }, { getPolarisPublicUrl }] = await Promise.all([
-            import("./domain-edge"),
-            import("./polaris-tunnel-service")
-        ]);
-        const [hosts, tunnel] = await Promise.all([
+        const [{ dashboardHosts, publicHostname }, { getPolarisPublicUrl }, { getTailscaleHost }] =
+            await Promise.all([
+                import("./domain-edge"),
+                import("./polaris-tunnel-service"),
+                import("./tailscale/tailscale-service")
+            ]);
+        const [hosts, tunnel, tailnet] = await Promise.all([
             dashboardHosts(),
             // A tunnel publishes the dashboard on a hostname nobody configured - the
             // provider mints it - so it is collected separately from the domains.
-            getPolarisPublicUrl().catch(() => null)
+            getPolarisPublicUrl().catch(() => null),
+            // Tailscale names the machine the same way, under the tailnet's ts.net.
+            getTailscaleHost().catch(() => null)
         ]);
         const tunnelHost = publicHostname(tunnel);
-        return tunnelHost ? [...hosts, tunnelHost] : hosts;
+        return [...hosts, ...(tunnelHost ? [tunnelHost] : []), ...(tailnet ? [tailnet] : [])];
     },
     // Lazily imported for the same reason as the domain modules: the mail service
     // reaches the database and pulls in an SMTP client, and this module is loaded
