@@ -55,7 +55,9 @@ export async function probeTcp(
             resolve({ latencyMs: Date.now() - started, detail });
         };
         socket.once("connect", () => settle(null));
-        socket.once("timeout", () => settle(`No answer within ${Math.round(timeoutMs / 1000)} seconds`));
+        socket.once("timeout", () =>
+            settle(`No answer within ${Math.round(timeoutMs / 1000)} seconds`)
+        );
         socket.once("error", (error: NodeJS.ErrnoException) => settle(reason(error)));
     });
 }
@@ -63,8 +65,10 @@ export async function probeTcp(
 /** A connection failure in words an operator can act on. */
 function reason(error: NodeJS.ErrnoException): string {
     if (error.code === "ECONNREFUSED") return "Nothing is listening on that port";
-    if (error.code === "EHOSTUNREACH" || error.code === "ENETUNREACH") return "No route to that address";
-    if (error.code === "ENOTFOUND" || error.code === "EAI_AGAIN") return "That address does not resolve";
+    if (error.code === "EHOSTUNREACH" || error.code === "ENETUNREACH")
+        return "No route to that address";
+    if (error.code === "ENOTFOUND" || error.code === "EAI_AGAIN")
+        return "That address does not resolve";
     return error.message;
 }
 

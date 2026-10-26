@@ -386,7 +386,9 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
     // Every camera that answered and has no hardware address yet gets one now,
     // which is what lets the pass above find it again after a move - including
     // the cameras added before it was recorded.
-    await recordCameraHardware(asked.filter((result) => result.reachable).map((result) => result.camera));
+    await recordCameraHardware(
+        asked.filter((result) => result.reachable).map((result) => result.camera)
+    );
     // How much of each place is down, counted across everything this pass asked -
     // which is what turns "a camera stopped" into "the building went dark".
     const downAt = new Map<string, number>();

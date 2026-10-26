@@ -47,8 +47,15 @@ vi.mock("@polaris/db", () => ({
             findMany: async () => cameras.map((camera) => ({ ...camera })),
             update: (args: never) => updates(args as never)
         },
-        cameraEvent: { findFirst: async () => null, create: async () => ({ id: "e" }), update: async () => undefined },
-        place: { findMany: async () => [{ id: "place", name: "Home" }], findFirst: async () => ({ name: "Home" }) },
+        cameraEvent: {
+            findFirst: async () => null,
+            create: async () => ({ id: "e" }),
+            update: async () => undefined
+        },
+        place: {
+            findMany: async () => [{ id: "place", name: "Home" }],
+            findFirst: async () => ({ name: "Home" })
+        },
         installedApp: { findFirst: async () => ({ ownerId: "owner" }) },
         alertRule: { findMany: async () => [], update: async () => undefined },
         chatMessage: { create: async () => ({ id: "m" }) },
@@ -74,7 +81,11 @@ vi.mock("@polaris-app/places/src/lib/relay", () => ({
 
 vi.mock("@polaris-app/places/src/lib/integrations/mac-locate", () => ({
     macsAt: async (addresses: readonly string[]) =>
-        new Map(addresses.flatMap((address) => (neighbours.has(address) ? [[address, neighbours.get(address)!]] : []))),
+        new Map(
+            addresses.flatMap((address) =>
+                neighbours.has(address) ? [[address, neighbours.get(address)!]] : []
+            )
+        ),
     locateMac: async (mac: string, options: { avoid?: string }) => {
         located(mac, options.avoid);
         for (const [address, hardware] of neighbours) if (hardware === mac) return address;

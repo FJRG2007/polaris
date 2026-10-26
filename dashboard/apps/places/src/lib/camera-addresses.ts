@@ -60,11 +60,17 @@ export async function recordCameraHardware(cameras: readonly FollowedCamera[]): 
         for (const camera of wanting) {
             const mac = macs.get(camera.address.trim());
             if (!mac || mac === camera.hardwareAddress) continue;
-            await prisma.camera.update({ where: { id: camera.id }, data: { hardwareAddress: mac } });
+            await prisma.camera.update({
+                where: { id: camera.id },
+                data: { hardwareAddress: mac }
+            });
             recorded += 1;
         }
     } catch (error) {
-        console.warn("[places] could not record a camera's hardware address", (error as Error).name);
+        console.warn(
+            "[places] could not record a camera's hardware address",
+            (error as Error).name
+        );
     }
     return recorded;
 }

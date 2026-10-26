@@ -16,7 +16,10 @@ interface HostRow {
 
 let hosts: HostRow[] = [];
 const writes = vi.fn(
-    async (args: { where: { id: string; offlineSince: unknown }; data: { offlineSince: Date | null } }) => {
+    async (args: {
+        where: { id: string; offlineSince: unknown };
+        data: { offlineSince: Date | null };
+    }) => {
         const row = hosts.find((host) => host.id === args.where.id);
         if (!row) return { count: 0 };
         const wantsNull = args.where.offlineSince === null;

@@ -188,10 +188,7 @@ export function lanMoveLinks(
  * stored JSON an older build may have written, so anything that does not parse
  * is no move rather than an error. Pure.
  */
-export function recentLanMove(
-    rawHistory: string | null,
-    now: number = Date.now()
-): LanMove | null {
+export function recentLanMove(rawHistory: string | null, now: number = Date.now()): LanMove | null {
     let parsed: unknown;
     try {
         parsed = JSON.parse(rawHistory ?? "[]");

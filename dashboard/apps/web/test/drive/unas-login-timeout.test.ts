@@ -28,7 +28,13 @@ describe("UNAS sign-in", () => {
     it("gives up on a console that never answers", async () => {
         const started = Date.now();
         await expect(
-            signIn({ host: "127.0.0.1", port, username: "fixture", password: "fixture", secure: false })
+            signIn({
+                host: "127.0.0.1",
+                port,
+                username: "fixture",
+                password: "fixture",
+                secure: false
+            })
         ).rejects.toThrow();
         const took = Date.now() - started;
         expect(took).toBeGreaterThanOrEqual(LOGIN_TIMEOUT_MS - 200);
