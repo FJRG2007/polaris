@@ -23,7 +23,6 @@ import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import { TaskRefusal } from "./refusal";
 import { requireTask } from "./access";
-import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 
 export interface AutomationEventInput {
     readonly trigger: core.AutomationTrigger;
@@ -295,8 +294,11 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
     const now = new Date();
     // "Due today" and "overdue" in a rule are read on the calendar of whoever set
     // it off; with nobody behind the event, the server's own.
+    // Loaded only once a rule is about to be matched: it pulls the session module
+    // in, which nothing else on this path needs.
     const zone = event.actorId
-        ? (await resolveDisplayPreferencesFor(event.actorId)).timeZone
+        ? (await (await import("@/lib/display-prefs-service")).resolveDisplayPreferencesFor(event.actorId))
+              .timeZone
         : core.AUTOMATIC_TIME_ZONE;
     // Counted rather than incremented per run: a rule that fired on forty rows is
     // forty runs and one write.
