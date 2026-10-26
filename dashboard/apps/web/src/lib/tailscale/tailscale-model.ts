@@ -62,7 +62,7 @@ const LOGIN_URL = /https:\/\/login\.tailscale\.com\/a\/[A-Za-z0-9]+/g;
 /** The newest login link in a stretch of container output, or null. */
 export function loginUrlFromLogs(text: string): string | null {
     const found = text.match(LOGIN_URL);
-    return found ? found[found.length - 1] : null;
+    return found?.[found.length - 1] ?? null;
 }
 
 const statusSchema = z

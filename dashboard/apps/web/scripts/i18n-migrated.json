@@ -496,6 +496,7 @@
         "web/src/app/(app)/admin/domains/actions.ts",
         "web/src/app/(app)/admin/domains/address-follow-card.tsx",
         "web/src/app/(app)/admin/domains/backup-access-card.tsx",
+        "web/src/app/(app)/admin/domains/tailscale-card.tsx",
         "web/src/app/(app)/admin/domains/call-ports-card.tsx",
         "web/src/app/(app)/admin/domains/dns-records-card.tsx",
         "web/src/app/(app)/admin/domains/domains-view.tsx",

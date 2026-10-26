@@ -28,6 +28,7 @@ import { DomainSetupWizard } from "./setup-wizard";
 import { DnsRecordsCard } from "./dns-records-card";
 import { AddressFollowCard } from "./address-follow-card";
 import { BackupAccessCard } from "./backup-access-card";
+import { TailscaleCard } from "./tailscale-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
 import { CertificateContactCard } from "./certificate-contact-card";
@@ -183,6 +184,7 @@ export function DomainsView() {
 
             <AddressFollowCard />
             <BackupAccessCard />
+            <TailscaleCard />
 
             <DnsRecordsCard />
 
