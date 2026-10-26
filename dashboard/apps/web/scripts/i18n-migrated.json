@@ -348,6 +348,7 @@
         "web/src/app/cal/layout.tsx",
         "web/src/components/arcade/game-invite-dialog.tsx",
         "web/src/components/client-logo.tsx",
+        "web/src/components/lan-address-banner.tsx",
         "web/src/app/(app)/account/assistants/connect-guides.tsx",
         "web/src/app/(app)/account/assistants/connected-app-actions.ts",
         "web/src/app/(app)/account/assistants/connected-apps.tsx",

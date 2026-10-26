@@ -18,6 +18,7 @@
  * when the network filter is on.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as notices from "@/lib/notification-service";
 import { wordsFor } from "@/lib/notifications/notice-words";
@@ -150,4 +151,39 @@ function defaultSteps(): LanFollowSteps {
         certificate: async () => (await import("@/lib/local-ca-service")).ensureLocalCa(),
         announce: announceMove
     };
+}
+
+/** How long a move stays on screen for the people who manage this Polaris. Long
+ *  enough to be seen after a weekend away; short enough not to be furniture. */
+export const LAN_MOVE_SHOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+const lanMoveSchema = z.object({
+    from: z.string().min(1).max(64),
+    to: z.string().min(1).max(64),
+    at: z.string().min(1).max(64)
+});
+
+export type LanMove = z.infer<typeof lanMoveSchema>;
+
+/**
+ * The newest recorded move, while it is recent enough to show. The history is
+ * stored JSON an older build may have written, so anything that does not parse
+ * is no move rather than an error. Pure.
+ */
+export function recentLanMove(
+    rawHistory: string | null,
+    now: number = Date.now()
+): LanMove | null {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(rawHistory ?? "[]");
+    } catch {
+        return null;
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    const newest = lanMoveSchema.safeParse(parsed[0]);
+    if (!newest.success) return null;
+    const at = Date.parse(newest.data.at);
+    if (Number.isNaN(at) || now - at > LAN_MOVE_SHOWN_MS || at - now > 60_000) return null;
+    return newest.data;
 }
