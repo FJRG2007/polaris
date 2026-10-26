@@ -61,10 +61,12 @@ function blank(templates: Texts): ComposeInput {
     return {
         kind: "announcement",
         template: "generic",
-        localized: true,
+        // The generic template's body is a prompt, not a message: it is shown as
+        // the field's placeholder, so an untouched form never sends it.
+        localized: false,
         severity: "info",
         title: templates.generic?.title ?? "",
-        body: templates.generic?.body ?? "",
+        body: "",
         linkUrl: null,
         linkLabel: null,
         audience: { ...NOBODY, everyone: true },
@@ -206,9 +208,9 @@ export function AnnouncementsView({
         setForm((current) => ({
             ...current,
             template: id,
-            localized: true,
+            localized: id !== "generic",
             title: templates[id]?.title ?? "",
-            body: templates[id]?.body ?? ""
+            body: id === "generic" ? "" : (templates[id]?.body ?? "")
         }));
 
     const pickKind = (kind: ComposeInput["kind"]) => {
@@ -357,6 +359,7 @@ export function AnnouncementsView({
                         <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.bodyLabel")}</span>
                         <Textarea
                             value={form.body}
+                            placeholder={form.template === "generic" ? templates.generic?.body : undefined}
                             rows={4}
                             maxLength={2000}
                             onChange={(event) => set("body", event.target.value)}
