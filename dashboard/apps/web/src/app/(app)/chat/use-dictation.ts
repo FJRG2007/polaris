@@ -23,6 +23,7 @@ import { measureVoice } from "./voice-level";
 import { micConstraints } from "./mic-cleanup";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_VOICE_SECONDS, recordingType } from "./voice-recorder";
+import { transcribeAudio } from "@/lib/polar/transcribe-audio";
 import {
     browserProblem,
     chunkReady,
@@ -219,8 +220,6 @@ export function useDictation(options: {
             queue = queue.then(async () => {
                 let heard: { text: string } | { error: string };
                 try {
-                    // Loaded on first use: the chat has no other need for Polar.
-                    const { transcribeAudio } = await import("@/components/polar/polar-voice");
                     heard = await transcribeAudio(blob, durationMs, null, abort.signal);
                 } catch {
                     heard = { error: "transcribe_failed" };

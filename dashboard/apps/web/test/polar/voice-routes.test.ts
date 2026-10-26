@@ -126,6 +126,30 @@ beforeEach(() => {
     state.duration = undefined;
 });
 
+describe("GET /api/polar/transcribe", () => {
+    it("says whether this person can be heard, for the chat's private dictation", async () => {
+        const yes = await transcribeRoute.GET();
+        expect(yes.status).toBe(200);
+        expect(await yes.json()).toEqual({ available: true });
+
+        state.provider = false;
+        expect(await (await transcribeRoute.GET()).json()).toEqual({ available: false });
+    });
+
+    it("answers no while viewing as somebody else, and refuses nobody signed in", async () => {
+        state.user = { id: OWNER, viewingAs: "someone" };
+        expect(await (await transcribeRoute.GET()).json()).toEqual({ available: false });
+
+        state.user = null;
+        expect((await transcribeRoute.GET()).status).toBe(401);
+    });
+
+    it("is rate limited", async () => {
+        state.limited = true;
+        expect((await transcribeRoute.GET()).status).toBe(429);
+    });
+});
+
 describe("POST /api/polar/transcribe", () => {
     it("answers the text of a recording", async () => {
         const response = await transcribeRoute.POST(recording());

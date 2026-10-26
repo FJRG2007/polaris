@@ -591,6 +591,10 @@ export function Composer({
         return () => window.removeEventListener("keydown", onKey, true);
     }, [dictating, stopDictation]);
 
+    // One composer serves whichever conversation is on screen: walking to
+    // another one ends what was being said into this one.
+    useEffect(() => stopDictation, [channelId, draftKey, stopDictation]);
+
     // Code points rather than length, so the count matches the one the server
     // makes: an emoji is one character to the person typing it and two to
     // JavaScript.
