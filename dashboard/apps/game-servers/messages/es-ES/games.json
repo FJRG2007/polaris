@@ -1416,5 +1416,14 @@
         "command": "Comando",
         "commandHint": "Una línea, como en la consola. Puede usar valores de pasos anteriores.",
         "consoleNone": "No hay servidores cuya consola puedas usar."
+    },
+    "mapDownload": {
+        "downloading": "Descargando mapa... {received} de {total}",
+        "retry": "Reintentar",
+        "unreachable": "No se pudo descargar el mapa. Comprueba la conexión a internet de este servidor e inténtalo de nuevo.",
+        "notPublished": "Este mapa no está disponible para esta versión de Polaris. Actualiza Polaris e inténtalo de nuevo.",
+        "corrupt": "El mapa descargado estaba dañado y se ha descartado. Inténtalo de nuevo.",
+        "noSpace": "No hay espacio en disco suficiente para este mapa. Libera espacio e inténtalo de nuevo.",
+        "failed": "No se pudo preparar el mapa. Inténtalo de nuevo."
     }
 }

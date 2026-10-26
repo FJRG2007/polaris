@@ -67,6 +67,7 @@ import {
     type BlueprintShape
 } from "../components/game-blueprint-fields";
 import { hostUi } from "@polaris/app-host/client";
+import { MapDownloadNotice, useMapDownload } from "./map-download";
 
 const { CopyButton } = hostUi.copyButton;
 
@@ -81,6 +82,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     const schemaText = useSchemaText();
     const router = useRouter();
     const [pending, startTransition] = useTransition();
+    const mapDownload = useMapDownload();
     const [setup, setSetup] = useState<GameSetup | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -346,6 +348,10 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             return;
         }
         startTransition(async () => {
+            // The world first, when it is not on this instance yet, so the new
+            // server does not wait for it with nothing on screen saying why.
+            const mapId = "mapId" in parsed.data ? parsed.data.mapId : undefined;
+            if (mapId && !(await mapDownload.prepare(mapId))) return;
             const result = await createGameServerAction(parsed.data);
             if (result.error || !result.installedAppId) {
                 setError(result.error ?? t("create.errors.createFailed"));
@@ -963,6 +969,11 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         </p>
                     </div>
 
+                    <MapDownloadNotice
+                        status={mapDownload.status}
+                        onRetry={submit}
+                        retrying={pending}
+                    />
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     <div className="flex justify-end gap-2">

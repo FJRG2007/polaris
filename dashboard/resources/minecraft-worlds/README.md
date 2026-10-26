@@ -24,9 +24,15 @@ here, open an issue and it will be removed.
 
 ## How they reach a server
 
-`apps/game-servers/scripts/stage-assets.mjs` stages this folder into the Game
-servers bundle, so only an instance that installed Game servers carries them.
-The dashboard serves them from there (`src/lib/minecraft/world-download.ts`): a
-world to the server's container, behind the instance's key, and a pack to the
-players' clients. Each entry in `src/lib/minecraft/maps.ts` names its archive
-and carries its hash and size; a test checks them against the files here.
+The worlds are not in the Game servers bundle. CI publishes each one as an
+artifact of its own in the dashboard's package (`docker/app-bundles.sh worlds`,
+tagged `minecraft-world-<name>-<sha12>`), and a dashboard downloads one onto its
+data volume only when a server is first created or reset onto that map
+(`apps/game-servers/src/lib/minecraft/map-store.ts`), by the sha256 its entry in
+`src/lib/minecraft/maps.ts` names. The two resource packs are a few kilobytes and
+are staged into the bundle by `apps/game-servers/scripts/stage-assets.mjs`.
+
+The dashboard serves both (`src/lib/minecraft/world-download.ts`): a world to
+the server's container, behind the instance's key, and a pack to the players'
+clients. Each entry in `maps.ts` carries its archive's hash and size; a test
+checks them against the files here.

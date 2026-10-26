@@ -1416,5 +1416,14 @@
         "command": "Command",
         "commandHint": "One line, as typed in the console. It can use values from earlier steps.",
         "consoleNone": "No servers whose console you can use."
+    },
+    "mapDownload": {
+        "downloading": "Downloading map... {received} of {total}",
+        "retry": "Try again",
+        "unreachable": "The map could not be downloaded. Check this server's internet connection and try again.",
+        "notPublished": "This map is not available for this version of Polaris. Update Polaris, then try again.",
+        "corrupt": "The downloaded map was damaged and was discarded. Try again.",
+        "noSpace": "There is not enough disk space for this map. Free some space, then try again.",
+        "failed": "The map could not be prepared. Try again."
     }
 }

@@ -6,6 +6,9 @@
 #                                  `app-bundles` stage), untagged, by digest
 #   app-bundles.sh tag <json>      tag each bundle `latest-app-<id>`; <json> is
 #                                  {"<id>": "<manifest digest>", ...}
+#   app-bundles.sh worlds <dir>    publish every Minecraft world in <dir>
+#                                  (resources/minecraft-worlds) as an artifact of
+#                                  its own, tagged `minecraft-world-<name>-<sha12>`
 #
 # A bundle is an OCI artifact in the dashboard's own package: the zip as its one
 # layer, under the manifest the bundler wrote (so its digest is the one the image
@@ -16,6 +19,12 @@
 # Pushed untagged first, like the image, and tagged by the same job that moves
 # `latest`: ghcr-prune.yml keeps what `latest` and the `latest-app-*` tags name,
 # plus anything pushed in the last hour, and deletes the rest.
+#
+# The worlds are kept out of the Game servers bundle so installing it does not
+# carry them: a dashboard downloads one only when a server is created on that
+# map (apps/game-servers/src/lib/minecraft/map-store.ts), by the sha256 its
+# catalog names, which is the blob's digest here. The tag names the content, so
+# it never moves; it is what keeps the blob from being pruned.
 #
 # Needs REGISTRY_USER and REGISTRY_TOKEN (a token that can write the package).
 
@@ -89,8 +98,41 @@ tag() {
     rm -f "$body"
 }
 
+WORLD_TYPE=application/vnd.polaris.minecraft-world.v1+zip
+
+worlds() {
+    local dir=$1 empty file name digest hex size manifest
+    empty=$(mktemp)
+    printf '{}' > "$empty"
+    push_blob "$empty" "$(sha "$empty")"
+    manifest=$(mktemp)
+    for file in "$dir"/*.zip; do
+        name=$(basename "$file" .zip)
+        # A map's resource pack is a few kilobytes and stays in the bundle.
+        case "$name" in *-resources) continue ;; esac
+        digest=$(sha "$file")
+        hex=${digest#sha256:}
+        size=$(stat -c %s "$file")
+        echo "$name"
+        push_blob "$file" "$digest"
+        jq -cn --arg config "$(sha "$empty")" --arg digest "$digest" --argjson size "$size"             --arg type "$WORLD_TYPE" --arg title "$name.zip" '{
+                schemaVersion: 2,
+                mediaType: "application/vnd.oci.image.manifest.v1+json",
+                artifactType: $type,
+                config: { mediaType: "application/vnd.oci.empty.v1+json", digest: $config, size: 2 },
+                layers: [{ mediaType: "application/zip", digest: $digest, size: $size,
+                           annotations: { "org.opencontainers.image.title": $title } }]
+            }' | tr -d '
+' > "$manifest"
+        put_manifest "$manifest" "minecraft-world-$name-${hex:0:12}"
+        echo "  minecraft-world-$name-${hex:0:12} -> $digest"
+    done
+    rm -f "$empty" "$manifest"
+}
+
 case "${1:-}" in
     push) push "$2" ;;
     tag) tag "$2" ;;
-    *) echo "usage: $0 push <dir> | tag <json>"; exit 2 ;;
+    worlds) worlds "$2" ;;
+    *) echo "usage: $0 push <dir> | tag <json> | worlds <dir>"; exit 2 ;;
 esac

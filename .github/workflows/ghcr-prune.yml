@@ -176,6 +176,10 @@ jobs:
                 # replaced build like any other.
                 case ",${tags:-}," in *,latest-app-*) continue;; esac
                 case ",${tags:-}," in *,latest-service-*) continue;; esac
+                # A Minecraft world, tagged by its content (app-bundles.sh worlds):
+                # a dashboard downloads it by the hash its catalog names, so one
+                # an older release still names has to stay.
+                case ",${tags:-}," in *,minecraft-world-*) continue;; esac
                 # Fed by a here-string, not a pipe: `grep -q` closing the pipe on
                 # its first hit fails the writer under `pipefail`, and a digest
                 # that is on the keep list would read as one that is not.

@@ -80,17 +80,18 @@ console.log(`Staged ${minecraft.length} Minecraft and ${ark.length} ARK item ico
 stage("default-skins", join(resources, "default-skins"));
 console.log(`Staged the default player skins in ${join(staged, "default-skins")}`);
 
-// The worlds a server can be created on and the resource packs two of them need
-// (resources/minecraft-worlds/README.md), which the dashboard serves to a new
-// server and to its players. Only the archives: the README stays in the repo.
+// The resource packs two maps need (resources/minecraft-worlds/README.md), which
+// the dashboard serves to the players' clients. Only the packs: the worlds are
+// tens of megabytes and are published on their own, downloaded by an instance
+// only when a server is built on one (src/lib/minecraft/map-store.ts).
 const worlds = join(staged, "minecraft-worlds");
 rmSync(worlds, { recursive: true, force: true });
 mkdirSync(worlds, { recursive: true });
 for (const name of readdirSync(join(resources, "minecraft-worlds"))) {
-    if (name.endsWith(".zip"))
+    if (name.endsWith("-resources.zip"))
         copyFileSync(join(resources, "minecraft-worlds", name), join(worlds, name));
 }
-console.log(`Staged the Minecraft worlds in ${worlds}`);
+console.log(`Staged the Minecraft map resource packs in ${worlds}`);
 
 // The reference libvorbis encoder, as the wasm-media-encoders package builds it.
 // Only the Ogg one: the Sounds tab never encodes MP3.
