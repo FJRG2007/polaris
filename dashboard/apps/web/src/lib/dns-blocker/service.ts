@@ -22,7 +22,7 @@ import { randomUUID } from "node:crypto";
 import { isPortTaken } from "@polaris/deploy";
 import { ENV_VALUE_MAX } from "@polaris/core";
 import { boundAddress, boundSource, dnsPublishSpec } from "./publish";
-import { getHostLanIp } from "@/lib/host-address";
+import { getHostLanIp, getHostLanIps } from "@/lib/host-address";
 import { setEnvVar } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { createVolume } from "@/lib/deploy-volume-service";
@@ -449,21 +449,23 @@ export async function turnOn(actorId: string): Promise<void> {
  * scheduled pass (`lan-address-follow`) compares the address the engine is bound
  * to with the one the machine holds now, and deploys it again on the new one.
  * Nothing at all when the blocker is off, the machine's address is unknown, or the
- * engine already listens there - or listens everywhere, as one from before the
- * binding did. Returns where it moved from, for the notice.
+ * engine listens on an address the machine still holds - a machine on cable and
+ * WiFi whose preferred link changed has not moved - or everywhere, as one from
+ * before the binding did. Returns where it moved from, for the notice.
  */
 export function followHostAddress(): Promise<{ from: string; to: string } | null> {
     return serialized(async () => {
         const engine = await engineRow();
         if (!engine?.applicationId) return null;
-        const address = await getHostLanIp().catch(() => null);
+        const held = await getHostLanIps().catch((): string[] => []);
+        const address = held[0];
         if (!address) return null;
         const app = await prisma.application.findUnique({
             where: { id: engine.applicationId },
             select: { sourceConfig: true }
         });
         const from = app ? boundAddress(app.sourceConfig) : null;
-        if (!from || from === address) return null;
+        if (!from || held.includes(from)) return null;
         const row = await appRow();
         if (!row) return null;
         const settings = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]);

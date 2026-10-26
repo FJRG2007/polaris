@@ -161,14 +161,20 @@ mdns.on("ready", () => {
     announce();
 });
 
-// Every 15 s: a moved server is advertised at its new address within seconds,
-// and a pass is one interface list and one read of the routing table.
-const timer = setInterval(announce, 15_000);
-timer.unref?.();
+/** Announce early only when the addresses changed, so a moved server is
+ *  advertised at its new address within seconds. */
+function check() {
+    if (hostIpv4s().join("\n") !== current.join("\n")) announce();
+}
+
+// Checked every 15 s - one interface list and one read of the routing table -
+// and announced every 60 s regardless, keeping caches of the 120 s records warm.
+const timers = [setInterval(check, 15_000), setInterval(announce, 60_000)];
+for (const timer of timers) timer.unref?.();
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
     process.on(signal, () => {
-        clearInterval(timer);
+        for (const timer of timers) clearInterval(timer);
         mdns.destroy(() => process.exit(0));
     });
 }

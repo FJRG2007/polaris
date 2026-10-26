@@ -19,10 +19,10 @@
  */
 
 import { prisma } from "@polaris/db";
-import { getHostLanIp } from "@/lib/host-address";
 import * as notices from "@/lib/notification-service";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { getHostLanIp, getHostLanIps } from "@/lib/host-address";
 
 /** The address the last pass saw. Written only by this module. */
 export const LAN_ADDRESS_KEY = "network.lanAddress";
@@ -39,16 +39,24 @@ export type LanAddressChange =
 /**
  * What the address did since the last pass. An unknown current address is no
  * change: the responder's file is briefly missing while it starts, and that is not
- * the machine leaving the network. Pure.
+ * the machine leaving the network. Neither is a last address the machine still
+ * holds: on cable and WiFi the preferred one follows the route order, while
+ * everything built on the other keeps answering. Pure.
  */
-export function lanAddressChange(last: string | null, current: string | null): LanAddressChange {
-    if (!current || current === last) return { kind: "none" };
+export function lanAddressChange(
+    last: string | null,
+    current: string | null,
+    held: readonly string[] = []
+): LanAddressChange {
+    if (!current || current === last || (last && held.includes(last))) return { kind: "none" };
     if (!last) return { kind: "first", to: current };
     return { kind: "moved", from: last, to: current };
 }
 
 export interface LanFollowSteps {
     readonly current: () => Promise<string | null>;
+    /** Every address the machine holds now. */
+    readonly held: () => Promise<string[]>;
     readonly read: (key: string) => Promise<string | null>;
     readonly write: (key: string, value: string) => Promise<void>;
     /** Move the DNS server; null when it had nothing to move. */
@@ -73,8 +81,9 @@ export interface LanFollowResult {
  */
 export async function followLanAddress(steps: LanFollowSteps = defaultSteps()): Promise<LanFollowResult> {
     const current = await steps.current().catch(() => null);
+    const held = await steps.held().catch((): string[] => []);
     const last = await steps.read(LAN_ADDRESS_KEY).catch(() => null);
-    const change = lanAddressChange(last, current);
+    const change = lanAddressChange(last, current, held);
     if (change.kind !== "none") await steps.write(LAN_ADDRESS_KEY, change.to);
 
     const dns = await steps.dns().catch((error: unknown) => {
@@ -127,6 +136,7 @@ async function announceMove(from: string, to: string, dnsMoved: boolean): Promis
 function defaultSteps(): LanFollowSteps {
     return {
         current: getHostLanIp,
+        held: getHostLanIps,
         read: getSetting,
         write: (key, value) => setSetting(key, value),
         dns: async () => (await import("@/lib/dns-blocker/service")).followHostAddress(),

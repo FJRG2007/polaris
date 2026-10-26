@@ -17,8 +17,9 @@ const state: {
     config: string | null;
     engine: "running" | null;
     address: string | null;
+    held: string[];
     source: string | null;
-} = { deployed: "", config: null, engine: "running", address: null, source: null };
+} = { deployed: "", config: null, engine: "running", address: null, held: [], source: null };
 const sourceWrites: string[] = [];
 
 const writeFile = vi.fn(async (_container: string, path: string) => {
@@ -70,7 +71,10 @@ vi.mock("@/lib/apps/install-config", () => ({
 }));
 vi.mock("@/lib/deploy-service", () => ({ deployApplication }));
 vi.mock("@/lib/env-var-service", () => ({ setEnvVar: async () => undefined }));
-vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => state.address }));
+vi.mock("@/lib/host-address", () => ({
+    getHostLanIp: async () => state.address,
+    getHostLanIps: async () => (state.address ? [state.address, ...state.held] : state.held)
+}));
 vi.mock("@/lib/dns-blocker/probe", () => ({
     probeDns: async () => ({ kind: "silent" }),
     tcpListening: async () => false,
@@ -100,6 +104,7 @@ beforeEach(() => {
     state.config = null;
     state.engine = "running";
     state.address = "10.0.0.5";
+    state.held = [];
     state.source = bound("192.168.1.20");
     deployApplication.mockClear();
 });
@@ -128,6 +133,13 @@ describe("followHostAddress", () => {
     it("leaves an engine already on this address alone", async () => {
         state.source = bound("10.0.0.5");
         expect(await service.followHostAddress()).toBeNull();
+        expect(deployApplication).not.toHaveBeenCalled();
+    });
+
+    it("leaves an engine on an address this machine still holds alone", async () => {
+        state.held = ["192.168.1.20"];
+        expect(await service.followHostAddress()).toBeNull();
+        expect(sourceWrites).toEqual([]);
         expect(deployApplication).not.toHaveBeenCalled();
     });
 
