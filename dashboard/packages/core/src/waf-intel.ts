@@ -70,7 +70,13 @@ export interface WafIntelSnapshot {
     readonly moved: Readonly<Record<string, number>>;
 }
 
-export const EMPTY_WAF_INTEL: WafIntelSnapshot = { v: WAF_INTEL_VERSION, at: 0, ips: {}, cidrs: [], moved: {} };
+export const EMPTY_WAF_INTEL: WafIntelSnapshot = {
+    v: WAF_INTEL_VERSION,
+    at: 0,
+    ips: {},
+    cidrs: [],
+    moved: {}
+};
 
 /**
  * The snapshot as the guard queries it. Built once per file read, then asked once
@@ -208,7 +214,10 @@ const SIGN_IN_EXACT = new Set([
 
 /** Whether a reputation entry is to be stepped over for this request path. Only
  *  reputation, only these paths, and never a path that walks out of them with `..`. */
-export function reputationSparesPath(entry: WafIntelEntry, path: string | null | undefined): boolean {
+export function reputationSparesPath(
+    entry: WafIntelEntry,
+    path: string | null | undefined
+): boolean {
     if (entry.reason !== "reputation" || !path) return false;
     if (path.includes("..") || path.includes("%2e") || path.includes("%2E")) return false;
     return SIGN_IN_EXACT.has(path) || SIGN_IN_PREFIXES.some((prefix) => path.startsWith(prefix));

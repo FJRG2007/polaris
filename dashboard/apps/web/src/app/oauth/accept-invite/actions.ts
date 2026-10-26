@@ -31,20 +31,28 @@ export async function lookupInviteCodeAction(
     const parsed = inviteCodeField.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0]?.message;
-        return { error: issue === undefined ? t("invite.errors.invalidCode") : validationMessage(tv, issue) };
+        return {
+            error:
+                issue === undefined ? t("invite.errors.invalidCode") : validationMessage(tv, issue)
+        };
     }
     const { invite, refusal } = await resolveInvite({ code: parsed.data }, await clientIp());
     if (!invite) return { error: validationMessage(tv, INVITE_REFUSALS[refusal ?? "unavailable"]) };
     return { invite: { email: invite.email, needsPassword: invite.needsPassword } };
 }
 
-export async function acceptInviteAction(input: unknown): Promise<{ email?: string; error?: string }> {
+export async function acceptInviteAction(
+    input: unknown
+): Promise<{ email?: string; error?: string }> {
     const t = await getTranslations("auth");
     const tv = await getTranslations("validation");
     const parsed = claimInviteSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0]?.message;
-        return { error: issue === undefined ? t("invite.errors.invalidInput") : validationMessage(tv, issue) };
+        return {
+            error:
+                issue === undefined ? t("invite.errors.invalidInput") : validationMessage(tv, issue)
+        };
     }
     const { token, code, oneTimePassword, name, username, password } = parsed.data;
     if (!token && !code) return { error: t("invite.errors.missingToken") };
