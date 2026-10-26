@@ -68,6 +68,12 @@ vi.mock("../../src/lib/tasks/automation-service", () => ({
     hasAutomationsFor
 }));
 
+// The closer's calendar, for the day a recurring job comes back on. Stubbed
+// rather than loaded: the real module pulls in the session and its environment.
+vi.mock("@/lib/display-prefs-service", () => ({
+    resolveDisplayPreferencesFor: async () => ({ timeZone: "UTC" })
+}));
+
 const { bulkUpdate } = await import("../../src/lib/tasks/task-service");
 
 function row(overrides: Partial<BeforeRow> & { id: string }): BeforeRow {
