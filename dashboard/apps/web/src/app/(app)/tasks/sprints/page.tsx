@@ -10,6 +10,7 @@ import { listSpaceTree } from "@/lib/tasks/space-service";
 import { SprintsView } from "@/app/(app)/tasks/planning-view";
 import { shelfScope, type TaskActor } from "@/lib/tasks/access";
 import { listSprints, sprintBurndown } from "@/lib/tasks/planning-service";
+import { readerZone } from "@/lib/tasks/report-service";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +37,12 @@ export default async function SprintsPage() {
     const named = sprints.map((sprint) => ({ ...sprint, spaceName: spaceNames.get(sprint.spaceId) ?? "" }));
 
     const burndowns: Record<string, BurndownPoint[]> = {};
+    // Drawn on the server, so the days of the line are the reader's, not UTC's.
+    const zone = await readerZone(user.id);
     for (const sprint of named) {
         // Only sprints that are running or finished have a line worth drawing; a
         // planned one is a straight edge nobody learns anything from.
-        if (sprint.status !== "planned") burndowns[sprint.id] = await sprintBurndown(sprint.id);
+        if (sprint.status !== "planned") burndowns[sprint.id] = await sprintBurndown(sprint.id, new Date(), zone);
     }
 
     return (

@@ -23,6 +23,7 @@ import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import { TaskRefusal } from "./refusal";
 import { requireTask } from "./access";
+import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 
 export interface AutomationEventInput {
     readonly trigger: core.AutomationTrigger;
@@ -292,6 +293,11 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
     const watching = await followersOf(involved.map((record) => record.id));
 
     const now = new Date();
+    // "Due today" and "overdue" in a rule are read on the calendar of whoever set
+    // it off; with nobody behind the event, the server's own.
+    const zone = event.actorId
+        ? (await resolveDisplayPreferencesFor(event.actorId)).timeZone
+        : core.AUTOMATIC_TIME_ZONE;
     // Counted rather than incremented per run: a rule that fired on forty rows is
     // forty runs and one write.
     const runs = new Map<string, number>();
@@ -315,7 +321,8 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
         const selected = core.selectAutomations(
             scoped,
             { trigger: event.trigger, task: facts },
-            now
+            now,
+            zone
         );
 
         for (const rule of selected) {

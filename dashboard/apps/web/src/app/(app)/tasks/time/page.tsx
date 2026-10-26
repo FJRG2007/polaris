@@ -24,13 +24,19 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const scope = await shelfScope(actor);
 
-    const weekStartsOn = weekStartIndex((await resolveDisplayPreferencesFor(user.id)).weekStart);
+    const prefs = await resolveDisplayPreferencesFor(user.id);
+    const weekStartsOn = weekStartIndex(prefs.weekStart);
+    const zone = prefs.timeZone;
     const offset = Number(week ?? "0");
-    const anchor = addDays(startOfWeek(new Date(), weekStartsOn), Number.isFinite(offset) ? offset * 7 : 0);
+    const anchor = addDays(
+        startOfWeek(new Date(), weekStartsOn, zone),
+        Number.isFinite(offset) ? offset * 7 : 0,
+        zone
+    );
 
     const [tree, sheet, timer] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),
-        weeklyTimesheet(user.id, anchor, scope, weekStartsOn),
+        weeklyTimesheet(user.id, anchor, scope, weekStartsOn, zone),
         runningTimer(user.id)
     ]);
 
