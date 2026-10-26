@@ -24,7 +24,11 @@ RUN cargo build --release -p polaris-hostd
 # privileged host operations and reaches the Docker socket. It listens on a
 # unix socket (0660) guarded by a per-run bearer token.
 # ---------------------------------------------------------------------------
-FROM alpine:3
+# Pinned to the Alpine minor so a rebuild never moves to a new release on its
+# own; `apk upgrade` below picks up that branch's fixes on every rebuild. The
+# daemon installs NUT and cifs-utils from the same branch on first use
+# (src/packages.rs), so bumping this line moves those too.
+FROM alpine:3.24
 
 # docker-cli drives builds/pulls; tar unpacks the build context for Nixpacks.
 # Nixpacks (best-effort, arch-aware) auto-builds repos that ship no Dockerfile; if
@@ -33,11 +37,18 @@ ARG TARGETARCH
 ARG NIXPACKS_VERSION=1.29.0
 # docker-cli-compose is REQUIRED: deploys run `docker compose up`. Without the
 # plugin the daemon has no `compose` subcommand and every deploy fails.
-# nut provides usbhid-ups/snmp-ups/upsd for /v1/ups: the daemon finds a UPS on
-# the USB bus and runs NUT for it, with upsd bound to 127.0.0.1 only.
-# cifs-utils/nfs-utils provide mount.cifs/mount.nfs so the daemon can kernel-mount
-# NAS shares (SMB/NFS) for nas volumes; without them `mount -t cifs` fails.
-RUN apk add --no-cache docker-cli docker-cli-compose docker-cli-buildx tar ca-certificates cifs-utils nfs-utils nut \
+# docker-cli-buildx stays: `docker build` and compose builds need BuildKit, and
+# without it any Dockerfile using `RUN --mount` fails. The Alpine packages carry
+# the same Go modules as Docker's own release binaries of the same versions, so
+# swapping them for those would change nothing; newer releases arrive through
+# `apk upgrade`.
+# nfs-utils provides mount.nfs so the daemon can kernel-mount NFS shares.
+# nut (/v1/ups) and cifs-utils (SMB shares) are NOT here: their libraries carry
+# advisories with no fix (libmodbus, net-snmp, libwbclient) and most hosts never
+# use either, so the daemon installs each the first time it is needed and keeps
+# the packages on its cache volume for the next start.
+RUN apk upgrade --no-cache \
+    && apk add --no-cache docker-cli docker-cli-compose docker-cli-buildx tar ca-certificates nfs-utils \
     && case "$TARGETARCH" in \
         arm64) NARCH=aarch64 ;; \
         *) NARCH=x86_64 ;; \

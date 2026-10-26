@@ -20,6 +20,7 @@ mod handlers;
 mod host_security;
 mod http;
 mod networks;
+mod packages;
 mod security;
 mod server;
 mod ups;

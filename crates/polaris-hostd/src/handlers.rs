@@ -76,8 +76,8 @@ fn capabilities(config: &Config) -> serde_json::Value {
         "kubernetes": kubernetes,
         "systemd": path_exists("/run/systemd/system"),
         "autoUpdate": config.auto_update,
-        // NUT is in this image: `/v1/ups` can find and drive a UPS.
-        "ups": ups::nut_installed(),
+        // `/v1/ups` can find and drive a UPS: NUT is installed on first use.
+        "ups": ups::nut_available(),
     })
 }
 
@@ -1385,9 +1385,10 @@ fn host_gpu() -> Response {
 }
 
 /// Every UPS on this host's USB bus with its NUT variables. `available: false`
-/// from an image that predates NUT, so the dashboard can say an update adds it.
+/// from an image that can neither run NUT nor install it, so the dashboard can
+/// say an update adds it.
 fn ups_list() -> Response {
-    if !ups::nut_installed() {
+    if !ups::nut_available() {
         return Response::json(
             200,
             "OK",
@@ -1428,7 +1429,7 @@ fn ups_snmp<R: Read>(req: &Request, body: &mut R) -> Response {
     if let Err(why) = source.validate() {
         return Response::bad_request(why);
     }
-    if !ups::nut_installed() {
+    if !ups::nut_available() {
         return Response::json(200, "OK", &serde_json::json!({ "available": false }));
     }
     let name = source.name();
@@ -1476,7 +1477,7 @@ fn ups_snmp_set<R: Read>(req: &Request, body: &mut R) -> Response {
             return Response::bad_request(why);
         }
     }
-    if !ups::nut_installed() {
+    if !ups::nut_available() {
         return Response::json(200, "OK", &serde_json::json!({ "available": false }));
     }
     match ups::set_snmp(request.sources) {
@@ -1549,7 +1550,7 @@ fn ups_netserver<R: Read>(req: &Request, body: &mut R) -> Response {
     let Ok(request) = serde_json::from_slice::<UpsNetserverRequest>(&raw) else {
         return Response::bad_request("invalid UPS network setting");
     };
-    if !ups::nut_installed() {
+    if !ups::nut_available() {
         return Response::json(200, "OK", &serde_json::json!({ "available": false }));
     }
     match ups::set_netserver(request.netserver) {
@@ -1865,6 +1866,12 @@ fn mount_command(
         MountKind::Smb => "cifs",
         MountKind::Nfs => "nfs",
     };
+    // `mount.cifs` is not in the image (its libraries carry open advisories and
+    // most hosts never mount SMB); it is installed here the first time a share
+    // needs it, which every container start repeats from the kept cache.
+    if request.kind == MountKind::Smb {
+        crate::packages::ensure(crate::packages::Tool::Cifs).map_err(MountError::Failed)?;
+    }
     // For CIFS credentials, write a 0600 credentials file on the daemon's tmpfs and
     // pass `credentials=<file>` - so the password never shows in `ps`/argv or the
     // mount table. Removed right after the mount call (the kernel keeps the session).
