@@ -89,7 +89,9 @@ async function publishIps(ips) {
         await writeAtomic(IPS_FILE, `${text}\n`);
         await writeAtomic(IP_FILE, `${ips[0]}\n`);
         if (publishedIps !== null) {
-            process.stdout.write(`polaris-mdns: address changed, advertising ${FQDN} -> ${ips[0]}\n`);
+            process.stdout.write(
+                `polaris-mdns: address changed, advertising ${FQDN} -> ${ips[0]}\n`
+            );
             // Join the multicast group on the interface that just appeared; the
             // socket only joined the ones that existed when it opened.
             mdns.update?.();
@@ -104,7 +106,9 @@ async function publishIps(ips) {
         // explain why - the likeliest cause being a root-owned mountpoint.
         if (error.code !== publishFailure) {
             publishFailure = error.code;
-            console.error(`mdns: could not publish the host address to ${IP_FILE}: ${error.message}`);
+            console.error(
+                `mdns: could not publish the host address to ${IP_FILE}: ${error.message}`
+            );
         }
     }
 }
@@ -143,10 +147,16 @@ mdns.on("query", (query) => {
         if ((question.type === "A" || question.type === "ANY") && name === FQDN) answers.push(r.a);
         // Any <app>.plr.local resolves to this host, so deployed apps get a clean LAN
         // hostname (Traefik then routes each name to its app).
-        if ((question.type === "A" || question.type === "ANY") && name.endsWith(APP_DOMAIN_SUFFIX)) {
+        if (
+            (question.type === "A" || question.type === "ANY") &&
+            name.endsWith(APP_DOMAIN_SUFFIX)
+        ) {
             answers.push({ name: question.name, type: "A", ttl: TTL, data: r.a.data });
         }
-        if (question.type === "PTR" && (name === SERVICE_TYPE || name === "_services._dns-sd._udp.local")) {
+        if (
+            question.type === "PTR" &&
+            (name === SERVICE_TYPE || name === "_services._dns-sd._udp.local")
+        ) {
             answers.push(r.ptr, r.srv, r.txt, r.a);
         }
         if ((question.type === "SRV" || question.type === "ANY") && name === SERVICE_NAME) {

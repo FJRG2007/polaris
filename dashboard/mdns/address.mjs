@@ -21,7 +21,9 @@ const WIRELESS = /^(wl|wifi|ath\d|ra\d)/;
  */
 export function defaultRouteInterfaces(routeTable) {
     const routes = [];
-    for (const line of String(routeTable ?? "").split("\n").slice(1)) {
+    for (const line of String(routeTable ?? "")
+        .split("\n")
+        .slice(1)) {
         const fields = line.trim().split(/\s+/);
         if (fields.length < 8) continue;
         const [name, destination, , flags, , , metric, mask] = fields;

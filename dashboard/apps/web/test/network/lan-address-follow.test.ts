@@ -9,16 +9,26 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@polaris/db", () => ({ prisma: { user: { findMany: async () => [] } } }));
-vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null, setSetting: async () => undefined }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    setSetting: async () => undefined
+}));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => () => "" }));
 vi.mock("@/lib/notification-service", () => ({ createNotification: async () => undefined }));
-vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => null, getHostLanIps: async () => [] }));
+vi.mock("@/lib/host-address", () => ({
+    getHostLanIp: async () => null,
+    getHostLanIps: async () => []
+}));
 
-const { followLanAddress, lanAddressChange, LAN_ADDRESS_KEY, LAN_HISTORY_KEY } = await import(
-    "@/lib/lan-address-follow"
-);
+const { followLanAddress, lanAddressChange, LAN_ADDRESS_KEY, LAN_HISTORY_KEY } =
+    await import("@/lib/lan-address-follow");
 
-function harness(current: string | null, last: string | null, dnsMoves = false, held: string[] = []) {
+function harness(
+    current: string | null,
+    last: string | null,
+    dnsMoves = false,
+    held: string[] = []
+) {
     const store = new Map<string, string>(last ? [[LAN_ADDRESS_KEY, last]] : []);
     const steps = {
         current: vi.fn(async () => current),
@@ -36,7 +46,10 @@ function harness(current: string | null, last: string | null, dnsMoves = false, 
 
 describe("lanAddressChange", () => {
     it("tells a first sighting, a move and nothing apart", () => {
-        expect(lanAddressChange(null, "192.168.1.20")).toEqual({ kind: "first", to: "192.168.1.20" });
+        expect(lanAddressChange(null, "192.168.1.20")).toEqual({
+            kind: "first",
+            to: "192.168.1.20"
+        });
         expect(lanAddressChange("192.168.1.20", "10.0.0.5")).toEqual({
             kind: "moved",
             from: "192.168.1.20",
@@ -50,7 +63,9 @@ describe("lanAddressChange", () => {
     });
 
     it("does not treat a change of preferred link as a move while the old address is held", () => {
-        expect(lanAddressChange("192.168.1.20", "192.168.1.31", ["192.168.1.31", "192.168.1.20"])).toEqual({
+        expect(
+            lanAddressChange("192.168.1.20", "192.168.1.31", ["192.168.1.31", "192.168.1.20"])
+        ).toEqual({
             kind: "none"
         });
         expect(lanAddressChange("192.168.1.20", "192.168.1.31", ["192.168.1.31"])).toEqual({

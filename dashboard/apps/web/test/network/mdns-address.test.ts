@@ -30,7 +30,9 @@ describe("the default route", () => {
 
     it("ignores a route that is down and a table that cannot be read", () => {
         expect(
-            defaultRouteInterfaces(routes("eth0\t00000000\t0101A8C0\t0002\t0\t0\t0\t00000000\t0\t0\t0"))
+            defaultRouteInterfaces(
+                routes("eth0\t00000000\t0101A8C0\t0002\t0\t0\t0\t00000000\t0\t0\t0")
+            )
         ).toEqual([]);
         expect(defaultRouteInterfaces("")).toEqual([]);
         expect(defaultRouteInterfaces(undefined)).toEqual([]);

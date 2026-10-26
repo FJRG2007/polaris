@@ -60,13 +60,19 @@ export async function recordHostDockerId(hostId: string, dockerId: string): Prom
     if (!dockerId) return;
     // Only on a change: this runs once per host per minute, and the row is read
     // on every Watch render.
-    await prisma.host.updateMany({ where: { id: hostId, dockerId: { not: dockerId } }, data: { dockerId } });
+    await prisma.host.updateMany({
+        where: { id: hostId, dockerId: { not: dockerId } },
+        data: { dockerId }
+    });
 }
 
 /** The daemon id of the machine Polaris runs on, or null before it has been
  *  sampled. Callers compare it against a host's own `dockerId`. */
 export async function localDockerId(): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key: LOCAL_DOCKER_ID_KEY }, select: { value: true } });
+    const row = await prisma.setting.findUnique({
+        where: { key: LOCAL_DOCKER_ID_KEY },
+        select: { value: true }
+    });
     return row?.value || null;
 }
 

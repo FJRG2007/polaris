@@ -9,6 +9,7 @@ export interface InterfaceAddress {
 export function defaultRouteInterfaces(routeTable: string | null | undefined): string[];
 
 export function lanAddresses(
-    interfaces: Readonly<Record<string, readonly InterfaceAddress[] | undefined>> | null | undefined,
+    interfaces:
+        Readonly<Record<string, readonly InterfaceAddress[] | undefined>> | null | undefined,
     routeTable: string | null | undefined
 ): string[];

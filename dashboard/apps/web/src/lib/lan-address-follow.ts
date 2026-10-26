@@ -79,7 +79,9 @@ export interface LanFollowResult {
  * consumer that can be left behind by a pass that failed half-way, or by an
  * install that moved before this existed.
  */
-export async function followLanAddress(steps: LanFollowSteps = defaultSteps()): Promise<LanFollowResult> {
+export async function followLanAddress(
+    steps: LanFollowSteps = defaultSteps()
+): Promise<LanFollowResult> {
     const current = await steps.current().catch(() => null);
     const held = await steps.held().catch((): string[] => []);
     const last = await steps.read(LAN_ADDRESS_KEY).catch(() => null);
@@ -87,7 +89,10 @@ export async function followLanAddress(steps: LanFollowSteps = defaultSteps()): 
     if (change.kind !== "none") await steps.write(LAN_ADDRESS_KEY, change.to);
 
     const dns = await steps.dns().catch((error: unknown) => {
-        console.error("polaris: the network filter could not follow this machine's address:", error);
+        console.error(
+            "polaris: the network filter could not follow this machine's address:",
+            error
+        );
         return null;
     });
     if (change.kind !== "moved") return { change, dnsMoved: dns !== null };
@@ -96,7 +101,9 @@ export async function followLanAddress(steps: LanFollowSteps = defaultSteps()): 
     await recordMove(steps, change.from, change.to).catch(() => undefined);
     await steps
         .certificate()
-        .catch((error: unknown) => console.error("polaris: local certificate not reissued:", error));
+        .catch((error: unknown) =>
+            console.error("polaris: local certificate not reissued:", error)
+        );
     await steps
         .announce(change.from, change.to, dns !== null)
         .catch((error: unknown) => console.error("polaris: address move not announced:", error));
