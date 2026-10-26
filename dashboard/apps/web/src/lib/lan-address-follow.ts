@@ -165,6 +165,24 @@ const lanMoveSchema = z.object({
 
 export type LanMove = z.infer<typeof lanMoveSchema>;
 
+/** A recent move with the links that reach this Polaris after it. */
+export interface LanMoveNotice extends LanMove {
+    readonly links: readonly string[];
+}
+
+/**
+ * The links that reach this Polaris after a move: the new address, and the name
+ * the responder advertises on the LAN over plain HTTP, as the deployment's own
+ * address list offers it (`deployment-addresses.ts`). Pure.
+ */
+export function lanMoveLinks(
+    move: Pick<LanMove, "to">,
+    env: Readonly<Record<string, string | undefined>> = process.env
+): string[] {
+    const name = env.POLARIS_MDNS_HOSTNAME || env.POLARIS_LOCAL_HOSTNAME || "polaris";
+    return [`https://${move.to}`, `http://${name}.local`];
+}
+
 /**
  * The newest recorded move, while it is recent enough to show. The history is
  * stored JSON an older build may have written, so anything that does not parse

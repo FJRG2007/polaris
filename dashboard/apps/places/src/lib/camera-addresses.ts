@@ -18,6 +18,7 @@
 import { prisma } from "@polaris/db";
 import { cameraTarget } from "./cameras";
 import { locateMac, macsAt } from "./integrations/mac-locate";
+import { endCameraTalk } from "./talk";
 import { keepsWarm, publishCamera, type RelayEndpoint } from "./relay";
 
 /** One camera, as this needs it. */
@@ -43,21 +44,22 @@ function followable(camera: Pick<FollowedCamera, "reachVia" | "address">): boole
 }
 
 /**
- * Record the hardware address of each of these cameras that just answered and
- * has none yet. This is also how every camera added before the column existed
- * gets one: on the next pass it answers in.
+ * Record the hardware address of each of these cameras that just answered, when
+ * it has none yet or a different unit now answers at its address. This is also
+ * how every camera added before the column existed gets one: on the next pass it
+ * answers in.
  *
  * Returns how many were recorded. Never throws.
  */
 export async function recordCameraHardware(cameras: readonly FollowedCamera[]): Promise<number> {
-    const wanting = cameras.filter((camera) => !camera.hardwareAddress && followable(camera));
+    const wanting = cameras.filter(followable);
     if (wanting.length === 0) return 0;
     let recorded = 0;
     try {
         const macs = await macsAt([...new Set(wanting.map((camera) => camera.address.trim()))]);
         for (const camera of wanting) {
             const mac = macs.get(camera.address.trim());
-            if (!mac) continue;
+            if (!mac || mac === camera.hardwareAddress) continue;
             await prisma.camera.update({ where: { id: camera.id }, data: { hardwareAddress: mac } });
             recorded += 1;
         }
@@ -85,6 +87,7 @@ export async function relocateCamera(
         const address = await locateMac(camera.hardwareAddress, { fresh: true, avoid: current });
         if (!address || address === current) return null;
         await prisma.camera.update({ where: { id: camera.id }, data: { address } });
+        await endCameraTalk(camera.id);
         const target = await cameraTarget(camera.installedAppId, camera.id);
         if (target && camera.enabled && !camera.privacy)
             await publishCamera(endpoint, target, camera.vendor, { warm: keepsWarm(camera) });

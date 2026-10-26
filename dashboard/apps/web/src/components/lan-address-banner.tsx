@@ -11,7 +11,7 @@
 
 import { Network, X } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
-import type { LanMove } from "@/lib/lan-address-follow";
+import type { LanMoveNotice } from "@/lib/lan-address-follow";
 import { useCallback, useEffect, useState } from "react";
 import { useLiveRead } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -20,11 +20,6 @@ import { lanAddressMoveAction } from "@/app/(app)/lan-address-actions";
 /** A move is rare; once every few minutes is plenty to notice one. */
 const REFRESH_MS = 5 * 60_000;
 const DISMISSED = "polaris.lanMove.dismissed";
-
-/** The links that reach this Polaris after a move. */
-export function lanMoveLinks(move: Pick<LanMove, "to">): string[] {
-    return [`https://${move.to}`, "https://polaris.local"];
-}
 
 function readDismissed(): string | null {
     try {
@@ -40,7 +35,7 @@ export function LanAddressBanner() {
     useEffect(() => setDismissed(readDismissed()), []);
 
     const load = useCallback(() => lanAddressMoveAction(), []);
-    const { data: move } = useLiveRead<LanMove | null>({
+    const { data: move } = useLiveRead<LanMoveNotice | null>({
         load,
         cacheKey: "lan-address-move",
         intervalMs: REFRESH_MS
@@ -68,7 +63,7 @@ export function LanAddressBanner() {
                     {t("lanMove.body", { from: move.from })}
                 </p>
                 <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                    {lanMoveLinks(move).map((link) => (
+                    {(move.links ?? []).map((link) => (
                         <li key={link} className="flex min-w-0 items-center gap-1">
                             <a
                                 href={link}
@@ -86,7 +81,7 @@ export function LanAddressBanner() {
                 type="button"
                 aria-label={t("lanMove.dismiss")}
                 title={t("lanMove.dismiss")}
-                className="shrink-0 rounded p-1 opacity-70 hover:opacity-100"
+                className="-m-1.5 inline-flex size-11 shrink-0 items-center justify-center rounded opacity-70 hover:opacity-100 sm:m-0 sm:size-7"
                 onClick={dismiss}
             >
                 <X className="size-4 shrink-0" aria-hidden />

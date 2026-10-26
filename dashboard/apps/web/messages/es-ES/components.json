@@ -1550,7 +1550,7 @@
     "lanMove": {
         "title": "Polaris está ahora en {to}",
         "body": "La dirección de este servidor en tu red cambió desde {from}. Los enlaces a la dirección anterior ya no funcionan; usa uno de estos.",
-        "copy": "Copiar enlace",
+        "copy": "Copiar",
         "dismiss": "Descartar"
     },
     "diskAlert": {

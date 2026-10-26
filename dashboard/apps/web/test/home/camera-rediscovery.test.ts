@@ -39,6 +39,7 @@ const updates = vi.fn(async (args: { where: { id: string }; data: Partial<Camera
 });
 const published = vi.fn();
 const located = vi.fn();
+const talkEnded = vi.fn();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -88,6 +89,10 @@ vi.mock("@polaris-app/places/src/lib/cameras", () => ({
     }
 }));
 
+vi.mock("@polaris-app/places/src/lib/talk", () => ({
+    endCameraTalk: async (id: string) => talkEnded(id)
+}));
+
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
 vi.mock("@/lib/notifications/preferences", () => ({
     ruleFor: async () => ({ inapp: true, email: false, destinations: [] })
@@ -123,6 +128,7 @@ beforeEach(() => {
     updates.mockClear();
     published.mockClear();
     located.mockClear();
+    talkEnded.mockClear();
 });
 
 describe("camera rediscovery by hardware address", () => {
@@ -134,13 +140,22 @@ describe("camera rediscovery by hardware address", () => {
         expect(cameras[0]!.hardwareAddress).toBe(MAC);
     });
 
-    it("does not overwrite a MAC already recorded", async () => {
+    it("does not rewrite a MAC that still answers at the stored address", async () => {
+        cameras = [camera({ hardwareAddress: MAC })];
+        answeringAt.set("door", "192.168.1.20");
+        neighbours.set("192.168.1.20", MAC);
+        await sweepCameraReachability();
+        expect(cameras[0]!.hardwareAddress).toBe(MAC);
+        expect(updates.mock.calls.some(([args]) => "hardwareAddress" in args.data)).toBe(false);
+    });
+
+    it("takes the MAC of a different unit now answering at the stored address", async () => {
         cameras = [camera({ hardwareAddress: MAC })];
         answeringAt.set("door", "192.168.1.20");
         neighbours.set("192.168.1.20", "FF:FF:FF:FF:FF:FF");
         await sweepCameraReachability();
-        expect(cameras[0]!.hardwareAddress).toBe(MAC);
-        expect(updates.mock.calls.some(([args]) => "hardwareAddress" in args.data)).toBe(false);
+        expect(cameras[0]!.hardwareAddress).toBe("FF:FF:FF:FF:FF:FF");
+        expect(talkEnded).not.toHaveBeenCalled();
     });
 
     it("moves a quiet camera to where its MAC answers now and keeps it up", async () => {
@@ -151,6 +166,7 @@ describe("camera rediscovery by hardware address", () => {
         expect(cameras[0]!.address).toBe("10.0.0.7");
         expect(located).toHaveBeenCalledWith(MAC, "192.168.1.20");
         expect(published).toHaveBeenCalledWith("door", "10.0.0.7");
+        expect(talkEnded).toHaveBeenCalledWith("door");
         expect(cameras[0]!.offlineSince).toBeNull();
         expect(sweep.probed).toBe(1);
     });

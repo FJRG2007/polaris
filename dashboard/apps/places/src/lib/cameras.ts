@@ -367,7 +367,7 @@ export async function updateCamera(
         where: { id },
         data: {
             ...(battery ? { offlineSince: null } : {}),
-            ...(moved ? { controlPin: null } : {}),
+            ...(moved ? { controlPin: null, hardwareAddress: null } : {}),
             placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,

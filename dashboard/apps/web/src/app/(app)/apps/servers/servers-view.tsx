@@ -764,15 +764,16 @@ function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerS
     if (!status)
         return <span className="text-xs text-muted-foreground">{t("status.checking")}</span>;
     if (status.state === "down") {
+        const label = status.downSince
+            ? t("status.downSince", { since: format.dateTime(status.downSince) })
+            : t("status.noAnswer");
         return (
             <Badge
                 variant="danger"
                 className="max-w-full min-w-0 truncate"
-                title={status.detail ?? undefined}
+                title={status.detail ? `${label} - ${status.detail}` : label}
             >
-                {status.downSince
-                    ? t("status.downSince", { since: format.dateTime(status.downSince) })
-                    : t("status.noAnswer")}
+                {label}
             </Badge>
         );
     }

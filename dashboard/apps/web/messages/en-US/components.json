@@ -1550,7 +1550,7 @@
     "lanMove": {
         "title": "Polaris is now at {to}",
         "body": "This server's address on your network changed from {from}. Links to the old address no longer work; use one of these.",
-        "copy": "Copy link",
+        "copy": "Copy",
         "dismiss": "Dismiss"
     },
     "diskAlert": {
