@@ -143,6 +143,20 @@ export const PROBLEM_KEYS: Readonly<Record<DictationProblem, NamespaceKey<"chat"
     failed: "dictation.problem.failed"
 };
 
+/** The sentences that point at the "Private dictation" switch, for a mic menu
+ *  that has it. */
+export const PRIVATE_SWITCH_KEYS: Readonly<Partial<Record<DictationProblem, NamespaceKey<"chat">>>> = {
+    serviceBlocked: "dictation.problemWithPrivate.serviceBlocked",
+    network: "dictation.problemWithPrivate.network",
+    language: "dictation.problemWithPrivate.language",
+    notSetUp: "dictation.problemWithPrivate.notSetUp"
+};
+
+/** The sentence for a problem, naming the switch only where it is on screen. */
+export function problemKey(problem: DictationProblem, privateSwitch: boolean): NamespaceKey<"chat"> {
+    return (privateSwitch ? PRIVATE_SWITCH_KEYS[problem] : undefined) ?? PROBLEM_KEYS[problem];
+}
+
 /**
  * A browser recognizer's error as a problem, or null for one that is not worth
  * a sentence (a stop somebody asked for). The codes are the ones

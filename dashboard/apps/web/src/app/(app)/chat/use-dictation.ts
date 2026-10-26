@@ -87,6 +87,9 @@ export interface Dictation {
     readonly problem: DictationProblem | null;
     readonly start: () => void;
     readonly stop: () => void;
+    /** Ends dictation and drops whatever it has not handed over yet - for a box
+     *  that was emptied or now belongs to another conversation. */
+    readonly cancel: () => void;
     readonly clearProblem: () => void;
 }
 
@@ -106,6 +109,9 @@ export function useDictation(options: {
     latest.current = options;
     /** Whatever ends the session that is running, or null. */
     const ending = useRef<(() => void) | null>(null);
+    /** Each session's way of dropping what it has still to hand over, kept
+     *  past a stop since a stopped session may still deliver its last words. */
+    const leftovers = useRef(new Set<() => void>());
 
     const stop = useCallback(() => {
         const end = ending.current;
@@ -131,6 +137,7 @@ export function useDictation(options: {
         let quick = 0;
         let silent = 0;
         let startedAt = 0;
+        let dropped = false;
         let recognizer: Recognizer;
         const open = () => {
             recognizer = new Constructor();
@@ -139,6 +146,7 @@ export function useDictation(options: {
             recognizer.interimResults = true;
             recognizer.maxAlternatives = 1;
             recognizer.onresult = (event) => {
+                if (dropped) return;
                 let guess = "";
                 for (let at = event.resultIndex; at < event.results.length; at++) {
                     const result = event.results[at]!;
@@ -157,6 +165,7 @@ export function useDictation(options: {
             recognizer.onsoundstart = () => setLevel(60);
             recognizer.onsoundend = () => setLevel(0);
             recognizer.onerror = (event) => {
+                if (!wanted) return;
                 // "no-speech" ends a quiet stretch, and listening goes on after
                 // it - twice in a row with nothing said is somebody who has
                 // stopped talking.
@@ -199,6 +208,15 @@ export function useDictation(options: {
                 // Already ended.
             }
         };
+        leftovers.current.add(() => {
+            dropped = true;
+            wanted = false;
+            try {
+                recognizer.abort();
+            } catch {
+                // Already ended.
+            }
+        });
     }, [fail]);
 
     const startPrivate = useCallback(() => {
@@ -228,7 +246,11 @@ export function useDictation(options: {
                 }
                 if (abort.signal.aborted) return;
                 if ("error" in heard) {
-                    setProblem(privateProblem(heard.error));
+                    const problem = privateProblem(heard.error);
+                    // A refusal that the next chunk would meet too ends the
+                    // session rather than leaving the microphone posting into it.
+                    if (problem !== "failed" && !stopped) fail(problem);
+                    else setProblem(problem);
                     return;
                 }
                 const said = heard.text.trim();
@@ -307,34 +329,45 @@ export function useDictation(options: {
                     }
                 }, TICK_MS);
             })
-            .catch(() => {
-                if (!stopped) fail("micBlocked");
+            .catch((error: unknown) => {
+                if (!stopped) fail(micProblem(error));
             });
 
         // Leaving the conversation drops what is still on its way; a stop the
         // person asked for lets the last chunk through.
-        return () => abort.abort();
+        leftovers.current.add(() => {
+            abort.abort();
+            release();
+        });
     }, [fail, stop]);
-
-    /** Cancels the private engine's requests when the box goes away. */
-    const cancelPending = useRef<(() => void) | null>(null);
 
     const start = useCallback(() => {
         if (ending.current) return;
         setProblem(null);
         const engine = latest.current.engine;
         if (engine === "browser") startBrowser();
-        else if (engine === "private") cancelPending.current = startPrivate() ?? null;
+        else if (engine === "private") startPrivate();
     }, [startBrowser, startPrivate]);
+
+    const dropLeftovers = useCallback(() => {
+        const drops = [...leftovers.current];
+        leftovers.current.clear();
+        for (const drop of drops) drop();
+    }, []);
+
+    const cancel = useCallback(() => {
+        ending.current = null;
+        dropLeftovers();
+        stop();
+    }, [dropLeftovers, stop]);
 
     // Gone with the box: a conversation left, a route changed.
     useEffect(
         () => () => {
-            ending.current?.();
             ending.current = null;
-            cancelPending.current?.();
+            dropLeftovers();
         },
-        []
+        [dropLeftovers]
     );
 
     // A hidden tab is not somebody dictating, and a live microphone behind
@@ -362,8 +395,20 @@ export function useDictation(options: {
         problem,
         start,
         stop,
+        cancel,
         clearProblem
     };
+}
+
+/** A refused microphone as a problem: a missing or busy device is not one the
+ *  site settings can fix. */
+function micProblem(error: unknown): DictationProblem {
+    const name = error instanceof DOMException ? error.name : "";
+    if (name === "NotFoundError" || name === "NotReadableError" || name === "OverconstrainedError") {
+        return "noMic";
+    }
+    if (name === "NotAllowedError" || name === "SecurityError") return "micBlocked";
+    return "failed";
 }
 
 /** How long one answer about private dictation is trusted in this tab. */

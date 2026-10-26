@@ -125,10 +125,21 @@ describe("dictation problems", () => {
         expect(logic.privateProblem("transcribe_failed")).toBe("failed");
     });
 
+    it("points at the Private dictation switch only where the mic menu has it", () => {
+        expect(logic.problemKey("network", true)).toBe("dictation.problemWithPrivate.network");
+        expect(logic.problemKey("network", false)).toBe("dictation.problem.network");
+        expect(logic.problemKey("notSetUp", false)).toBe("dictation.problem.notSetUp");
+        expect(logic.problemKey("tooMany", true)).toBe("dictation.problem.tooMany");
+        const t = webCatalogs.translator("en-US", "chat");
+        for (const problem of Object.keys(logic.PROBLEM_KEYS) as (keyof typeof logic.PROBLEM_KEYS)[]) {
+            expect(t(logic.problemKey(problem, false))).not.toMatch(/Private dictation|set up/i);
+        }
+    });
+
     it("has a sentence for each, in English and Spanish", () => {
         for (const locale of ["en-US", "es-ES"] as const) {
             const t = webCatalogs.translator(locale, "chat");
-            for (const key of Object.values(logic.PROBLEM_KEYS)) {
+            for (const key of [...Object.values(logic.PROBLEM_KEYS), ...Object.values(logic.PRIVATE_SWITCH_KEYS)]) {
                 const said = t(key);
                 expect(said).not.toBe(key);
                 expect(said.length).toBeGreaterThan(10);

@@ -70,7 +70,7 @@ import {
     composerSlot,
     dictationEngine,
     privateDictation,
-    PROBLEM_KEYS,
+    problemKey,
     setPrivateDictation,
     type AttachItem
 } from "./dictation-logic";
@@ -96,6 +96,9 @@ const TYPING_EVERY_MS = 2500;
 /** How close to the length limit the counter appears. Showing it from the first
  *  character would put a number on a field nobody is near the end of. */
 const COUNTER_WITHIN = 200;
+
+/** Whatever closes on Escape by itself, which dictation leaves the key to. */
+const ESCAPE_OWNERS = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
 export function Composer({
     channelId,
@@ -398,6 +401,8 @@ export function Composer({
     const engine = inCall
         ? null
         : dictationEngine({ browser: browserSpeech, private: canPrivate, preferPrivate });
+    /** The "Private dictation" switch is in the mic menu: there is a choice. */
+    const privateSwitch = browserSpeech && canPrivate;
     const dictation = useDictation({ engine, locale, onText: (text) => hand(text) });
     const dictationKey = useShortcutHint("chat.dictate");
     /** A voice message may be recorded here: it is a file, so only where files
@@ -575,14 +580,22 @@ export function Composer({
     /**
      * Escape stops dictation, ahead of backing out of an edit or a reply - it is
      * the most recent thing started. Caught on the way down so the other
-     * listener never sees it.
+     * listener never sees it - unless it is meant for a dialog or menu open over
+     * the box, or for another box on screen.
      */
+    const box = useRef<HTMLDivElement>(null);
     const dictating = dictation.active;
     const stopDictation = dictation.stop;
+    const cancelDictation = dictation.cancel;
     useEffect(() => {
         if (!dictating) return;
         const onKey = (event: KeyboardEvent) => {
             if (event.key !== "Escape") return;
+            const target = event.target instanceof Element ? event.target : null;
+            const owner = target?.closest(ESCAPE_OWNERS);
+            if (owner && !owner.contains(box.current)) return;
+            const other = target?.closest("[data-chat-composer]");
+            if (other && other !== box.current) return;
             event.preventDefault();
             event.stopPropagation();
             stopDictation();
@@ -593,7 +606,7 @@ export function Composer({
 
     // One composer serves whichever conversation is on screen: walking to
     // another one ends what was being said into this one.
-    useEffect(() => stopDictation, [channelId, draftKey, stopDictation]);
+    useEffect(() => cancelDictation, [channelId, draftKey, cancelDictation]);
 
     // Code points rather than length, so the count matches the one the server
     // makes: an emoji is one character to the person typing it and two to
@@ -689,8 +702,9 @@ export function Composer({
         if (disabled || tooLong || (!text && files.length === 0 && kept.length === 0)) return;
         // An edit that puts back the words already there changes nothing.
         if (editing && !isDirty(editing.body, text)) return onCancelEdit?.();
-        // Sending is the end of what was being said.
-        dictation.stop();
+        // Sending is the end of what was being said, and words still on their
+        // way would land in the box it just emptied.
+        dictation.cancel();
         const sending = files;
         const staying = kept;
         // The marks over both lists, in the order the server reads them: the
@@ -969,6 +983,8 @@ export function Composer({
 
     return (
         <div
+            ref={box}
+            data-chat-composer=""
             // The dictation key, while the focus is in this box: two boxes on
             // screen (a thread beside its channel) must not both start.
             onKeyDown={(event) => {
@@ -1220,7 +1236,7 @@ export function Composer({
             )}
             {dictation.problem && (
                 <p role="alert" className="mb-2 flex items-start gap-2 text-xs text-danger">
-                    <span className="min-w-0 flex-1">{t(PROBLEM_KEYS[dictation.problem])}</span>
+                    <span className="min-w-0 flex-1">{t(problemKey(dictation.problem, privateSwitch))}</span>
                     <button
                         type="button"
                         onClick={dictation.clearProblem}
@@ -1375,7 +1391,7 @@ export function Composer({
                                         onVoiceStop={voice.stop}
                                         onVoiceCancel={voice.cancel}
                                         privateChoice={
-                                            browserSpeech && canPrivate
+                                            privateSwitch
                                                 ? {
                                                       on: preferPrivate,
                                                       onChange: (on) => {

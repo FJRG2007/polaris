@@ -188,6 +188,9 @@ export function useVoiceRecording(
     const recorder = useRef<MediaRecorder | null>(null);
     const chunks = useRef<Blob[]>([]);
     const keep = useRef(true);
+    /** Bumped by every start and every stop, so a microphone that opens after
+     *  the press that asked for it was already let go is closed, not recorded. */
+    const attempt = useRef(0);
     const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
     const began = useRef(0);
     const measured = useRef<number[]>([]);
@@ -231,10 +234,16 @@ export function useVoiceRecording(
             return;
         }
         setError(null);
+        const current = ++attempt.current;
+        const abandoned = () => current !== attempt.current;
 
         void navigator.mediaDevices
             .getUserMedia({ audio: micConstraints() })
             .then(async (raw) => {
+                if (abandoned()) {
+                    for (const track of raw.getTracks()) track.stop();
+                    return;
+                }
                 // The same cleanup and the same level a call goes out at. A
                 // voice message recorded through the untouched microphone while
                 // calls have the model on it is the same person sounding like
@@ -246,6 +255,11 @@ export function useVoiceRecording(
                     null,
                     micGain()
                 ).catch(() => null);
+                if (abandoned()) {
+                    void built?.stop().catch(() => undefined);
+                    for (const track of raw.getTracks()) track.stop();
+                    return;
+                }
                 processed.current = built;
                 // What is recorded is what comes out of the graph; what is
                 // metered and what is stopped is still the microphone itself.
@@ -336,17 +350,20 @@ export function useVoiceRecording(
                 }, METER_EVERY_MS);
             })
             .catch(() => {
+                if (abandoned()) return;
                 setError("Polaris could not reach your microphone.");
             });
     }, [release]);
 
     const stop = useCallback(() => {
+        attempt.current++;
         keep.current = true;
         if (recorder.current?.state === "recording") recorder.current.stop();
         else release();
     }, [release]);
 
     const cancel = useCallback(() => {
+        attempt.current++;
         keep.current = false;
         if (recorder.current?.state === "recording") recorder.current.stop();
         else release();
@@ -354,6 +371,7 @@ export function useVoiceRecording(
 
     useEffect(() => {
         return () => {
+            attempt.current++;
             keep.current = false;
             if (recorder.current?.state === "recording") recorder.current.stop();
             release();

@@ -2054,14 +2054,20 @@
         "privateHelp": "Polaris writes it down instead of your browser.",
         "problem": {
             "micBlocked": "The microphone is blocked. Allow it in the browser's site settings, then try again.",
-            "serviceBlocked": "This browser turned dictation off. Try Private dictation in the mic menu, or send a voice message.",
+            "serviceBlocked": "This browser turned dictation off.",
             "noSpeech": "Nothing was heard. Tap the mic and speak.",
-            "network": "Dictation needs a connection. Check it, or try Private dictation in the mic menu.",
+            "network": "Dictation needs a connection. Check it and try again.",
             "noMic": "No microphone found. Plug one in or pick it in the mic menu.",
-            "language": "Dictation is not available in this language here. Try Private dictation in the mic menu.",
-            "notSetUp": "Private dictation is not set up. Turn it off in the mic menu.",
+            "language": "Dictation is not available in this language in this browser.",
+            "notSetUp": "Dictation is not available here yet. Your administrators can turn it on.",
             "tooMany": "Too many dictations for now. Wait a minute and try again.",
             "failed": "That could not be written down. Try again."
+        },
+        "problemWithPrivate": {
+            "serviceBlocked": "This browser turned dictation off. Try Private dictation in the mic menu, or send a voice message.",
+            "network": "Dictation needs a connection. Check it, or try Private dictation in the mic menu.",
+            "language": "Dictation is not available in this language here. Try Private dictation in the mic menu.",
+            "notSetUp": "Private dictation is not available here yet. Turn it off in the mic menu."
         }
     }
 }
