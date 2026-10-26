@@ -61,3 +61,26 @@ describe("getHostLanIp", () => {
         }
     });
 });
+
+describe("getHostLanIps", () => {
+    async function readAll(): Promise<string[]> {
+        vi.resetModules();
+        const { getHostLanIps } = await import("../../src/lib/host-address");
+        return getHostLanIps();
+    }
+
+    it("lists every LAN address the responder found, the advertised one first", async () => {
+        await writeFile(file, "192.168.1.20\n");
+        await writeFile(`${file}s`, "192.168.1.20\n192.168.1.31\n169.254.3.3\n");
+        expect(await readAll()).toEqual(["192.168.1.20", "192.168.1.31"]);
+    });
+
+    it("is the one address from a responder that wrote no list", async () => {
+        await writeFile(file, "10.0.4.7\n");
+        expect(await readAll()).toEqual(["10.0.4.7"]);
+    });
+
+    it("is empty when nothing has published one", async () => {
+        expect(await readAll()).toEqual([]);
+    });
+});

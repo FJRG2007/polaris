@@ -27,7 +27,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { getHostLanIp } from "./host-address";
+import { getHostLanIps } from "./host-address";
 import { getLocalHostId } from "./local-server";
 
 /** Where the local daemon's id is kept. It has no Host row to hang off. */
@@ -60,13 +60,19 @@ export async function recordHostDockerId(hostId: string, dockerId: string): Prom
     if (!dockerId) return;
     // Only on a change: this runs once per host per minute, and the row is read
     // on every Watch render.
-    await prisma.host.updateMany({ where: { id: hostId, dockerId: { not: dockerId } }, data: { dockerId } });
+    await prisma.host.updateMany({
+        where: { id: hostId, dockerId: { not: dockerId } },
+        data: { dockerId }
+    });
 }
 
 /** The daemon id of the machine Polaris runs on, or null before it has been
  *  sampled. Callers compare it against a host's own `dockerId`. */
 export async function localDockerId(): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key: LOCAL_DOCKER_ID_KEY }, select: { value: true } });
+    const row = await prisma.setting.findUnique({
+        where: { key: LOCAL_DOCKER_ID_KEY },
+        select: { value: true }
+    });
     return row?.value || null;
 }
 
@@ -78,15 +84,15 @@ export async function localDockerId(): Promise<string | null> {
  * than a negative answer.
  */
 export async function localMachineIdentity(): Promise<LocalMachineIdentity> {
-    const [hostId, dockerId, lanIp] = await Promise.all([
+    const [hostId, dockerId, lanIps] = await Promise.all([
         getLocalHostId().catch(() => null),
         localDockerId().catch(() => null),
-        getHostLanIp().catch(() => null)
+        getHostLanIps().catch(() => [] as string[])
     ]);
     return {
         hostId,
         dockerId,
-        addresses: new Set([...LOOPBACK, ...(lanIp ? [lanIp] : [])].map((address) => address.toLowerCase()))
+        addresses: new Set([...LOOPBACK, ...lanIps].map((address) => address.toLowerCase()))
     };
 }
 

@@ -130,6 +130,7 @@ vi.mock("@/lib/docker-service", () => ({
 }));
 vi.mock("@/lib/host-address", () => ({
     getHostLanIp: async () => lanIp,
+    getHostLanIps: async () => (lanIp ? [lanIp] : []),
     isLanAddress: () => true
 }));
 vi.mock("@/lib/storage-service", () => ({

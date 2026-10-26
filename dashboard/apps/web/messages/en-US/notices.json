@@ -487,5 +487,10 @@
         "onManualBody": "Switched to the backup path by hand. It stays there until it is switched back.",
         "offManualBody": "Switched back to the direct path by hand, and the original DNS records are back.",
         "offUnconfiguredBody": "The backup path was turned off, so the original DNS records are back."
+    },
+    "lanAddress": {
+        "movedTitle": "Polaris is now at {to}",
+        "movedBody": "This server's address on your network changed from {from} to {to}. Open it at https://{to} or https://polaris.local - links to {from} no longer work. To keep the address, reserve {to} for this server in your router's DHCP settings.",
+        "movedBodyDns": "This server's address on your network changed from {from} to {to}. Open it at https://{to} or https://polaris.local - links to {from} no longer work. The network filter moved too: devices that use {from} as their DNS server need {to} now. To keep the address, reserve {to} for this server in your router's DHCP settings."
     }
 }

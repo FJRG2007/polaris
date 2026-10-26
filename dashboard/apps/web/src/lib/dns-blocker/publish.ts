@@ -45,3 +45,19 @@ export function boundSource(stored: string, address: string): string | null {
         hostIp: address
     });
 }
+
+/**
+ * The address an engine's stored source binds its ports to, or null when it binds
+ * none (an engine from before the ports were bound, which listens on every
+ * interface and so has nothing to follow). Pure.
+ */
+export function boundAddress(stored: string): string | null {
+    try {
+        const parsed: unknown = JSON.parse(stored);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+        const hostIp = (parsed as Record<string, unknown>).hostIp;
+        return typeof hostIp === "string" && hostIp.trim() ? hostIp.trim() : null;
+    } catch {
+        return null;
+    }
+}

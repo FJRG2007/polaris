@@ -487,5 +487,10 @@
         "onManualBody": "Se cambió a mano a la ruta de respaldo. Sigue ahí hasta que se vuelva a cambiar.",
         "offManualBody": "Se volvió a mano a la ruta directa y los registros DNS originales están de vuelta.",
         "offUnconfiguredBody": "Se apagó la ruta de respaldo, así que los registros DNS originales están de vuelta."
+    },
+    "lanAddress": {
+        "movedTitle": "Polaris está ahora en {to}",
+        "movedBody": "La dirección de este servidor en tu red cambió de {from} a {to}. Ábrelo en https://{to} o https://polaris.local; los enlaces a {from} ya no funcionan. Para conservarla, reserva {to} para este servidor en los ajustes DHCP del router.",
+        "movedBodyDns": "La dirección de este servidor en tu red cambió de {from} a {to}. Ábrelo en https://{to} o https://polaris.local; los enlaces a {from} ya no funcionan. El filtro de red también se movió: los dispositivos que usan {from} como servidor DNS necesitan {to} ahora. Para conservarla, reserva {to} para este servidor en los ajustes DHCP del router."
     }
 }

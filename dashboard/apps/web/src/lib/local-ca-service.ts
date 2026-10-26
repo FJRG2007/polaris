@@ -18,7 +18,7 @@ import { promisify } from "node:util";
 import { loadEnv } from "@polaris/config";
 import { networkInterfaces } from "node:os";
 import { execFile } from "node:child_process";
-import { getHostLanIp } from "@/lib/host-address";
+import { getHostLanIps } from "@/lib/host-address";
 import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
 import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 
@@ -104,10 +104,14 @@ export async function subjectAltNames(): Promise<string[]> {
     }
 
     const ips = new Set<string>(["127.0.0.1"]);
+    // The addresses this machine holds now. The one written at install is only a
+    // hint for when none is known: a server that moved network no longer has it,
+    // and a certificate naming it does nothing for the address it is reached on.
+    const lanIps = await getHostLanIps().catch(() => []);
+    for (const ip of lanIps) ips.add(ip);
     const configuredIp = process.env.POLARIS_PUBLIC_IP;
-    if (configuredIp && /^\d{1,3}(\.\d{1,3}){3}$/.test(configuredIp)) ips.add(configuredIp);
-    const lanIp = await getHostLanIp();
-    if (lanIp) ips.add(lanIp);
+    if (lanIps.length === 0 && configuredIp && /^\d{1,3}(\.\d{1,3}){3}$/.test(configuredIp))
+        ips.add(configuredIp);
     // Only when Polaris runs on the machine directly: there its own interfaces are
     // the ones a browser connects to. In a container they are docker bridges, whose
     // addresses no client can use and which change on every recreate.
