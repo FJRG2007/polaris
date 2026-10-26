@@ -26,6 +26,7 @@ import { prisma } from "@polaris/db";
 import { PROJECTS_KEY } from "./minecraft/join-guard";
 import { loaderReleasedBy } from "./minecraft/loader-pin";
 import { findMap, pinnedRelease } from "./minecraft/maps";
+import { warmMap } from "./minecraft/map-store";
 import { editionOf } from "./minecraft/service";
 import { formatMemory, hasCrossplay } from "./minecraft/blueprints";
 import { parseMemoryMb } from "./games-service";
@@ -156,6 +157,8 @@ export async function resetMinecraftServer(
     // take it back. A reset already replaces the world; this is the smaller half
     // of the same sentence.
     const aside = await setAsideVersionedConfig(ownerId, installedAppId);
+    // On this disk before the container asks for it, if it is not already.
+    if (mapped) warmMap(mapped);
 
     // And the plugins the new list no longer asks for, which until now stayed on
     // the disk and kept loading. A map that carries its own game takes the

@@ -58,7 +58,9 @@ import {
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "./ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "./ark/settings";
 import { mapAddresses } from "./minecraft/world-address";
+import { warmMap } from "./minecraft/map-store";
 import {
+    findMap,
     isMapResourcePack,
     mapFor,
     mapPackEnv,
@@ -588,6 +590,9 @@ async function createMinecraftServer(
         },
         new Map(base.env.map((entry) => [entry.key, entry.value]))
     );
+    // On this disk before the container asks for it, if it is not already.
+    const map = findMap(input.mapId);
+    if (map) warmMap(map);
     env.set("MAX_PLAYERS", String(input.maxPlayers));
     if (input.edition === "java") {
         const heapMb = shapeHeapMb(env, blueprint, input.concurrentPlayers);

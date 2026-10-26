@@ -104,6 +104,22 @@ describe("app bundles", () => {
         ]);
     });
 
+    it("leave the Minecraft worlds out of Game servers, which downloads them on demand", async () => {
+        const game = built.find((bundle) => bundle.manifest.id === "game-servers");
+        const zip = await JSZip.loadAsync(readFileSync(join(root, "image", "game-servers.zip")));
+        const maps = Object.keys(zip.files)
+            .filter((name) => name.includes("minecraft-worlds/") && !name.endsWith("/"))
+            .map((name) => name.split("/").pop())
+            .sort();
+        // Only the two resource packs, a few kilobytes; every world is published
+        // on its own (docker/app-bundles.sh worlds).
+        expect(maps).toEqual([
+            "bedwars-treasure-island-resources.zip",
+            "luckyblock-towers-resources.zip"
+        ]);
+        expect(game?.size ?? Infinity).toBeLessThan(40 * 1024 * 1024);
+    });
+
     it("ask only for libraries the dashboard provides", () => {
         const server = sharedServerModules();
         for (const bundle of built) {

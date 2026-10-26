@@ -364,6 +364,16 @@ jobs:
         run: |
           bash dashboard/docker/app-bundles.sh push "$RUNNER_TEMP/app-bundles"
           echo "list=$(jq -c '.apps | map_values(.manifest)' "$RUNNER_TEMP/app-bundles/index.json")" >> "$GITHUB_OUTPUT"
+      # The Minecraft worlds a server can be created on, one artifact per map,
+      # outside every bundle: a dashboard downloads one only when a server is
+      # built on it. Content-addressed, so a world that did not change is only
+      # checked, never uploaded again.
+      - name: Publish the Minecraft worlds
+        if: env.PUBLISH == 'true'
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash dashboard/docker/app-bundles.sh worlds dashboard/resources/minecraft-worlds
       # The compile cache this build left, for the next one. Also from a dry run, so
       # a change to the build can be timed warm; a branch's copy is only ever read
       # by that branch. Never fails the publish: the worst case is a cold build.

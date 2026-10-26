@@ -19,6 +19,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useGameText, useSchemaText } from "../game-text";
 import { findMap } from "../../lib/minecraft/maps";
 import { resetGameServerAction } from "./minecraft-actions";
+import { MapDownloadNotice, useMapDownload } from "../map-download";
 import { expectedMemoryAction, saveServerAsTemplateAction } from "../actions";
 import { BookmarkPlus, Loader2, RotateCcw, TriangleAlert } from "lucide-react";
 import { findBlueprint } from "../../lib/minecraft/blueprints";
@@ -158,6 +159,7 @@ function ResetDialog({
     const [savingTemplate, setSavingTemplate] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const mapDownload = useMapDownload();
 
     const seedError = shapeError(shape);
     /** Undefined while it is being asked for, null for an edition with no heap. */
@@ -207,6 +209,11 @@ function ResetDialog({
     async function submit(): Promise<void> {
         setPending(true);
         setError(null);
+        // The new map's world first, when it is not on this instance yet.
+        if (shape.mapId && !(await mapDownload.prepare(shape.mapId))) {
+            setPending(false);
+            return;
+        }
         const result = await resetGameServerAction({
             installedAppId,
             blueprintId: shape.blueprintId,
@@ -356,6 +363,11 @@ function ResetDialog({
                         </span>
                     </p>
 
+                    <MapDownloadNotice
+                        status={mapDownload.status}
+                        onRetry={() => void submit()}
+                        retrying={pending}
+                    />
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     <div className="flex justify-end gap-2">

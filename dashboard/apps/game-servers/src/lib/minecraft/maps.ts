@@ -39,10 +39,11 @@
  * works when a person clicks it and fails from inside a container, and failing
  * there means a server that boots into an empty world with the reason only in its
  * log. What ships is the world folder and nothing else
- * (resources/minecraft-worlds), staged into the Game servers bundle, so an
- * instance that never installed Game servers carries none of it. Every entry
- * credits its author and links the page it came from, and carries the hash of
- * the archive it names.
+ * (resources/minecraft-worlds), published by Polaris's own CI beside its app
+ * bundles and downloaded by an instance only when a server is built on that map
+ * (`map-store.ts`), so an instance carries only the worlds its servers use.
+ * Every entry credits its author and links the page it came from, and carries
+ * the hash of the archive it names, which is also how it is fetched.
  *
  * The dashboard serves them (`world-download.ts`): a world to the server's
  * container behind the instance's key, a pack to the players' clients. This

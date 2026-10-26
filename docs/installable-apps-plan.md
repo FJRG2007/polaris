@@ -325,7 +325,11 @@ false` only when it only adds (creating, sending, starting a run);
    besides code travels in its bundle too: Game servers' item icons and the
    login mod's jars (`apps/game-servers/scripts/stage-assets.mjs`, the
    Dockerfile's `app-bundles-build` stage), served from
-   `/api/app-bundles/<app>/current/assets/...`.
+   `/api/app-bundles/<app>/current/assets/...`. The Minecraft map worlds are
+   the exception: tens of megabytes most instances never use, so each is
+   published as an artifact of its own in the same package
+   (`docker/app-bundles.sh worlds`) and downloaded onto `polaris-data` only when
+   a server is first built on that map, by the hash the catalog names.
 
    An app's jobs are read on every scheduler tick (`scheduledJobs()`), since
    they arrive with its code. `npm run dev:up` builds the bundles into

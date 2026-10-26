@@ -106,6 +106,7 @@
         "game-servers/src/screens/installed/restart-actions.ts",
         "game-servers/src/screens/installed/xray-actions.ts",
         "game-servers/src/screens/list.ts",
+        "game-servers/src/screens/map-download.tsx",
         "game-servers/src/screens/new-server-dialog.tsx",
         "places/src/lib/access.ts",
         "places/src/lib/action-guard.ts",

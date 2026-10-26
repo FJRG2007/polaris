@@ -5,19 +5,29 @@
  * A world is tens of megabytes, so its address carries the instance's key: a
  * wrong key is the same 404 as a missing file. A pack is fetched by game clients
  * that present nothing, so it is public. Both serve only the archives the map
- * catalog names, and count downloads per address.
+ * catalog names, and count downloads per address. A world that is not on this
+ * disk yet is downloaded first (map-store), and one that cannot be is a 503 the
+ * container retries rather than a 404.
  */
 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdtempSync, writeFileSync } from "node:fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dir = mkdtempSync(join(tmpdir(), "polaris-worlds-"));
-writeFileSync(join(dir, "skyblock-2-1.zip"), "world-bytes");
+const cache = mkdtempSync(join(tmpdir(), "polaris-map-cache-"));
+// A bundle from before the worlds left it: its copy is used as it is. Only the
+// size is checked against the catalog, so the bytes can be anything.
+const SKYBLOCK_BYTES = 2554241;
+writeFileSync(join(dir, "skyblock-2-1.zip"), Buffer.alloc(SKYBLOCK_BYTES, 1));
 writeFileSync(join(dir, "luckyblock-towers-resources.zip"), "pack-bytes");
 writeFileSync(join(dir, "stray.zip"), "not-a-map");
 process.env.POLARIS_MINECRAFT_WORLDS_DIR = dir;
+process.env.POLARIS_MINECRAFT_MAP_CACHE_DIR = cache;
+// The build's placeholders stand in for the secrets nothing here reads.
+process.env.NEXT_PHASE = "phase-production-build";
+process.env.POLARIS_APP_BUNDLES_DIR = join(dir, "no-index");
 
 const counted = new Map<string, number>();
 
@@ -39,6 +49,7 @@ vi.mock("@polaris/app-host", () => ({
 }));
 
 beforeEach(() => counted.clear());
+afterEach(() => vi.unstubAllGlobals());
 
 const world =
     await import("@polaris-app/game-servers/src/routes/api/minecraft/world/[token]/[file]/route");
@@ -52,10 +63,24 @@ describe("a world, for a server's container", () => {
     it("serves the archive with the key", async () => {
         const head = await world.HEAD(request("HEAD"), worldParams("skyblock-2-1.zip"));
         expect(head.status).toBe(200);
-        expect(head.headers.get("content-length")).toBe("11");
+        expect(head.headers.get("content-length")).toBe(String(SKYBLOCK_BYTES));
+        const fetched = vi.fn();
+        vi.stubGlobal("fetch", fetched);
         const got = await world.GET(request("GET"), worldParams("skyblock-2-1.zip"));
         expect(got.status).toBe(200);
-        expect(await got.text()).toBe("world-bytes");
+        expect((await got.arrayBuffer()).byteLength).toBe(SKYBLOCK_BYTES);
+        // On disk already, so nothing was downloaded.
+        expect(fetched).not.toHaveBeenCalled();
+    });
+
+    it("answers a world it could not download with a retry, never a 404", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response(null, { status: 404 }))
+        );
+        const got = await world.GET(request("GET"), worldParams("parkour-spiral.zip"));
+        expect(got.status).toBe(503);
+        expect(got.headers.get("retry-after")).toBe("60");
     });
 
     it("answers a wrong key, a file no map names, and a pack the same: not found", async () => {
