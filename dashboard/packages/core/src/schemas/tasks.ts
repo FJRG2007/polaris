@@ -620,12 +620,20 @@ export type TaskViewInput = z.infer<typeof taskViewSchema>;
  * older build - or edited by hand - opens the board on the defaults instead of
  * breaking the page.
  */
+/**
+ * How a list or a board shows subtasks: tucked under their parent behind a
+ * caret (the default), already opened out, or as tasks of their own.
+ */
+export const TASK_SUBTASK_MODES = ["collapsed", "expanded", "separate"] as const;
+export type TaskSubtaskMode = (typeof TASK_SUBTASK_MODES)[number];
+
 export const taskViewPreferencesSchema = z.object({
     type: z.enum(TASK_VIEW_TYPES).default("board"),
     groupBy: z.enum(TASK_GROUP_FIELDS).default("status"),
     sort: taskSortSchema.default({ field: "priority", direction: "asc" }),
     filter: taskFilterSchema.default(EMPTY_FILTER),
-    showClosed: z.boolean().default(false)
+    showClosed: z.boolean().default(false),
+    subtasks: z.enum(TASK_SUBTASK_MODES).default("collapsed")
 });
 
 export type TaskViewPreferences = z.infer<typeof taskViewPreferencesSchema>;

@@ -266,7 +266,9 @@ export async function listSpaceMembersAction(spaceId: string): Promise<{
             spaces.listSpaceMembers(spaceId, caller)
         ]);
         const canManage = role === "owner" || role === "admin";
-        return space ? { space, members, canManage } : { error: await errorText("errors.spaceGone") };
+        return space
+            ? { space, members, canManage }
+            : { error: await errorText("errors.spaceGone") };
     } catch (caught) {
         return failure(caught, "errors.readAccess");
     }
@@ -278,7 +280,8 @@ export async function addSpaceMemberAction(
     role: core.SpaceRole
 ): Promise<{ error?: string }> {
     const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role)) return { error: await errorText("errors.pickRole") };
+    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
+        return { error: await errorText("errors.pickRole") };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.addSpaceMember(spaceId, identifier, role);
@@ -295,7 +298,8 @@ export async function setSpaceMemberRoleAction(
     role: core.SpaceRole
 ): Promise<{ error?: string }> {
     const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role)) return { error: await errorText("errors.pickRole") };
+    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
+        return { error: await errorText("errors.pickRole") };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.setSpaceMemberRole(spaceId, userId, role);
@@ -324,7 +328,8 @@ export async function removeSpaceMemberAction(
 export async function createFolderAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.folderSchema.safeParse(input);
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
     try {
         // A subfolder is authorized against the folder it goes into, so somebody
         // invited to one client can organise inside it without holding the space.
@@ -345,7 +350,8 @@ export async function renameFolderAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.containerName.safeParse(name);
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
     try {
         const { spaceId } = await access.requireFolder(caller, folderId, "member");
         await spaces.renameFolder(folderId, parsed.data);
@@ -428,7 +434,9 @@ export async function listFolderMembersAction(folderId: string): Promise<{
             spaces.listFolderMembers(folderId, caller)
         ]);
         const canManage = role === "owner" || role === "admin";
-        return folder ? { folder, members, canManage } : { error: await errorText("errors.folderGone") };
+        return folder
+            ? { folder, members, canManage }
+            : { error: await errorText("errors.folderGone") };
     } catch (caught) {
         return failure(caught, "errors.readAccess");
     }
@@ -440,7 +448,8 @@ export async function addFolderMemberAction(
     role: core.SpaceRole
 ): Promise<{ error?: string }> {
     const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role)) return { error: await errorText("errors.pickRole") };
+    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
+        return { error: await errorText("errors.pickRole") };
     try {
         const { spaceId } = await access.requireFolder(caller, folderId, "admin");
         await spaces.addFolderMember(folderId, identifier, role);
@@ -463,7 +472,8 @@ export async function setFolderMemberRoleAction(
     role: core.SpaceRole
 ): Promise<{ error?: string }> {
     const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role)) return { error: await errorText("errors.pickRole") };
+    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
+        return { error: await errorText("errors.pickRole") };
     try {
         const { spaceId } = await access.requireFolder(caller, folderId, "admin");
         await spaces.setFolderMemberRole(folderId, userId, role);
@@ -542,7 +552,8 @@ export async function grantSpaceTeamAction(
     role: core.SpaceRole
 ): Promise<{ error?: string }> {
     const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role)) return { error: await errorText("errors.pickRole") };
+    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
+        return { error: await errorText("errors.pickRole") };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         const eligible = await orgs.teamsForSpace(spaceId);
@@ -580,7 +591,8 @@ export async function grantFolderTeamAction(
     role: core.SpaceRole
 ): Promise<{ error?: string }> {
     const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role)) return { error: await errorText("errors.pickRole") };
+    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
+        return { error: await errorText("errors.pickRole") };
     try {
         const { spaceId } = await access.requireFolder(caller, folderId, "admin");
         const eligible = await orgs.teamsForSpace(spaceId);
@@ -732,7 +744,9 @@ export async function updateListAction(
         const { spaceId } = await access.requireList(caller, listId, "member");
         const parsed = core.listSchema.safeParse({ ...(input as object), spaceId });
         if (!parsed.success)
-            return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkDetails") };
+            return {
+                error: await inputError(parsed.error.issues[0]?.message, "errors.checkDetails")
+            };
         await spaces.updateList(listId, parsed.data);
         refresh(caller, spaceId);
         return {};
@@ -746,7 +760,8 @@ export async function updateListAction(
 export async function renameListAction(listId: string, name: string): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.containerName.safeParse(name);
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
     try {
         const { spaceId } = await access.requireList(caller, listId, "member");
         await spaces.renameList(listId, parsed.data);
@@ -763,7 +778,8 @@ export async function renameSpaceAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.containerName.safeParse(name);
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.renameSpace(spaceId, parsed.data);
@@ -984,6 +1000,13 @@ export async function createTaskAction(
         return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkTask") };
     try {
         const { spaceId } = await access.requireList(caller, parsed.data.listId, "member");
+        // A subtask hangs under a task the caller can reach, in the same space:
+        // an id typed in from elsewhere would otherwise tie this work to a task
+        // in a space they have nothing to do with.
+        if (parsed.data.parentId) {
+            const parent = await access.requireTask(caller, parsed.data.parentId, "member");
+            if (parent.spaceId !== spaceId) throw new access.TaskAccessError();
+        }
         const created = await tasks.createTask(caller.id, spaceId, parsed.data);
         refresh(caller, spaceId);
         return created;
@@ -1184,7 +1207,9 @@ export async function addCommentAction(
     const caller = await actor("tasks.read");
     const parsed = core.commentSchema.safeParse(input);
     if (!parsed.success)
-        return { error: await inputError(parsed.error.issues[0]?.message, "errors.writeSomething") };
+        return {
+            error: await inputError(parsed.error.issues[0]?.message, "errors.writeSomething")
+        };
     try {
         const { spaceId } = await access.requireTask(caller, parsed.data.taskId, "guest");
         // The id comes back so files sent with the comment can be attached to it.
@@ -1206,7 +1231,9 @@ export async function editCommentAction(
     const caller = await actor("tasks.read");
     const parsed = core.commentSchema.shape.body.safeParse(body);
     if (!parsed.success)
-        return { error: await inputError(parsed.error.issues[0]?.message, "errors.writeSomething") };
+        return {
+            error: await inputError(parsed.error.issues[0]?.message, "errors.writeSomething")
+        };
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "guest");
         await details.editComment(caller.id, commentId, parsed.data);
@@ -1259,7 +1286,8 @@ export async function createChecklistAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.checklistSchema.safeParse({ taskId, name });
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.createChecklist(taskId, parsed.data.name);
@@ -1330,7 +1358,8 @@ export async function addChecklistItemAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.taskName.safeParse(name);
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterStep") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterStep") };
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.addChecklistItem(taskId, checklistId, parsed.data);
@@ -1534,7 +1563,9 @@ export async function sendTaskShareAction(input: unknown): Promise<{
     const caller: access.TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const parsed = core.taskShareEmailSchema.safeParse(input);
     if (!parsed.success)
-        return { error: await inputError(parsed.error.issues[0]?.message, "errors.chooseRecipients") };
+        return {
+            error: await inputError(parsed.error.issues[0]?.message, "errors.chooseRecipients")
+        };
     try {
         await access.requireTask(caller, parsed.data.taskId, "member");
         const delivery = await shares.sendTaskByEmail(

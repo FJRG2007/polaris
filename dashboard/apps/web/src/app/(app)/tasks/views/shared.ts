@@ -8,6 +8,7 @@
  */
 
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import type { SubtaskView } from "./subtasks";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     TASK_SELECTION_MAX,
@@ -74,9 +75,7 @@ export interface TaskBulkEdit {
 /** What happens to the work on a column that is being removed. Mirrors
  *  `ColumnWorkFate` in lib/tasks/space-service, which is what enforces it. */
 export type ColumnWorkFate =
-    | { kind: "move"; replacementId: string }
-    | { kind: "archive" }
-    | { kind: "delete" };
+    { kind: "move"; replacementId: string } | { kind: "archive" } | { kind: "delete" };
 
 export interface TaskListRef {
     readonly id: string;
@@ -172,6 +171,43 @@ export function shortfallMessage(
     return `${verb} ${count} of ${asked}: ${rest === 1 ? "one task is" : `${rest} tasks are`} not yours to change.`;
 }
 
+/** What an inline composer can say about the task it is making, besides its name. */
+export interface QuickCreateExtra {
+    /** Made as a subtask of this task, in that task's own list. */
+    readonly parent?: { readonly id: string; readonly listId: string };
+    readonly assigneeIds?: string[];
+    readonly dueDate?: string | null;
+    readonly priority?: TaskPriority;
+    readonly tagIds?: string[];
+}
+
+/**
+ * Where a composer's task goes and what it starts as. A subtask lives in its
+ * parent's list and starts in the space's default status, never in whichever
+ * group its parent happens to be drawn in. `listId` is null when the screen
+ * spans several lists and has none to put it in.
+ */
+export function quickCreatePlacement(
+    groupKey: string,
+    groupBy: TaskGroupField,
+    extra: QuickCreateExtra,
+    listId: string | null
+) {
+    // The key says what it is rather than being read off the current view: a
+    // calendar hands back "date:<iso>", every other view hands back the group
+    // it was added to. Guessing from the view type puts a status id in the
+    // due date the moment somebody uses the header button on a calendar.
+    const dueDate = groupKey.startsWith("date:") ? groupKey.slice(5) : null;
+    const statusId =
+        !dueDate && !extra.parent && groupBy === "status" && groupKey ? groupKey : null;
+    return {
+        listId: extra.parent?.listId ?? listId,
+        statusId,
+        dueDate: extra.dueDate ?? dueDate,
+        parentId: extra.parent?.id ?? null
+    };
+}
+
 export interface ViewProps {
     readonly rows: readonly TaskRow[];
     readonly groups: readonly TaskGroup<TaskRow>[];
@@ -216,7 +252,13 @@ export interface ViewProps {
      *  box at the head of a table's checkbox column does. */
     readonly onReplaceSelection?: (taskIds: readonly string[]) => void;
     readonly onMove: (move: BoardMove) => void;
-    readonly onQuickCreate: (groupKey: string, name: string) => void;
+    readonly onQuickCreate: (groupKey: string, name: string, extra?: QuickCreateExtra) => void;
+    /**
+     * Subtasks pulled under their parents. Handed to the list and the board,
+     * where `groups` then holds only the work at the top; absent everywhere
+     * else, which draws every task as its own row.
+     */
+    readonly subtasks?: SubtaskView;
     /** Apply a change from the row itself, optimistically. */
     readonly onEdit: (task: TaskRow, change: TaskEdit) => void;
     /** Apply a change to everything a menu is acting on, which is one task or a

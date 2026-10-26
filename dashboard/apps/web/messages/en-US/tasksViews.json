@@ -79,7 +79,9 @@
         "search": "Search tasks",
         "count": "{shown} of {total}",
         "view": "View",
-        "clearSearch": "Clear search"
+        "clearSearch": "Clear search",
+        "subtasks": "{mode, select, collapsed {Subtasks: collapsed} expanded {Subtasks: expanded} other {Subtasks: separate}}",
+        "subtasksLabel": "Subtasks"
     },
     "empty": {
         "title": "Nothing here yet.",
@@ -93,7 +95,19 @@
         "addTo": "Add a task to {name}",
         "quickPlaceholder": "Task name, then enter",
         "noMatch": "No tasks match this view.",
-        "noMatchDescription": "Change the filters, or add the first one."
+        "noMatchDescription": "Change the filters, or add the first one.",
+        "columnName": "Name",
+        "columnAssignee": "Assignee",
+        "columnDue": "Due date",
+        "columnPriority": "Priority",
+        "addTask": "Add task",
+        "addSubtask": "Add a subtask to {name}",
+        "taskName": "Task name",
+        "cancel": "Cancel",
+        "save": "Save",
+        "showSubtasks": "Show subtasks of {name}",
+        "hideSubtasks": "Hide subtasks of {name}",
+        "subtaskCount": "{count, plural, one {# subtask} other {# subtasks}}"
     },
     "search": {
         "noMatch": "No task contains “{query}”.",
@@ -153,7 +167,7 @@
         "columnColor": "Column color",
         "saving": "Saving...",
         "repeats": "Repeats",
-        "subtasks": "{count} subtasks",
+        "subtasks": "{count, plural, one {# subtask} other {# subtasks}}",
         "comments": "{count} comments",
         "points": "Points",
         "pts": "{count} pts",
