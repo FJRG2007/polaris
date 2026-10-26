@@ -141,6 +141,9 @@ pub fn ensure(tool: Tool) -> Result<(), String> {
     if tool.installed() {
         return Ok(());
     }
+    if let Some(why) = recent_failure(tool) {
+        return Err(why);
+    }
     let result = install(tool);
     let mut slots = slots().lock().unwrap_or_else(|p| p.into_inner());
     let slot = slots.entry(tool).or_default();
