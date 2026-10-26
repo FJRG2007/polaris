@@ -23,6 +23,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // pulls in - they reach Prisma, the SSH stack and the DNS helpers.
 vi.mock("../../src/app/(app)/admin/domains/actions", () => ({}));
 vi.mock("../../src/app/(app)/admin/domains/setup-actions", () => ({}));
+vi.mock("../../src/app/(app)/admin/domains/tailscale-actions", () => ({}));
 vi.mock("../../src/app/(app)/admin/integrations/actions", () => ({}));
 vi.mock("../../src/app/(app)/account/domains/dns-actions", () => ({}));
 vi.mock("../../src/app/(app)/apps/deploy/restore-actions", () => ({

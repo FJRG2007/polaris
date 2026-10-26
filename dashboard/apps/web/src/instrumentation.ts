@@ -161,6 +161,11 @@ export async function register(): Promise<void> {
     const { syncDashboardRoute } = await import("./lib/domain-edge");
     void publishEdgeRoutes(syncDashboardRoute);
 
+    // The Tailscale name is published from the card while it is open; this keeps it
+    // published when it is not - a node that finishes signing in, or is renamed.
+    const { startTailscaleWatch } = await import("./lib/tailscale/tailscale-service");
+    void afterPredecessor().then(startTailscaleWatch);
+
     // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
     // so its traffic is logged (and future restarts leave an edge tunnel untouched).
     const { reconcileQuickTunnels } = await import("./lib/deploy/quick-tunnel-service");

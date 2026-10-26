@@ -262,6 +262,12 @@ export async function syncDashboardRoute(): Promise<boolean> {
         // instance. Imported here rather than at the top: that module reads this
         // one's hostnames.
         const { syncCallServerRoute } = await import("./chat/call-edge");
+        // The Tailscale name's route is republished on the same occasions - startup
+        // above all - so a dynamic directory that lost it gets it back without the
+        // operator opening the card. Best-effort: it is not this route's failure.
+        await import("./tailscale/tailscale-service")
+            .then((module) => module.syncTailscaleRoute())
+            .catch(() => undefined);
         // Its answer is this function's answer: a dashboard route written beside a
         // missing call route is an edge that serves every page and no call.
         return await syncCallServerRoute();

@@ -39,7 +39,8 @@ const PART_KEYS: Readonly<Record<string, string>> = {
     "Local discovery": "mdns",
     "Minecraft router": "mcRouter",
     "Edge (legacy)": "caddy",
-    "Public tunnel": "tunnel"
+    "Public tunnel": "tunnel",
+    "Remote access": "tailscale"
 };
 
 function partWords(t: Words, part: FootprintPart): { label: string; summary: string } {
@@ -62,23 +63,26 @@ export function PolarisFootprintCard() {
     // what keeps a page open in two tabs from measuring the stack twice.
     const forced = useRef(false);
 
-    const load = useCallback(async (signal: AbortSignal): Promise<PolarisFootprint> => {
-        const fresh = forced.current;
-        forced.current = false;
-        const response = await fetch(`/api/polaris/footprint${fresh ? "?fresh=1" : ""}`, {
-            cache: "no-store",
-            signal
-        });
-        const body: unknown = await response.json();
-        if (!response.ok) {
-            throw new Error(
-                typeof body === "object" && body !== null && "error" in body
-                    ? String((body as { error: unknown }).error)
-                    : t("footprint.noReason")
-            );
-        }
-        return body as PolarisFootprint;
-    }, [t]);
+    const load = useCallback(
+        async (signal: AbortSignal): Promise<PolarisFootprint> => {
+            const fresh = forced.current;
+            forced.current = false;
+            const response = await fetch(`/api/polaris/footprint${fresh ? "?fresh=1" : ""}`, {
+                cache: "no-store",
+                signal
+            });
+            const body: unknown = await response.json();
+            if (!response.ok) {
+                throw new Error(
+                    typeof body === "object" && body !== null && "error" in body
+                        ? String((body as { error: unknown }).error)
+                        : t("footprint.noReason")
+                );
+            }
+            return body as PolarisFootprint;
+        },
+        [t]
+    );
 
     const {
         data: footprint,
@@ -131,10 +135,18 @@ export function PolarisFootprintCard() {
                         <table className="w-full min-w-[38rem] text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">{t("footprint.columns.part")}</th>
-                                    <th className="py-1 pr-3 font-medium">{t("footprint.columns.cpu")}</th>
-                                    <th className="py-1 pr-3 font-medium">{t("footprint.columns.memory")}</th>
-                                    <th className="py-1 font-medium">{t("footprint.columns.disk")}</th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("footprint.columns.part")}
+                                    </th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("footprint.columns.cpu")}
+                                    </th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("footprint.columns.memory")}
+                                    </th>
+                                    <th className="py-1 font-medium">
+                                        {t("footprint.columns.disk")}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -228,7 +240,9 @@ function PartRow({ part }: { part: FootprintPart }) {
             <td
                 className="py-2 text-muted-foreground"
                 title={[
-                    part.imageBytes === null ? null : t("footprint.image", { size: formatBytes(part.imageBytes) }),
+                    part.imageBytes === null
+                        ? null
+                        : t("footprint.image", { size: formatBytes(part.imageBytes) }),
                     part.writableBytes === null
                         ? null
                         : t("footprint.written", { size: formatBytes(part.writableBytes) }),

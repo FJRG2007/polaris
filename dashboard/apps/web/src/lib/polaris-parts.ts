@@ -23,6 +23,8 @@
  */
 export const TUNNEL_PROJECT = "polaris-tunnel";
 export const PUBLIC_TUNNEL_PROJECT = "polaris-ptunnel";
+/** Remote access through Tailscale, started only while it is turned on. */
+export const TAILSCALE_PROJECT = "polaris-tailscale";
 
 /**
  * The compose projects that are Polaris rather than something it runs.
@@ -31,7 +33,7 @@ export const PUBLIC_TUNNEL_PROJECT = "polaris-ptunnel";
  * Polaris, so what it costs is part of what Polaris costs. A tunnel a deployed app
  * was given belongs to that app.
  */
-const OWN_PROJECTS = ["polaris", TUNNEL_PROJECT, PUBLIC_TUNNEL_PROJECT];
+const OWN_PROJECTS = ["polaris", TUNNEL_PROJECT, PUBLIC_TUNNEL_PROJECT, TAILSCALE_PROJECT];
 
 /** What each part of the stack is called, and what it is for. Keyed by the compose
  *  service, which is the name in the file and survives the container being
@@ -63,6 +65,11 @@ const PARTS: Record<string, { label: string; summary: string }> = {
     caddy: { label: "Edge (legacy)", summary: "The previous edge, kept for rollback." },
     // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     ptunnel: { label: "Public tunnel", summary: "Publishes Polaris without a port forward." },
+    "polaris-tailscale": {
+        // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
+        label: "Remote access",
+        summary: "Reaches Polaris from your Tailscale devices."
+    },
     "polaris-tunnel": {
         // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
         label: "Public tunnel",
