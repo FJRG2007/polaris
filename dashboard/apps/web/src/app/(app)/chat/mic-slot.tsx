@@ -215,7 +215,7 @@ export function MicSlot({
             className={cn(
                 "relative touch-none select-none rounded p-1.5 transition-colors [-webkit-touch-callout:none] disabled:opacity-50",
                 dictating
-                    ? "bg-danger/15 text-danger"
+                    ? "bg-danger-soft text-danger"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 !handheld && "rounded-r-none pr-1"
             )}

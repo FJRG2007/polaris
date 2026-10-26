@@ -1210,7 +1210,7 @@ export function Composer({
             )}
 
             {dictation.active && (
-                <div className="mb-2 flex items-center gap-2 rounded-md border border-danger/40 bg-field px-3 py-1.5">
+                <div className="mb-2 flex items-center gap-2 rounded-md border border-danger-edge bg-field px-3 py-1.5">
                     <span
                         aria-hidden="true"
                         className="size-2 shrink-0 animate-pulse rounded-full bg-danger"
