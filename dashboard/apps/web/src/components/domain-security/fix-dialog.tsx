@@ -6,17 +6,17 @@
  * Every change shows what is there now beside what would be there after, and
  * each can be left out. A stricter DMARC policy is never in the plan by itself:
  * it appears only once somebody picks one here, because moving to quarantine or
- * reject before every sender passes is how real mail gets lost. What it does
- * offer is a recommendation, read from who the DMARC reports say sends as the
- * domain, so the choice is never left without an answer.
+ * reject before every sender passes is how real mail gets lost. Polaris decides
+ * when that is from the reports it reads (see dmarc-advice), so the dialog
+ * preselects the stricter policy once it is safe and otherwise says what it is
+ * waiting for. With nothing to apply there is no primary button, only Close.
  */
 
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { reportHost } from "@/lib/domain-security/records";
-import { dmarcAdvice } from "@/lib/domain-security/dmarc-advice";
+import { READY_DAYS } from "@/lib/domain-security/dmarc-advice";
 import { normalizeReportTo, reportToSchema } from "@/lib/domain-security/report-to";
 import type { SecurityReport } from "@/lib/domain-security/types";
 import type { DomainSecurityView } from "@/lib/domain-security/service";
@@ -135,18 +135,21 @@ export function FixDialog({
 }) {
     const t = useTranslations("domainSecurity");
     const tc = useTranslations("common");
-    const current = report.findings.some((finding) => finding.code === "dmarcNone")
-        ? "none"
-        : report.findings.some((finding) => finding.code === "dmarcQuarantine")
-          ? "quarantine"
-          : null;
-    const advice = current
-        ? dmarcAdvice(current, view ?? { reportAddress: null, sources: null }, [
-              ...new Set(report.rua.map(reportHost).filter((host): host is string => host !== null))
-          ])
+    const policyFinding = report.findings.find(
+        (finding) => finding.code === "dmarcNone" || finding.code === "dmarcQuarantine"
+    );
+    const current = policyFinding
+        ? policyFinding.code === "dmarcNone"
+            ? "none"
+            : "quarantine"
         : null;
-    const recommended = advice?.kind === "tighten" ? advice.to : "keep";
-    const [policy, setPolicy] = useState<Policy>("keep");
+    // What Polaris decided from the reports; an audit stored before it decided
+    // has no state and reads as still collecting.
+    const state = String(policyFinding?.params.state ?? "collecting");
+    const to = current === "none" ? "quarantine" : "reject";
+    const ready = state === "ready";
+    const recommended: Policy = ready ? to : "keep";
+    const [policy, setPolicy] = useState<Policy>(recommended);
     const [changes, setChanges] = useState<PreviewChange[] | null>(null);
     const [left, setLeft] = useState<Set<string>>(new Set());
     const [error, setError] = useState("");
@@ -154,7 +157,8 @@ export function FixDialog({
     const [outcome, setOutcome] = useState("");
     // Where reports go, for a domain nobody receives them for: the one fix the
     // advice asks for, offered here so it can be applied like the others.
-    const asksForReports = advice?.kind === "noReports";
+    const asksForReports =
+        current !== null && state === "unread" && report.rua.length === 0 && !view?.reportAddress;
     const [reportDraft, setReportDraft] = useState("");
     const reportTyped = reportDraft.trim() !== "";
     const reportValid = reportTyped && reportToSchema.safeParse(reportDraft).success;
@@ -270,40 +274,28 @@ export function FixDialog({
                                 className="w-44"
                             />
                         </label>
-                        {advice && (
-                            <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-card px-3 py-2 sm:flex-row sm:items-start sm:justify-between">
-                                <p className="min-w-0 text-sm">
-                                    <span className="font-medium">{t("fix.advice.title")}: </span>
-                                    {advice.kind === "tighten"
-                                        ? advice.to === "quarantine"
-                                            ? t("fix.advice.tightenQuarantine")
-                                            : t("fix.advice.tightenReject")
-                                        : advice.kind === "fixSenders"
-                                          ? t("fix.advice.fixSenders", {
-                                                count: advice.count,
-                                                domain
-                                            })
-                                          : advice.kind === "readElsewhere"
-                                            ? t("fix.advice.readElsewhere", {
-                                                  hosts: advice.hosts.join(", "),
-                                                  to: advice.to
-                                              })
-                                            : advice.kind === "waitReports"
-                                              ? t("fix.advice.waitReports")
-                                              : t("fix.advice.noReports", { domain })}
-                                </p>
-                                {advice.kind === "tighten" && policy !== advice.to && (
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        className="shrink-0"
-                                        onClick={() => setPolicy(advice.to)}
-                                    >
-                                        {t("fix.advice.use")}
-                                    </Button>
-                                )}
-                            </div>
-                        )}
+                        <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-card px-3 py-2 sm:flex-row sm:items-start sm:justify-between">
+                            <p className="min-w-0 text-sm">
+                                <span className="font-medium">{t("fix.advice.title")}: </span>
+                                {t("fix.advice.state", {
+                                    state,
+                                    to,
+                                    domain,
+                                    days: READY_DAYS,
+                                    left: Number(policyFinding?.params.left ?? READY_DAYS)
+                                })}
+                            </p>
+                            {ready && policy !== to && (
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="shrink-0"
+                                    onClick={() => setPolicy(to)}
+                                >
+                                    {t("fix.advice.use")}
+                                </Button>
+                            )}
+                        </div>
                         <p className="text-muted-foreground text-xs">
                             {t("fix.policy.hint", { domain })}
                         </p>
@@ -373,7 +365,7 @@ export function FixDialog({
                         {current && policy === "keep"
                             ? asksForReports
                                 ? t("fix.noneButReports")
-                                : t("fix.noneButPolicy")
+                                : t("fix.waiting", { state })
                             : t("fix.none")}
                     </p>
                 ) : (
@@ -397,20 +389,24 @@ export function FixDialog({
                 )}
 
                 <DialogFooter>
-                    <Button variant="ghost" disabled={applying} onClick={onClose}>
-                        {tc("actions.cancel")}
-                    </Button>
+                    {/* A primary button that does nothing is a dead end: with nothing to
+                        apply the dialog only closes. */}
                     <Button
-                        aria-disabled={applying || chosen.length === 0}
-                        disabled={applying || chosen.length === 0}
-                        onClick={() => void apply()}
+                        variant={chosen.length === 0 && changes !== null ? "secondary" : "ghost"}
+                        disabled={applying}
+                        onClick={onClose}
                     >
-                        {applying
-                            ? t("fix.applying")
-                            : chosen.length === 0
-                              ? t("fix.nothingToApply")
-                              : t("fix.apply", { count: chosen.length })}
+                        {chosen.length === 0 && changes !== null
+                            ? t("fix.close")
+                            : tc("actions.cancel")}
                     </Button>
+                    {chosen.length > 0 && (
+                        <Button disabled={applying} onClick={() => void apply()}>
+                            {applying
+                                ? t("fix.applying")
+                                : t("fix.apply", { count: chosen.length })}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

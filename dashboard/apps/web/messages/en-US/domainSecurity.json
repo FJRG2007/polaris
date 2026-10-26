@@ -72,9 +72,7 @@
         "someFailed": "{failed, plural, one {# change was not made} other {# changes were not made}}: {detail}",
         "cannotOwner": "Polaris publishes these for you once this domain has a Cloudflare token (under its certificate).",
         "cannotAdmin": "Polaris publishes these for you when the Cloudflare account connected under Integrations holds this zone.",
-        "noneButPolicy": "Nothing else to change. The DMARC policy above is the one fix left.",
         "noneButReports": "Nothing to change while the policy stays as it is. Add a report address above and the record change shows up here.",
-        "nothingToApply": "Nothing to apply",
         "reportTo": {
             "label": "Send DMARC reports to",
             "placeholder": "reports@{domain}",
@@ -85,13 +83,10 @@
             "title": "Recommended",
             "use": "Use recommended",
             "option": "{label} (recommended)",
-            "tightenQuarantine": "Move to Quarantine. Every sender in the last 30 days of reports passes, so mail that still fails is forged and goes to spam. Move to Reject once a few weeks pass with nothing legitimate in spam.",
-            "tightenReject": "Move to Reject. Every sender in the last 30 days of reports passes, so mail that still fails is forged and is refused.",
-            "fixSenders": "Keep it for now. {count, plural, one {# service sends as {domain} and fails} other {# services send as {domain} and fail}}: add them to SPF or have them sign with DKIM (they show as Not set up in the senders list), then tighten.",
-            "waitReports": "Keep it for now. Receivers send their first reports within a day; once they show every sender passing, the next step is recommended here.",
-            "readElsewhere": "Keep it until you have checked the reports at {hosts}. Once every sender there passes, choose {to, select, quarantine {Quarantine} other {Reject}}.",
-            "noReports": "Keep it for now. Nobody receives reports for {domain}, so there is no way to tell whether every sender passes. Add a report address (rua) to its DMARC record first."
-        }
+            "state": "{state, select, ready {Move to {to, select, quarantine {Quarantine} other {Reject}}. Every sender has passed for {days} days, so mail that still fails is forged.} failing {Keep it for now. Fix the failing senders shown on the domain first; Polaris tells you when it is safe to tighten.} noReports {Keep it for now. Reports do not reach Polaris yet: apply the report address change below and Polaris tells you when it is safe to tighten.} unread {Keep it for now. Polaris does not receive reports for {domain}, so it cannot tell when tightening is safe. It reads them for domains on its own mail server.} other {Keep it for now. Polaris is reading the reports and tells you when it is safe to tighten, after {days} days of every sender passing ({left, plural, one {# day to go} other {# days to go}}).}}"
+        },
+        "waiting": "{state, select, failing {Nothing to apply here. Each failing sender is fixed in its own settings; Polaris checks again every day.} unread {Nothing Polaris can apply. It does not receive this domain's reports.} other {Nothing to apply yet. Polaris tells you when it is safe to tighten.}}",
+        "close": "Close"
     },
     "dedicated": {
         "label": "Keep it fixed automatically",
@@ -150,7 +145,11 @@
         "worse": "{domain}: {count, plural, one {# new security problem} other {# new security problems}}",
         "worseBody": "{fixed, plural, =0 {Open the domain to see what to fix.} one {Polaris fixed # record itself. Open the domain to see what is left.} other {Polaris fixed # records itself. Open the domain to see what is left.}}",
         "fixed": "{domain}: Polaris fixed {count, plural, one {# record} other {# records}}",
-        "fixedBody": "The daily check found problems it could fix itself and published the fixes."
+        "fixedBody": "The daily check found problems it could fix itself and published the fixes.",
+        "ready": "{domain}: ready to tighten DMARC",
+        "readyBody": "Every sender has passed for two weeks. Open the domain to apply the stricter policy.",
+        "sender": "{domain}: {host} fails DMARC",
+        "senderBody": "A service that sends as the domain fails. Open the domain to see how to fix it."
     },
     "findings": {
         "mxOk": {
@@ -273,14 +272,14 @@
             "fix": "Correct the record: it starts with v=DMARC1 followed by p=."
         },
         "dmarcNone": {
-            "title": "DMARC only monitors",
-            "risk": "With p=none forged mail is still delivered; it only asks for reports.",
-            "fix": "Once every sender passes, move to quarantine, then reject."
+            "title": "{state, select, ready {Ready to move DMARC to quarantine} other {DMARC is monitoring}}",
+            "risk": "{state, select, ready {Every sender passed for the last two weeks, so mail that still fails is forged.} failing {Forged mail is still delivered while the failing senders are fixed.} noReports {Forged mail is still delivered. Reports do not reach Polaris yet, so it cannot tell when tightening is safe.} unread {Forged mail is still delivered. Polaris does not receive this domain's reports, so it cannot tell when tightening is safe.} other {Forged mail is still delivered for now. Polaris is reading the reports.}}",
+            "fix": "{state, select, ready {Apply Quarantine from Review fixes.} failing {Fix the failing senders listed here first.} noReports {Send the reports to Polaris as well.} unread {Polaris reads reports only for domains on its own mail server.} other {Nothing to do. Polaris tells you when it is safe to tighten.}}"
         },
         "dmarcQuarantine": {
-            "title": "DMARC quarantines",
-            "risk": "Forged mail goes to spam rather than being refused.",
-            "fix": "Move to reject once nothing legitimate is quarantined."
+            "title": "{state, select, ready {Ready to move DMARC to reject} other {DMARC quarantines}}",
+            "risk": "{state, select, ready {Every sender passed for the last two weeks, so mail that still fails is forged and can be refused.} failing {Forged mail goes to spam rather than being refused while the failing senders are fixed.} other {Forged mail goes to spam rather than being refused.}}",
+            "fix": "{state, select, ready {Apply Reject from Review fixes.} failing {Fix the failing senders listed here first.} noReports {Send the reports to Polaris as well.} unread {Polaris reads reports only for domains on its own mail server.} other {Nothing to do. Polaris tells you when it is safe to tighten.}}"
         },
         "dmarcPct": {
             "title": "DMARC covers part of the mail",
@@ -301,6 +300,16 @@
             "title": "Report address not authorized",
             "risk": "{host} has not published that it accepts reports for this domain, so receivers drop them.",
             "fix": "Publish the authorization record at {host}, or use an address on this domain."
+        },
+        "dmarcReportsElsewhere": {
+            "title": "DMARC reports do not reach Polaris",
+            "risk": "Reports go only to other addresses, so Polaris cannot tell when it is safe to tighten the policy.",
+            "fix": "Add {address} to the record's rua, next to what is there."
+        },
+        "dmarcSenderFailing": {
+            "title": "{host} fails DMARC",
+            "risk": "{failed, plural, one {# message} other {# messages}} from {host} ({name}) failed in the last two weeks. A stricter policy would lose its mail.",
+            "fix": "If you use this service, add it to the domain's SPF record or switch on DKIM signing for the domain in its settings. If you do not, it is forged and needs nothing."
         },
         "parkedOk": {
             "title": "Locked down, sends no mail",
