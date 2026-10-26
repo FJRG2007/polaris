@@ -5,7 +5,7 @@
  * shows the login link the component prints (or takes a pasted auth key), and once
  * signed in the machine's ts.net address, the tailnet, and who it answers: the
  * tailnet (Serve) or the internet too (Funnel). Refreshed in the background, faster
- * while it is waiting on a sign-in.
+ * while it is starting or waiting on a sign-in.
  */
 
 import { useId, useState } from "react";
@@ -24,6 +24,8 @@ import {
 } from "./tailscale-actions";
 
 const STATUS_URL = "/api/admin/domains/tailscale";
+const POLL_MS = 5_000;
+const SETTLED_POLL_MS = 30_000;
 
 export function TailscaleCard() {
     const t = useTranslations("admin");
@@ -32,13 +34,18 @@ export function TailscaleCard() {
     const [key, setKey] = useState("");
     const [confirm, setConfirm] = useState(false);
     const keyHint = useId();
+    const [settled, setSettled] = useState(false);
     const live = useLiveResource<TailscaleView>({
         url: STATUS_URL,
         cacheKey: "admin.tailscale",
-        intervalMs: 5_000,
+        intervalMs: settled ? SETTLED_POLL_MS : POLL_MS,
         select: (body) => body as TailscaleView
     });
     const view = live.data;
+    const nowSettled = view
+        ? !view.config.enabled || view.edition === "limited" || view.status.state === "connected"
+        : false;
+    if (nowSettled !== settled) setSettled(nowSettled);
     const trimmed = key.trim();
     const keyValid = trimmed === "" || authKeySchema.safeParse(trimmed).success;
 

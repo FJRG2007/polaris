@@ -718,7 +718,7 @@
             "connecting": "Connecting...",
             "now": "Status",
             "states": {
-                "off": "Off",
+                "off": "Not running",
                 "starting": "Starting",
                 "needs-login": "Waiting for sign-in",
                 "connected": "Connected",

@@ -163,10 +163,54 @@ async function syncHost(host: string | null): Promise<void> {
     await setSetting(HOST_KEY, name);
 }
 
-/** Rewrite the edge route from the remembered name. Called with the dashboard's
- *  own route, startup included. */
+/** Ask the component for its name and publish it when it is connected. Nothing
+ *  is asked of a component that is off or on an edition with no daemon. */
+async function refreshTailscaleHost(): Promise<void> {
+    if (edition() === "limited" || !(await getTailscaleConfig()).enabled) return;
+    const ports = new HostdPorts();
+    try {
+        const status = await readStatus(ports);
+        if (status.state === "connected") await syncHost(status.host);
+    } finally {
+        await ports.dispose();
+    }
+}
+
+/** Rewrite the edge route from the remembered name, then from the live one in the
+ *  background, so a slow daemon never holds up the routes published beside it.
+ *  Called with the dashboard's own route, startup included. */
 export async function syncTailscaleRoute(): Promise<void> {
-    await writeDynamicFile(ROUTE_FILE, renderTailscaleRoute(await getTailscaleHost(), dashboardOrigin()));
+    await writeDynamicFile(
+        ROUTE_FILE,
+        renderTailscaleRoute(await getTailscaleHost(), dashboardOrigin())
+    );
+    void refreshTailscaleHost().catch((error) =>
+        console.error("polaris: reading the Tailscale name failed:", error)
+    );
+}
+
+const WATCH_MS = 60_000;
+const WATCHING = Symbol.for("polaris.tailscale.watch");
+
+/** Keep the route and the trusted sign-in name in step with the component while
+ *  nobody has the card open: a node that finishes signing in, or is renamed. */
+export function startTailscaleWatch(): void {
+    const holder = globalThis as { [WATCHING]?: boolean };
+    if (holder[WATCHING]) return;
+    holder[WATCHING] = true;
+    let running = false;
+    const run = async () => {
+        if (running) return;
+        running = true;
+        try {
+            await refreshTailscaleHost();
+        } catch (error) {
+            console.error("polaris: the Tailscale watcher failed a pass:", error);
+        } finally {
+            running = false;
+        }
+    };
+    setInterval(() => void run(), WATCH_MS).unref?.();
 }
 
 /** Everything the card shows. Reads the component live; never starts it. */
@@ -210,8 +254,8 @@ export async function connectTailscale(
     requireFull(limitedMessage);
     if (authKey) await setSetting(AUTH_KEY, sealKey(authKey));
     const config = { ...(await getTailscaleConfig()), enabled: true };
-    await saveConfig(config);
     await bringUp(config);
+    await saveConfig(config);
 }
 
 /** Change Serve or Funnel. Recreates the container with the new serve config; the
@@ -224,8 +268,8 @@ export async function setTailscaleToggles(
     const current = await getTailscaleConfig();
     const config = { ...current, ...toggles };
     if (JSON.stringify(config) === JSON.stringify(current)) return;
-    await saveConfig(config);
     if (config.enabled) await bringUp(config);
+    await saveConfig(config);
 }
 
 /**
@@ -237,7 +281,7 @@ export async function disconnectTailscale(): Promise<void> {
     const ports = new HostdPorts();
     try {
         await ports.runIn(SERVICE, ["tailscale", "logout"]).catch(() => undefined);
-        await ports.composeDown(TAILSCALE_PROJECT).catch(() => undefined);
+        await ports.composeDown(TAILSCALE_PROJECT);
     } finally {
         await ports.dispose();
     }
