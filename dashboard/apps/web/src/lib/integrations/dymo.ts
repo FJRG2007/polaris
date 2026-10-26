@@ -57,9 +57,11 @@ const BEHAVIOURAL_IP_RULES = new Set(["FRAUD", "HIGH_RISK_SCORE"]);
  * address is, and it is the one they asked for. Pure, so it can be tested without
  * the network.
  */
-export function settleIpVerdict(
-    answer: z.infer<typeof IP_VERDICT>
-): { allow: boolean; reasons: string[]; shared: boolean } {
+export function settleIpVerdict(answer: z.infer<typeof IP_VERDICT>): {
+    allow: boolean;
+    reasons: string[];
+    shared: boolean;
+} {
     const reasons = answer.reasons ?? [];
     const shared =
         answer.response?.vpn === true ||

@@ -17,8 +17,6 @@ import { prisma } from "@polaris/db";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { verifyIp } from "@/lib/integrations/dymo";
-import { recordAudit } from "@/lib/audit-service";
-import { addressesSignedIn } from "@/lib/address-accounts";
 import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { getSetting, setSetting } from "@/lib/setting-store";
@@ -209,6 +207,9 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
     // is not banned on a provider's say-so. A reputation verdict on a shared address -
     // a VPN, WARP, a relay, a carrier's NAT - is about other people on it, and banning
     // it took the instance away from the member using it.
+    // Imported when needed: both reach the request context and the audit log, which
+    // nothing else in this module does and which its callers should not have to load.
+    const { addressesSignedIn } = await import("@/lib/address-accounts");
     const signedIn = await addressesSignedIn(candidates.filter((ip) => !banned.has(ip)));
 
     let asked = 0;
@@ -352,6 +353,7 @@ export async function liftReputationBanOnSignIn(
         const { count } = await prisma.wafBan.deleteMany({ where: { ip, reason: "reputation" } });
         if (count === 0) return false;
         await publishWafIntel();
+        const { recordAudit } = await import("@/lib/audit-service");
         await recordAudit({
             actorId: userId,
             action: "waf.ban.lift.signin",

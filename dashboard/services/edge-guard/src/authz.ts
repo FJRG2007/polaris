@@ -268,10 +268,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         const spared =
             hit !== null &&
             rule.dashboard === true &&
-            reputationSparesPath(
-                hit,
-                parseUri(req.forwardedUri, proto, host)?.pathname ?? null
-            );
+            reputationSparesPath(hit, parseUri(req.forwardedUri, proto, host)?.pathname ?? null);
         if (hit && !spared)
             return {
                 status: 403,

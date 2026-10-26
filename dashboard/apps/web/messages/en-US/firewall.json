@@ -587,7 +587,9 @@
         "offences": "{count}x",
         "untilLifted": "Until you lift it",
         "liftNamed": "Lift the ban on {ip}",
-        "lift": "Lift this ban"
+        "lift": "Lift this ban",
+        "search": "Search address or reason",
+        "noMatch": "No ban matches \"{query}\"."
     },
     "trusted": {
         "title": "Trusted addresses",
@@ -639,5 +641,16 @@
         "closing": "Closing. Each service changes over in the background.",
         "closeFailed": "Could not close the port. The service keeps running as it was.",
         "noPermission": "Only whoever runs this instance can close these."
+    },
+    "decide": {
+        "title": "Decide for this address",
+        "scope": "Applies to",
+        "allow": "Allow",
+        "deny": "Block",
+        "lift": "Lift ban",
+        "copy": "Copy IP",
+        "allowed": "On the allowlist for {scope}.",
+        "denied": "On the denylist for {scope}.",
+        "lifted": "Ban lifted."
     }
 }

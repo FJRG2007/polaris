@@ -27,7 +27,11 @@ let audits: { action: string; targetId: string; actorId: string }[] = [];
 let asked: string[] = [];
 
 // Lifting a ban republishes the snapshot; it goes somewhere harmless.
-process.env.POLARIS_EDGE_INTEL_FILE = join(tmpdir(), `polaris-reputation-test-${process.pid}`, "waf-intel.json");
+process.env.POLARIS_EDGE_INTEL_FILE = join(
+    tmpdir(),
+    `polaris-reputation-test-${process.pid}`,
+    "waf-intel.json"
+);
 
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async () => null,
@@ -104,23 +108,47 @@ describe("reputation and the people signed in", () => {
     });
 
     it("lifts a reputation ban when an account signs in from the address, and says why", async () => {
-        bans = [{ ip: SHARED, reason: "reputation", source: "dymo", note: "FRAUD", until: later(), offences: 1 }];
+        bans = [
+            {
+                ip: SHARED,
+                reason: "reputation",
+                source: "dymo",
+                note: "FRAUD",
+                until: later(),
+                offences: 1
+            }
+        ];
         expect(await liftReputationBanOnSignIn(SHARED, "user-1")).toBe(true);
         expect(bans).toEqual([]);
         expect(audits).toEqual([
-            expect.objectContaining({ action: "waf.ban.lift.signin", targetId: SHARED, actorId: "user-1" })
+            expect.objectContaining({
+                action: "waf.ban.lift.signin",
+                targetId: SHARED,
+                actorId: "user-1"
+            })
         ]);
     });
 
     it("lifts it on an accepted invite too", async () => {
-        bans = [{ ip: SHARED, reason: "reputation", source: "dymo", note: "FRAUD", until: later(), offences: 1 }];
+        bans = [
+            {
+                ip: SHARED,
+                reason: "reputation",
+                source: "dymo",
+                note: "FRAUD",
+                until: later(),
+                offences: 1
+            }
+        ];
         expect(await liftReputationBanOnSignIn(SHARED, "user-2", "invite")).toBe(true);
         expect(bans).toEqual([]);
     });
 
     it("leaves a jail, Tor or manual ban exactly where it is", async () => {
         for (const reason of ["ban", "tor", "manual"]) {
-            bans = [{ ip: SHARED, reason, source: "probes", note: null, until: later(), offences: 1 }];
+            bans = [
+                { ip: SHARED, reason, source: "probes", note: null, until: later(), offences: 1 }
+            ];
             expect(await liftReputationBanOnSignIn(SHARED, "user-1")).toBe(false);
             expect(bans).toHaveLength(1);
         }

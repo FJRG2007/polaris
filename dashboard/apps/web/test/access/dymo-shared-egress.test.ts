@@ -17,7 +17,9 @@ describe("settling a Dymo IP verdict", () => {
     });
 
     it("keeps the operator's own VPN or PROXY rule", () => {
-        expect(settleIpVerdict({ allow: false, reasons: ["FRAUD", "VPN"], response: { vpn: true } })).toEqual({
+        expect(
+            settleIpVerdict({ allow: false, reasons: ["FRAUD", "VPN"], response: { vpn: true } })
+        ).toEqual({
             allow: false,
             reasons: ["VPN"],
             shared: true
@@ -25,12 +27,19 @@ describe("settling a Dymo IP verdict", () => {
     });
 
     it("keeps a refusal it has nothing to say about", () => {
-        expect(settleIpVerdict({ allow: false, reasons: ["COUNTRY:XX"], response: { vpn: true } }).allow).toBe(false);
-        expect(settleIpVerdict({ allow: false, reasons: [], response: { proxy: true } }).allow).toBe(false);
+        expect(
+            settleIpVerdict({ allow: false, reasons: ["COUNTRY:XX"], response: { vpn: true } })
+                .allow
+        ).toBe(false);
+        expect(
+            settleIpVerdict({ allow: false, reasons: [], response: { proxy: true } }).allow
+        ).toBe(false);
     });
 
     it("bans an unshared address flagged as fraud, as before", () => {
-        expect(settleIpVerdict({ allow: false, reasons: ["FRAUD"], response: { vpn: false } })).toEqual({
+        expect(
+            settleIpVerdict({ allow: false, reasons: ["FRAUD"], response: { vpn: false } })
+        ).toEqual({
             allow: false,
             reasons: ["FRAUD"],
             shared: false
