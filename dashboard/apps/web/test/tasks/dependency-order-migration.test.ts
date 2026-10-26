@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 const sql = readFileSync(
     join(
         process.cwd(),
-        "../../packages/db/prisma/migrations/20261231100000_task_dependency_order/migration.sql"
+        "../../packages/db/prisma/migrations/20261231120000_task_dependency_order/migration.sql"
     ),
     "utf8"
 );
