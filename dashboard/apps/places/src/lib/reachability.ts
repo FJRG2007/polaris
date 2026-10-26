@@ -29,6 +29,7 @@ import { raiseAlerts, type Said } from "./alerts";
 import { englishPlaces } from "../../messages";
 import { placesTFor, type PlacesTranslator } from "./i18n";
 import { POWER_SOURCES } from "./camera-models";
+import { recordCameraHardware, relocateCamera, type FollowedCamera } from "./camera-addresses";
 
 /** The answers that mean "this camera is spending its own charge". Derived from
  *  the list rather than written out again, so a fourth answer added later cannot
@@ -59,12 +60,9 @@ const PROBE_TIMEOUT_MS = 10_000;
 const PROBE_QUALITY = "sub" as const;
 
 /** One camera, as this pass needs it. */
-interface Watched {
-    readonly id: string;
+interface Watched extends FollowedCamera {
     readonly name: string;
     readonly placeId: string | null;
-    readonly installedAppId: string;
-    readonly reachVia: string;
     readonly offlineSince: Date | null;
 }
 
@@ -339,7 +337,13 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
             placeId: true,
             installedAppId: true,
             reachVia: true,
-            offlineSince: true
+            offlineSince: true,
+            address: true,
+            hardwareAddress: true,
+            vendor: true,
+            power: true,
+            enabled: true,
+            privacy: true
         }
     });
     if (cameras.length === 0) return { probed: 0, reported: 0, recovered: 0 };
@@ -365,12 +369,25 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
             if (relay.serving && !relay.serving.has(streamName(camera.id, PROBE_QUALITY)))
                 return { camera, reachable: null as boolean | null };
             const reachable = await withTimeout(answers(relay.endpoint, camera.id));
-            return { camera, reachable };
+            if (reachable) return { camera, reachable };
+            // Quiet at the address it was stored with. If the network handed it
+            // another one, it is found there by its hardware address, moved,
+            // and asked once more - a camera that only changed address is not
+            // an outage.
+            const moved = await relocateCamera(relay.endpoint, camera);
+            if (!moved) return { camera, reachable };
+            return { camera, reachable: await withTimeout(answers(relay.endpoint, camera.id)) };
         })
     );
 
     const asked = results.filter(
         (result): result is { camera: Watched; reachable: boolean } => result.reachable !== null
+    );
+    // Every camera that answered and has no hardware address yet gets one now,
+    // which is what lets the pass above find it again after a move - including
+    // the cameras added before it was recorded.
+    await recordCameraHardware(
+        asked.filter((result) => result.reachable).map((result) => result.camera)
     );
     // How much of each place is down, counted across everything this pass asked -
     // which is what turns "a camera stopped" into "the building went dark".

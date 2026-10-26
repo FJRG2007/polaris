@@ -2220,6 +2220,10 @@ model Host {
     encryptedCredential Bytes?
     credentialNonce     Bytes?
     credentialKeyId     String?
+    /// When it stopped answering the reachability probe, and null while it
+    /// answers. What lets the Servers screen say "not reachable since" rather
+    /// than only "no answer". Written on a change, never on every poll.
+    offlineSince        DateTime?
     status              String   @default("active")
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
@@ -11282,19 +11286,24 @@ model Camera {
     power          String  @default("mains")
 
     // How Polaris reaches it.
-    address   String
-    rtspPort  Int     @default(554)
+    address         String
+    /// The hardware (MAC) address `address` answered as, "AA:BB:CC:DD:EE:FF",
+    /// recorded the first time it answers on this server's own network. It is
+    /// what finds the camera again after DHCP or a move hands it another IP.
+    /// Null until then, and always on a camera reached through another server.
+    hardwareAddress String?
+    rtspPort        Int     @default(554)
     /// The ONVIF service port when it speaks ONVIF: 80 on most, 2020 on Tapo.
     /// Null when it does not, which is what makes the movement controls absent
     /// rather than broken.
-    onvifPort Int?
+    onvifPort       Int?
     /// Stream paths below the host, resolved when the camera was added and then
     /// left alone. `mainPath` is the quality that gets recorded and watched;
     /// `subPath` is the small one detection reads, because running detection on
     /// the main stream is how a house of cameras eats a machine.
-    mainPath  String?
-    subPath   String?
-    username  String?
+    mainPath        String?
+    subPath         String?
+    username        String?
     // Envelope-encrypted camera password.
     encryptedSecret Bytes?
     secretNonce     Bytes?

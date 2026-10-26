@@ -1547,6 +1547,12 @@
     "customEmoji": {
         "from": "From {space}"
     },
+    "lanMove": {
+        "title": "Polaris is now at {to}",
+        "body": "This server's address on your network changed from {from}. Links to the old address no longer work; use one of these.",
+        "copy": "Copy",
+        "dismiss": "Dismiss"
+    },
     "diskAlert": {
         "low": "{name} is running out of disk: {free} free ({percent}% used)",
         "critical": "{name} is almost out of disk: {free} free ({percent}% used). Deploys and databases on it can fail.",

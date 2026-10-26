@@ -27,6 +27,7 @@ import { QuickEnroll } from "./quick-enroll";
 import { ServerGroups } from "./server-groups";
 import { ENVIRONMENT_META, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDisplayFormat } from "@/components/display-format";
 import { TerminalPanel } from "../deploy/terminal-panel";
 import { RemoveServerDialog } from "./remove-server-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -758,13 +759,21 @@ function RenameField({
  *  the machine answering the request, so it is stated rather than probed. */
 function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerStatus | null }) {
     const t = useTranslations("servers");
+    const format = useDisplayFormat();
     if (kind === "local") return <Badge variant="success">{t("status.up")}</Badge>;
     if (!status)
         return <span className="text-xs text-muted-foreground">{t("status.checking")}</span>;
     if (status.state === "down") {
+        const label = status.downSince
+            ? t("status.downSince", { since: format.dateTime(status.downSince) })
+            : t("status.noAnswer");
         return (
-            <Badge variant="danger" title={status.detail ?? undefined}>
-                {t("status.noAnswer")}
+            <Badge
+                variant="danger"
+                className="max-w-full min-w-0 truncate"
+                title={status.detail ? `${label} - ${status.detail}` : label}
+            >
+                {label}
             </Badge>
         );
     }

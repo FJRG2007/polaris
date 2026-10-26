@@ -37,6 +37,7 @@ import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { ownStatus, presenceChoiceOf } from "@/lib/presence-service";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { DiskAlertBanner } from "@/components/disk-alert-banner";
+import { LanAddressBanner } from "@/components/lan-address-banner";
 import { PageNotices } from "@/components/page-notices";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { GuidedTours } from "@/components/tours/guided-tours";
@@ -534,7 +535,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                             <DeniedNotice />
                                                                                             {user.isAdmin &&
                                                                                             !user.viewingAs ? (
-                                                                                                <DiskAlertBanner />
+                                                                                                <>
+                                                                                                    <LanAddressBanner />
+                                                                                                    <DiskAlertBanner />
+                                                                                                </>
                                                                                             ) : null}
                                                                                         </PageNotices>
                                                                                         <RouteSkeletonCapture>

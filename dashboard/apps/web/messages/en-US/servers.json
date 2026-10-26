@@ -46,6 +46,7 @@
         "up": "Up",
         "checking": "Checking...",
         "noAnswer": "No answer",
+        "downSince": "Not reachable since {since}",
         "latency": "{ms} ms"
     },
     "shell": {
@@ -230,6 +231,7 @@
         "up": "Answering on port {port}.",
         "upIn": "Answering on port {port} in {ms} ms.",
         "down": "Not answering: {reason}.",
+        "downSince": "Not reachable since {since}: {reason}.",
         "noReason": "no reason given"
     },
     "connect": {
