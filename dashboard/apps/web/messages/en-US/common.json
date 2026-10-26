@@ -117,5 +117,12 @@
         "copyFailed": "Copying was blocked. Use your keyboard's copy shortcut.",
         "pasteFailed": "The browser didn't allow pasting. Use your keyboard's paste shortcut.",
         "browserMenu": "Shift+right-click opens the browser's own menu"
+    },
+    "permissionSections": {
+        "search": "Search permissions",
+        "expandAll": "Expand all",
+        "collapseAll": "Collapse all",
+        "noMatch": "Nothing matches \"{query}\".",
+        "empty": "Nothing to show."
     }
 }

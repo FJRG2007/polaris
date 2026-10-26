@@ -117,5 +117,12 @@
         "copyFailed": "Se bloqueó la copia. Usa el atajo de copiar del teclado.",
         "pasteFailed": "El navegador no permitió pegar. Usa el atajo de pegar del teclado.",
         "browserMenu": "Mayús+clic derecho abre el menú del navegador"
+    },
+    "permissionSections": {
+        "search": "Buscar permisos",
+        "expandAll": "Abrir todo",
+        "collapseAll": "Cerrar todo",
+        "noMatch": "Nada coincide con \"{query}\".",
+        "empty": "Nada que mostrar."
     }
 }

@@ -253,7 +253,9 @@
             "crmPeopleDelete": "Delete people",
             "crmOpportunitiesEdit": "Add and change opportunities",
             "crmOpportunitiesDelete": "Delete opportunities"
-        }
+        },
+        "areaCount": "{count} of {total}",
+        "areaAll": "All of {area}"
     },
     "settings": {
         "chat": {

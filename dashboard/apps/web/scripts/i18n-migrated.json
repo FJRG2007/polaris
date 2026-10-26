@@ -1293,6 +1293,7 @@
         "web/src/components/file-picker/as-files.ts",
         "web/src/components/file-picker/choose-files-dialog.tsx",
         "web/src/components/mcp-scope-checklist.tsx",
+        "web/src/components/permission-sections.tsx",
         "web/src/lib/backups/refusal-text.ts",
         "web/src/lib/backups/service.ts",
         "web/src/lib/backups/sources/databases.ts",

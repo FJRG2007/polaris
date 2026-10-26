@@ -17,7 +17,7 @@
  */
 
 import * as core from "@polaris/core";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IdCard, Plus, Trash2 } from "lucide-react";
@@ -25,6 +25,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgRoleView } from "@/lib/orgs/role-service";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { PermissionSections } from "@/components/permission-sections";
 import {
     createOrgRoleAction,
     deleteOrgRoleAction,
@@ -45,7 +46,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Textarea
+    Textarea,
+    cn
 } from "@polaris/ui";
 
 /** Everything a role can be given, minus the one every role already has. */
@@ -216,7 +218,12 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                     <p className="text-muted-foreground text-sm">{t("roles.locked")}</p>
                 ) : (
                     <>
-                        <PermissionGrid held={held} disabled={busy} onChange={setHeld} />
+                        <PermissionGrid
+                            held={held}
+                            disabled={busy}
+                            storageKey={`org.roles.${role.id}`}
+                            onChange={setHeld}
+                        />
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-muted-foreground text-xs">
                                 {role.restricted
@@ -265,32 +272,93 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
 function PermissionGrid({
     held,
     disabled,
+    storageKey,
     onChange
 }: {
     held: Set<string>;
     disabled: boolean;
+    storageKey?: string;
     onChange: (next: Set<string>) => void;
 }) {
     const t = useTranslations("accountOrgs");
-    const areaLabel = (area: string) => {
-        const key = AREA_LABELS[area];
-        return key ? t(key) : area;
-    };
+    const sections = useMemo(
+        () =>
+            AREAS.map(({ area, permissions }) => {
+                const key = AREA_LABELS[area];
+                return {
+                    id: area,
+                    label: key ? t(key) : area,
+                    items: permissions.map((permission) => ({
+                        id: permission,
+                        label: t(PERMISSION_LABELS[permission])
+                    }))
+                };
+            }),
+        [t]
+    );
+    // Open on arrival only where the role holds part of an area, decided on what
+    // was loaded so ticking the last box does not fold it away.
+    const [initial] = useState(held);
+    const startOpen = useCallback(
+        (section: { items: readonly { id: string }[] }) => {
+            const count = section.items.filter((item) => initial.has(item.id)).length;
+            return count > 0 && count < section.items.length;
+        },
+        [initial]
+    );
+
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {AREAS.map(({ area, permissions }) => (
-                <div key={area} className="flex flex-col gap-1.5">
-                    <p className="text-muted-foreground text-xs font-medium">{areaLabel(area)}</p>
-                    {permissions.map((permission) => (
+        <PermissionSections
+            sections={sections}
+            storageKey={storageKey}
+            startOpen={startOpen}
+            summary={(section) => {
+                const count = section.items.filter((item) => held.has(item.id)).length;
+                return (
+                    <span
+                        className={cn(
+                            "text-xs",
+                            count > 0 ? "text-primary" : "text-muted-foreground"
+                        )}
+                    >
+                        {t("roles.areaCount", { count, total: section.items.length })}
+                    </span>
+                );
+            }}
+            lead={(section) => {
+                const ids = section.items.map((item) => item.id);
+                const count = ids.filter((id) => held.has(id)).length;
+                const all = count === ids.length;
+                return (
+                    <Checkbox
+                        checked={all}
+                        indeterminate={!all && count > 0}
+                        disabled={disabled}
+                        aria-label={t("roles.areaAll", { area: section.label })}
+                        title={t("roles.areaAll", { area: section.label })}
+                        onChange={() => {
+                            const next = new Set(held);
+                            for (const id of ids) {
+                                if (all) next.delete(id);
+                                else next.add(id);
+                            }
+                            onChange(next);
+                        }}
+                    />
+                );
+            }}
+            renderItems={(section) => (
+                <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 pl-6 sm:grid-cols-2">
+                    {section.items.map(({ id: permission, label }) => (
                         <label
                             key={permission}
-                            className="flex cursor-pointer items-start gap-2 text-sm"
+                            className="flex min-w-0 cursor-pointer items-start gap-2 text-sm"
                         >
                             <Checkbox
                                 className="mt-0.5"
                                 checked={held.has(permission)}
                                 disabled={disabled}
-                                aria-label={t(PERMISSION_LABELS[permission])}
+                                aria-label={label}
                                 onChange={(event) => {
                                     const next = new Set(held);
                                     if (event.target.checked) next.add(permission);
@@ -298,12 +366,12 @@ function PermissionGrid({
                                     onChange(next);
                                 }}
                             />
-                            <span className="min-w-0">{t(PERMISSION_LABELS[permission])}</span>
+                            <span className="min-w-0 break-words">{label}</span>
                         </label>
                     ))}
                 </div>
-            ))}
-        </div>
+            )}
+        />
     );
 }
 

@@ -103,6 +103,14 @@ describe("the roles editor in Spanish", () => {
         expect(markup).not.toContain("See files and download them");
     });
 
+    it("folds the areas, opening only the one the role holds part of", () => {
+        expect(markup).toContain("Buscar permisos");
+        expect(markup).toContain("Todo Drive");
+        expect(markup).toMatch(/aria-expanded="true"/);
+        expect(markup.match(/aria-expanded="true"/g)).toHaveLength(1);
+        expect(markup).not.toContain("Search permissions");
+    });
+
     it("keeps the role's own name and counts its holders", () => {
         expect(markup).toContain("member");
         expect(markup).toContain("1 persona");
