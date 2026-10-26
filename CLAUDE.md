@@ -99,7 +99,8 @@ Traefik ranks routers by **the length of the rule** unless a priority says
 otherwise, and the dashboard's own host rule is long enough to outrank every path
 router in the deployment. **Give every router an explicit `priority`.** The
 ordering in use: 110 guarded call path, 100 path prefixes with no host of their
-own (`/api/deploy/ws`, `/livekit`), 50 the dashboard's public hostnames and an
+own (`/api/deploy/ws`, `/livekit`), 60 the tailnet app paths
+(`/.polaris-ts/<port>/` on the machine's ts.net name), 50 the dashboard's public hostnames and an
 installed app's own custom-domain routes, 10 the compose-label catch-all.
 
 One malformed file in Traefik's dynamic directory freezes the whole edge on its
