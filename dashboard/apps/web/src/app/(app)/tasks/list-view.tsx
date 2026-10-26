@@ -303,7 +303,13 @@ export function ListScreen({
             .filter((task) => !hidesClosed || task.statusType !== "closed")
             .map(toFacts)
             .filter((facts) =>
-                core.matchesFilter(facts, filter, now, format.weekStartsOn, dayZone(format.preferences))
+                core.matchesFilter(
+                    facts,
+                    filter,
+                    now,
+                    format.weekStartsOn,
+                    dayZone(format.preferences)
+                )
             );
         const sorted = core.sortTasks(working, sort, statusOrder);
         if (!needle) return sorted;

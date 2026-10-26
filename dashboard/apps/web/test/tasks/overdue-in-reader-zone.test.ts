@@ -56,7 +56,11 @@ async function bounds(now: string) {
     state.counts = [];
     await myWorkCounts("user-1", scope, new Date(now));
     const [, overdue, today] = state.counts as { dueDate: { lt?: Date; gte?: Date; lte?: Date } }[];
-    return { overdueBefore: overdue!.dueDate.lt!, todayFrom: today!.dueDate.gte!, todayTo: today!.dueDate.lte! };
+    return {
+        overdueBefore: overdue!.dueDate.lt!,
+        todayFrom: today!.dueDate.gte!,
+        todayTo: today!.dueDate.lte!
+    };
 }
 
 describe("tasks due today, counted on a UTC server", () => {

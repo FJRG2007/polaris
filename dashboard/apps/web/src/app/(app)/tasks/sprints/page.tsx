@@ -34,7 +34,10 @@ export default async function SprintsPage() {
     ]);
 
     const spaceNames = new Map(spaces.map((space) => [space.id, space.name]));
-    const named = sprints.map((sprint) => ({ ...sprint, spaceName: spaceNames.get(sprint.spaceId) ?? "" }));
+    const named = sprints.map((sprint) => ({
+        ...sprint,
+        spaceName: spaceNames.get(sprint.spaceId) ?? ""
+    }));
 
     const burndowns: Record<string, BurndownPoint[]> = {};
     // Drawn on the server, so the days of the line are the reader's, not UTC's.
@@ -42,7 +45,8 @@ export default async function SprintsPage() {
     for (const sprint of named) {
         // Only sprints that are running or finished have a line worth drawing; a
         // planned one is a straight edge nobody learns anything from.
-        if (sprint.status !== "planned") burndowns[sprint.id] = await sprintBurndown(sprint.id, new Date(), zone);
+        if (sprint.status !== "planned")
+            burndowns[sprint.id] = await sprintBurndown(sprint.id, new Date(), zone);
     }
 
     return (

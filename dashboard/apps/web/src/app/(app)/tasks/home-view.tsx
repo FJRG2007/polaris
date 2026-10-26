@@ -155,7 +155,12 @@ export function HomeView({
         for (const facts of arranged) {
             const task = byId.get(facts.id);
             if (!task) continue;
-            const bucket = core.dueBucket(facts, now, format.weekStartsOn, dayZone(format.preferences));
+            const bucket = core.dueBucket(
+                facts,
+                now,
+                format.weekStartsOn,
+                dayZone(format.preferences)
+            );
             const existing = buckets.get(bucket);
             if (existing) existing.push(task);
             else buckets.set(bucket, [task]);

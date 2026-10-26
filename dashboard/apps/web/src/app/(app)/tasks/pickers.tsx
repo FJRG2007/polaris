@@ -828,7 +828,12 @@ export function DueBadge({
     const t = useTranslations("tasks");
     const zone = dayZone(useDisplayPreferences());
     if (!dueDate) return null;
-    const bucket = core.dueBucket({ dueDate: new Date(dueDate), statusType, timed }, new Date(), 1, zone);
+    const bucket = core.dueBucket(
+        { dueDate: new Date(dueDate), statusType, timed },
+        new Date(),
+        1,
+        zone
+    );
     const tone =
         bucket === "overdue"
             ? "text-danger"

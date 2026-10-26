@@ -297,8 +297,11 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
     // Loaded only once a rule is about to be matched: it pulls the session module
     // in, which nothing else on this path needs.
     const zone = event.actorId
-        ? (await (await import("@/lib/display-prefs-service")).resolveDisplayPreferencesFor(event.actorId))
-              .timeZone
+        ? (
+              await (
+                  await import("@/lib/display-prefs-service")
+              ).resolveDisplayPreferencesFor(event.actorId)
+          ).timeZone
         : core.AUTOMATIC_TIME_ZONE;
     // Counted rather than incremented per run: a rule that fired on forty rows is
     // forty runs and one write.

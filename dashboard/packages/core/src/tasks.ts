@@ -169,7 +169,8 @@ export function parseDurationMinutes(input: string): number | null {
 
 /** Minutes as the estimate box shows them back: "2h 30m", "3d", "45m". */
 export function formatDurationMinutes(minutes: number | null | undefined): string {
-    if (minutes === null || minutes === undefined || !Number.isFinite(minutes) || minutes <= 0) return "";
+    if (minutes === null || minutes === undefined || !Number.isFinite(minutes) || minutes <= 0)
+        return "";
     let left = Math.round(minutes);
     const parts: string[] = [];
     for (const [unit, size] of [
@@ -235,7 +236,13 @@ function calendarDay(date: Date, zone: string): number {
 function midnightOf(day: number, zone: string): Date {
     const parts = new Date(day);
     return zonedInstant(
-        { year: parts.getUTCFullYear(), month: parts.getUTCMonth() + 1, day: parts.getUTCDate(), hours: 0, minutes: 0 },
+        {
+            year: parts.getUTCFullYear(),
+            month: parts.getUTCMonth() + 1,
+            day: parts.getUTCDate(),
+            hours: 0,
+            minutes: 0
+        },
         zone
     );
 }
@@ -250,7 +257,8 @@ export function startOfDay(date: Date, zone?: string): Date {
 export function endOfDay(date: Date, zone?: string): Date {
     // The moment before the next midnight, so a day that daylight saving made
     // 23 or 25 hours long still ends where it does.
-    if (zoned(zone)) return new Date(midnightOf(calendarDay(date, zone) + DAY_MS, zone).getTime() - 1);
+    if (zoned(zone))
+        return new Date(midnightOf(calendarDay(date, zone) + DAY_MS, zone).getTime() - 1);
     const copy = new Date(date);
     copy.setHours(23, 59, 59, 999);
     return copy;
@@ -454,7 +462,8 @@ export function dueBucket(
     const { dueDate } = task;
     if (!dueDate) return "none";
     const deadline = deadlineOf(task, zone) as Date;
-    if (!work.isFinishedStatus(task.statusType) && deadline.getTime() < now.getTime()) return "overdue";
+    if (!work.isFinishedStatus(task.statusType) && deadline.getTime() < now.getTime())
+        return "overdue";
     if (isSameDay(dueDate, now, zone)) return "today";
     if (isSameDay(dueDate, addDays(now, 1, zone), zone)) return "tomorrow";
     const weekEnd = endOfDay(addDays(startOfWeek(now, weekStartsOn, zone), 6, zone), zone);
@@ -522,7 +531,11 @@ function factDate(task: TaskFacts, field: work.TaskFilterCondition["field"]): Da
     return null;
 }
 
-const DATE_FIELDS = new Set<work.TaskFilterCondition["field"]>(["dueDate", "startDate", "createdAt"]);
+const DATE_FIELDS = new Set<work.TaskFilterCondition["field"]>([
+    "dueDate",
+    "startDate",
+    "createdAt"
+]);
 const NUMBER_FIELDS = new Set<work.TaskFilterCondition["field"]>(["points", "timeEstimate"]);
 
 /** A condition value that names a relative window, or null when it is an
@@ -598,7 +611,10 @@ function matchesDateCondition(
     return condition.operator === "isNot" ? !inside : inside;
 }
 
-function matchesNumberCondition(value: number | null, condition: work.TaskFilterCondition): boolean {
+function matchesNumberCondition(
+    value: number | null,
+    condition: work.TaskFilterCondition
+): boolean {
     if (condition.operator === "isSet") return value !== null;
     if (condition.operator === "isNotSet") return value === null;
     if (value === null) return false;
@@ -636,7 +652,13 @@ export function matchesCondition(
         if (condition.values.includes("overdue") && condition.operator === "is") {
             return isOverdue(task, now, zone);
         }
-        return matchesDateCondition(factDate(task, condition.field), condition, now, weekStartsOn, zone);
+        return matchesDateCondition(
+            factDate(task, condition.field),
+            condition,
+            now,
+            weekStartsOn,
+            zone
+        );
     }
     if (NUMBER_FIELDS.has(condition.field)) {
         return matchesNumberCondition(
@@ -661,9 +683,13 @@ export function matchesCondition(
         case "noneOf":
             return wanted.length === 0 || !values.some((value) => wanted.includes(value));
         case "contains":
-            return values.some((value) => value.toLowerCase().includes((wanted[0] ?? "").toLowerCase()));
+            return values.some((value) =>
+                value.toLowerCase().includes((wanted[0] ?? "").toLowerCase())
+            );
         case "notContains":
-            return !values.some((value) => value.toLowerCase().includes((wanted[0] ?? "").toLowerCase()));
+            return !values.some((value) =>
+                value.toLowerCase().includes((wanted[0] ?? "").toLowerCase())
+            );
         default:
             return true;
     }
@@ -680,8 +706,12 @@ export function matchesFilter(
 ): boolean {
     if (filter.conditions.length === 0) return true;
     return filter.match === "all"
-        ? filter.conditions.every((condition) => matchesCondition(task, condition, now, weekStartsOn, zone))
-        : filter.conditions.some((condition) => matchesCondition(task, condition, now, weekStartsOn, zone));
+        ? filter.conditions.every((condition) =>
+              matchesCondition(task, condition, now, weekStartsOn, zone)
+          )
+        : filter.conditions.some((condition) =>
+              matchesCondition(task, condition, now, weekStartsOn, zone)
+          );
 }
 
 export function applyFilter<T extends TaskFacts>(
@@ -695,7 +725,10 @@ export function applyFilter<T extends TaskFacts>(
 }
 
 /** Free-text search over the fields a person types into a search box. */
-export function searchTasks<T extends TaskFacts & { reference?: string }>(tasks: readonly T[], query: string): T[] {
+export function searchTasks<T extends TaskFacts & { reference?: string }>(
+    tasks: readonly T[],
+    query: string
+): T[] {
     const needle = query.trim().toLowerCase();
     if (!needle) return [...tasks];
     return tasks.filter(
@@ -780,13 +813,16 @@ export function compareTasks(
         // not asking for the furthest deadline first within each band.
         case "priority":
             return (
-                (work.priorityRank(left.priority) - work.priorityRank(right.priority)) * direction ||
-                byDeadlineThenEffort(left, right)
+                (work.priorityRank(left.priority) - work.priorityRank(right.priority)) *
+                    direction || byDeadlineThenEffort(left, right)
             );
         case "dueDate":
             return (
-                compareNullable(left.dueDate?.getTime() ?? null, right.dueDate?.getTime() ?? null, direction) ||
-                byUrgency(left, right)
+                compareNullable(
+                    left.dueDate?.getTime() ?? null,
+                    right.dueDate?.getTime() ?? null,
+                    direction
+                ) || byUrgency(left, right)
             );
         case "startDate":
             return compareNullable(
@@ -900,13 +936,21 @@ export function statusColumns(
     const columns: StatusColumn[] = [];
     const byName = new Map<string, StatusColumn>();
     for (const status of statuses) {
-        const key = status.name.trim().toLowerCase().replace(/cancelled/g, "canceled");
+        const key = status.name
+            .trim()
+            .toLowerCase()
+            .replace(/cancelled/g, "canceled");
         const existing = byName.get(key);
         if (existing) {
             existing.ids.push(status.id);
             continue;
         }
-        const column: StatusColumn = { id: status.id, name: status.name, color: status.color, ids: [status.id] };
+        const column: StatusColumn = {
+            id: status.id,
+            name: status.name,
+            color: status.color,
+            ids: [status.id]
+        };
         byName.set(key, column);
         columns.push(column);
     }
@@ -1006,36 +1050,63 @@ export function groupTasks<T extends TaskFacts>(
 
     if (groupBy === "status") {
         for (const column of columns) {
-            groups.push({ key: column.id, label: column.name, color: column.color, tasks: consume(column.id) });
+            groups.push({
+                key: column.id,
+                label: column.name,
+                color: column.color,
+                tasks: consume(column.id)
+            });
         }
     } else if (groupBy === "priority") {
         for (const priority of ["urgent", "high", "normal", "low", "none"] as const) {
             groups.push({
                 key: priority,
-                label: priority === "none" ? "No priority" : priority[0]!.toUpperCase() + priority.slice(1),
+                label:
+                    priority === "none"
+                        ? "No priority"
+                        : priority[0]!.toUpperCase() + priority.slice(1),
                 tasks: consume(priority)
             });
         }
     } else if (groupBy === "dueDate") {
         for (const bucket of DUE_BUCKETS) {
             const found = consume(bucket);
-            if (found.length > 0) groups.push({ key: bucket, label: DUE_BUCKET_LABELS[bucket], tasks: found });
+            if (found.length > 0)
+                groups.push({ key: bucket, label: DUE_BUCKET_LABELS[bucket], tasks: found });
         }
     } else if (groupBy === "blocked") {
         // Both columns always, even when one is empty: an empty Blocked column is
         // the answer somebody grouped this way to see.
-        groups.push({ key: "blocked", label: "Blocked", color: "#ef4444", tasks: consume("blocked") });
+        groups.push({
+            key: "blocked",
+            label: "Blocked",
+            color: "#ef4444",
+            tasks: consume("blocked")
+        });
         groups.push({ key: "clear", label: "Not blocked", tasks: consume("clear") });
     } else {
         const source =
             groupBy === "assignee"
-                ? (context.people ?? []).map((person) => ({ id: person.id, name: person.name, color: undefined }))
+                ? (context.people ?? []).map((person) => ({
+                      id: person.id,
+                      name: person.name,
+                      color: undefined
+                  }))
                 : groupBy === "tag"
-                  ? (context.tags ?? []).map((tag) => ({ id: tag.id, name: tag.name, color: tag.color }))
-                  : (context.lists ?? []).map((list) => ({ id: list.id, name: list.name, color: undefined }));
+                  ? (context.tags ?? []).map((tag) => ({
+                        id: tag.id,
+                        name: tag.name,
+                        color: tag.color
+                    }))
+                  : (context.lists ?? []).map((list) => ({
+                        id: list.id,
+                        name: list.name,
+                        color: undefined
+                    }));
         for (const entry of source) {
             const found = consume(entry.id);
-            if (found.length > 0) groups.push({ key: entry.id, label: entry.name, color: entry.color, tasks: found });
+            if (found.length > 0)
+                groups.push({ key: entry.id, label: entry.name, color: entry.color, tasks: found });
         }
     }
 
@@ -1043,7 +1114,11 @@ export function groupTasks<T extends TaskFacts>(
     // no longer on the space) still has to appear, or its tasks vanish.
     for (const [key, found] of buckets) {
         if (found.length === 0) continue;
-        groups.push({ key, label: key === "" ? (UNSET_LABELS[groupBy] ?? "Other") : "Other", tasks: found });
+        groups.push({
+            key,
+            label: key === "" ? (UNSET_LABELS[groupBy] ?? "Other") : "Other",
+            tasks: found
+        });
     }
     return groups;
 }
@@ -1110,7 +1185,10 @@ export interface TaskNode<T> {
  * as a root, so filtering to "my tasks" shows the subtask assigned to you rather
  * than dropping it because its parent belongs to somebody else.
  */
-export function buildTaskTree<T extends TaskFacts>(tasks: readonly T[], maxDepth = 7): TaskNode<T>[] {
+export function buildTaskTree<T extends TaskFacts>(
+    tasks: readonly T[],
+    maxDepth = 7
+): TaskNode<T>[] {
     const byId = new Map(tasks.map((task) => [task.id, task]));
     const children = new Map<string, T[]>();
     const roots: T[] = [];
@@ -1127,7 +1205,9 @@ export function buildTaskTree<T extends TaskFacts>(tasks: readonly T[], maxDepth
         task,
         depth,
         children:
-            depth >= maxDepth ? [] : (children.get(task.id) ?? []).map((child) => build(child, depth + 1))
+            depth >= maxDepth
+                ? []
+                : (children.get(task.id) ?? []).map((child) => build(child, depth + 1))
     });
     return roots.map((task) => build(task, 0));
 }
@@ -1209,7 +1289,10 @@ export function folderAncestors<T extends FolderRow>(folders: readonly T[], fold
 
 /** A folder and everything under it. The folder itself is included, because
  *  every caller either moves it or checks access to the whole branch. */
-export function folderBranch<T extends FolderRow>(folders: readonly T[], folderId: string): Set<string> {
+export function folderBranch<T extends FolderRow>(
+    folders: readonly T[],
+    folderId: string
+): Set<string> {
     const children = new Map<string, string[]>();
     for (const folder of folders) {
         if (!folder.parentId) continue;
@@ -1279,7 +1362,11 @@ export interface DependencyEdge {
  * chart unsolvable and a scheduler spin, so it is refused at the point of entry
  * rather than detected later.
  */
-export function wouldCycle(edges: readonly DependencyEdge[], blockerId: string, blockedId: string): boolean {
+export function wouldCycle(
+    edges: readonly DependencyEdge[],
+    blockerId: string,
+    blockedId: string
+): boolean {
     if (blockerId === blockedId) return true;
     const forward = new Map<string, string[]>();
     for (const edge of edges) {
@@ -1580,7 +1667,8 @@ export function burndown(
             continue;
         }
         const burned = input.tasks.reduce(
-            (sum, task) => (task.completedAt && task.completedAt <= date ? sum + weight(task) : sum),
+            (sum, task) =>
+                task.completedAt && task.completedAt <= date ? sum + weight(task) : sum,
             0
         );
         points.push({ date, ideal, remaining: Math.max(0, total - burned) });

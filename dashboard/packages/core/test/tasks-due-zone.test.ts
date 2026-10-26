@@ -12,9 +12,17 @@ const MADRID = "Europe/Madrid";
 const NEW_YORK = "America/New_York";
 
 /** "26 Oct" picked in Madrid (UTC+1 after the clocks went back on the 25th). */
-const dueMadrid = { dueDate: new Date("2026-10-25T23:00:00Z"), statusType: "open" as const, timed: false };
+const dueMadrid = {
+    dueDate: new Date("2026-10-25T23:00:00Z"),
+    statusType: "open" as const,
+    timed: false
+};
 /** "26 Oct" picked in New York (UTC-4 until 1 Nov). */
-const dueNewYork = { dueDate: new Date("2026-10-26T04:00:00Z"), statusType: "open" as const, timed: false };
+const dueNewYork = {
+    dueDate: new Date("2026-10-26T04:00:00Z"),
+    statusType: "open" as const,
+    timed: false
+};
 
 describe("an all-day task due today, read on a UTC server", () => {
     it("is not overdue at 10:00 in Madrid", () => {
@@ -35,16 +43,24 @@ describe("an all-day task due today, read on a UTC server", () => {
     });
 
     it("is not overdue at 10:00 or 23:30 in New York, and is at 00:30 the next day", () => {
-        expect(engine.isOverdue(dueNewYork, new Date("2026-10-26T14:00:00Z"), NEW_YORK)).toBe(false);
-        expect(engine.dueBucket(dueNewYork, new Date("2026-10-26T14:00:00Z"), 1, NEW_YORK)).toBe("today");
-        expect(engine.isOverdue(dueNewYork, new Date("2026-10-27T03:30:00Z"), NEW_YORK)).toBe(false);
+        expect(engine.isOverdue(dueNewYork, new Date("2026-10-26T14:00:00Z"), NEW_YORK)).toBe(
+            false
+        );
+        expect(engine.dueBucket(dueNewYork, new Date("2026-10-26T14:00:00Z"), 1, NEW_YORK)).toBe(
+            "today"
+        );
+        expect(engine.isOverdue(dueNewYork, new Date("2026-10-27T03:30:00Z"), NEW_YORK)).toBe(
+            false
+        );
         expect(engine.isOverdue(dueNewYork, new Date("2026-10-27T04:30:00Z"), NEW_YORK)).toBe(true);
     });
 
     it("reads tomorrow as tomorrow in the reader's zone", () => {
         const now = new Date("2026-10-25T09:00:00Z");
         expect(engine.dueBucket(dueMadrid, now, 1, MADRID)).toBe("tomorrow");
-        expect(engine.dueBucket(dueNewYork, new Date("2026-10-25T14:00:00Z"), 1, NEW_YORK)).toBe("tomorrow");
+        expect(engine.dueBucket(dueNewYork, new Date("2026-10-25T14:00:00Z"), 1, NEW_YORK)).toBe(
+            "tomorrow"
+        );
     });
 
     it("a finished task is never overdue", () => {
@@ -53,7 +69,11 @@ describe("an all-day task due today, read on a UTC server", () => {
     });
 
     it("a timed task is due at its own instant, whatever the zone", () => {
-        const timed = { dueDate: new Date("2026-10-26T09:00:00Z"), statusType: "open" as const, timed: true };
+        const timed = {
+            dueDate: new Date("2026-10-26T09:00:00Z"),
+            statusType: "open" as const,
+            timed: true
+        };
         expect(engine.isOverdue(timed, new Date("2026-10-26T09:30:00Z"), MADRID)).toBe(true);
         expect(engine.isOverdue(timed, new Date("2026-10-26T08:30:00Z"), MADRID)).toBe(false);
     });
@@ -61,8 +81,14 @@ describe("an all-day task due today, read on a UTC server", () => {
     it("filters 'due today' and 'overdue' against the reader's day", () => {
         const facts = { ...dueMadrid } as unknown as engine.TaskFacts;
         const now = new Date("2026-10-26T09:00:00Z");
-        const today = { match: "all", conditions: [{ field: "dueDate", operator: "is", values: ["today"] }] };
-        const overdue = { match: "all", conditions: [{ field: "dueDate", operator: "is", values: ["overdue"] }] };
+        const today = {
+            match: "all",
+            conditions: [{ field: "dueDate", operator: "is", values: ["today"] }]
+        };
+        const overdue = {
+            match: "all",
+            conditions: [{ field: "dueDate", operator: "is", values: ["overdue"] }]
+        };
         expect(engine.matchesFilter(facts, today as never, now, 1, MADRID)).toBe(true);
         expect(engine.matchesFilter(facts, overdue as never, now, 1, MADRID)).toBe(false);
     });
@@ -93,7 +119,9 @@ describe("zoned day boundaries", () => {
         const at = new Date(2026, 9, 26, 15, 0, 0);
         expect(engine.startOfDay(at).getTime()).toBe(new Date(2026, 9, 26).getTime());
         expect(engine.startOfDay(at, "auto").getTime()).toBe(new Date(2026, 9, 26).getTime());
-        expect(engine.endOfDay(at).getTime()).toBe(new Date(2026, 9, 26, 23, 59, 59, 999).getTime());
+        expect(engine.endOfDay(at).getTime()).toBe(
+            new Date(2026, 9, 26, 23, 59, 59, 999).getTime()
+        );
     });
 });
 
