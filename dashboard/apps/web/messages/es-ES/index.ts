@@ -33,6 +33,7 @@ import account from "./account.json";
 import backups from "./backups.json";
 import catalog from "./catalog.json";
 import notices from "./notices.json";
+import announcements from "./announcements.json";
 import runners from "./runners.json";
 import tunnels from "./tunnels.json";
 import servers from "./servers.json";
@@ -126,6 +127,7 @@ export default {
     nav,
     notes,
     notices,
+    announcements,
     office,
     polar,
     publicPages,

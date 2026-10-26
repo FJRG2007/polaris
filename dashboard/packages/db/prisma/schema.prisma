@@ -282,6 +282,7 @@ model User {
     dropPointTemplates DropPointTemplate[]
     uploads           UploadSession[]
     notifications     Notification[]
+    announcementDismissals AnnouncementDismissal[]
     deployTargets     DeployTarget[]
     projects          Project[]
     projectMemberships ProjectMember[]
@@ -3923,6 +3924,8 @@ model Notification {
     // resolved and one-off rows are unaffected. Also what makes two checkers
     // raising the same condition at once end in one row.
     @@unique([userId, conditionKey])
+    // An announcement's history counts its notices by key, across readers.
+    @@index([conditionKey])
 }
 
 // Somewhere an alert can be sent besides the bell and the account's mailbox: a
@@ -15942,4 +15945,75 @@ model ArcadeSessionPlayer {
 
     @@id([sessionId, userId])
     @@index([userId, leftAt])
+}
+
+// Something an administrator tells the people on this instance: a notice on the
+// bell, a banner at the top of every screen, or both. A maintenance window is
+// the same row with a window and a lead time, and its phase (announced, in
+// progress, finished) is worked out from the clock rather than stored, so a
+// rescheduled window is right everywhere the moment it is saved.
+//
+// `audience` is stringified JSON ({ everyone, roleIds, groupIds, orgIds,
+// userIds }) and is matched live, so somebody who joins a group after the send
+// still sees the banner. `reach` is how many accounts it matched when it went
+// out. Title and body are what the administrator wrote; when `localized` is set
+// they were left as the template's words and every reader gets the template in
+// their own language and time zone instead.
+model Announcement {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    // announcement | maintenance
+    kind         String    @default("announcement")
+    // Template id the text started from (maintenance, incident, generic...).
+    template     String    @default("generic")
+    localized    Boolean   @default(false)
+    // info | success | warning | critical
+    severity     String    @default("info")
+    title        String
+    body         String    @default("")
+    linkUrl      String?
+    linkLabel    String?
+    // Stringified JSON: { affected: string[] } and anything else a template reads.
+    vars         String?
+    audience     String
+    sendNotice   Boolean   @default(true)
+    showBanner   Boolean   @default(true)
+    // When the banner starts and stops showing. For maintenance, startsAt is the
+    // window's start minus the lead time and endsAt the window's end.
+    startsAt     DateTime
+    endsAt       DateTime?
+    windowStart  DateTime?
+    windowEnd    DateTime?
+    leadMinutes  Int?
+    // Raise a notice at each maintenance step, not only the first.
+    notifySteps  Boolean   @default(false)
+    // The last phase a notice went out for; the clock compares against it.
+    noticedPhase String?
+    reach        Int       @default(0)
+    createdById  String?   @db.Uuid
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+    retractedAt  DateTime?
+
+    dismissals AnnouncementDismissal[]
+
+    // The shell asks "what is showing now" on every page load.
+    @@index([showBanner, retractedAt, startsAt, endsAt])
+    // The clock asks "what is due a notice".
+    @@index([retractedAt, startsAt])
+    @@index([createdAt])
+}
+
+// Somebody closed a banner. Per phase, so closing a maintenance countdown does
+// not also hide "finished" when it comes.
+model AnnouncementDismissal {
+    announcementId String   @db.Uuid
+    userId         String   @db.Uuid
+    phase          String
+    dismissedAt    DateTime @default(now())
+
+    announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+    user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([announcementId, userId])
+    @@index([userId])
 }
