@@ -953,8 +953,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     <Input
                                         value={ownerPlayer}
                                         onChange={(event) => setOwnerPlayer(event.target.value)}
-                                        // i18n-ignore: the game's default player name
                                         placeholder={
+                                            // i18n-ignore: the game's default player name
                                             edition === "bedrock" ? t("create.gamertag") : "Steve"
                                         }
                                     />
