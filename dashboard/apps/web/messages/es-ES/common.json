@@ -123,6 +123,8 @@
         "expandAll": "Abrir todo",
         "collapseAll": "Cerrar todo",
         "noMatch": "Nada coincide con \"{query}\".",
-        "empty": "Nada que mostrar."
+        "empty": "Nada que mostrar.",
+        "areaCount": "{count} de {total}",
+        "areaAll": "Todos los permisos de {area}"
     }
 }

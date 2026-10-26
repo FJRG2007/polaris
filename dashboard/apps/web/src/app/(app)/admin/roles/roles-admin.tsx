@@ -16,14 +16,14 @@
  * you want is to see it.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Plus, Trash2 } from "lucide-react";
 import type { RoleView } from "@/lib/role-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { viewAsRoleAction } from "@/app/(app)/view-as-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { PermissionSections } from "@/components/permission-sections";
+import { HeldPermissionSections } from "@/components/permission-sections";
 import { groupByArea } from "@/lib/permission-sections";
 import { areaLabel, permissionLabel } from "@/lib/permission-labels";
 import { createRoleAction, deleteRoleAction, setRolePermissionsAction } from "./actions";
@@ -41,14 +41,12 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
-    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input,
-    cn
+    Input
 } from "@polaris/ui";
 
 /** The permissions of each area, in the order the areas were declared. */
@@ -218,13 +216,6 @@ function RoleCard({ role }: { role: RoleView }) {
     );
 }
 
-/** Whether an area opens on arrival: only when the role holds part of it, which
- *  is where a decision was made. All or none says itself in the header. */
-function partlyHeld(held: Set<Permission>, ids: readonly Permission[]): boolean {
-    const count = ids.filter((id) => held.has(id)).length;
-    return count > 0 && count < ids.length;
-}
-
 function PermissionGrid({
     held,
     disabled,
@@ -249,76 +240,14 @@ function PermissionGrid({
             })),
         [t]
     );
-    // Decided once, on what was loaded, so ticking the last box of an area does
-    // not fold it away under the pointer.
-    const [initial] = useState(held);
-    const startOpen = useCallback(
-        (section: { items: readonly { id: Permission }[] }) =>
-            partlyHeld(
-                initial,
-                section.items.map((item) => item.id)
-            ),
-        [initial]
-    );
 
     return (
-        <PermissionSections
+        <HeldPermissionSections
             sections={sections}
+            held={held}
+            disabled={disabled}
             storageKey={storageKey}
-            startOpen={startOpen}
-            summary={(section) => {
-                const count = section.items.filter((item) => held.has(item.id)).length;
-                return (
-                    <span
-                        className={cn(
-                            "text-xs",
-                            count > 0 ? "text-primary" : "text-muted-foreground"
-                        )}
-                    >
-                        {t("roles.areaCount", { count, total: section.items.length })}
-                    </span>
-                );
-            }}
-            lead={(section) => {
-                const ids = section.items.map((item) => item.id);
-                const count = ids.filter((id) => held.has(id)).length;
-                const all = count === ids.length;
-                return (
-                    <Checkbox
-                        checked={all}
-                        indeterminate={!all && count > 0}
-                        disabled={disabled}
-                        aria-label={t("roles.areaAll", { area: section.label })}
-                        title={t("roles.areaAll", { area: section.label })}
-                        onChange={() =>
-                            onChange(
-                                ids.reduce((next, id) => toggle(next, id, !all), held)
-                            )
-                        }
-                    />
-                );
-            }}
-            renderItems={(section) => (
-                <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 pl-6 sm:grid-cols-2">
-                    {section.items.map(({ id: permission, label }) => (
-                        <label
-                            key={permission}
-                            className="flex min-w-0 cursor-pointer items-start gap-2 text-sm"
-                        >
-                            <Checkbox
-                                className="mt-0.5"
-                                checked={held.has(permission)}
-                                disabled={disabled}
-                                aria-label={label}
-                                onChange={(event) =>
-                                    onChange(toggle(held, permission, event.target.checked))
-                                }
-                            />
-                            <span className="min-w-0 break-words">{label}</span>
-                        </label>
-                    ))}
-                </div>
-            )}
+            onToggle={(ids, on) => onChange(ids.reduce((next, id) => toggle(next, id, on), held))}
         />
     );
 }

@@ -2751,9 +2751,7 @@
                 "open": "Open Games",
                 "calls": "Play games in calls"
             }
-        },
-        "areaCount": "{count} of {total}",
-        "areaAll": "All of {area}"
+        }
     },
     "safety": {
         "page": {

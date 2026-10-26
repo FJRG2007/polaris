@@ -8,8 +8,10 @@ import {
     filterSections,
     foldText,
     groupByArea,
+    heldCount,
     openSections,
-    parseChosen
+    parseChosen,
+    partlyHeld
 } from "@/lib/permission-sections";
 
 const sections = [
@@ -60,12 +62,12 @@ describe("filterSections", () => {
     });
 
     it("applies the extra filter with and without a query", () => {
-        expect(filterSections(sections, "", (item) => "held" in item && item.held === true)).toEqual([
-            { ...sections[0], items: [sections[0]!.items[0]] }
-        ]);
-        expect(filterSections(sections, "edit", (item) => "held" in item && item.held === true)).toEqual(
-            []
-        );
+        expect(
+            filterSections(sections, "", (item) => "held" in item && item.held === true)
+        ).toEqual([{ ...sections[0], items: [sections[0]!.items[0]] }]);
+        expect(
+            filterSections(sections, "edit", (item) => "held" in item && item.held === true)
+        ).toEqual([]);
     });
 
     it("returns nothing when nothing matches", () => {
@@ -82,7 +84,7 @@ describe("openSections", () => {
 
 describe("parseChosen", () => {
     it("reads booleans back and drops everything else", () => {
-        expect(parseChosen("{\"a\":true,\"b\":\"x\",\"c\":false}")).toEqual({ a: true, c: false });
+        expect(parseChosen('{"a":true,"b":"x","c":false}')).toEqual({ a: true, c: false });
     });
 
     it("survives nothing stored, junk and the wrong shape", () => {
@@ -95,5 +97,19 @@ describe("parseChosen", () => {
 describe("foldText", () => {
     it("lowers case and strips accents", () => {
         expect(foldText("Édición")).toBe("edicion");
+    });
+});
+
+describe("heldCount and partlyHeld", () => {
+    const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
+
+    it("counts only the entries that are held", () => {
+        expect(heldCount(new Set(["a", "c", "z"]), items)).toBe(2);
+    });
+
+    it("is partly held only between none and all", () => {
+        expect(partlyHeld(new Set<string>(), items)).toBe(false);
+        expect(partlyHeld(new Set(["b"]), items)).toBe(true);
+        expect(partlyHeld(new Set(["a", "b", "c"]), items)).toBe(false);
     });
 });

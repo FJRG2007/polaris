@@ -31,9 +31,30 @@ export function groupByArea<T>(items: readonly T[], areaOf: (item: T) => string)
     return [...grouped];
 }
 
+/** How many of `items` are in `held`. */
+export function heldCount<Id extends string>(
+    held: ReadonlySet<Id>,
+    items: readonly { readonly id: Id }[]
+): number {
+    return items.filter((item) => held.has(item.id)).length;
+}
+
+/** Whether `held` has some of `items` but not all - where a decision was made,
+ *  since all or none says itself in a count. */
+export function partlyHeld<Id extends string>(
+    held: ReadonlySet<Id>,
+    items: readonly { readonly id: Id }[]
+): boolean {
+    const count = heldCount(held, items);
+    return count > 0 && count < items.length;
+}
+
 /** Lower case with the accents taken off, so "edicion" finds "Edición". */
 export function foldText(text: string): string {
-    return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    return text
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .toLowerCase();
 }
 
 /**

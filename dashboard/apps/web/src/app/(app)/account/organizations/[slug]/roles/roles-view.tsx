@@ -17,7 +17,7 @@
  */
 
 import * as core from "@polaris/core";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IdCard, Plus, Trash2 } from "lucide-react";
@@ -25,7 +25,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgRoleView } from "@/lib/orgs/role-service";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { PermissionSections } from "@/components/permission-sections";
+import { HeldPermissionSections } from "@/components/permission-sections";
 import {
     createOrgRoleAction,
     deleteOrgRoleAction,
@@ -38,7 +38,6 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
-    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -46,8 +45,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Textarea,
-    cn
+    Textarea
 } from "@polaris/ui";
 
 /** Everything a role can be given, minus the one every role already has. */
@@ -296,81 +294,21 @@ function PermissionGrid({
             }),
         [t]
     );
-    // Open on arrival only where the role holds part of an area, decided on what
-    // was loaded so ticking the last box does not fold it away.
-    const [initial] = useState(held);
-    const startOpen = useCallback(
-        (section: { items: readonly { id: string }[] }) => {
-            const count = section.items.filter((item) => initial.has(item.id)).length;
-            return count > 0 && count < section.items.length;
-        },
-        [initial]
-    );
 
     return (
-        <PermissionSections
+        <HeldPermissionSections
             sections={sections}
+            held={held}
+            disabled={disabled}
             storageKey={storageKey}
-            startOpen={startOpen}
-            summary={(section) => {
-                const count = section.items.filter((item) => held.has(item.id)).length;
-                return (
-                    <span
-                        className={cn(
-                            "text-xs",
-                            count > 0 ? "text-primary" : "text-muted-foreground"
-                        )}
-                    >
-                        {t("roles.areaCount", { count, total: section.items.length })}
-                    </span>
-                );
+            onToggle={(ids, on) => {
+                const next = new Set(held);
+                for (const id of ids) {
+                    if (on) next.add(id);
+                    else next.delete(id);
+                }
+                onChange(next);
             }}
-            lead={(section) => {
-                const ids = section.items.map((item) => item.id);
-                const count = ids.filter((id) => held.has(id)).length;
-                const all = count === ids.length;
-                return (
-                    <Checkbox
-                        checked={all}
-                        indeterminate={!all && count > 0}
-                        disabled={disabled}
-                        aria-label={t("roles.areaAll", { area: section.label })}
-                        title={t("roles.areaAll", { area: section.label })}
-                        onChange={() => {
-                            const next = new Set(held);
-                            for (const id of ids) {
-                                if (all) next.delete(id);
-                                else next.add(id);
-                            }
-                            onChange(next);
-                        }}
-                    />
-                );
-            }}
-            renderItems={(section) => (
-                <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 pl-6 sm:grid-cols-2">
-                    {section.items.map(({ id: permission, label }) => (
-                        <label
-                            key={permission}
-                            className="flex min-w-0 cursor-pointer items-start gap-2 text-sm"
-                        >
-                            <Checkbox
-                                className="mt-0.5"
-                                checked={held.has(permission)}
-                                disabled={disabled}
-                                aria-label={label}
-                                onChange={(event) => {
-                                    const next = new Set(held);
-                                    if (event.target.checked) next.add(permission);
-                                    else next.delete(permission);
-                                    onChange(next);
-                                }}
-                            />
-                            <span className="min-w-0 break-words">{label}</span>
-                        </label>
-                    ))}
-                </div>
-            )}
         />
     );
 }

@@ -16,14 +16,16 @@
  * the entries (`renderItems`) and holds whatever they change.
  */
 
-import { Button, Input, cn } from "@polaris/ui";
+import { Button, Checkbox, Input, cn } from "@polaris/ui";
 import { ChevronRight, Search } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import {
     filterSections,
+    heldCount,
     openSections,
     parseChosen,
+    partlyHeld,
     type Section,
     type SectionItem
 } from "@/lib/permission-sections";
@@ -47,7 +49,7 @@ export function PermissionSections<T extends SectionItem>({
     /** What the header says about the whole area, search aside. */
     summary: (section: Section<T>) => ReactNode;
     startOpen: (section: Section<T>) => boolean;
-    /** Drawn before the header's toggle - a box that acts on the visible entries. */
+    /** Drawn before the header's toggle - a box that acts on the whole area. */
     lead?: (section: Section<T>) => ReactNode;
     /** Drawn after the header's toggle - an action on the area. */
     trail?: (section: Section<T>) => ReactNode;
@@ -86,7 +88,10 @@ export function PermissionSections<T extends SectionItem>({
 
     const searching = query.trim() !== "";
     const visible = useMemo(() => filterSections(sections, query, keep), [sections, query, keep]);
-    const whole = useMemo(() => new Map(sections.map((section) => [section.id, section])), [sections]);
+    const whole = useMemo(
+        () => new Map(sections.map((section) => [section.id, section])),
+        [sections]
+    );
     const open = useMemo(
         () =>
             openSections(
@@ -151,7 +156,7 @@ export function PermissionSections<T extends SectionItem>({
                                 className="min-w-0 border-b border-border last:border-b-0"
                             >
                                 <div className="flex min-w-0 items-center gap-2 px-3 py-2">
-                                    {lead?.(section)}
+                                    {lead?.(full)}
                                     <button
                                         type="button"
                                         aria-expanded={expanded}
@@ -190,5 +195,97 @@ export function PermissionSections<T extends SectionItem>({
                 </div>
             )}
         </div>
+    );
+}
+
+/**
+ * A role's permissions as boxes folded by area: each header counts what the role
+ * holds of it and carries a box for the whole area, and an area opens on arrival
+ * only where the role holds part of it. `onToggle` says which permissions the
+ * reader turned on or off; the caller decides what else follows.
+ */
+export function HeldPermissionSections<Id extends string>({
+    sections,
+    held,
+    disabled,
+    storageKey,
+    onToggle
+}: {
+    sections: readonly Section<{ id: Id; label: string }>[];
+    held: ReadonlySet<Id>;
+    disabled: boolean;
+    storageKey?: string;
+    onToggle: (ids: readonly Id[], on: boolean) => void;
+}) {
+    const tc = useTranslations("common");
+    // Decided once, on what was loaded, so ticking the last box of an area does
+    // not fold it away under the pointer.
+    const [initial] = useState(held);
+    const startOpen = useCallback(
+        (section: Section<{ id: Id; label: string }>) => partlyHeld(initial, section.items),
+        [initial]
+    );
+
+    return (
+        <PermissionSections
+            sections={sections}
+            storageKey={storageKey}
+            startOpen={startOpen}
+            summary={(section) => {
+                const count = heldCount(held, section.items);
+                return (
+                    <span
+                        className={cn(
+                            "text-xs",
+                            count > 0 ? "text-primary" : "text-muted-foreground"
+                        )}
+                    >
+                        {tc("permissionSections.areaCount", {
+                            count,
+                            total: section.items.length
+                        })}
+                    </span>
+                );
+            }}
+            lead={(section) => {
+                const count = heldCount(held, section.items);
+                const all = count === section.items.length;
+                const label = tc("permissionSections.areaAll", { area: section.label });
+                return (
+                    <Checkbox
+                        checked={all}
+                        indeterminate={!all && count > 0}
+                        disabled={disabled}
+                        aria-label={label}
+                        title={label}
+                        onChange={() =>
+                            onToggle(
+                                section.items.map((item) => item.id),
+                                !all
+                            )
+                        }
+                    />
+                );
+            }}
+            renderItems={(section) => (
+                <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 pl-6 sm:grid-cols-2">
+                    {section.items.map(({ id, label }) => (
+                        <label
+                            key={id}
+                            className="flex min-w-0 cursor-pointer items-start gap-2 text-sm"
+                        >
+                            <Checkbox
+                                className="mt-0.5"
+                                checked={held.has(id)}
+                                disabled={disabled}
+                                aria-label={label}
+                                onChange={(event) => onToggle([id], event.target.checked)}
+                            />
+                            <span className="min-w-0 break-words">{label}</span>
+                        </label>
+                    ))}
+                </div>
+            )}
+        />
     );
 }

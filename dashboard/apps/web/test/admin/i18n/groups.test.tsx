@@ -105,7 +105,7 @@ describe("the roles editor in Spanish", () => {
 
     it("folds the areas, opening only the one the role holds part of", () => {
         expect(markup).toContain("Buscar permisos");
-        expect(markup).toContain("Todo Drive");
+        expect(markup).toContain("Todos los permisos de Drive");
         expect(markup).toMatch(/aria-expanded="true"/);
         expect(markup.match(/aria-expanded="true"/g)).toHaveLength(1);
         expect(markup).not.toContain("Search permissions");

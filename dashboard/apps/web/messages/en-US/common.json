@@ -123,6 +123,8 @@
         "expandAll": "Expand all",
         "collapseAll": "Collapse all",
         "noMatch": "Nothing matches \"{query}\".",
-        "empty": "Nothing to show."
+        "empty": "Nothing to show.",
+        "areaCount": "{count} of {total}",
+        "areaAll": "All of {area}"
     }
 }

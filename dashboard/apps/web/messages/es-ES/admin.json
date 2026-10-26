@@ -2751,9 +2751,7 @@
                 "open": "Abrir Juegos",
                 "calls": "Jugar en llamadas"
             }
-        },
-        "areaCount": "{count} de {total}",
-        "areaAll": "Todo {area}"
+        }
     },
     "safety": {
         "page": {
