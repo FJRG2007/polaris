@@ -36,6 +36,10 @@ const MAX_PARALLEL = 2;
 const ATTEMPTS = 3;
 /** Per attempt. The largest world is under 30 MB. */
 const ATTEMPT_TIMEOUT_MS = 10 * 60_000;
+/** How long a failure is news: long enough for a form polling every second to
+ *  hear of it, short enough that a later form tries again rather than being
+ *  told of an old one. */
+const FAILURE_NEWS_MS = 30_000;
 
 /** Why a map could not be had, as a code the screen words. */
 export type MapFailure = "unreachable" | "notPublished" | "corrupt" | "noSpace" | "failed";
@@ -57,7 +61,7 @@ export class MapUnavailable extends Error {
 type Entry = { promise: Promise<string>; received: number; total: number };
 type State = {
     running: Map<string, Entry>;
-    failed: Map<string, MapFailure>;
+    failed: Map<string, { reason: MapFailure; at: number }>;
     active: number;
     queue: (() => void)[];
 };
@@ -252,7 +256,7 @@ function start(map: WorldMap): Entry {
         })
         .catch((error: unknown) => {
             const reason = failureOf(error);
-            state.failed.set(map.id, reason);
+            state.failed.set(map.id, { reason, at: Date.now() });
             console.error(
                 `[minecraft-map] ${map.archive} could not be downloaded: ${reason}`,
                 error
@@ -287,17 +291,16 @@ export async function ensureMap(map: WorldMap): Promise<string> {
 /**
  * Where this map stands, starting its download when it is not on disk. What a
  * screen asks, again and again, while it shows the progress. A failure is
- * reported once; asking after it is a retry.
+ * reported once, and only while it is recent; asking after it is a retry.
  */
 export async function prepareMap(map: WorldMap): Promise<MapDownload> {
     const running = state.running.get(map.id);
     if (running) return { state: "downloading", received: running.received, total: running.total };
     if (await mapArchivePath(map)) return { state: "ready" };
     const failed = state.failed.get(map.id);
-    if (failed) {
-        state.failed.delete(map.id);
-        return { state: "failed", reason: failed };
-    }
+    state.failed.delete(map.id);
+    if (failed && Date.now() - failed.at < FAILURE_NEWS_MS)
+        return { state: "failed", reason: failed.reason };
     const entry = start(map);
     entry.promise.catch(() => undefined);
     return { state: "downloading", received: entry.received, total: entry.total };

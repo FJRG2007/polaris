@@ -9,10 +9,10 @@
  * with a button that asks again. A map already here answers at once.
  */
 
+import { z } from "zod";
 import { Button } from "@polaris/ui";
 import { useGameText } from "./game-text";
 import { formatBytes } from "@polaris/core";
-import { prepareMapAction } from "./actions";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import type { MapDownload, MapFailure } from "../lib/minecraft/map-store";
@@ -20,6 +20,28 @@ import type { MapDownload, MapFailure } from "../lib/minecraft/map-store";
 const POLL_MS = 1000;
 
 type Waiting = Exclude<MapDownload, { state: "ready" }>;
+
+const UNREACHABLE: MapDownload = { state: "failed", reason: "unreachable" };
+
+const ANSWER = z.discriminatedUnion("state", [
+    z.object({ state: z.literal("ready") }),
+    z.object({ state: z.literal("downloading"), received: z.number(), total: z.number() }),
+    z.object({
+        state: z.literal("failed"),
+        reason: z.enum(["unreachable", "notPublished", "corrupt", "noSpace", "failed"])
+    })
+]) satisfies z.ZodType<MapDownload>;
+
+/** Asked through a route: a form polls it, and an update renames server actions. */
+async function askMap(mapId: string): Promise<MapDownload> {
+    const response = await fetch(`/api/apps/games/maps/${encodeURIComponent(mapId)}`, {
+        method: "POST",
+        cache: "no-store"
+    });
+    if (!response.ok) return UNREACHABLE;
+    const answer = ANSWER.safeParse(await response.json());
+    return answer.success ? answer.data : UNREACHABLE;
+}
 
 /** `prepare(mapId)` resolves true once the world is here, false when it could
  *  not be had; `status` is what to show meanwhile, null when nothing is. */
@@ -39,10 +61,7 @@ export function useMapDownload(): {
     const prepare = useCallback(async (mapId: string) => {
         setStatus(null);
         for (;;) {
-            const answer = await prepareMapAction(mapId).catch((): MapDownload => ({
-                state: "failed",
-                reason: "unreachable"
-            }));
+            const answer = await askMap(mapId).catch(() => UNREACHABLE);
             if (!alive.current) return false;
             if (answer.state === "ready") {
                 setStatus(null);

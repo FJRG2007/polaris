@@ -177,4 +177,42 @@ describe("what a form is told while it waits", () => {
         await store.ensureMap(map);
         expect(await store.prepareMap(map)).toEqual({ state: "ready" });
     });
+
+    it("tries again rather than reporting a failure nobody was waiting for", async () => {
+        registry(BYTES, 404);
+        const map = fixtureMap();
+        await store.ensureMap(map).catch(() => undefined);
+        const now = Date.now();
+        vi.spyOn(Date, "now").mockReturnValue(now + 60_000);
+        try {
+            registry();
+            expect((await store.prepareMap(map)).state).toBe("downloading");
+            await store.ensureMap(map);
+            expect(await store.prepareMap(map)).toEqual({ state: "ready" });
+        } finally {
+            vi.restoreAllMocks();
+        }
+    });
+});
+
+describe("where maps are downloaded from", () => {
+    it("is where the app bundles come from, by the same rule", async () => {
+        const { registryOf } = await import("@/lib/app-bundles/store");
+        const dir = mkdtempSync(join(tmpdir(), "polaris-bundle-index-"));
+        const previous = process.env.POLARIS_APP_BUNDLES_DIR;
+        process.env.POLARIS_APP_BUNDLES_DIR = dir;
+        try {
+            const index = { format: 1, build: "x", apps: {} };
+            expect(store.mapRegistry()).toEqual(registryOf(index));
+            const published = { ...index, registry: "ghcr.example/team/polaris-dashboard:tag" };
+            writeFileSync(join(dir, "index.json"), JSON.stringify(published));
+            expect(store.mapRegistry()).toEqual(registryOf(published));
+            expect(store.mapRegistry()).toEqual({
+                host: "ghcr.example",
+                repository: "team/polaris-dashboard"
+            });
+        } finally {
+            process.env.POLARIS_APP_BUNDLES_DIR = previous;
+        }
+    });
 });

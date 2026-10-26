@@ -14,7 +14,6 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { clearResourceGrants } from "@polaris/auth";
 import { findMap } from "../lib/minecraft/maps";
-import { prepareMap, type MapDownload } from "../lib/minecraft/map-store";
 import { flushGameWorld } from "../lib/games-flush";
 import { setServerRunning } from "../lib/games-operations";
 import { gameDomainSuffix } from "../lib/minecraft/address";
@@ -208,22 +207,6 @@ export async function blueprintVersionsAction(
 export async function minecraftReleasesAction(): Promise<string[]> {
     await requirePermission("games.read");
     return releaseVersions().catch(() => []);
-}
-
-/**
- * Where a map's world stands on this instance, starting its download the first
- * time a server is built on it. The create and reset forms ask this until it is
- * ready, so the server's container finds the world already here.
- *
- * Read permission, because a reset is open to whoever may manage that one
- * server: what it can do is fetch one of the few archives the catalog names.
- */
-export async function prepareMapAction(mapId: string): Promise<MapDownload> {
-    await requirePermission("games.read");
-    const parsed = z.string().trim().min(1).max(64).safeParse(mapId);
-    const map = parsed.success ? findMap(parsed.data) : undefined;
-    if (!map) return { state: "failed", reason: "failed" };
-    return prepareMap(map);
 }
 
 /** Create a server. Returns its installed-app id so the page can open it. */
