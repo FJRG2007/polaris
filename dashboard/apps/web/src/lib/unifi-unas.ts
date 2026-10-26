@@ -20,6 +20,11 @@ export const insecure = new Agent({ connect: { rejectUnauthorized: false } });
 /** How long to wait for the first device-state frame before giving up. */
 const SNAPSHOT_TIMEOUT_MS = 9000;
 
+/** How long the console's sign-in may take. A console that is unplugged or on
+ *  another network otherwise holds every caller - the Drive overview's metrics
+ *  card, the collector - for the full connect timeout. */
+export const LOGIN_TIMEOUT_MS = 5000;
+
 export interface UnasDisk {
     readonly slot: number;
     readonly present: boolean;
@@ -98,7 +103,8 @@ export async function signIn(target: UnasTarget): Promise<ConsoleSession> {
             password: target.password,
             rememberMe: true
         }),
-        dispatcher: insecure
+        dispatcher: insecure,
+        signal: AbortSignal.timeout(LOGIN_TIMEOUT_MS)
     });
     if (response.status === 401) {
         throw new Error(
