@@ -17,7 +17,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { OrgAvatar } from "@/components/avatar";
-import { PERSONAL_SCOPE, formatScope } from "@polaris/core";
+import { shelfKey } from "@/lib/shelf";
+import { announceShelf, announcedShelf } from "@/lib/shelf-announce";
+import { PERSONAL_SCOPE, formatScope, parseScope, scopeOrgId } from "@polaris/core";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { AccountSwitcherDialog } from "@/components/device-accounts";
 import { Check, ChevronsUpDown, Settings2, UserRound, Users } from "lucide-react";
@@ -37,6 +39,11 @@ export interface ScopeOption {
     readonly slug: string;
     readonly name: string;
 }
+
+/** How long a switch that went through stays announced. Only a backstop: the
+ *  announcement stops counting as soon as the server's frame shows the new
+ *  shelf. */
+const ANNOUNCED_FOR_MS = 10_000;
 
 export function ScopeSwitcher({
     personalName,
@@ -69,11 +76,32 @@ export function ScopeSwitcher({
     const choose = (value: string) => {
         setOpen(false);
         setPending(true);
+        // Said before the server is asked, so a screen that can draw the other
+        // shelf from what it kept does so now - see `shelf-announce`. Withdrawn
+        // if the switch is refused, which puts that screen back.
+        const switching = {
+            from: shelfKey(current?.id ?? null),
+            to: shelfKey(scopeOrgId(parseScope(value)))
+        };
+        announceShelf(switching);
+        const withdraw = () => {
+            if (announcedShelf() === switching) announceShelf(null);
+        };
         void setWorkspaceScopeAction(value)
             .then((outcome) => {
-                if (outcome.error) toast.show({ title: outcome.error });
+                if (outcome.error) {
+                    withdraw();
+                    toast.show({ title: outcome.error });
+                    return;
+                }
+                // The new frame is on its way with the answer; the announcement
+                // stops counting once it lands, and is cleared well after.
+                setTimeout(withdraw, ANNOUNCED_FOR_MS);
             })
-            .catch(() => toast.show({ title: t("scope.failed") }))
+            .catch(() => {
+                withdraw();
+                toast.show({ title: t("scope.failed") });
+            })
             .finally(() => setPending(false));
     };
 

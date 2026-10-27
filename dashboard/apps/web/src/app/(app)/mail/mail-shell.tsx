@@ -40,6 +40,7 @@ import {
     type UnreadHandle
 } from "@/lib/mailbox/unread-overlay";
 import { mailCache } from "@/lib/mailbox/mail-cache";
+import { shelfAhead, useAnnouncedShelf } from "@/lib/shelf-announce";
 import { useHoldConversationNotices } from "@/components/notifications/notifications-provider";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
@@ -257,6 +258,11 @@ const railSchema = z.object({
  *  dialog, already open. */
 export const CONNECT_MAILBOX_HREF = "/mail/settings/accounts?connect=1";
 
+/** Mail set to show every mailbox, whichever shelf is open: the header's
+ *  switch does not move its list. The value of `EVERY_SHELF`, which lives in a
+ *  server module. */
+const EVERY_SHELF_KEY = "*";
+
 export function MailShell({
     accounts: sentAccounts,
     folders: sentFolders,
@@ -265,7 +271,7 @@ export function MailShell({
     unread: sentUnread,
     viewerName,
     viewerId,
-    shelf,
+    shelf: serverShelf,
     lent,
     mailboxIds,
     children
@@ -289,6 +295,16 @@ export function MailShell({
     // read the device's copy from their own effects, and a child's effects run
     // before its parent's. Idempotent, so a render twice is nothing twice.
     mailCache.setOwner(viewerId);
+    /**
+     * The shelf the list is drawn for: the server's, or the one the header is
+     * switching to while the server renders it (see `shelf-announce`). The list
+     * asks for its shelf by name and keeps its copies under it, so it can draw
+     * the other shelf from this device at once rather than after the slower
+     * shelf's counts. The rail stays the server's until its frame lands; a
+     * refused switch withdraws the announcement and this falls back.
+     */
+    const switching = useAnnouncedShelf();
+    const shelf = shelfAhead(serverShelf, switching, serverShelf !== EVERY_SHELF_KEY);
     const router = useRouter();
     const toast = useToast();
     const t = useTranslations("mail");
@@ -494,7 +510,7 @@ export function MailShell({
         // The shelf this tab drew, not the header's: that is shared by every
         // tab, and another tab switching it must not move this rail - nor the
         // mailbox this tab's composer starts on.
-        void fetch(`${RAIL_PATH}?shelf=${encodeURIComponent(shelf)}`, { cache: "no-store" })
+        void fetch(`${RAIL_PATH}?shelf=${encodeURIComponent(serverShelf)}`, { cache: "no-store" })
             .then((response) => (response.ok ? response.json() : null))
             .then((body) => {
                 const parsed = railSchema.safeParse(body);
@@ -504,7 +520,7 @@ export function MailShell({
                 // The rail stays as it is, which is the last thing the server
                 // actually said. The next frame asks again.
             });
-    }, [shelf]);
+    }, [serverShelf]);
 
     // A change was confirmed: ask for the rail now, so its numbers settle on
     // the server's as soon as the server has them rather than on the next frame.
@@ -662,8 +678,8 @@ export function MailShell({
     const inView = useMemo(() => mailboxInView(pathname, folders), [pathname, folders]);
     useEffect(() => {
         if (inView && accounts.some((account) => account.id === inView))
-            rememberSender(shelf, inView);
-    }, [inView, accounts, shelf]);
+            rememberSender(serverShelf, inView);
+    }, [inView, accounts, serverShelf]);
 
     const openComposer = useCallback(
         (draft: ComposerSeed | null) => {
@@ -679,14 +695,14 @@ export function MailShell({
                           ...draft,
                           accountId: defaultSender({
                               inView,
-                              remembered: rememberedSender(shelf),
+                              remembered: rememberedSender(serverShelf),
                               visible: accounts
                           })
                       }
                     : draft
             );
         },
-        [hasMailbox, router, inView, shelf, accounts]
+        [hasMailbox, router, inView, serverShelf, accounts]
     );
 
     const value = useMemo<MailContextValue>(
