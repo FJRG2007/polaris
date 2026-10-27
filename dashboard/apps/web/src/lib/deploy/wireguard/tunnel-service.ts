@@ -189,6 +189,21 @@ export async function listTunnels(ownerId: string): Promise<TunnelView[]> {
     }));
 }
 
+/**
+ * The UDP ports this machine listens on as the public end of a running tunnel.
+ *
+ * A tunnel whose public end is this machine needs its port reachable from
+ * outside; behind a carrier NAT only the backup relay can carry it.
+ */
+export async function homeListenPorts(): Promise<number[]> {
+    const rows = await prisma.wireguardTunnel.findMany({
+        where: { paused: false, publicTarget: { kind: "local" } },
+        select: { listenPort: true },
+        take: 1000
+    });
+    return rows.map((row) => row.listenPort);
+}
+
 /** Create a tunnel and bring both ends up. */
 export async function createTunnel(
     ownerId: string,
@@ -669,9 +684,8 @@ async function publishRoutes(ownerId: string, target: TunnelRow["publicTarget"])
  * serves for a moment), so that is refused with the reason instead.
  */
 async function ensureEdge(hostId: string, ownerId: string, proxyNetwork: string): Promise<void> {
-    const { readServerEdge, prepareServerEdge, withSetupLock } = await import(
-        "@/lib/deploy/server-edge"
-    );
+    const { readServerEdge, prepareServerEdge, withSetupLock } =
+        await import("@/lib/deploy/server-edge");
     const edge = await readServerEdge(hostId, ownerId);
     if (edge.error) throw new TunnelRefusal("unreachable");
     if (!edge.traefik) {

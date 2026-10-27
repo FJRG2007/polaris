@@ -36,7 +36,7 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { internetOffline } from "@/lib/offline/outbound-lookup";
 import { forwardedPorts } from "@/lib/app-extensions/registry";
 import { generateKeyPair } from "@/lib/deploy/wireguard/tunnel-config";
-import { openKey, sealKey } from "@/lib/deploy/wireguard/tunnel-service";
+import { homeListenPorts, openKey, sealKey } from "@/lib/deploy/wireguard/tunnel-service";
 import {
     loadCloudflareToken,
     requireCloudflareAccount
@@ -658,7 +658,14 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
     const games = await forwardedPorts().catch(() => []);
     // The call media rides the relay too: without it a call through the relay
     // joins and carries no sound.
-    const ports = relayPorts([...games.flatMap((row) => row.ports), ...CALL_PORTS]);
+    // So do the WireGuard tunnels whose public end is this machine: their peers
+    // dial its listen port, which a carrier NAT never lets in.
+    const tunnels = await homeListenPorts().catch(() => []);
+    const ports = relayPorts([
+        ...games.flatMap((row) => row.ports),
+        ...CALL_PORTS,
+        ...tunnels.map((port) => ({ port, protocol: "udp" as const }))
+    ]);
     // Fresh keys start with no ports, so they always bring both ends up again; a
     // relay brought up before UDP was carried stored none, so one with UDP game
     // ports comes up again with them.
