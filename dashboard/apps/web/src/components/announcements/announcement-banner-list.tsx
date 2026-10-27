@@ -22,9 +22,9 @@ import { AlertTriangle, CheckCircle2, Info, Megaphone, Wrench, X } from "lucide-
 
 const TONE: Record<string, string> = {
     info: "border-sky-500/30 bg-sky-500/10 text-sky-950 dark:text-sky-100",
-    success: "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100",
-    warning: "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100",
-    critical: "border-red-500/40 bg-red-500/10 text-red-950 dark:text-red-100"
+    success: "border-success-edge bg-success-soft text-success-ink",
+    warning: "border-warning-edge bg-warning-soft text-warning-ink",
+    critical: "border-danger-edge bg-danger-soft text-danger-ink"
 };
 
 function Icon({ banner }: { banner: BannerView }) {
