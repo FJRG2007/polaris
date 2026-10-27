@@ -6,7 +6,7 @@
  * separate question it does not answer (the dashboard's own address, the sharing
  * domain, the full list of names it answers on, the DNS records) or the manual
  * controls behind it. Remote access, ports, certificates and the security inventory
- * each have a page of their own under the same rail, so this one stays short.
+ * each have a page of their own under the Domains heading, so this one stays short.
  *
  * Those manual controls sit under Advanced rather than beside the setup, because they
  * are the same settings a second time: an exposure mode the setup already stored and a

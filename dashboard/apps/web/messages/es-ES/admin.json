@@ -485,7 +485,7 @@
                 "description": "Confía en Polaris en tu red local y elige la dirección a la que escribe la autoridad de certificación."
             },
             "security": {
-                "title": "Seguridad de dominios",
+                "title": "Seguridad",
                 "description": "Cada dominio que conoce Polaris, revisado en busca de suplantación y problemas de DNS, registro y HTTPS."
             }
         },

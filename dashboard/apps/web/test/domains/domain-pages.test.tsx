@@ -42,10 +42,18 @@ vi.mock("@/app/(app)/admin/domains/domains-view", () => ({
     DomainsView: stub("DomainsView"),
     LocalCertificate: stub("LocalCertificate")
 }));
-vi.mock("@/app/(app)/admin/domains/backup-access-card", () => ({ BackupAccessCard: stub("BackupAccessCard") }));
-vi.mock("@/app/(app)/admin/domains/tailscale-card", () => ({ TailscaleCard: stub("TailscaleCard") }));
-vi.mock("@/app/(app)/admin/domains/game-ports-card", () => ({ GamePortsCard: stub("GamePortsCard") }));
-vi.mock("@/app/(app)/admin/domains/call-ports-card", () => ({ CallPortsCard: stub("CallPortsCard") }));
+vi.mock("@/app/(app)/admin/domains/backup-access-card", () => ({
+    BackupAccessCard: stub("BackupAccessCard")
+}));
+vi.mock("@/app/(app)/admin/domains/tailscale-card", () => ({
+    TailscaleCard: stub("TailscaleCard")
+}));
+vi.mock("@/app/(app)/admin/domains/game-ports-card", () => ({
+    GamePortsCard: stub("GamePortsCard")
+}));
+vi.mock("@/app/(app)/admin/domains/call-ports-card", () => ({
+    CallPortsCard: stub("CallPortsCard")
+}));
 vi.mock("@/app/(app)/admin/domains/certificate-contact-card", () => ({
     CertificateContactCard: stub("CertificateContactCard")
 }));
@@ -129,21 +137,21 @@ describe("the Domains pages", () => {
             await expect(page()).rejects.toThrow("NEXT_REDIRECT");
         });
 
-        it(`${href} sits in the Domains rail`, () => {
+        it(`${href} sits under the Domains heading of the Platform rail`, () => {
             const subapp = resolveSubapp(href);
+            const section = subapp?.sections.find((entry) => entry.href === href);
 
-            expect(subapp?.id).toBe("admin-domains");
-            expect(subapp?.sections.map((section) => section.href)).toContain(href);
-            expect(subapp?.sections.find((section) => section.href === href)?.adminOnly).toBe(true);
+            expect(subapp?.id).toBe("admin-platform");
+            expect(section?.group).toBe("Domains");
+            expect(section?.adminOnly).toBe(true);
         });
     }
 
-    it("lists no page in the rail that does not exist", () => {
-        const rail = APP_SUBAPPS.find((subapp) => subapp.id === "admin-domains");
+    it("lists no page under the Domains heading that does not exist", () => {
+        const rail = APP_SUBAPPS.find((subapp) => subapp.id === "admin-platform");
+        const listed = rail?.sections.filter((section) => section.group === "Domains");
 
-        expect(rail?.sections.map((section) => section.href).sort()).toEqual(
-            Object.keys(PAGES).sort()
-        );
+        expect(listed?.map((section) => section.href).sort()).toEqual(Object.keys(PAGES).sort());
     });
 
     it("draws each card on exactly one page", async () => {
@@ -168,8 +176,7 @@ describe("an old link to /admin/domains#anchor", () => {
             const owner = ANCHOR_OWNERS[id]!;
             const source = readFileSync(join(process.cwd(), owner.file), "utf8");
             const declared =
-                source.includes(`id="${id}"`) ||
-                new RegExp(`=\\s*"${id}"`).test(source);
+                source.includes(`id="${id}"`) || new RegExp(`=\\s*"${id}"`).test(source);
 
             expect(declared).toBe(true);
 

@@ -678,6 +678,14 @@ const DEVELOPERS_GROUP = "Developers";
 const ADMIN_AREAS_GROUP = "Areas";
 
 /**
+ * Platform's Domains heading. Domains grew past one page - the tunnels, the ports
+ * and the certificates each answer a different question, and on one page they
+ * were a long scroll - so its screens sit under a heading of their own in the
+ * Platform rail, at the addresses below /admin/domains.
+ */
+const DOMAINS_GROUP = "Domains";
+
+/**
  * The Management areas, each a rail of its own.
  *
  * Twenty-odd screens under seven headings was still a list to read through, so
@@ -863,7 +871,7 @@ const ADMIN_AREAS: AppSubapp[] = [
         label: "Platform", // i18n-ignore
         icon: Settings,
         base: "/admin/settings",
-        match: ["/admin/apps", "/admin/setup", "/admin/display"],
+        match: ["/admin/apps", "/admin/setup", "/admin/display", "/admin/domains"],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
@@ -899,8 +907,48 @@ const ADMIN_AREAS: AppSubapp[] = [
                 label: "Domains", // i18n-ignore
                 href: "/admin/domains",
                 adminOnly: true,
+                group: DOMAINS_GROUP,
                 icon: Globe,
-                keywords: ["dns", "tunnels", "certificates", "ports", "remote access"]
+                keywords: ["dns", "dns records", "setup", "app domain", "sharing domain", "duckdns"]
+            },
+            {
+                label: "Remote access", // i18n-ignore
+                href: "/admin/domains/remote-access",
+                adminOnly: true,
+                group: DOMAINS_GROUP,
+                icon: Waypoints,
+                keywords: [
+                    "tunnels",
+                    "cloudflare tunnel",
+                    "tailscale",
+                    "relay",
+                    "cgnat",
+                    "backup access"
+                ]
+            },
+            {
+                label: "Ports", // i18n-ignore
+                href: "/admin/domains/ports",
+                adminOnly: true,
+                group: DOMAINS_GROUP,
+                icon: EthernetPort,
+                keywords: ["port forwarding", "router", "game ports", "call ports", "nat"]
+            },
+            {
+                label: "Certificates", // i18n-ignore
+                href: "/admin/domains/certificates",
+                adminOnly: true,
+                group: DOMAINS_GROUP,
+                icon: FileBadge,
+                keywords: ["https", "tls", "ssl", "root certificate", "polaris.local", "acme"]
+            },
+            {
+                label: "Domain security", // i18n-ignore
+                href: "/admin/domains/security",
+                adminOnly: true,
+                group: DOMAINS_GROUP,
+                icon: ShieldCheck,
+                keywords: ["spoofing", "dmarc", "spf", "dkim", "registration", "expiry"]
             }
         ]
     },
@@ -2507,62 +2555,6 @@ export interface AppSubapp {
 
 export const APP_SUBAPPS: AppSubapp[] = [
     ...ADMIN_AREAS,
-    {
-        // Domains grew past one page: the tunnels, the ports and the certificates
-        // each answer a different question, and on one page they were a long
-        // scroll. Platform's Domains entry opens this, and the addresses below
-        // /admin/domains belong to it rather than to Platform.
-        id: "admin-domains",
-        label: "Domains", // i18n-ignore
-        icon: Globe,
-        base: "/admin/domains",
-        parent: { label: "Platform", href: "/admin/settings" }, // i18n-ignore
-        parentAppId: "admin",
-        sections: [
-            {
-                label: "Domains", // i18n-ignore
-                href: "/admin/domains",
-                adminOnly: true,
-                icon: Globe,
-                keywords: ["dns", "dns records", "setup", "app domain", "sharing domain", "duckdns"]
-            },
-            {
-                label: "Remote access", // i18n-ignore
-                href: "/admin/domains/remote-access",
-                adminOnly: true,
-                icon: Waypoints,
-                keywords: [
-                    "tunnels",
-                    "cloudflare tunnel",
-                    "tailscale",
-                    "relay",
-                    "cgnat",
-                    "backup access"
-                ]
-            },
-            {
-                label: "Ports", // i18n-ignore
-                href: "/admin/domains/ports",
-                adminOnly: true,
-                icon: EthernetPort,
-                keywords: ["port forwarding", "router", "game ports", "call ports", "nat"]
-            },
-            {
-                label: "Certificates", // i18n-ignore
-                href: "/admin/domains/certificates",
-                adminOnly: true,
-                icon: FileBadge,
-                keywords: ["https", "tls", "ssl", "root certificate", "polaris.local", "acme"]
-            },
-            {
-                label: "Domain security", // i18n-ignore
-                href: "/admin/domains/security",
-                adminOnly: true,
-                icon: ShieldCheck,
-                keywords: ["spoofing", "dmarc", "spf", "dkim", "registration", "expiry"]
-            }
-        ]
-    },
     {
         id: "inbox",
         label: "Inbox", // i18n-ignore

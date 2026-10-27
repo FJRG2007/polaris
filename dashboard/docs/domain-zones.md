@@ -185,7 +185,8 @@ or the manual controls for settings the setup already wrote. Those (Network & ex
 DuckDNS) sit behind an **Advanced** disclosure with a Save each, so that one setting is
 never edited by two panels under one button.
 
-The rest of the subject has pages of its own under the same rail:
+The rest of the subject has pages of its own, under the Domains heading of the
+Platform rail:
 
 | Page | Holds |
 | --- | --- |
