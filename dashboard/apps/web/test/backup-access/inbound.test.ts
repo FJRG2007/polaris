@@ -267,6 +267,36 @@ describe("call address", () => {
         ).toBe("local-only");
     });
 
+    it("explains why outsiders cannot reach a call", () => {
+        expect(
+            inbound.callsOutside({ cgnat: true, serving: "direct", path: null, relayAddress: null })
+        ).toBe("cgnat");
+        expect(
+            inbound.callsOutside({
+                cgnat: false,
+                serving: "backup",
+                path: "tunnel",
+                relayAddress: null
+            })
+        ).toBe("backup");
+        expect(
+            inbound.callsOutside({
+                cgnat: true,
+                serving: "backup",
+                path: "relay",
+                relayAddress: RELAY
+            })
+        ).toBeNull();
+        expect(
+            inbound.callsOutside({
+                cgnat: false,
+                serving: "direct",
+                path: null,
+                relayAddress: null
+            })
+        ).toBeNull();
+    });
+
     it("never advertises a private relay address", () => {
         expect(
             inbound.callNodeIp({ serving: "backup", path: "relay", relayAddress: "10.1.2.3" })

@@ -84,9 +84,11 @@ import { refreshInboundReach, readInboundReach } from "./inbound-service";
 import {
     callNodeIp,
     callReach,
+    callsOutside,
     cgnatVerdict,
     recommendPath,
     type CallReach,
+    type CallsOutside,
     type InboundPath,
     type InboundReach
 } from "./inbound";
@@ -192,6 +194,22 @@ function parse<S extends z.ZodTypeAny>(schema: S, raw: string | null): z.output<
 
 export async function readConfig(): Promise<BackupConfig> {
     return parse(configSchema, await getSetting(BACKUP_CONFIG_KEY)) ?? DEFAULT_CONFIG;
+}
+
+/** Why callers outside the house cannot reach a call now, or null when they can. */
+export async function callsOutsideNow(): Promise<CallsOutside | null> {
+    const [config, state, relay, reach] = await Promise.all([
+        readConfig(),
+        getSetting(BACKUP_STATE_KEY).then(readState),
+        getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw)),
+        readInboundReach().catch(() => null)
+    ]);
+    return callsOutside({
+        cgnat: reach?.cgnat ?? false,
+        serving: state.serving,
+        path: config.path,
+        relayAddress: relay?.address ?? null
+    });
 }
 
 /** What Admin -> Domains shows. */

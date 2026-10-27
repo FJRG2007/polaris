@@ -210,6 +210,19 @@ export function callReach(input: {
     return "direct";
 }
 
+export type CallsOutside = "cgnat" | "backup";
+
+/**
+ * Why a caller outside the house cannot reach the call media, or null when they
+ * can. "cgnat": the line takes nothing in and no relay carries the media.
+ * "backup": a tunnel serves the web while the direct line is down, and a tunnel
+ * carries no media. People in the house can still call either way.
+ */
+export function callsOutside(input: Parameters<typeof callReach>[0]): CallsOutside | null {
+    if (callReach(input) !== "local-only") return null;
+    return input.cgnat ? "cgnat" : "backup";
+}
+
 /** The ways in Polaris can offer, the direct line included. */
 export const INBOUND_PATHS = ["direct", "relay", "tunnel", "tailscale", "ipv6"] as const;
 export type InboundPath = (typeof INBOUND_PATHS)[number];
