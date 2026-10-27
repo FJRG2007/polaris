@@ -19,6 +19,7 @@
  */
 
 import { POLARIS_CA } from "./evaluate";
+import { ruaAddress } from "./dmarc-advice";
 import { txtText } from "@/lib/dns/record-schema";
 import type { FindingCode, SecurityReport } from "./types";
 import {
@@ -218,9 +219,16 @@ export function planChanges(input: PlanInput): PlannedChange[] {
                     code = parsed.record.p === "none" ? "dmarcNone" : "dmarcQuarantine";
                 }
             }
-            if (parsed.ok && parsed.record.rua.length === 0 && input.reportAddress) {
+            // Reports reach Polaris's own mailbox, alongside any address already
+            // named, so it can tell by itself when tightening is safe.
+            if (
+                parsed.ok &&
+                input.reportAddress &&
+                !parsed.record.rua.map(ruaAddress).includes(input.reportAddress.toLowerCase())
+            ) {
                 next = withRua(next, `mailto:${input.reportAddress}`);
-                code ??= "dmarcRuaMissing";
+                code ??=
+                    parsed.record.rua.length === 0 ? "dmarcRuaMissing" : "dmarcReportsElsewhere";
             }
             if (code && next !== current) {
                 push({
@@ -364,6 +372,34 @@ export function planChanges(input: PlanInput): PlannedChange[] {
  *  makes them: a null MX on a domain that sends mail gets its mail refused, and
  *  a first CAA record stops every other CA from issuing under it. */
 const ASKED_FIRST: readonly FindingCode[] = ["mxMissing", "caaMissing"];
+
+/** The checks a plan can answer with a change. A finding outside this list is
+ *  fixed somewhere Polaris does not reach, so it never opens the fix dialog.
+ *  The DMARC policy is in it only once tightening is safe (see withReadiness). */
+export const PLANNABLE: ReadonlySet<FindingCode> = new Set<FindingCode>([
+    "spfMissing",
+    "spfMultiple",
+    "spfAllPass",
+    "spfAllNeutral",
+    "spfAllMissing",
+    "dmarcMissing",
+    "dmarcNone",
+    "dmarcQuarantine",
+    "dmarcRuaMissing",
+    "dmarcReportsElsewhere",
+    "mxMissing",
+    "parkedNullMx",
+    "parkedDkim",
+    "tlsRptMissing",
+    "caaMissing",
+    "caaBlocksPolaris",
+    "dnssecOff",
+    "hstsMissing",
+    "hstsShort",
+    "headerFramingMissing",
+    "headerNosniffMissing",
+    "headerReferrerMissing"
+]);
 
 /** The changes a domain handed to Polaris gets without asking: every one the
  *  plan makes on its own that cannot take something away. A stricter DMARC

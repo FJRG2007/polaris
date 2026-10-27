@@ -11,7 +11,12 @@ import type { KnownDomain } from "@/lib/domain-security/inventory";
 const ZONE_ID = "a".repeat(32);
 const audits = new Map<string, Record<string, unknown>>();
 let known: KnownDomain[] = [];
-const notified: { userId: string; title: string; href: string | null | undefined }[] = [];
+const notified: {
+    userId: string;
+    title: string;
+    href: string | null | undefined;
+    condition?: string;
+}[] = [];
 const saved: {
     scope: unknown;
     recordId: string | null;
@@ -66,9 +71,21 @@ vi.mock("@/lib/domain-security/inventory", () => ({
     knownDomain: vi.fn(async (name: string) => known.find((entry) => entry.domain === name) ?? null)
 }));
 vi.mock("@/lib/notifications/dispatch", () => ({
-    notify: vi.fn(async (input: { userId: string; title: string; href?: string | null }) => {
-        notified.push({ userId: input.userId, title: input.title, href: input.href });
-    })
+    notify: vi.fn(
+        async (input: {
+            userId: string;
+            title: string;
+            href?: string | null;
+            condition?: string;
+        }) => {
+            notified.push({
+                userId: input.userId,
+                title: input.title,
+                href: input.href,
+                condition: input.condition
+            });
+        }
+    )
 }));
 vi.mock("@/lib/notifications/notice-words", async () => {
     const { translatorFor } = await import("@/lib/i18n/translate");
@@ -213,6 +230,8 @@ describe("the daily pass", () => {
             expect.objectContaining({ userId: "user-1", href: "/account/domains" })
         ]);
         expect(notified[0]!.title).toMatch(/^example\.com: \d+ new security problems$/);
+        // One open notice per domain, rewritten while anything is left to do.
+        expect(notified[0]!.condition).toBe("domain.security:example.com");
     });
 
     it("says nothing the second time when nothing got worse", async () => {
@@ -314,5 +333,34 @@ describe("the daily pass", () => {
         const result = await service.runDomainSecuritySweep(emptyProbes());
         expect(result.fixed).toBe(0);
         expect(saved).toEqual([]);
+    });
+});
+
+describe("what an alert is about", () => {
+    const finding = (code: string, severity: string, params: Record<string, string> = {}) =>
+        ({ code, section: "email", severity, params, records: [], where: null }) as never;
+
+    it("treats a DMARC policy still collecting reports as a status, not something to act on", () => {
+        expect(service.actionable(finding("dmarcNone", "info", { state: "collecting" }))).toBe(
+            false
+        );
+        expect(service.actionable(finding("dmarcNone", "medium", { state: "ready" }))).toBe(true);
+    });
+
+    it("says ready to tighten, or names the failing sender, when that is the one new thing", () => {
+        expect(service.noticeKind([finding("dmarcNone", "medium", { state: "ready" })])).toEqual({
+            kind: "ready"
+        });
+        expect(
+            service.noticeKind([
+                finding("dmarcSenderFailing", "medium", { host: "mailer.example.net" })
+            ])
+        ).toEqual({ kind: "sender", host: "mailer.example.net" });
+        expect(
+            service.noticeKind([
+                finding("dmarcNone", "medium", { state: "ready" }),
+                finding("hstsMissing", "medium")
+            ])
+        ).toEqual({ kind: "worse" });
     });
 });

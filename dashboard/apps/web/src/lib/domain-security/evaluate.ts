@@ -11,6 +11,7 @@
 
 import type { DomainFacts } from "./facts";
 import * as rec from "./records";
+import { ruaAddress } from "./dmarc-advice";
 import {
     gradeOf,
     type Finding,
@@ -352,6 +353,21 @@ function emailFindings(
                 }
                 if (record.rua.length === 0) {
                     out.add("email", "dmarcRuaMissing", "low", {}, { where: "dns" });
+                } else if (report && !record.rua.map(ruaAddress).includes(report.toLowerCase())) {
+                    // Reports go somewhere Polaris does not read, so it cannot tell
+                    // when tightening is safe; adding its own mailbox fixes that.
+                    out.add(
+                        "email",
+                        "dmarcReportsElsewhere",
+                        "low",
+                        { address: report },
+                        {
+                            records: [
+                                txt(dmarcName, rec.withRua(dmarcTexts[0]!, `mailto:${report}`))
+                            ],
+                            where: "dns"
+                        }
+                    );
                 }
                 for (const [host, authorized] of Object.entries(facts.ruaAuthorization)) {
                     if (authorized === false)

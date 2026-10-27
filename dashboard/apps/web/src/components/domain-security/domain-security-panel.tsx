@@ -38,6 +38,7 @@ import {
     setDomainDedicatedAction,
     type SecurityRef
 } from "@/app/(app)/account/domains/security-actions";
+import { PLANNABLE } from "@/lib/domain-security/plan";
 import * as polls from "../shared-polls";
 
 /** How long an answer is shown again without asking. */
@@ -64,12 +65,28 @@ function counts(finding: Finding): boolean {
     return severityRank(finding.severity) >= severityRank("low");
 }
 
-/** What a finding says, with its parameters filled in. */
-function words(t: Words, finding: Finding, part: "title" | "risk" | "fix"): string {
-    return t(
-        key(`findings.${finding.code}.${part}`),
-        finding.params as Record<string, string | number>
+/** A DMARC policy finding Polaris has not cleared for tightening: a calm status
+ *  with nothing to apply, not a fix. */
+function waitingPolicy(finding: Finding): boolean {
+    return (
+        (finding.code === "dmarcNone" || finding.code === "dmarcQuarantine") &&
+        finding.params.state !== "ready"
     );
+}
+
+/** Whether the fix dialog has something to offer for it - what "Review fixes"
+ *  is shown for, so it never opens onto nothing. */
+function applicable(finding: Finding): boolean {
+    return open(finding) && PLANNABLE.has(finding.code) && !waitingPolicy(finding);
+}
+
+/** What a finding says, with its parameters filled in. An audit stored before
+ *  the DMARC state existed reads as the plain status. */
+function words(t: Words, finding: Finding, part: "title" | "risk" | "fix"): string {
+    return t(key(`findings.${finding.code}.${part}`), {
+        state: "other",
+        ...finding.params
+    } as Record<string, string | number>);
 }
 
 function whereText(t: Words, finding: Finding, canFix: boolean): string | null {
@@ -92,7 +109,7 @@ function whereText(t: Words, finding: Finding, canFix: boolean): string | null {
 function FindingRow({ finding, canFix }: { finding: Finding; canFix: boolean }) {
     const t = useTranslations("domainSecurity");
     const fixable = open(finding);
-    const where = fixable ? whereText(t, finding, canFix) : null;
+    const where = fixable && !waitingPolicy(finding) ? whereText(t, finding, canFix) : null;
     // A passed check has no fix; its words are only a title and what it means.
     const hasFix =
         fixable &&
@@ -189,11 +206,7 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
         .filter(open)
         .sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
     const sectionPassed = inSection.filter((finding) => !open(finding));
-    const fixable = findings.filter(
-        (finding) =>
-            open(finding) &&
-            (finding.where === "dns" || finding.where === "dnssec" || finding.where === "edge")
-    );
+    const fixable = findings.filter(applicable);
     const needsZone = findings.some(
         (finding) => open(finding) && finding.where === "dns" && finding.records.length > 0
     );

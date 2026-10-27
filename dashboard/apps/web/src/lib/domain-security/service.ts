@@ -31,7 +31,14 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { knownDomain, knownDomains, type KnownDomain } from "./inventory";
 import { storedReport } from "@/lib/mail-server/dmarc-report";
 import { sendingSources, type SendingSource } from "./dmarc-sources";
-import { regressions, type Grade, type SecurityReport } from "./types";
+import {
+    dmarcReadiness,
+    withReadiness,
+    MAX_SENDER_FINDINGS,
+    type DmarcReadiness
+} from "./dmarc-advice";
+import { resolveCondition } from "@/lib/notification-service";
+import { regressions, severityRank, type Finding, type Grade, type SecurityReport } from "./types";
 import { emptyDraft, type DnsRecordDraft } from "@/lib/dns/record-schema";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
 import {
@@ -71,6 +78,8 @@ const STALE_MS = 20 * 60 * 60 * 1000;
 const PER_RUN = 25;
 /** How far back sending sources are read. */
 const SOURCES_DAYS = 30;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface Access {
     readonly known: KnownDomain;
@@ -215,7 +224,11 @@ async function audit(
         },
         probes ?? (await import("./probes")).liveProbes()
     );
-    const report = evaluate(facts);
+    const evaluated = evaluate(facts);
+    const report = withReadiness(
+        evaluated,
+        await readinessFor(known.domain, reportAddressFor(known), evaluated.rua)
+    );
     const row = await prisma.domainSecurityAudit.findUnique({
         where: { domain: known.domain },
         select: { report: true }
@@ -304,7 +317,7 @@ async function namedSources(sources: SendingSource[]): Promise<SendingSource[]> 
 }
 
 async function sourcesFor(domain: string): Promise<SendingSource[] | null> {
-    const since = new Date(Date.now() - SOURCES_DAYS * 24 * 60 * 60 * 1000);
+    const since = new Date(Date.now() - SOURCES_DAYS * DAY_MS);
     const rows = await prisma.mailDmarcReport.findMany({
         where: { domain, endAt: { gte: since } },
         orderBy: { endAt: "desc" },
@@ -312,6 +325,33 @@ async function sourcesFor(domain: string): Promise<SendingSource[] | null> {
     });
     if (rows.length === 0) return null;
     return namedSources(sendingSources(rows.map(storedReport)).slice(0, 20));
+}
+
+/** Whether the DMARC policy can tighten, from the reports Polaris filed for the
+ *  domain; failing senders get their reverse name, which is what says who they are. */
+async function readinessFor(
+    domain: string,
+    reportAddress: string | null,
+    rua: readonly string[]
+): Promise<DmarcReadiness> {
+    const rows = reportAddress
+        ? await prisma.mailDmarcReport.findMany({
+              where: { domain, endAt: { gte: new Date(Date.now() - SOURCES_DAYS * DAY_MS) } },
+              orderBy: { endAt: "desc" },
+              take: 1000
+          })
+        : [];
+    const readiness = dmarcReadiness({
+        reportAddress,
+        rua,
+        reports: rows.map(storedReport),
+        now: new Date()
+    });
+    if (readiness.kind !== "failing") return readiness;
+    return {
+        kind: "failing",
+        senders: await namedSources(readiness.senders.slice(0, MAX_SENDER_FINDINGS))
+    };
 }
 
 async function viewOf(access: Access): Promise<DomainSecurityView> {
@@ -617,22 +657,92 @@ async function recipientsFor(known: KnownDomain): Promise<{ userId: string; href
     return [...out.entries()].map(([userId, href]) => ({ userId, href }));
 }
 
-async function tell(known: KnownDomain, worse: number, fixed: number): Promise<void> {
+/** The open notice about a domain's problems, one per reader while any holds. */
+export function securityCondition(domain: string): string {
+    return `domain.security:${domain}`;
+}
+
+/** Whether a finding is something a reader can act on now: what alerts are for.
+ *  A calm status (a DMARC policy still collecting reports) is info, not this. */
+export function actionable(finding: Finding): boolean {
+    return severityRank(finding.severity) >= severityRank("medium");
+}
+
+/** What a notice about new problems says: the one thing when it is one thing. */
+export function noticeKind(
+    worse: readonly Finding[]
+): { kind: "ready" } | { kind: "sender"; host: string } | { kind: "worse" } {
+    if (worse.length !== 1) return { kind: "worse" };
+    const only = worse[0]!;
+    if (
+        (only.code === "dmarcNone" || only.code === "dmarcQuarantine") &&
+        only.params.state === "ready"
+    )
+        return { kind: "ready" };
+    if (only.code === "dmarcSenderFailing")
+        return { kind: "sender", host: String(only.params.host) };
+    return { kind: "worse" };
+}
+
+async function tell(known: KnownDomain, worse: readonly Finding[], fixed: number): Promise<void> {
+    const what = noticeKind(worse);
     for (const recipient of await recipientsFor(known)) {
         const t = await wordsFor(recipient.userId, "domainSecurity");
+        const domain = known.domain;
         await notify({
             userId: recipient.userId,
             event: "domain.security",
             title:
-                worse > 0
-                    ? t("notice.worse", { domain: known.domain, count: worse })
-                    : t("notice.fixed", { domain: known.domain, count: fixed }),
-            body: worse > 0 ? t("notice.worseBody", { fixed }) : t("notice.fixedBody"),
+                worse.length === 0
+                    ? t("notice.fixed", { domain, count: fixed })
+                    : what.kind === "ready"
+                      ? t("notice.ready", { domain })
+                      : what.kind === "sender"
+                        ? t("notice.sender", { domain, host: what.host })
+                        : t("notice.worse", { domain, count: worse.length }),
+            body:
+                worse.length === 0
+                    ? t("notice.fixedBody")
+                    : what.kind === "ready"
+                      ? t("notice.readyBody")
+                      : what.kind === "sender"
+                        ? t("notice.senderBody")
+                        : t("notice.worseBody", { fixed }),
             href: recipient.href,
-            level: worse > 0 ? "warning" : "success",
-            actionRequired: worse > 0
+            level: worse.length > 0 ? "warning" : "success",
+            actionRequired: worse.length > 0,
+            metadata: { domain },
+            // One notice per domain while something is open: a later regression
+            // rewrites it, and the sweep closes it once nothing is left to do.
+            ...(worse.length > 0 ? { condition: securityCondition(domain), resurface: true } : {})
         }).catch(() => undefined);
     }
+}
+
+/**
+ * Close a domain's open alerts once nothing on it is actionable, including the
+ * ones written before alerts carried a condition (matched by type and the
+ * domain their title starts with), so an alert about a policy that is now a calm
+ * status stops waiting on anybody.
+ */
+async function settle(known: KnownDomain): Promise<number> {
+    const domain = known.domain;
+    const closed = await resolveCondition(securityCondition(domain));
+    const userIds = (await recipientsFor(known)).map((recipient) => recipient.userId);
+    if (userIds.length === 0) return closed;
+    const legacy = await prisma.notification
+        .updateMany({
+            where: {
+                userId: { in: userIds },
+                type: "domain.security",
+                conditionKey: null,
+                actionRequired: true,
+                title: { startsWith: `${domain}:` }
+            },
+            data: { actionRequired: false, readAt: new Date() }
+        })
+        .catch(() => ({ count: 0 }));
+    return closed + legacy.count;
 }
 
 /** The safe fixes for a domain handed to Polaris, made with nobody asking and
@@ -715,11 +825,12 @@ export async function runDomainSecuritySweep(
                     report = (await audit(entry, system, probes)).report;
                 }
             }
-            const worse = regressions(previous?.findings ?? null, report.findings).length;
-            if (worse > 0 || applied > 0) {
+            const worse = regressions(previous?.findings ?? null, report.findings);
+            if (worse.length > 0 || applied > 0) {
                 await tell(entry, worse, applied);
                 told += 1;
             }
+            if (!report.findings.some(actionable)) await settle(entry);
         } catch (error) {
             console.error(`polaris: auditing ${entry.domain} failed:`, error);
         }

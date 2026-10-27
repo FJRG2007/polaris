@@ -125,6 +125,36 @@ describe("planning fixes", () => {
         ]);
     });
 
+    it("adds Polaris's report address next to one that reports go to elsewhere", () => {
+        const text = "v=DMARC1; p=none; rua=mailto:dmarc@reports.example.net";
+        const changes = plan({
+            facts: { dmarcTxt: [text] },
+            records: [{ id: ID(7), type: "TXT", name: "_dmarc.example.com", content: text }],
+            reportAddress: "dmarc-reports@example.com"
+        });
+        expect(changes).toEqual([
+            expect.objectContaining({
+                code: "dmarcReportsElsewhere",
+                before: [text],
+                after: `${text},mailto:dmarc-reports@example.com`
+            })
+        ]);
+    });
+
+    for (const text of [
+        "v=DMARC1;p=none;rua=mailto:dmarc-reports@example.com;",
+        "v=DMARC1; p=none; rua=mailto:DMARC-reports@example.com!10m"
+    ]) {
+        it(`leaves a DMARC that already reports to Polaris alone (${text})`, () => {
+            const changes = plan({
+                facts: { dmarcTxt: [text] },
+                records: [{ id: ID(8), type: "TXT", name: "_dmarc.example.com", content: text }],
+                reportAddress: "dmarc-reports@example.com"
+            });
+            expect(changes).toEqual([]);
+        });
+    }
+
     it("adds a CAA issuer alongside the ones there, and leaves an MX alone", () => {
         const records: ZoneRecordLike[] = [
             { id: ID(5), type: "CAA", name: "example.com", content: '0 issue "digicert.com"' },

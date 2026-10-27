@@ -55,6 +55,8 @@ export const FINDING_CODES = [
     "dmarcSubdomainWeaker",
     "dmarcRuaMissing",
     "dmarcRuaUnauthorized",
+    "dmarcReportsElsewhere",
+    "dmarcSenderFailing",
     "parkedOk",
     "parkedNullMx",
     "parkedDkim",
