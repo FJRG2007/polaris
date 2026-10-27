@@ -696,7 +696,7 @@
         "dropPointNotYours": "Este buzón no es tuyo.",
         "notOpenYet": "Este buzón aún no está abierto.",
         "outsideHours": "Este buzón solo acepta texto en un horario. Vuelve a intentarlo dentro de él.",
-        "locationDenied": "Este buzón no está disponible desde tu ubicación.",
+        "dropPointLocationDenied": "Este buzón no está disponible desde tu ubicación.",
         "closed": "Este buzón está cerrado.",
         "networkDenied": "Este buzón no está disponible desde tu red.",
         "signInToSend": "Inicia sesión para enviarlo.",
