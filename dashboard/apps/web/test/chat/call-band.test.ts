@@ -15,7 +15,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { callBandHeight, callBandLimit, callBareFaces } from "@/app/(app)/chat/call-band";
+import {
+    callBandHeight,
+    callBandLimit,
+    callBandSize,
+    callBareFaces
+} from "@/app/(app)/chat/call-band";
+import { storedPaneSize, writePaneSize } from "@/app/(app)/chat/pane-preferences";
 
 /** The cap as a percentage, so an assertion can read as a size rather than as a
  *  class name. */
@@ -119,5 +125,59 @@ describe("the same limit in pixels, for the divider", () => {
         expect(callBandLimit("direct", false, 0, BOUNDS)).toBe(BOUNDS.max);
         expect(callBandLimit("direct", false, Number.NaN, BOUNDS)).toBe(BOUNDS.max);
         expect(callBandLimit("room", false, 900, BOUNDS)).toBe(BOUNDS.max);
+    });
+});
+
+describe("the height the call's divider is at", () => {
+    // The same numbers the conversation uses for its call.
+    const BAND = { min: 140, max: 720, fallback: 260 };
+
+    it("is what somebody dragged it to, inside the limit", () => {
+        expect(callBandSize(400, 300, 600, BAND)).toBe(400);
+    });
+
+    it("is the drawn height until somebody has dragged it", () => {
+        expect(callBandSize(null, 300, 600, BAND)).toBe(300);
+        expect(callBandSize(null, null, 600, BAND)).toBe(BAND.fallback);
+    });
+
+    it("never goes past the limit of the window it is in", () => {
+        // A height kept from a taller window.
+        expect(callBandSize(700, 300, 450, BAND)).toBe(450);
+    });
+
+    it("never goes under the floor, even in a column too short for it", () => {
+        expect(callBandSize(40, 300, 600, BAND)).toBe(BAND.min);
+        expect(callBandSize(400, 300, 90, BAND)).toBe(BAND.min);
+        expect(callBandSize(Number.NaN, null, 600, BAND)).toBe(BAND.fallback);
+    });
+
+    it("comes back from this browser at the height it was left at, clamped", () => {
+        const store = new Map<string, string>();
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {
+                localStorage: {
+                    getItem: (key: string) => store.get(key) ?? null,
+                    setItem: (key: string, value: string) => void store.set(key, value),
+                    removeItem: (key: string) => void store.delete(key)
+                }
+            }
+        });
+        try {
+            expect(storedPaneSize("call.direct", BAND)).toBeNull();
+            writePaneSize("call.direct", 380);
+            const kept = storedPaneSize("call.direct", BAND);
+            expect(kept).toBe(380);
+            expect(callBandSize(kept, 200, callBandLimit("direct", true, 1000, BAND), BAND)).toBe(
+                380
+            );
+            // Kept apart from a channel's call, which is a different question.
+            expect(storedPaneSize("call.channel", BAND)).toBeNull();
+            writePaneSize("call.direct", 5000);
+            expect(storedPaneSize("call.direct", BAND)).toBe(BAND.max);
+        } finally {
+            Reflect.deleteProperty(globalThis, "window");
+        }
     });
 });
