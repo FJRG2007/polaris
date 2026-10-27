@@ -11,6 +11,8 @@
 import { reverse } from "node:dns/promises";
 import { getPublicIp } from "@/lib/domain-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { getRouterWanIp } from "@/lib/host-address";
+import { stunMappedIp } from "@/lib/network/stun";
 import { detectLocalEnvironment } from "@/lib/network-service";
 import { detectCgnat, INBOUND_KEY, readReach, type InboundReach } from "./inbound";
 
@@ -63,18 +65,20 @@ export async function refreshInboundReach(input: ReachInput): Promise<InboundRea
     const previous = await readInboundReach();
     if (!input.publicIp) return previous;
     const sameIp = previous?.publicIp === input.publicIp;
-    const [ownIp, ptr] = await Promise.all([
+    const [ownIp, ptr, routerWanIp, stunIp] = await Promise.all([
         getPublicIp().catch(() => null),
-        reverseNames(input.publicIp)
+        reverseNames(input.publicIp),
+        getRouterWanIp().catch(() => null),
+        stunMappedIp().catch(() => null)
     ]);
     const verdict = detectCgnat({
         ownIp,
-        routerWanIp: null,
+        routerWanIp,
         publicIp: input.publicIp,
         ptr,
         outside: input.outside ?? (sameIp && previous?.inboundProven ? "up" : null),
         hairpin: input.hairpin,
-        stunIp: null
+        stunIp
     });
     const now = new Date().toISOString();
     const reach: InboundReach = {

@@ -63,6 +63,16 @@ export async function getHostLanIps(): Promise<string[]> {
 }
 
 /**
+ * The router's own WAN address, as it answered NAT-PMP to the responder, or null
+ * when the router does not speak it or nothing was written yet.
+ */
+export async function getRouterWanIp(): Promise<string | null> {
+    const raw = await readFile(`${IP_FILE}wan`, "utf8").catch(() => null);
+    const value = raw?.trim() ?? "";
+    return IPV4.test(value) ? value : null;
+}
+
+/**
  * This server's stable global IPv6, or null when it has none or the responder has
  * not said. The responder picks it (default-route interface, no temporary or
  * unique-local address); checked again here because it is read from a file.

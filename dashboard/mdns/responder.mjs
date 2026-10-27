@@ -13,7 +13,14 @@ import { readFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import makeMdns from "multicast-dns";
-import { globalIpv6, lanAddresses } from "./address.mjs";
+import { createSocket } from "node:dgram";
+import {
+    defaultGateway,
+    globalIpv6,
+    lanAddresses,
+    NAT_PMP_REQUEST,
+    natPmpExternal
+} from "./address.mjs";
 
 const NAME = (process.env.POLARIS_MDNS_HOSTNAME || "polaris").toLowerCase();
 const FQDN = `${NAME}.local`;
@@ -145,6 +152,57 @@ async function publishIpv6(address) {
     }
 }
 
+/**
+ * The router's own WAN address, asked of the gateway over NAT-PMP (RFC 6886) -
+ * one two-byte UDP packet to port 5351. Only this process can ask: the gateway
+ * of every other container is a Docker bridge. A WAN address in the carrier
+ * range, or one that differs from what the internet sees, is a carrier NAT for
+ * certain. Routers without NAT-PMP stay silent, and the file is left empty.
+ */
+const WAN_FILE = `${IP_FILE}wan`;
+let publishedWan = null;
+
+function askRouterWan() {
+    let routes = "";
+    try {
+        routes = readFileSync("/proc/net/route", "utf8");
+    } catch {
+        return Promise.resolve(null);
+    }
+    const gateway = defaultGateway(routes);
+    if (!gateway) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        const socket = createSocket("udp4");
+        let settled = false;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            socket.close();
+            resolve(value);
+        };
+        const timer = setTimeout(() => finish(null), 1_000);
+        socket.on("error", () => finish(null));
+        socket.on("message", (message, from) => {
+            if (from.address === gateway) finish(natPmpExternal(message));
+        });
+        socket.send(NAT_PMP_REQUEST, 5351, gateway, (error) => {
+            if (error) finish(null);
+        });
+    });
+}
+
+async function publishRouterWan() {
+    const text = (await askRouterWan().catch(() => null)) ?? "";
+    if (text === publishedWan) return;
+    try {
+        await writeAtomic(WAN_FILE, text ? `${text}\n` : "");
+        publishedWan = text;
+    } catch {
+        // Said by publishIps for the same volume; tried again next time.
+    }
+}
+
 const mdns = makeMdns();
 
 /** The records that answer "where is polaris.local" and describe the service. */
@@ -212,7 +270,13 @@ function check() {
 
 // Checked every 15 s - one interface list and one read of the routing table -
 // and announced every 60 s regardless, keeping caches of the 120 s records warm.
-const timers = [setInterval(check, 15_000), setInterval(announce, 60_000)];
+// The router is asked every five minutes: its WAN address changes with the line.
+void publishRouterWan();
+const timers = [
+    setInterval(check, 15_000),
+    setInterval(announce, 60_000),
+    setInterval(() => void publishRouterWan(), 300_000)
+];
 for (const timer of timers) timer.unref?.();
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

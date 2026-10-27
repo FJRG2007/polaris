@@ -38,3 +38,11 @@ addresses (`host-ipv6`, empty when there is none): the address on the interface
 that carries the IPv6 default route, never a temporary (privacy), deprecated,
 unique-local or link-local one. The dashboard checks it from outside and, when
 it gets in, publishes it as AAAA records in a Cloudflare-managed zone.
+
+## The router's WAN address
+
+Every five minutes it asks the default gateway for its external address over
+NAT-PMP (one UDP packet to port 5351) and writes it to `host-ipwan`, empty when
+the router does not answer. The dashboard uses it to recognise a carrier NAT:
+a WAN address in 100.64.0.0/10, or one that differs from what the internet
+sees. UPnP is not asked.

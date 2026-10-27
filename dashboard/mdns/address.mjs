@@ -136,3 +136,46 @@ export function globalIpv6(addressTable, routeTable) {
     found.sort((a, b) => a.rank - b.rank);
     return found[0]?.address ?? null;
 }
+
+/**
+ * The IPv4 gateway of the best default route, from the text of /proc/net/route,
+ * or null. The kernel prints it as little-endian hex.
+ */
+export function defaultGateway(routeTable) {
+    let best = null;
+    for (const line of String(routeTable ?? "")
+        .split("\n")
+        .slice(1)) {
+        const fields = line.trim().split(/\s+/);
+        if (fields.length < 8) continue;
+        const [, destination, gateway, flags, , , metric, mask] = fields;
+        if (destination !== "00000000" || mask !== "00000000") continue;
+        // RTF_UP and RTF_GATEWAY.
+        if ((Number.parseInt(flags, 16) & 3) !== 3) continue;
+        const value = Number.parseInt(gateway, 16);
+        if (!Number.isFinite(value) || value === 0) continue;
+        const rank = Number.parseInt(metric, 10) || 0;
+        if (best && best.rank <= rank) continue;
+        best = {
+            rank,
+            address: [value & 255, (value >>> 8) & 255, (value >>> 16) & 255, value >>> 24].join(".")
+        };
+    }
+    return best?.address ?? null;
+}
+
+/** A NAT-PMP external-address request (RFC 6886): version 0, opcode 0. */
+export const NAT_PMP_REQUEST = Uint8Array.from([0, 0]);
+
+/**
+ * The external address from a NAT-PMP answer, or null: anything but a
+ * successful version-0 reply to opcode 0, or an all-zero address (a router with
+ * no WAN address yet).
+ */
+export function natPmpExternal(message) {
+    const bytes = Uint8Array.from(message ?? []);
+    if (bytes.length < 12 || bytes[0] !== 0 || bytes[1] !== 128) return null;
+    if (bytes[2] !== 0 || bytes[3] !== 0) return null;
+    const address = [...bytes.subarray(8, 12)];
+    return address.every((part) => part === 0) ? null : address.join(".");
+}
