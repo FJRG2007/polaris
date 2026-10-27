@@ -1298,6 +1298,46 @@ export async function createChecklistAction(
     }
 }
 
+/** Rename a checklist. The same name rule as creating one. */
+export async function renameChecklistAction(
+    taskId: string,
+    checklistId: string,
+    name: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.checklistSchema.shape.name.safeParse(name);
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterName") };
+    try {
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
+        await details.renameChecklist(taskId, checklistId, parsed.data);
+        refresh(caller, spaceId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "errors.renameChecklist");
+    }
+}
+
+/** Reword a checklist step. The same name rule as adding one. */
+export async function renameChecklistItemAction(
+    taskId: string,
+    itemId: string,
+    name: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.taskName.safeParse(name);
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.enterStep") };
+    try {
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
+        await details.renameChecklistItem(taskId, itemId, parsed.data);
+        refresh(caller, spaceId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "errors.renameStep");
+    }
+}
+
 /** Reorder the checklists on a task after a drag. */
 export async function moveChecklistAction(
     taskId: string,
@@ -1451,6 +1491,25 @@ export async function addDependencyAction(input: unknown): Promise<{ error?: str
         return {};
     } catch (caught) {
         return failure(caught, "errors.linkTasks");
+    }
+}
+
+/** Reorder one of a task's dependency lists after a drag. */
+export async function moveDependencyAction(
+    taskId: string,
+    dependencyId: string,
+    move: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.dependencyMoveSchema.safeParse(move);
+    if (!parsed.success) return { error: await errorText("errors.dropPlace") };
+    try {
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
+        await details.moveDependency(taskId, dependencyId, parsed.data);
+        refresh(caller, spaceId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "errors.moveLink");
     }
 }
 

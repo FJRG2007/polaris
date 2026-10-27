@@ -137,8 +137,30 @@ export async function createChecklist(taskId: string, name: string): Promise<str
     return checklist.id;
 }
 
-export async function renameChecklist(checklistId: string, name: string): Promise<void> {
-    await prisma.taskChecklist.update({ where: { id: checklistId }, data: { name } });
+/** Rename a checklist on the task the caller was authorized for. */
+export async function renameChecklist(
+    taskId: string,
+    checklistId: string,
+    name: string
+): Promise<void> {
+    const { count } = await prisma.taskChecklist.updateMany({
+        where: { id: checklistId, taskId },
+        data: { name }
+    });
+    if (count === 0) throw new TaskRefusal("refusals.checklistGone");
+}
+
+/** Reword a step, on a checklist of the task the caller was authorized for. */
+export async function renameChecklistItem(
+    taskId: string,
+    itemId: string,
+    name: string
+): Promise<void> {
+    const { count } = await prisma.taskChecklistItem.updateMany({
+        where: { id: itemId, checklist: { taskId } },
+        data: { name }
+    });
+    if (count === 0) throw new TaskRefusal("refusals.stepGone");
 }
 
 /**
@@ -175,9 +197,15 @@ export async function moveChecklist(
     move: { beforeId: string | null; afterId: string | null }
 ): Promise<void> {
     const order = await orderForDrop(
+        // A neighbour is read on this task only: an id from another task is not a
+        // place in this list, and reading it would leak where that one sits.
         async (id) =>
-            (await prisma.taskChecklist.findUnique({ where: { id }, select: { order: true } }))
-                ?.order ?? null,
+            (
+                await prisma.taskChecklist.findFirst({
+                    where: { id, taskId },
+                    select: { order: true }
+                })
+            )?.order ?? null,
         async () => {
             const siblings = await prisma.taskChecklist.findMany({
                 where: { taskId },
@@ -232,8 +260,12 @@ export async function moveChecklistItem(
 
     const order = await orderForDrop(
         async (id) =>
-            (await prisma.taskChecklistItem.findUnique({ where: { id }, select: { order: true } }))
-                ?.order ?? null,
+            (
+                await prisma.taskChecklistItem.findFirst({
+                    where: { id, checklistId: move.checklistId },
+                    select: { order: true }
+                })
+            )?.order ?? null,
         async () => {
             const siblings = await prisma.taskChecklistItem.findMany({
                 where: { checklistId: move.checklistId },
@@ -377,9 +409,87 @@ export async function addDependency(spaceId: string, input: core.DependencyInput
         }
     }
 
+    // A new link goes at the end of both lists it is drawn in.
+    const [lastBlocking, lastWaiting] = await Promise.all([
+        prisma.taskDependency.findFirst({
+            where: { blockerId },
+            orderBy: { blockingOrder: "desc" },
+            select: { blockingOrder: true }
+        }),
+        prisma.taskDependency.findFirst({
+            where: { blockedId },
+            orderBy: { waitingOrder: "desc" },
+            select: { waitingOrder: true }
+        })
+    ]);
     await prisma.taskDependency
-        .create({ data: { blockerId, blockedId, type: input.type } })
+        .create({
+            data: {
+                blockerId,
+                blockedId,
+                type: input.type,
+                blockingOrder: (lastBlocking?.blockingOrder ?? 0) + core.ORDER_STEP,
+                waitingOrder: (lastWaiting?.waitingOrder ?? 0) + core.ORDER_STEP
+            }
+        })
         .catch(() => undefined);
+}
+
+/**
+ * Reorder one of a task's two dependency lists after a drag.
+ *
+ * An edge is in the blocker's "blocking" list and the blocked task's "waiting
+ * on" list, each with its own key, so arranging one task's list never moves
+ * anything on the other task. The edge and both neighbours have to be in that
+ * same list of the task the caller was authorized for.
+ */
+export async function moveDependency(
+    taskId: string,
+    dependencyId: string,
+    move: {
+        direction: core.DependencyDirection;
+        beforeId: string | null;
+        afterId: string | null;
+    }
+): Promise<void> {
+    const side =
+        move.direction === "blocking"
+            ? ({ owner: "blockerId", key: "blockingOrder" } as const)
+            : ({ owner: "blockedId", key: "waitingOrder" } as const);
+    const inList = { [side.owner]: taskId };
+
+    const order = await orderForDrop(
+        async (id) => {
+            const row = await prisma.taskDependency.findFirst({
+                where: { id, ...inList },
+                select: { blockingOrder: true, waitingOrder: true }
+            });
+            return row ? row[side.key] : null;
+        },
+        async () => {
+            const siblings = await prisma.taskDependency.findMany({
+                where: inList,
+                orderBy: [{ [side.key]: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+                select: { id: true }
+            });
+            const orders = core.rebalanceOrders(siblings.length);
+            await prisma.$transaction(
+                siblings.map((row, index) =>
+                    prisma.taskDependency.update({
+                        where: { id: row.id },
+                        data: { [side.key]: orders[index] }
+                    })
+                )
+            );
+        },
+        move
+    );
+    if (order === null) throw new TaskRefusal("refusals.spotMovedShort");
+    const { count } = await prisma.taskDependency.updateMany({
+        where: { id: dependencyId, ...inList },
+        data: { [side.key]: order }
+    });
+    if (count === 0) throw new TaskRefusal("refusals.linkGone");
 }
 
 export async function removeDependency(taskId: string, dependencyId: string): Promise<void> {
@@ -494,7 +604,9 @@ export async function dispatchDueReminders(now = new Date()): Promise<number> {
                     userId: reminder.userId,
                     event: "tasks.due",
                     title: reminder.task.name,
-                    body: reminder.note || translate(await getUserLocale(reminder.userId), "tasks.notify.reminder"),
+                    body:
+                        reminder.note ||
+                        translate(await getUserLocale(reminder.userId), "tasks.notify.reminder"),
                     href: `/tasks/t/${reminder.taskId}`,
                     shelf: { orgId: reminder.task.space.orgId }
                 });

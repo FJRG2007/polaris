@@ -7769,13 +7769,20 @@ model TaskDependency {
     blockedId String   @db.Uuid
     // blocks | relates - `relates` carries no scheduling meaning.
     type      String   @default("blocks")
-    createdAt DateTime @default(now())
+    // Where this edge sits in the blocker's "blocking" list and in the blocked
+    // task's "waiting on" list. Two keys because one edge is drawn on two tasks
+    // and each is arranged by hand on its own.
+    blockingOrder Float    @default(1024)
+    waitingOrder  Float    @default(1024)
+    createdAt     DateTime @default(now())
 
     blocker Task @relation("TaskBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
     blocked Task @relation("TaskBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
 
     @@unique([blockerId, blockedId, type])
     @@index([blockedId])
+    @@index([blockerId, blockingOrder])
+    @@index([blockedId, waitingOrder])
 }
 
 // A stretch of tracked time. A running timer is a row with no `endedAt`; there

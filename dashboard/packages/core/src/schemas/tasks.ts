@@ -327,6 +327,21 @@ export const dependencySchema = z.object({
 
 export type DependencyInput = z.infer<typeof dependencySchema>;
 
+/** The two lists a task's dependencies are drawn in, from that task's side. */
+export const DEPENDENCY_DIRECTIONS = ["waitingOn", "blocking"] as const;
+export type DependencyDirection = (typeof DEPENDENCY_DIRECTIONS)[number];
+
+/**
+ * Where a dependency was dropped in one of a task's two lists. An edge sits in
+ * the "blocking" list of one task and the "waiting on" list of the other, and
+ * each keeps its own order, so the list it was moved in is part of the move.
+ */
+export const dependencyMoveSchema = z.object({
+    direction: z.enum(DEPENDENCY_DIRECTIONS),
+    beforeId: uuid.nullable().default(null),
+    afterId: uuid.nullable().default(null)
+});
+
 /**
  * Why a task is held up, in the words of whoever recorded it.
  *
