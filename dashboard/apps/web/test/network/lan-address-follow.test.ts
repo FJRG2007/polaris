@@ -152,7 +152,9 @@ describe("the call server following the preferred address", () => {
     });
 
     it("restarts it when cable and WiFi trade places, even with both held", async () => {
-        const { steps, store } = harness("192.168.1.149", "192.168.1.142", false, ["192.168.1.142"]);
+        const { steps, store } = harness("192.168.1.149", "192.168.1.142", false, [
+            "192.168.1.142"
+        ]);
         store.set(CALLS_LAN_KEY, "192.168.1.142");
         await followLanAddress(steps);
         expect(steps.calls).toHaveBeenCalledOnce();

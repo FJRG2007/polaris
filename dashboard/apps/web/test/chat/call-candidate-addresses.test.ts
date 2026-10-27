@@ -149,11 +149,14 @@ describe("the one local address a call is offered", () => {
             .join("\n")
             .replace(/\$\$/g, "$")
             .replace("exec /livekit-server", "printf '%s\\n' \"$LIVEKIT_CONFIG\"");
-        const ip = 'ip() { if [ "$1" = -4 ]; then printf \'%s\\n\' "$FAKE_V4"; else printf \'%s\\n\' "$FAKE_V6"; fi; }';
+        const ip =
+            'ip() { if [ "$1" = -4 ]; then printf \'%s\\n\' "$FAKE_V4"; else printf \'%s\\n\' "$FAKE_V6"; fi; }';
         const config = COMPOSE.slice(COMPOSE.indexOf("      LIVEKIT_CONFIG: |"))
             .split(/\r?\n/)
             .slice(1)
-            .filter((line, index, all) => all.slice(0, index + 1).every((seen) => seen === "" || seen.startsWith("        ")))
+            .filter((line, index, all) =>
+                all.slice(0, index + 1).every((seen) => seen === "" || seen.startsWith("        "))
+            )
             .map((line) => line.slice(8))
             .join("\n");
         const run = spawnSync("sh", ["-c", `${ip}\n${body}`], {
@@ -168,7 +171,10 @@ describe("the one local address a call is offered", () => {
     const includesLine = (config: string) =>
         config.split("\n").find((line) => line.trim().startsWith("includes:")) ?? null;
     const markerIndent = (config: string) =>
-        config.split("\n").find((line) => line.trim() === "excludes:")!.match(/^ */)![0];
+        config
+            .split("\n")
+            .find((line) => line.trim() === "excludes:")!
+            .match(/^ */)![0];
 
     it.skipIf(!HAS_SH)(
         "writes the default route's IPv4 and IPv6 sources into rtc.ips.includes",
@@ -184,16 +190,13 @@ describe("the one local address a call is offered", () => {
         }
     );
 
-    it.skipIf(!HAS_SH)(
-        "narrows to the IPv4 address alone when there is no IPv6 route",
-        () => {
-            const { config } = start({
-                v4: "1.1.1.1 via 10.0.0.1 dev wlan0 src 10.0.0.7 uid 0",
-                v6: ""
-            });
-            expect(includesLine(config)).toBe(`${markerIndent(config)}includes: ["10.0.0.7/32"]`);
-        }
-    );
+    it.skipIf(!HAS_SH)("narrows to the IPv4 address alone when there is no IPv6 route", () => {
+        const { config } = start({
+            v4: "1.1.1.1 via 10.0.0.1 dev wlan0 src 10.0.0.7 uid 0",
+            v6: ""
+        });
+        expect(includesLine(config)).toBe(`${markerIndent(config)}includes: ["10.0.0.7/32"]`);
+    });
 
     it.skipIf(!HAS_SH)(
         "narrows nothing when the route goes through a tunnel or there is none",

@@ -128,7 +128,14 @@ export async function watchCallAddress(): Promise<CallAddressState> {
     // the same question every ten minutes for the life of the deployment.
     if (container.startedAt && container.startedAt > changedAt) {
         await setSetting(CHANGED_AT, null);
-        return { current, changedAt, startedAt: container.startedAt, stale: false, healed: false, cannotHeal: null };
+        return {
+            current,
+            changedAt,
+            startedAt: container.startedAt,
+            stale: false,
+            healed: false,
+            cannotHeal: null
+        };
     }
 
     const healed = await restart(container.id);
