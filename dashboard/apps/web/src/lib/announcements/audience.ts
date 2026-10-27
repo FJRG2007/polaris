@@ -15,8 +15,10 @@ import { prisma, VISIBLE_USER, type Prisma } from "@polaris/db";
 export function audienceWhere(audience: AudienceSpec): Prisma.UserWhereInput {
     if (audience.everyone) return { ...VISIBLE_USER };
     const any: Prisma.UserWhereInput[] = [];
-    if (audience.roleIds.length > 0) any.push({ roles: { some: { roleId: { in: audience.roleIds } } } });
-    if (audience.groupIds.length > 0) any.push({ groups: { some: { groupId: { in: audience.groupIds } } } });
+    if (audience.roleIds.length > 0)
+        any.push({ roles: { some: { roleId: { in: audience.roleIds } } } });
+    if (audience.groupIds.length > 0)
+        any.push({ groups: { some: { groupId: { in: audience.groupIds } } } });
     if (audience.orgIds.length > 0) {
         any.push({ orgMemberships: { some: { orgId: { in: audience.orgIds } } } });
     }
@@ -75,7 +77,10 @@ const PAGE = 200;
  * Every account in the audience, a page at a time by id, so a large instance is
  * never one read. `from` resumes after the last account a send reached.
  */
-export async function* audiencePages(audience: AudienceSpec, from: string | null = null): AsyncGenerator<string[]> {
+export async function* audiencePages(
+    audience: AudienceSpec,
+    from: string | null = null
+): AsyncGenerator<string[]> {
     const where = audienceWhere(audience);
     let after: string | null = from;
     for (;;) {

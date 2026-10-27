@@ -29,14 +29,19 @@ const TONE: Record<string, string> = {
 
 function Icon({ banner }: { banner: BannerView }) {
     const className = "mt-0.5 size-4 shrink-0";
-    if (banner.phase === "upcoming" || banner.phase === "inProgress") return <Wrench className={className} aria-hidden />;
+    if (banner.phase === "upcoming" || banner.phase === "inProgress")
+        return <Wrench className={className} aria-hidden />;
     if (banner.severity === "critical" || banner.severity === "warning") {
         return <AlertTriangle className={className} aria-hidden />;
     }
     if (banner.severity === "success" || banner.phase === "finished") {
         return <CheckCircle2 className={className} aria-hidden />;
     }
-    return banner.severity === "info" ? <Info className={className} aria-hidden /> : <Megaphone className={className} aria-hidden />;
+    return banner.severity === "info" ? (
+        <Info className={className} aria-hidden />
+    ) : (
+        <Megaphone className={className} aria-hidden />
+    );
 }
 
 function useNow(enabled: boolean): number {
@@ -49,7 +54,13 @@ function useNow(enabled: boolean): number {
     return now;
 }
 
-export function AnnouncementBannerList({ banners, locale }: { banners: BannerView[]; locale: Locale }) {
+export function AnnouncementBannerList({
+    banners,
+    locale
+}: {
+    banners: BannerView[];
+    locale: Locale;
+}) {
     const t = useTranslations("announcements");
     const [hidden, setHidden] = useState<readonly string[]>([]);
     const [, startTransition] = useTransition();
@@ -70,7 +81,9 @@ export function AnnouncementBannerList({ banners, locale }: { banners: BannerVie
             {shown.map((banner) => {
                 const left = banner.countdownTo ? Date.parse(banner.countdownTo) - now : null;
                 const phaseLabel =
-                    banner.phase === "upcoming" || banner.phase === "inProgress" || banner.phase === "finished"
+                    banner.phase === "upcoming" ||
+                    banner.phase === "inProgress" ||
+                    banner.phase === "finished"
                         ? t(`banner.phase.${banner.phase}`)
                         : null;
                 return (
@@ -91,7 +104,9 @@ export function AnnouncementBannerList({ banners, locale }: { banners: BannerVie
                                         left === null
                                             ? null
                                             : left > 60_000
-                                              ? t("banner.startsIn", { time: formatDuration(left, locale) })
+                                              ? t("banner.startsIn", {
+                                                    time: formatDuration(left, locale)
+                                                })
                                               : t("banner.startsNow")
                                     ]
                                         .filter(Boolean)
@@ -99,7 +114,10 @@ export function AnnouncementBannerList({ banners, locale }: { banners: BannerVie
                                 </p>
                             ) : null}
                             <p className="break-words font-medium">{banner.title}</p>
-                            <AnnouncementMarkdown source={banner.body} className="mt-0.5 text-xs opacity-90" />
+                            <AnnouncementMarkdown
+                                source={banner.body}
+                                className="mt-0.5 text-xs opacity-90"
+                            />
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                             {banner.linkUrl ? (

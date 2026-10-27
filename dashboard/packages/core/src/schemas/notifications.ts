@@ -1033,7 +1033,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "instance.announcement",
         group: "system",
         label: "Announcement from your administrator",
-        description: "A message an administrator of this instance sent to you or a group you are in.",
+        description:
+            "A message an administrator of this instance sent to you or a group you are in.",
         level: "info",
         defaults: { inapp: true, email: false }
     },

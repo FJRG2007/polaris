@@ -60,7 +60,11 @@ export function bannerDismissible(severity: string, phase: Phase): boolean {
 }
 
 /** A banner closed in an earlier phase comes back when the phase changes. */
-export function bannerHidden(phase: Phase, dismissedPhase: string | null | undefined, severity: string): boolean {
+export function bannerHidden(
+    phase: Phase,
+    dismissedPhase: string | null | undefined,
+    severity: string
+): boolean {
     return dismissedPhase === phase && bannerDismissible(severity, phase);
 }
 

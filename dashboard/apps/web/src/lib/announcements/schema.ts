@@ -54,7 +54,13 @@ export const audienceSchema = z
     .strict();
 export type AudienceSpec = z.infer<typeof audienceSchema>;
 
-export const NOBODY: AudienceSpec = { everyone: false, roleIds: [], groupIds: [], orgIds: [], userIds: [] };
+export const NOBODY: AudienceSpec = {
+    everyone: false,
+    roleIds: [],
+    groupIds: [],
+    orgIds: [],
+    userIds: []
+};
 
 /** Nobody picked at all - not the same as a pick that happens to match nobody. */
 export function audienceIsEmpty(audience: AudienceSpec): boolean {

@@ -49,7 +49,10 @@ const PHASE_TEMPLATE: Partial<Record<Phase, TemplateId>> = {
 };
 
 /** The template a phase reads from: a maintenance step's own, or the one picked. */
-export function templateForPhase(item: Pick<RenderInput, "kind" | "template">, phase: Phase): string {
+export function templateForPhase(
+    item: Pick<RenderInput, "kind" | "template">,
+    phase: Phase
+): string {
     if (item.kind !== "maintenance") return item.template;
     return PHASE_TEMPLATE[phase] ?? item.template;
 }
@@ -76,10 +79,14 @@ export function placeholderValues(item: RenderInput, reader: Reader): Record<Pla
     return {
         start: when.format(start),
         end: end ? when.format(end) : t("vars.noEnd"),
-        duration: end ? formatDuration(end.getTime() - start.getTime(), reader.locale) : t("vars.noEnd"),
+        duration: end
+            ? formatDuration(end.getTime() - start.getTime(), reader.locale)
+            : t("vars.noEnd"),
         affected:
             item.affected.length > 0
-                ? new Intl.ListFormat(reader.locale, { type: "conjunction" }).format([...item.affected])
+                ? new Intl.ListFormat(reader.locale, { type: "conjunction" }).format([
+                      ...item.affected
+                  ])
                 : t("vars.everything")
     };
 }
@@ -96,10 +103,19 @@ export function templateText(locale: Locale, id: string): { title: string; body:
 }
 
 /** The title and body one reader sees in one phase. */
-export function renderFor(item: RenderInput, phase: Phase, reader: Reader): { title: string; body: string } {
+export function renderFor(
+    item: RenderInput,
+    phase: Phase,
+    reader: Reader
+): { title: string; body: string } {
     const values = placeholderValues(item, reader);
     const template = templateForPhase(item, phase);
     const own = !item.localized && template === item.template;
-    const text = own ? { title: item.title, body: item.body } : templateText(reader.locale, template);
-    return { title: fillPlaceholders(text.title, values), body: fillPlaceholders(text.body, values) };
+    const text = own
+        ? { title: item.title, body: item.body }
+        : templateText(reader.locale, template);
+    return {
+        title: fillPlaceholders(text.title, values),
+        body: fillPlaceholders(text.body, values)
+    };
 }

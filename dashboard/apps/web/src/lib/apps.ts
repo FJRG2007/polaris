@@ -712,7 +712,14 @@ const ADMIN_AREAS: AppSubapp[] = [
                 href: "/admin/announcements",
                 adminOnly: true,
                 icon: Megaphone,
-                keywords: ["maintenance", "banner", "broadcast", "notify everyone", "outage", "notice"]
+                keywords: [
+                    "maintenance",
+                    "banner",
+                    "broadcast",
+                    "notify everyone",
+                    "outage",
+                    "notice"
+                ]
             },
             {
                 label: "Groups", // i18n-ignore

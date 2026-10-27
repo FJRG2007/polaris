@@ -534,7 +534,11 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                     >
                                                                                         <PageNotices>
                                                                                             <DeniedNotice />
-                                                                                            <AnnouncementBanners user={user} />
+                                                                                            <AnnouncementBanners
+                                                                                                user={
+                                                                                                    user
+                                                                                                }
+                                                                                            />
                                                                                             {user.isAdmin &&
                                                                                             !user.viewingAs ? (
                                                                                                 <>

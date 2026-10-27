@@ -13,7 +13,9 @@ export function formatDuration(ms: number, locale: Locale): string {
     const hours = Math.floor((minutes % 1440) / 60);
     const rest = minutes % 60;
     const unit = (value: number, name: "day" | "hour" | "minute") =>
-        new Intl.NumberFormat(locale, { style: "unit", unit: name, unitDisplay: "long" }).format(value);
+        new Intl.NumberFormat(locale, { style: "unit", unit: name, unitDisplay: "long" }).format(
+            value
+        );
     const parts = [
         days > 0 ? unit(days, "day") : null,
         hours > 0 ? unit(hours, "hour") : null,
@@ -28,4 +30,3 @@ export function fillPlaceholders(text: string, values: Record<Placeholder, strin
         (PLACEHOLDERS as readonly string[]).includes(name) ? values[name as Placeholder] : whole
     );
 }
-

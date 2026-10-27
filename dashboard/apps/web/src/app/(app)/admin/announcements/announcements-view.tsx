@@ -177,7 +177,8 @@ export function AnnouncementsView({
         const seen = new Set(latest.map((row) => row.id));
         return [...latest, ...older.filter((row) => !seen.has(row.id))];
     }, [latest, older]);
-    const hasOlder = latest != null && (older.length === 0 ? latest.length >= HISTORY_PAGE : !olderDone);
+    const hasOlder =
+        latest != null && (older.length === 0 ? latest.length >= HISTORY_PAGE : !olderDone);
 
     const showOlder = () => {
         const last = history?.[history.length - 1];
@@ -213,8 +214,9 @@ export function AnnouncementsView({
     const check = composeSchema.safeParse(input);
     const issue = check.success ? null : check.error.issues[0];
     const issueKey = issue
-        ? ((["audience", "delivery", "window", "order", "link"] as const).find((one) => one === issue.message) ??
-          (issue.path[0] === "title" ? "title" : "invalid"))
+        ? ((["audience", "delivery", "window", "order", "link"] as const).find(
+              (one) => one === issue.message
+          ) ?? (issue.path[0] === "title" ? "title" : "invalid"))
         : null;
 
     // The live count: asked a moment after the audience stops changing.
@@ -222,7 +224,9 @@ export function AnnouncementsView({
     useEffect(() => {
         setReach(null);
         const timer = window.setTimeout(() => {
-            void countAudienceAction(JSON.parse(audienceKey)).then((answer) => setReach(answer.count));
+            void countAudienceAction(JSON.parse(audienceKey)).then((answer) =>
+                setReach(answer.count)
+            );
         }, 300);
         return () => window.clearTimeout(timer);
     }, [audienceKey]);
@@ -232,7 +236,8 @@ export function AnnouncementsView({
             const next = { ...current, [key]: value };
             if (key === "title" || key === "body") {
                 const own = templates[next.template];
-                next.localized = own !== undefined && next.title === own.title && next.body === own.body;
+                next.localized =
+                    own !== undefined && next.title === own.title && next.body === own.body;
             }
             return next;
         });
@@ -247,7 +252,11 @@ export function AnnouncementsView({
         }));
 
     const pickKind = (kind: ComposeInput["kind"]) => {
-        setForm((current) => ({ ...current, kind, severity: kind === "maintenance" ? "warning" : current.severity }));
+        setForm((current) => ({
+            ...current,
+            kind,
+            severity: kind === "maintenance" ? "warning" : current.severity
+        }));
         pickTemplate(kind === "maintenance" ? "maintenanceScheduled" : "generic");
     };
 
@@ -321,7 +330,11 @@ export function AnnouncementsView({
 
     // Preview: this browser's language and zone, which is what one reader sees.
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: zone });
+    const when = new Intl.DateTimeFormat(locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: zone
+    });
     const start = input.kind === "maintenance" ? input.windowStart : input.startsAt;
     const stop = input.kind === "maintenance" ? input.windowEnd : input.endsAt;
     const values = {
@@ -337,50 +350,77 @@ export function AnnouncementsView({
                 : t("vars.everything")
     };
     const scheduled =
-        (input.kind === "announcement" && input.startsAt !== null && Date.parse(input.startsAt) > Date.now()) ||
+        (input.kind === "announcement" &&
+            input.startsAt !== null &&
+            Date.parse(input.startsAt) > Date.now()) ||
         input.kind === "maintenance";
-    const fieldError = (field: string) => (tried && issue && issue.path[0] === field ? t(`admin.errors.${issueKey!}`) : null);
+    const fieldError = (field: string) =>
+        tried && issue && issue.path[0] === field ? t(`admin.errors.${issueKey!}`) : null;
 
     return (
         <div className="flex flex-col gap-6">
             <Card>
                 <CardBody className="flex flex-col gap-4">
-                    {editing ? <p className="text-sm font-medium">{t("admin.compose.editTitle")}</p> : null}
+                    {editing ? (
+                        <p className="text-sm font-medium">{t("admin.compose.editTitle")}</p>
+                    ) : null}
                     <div className="grid gap-3 sm:grid-cols-3">
                         <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.kind")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("admin.compose.kind")}
+                            </span>
                             <Select
                                 value={form.kind}
                                 onValueChange={(value) => pickKind(value as ComposeInput["kind"])}
                                 aria-label={t("admin.compose.kind")}
                                 options={[
-                                    { value: "announcement", label: t("admin.compose.kindAnnouncement") },
-                                    { value: "maintenance", label: t("admin.compose.kindMaintenance") }
+                                    {
+                                        value: "announcement",
+                                        label: t("admin.compose.kindAnnouncement")
+                                    },
+                                    {
+                                        value: "maintenance",
+                                        label: t("admin.compose.kindMaintenance")
+                                    }
                                 ]}
                             />
                         </label>
                         <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.template")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("admin.compose.template")}
+                            </span>
                             <Select
                                 value={form.template}
                                 onValueChange={(value) => pickTemplate(value as TemplateId)}
                                 aria-label={t("admin.compose.template")}
-                                options={TEMPLATES.map((id) => ({ value: id, label: t(`admin.template.${id}`) }))}
+                                options={TEMPLATES.map((id) => ({
+                                    value: id,
+                                    label: t(`admin.template.${id}`)
+                                }))}
                             />
                         </label>
                         <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.severity")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("admin.compose.severity")}
+                            </span>
                             <Select
                                 value={form.severity}
-                                onValueChange={(value) => set("severity", value as ComposeInput["severity"])}
+                                onValueChange={(value) =>
+                                    set("severity", value as ComposeInput["severity"])
+                                }
                                 aria-label={t("admin.compose.severity")}
-                                options={SEVERITIES.map((id) => ({ value: id, label: t(`admin.severity.${id}`) }))}
+                                options={SEVERITIES.map((id) => ({
+                                    value: id,
+                                    label: t(`admin.severity.${id}`)
+                                }))}
                             />
                         </label>
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.titleLabel")} *</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("admin.compose.titleLabel")} *
+                        </span>
                         <Input
                             value={form.title}
                             maxLength={120}
@@ -389,22 +429,32 @@ export function AnnouncementsView({
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.bodyLabel")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("admin.compose.bodyLabel")}
+                        </span>
                         <Textarea
                             value={form.body}
-                            placeholder={form.template === "generic" ? templates.generic?.body : undefined}
+                            placeholder={
+                                form.template === "generic" ? templates.generic?.body : undefined
+                            }
                             rows={4}
                             maxLength={2000}
                             onChange={(event) => set("body", event.target.value)}
                         />
-                        <span className="text-xs text-muted-foreground">{t("admin.compose.bodyHint")}</span>
                         <span className="text-xs text-muted-foreground">
-                            {form.localized ? t("admin.compose.translated") : t("admin.compose.edited")}
+                            {t("admin.compose.bodyHint")}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {form.localized
+                                ? t("admin.compose.translated")
+                                : t("admin.compose.edited")}
                         </span>
                     </label>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.linkUrl")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("admin.compose.linkUrl")}
+                            </span>
                             <Input
                                 value={form.linkUrl ?? ""}
                                 placeholder="/drive"
@@ -416,7 +466,9 @@ export function AnnouncementsView({
                             </span>
                         </label>
                         <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.linkLabel")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("admin.compose.linkLabel")}
+                            </span>
                             <Input
                                 value={form.linkLabel ?? ""}
                                 maxLength={40}
@@ -428,28 +480,40 @@ export function AnnouncementsView({
                     {form.kind === "maintenance" ? (
                         <div className="grid gap-3 sm:grid-cols-3">
                             <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.windowStart")} *</span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    {t("admin.compose.windowStart")} *
+                                </span>
                                 <Input
                                     type="datetime-local"
                                     value={toLocalInput(form.windowStart)}
-                                    onChange={(event) => set("windowStart", fromLocalInput(event.target.value))}
+                                    onChange={(event) =>
+                                        set("windowStart", fromLocalInput(event.target.value))
+                                    }
                                     aria-invalid={fieldError("windowStart") ? true : undefined}
                                 />
                             </label>
                             <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.windowEnd")} *</span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    {t("admin.compose.windowEnd")} *
+                                </span>
                                 <Input
                                     type="datetime-local"
                                     value={toLocalInput(form.windowEnd)}
-                                    onChange={(event) => set("windowEnd", fromLocalInput(event.target.value))}
+                                    onChange={(event) =>
+                                        set("windowEnd", fromLocalInput(event.target.value))
+                                    }
                                     aria-invalid={fieldError("windowEnd") ? true : undefined}
                                 />
                             </label>
                             <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.lead")}</span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    {t("admin.compose.lead")}
+                                </span>
                                 <Select
                                     value={String((form.leadMinutes ?? DEFAULT_LEAD_MINUTES) / 60)}
-                                    onValueChange={(value) => set("leadMinutes", Number(value) * 60)}
+                                    onValueChange={(value) =>
+                                        set("leadMinutes", Number(value) * 60)
+                                    }
                                     aria-label={t("admin.compose.lead")}
                                     options={LEAD_CHOICES.map((hours) => ({
                                         value: String(hours),
@@ -458,9 +522,16 @@ export function AnnouncementsView({
                                 />
                             </label>
                             <label className="flex min-w-0 flex-col gap-1 text-sm sm:col-span-2">
-                                <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.affected")}</span>
-                                <Input value={affectedText} onChange={(event) => setAffectedText(event.target.value)} />
-                                <span className="text-xs text-muted-foreground">{t("admin.compose.affectedHint")}</span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    {t("admin.compose.affected")}
+                                </span>
+                                <Input
+                                    value={affectedText}
+                                    onChange={(event) => setAffectedText(event.target.value)}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                    {t("admin.compose.affectedHint")}
+                                </span>
                             </label>
                             <label className="flex items-center gap-2 self-center text-sm">
                                 <Checkbox
@@ -473,36 +544,53 @@ export function AnnouncementsView({
                     ) : (
                         <div className="grid gap-3 sm:grid-cols-2">
                             <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.startsAt")}</span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    {t("admin.compose.startsAt")}
+                                </span>
                                 <Input
                                     type="datetime-local"
                                     value={toLocalInput(form.startsAt)}
-                                    onChange={(event) => set("startsAt", fromLocalInput(event.target.value))}
+                                    onChange={(event) =>
+                                        set("startsAt", fromLocalInput(event.target.value))
+                                    }
                                 />
-                                <span className="text-xs text-muted-foreground">{t("admin.compose.startsNow")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("admin.compose.startsNow")}
+                                </span>
                             </label>
                             <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.endsAt")}</span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    {t("admin.compose.endsAt")}
+                                </span>
                                 <Input
                                     type="datetime-local"
                                     value={toLocalInput(form.endsAt)}
-                                    onChange={(event) => set("endsAt", fromLocalInput(event.target.value))}
+                                    onChange={(event) =>
+                                        set("endsAt", fromLocalInput(event.target.value))
+                                    }
                                     aria-invalid={fieldError("endsAt") ? true : undefined}
                                 />
-                                <span className="text-xs text-muted-foreground">{fieldError("endsAt") ?? t("admin.compose.noEnd")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {fieldError("endsAt") ?? t("admin.compose.noEnd")}
+                                </span>
                             </label>
                         </div>
                     )}
 
                     <fieldset className="flex flex-col gap-3">
-                        <legend className="mb-1 text-sm font-medium">{t("admin.compose.audience")}</legend>
+                        <legend className="mb-1 text-sm font-medium">
+                            {t("admin.compose.audience")}
+                        </legend>
                         <label className="flex items-center gap-2 text-sm">
                             <Checkbox
                                 checked={form.audience.everyone}
                                 onChange={(event) =>
                                     setForm((current) => ({
                                         ...current,
-                                        audience: { ...current.audience, everyone: event.target.checked }
+                                        audience: {
+                                            ...current.audience,
+                                            everyone: event.target.checked
+                                        }
                                     }))
                                 }
                             />
@@ -510,9 +598,24 @@ export function AnnouncementsView({
                         </label>
                         {form.audience.everyone ? null : (
                             <>
-                                <Chips items={roles} picked={form.audience.roleIds} onToggle={(id) => toggle("roleIds", id)} label={t("admin.compose.roles")} />
-                                <Chips items={groups} picked={form.audience.groupIds} onToggle={(id) => toggle("groupIds", id)} label={t("admin.compose.groups")} />
-                                <Chips items={orgs} picked={form.audience.orgIds} onToggle={(id) => toggle("orgIds", id)} label={t("admin.compose.orgs")} />
+                                <Chips
+                                    items={roles}
+                                    picked={form.audience.roleIds}
+                                    onToggle={(id) => toggle("roleIds", id)}
+                                    label={t("admin.compose.roles")}
+                                />
+                                <Chips
+                                    items={groups}
+                                    picked={form.audience.groupIds}
+                                    onToggle={(id) => toggle("groupIds", id)}
+                                    label={t("admin.compose.groups")}
+                                />
+                                <Chips
+                                    items={orgs}
+                                    picked={form.audience.orgIds}
+                                    onToggle={(id) => toggle("orgIds", id)}
+                                    label={t("admin.compose.orgs")}
+                                />
                                 <PeoplePicker
                                     picked={people}
                                     onChange={setPeople}
@@ -522,38 +625,69 @@ export function AnnouncementsView({
                             </>
                         )}
                         <p className="text-sm font-medium" aria-live="polite">
-                            {reach === null ? t("admin.compose.counting") : t("admin.compose.reaches", { count: reach })}
+                            {reach === null
+                                ? t("admin.compose.counting")
+                                : t("admin.compose.reaches", { count: reach })}
                         </p>
-                        {fieldError("audience") ? <p className="text-xs text-destructive">{fieldError("audience")}</p> : null}
+                        {fieldError("audience") ? (
+                            <p className="text-xs text-destructive">{fieldError("audience")}</p>
+                        ) : null}
                     </fieldset>
 
                     <fieldset className="flex flex-col gap-2">
-                        <legend className="mb-1 text-sm font-medium">{t("admin.compose.delivery")}</legend>
+                        <legend className="mb-1 text-sm font-medium">
+                            {t("admin.compose.delivery")}
+                        </legend>
                         <label className="flex items-start gap-2 text-sm">
-                            <Checkbox checked={form.sendNotice} onChange={(event) => set("sendNotice", event.target.checked)} />
+                            <Checkbox
+                                checked={form.sendNotice}
+                                onChange={(event) => set("sendNotice", event.target.checked)}
+                            />
                             <span className="min-w-0">
                                 {t("admin.compose.sendNotice")}
-                                <span className="block text-xs text-muted-foreground">{t("admin.compose.sendNoticeHint")}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    {t("admin.compose.sendNoticeHint")}
+                                </span>
                             </span>
                         </label>
                         <label className="flex items-start gap-2 text-sm">
-                            <Checkbox checked={form.showBanner} onChange={(event) => set("showBanner", event.target.checked)} />
+                            <Checkbox
+                                checked={form.showBanner}
+                                onChange={(event) => set("showBanner", event.target.checked)}
+                            />
                             <span className="min-w-0">
                                 {t("admin.compose.showBanner")}
-                                <span className="block text-xs text-muted-foreground">{t("admin.compose.showBannerHint")}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    {t("admin.compose.showBannerHint")}
+                                </span>
                             </span>
                         </label>
-                        {fieldError("showBanner") ? <p className="text-xs text-destructive">{fieldError("showBanner")}</p> : null}
+                        {fieldError("showBanner") ? (
+                            <p className="text-xs text-destructive">{fieldError("showBanner")}</p>
+                        ) : null}
                     </fieldset>
 
                     <div className="flex flex-col gap-1 rounded-lg border border-dashed p-3">
-                        <span className="text-xs font-medium text-muted-foreground">{t("admin.compose.preview")}</span>
-                        <p className="break-words text-sm font-medium">{fillPlaceholders(input.title, values) || "-"}</p>
-                        <AnnouncementMarkdown source={fillPlaceholders(input.body, values)} className="text-xs" />
-                        <span className="text-xs text-muted-foreground">{t("admin.compose.previewHint")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("admin.compose.preview")}
+                        </span>
+                        <p className="break-words text-sm font-medium">
+                            {fillPlaceholders(input.title, values) || "-"}
+                        </p>
+                        <AnnouncementMarkdown
+                            source={fillPlaceholders(input.body, values)}
+                            className="text-xs"
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            {t("admin.compose.previewHint")}
+                        </span>
                     </div>
 
-                    {tried && issueKey && !["audience", "showBanner", "linkUrl", "endsAt"].includes(String(issue?.path[0])) ? (
+                    {tried &&
+                    issueKey &&
+                    !["audience", "showBanner", "linkUrl", "endsAt"].includes(
+                        String(issue?.path[0])
+                    ) ? (
                         <p className="text-sm text-destructive">{t(`admin.errors.${issueKey}`)}</p>
                     ) : null}
                     {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
@@ -564,7 +698,11 @@ export function AnnouncementsView({
                             </Button>
                         ) : null}
                         <Button onClick={submit} disabled={pending} aria-disabled={!check.success}>
-                            {editing ? t("admin.compose.save") : scheduled ? t("admin.compose.schedule") : t("admin.compose.send")}
+                            {editing
+                                ? t("admin.compose.save")
+                                : scheduled
+                                  ? t("admin.compose.schedule")
+                                  : t("admin.compose.send")}
                         </Button>
                     </div>
                 </CardBody>
@@ -579,7 +717,10 @@ export function AnnouncementsView({
                         ))}
                     </div>
                 ) : history.length === 0 ? (
-                    <EmptyState title={t("admin.history.empty")} description={t("admin.history.emptyHint")} />
+                    <EmptyState
+                        title={t("admin.history.empty")}
+                        description={t("admin.history.emptyHint")}
+                    />
                 ) : (
                     <ul className="flex flex-col divide-y rounded-lg border">
                         {history.map((row) => {
@@ -591,32 +732,73 @@ export function AnnouncementsView({
                             const active = !["ended", "retracted"].includes(row.phase);
                             const start = row.windowStart ?? row.startsAt;
                             return (
-                                <li key={row.id} className="flex flex-wrap items-start gap-3 px-3 py-2.5">
+                                <li
+                                    key={row.id}
+                                    className="flex flex-wrap items-start gap-3 px-3 py-2.5"
+                                >
                                     <div className="min-w-0 grow basis-64">
-                                        <p className="truncate text-sm font-medium" title={row.title}>
+                                        <p
+                                            className="truncate text-sm font-medium"
+                                            title={row.title}
+                                        >
                                             {row.title}
                                         </p>
                                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                                            <Badge variant="neutral">{t(`admin.phase.${row.phase}`)}</Badge>
-                                            <Badge variant="neutral">{t(`admin.severity.${row.severity as "info"}`)}</Badge>
-                                            <span>{new Date(start).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })}</span>
+                                            <Badge variant="neutral">
+                                                {t(`admin.phase.${row.phase}`)}
+                                            </Badge>
+                                            <Badge variant="neutral">
+                                                {t(`admin.severity.${row.severity as "info"}`)}
+                                            </Badge>
+                                            <span>
+                                                {new Date(start).toLocaleString(locale, {
+                                                    dateStyle: "medium",
+                                                    timeStyle: "short"
+                                                })}
+                                            </span>
                                             <span>
                                                 {row.audience.everyone
                                                     ? t("admin.history.audienceEveryone")
-                                                    : t("admin.history.audiencePicked", { count: picks })}
+                                                    : t("admin.history.audiencePicked", {
+                                                          count: picks
+                                                      })}
                                             </span>
-                                            <span>{t("admin.history.reach", { count: row.reach })}</span>
-                                            {row.sendNotice ? <span>{t("admin.history.read", { count: row.read })}</span> : null}
-                                            {row.showBanner ? <span>{t("admin.history.dismissed", { count: row.dismissed })}</span> : null}
+                                            <span>
+                                                {t("admin.history.reach", { count: row.reach })}
+                                            </span>
+                                            {row.sendNotice ? (
+                                                <span>
+                                                    {t("admin.history.read", { count: row.read })}
+                                                </span>
+                                            ) : null}
+                                            {row.showBanner ? (
+                                                <span>
+                                                    {t("admin.history.dismissed", {
+                                                        count: row.dismissed
+                                                    })}
+                                                </span>
+                                            ) : null}
                                         </div>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1">
                                         {row.editable ? (
-                                            <Button size="icon" variant="ghost" onClick={() => load(row.id, true)} aria-label={t("admin.history.edit")} title={t("admin.history.edit")}>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() => load(row.id, true)}
+                                                aria-label={t("admin.history.edit")}
+                                                title={t("admin.history.edit")}
+                                            >
                                                 <Pencil className="size-4" aria-hidden />
                                             </Button>
                                         ) : null}
-                                        <Button size="icon" variant="ghost" onClick={() => load(row.id, false)} aria-label={t("admin.history.duplicate")} title={t("admin.history.duplicate")}>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => load(row.id, false)}
+                                            aria-label={t("admin.history.duplicate")}
+                                            title={t("admin.history.duplicate")}
+                                        >
                                             <Copy className="size-4" aria-hidden />
                                         </Button>
                                         {active ? (
@@ -625,14 +807,28 @@ export function AnnouncementsView({
                                                 variant="ghost"
                                                 onClick={() => end(row)}
                                                 disabled={pending}
-                                                aria-label={row.kind === "maintenance" && row.editable ? t("admin.history.cancelMaintenance") : t("admin.history.end")}
-                                                title={row.kind === "maintenance" && row.editable ? t("admin.history.cancelMaintenance") : t("admin.history.end")}
+                                                aria-label={
+                                                    row.kind === "maintenance" && row.editable
+                                                        ? t("admin.history.cancelMaintenance")
+                                                        : t("admin.history.end")
+                                                }
+                                                title={
+                                                    row.kind === "maintenance" && row.editable
+                                                        ? t("admin.history.cancelMaintenance")
+                                                        : t("admin.history.end")
+                                                }
                                             >
                                                 <Square className="size-4" aria-hidden />
                                             </Button>
                                         ) : null}
                                         {row.phase !== "retracted" ? (
-                                            <Button size="icon" variant="ghost" onClick={() => setRetracting(row)} aria-label={t("admin.history.retract")} title={t("admin.history.retract")}>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() => setRetracting(row)}
+                                                aria-label={t("admin.history.retract")}
+                                                title={t("admin.history.retract")}
+                                            >
                                                 <Undo2 className="size-4" aria-hidden />
                                             </Button>
                                         ) : null}
@@ -643,7 +839,12 @@ export function AnnouncementsView({
                     </ul>
                 )}
                 {hasOlder ? (
-                    <Button variant="ghost" className="self-center" onClick={showOlder} disabled={loadingOlder}>
+                    <Button
+                        variant="ghost"
+                        className="self-center"
+                        onClick={showOlder}
+                        disabled={loadingOlder}
+                    >
                         {t("admin.history.older")}
                     </Button>
                 ) : null}

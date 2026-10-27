@@ -31,7 +31,9 @@ export function parseInline(text: string): Inline[] {
         else if (star || under) out.push({ kind: "italic", text: (star ?? under)! });
         else if (code) out.push({ kind: "code", text: code });
         else if (label && href) {
-            out.push(safeLink(href) ? { kind: "link", text: label, href } : { kind: "text", text: whole });
+            out.push(
+                safeLink(href) ? { kind: "link", text: label, href } : { kind: "text", text: whole }
+            );
         }
         last = at + whole.length;
     }
@@ -45,7 +47,10 @@ export function parseMarkdown(source: string): Block[] {
         const lines = chunk.split("\n").filter((line) => line.trim().length > 0);
         if (lines.length === 0) continue;
         if (lines.every((line) => /^\s*[-*]\s+/.test(line))) {
-            blocks.push({ kind: "list", items: lines.map((line) => parseInline(line.replace(/^\s*[-*]\s+/, ""))) });
+            blocks.push({
+                kind: "list",
+                items: lines.map((line) => parseInline(line.replace(/^\s*[-*]\s+/, "")))
+            });
         } else {
             blocks.push({ kind: "paragraph", lines: lines.map((line) => parseInline(line)) });
         }

@@ -16,7 +16,10 @@ function InlineText({ parts }: { parts: Inline[] }) {
                 if (part.kind === "italic") return <em key={index}>{part.text}</em>;
                 if (part.kind === "code") {
                     return (
-                        <code key={index} className="rounded bg-black/10 px-1 text-[0.9em] dark:bg-white/10">
+                        <code
+                            key={index}
+                            className="rounded bg-black/10 px-1 text-[0.9em] dark:bg-white/10"
+                        >
                             {part.text}
                         </code>
                     );
@@ -44,7 +47,13 @@ function InlineText({ parts }: { parts: Inline[] }) {
     );
 }
 
-export function AnnouncementMarkdown({ source, className }: { source: string; className?: string }) {
+export function AnnouncementMarkdown({
+    source,
+    className
+}: {
+    source: string;
+    className?: string;
+}) {
     const blocks = parseMarkdown(source);
     if (blocks.length === 0) return null;
     return (

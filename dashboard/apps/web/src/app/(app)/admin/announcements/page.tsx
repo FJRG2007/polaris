@@ -25,9 +25,21 @@ export default async function AnnouncementsPage() {
     const [locale, t, roles, groups, orgs] = await Promise.all([
         getLocale(),
         getTranslations("announcements"),
-        prisma.role.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: PICK_LIMIT }),
-        prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: PICK_LIMIT }),
-        prisma.organization.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: PICK_LIMIT })
+        prisma.role.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+            take: PICK_LIMIT
+        }),
+        prisma.group.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+            take: PICK_LIMIT
+        }),
+        prisma.organization.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+            take: PICK_LIMIT
+        })
     ]);
     const templates = Object.fromEntries(TEMPLATES.map((id) => [id, templateText(locale, id)]));
 
@@ -35,7 +47,13 @@ export default async function AnnouncementsPage() {
         <Messages namespaces={["announcements"]}>
             <div className="mx-auto flex w-full max-w-4xl flex-col">
                 <PageHeader title={t("admin.title")} description={t("admin.description")} />
-                <AnnouncementsView locale={locale} templates={templates} roles={roles} groups={groups} orgs={orgs} />
+                <AnnouncementsView
+                    locale={locale}
+                    templates={templates}
+                    roles={roles}
+                    groups={groups}
+                    orgs={orgs}
+                />
             </div>
         </Messages>
     );

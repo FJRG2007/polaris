@@ -5,7 +5,12 @@ vi.mock("@polaris/db", () => ({ prisma: {}, VISIBLE_USER: { bannedAt: null, disa
 import { audienceWhere } from "@/lib/announcements/audience";
 import { parseInline, plainText } from "@/lib/announcements/markdown";
 import { renderFor, templateText, type RenderInput } from "@/lib/announcements/templates";
-import { composeSchema, NOBODY, normalizeCompose, type ComposeInput } from "@/lib/announcements/schema";
+import {
+    composeSchema,
+    NOBODY,
+    normalizeCompose,
+    type ComposeInput
+} from "@/lib/announcements/schema";
 import {
     bannerDismissible,
     bannerHidden,
@@ -42,7 +47,12 @@ describe("maintenance phases", () => {
     });
 
     it("an announcement is scheduled, live, then ended", () => {
-        const item = { ...maintenance, kind: "announcement", startsAt: windowStart, endsAt: windowEnd };
+        const item = {
+            ...maintenance,
+            kind: "announcement",
+            startsAt: windowStart,
+            endsAt: windowEnd
+        };
         expect(phaseAt(item, at(-1))).toBe("scheduled");
         expect(phaseAt(item, at(1))).toBe("live");
         expect(phaseAt(item, windowEnd)).toBe("ended");
@@ -54,11 +64,13 @@ describe("maintenance phases", () => {
         expect(noticeDue({ ...base, phase: "upcoming", noticedPhase: null })).toBe("upcoming");
         expect(noticeDue({ ...base, phase: "upcoming", noticedPhase: "upcoming" })).toBeNull();
         expect(noticeDue({ ...base, phase: "inProgress", noticedPhase: "upcoming" })).toBeNull();
-        expect(noticeDue({ ...base, notifySteps: true, phase: "inProgress", noticedPhase: "upcoming" })).toBe(
-            "inProgress"
-        );
+        expect(
+            noticeDue({ ...base, notifySteps: true, phase: "inProgress", noticedPhase: "upcoming" })
+        ).toBe("inProgress");
         expect(noticeDue({ ...base, phase: "scheduled", noticedPhase: null })).toBeNull();
-        expect(noticeDue({ ...base, sendNotice: false, phase: "live", noticedPhase: null })).toBeNull();
+        expect(
+            noticeDue({ ...base, sendNotice: false, phase: "live", noticedPhase: null })
+        ).toBeNull();
     });
 });
 
@@ -79,11 +91,20 @@ describe("banner dismissal", () => {
 
 describe("audience", () => {
     it("everyone is every visible account", () => {
-        expect(audienceWhere({ ...NOBODY, everyone: true })).toEqual({ bannedAt: null, disabledAt: null });
+        expect(audienceWhere({ ...NOBODY, everyone: true })).toEqual({
+            bannedAt: null,
+            disabledAt: null
+        });
     });
 
     it("combines picks as a union and never widens an empty pick", () => {
-        const where = audienceWhere({ ...NOBODY, roleIds: ["r"], groupIds: ["g"], orgIds: ["o"], userIds: ["u"] });
+        const where = audienceWhere({
+            ...NOBODY,
+            roleIds: ["r"],
+            groupIds: ["g"],
+            orgIds: ["o"],
+            userIds: ["u"]
+        });
         expect(where).toEqual({
             bannedAt: null,
             disabledAt: null,
@@ -134,7 +155,12 @@ describe("templates per reader", () => {
     });
 
     it("keeps edited text in every language but fills its placeholders", () => {
-        const edited = { ...item, localized: false, title: "Down at {start}", body: "**{affected}**" };
+        const edited = {
+            ...item,
+            localized: false,
+            title: "Down at {start}",
+            body: "**{affected}**"
+        };
         const view = renderFor(edited, "upcoming", { locale: "es-ES", timeZone: "UTC" });
         expect(view.title).toMatch(/^Down at /);
         expect(view.body).toBe("**Mail y Drive**");
@@ -144,7 +170,9 @@ describe("templates per reader", () => {
     });
 
     it("hands the compose form the raw placeholders", () => {
-        expect(templateText("en-US", "maintenanceScheduled").title).toBe("Scheduled maintenance on {start}");
+        expect(templateText("en-US", "maintenanceScheduled").title).toBe(
+            "Scheduled maintenance on {start}"
+        );
         expect(templateText("es-ES", "incident").body).toContain("{affected}");
     });
 });
