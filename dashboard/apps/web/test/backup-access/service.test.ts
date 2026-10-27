@@ -17,7 +17,8 @@ interface FakeRecord {
 }
 
 const HOME = "203.0.113.10";
-const RELAY = "198.51.100.20";
+// Public-looking on purpose: the call server is never pointed at a documentation range.
+const RELAY = "51.0.0.30";
 const NAMES = ["example.test", "www.example.test"];
 
 const settings = new Map<string, string>();
@@ -85,6 +86,21 @@ vi.mock("@/lib/domain-zones", () => ({
 vi.mock("@/lib/domain-dns", () => ({ ownedZoneNames: async () => NAMES }));
 vi.mock("@/lib/domain-address-sync", () => ({ PUBLISHED_KEY: "published" }));
 vi.mock("@/lib/network-service", () => ({ probePublicIp: async () => HOME }));
+let reachNow: Record<string, unknown> | null = null;
+vi.mock("../../src/lib/backup-access/inbound-service", () => ({
+    refreshInboundReach: async () => reachNow,
+    readInboundReach: async () => reachNow
+}));
+const callNodeIps: (string | null)[] = [];
+let callSyncFails = false;
+vi.mock("@/lib/chat/call-address-watch", () => ({
+    syncCallNodeIp: async (ip: string | null) => {
+        if (callSyncFails) throw new Error("no container engine");
+        callNodeIps.push(ip);
+        return true;
+    }
+}));
+vi.mock("@/lib/tailscale/tailscale-service", () => ({ getTailscaleHost: async () => null }));
 vi.mock("@/lib/offline/outbound-lookup", () => ({ internetOffline: () => false }));
 vi.mock("@/lib/app-extensions/registry", () => ({ forwardedPorts: async () => games }));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key: string) => key }));
@@ -196,6 +212,9 @@ beforeEach(() => {
     deletedTunnels.length = 0;
     nextId = 1;
     lineUp = true;
+    reachNow = null;
+    callNodeIps.length = 0;
+    callSyncFails = false;
     settings.set("published", HOME);
     for (const name of NAMES) {
         const id = `r${nextId++}`;
@@ -326,6 +345,58 @@ describe("runBackupAccess", () => {
         expect(JSON.parse(settings.get("backupAccess.probe") ?? "{}").conflicts).toEqual([]);
     });
 
+    it("flips on the first pass when the line is certainly behind a carrier NAT", async () => {
+        await service.saveConfig({
+            mode: "automatic",
+            path: "tunnel",
+            relayTargetId: null,
+            dataSaver: true,
+            manualOn: false
+        });
+        await pass();
+        expect(serving()).toBe("direct");
+
+        reachNow = { publicIp: HOME, cgnat: true, certain: false, reason: "starlink" };
+        await pass();
+        expect(serving()).toBe("direct");
+
+        reachNow = { publicIp: HOME, cgnat: true, certain: true, reason: "carrier-address" };
+        expect((await pass()).verdict).toBe("down");
+        expect(serving()).toBe("backup");
+    });
+
+    it("ignores a carrier-NAT verdict about another address", async () => {
+        await service.saveConfig({
+            mode: "automatic",
+            path: "tunnel",
+            relayTargetId: null,
+            dataSaver: true,
+            manualOn: false
+        });
+        reachNow = { publicIp: RELAY, cgnat: true, certain: true, reason: "carrier-address" };
+        await passes(FAIL_TO_FLIP);
+        expect(serving()).toBe("direct");
+    });
+
+    it("points the call server at the relay while it serves, apart from the backup status", async () => {
+        await service.saveConfig({
+            mode: "always",
+            path: "relay",
+            relayTargetId: "11111111-1111-4111-8111-111111111111",
+            dataSaver: true,
+            manualOn: false
+        });
+        await pass();
+        expect(serving()).toBe("backup");
+        expect(callNodeIps.at(-1)).toBe(RELAY);
+
+        callSyncFails = true;
+        await pass();
+        const probe = JSON.parse(settings.get("backupAccess.probe") ?? "{}");
+        expect(probe.problem).toBeNull();
+        expect(records().map((record) => record.content)).toEqual([RELAY, RELAY]);
+    });
+
     it("brings a relay from before UDP was carried up again with the UDP ports", async () => {
         const relayConfig = {
             mode: "automatic" as const,
@@ -358,12 +429,12 @@ describe("runBackupAccess", () => {
         expect(images("home")).toContain("fatedier/frpc:v0.71.0");
         expect(images("relay")).toContain("fatedier/frps:v0.71.0");
         const stored = JSON.parse(settings.get("backupAccess.relay") ?? "{}");
-        expect(stored.tcp).toEqual([80, 443, 25565]);
-        expect(stored.udp).toEqual([19132]);
+        expect(stored.tcp).toEqual([80, 443, 7881, 25565]);
+        expect(stored.udp).toEqual([7882, 19132]);
         expect((await service.backupView()).relay).toEqual({
             address: RELAY,
-            tcp: [80, 443, 25565],
-            udp: [19132]
+            tcp: [80, 443, 7881, 25565],
+            udp: [7882, 19132]
         });
 
         // Nothing changed: nothing is brought up again.

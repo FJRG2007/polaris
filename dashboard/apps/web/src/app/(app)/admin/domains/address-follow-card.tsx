@@ -142,16 +142,26 @@ function StatusLine({ status }: { status: FollowStatus | null }) {
                 </p>
             );
         case "cgnat":
+        case "not-public":
             return (
                 <p className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
-                    {t.rich("domains.follow.problem.cgnat", {
-                        ip: status.ip ?? "-",
-                        link: (chunks) => (
-                            <a key="link" href="#backup-access" className="text-primary hover:underline">
-                                {chunks}
-                            </a>
-                        )
-                    })}
+                    {t.rich(
+                        status.problem === "cgnat"
+                            ? "domains.follow.problem.cgnat"
+                            : "domains.follow.problem.notPublic",
+                        {
+                            ip: status.ip ?? "-",
+                            link: (chunks) => (
+                                <a
+                                    key="link"
+                                    href="#backup-access"
+                                    className="text-primary hover:underline"
+                                >
+                                    {chunks}
+                                </a>
+                            )
+                        }
+                    )}
                 </p>
             );
         case "unreached":

@@ -11,7 +11,7 @@
  */
 
 import { getSetting, setSetting } from "./setting-store";
-import { actingEnvironment, INBOUND_KEY, readReach } from "./backup-access/inbound";
+import { actingEnvironment, INBOUND_KEY, lineIsCgnat, readReach } from "./backup-access/inbound";
 import { deployZoneBase, zoneDnsVerified } from "./domain-zones";
 import { DEFAULT_SUBDOMAIN_BASE, magicDomain } from "@polaris/deploy";
 import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
@@ -123,7 +123,8 @@ export async function detectLocalEnvironment(force = false): Promise<ServerEnvir
         const reach = readReach(await getSetting(INBOUND_KEY));
         if (externalIp)
             environment =
-                isCarrierGradeNat(externalIp) || (reach?.cgnat && reach.publicIp === externalIp)
+                isCarrierGradeNat(externalIp) ||
+                (lineIsCgnat(reach) && reach?.publicIp === externalIp)
                     ? "home-cgnat"
                     : "home-nat";
     }

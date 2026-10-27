@@ -72,8 +72,8 @@ export async function refreshInboundReach(input: ReachInput): Promise<InboundRea
         routerWanIp: null,
         publicIp: input.publicIp,
         ptr,
-        outside: input.outside,
-        hairpin: input.hairpin || (sameIp && input.outside === null && !!previous?.inboundProven),
+        outside: input.outside ?? (sameIp && previous?.inboundProven ? "up" : null),
+        hairpin: input.hairpin,
         stunIp: null
     });
     const now = new Date().toISOString();

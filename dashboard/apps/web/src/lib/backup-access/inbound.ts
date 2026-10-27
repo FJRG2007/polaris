@@ -76,13 +76,18 @@ export interface CgnatVerdict {
 /**
  * Decide from the evidence. A carrier address seen directly - on the box or on
  * the router's WAN - is conclusive and nothing outweighs it. Otherwise a
- * connection that was seen to get in proves the line takes visitors, whatever its
- * reverse name says (Starlink sells public addresses too). Without that proof, a
- * Starlink reverse name, or an outside check that could not get in while this
- * box gets out, is enough to stop treating the address as a way in.
+ * connection from outside that was seen to get in proves the line takes
+ * visitors, whatever its reverse name says (Starlink sells public addresses too).
+ * A hairpin is weaker - the router's own page, or somebody else's router behind
+ * a carrier address, answers it too - so it counts only when no outside check
+ * answered and the reverse name is not Starlink's. Without proof, a Starlink
+ * reverse name, or an outside check that could not get in while this box gets
+ * out, is enough to stop treating the address as a way in.
  */
 export function detectCgnat(evidence: InboundEvidence): CgnatVerdict {
-    const inboundProven = evidence.outside === "up" || evidence.hairpin;
+    const starlink = evidence.ptr.some((name) => STARLINK_PTR.test(name));
+    const inboundProven =
+        evidence.outside === "up" || (evidence.outside === null && evidence.hairpin && !starlink);
     const found = (reason: CgnatReason, certain: boolean): CgnatVerdict => ({
         cgnat: true,
         certain,
@@ -103,11 +108,23 @@ export function detectCgnat(evidence: InboundEvidence): CgnatVerdict {
             return found("router-wan", true);
     }
     if (inboundProven) return { cgnat: false, certain: false, reason: null, inboundProven };
-    if (evidence.ptr.some((name) => STARLINK_PTR.test(name))) return found("starlink", false);
+    if (starlink) return found("starlink", false);
     if (evidence.outside === "down") return found("no-inbound", false);
     if (evidence.stunIp && evidence.publicIp && evidence.stunIp !== evidence.publicIp)
         return found("address-mismatch", false);
     return { cgnat: false, certain: false, reason: null, inboundProven };
+}
+
+/**
+ * Whether the verdict says what kind of line this is, rather than only that
+ * nothing got in. A failed outside check alone is also what a home router with
+ * no forward yet looks like, and calling that line a carrier NAT would tell its
+ * operator that no forward can help - the one fix it needs.
+ */
+export function lineIsCgnat(
+    reach: Pick<InboundReach, "cgnat" | "certain" | "reason"> | null
+): boolean {
+    return Boolean(reach?.cgnat && (reach.certain || reach.reason === "starlink"));
 }
 
 /**
@@ -118,9 +135,9 @@ export function detectCgnat(evidence: InboundEvidence): CgnatVerdict {
 export function actingEnvironment(
     answered: ServerEnvironment | null,
     detected: ServerEnvironment,
-    reach: Pick<InboundReach, "cgnat"> | null
+    reach: Pick<InboundReach, "cgnat" | "certain" | "reason"> | null
 ): ServerEnvironment {
-    if (detected === "home-cgnat" || reach?.cgnat) {
+    if (detected === "home-cgnat" || lineIsCgnat(reach)) {
         // A datacenter box is never behind a carrier NAT of a home line.
         if (answered === "cloud" || answered === "vps") return answered;
         return "home-cgnat";
@@ -197,14 +214,7 @@ export function callReach(input: {
 export const INBOUND_PATHS = ["direct", "relay", "tunnel", "tailscale", "ipv6"] as const;
 export type InboundPath = (typeof INBOUND_PATHS)[number];
 
-export const INBOUND_FEATURES = [
-    "web",
-    "ownDomain",
-    "calls",
-    "games",
-    "mail",
-    "everyone"
-] as const;
+export const INBOUND_FEATURES = ["web", "ownDomain", "calls", "games", "mail", "everyone"] as const;
 export type InboundFeature = (typeof INBOUND_FEATURES)[number];
 
 /**

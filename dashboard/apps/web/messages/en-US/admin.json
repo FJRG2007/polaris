@@ -621,7 +621,8 @@
                 "conflict": "These names point at an address Polaris did not write, so they were left alone: {detail}",
                 "failed": "Some records could not be updated: {detail}",
                 "unreached": "Public resolvers still answer another address after the record's TTL. Check the records below.",
-                "cgnat": "The DNS records were not pointed at {ip}: this line takes no visitors (carrier-grade NAT). <link>Choose a way in under Backup access</link>."
+                "cgnat": "The DNS records were not pointed at {ip}: this line takes no visitors (carrier-grade NAT). <link>Choose a way in under Backup access</link>.",
+                "notPublic": "The DNS records were not pointed at {ip}: it is not a public address, so nobody outside can reach it. <link>Choose a way in under Backup access</link>."
             }
         },
         "acme": {
@@ -710,6 +711,7 @@
             "fromInside": "from this server",
             "cgnat": {
                 "title": "This line takes no visitors from the internet: {ip} is shared by the provider (carrier-grade NAT).",
+                "titleSuspected": "This line takes no visitors from the internet at {ip}.",
                 "reasons": {
                     "carrier-address": "This server has a carrier address.",
                     "router-wan": "The router's own address is not the one the internet sees.",

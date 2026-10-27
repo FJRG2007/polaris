@@ -62,10 +62,36 @@ describe("detectCgnat", () => {
 
     it("lets proof of inbound outweigh a Starlink name (a business public address)", () => {
         const verdict = inbound.detectCgnat(
-            evidence({ publicIp: STARLINK, ptr: ["customer.x.pop.starlinkisp.net."], outside: "up" })
+            evidence({
+                publicIp: STARLINK,
+                ptr: ["customer.x.pop.starlinkisp.net."],
+                outside: "up"
+            })
         );
         expect(verdict.cgnat).toBe(false);
         expect(verdict.inboundProven).toBe(true);
+    });
+
+    it("does not let a hairpin outweigh an outside check that could not get in", () => {
+        expect(inbound.detectCgnat(evidence({ outside: "down", hairpin: true }))).toMatchObject({
+            cgnat: true,
+            reason: "no-inbound",
+            inboundProven: false
+        });
+    });
+
+    it("does not let a hairpin outweigh a Starlink name", () => {
+        const verdict = inbound.detectCgnat(
+            evidence({ publicIp: STARLINK, ptr: ["customer.x.pop.starlinkisp.net"], hairpin: true })
+        );
+        expect(verdict).toMatchObject({ cgnat: true, reason: "starlink", inboundProven: false });
+    });
+
+    it("takes a hairpin as proof only when no outside check answered", () => {
+        expect(inbound.detectCgnat(evidence({ hairpin: true }))).toMatchObject({
+            cgnat: false,
+            inboundProven: true
+        });
     });
 
     it("treats an outside check that cannot get in as no inbound", () => {
@@ -80,18 +106,51 @@ describe("detectCgnat", () => {
     });
 
     it("does not match a look-alike reverse name", () => {
-        expect(inbound.detectCgnat(evidence({ ptr: ["host.notstarlinkisp.net"] })).cgnat).toBe(false);
+        expect(inbound.detectCgnat(evidence({ ptr: ["host.notstarlinkisp.net"] })).cgnat).toBe(
+            false
+        );
     });
 });
 
 describe("actingEnvironment", () => {
     it("lets a detected carrier NAT win over a home-nat answer pinned months ago", () => {
         expect(inbound.actingEnvironment("home-nat", "home-cgnat", null)).toBe("home-cgnat");
-        expect(inbound.actingEnvironment("home-nat", "home-nat", { cgnat: true })).toBe("home-cgnat");
+        expect(
+            inbound.actingEnvironment("home-nat", "home-nat", {
+                cgnat: true,
+                certain: true,
+                reason: "router-wan"
+            })
+        ).toBe("home-cgnat");
+        expect(
+            inbound.actingEnvironment("home-nat", "home-nat", {
+                cgnat: true,
+                certain: false,
+                reason: "starlink"
+            })
+        ).toBe("home-cgnat");
+    });
+
+    it("keeps a home-nat answer when only the outside check failed (a forward not set up yet)", () => {
+        expect(
+            inbound.actingEnvironment("home-nat", "home-nat", {
+                cgnat: true,
+                certain: false,
+                reason: "no-inbound"
+            })
+        ).toBe("home-nat");
+        expect(inbound.lineIsCgnat(reach({ reason: "no-inbound" }))).toBe(false);
+        expect(inbound.lineIsCgnat(reach({ reason: "starlink" }))).toBe(true);
     });
 
     it("keeps the operator's answer otherwise", () => {
-        expect(inbound.actingEnvironment("home-nat", "unknown", { cgnat: false })).toBe("home-nat");
+        expect(
+            inbound.actingEnvironment("home-nat", "unknown", {
+                cgnat: false,
+                certain: false,
+                reason: null
+            })
+        ).toBe("home-nat");
         expect(inbound.actingEnvironment(null, "vps", null)).toBe("vps");
         expect(inbound.actingEnvironment("vps", "home-cgnat", null)).toBe("vps");
     });
@@ -99,7 +158,9 @@ describe("actingEnvironment", () => {
 
 describe("mayPublish", () => {
     it("publishes a reachable public address", () => {
-        expect(inbound.mayPublish({ ip: FIBRE, reach: null, backupServing: false }).publish).toBe(true);
+        expect(inbound.mayPublish({ ip: FIBRE, reach: null, backupServing: false }).publish).toBe(
+            true
+        );
     });
 
     it("refuses the address a carrier NAT shares", () => {
@@ -110,20 +171,24 @@ describe("mayPublish", () => {
     });
 
     it("refuses a carrier-space or private address outright", () => {
-        expect(inbound.mayPublish({ ip: "100.64.3.3", reach: null, backupServing: false }).refusal).toBe(
-            "not-public"
-        );
-        expect(inbound.mayPublish({ ip: "10.0.0.1", reach: null, backupServing: false }).refusal).toBe(
-            "not-public"
-        );
+        expect(
+            inbound.mayPublish({ ip: "100.64.3.3", reach: null, backupServing: false }).refusal
+        ).toBe("not-public");
+        expect(
+            inbound.mayPublish({ ip: "10.0.0.1", reach: null, backupServing: false }).refusal
+        ).toBe("not-public");
     });
 
     it("stands back while backup access owns the records", () => {
-        expect(inbound.mayPublish({ ip: FIBRE, reach: null, backupServing: true }).refusal).toBe("backup");
+        expect(inbound.mayPublish({ ip: FIBRE, reach: null, backupServing: true }).refusal).toBe(
+            "backup"
+        );
     });
 
     it("does not carry a verdict about the Starlink address over to the fibre one", () => {
-        expect(inbound.mayPublish({ ip: FIBRE, reach: reach(), backupServing: false }).publish).toBe(true);
+        expect(
+            inbound.mayPublish({ ip: FIBRE, reach: reach(), backupServing: false }).publish
+        ).toBe(true);
     });
 });
 
@@ -180,7 +245,9 @@ describe("call address", () => {
     });
 
     it("leaves STUN to decide on the direct path", () => {
-        expect(inbound.callNodeIp({ serving: "direct", path: "relay", relayAddress: RELAY })).toBeNull();
+        expect(
+            inbound.callNodeIp({ serving: "direct", path: "relay", relayAddress: RELAY })
+        ).toBeNull();
         expect(
             inbound.callReach({ cgnat: false, serving: "direct", path: null, relayAddress: null })
         ).toBe("direct");
@@ -188,11 +255,16 @@ describe("call address", () => {
 
     it("says calls stay in the house behind a tunnel or a bare CGNAT line", () => {
         expect(
-            inbound.callReach({ cgnat: true, serving: "backup", path: "tunnel", relayAddress: null })
+            inbound.callReach({
+                cgnat: true,
+                serving: "backup",
+                path: "tunnel",
+                relayAddress: null
+            })
         ).toBe("local-only");
-        expect(inbound.callReach({ cgnat: true, serving: "direct", path: null, relayAddress: null })).toBe(
-            "local-only"
-        );
+        expect(
+            inbound.callReach({ cgnat: true, serving: "direct", path: null, relayAddress: null })
+        ).toBe("local-only");
     });
 
     it("never advertises a private relay address", () => {
@@ -209,7 +281,12 @@ describe("paths", () => {
         expect(inbound.recommendPath({ ...base, cgnat: true })).toBe("relay");
         expect(inbound.recommendPath({ ...base, cgnat: true, hasServer: false })).toBe("tunnel");
         expect(
-            inbound.recommendPath({ cgnat: true, hasServer: false, cloudflare: false, tailscale: true })
+            inbound.recommendPath({
+                cgnat: true,
+                hasServer: false,
+                cloudflare: false,
+                tailscale: true
+            })
         ).toBe("tailscale");
     });
 

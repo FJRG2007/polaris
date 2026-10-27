@@ -217,24 +217,26 @@ export interface BackupView {
 export async function backupView(): Promise<BackupView> {
     const [zones, config, state, probe, tunnel, relay, token, servers, reach, tailscale] =
         await Promise.all([
-        getDomainZones().catch(() => null),
-        readConfig(),
-        getSetting(BACKUP_STATE_KEY).then(readState),
-        getSetting(PROBE_KEY).then((raw) => parse(probeSchema, raw)),
-        getSetting(TUNNEL_KEY).then((raw) => parse(tunnelSchema, raw)),
-        getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw)),
-        loadCloudflareToken().catch(() => null),
-        prisma.deployTarget
-            .findMany({
-                where: { status: "active", kind: { not: "local" }, owner: { isAdmin: true } },
-                select: { id: true, name: true },
-                orderBy: { name: "asc" },
-                take: 100
-            })
-            .catch(() => []),
-        readInboundReach().catch(() => null),
-        getTailscaleHost().then(Boolean).catch(() => false)
-    ]);
+            getDomainZones().catch(() => null),
+            readConfig(),
+            getSetting(BACKUP_STATE_KEY).then(readState),
+            getSetting(PROBE_KEY).then((raw) => parse(probeSchema, raw)),
+            getSetting(TUNNEL_KEY).then((raw) => parse(tunnelSchema, raw)),
+            getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw)),
+            loadCloudflareToken().catch(() => null),
+            prisma.deployTarget
+                .findMany({
+                    where: { status: "active", kind: { not: "local" }, owner: { isAdmin: true } },
+                    select: { id: true, name: true },
+                    orderBy: { name: "asc" },
+                    take: 100
+                })
+                .catch(() => []),
+            readInboundReach().catch(() => null),
+            getTailscaleHost()
+                .then(Boolean)
+                .catch(() => false)
+        ]);
     const cgnat = reach?.cgnat ?? false;
     return {
         configured: Boolean(zones?.baseDomain),
@@ -322,7 +324,8 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     // A carrier NAT takes no visitors whatever the probes say: a hairpin to the
     // carrier's address can even answer from somebody else's router.
     const cgnat = cgnatVerdict(reach, evidence.ip);
-    const verdict: Verdict = cgnat.down && measured.verdict !== "no-uplink" ? "down" : measured.verdict;
+    const verdict: Verdict =
+        cgnat.down && measured.verdict !== "no-uplink" ? "down" : measured.verdict;
     const now = new Date();
     const decision = decide(previous, {
         mode: config.mode,
@@ -369,14 +372,18 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
         try {
             await arm(zones.baseDomain, target !== null);
             await retireUnused(config);
+        } catch (caught) {
+            problem = problem ?? "failed";
+            detail = detail ?? message(caught);
+        }
+        try {
             const serving = (await getSetting(BACKUP_STATE_KEY).then(readState)).serving;
             const relay = parse(relaySchema, await getSetting(RELAY_KEY));
             await syncCallNodeIp(
                 callNodeIp({ serving, path: config.path, relayAddress: relay?.address ?? null })
             );
         } catch (caught) {
-            problem = problem ?? "failed";
-            detail = detail ?? message(caught);
+            console.error("polaris: could not point the call server at the relay:", caught);
         }
     }
     await setSetting(

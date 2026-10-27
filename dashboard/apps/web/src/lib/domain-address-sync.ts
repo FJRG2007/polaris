@@ -74,7 +74,8 @@ const REACH_GRACE_MS = 2 * 60 * 1000;
 /** What Cloudflare's "automatic" TTL (1) means in seconds. */
 const AUTO_TTL_S = 300;
 
-export type FollowProblem = "no-token" | "api" | "conflict" | "failed" | "unreached" | "cgnat";
+export type FollowProblem =
+    "no-token" | "api" | "conflict" | "failed" | "unreached" | "cgnat" | "not-public";
 
 /** What the last run found, as Admin -> Domains shows it. */
 export interface FollowStatus {
@@ -306,7 +307,7 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
         backupServing: false
     });
     if (gate.refusal === "cgnat" || gate.refusal === "not-public") {
-        await save({ ip: current, problem: "cgnat", detail: null, reachBy: null });
+        await save({ ip: current, problem: gate.refusal, detail: null, reachBy: null });
         return { ...NOTHING, from, to: current, skipped: "The address takes no visitors" };
     }
 

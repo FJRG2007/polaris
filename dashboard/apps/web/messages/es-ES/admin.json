@@ -621,7 +621,8 @@
                 "conflict": "Estos nombres apuntan a una dirección que Polaris no escribió, así que no se tocaron: {detail}",
                 "failed": "Algunos registros no se pudieron actualizar: {detail}",
                 "unreached": "Los resolvedores públicos siguen respondiendo otra dirección pasado el TTL. Revisa los registros de abajo.",
-                "cgnat": "Los registros DNS no se han apuntado a {ip}: esta línea no recibe visitas (CGNAT). <link>Elige una vía en Acceso de respaldo</link>."
+                "cgnat": "Los registros DNS no se han apuntado a {ip}: esta línea no recibe visitas (CGNAT). <link>Elige una vía en Acceso de respaldo</link>.",
+                "notPublic": "Los registros DNS no se han apuntado a {ip}: no es una dirección pública, así que nadie de fuera puede llegar a ella. <link>Elige una vía en Acceso de respaldo</link>."
             }
         },
         "acme": {
@@ -710,6 +711,7 @@
             "fromInside": "desde este servidor",
             "cgnat": {
                 "title": "Esta línea no recibe visitas desde internet: {ip} lo comparte el proveedor (CGNAT).",
+                "titleSuspected": "Esta línea no recibe visitas desde internet en {ip}.",
                 "reasons": {
                     "carrier-address": "Este servidor tiene una dirección del operador.",
                     "router-wan": "La dirección del router no es la que ve internet.",
@@ -737,7 +739,7 @@
                 "web": "Panel y webs",
                 "ownDomain": "Tu dominio",
                 "calls": "Llamadas con gente de fuera",
-                "games": "Servidores de juegos",
+                "games": "Juegos",
                 "mail": "Correo entrante"
             },
             "compare": {

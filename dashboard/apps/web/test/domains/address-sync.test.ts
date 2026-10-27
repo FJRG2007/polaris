@@ -93,8 +93,9 @@ vi.mock("@/lib/notifications/notice-words", () => ({
 vi.mock("@/lib/dns/authoritative", () => ({ publicA: (name: string) => publicA(name) }));
 vi.mock("@/lib/backup-access", () => ({ backupAccessActive: async () => false }));
 
-const { formerAddresses, planRepoint, syncZoneAddress, PUBLISHED_KEY } =
+const { formerAddresses, planRepoint, syncZoneAddress, PUBLISHED_KEY, STATUS_KEY } =
     await import("@/lib/domain-address-sync");
+const { INBOUND_KEY } = await import("@/lib/backup-access/inbound");
 
 function record(id: string, content: string, extra: { ttl?: number; proxied?: boolean } = {}) {
     return { id, content, ttl: extra.ttl ?? 300, proxied: extra.proxied ?? false };
@@ -175,6 +176,38 @@ describe("the plan", () => {
 });
 
 describe("a run", () => {
+    it("leaves the records alone on an address a carrier NAT shares, and says so", async () => {
+        settings.set(
+            INBOUND_KEY,
+            JSON.stringify({
+                checkedAt: "2026-10-27T10:00:00.000Z",
+                publicIp: NEW,
+                cgnat: true,
+                certain: false,
+                reason: "starlink",
+                inboundProven: false
+            })
+        );
+        const result = await syncZoneAddress();
+        expect(result.repointed).toHaveLength(0);
+        expect(repoint).not.toHaveBeenCalled();
+        expect(JSON.parse(settings.get(STATUS_KEY) ?? "{}")).toMatchObject({
+            ip: NEW,
+            problem: "cgnat"
+        });
+    });
+
+    it("calls an address that is not public what it is, not a carrier NAT", async () => {
+        probe.mockResolvedValue("192.168.1.10");
+        const result = await syncZoneAddress();
+        expect(result.repointed).toHaveLength(0);
+        expect(repoint).not.toHaveBeenCalled();
+        expect(JSON.parse(settings.get(STATUS_KEY) ?? "{}")).toMatchObject({
+            ip: "192.168.1.10",
+            problem: "not-public"
+        });
+    });
+
     it("repoints every owned name on the first run, learning the old address from the dashboard's record", async () => {
         const result = await syncZoneAddress();
         expect(result.repointed).toHaveLength(5);

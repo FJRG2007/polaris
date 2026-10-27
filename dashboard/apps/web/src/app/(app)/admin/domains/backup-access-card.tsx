@@ -356,7 +356,14 @@ function LineReach({ view }: { view: BackupView }) {
                     role="status"
                     className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground"
                 >
-                    {t("domains.backup.cgnat.title", { ip: reach.publicIp ?? "-" })}{" "}
+                    {t(
+                        reach.certain
+                            ? "domains.backup.cgnat.title"
+                            : "domains.backup.cgnat.titleSuspected",
+                        {
+                            ip: reach.publicIp ?? "-"
+                        }
+                    )}{" "}
                     {reach.reason ? t(`domains.backup.cgnat.reasons.${reach.reason}`) : null}{" "}
                     {view.config.path
                         ? t("domains.backup.cgnat.covered")
@@ -366,28 +373,32 @@ function LineReach({ view }: { view: BackupView }) {
             <div className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">
                     {active
-                        ? t("domains.backup.works.on", { path: t(`domains.backup.paths.${active}`) })
+                        ? t("domains.backup.works.on", {
+                              path: t(`domains.backup.paths.${active}`)
+                          })
                         : t("domains.backup.works.none")}
                 </span>
                 <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-xs sm:grid-cols-2">
-                    {INBOUND_FEATURES.filter((feature) => feature !== "everyone").map(
-                        (feature) => {
-                            const on = active !== null && carries(active, feature);
-                            return (
-                                <li key={feature} className="flex min-w-0 gap-2">
-                                    <span className={on ? "text-success" : "text-danger"}>
-                                        {on ? t("domains.backup.works.yes") : t("domains.backup.works.no")}
-                                    </span>
-                                    <span className="min-w-0 truncate">
-                                        {t(`domains.backup.features.${feature}`)}
-                                    </span>
-                                </li>
-                            );
-                        }
-                    )}
+                    {INBOUND_FEATURES.filter((feature) => feature !== "everyone").map((feature) => {
+                        const on = active !== null && carries(active, feature);
+                        return (
+                            <li key={feature} className="flex min-w-0 gap-2">
+                                <span className={on ? "text-success" : "text-danger"}>
+                                    {on
+                                        ? t("domains.backup.works.yes")
+                                        : t("domains.backup.works.no")}
+                                </span>
+                                <span className="min-w-0 truncate">
+                                    {t(`domains.backup.features.${feature}`)}
+                                </span>
+                            </li>
+                        );
+                    })}
                 </ul>
                 {view.calls === "local-only" ? (
-                    <p className="text-xs text-muted-foreground">{t("domains.backup.works.callsLocal")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("domains.backup.works.callsLocal")}
+                    </p>
                 ) : null}
             </div>
         </div>
@@ -402,13 +413,17 @@ function PathsCompared({ view }: { view: BackupView }) {
     if (!view.reach?.cgnat && view.config.path) return null;
     return (
         <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">{t("domains.backup.compare.title")}</span>
+            <span className="text-xs text-muted-foreground">
+                {t("domains.backup.compare.title")}
+            </span>
             <ul className="flex flex-col gap-1.5 text-xs">
                 {COMPARED.map((path) => (
                     <li key={path} className="min-w-0 break-words">
                         <span className="font-medium">{t(`domains.backup.paths.${path}`)}</span>
                         {view.recommended === path ? (
-                            <span className="ml-2 text-success">{t("domains.backup.compare.recommended")}</span>
+                            <span className="ml-2 text-success">
+                                {t("domains.backup.compare.recommended")}
+                            </span>
                         ) : null}
                         <span className="block text-muted-foreground">
                             {t(`domains.backup.compare.${path}`)}
