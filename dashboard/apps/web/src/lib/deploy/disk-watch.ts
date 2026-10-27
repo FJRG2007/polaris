@@ -200,7 +200,7 @@ export async function lastDiskReadings(): Promise<DiskReading[]> {
 export async function keepDiskReading(reading: DiskReading): Promise<void> {
     const kept = (await lastDiskReadings()).filter((one) => one.machine !== reading.machine);
     await setSetting(KEY, JSON.stringify([...kept, reading]));
-    publishNoticeChange({ topic: "disk", reach: "admins" });
+    publishNoticeChange({ topic: "disk", reach: { permission: "system.manage" } });
 }
 
 /** Whether the warning every administrator sees reads differently now: a machine's level moved. */
@@ -312,6 +312,6 @@ export async function watchDisks(): Promise<DiskReading[]> {
     }
     await setSetting(KEY, JSON.stringify(readings));
     if (diskLevelsChanged([...last.values()], readings))
-        publishNoticeChange({ topic: "disk", reach: "admins" });
+        publishNoticeChange({ topic: "disk", reach: { permission: "system.manage" } });
     return readings;
 }

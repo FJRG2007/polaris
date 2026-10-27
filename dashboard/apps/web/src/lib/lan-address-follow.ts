@@ -110,7 +110,7 @@ export async function followLanAddress(
 
     console.info(`polaris: this machine's LAN address moved from ${change.from} to ${change.to}`);
     await recordMove(steps, change.from, change.to).catch(() => undefined);
-    publishNoticeChange({ topic: "lan", reach: "admins" });
+    publishNoticeChange({ topic: "lan", reach: { permission: "system.manage" } });
     await steps
         .certificate()
         .catch((error: unknown) =>

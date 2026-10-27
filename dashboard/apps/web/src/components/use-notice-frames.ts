@@ -3,7 +3,9 @@
 /**
  * Calls `onChange` when the account's live stream says a notice above the page
  * changed (see `shell-notices-live`). Rides the shared stream, so it opens no
- * connection of its own. A burst is gathered into one call.
+ * connection of its own. A burst is gathered into one call, and each tab waits
+ * a random part of a couple of seconds more, so a change every open tab hears
+ * is not every tab reading again in the same instant.
  */
 
 import { useEffect, useRef } from "react";
@@ -13,6 +15,7 @@ import type { NoticeTopic } from "@/lib/shell-notices-live";
 
 const STREAM_PATH = "/api/access/stream";
 const SETTLE_MS = 300;
+export const NOTICE_SPREAD_MS = 2_000;
 
 /** Whether a frame off the stream is a change to this notice. */
 export function isNoticeFrame(data: string, topic: NoticeTopic): boolean {
@@ -37,7 +40,7 @@ export function useNoticeFrames(topic: NoticeTopic, onChange: () => void, enable
             timer = setTimeout(() => {
                 timer = null;
                 latest.current();
-            }, SETTLE_MS);
+            }, SETTLE_MS + Math.random() * NOTICE_SPREAD_MS);
         });
         return () => {
             if (timer) clearTimeout(timer);

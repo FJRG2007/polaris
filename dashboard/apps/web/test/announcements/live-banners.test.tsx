@@ -36,7 +36,8 @@ vi.mock("@/lib/announcements/audience", () => ({
 import type { BannerState, BannerView } from "@/lib/announcements/service";
 import { rereadDelay, REREAD_MAX_MS, REREAD_SLACK_MS } from "@/lib/announcements/phase";
 import { AnnouncementBannerList } from "@/components/announcements/announcement-banner-list";
-import { noticeReaches, publishNoticeChange, subscribeNotices } from "@/lib/shell-notices-live";
+import { NOTICE_SPREAD_MS } from "@/components/use-notice-frames";
+import { noticeReaches, publishNoticeChange, subscribeNotices, type NoticeLookups } from "@/lib/shell-notices-live";
 
 const GROUP = "0190f3c6-0000-7000-8000-0000000000a1";
 const audience = (over: Record<string, unknown> = {}) => ({
@@ -71,29 +72,36 @@ function frame(topic: string) {
 
 describe("who a change reaches", () => {
     const ana = { id: "ana", isAdmin: false };
+    const root = { id: "root", isAdmin: true };
     const none = vi.fn(async () => null);
+    const looking = (over: Partial<NoticeLookups> = {}): NoticeLookups => ({
+        membership: none,
+        can: vi.fn(async () => false),
+        viewing: vi.fn(async () => null),
+        ...over
+    });
 
     it("reaches everyone for an audience of everyone, without reading memberships", async () => {
-        const member = vi.fn(async () => null);
+        const lookups = looking({ membership: vi.fn(async () => null) });
         const change = { topic: "announcements" as const, reach: { audiences: [audience({ everyone: true })] } };
-        expect(await noticeReaches(change, ana, member)).toBe(true);
-        expect(member).not.toHaveBeenCalled();
+        expect(await noticeReaches(change, ana, lookups)).toBe(true);
+        expect(lookups.membership).not.toHaveBeenCalled();
     });
 
     it("reaches a person named in it, and nobody else, without reading memberships", async () => {
-        const member = vi.fn(async () => null);
+        const lookups = looking({ membership: vi.fn(async () => null) });
         const change = { topic: "announcements" as const, reach: { audiences: [audience({ userIds: ["ana"] })] } };
-        expect(await noticeReaches(change, ana, member)).toBe(true);
-        expect(await noticeReaches(change, { id: "ben", isAdmin: false }, member)).toBe(false);
-        expect(member).not.toHaveBeenCalled();
+        expect(await noticeReaches(change, ana, lookups)).toBe(true);
+        expect(await noticeReaches(change, { id: "ben", isAdmin: false }, lookups)).toBe(false);
+        expect(lookups.membership).not.toHaveBeenCalled();
     });
 
     it("reaches a group's members through one read of the reader's memberships", async () => {
         const change = { topic: "announcements" as const, reach: { audiences: [audience({ groupIds: [GROUP] })] } };
         const inGroup = vi.fn(async () => ({ id: "ana", roleIds: new Set<string>(), groupIds: new Set([GROUP]), orgIds: new Set<string>() }));
-        expect(await noticeReaches(change, ana, inGroup)).toBe(true);
+        expect(await noticeReaches(change, ana, looking({ membership: inGroup }))).toBe(true);
         expect(inGroup).toHaveBeenCalledTimes(1);
-        expect(await noticeReaches(change, ana, none)).toBe(false);
+        expect(await noticeReaches(change, ana, looking())).toBe(false);
     });
 
     it("reaches the old audience and the new one of an edit", async () => {
@@ -101,23 +109,40 @@ describe("who a change reaches", () => {
             topic: "announcements" as const,
             reach: { audiences: [audience({ userIds: ["ben"] }), audience({ userIds: ["ana"] })] }
         };
-        expect(await noticeReaches(change, ana, none)).toBe(true);
-        expect(await noticeReaches(change, { id: "ben", isAdmin: false }, none)).toBe(true);
-        expect(await noticeReaches(change, { id: "cy", isAdmin: false }, none)).toBe(false);
+        expect(await noticeReaches(change, ana, looking())).toBe(true);
+        expect(await noticeReaches(change, { id: "ben", isAdmin: false }, looking())).toBe(true);
+        expect(await noticeReaches(change, { id: "cy", isAdmin: false }, looking())).toBe(false);
     });
 
-    it("keeps an administrators' notice to administrators", async () => {
-        const change = { topic: "disk" as const, reach: "admins" as const };
-        expect(await noticeReaches(change, ana, none)).toBe(false);
-        expect(await noticeReaches(change, { id: "root", isAdmin: true }, none)).toBe(true);
+    it("keeps a system notice to whoever manages the system, administrators included", async () => {
+        const change = { topic: "disk" as const, reach: { permission: "system.manage" as const } };
+        expect(await noticeReaches(change, ana, looking())).toBe(false);
+        const can = vi.fn(async (permission: string) => permission === "system.manage");
+        expect(await noticeReaches(change, ana, looking({ can }))).toBe(true);
+        expect(can).toHaveBeenCalledWith("system.manage");
+        expect(await noticeReaches(change, root, looking())).toBe(true);
+    });
+
+    it("spares administrators somebody else closing a banner, unless they are viewing as them", async () => {
+        const change = { topic: "announcements" as const, reach: { audiences: [audience({ userIds: ["ana"] })] } };
+        expect(await noticeReaches(change, root, looking())).toBe(false);
+        expect(await noticeReaches(change, root, looking({ viewing: async () => "ana" }))).toBe(true);
+        expect(await noticeReaches(change, { id: "ana", isAdmin: true }, looking())).toBe(true);
+    });
+
+    it("still tells administrators about an audience of roles, groups or organizations", async () => {
+        const change = { topic: "announcements" as const, reach: { audiences: [audience({ groupIds: [GROUP] })] } };
+        const lookups = looking();
+        expect(await noticeReaches(change, root, lookups)).toBe(true);
+        expect(lookups.viewing).not.toHaveBeenCalled();
     });
 
     it("is carried by the in-process bus to every listener", () => {
         const heard: string[] = [];
         const stop = subscribeNotices((change) => heard.push(change.topic));
-        publishNoticeChange({ topic: "lan", reach: "admins" });
+        publishNoticeChange({ topic: "lan", reach: "everyone" });
         stop();
-        publishNoticeChange({ topic: "lan", reach: "admins" });
+        publishNoticeChange({ topic: "lan", reach: "everyone" });
         expect(heard).toEqual(["lan"]);
     });
 });
@@ -157,7 +182,7 @@ describe("the banner stack follows along", () => {
         await act(async () => {
             frame("announcements");
             frame("announcements");
-            await vi.advanceTimersByTimeAsync(400);
+            await vi.advanceTimersByTimeAsync(400 + NOTICE_SPREAD_MS);
         });
         // A burst of frames is one read.
         expect(read).toHaveBeenCalledTimes(1);
@@ -171,12 +196,12 @@ describe("the banner stack follows along", () => {
         });
         await act(async () => {
             frame("disk");
-            await vi.advanceTimersByTimeAsync(400);
+            await vi.advanceTimersByTimeAsync(400 + NOTICE_SPREAD_MS);
         });
         expect(read).not.toHaveBeenCalled();
         await act(async () => {
             frame("announcements");
-            await vi.advanceTimersByTimeAsync(400);
+            await vi.advanceTimersByTimeAsync(400 + NOTICE_SPREAD_MS);
         });
         expect(screen.queryByText("Scheduled maintenance")).toBeNull();
     });
@@ -219,7 +244,7 @@ describe("the banner stack follows along", () => {
         });
         await act(async () => {
             frame("announcements");
-            await vi.advanceTimersByTimeAsync(400);
+            await vi.advanceTimersByTimeAsync(400 + NOTICE_SPREAD_MS);
         });
         expect(screen.getByText("Scheduled maintenance")).toBeTruthy();
     });

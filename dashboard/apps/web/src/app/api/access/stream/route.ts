@@ -25,12 +25,14 @@
  * Node runtime for Prisma, and never cached.
  */
 
+import { userHasPermission } from "@polaris/auth";
 import { resolveSession } from "@/lib/session";
 import { subscribeLocale } from "@/lib/i18n/locale-live";
 import { concerns, subscribeAccess } from "@/lib/access-live";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { viewedUserId } from "@/lib/view-as-service";
 import { membershipOf } from "@/lib/announcements/audience";
-import { noticeReaches, subscribeNotices } from "@/lib/shell-notices-live";
+import { noticeReaches, subscribeNotices, type NoticeLookups } from "@/lib/shell-notices-live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +55,12 @@ export async function GET(request: Request): Promise<Response> {
     // above does not survive into a callback.
     const readerId = session.id;
     const reader = { id: session.id, isAdmin: session.isAdmin };
+    const sessionId = session.sessionId;
+    const lookups: NoticeLookups = {
+        membership: () => membershipOf(readerId),
+        can: (permission) => userHasPermission(readerId, permission),
+        viewing: () => viewedUserId(sessionId)
+    };
     const encoder = new TextEncoder();
     let unsubscribe: (() => void) | null = null;
     let unsubscribeLocale: (() => void) | null = null;
@@ -111,7 +119,7 @@ export async function GET(request: Request): Promise<Response> {
 
             unsubscribeNotices = subscribeNotices((change) => {
                 if (closed) return;
-                void noticeReaches(change, reader, () => membershipOf(readerId))
+                void noticeReaches(change, reader, lookups)
                     .then((reaches) => {
                         if (!reaches || closed) return;
                         sequence += 1;

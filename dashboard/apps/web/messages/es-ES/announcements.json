@@ -105,6 +105,7 @@
             "edited": "El texto editado se muestra tal como lo escribiste, en todos los idiomas.",
             "detailsLabel": "Detalles",
             "detailsHint": "Se muestran en su propia página tras \"Ver detalles\". Opcional.",
+            "detailsTooLong": "Demasiado largo: {count, number} de {max, number} caracteres.",
             "detailsPlaceholder": "Qué se ve afectado, los plazos, qué esperar"
         },
         "severity": {

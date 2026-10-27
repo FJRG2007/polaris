@@ -16011,8 +16011,6 @@ model Announcement {
     @@index([createdAt])
 }
 
-// Somebody closed a banner. Per phase, so closing a maintenance countdown does
-// not also hide "finished" when it comes.
 // A note added to an announcement after it went out ("the upgrade is taking
 // longer"), shown in order on its details page.
 model AnnouncementUpdate {
@@ -16027,6 +16025,8 @@ model AnnouncementUpdate {
     @@index([announcementId, createdAt])
 }
 
+// Somebody closed a banner. Per phase, so closing a maintenance countdown does
+// not also hide "finished" when it comes.
 model AnnouncementDismissal {
     announcementId String   @db.Uuid
     userId         String   @db.Uuid

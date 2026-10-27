@@ -493,7 +493,12 @@ export function AnnouncementsView({
                                     : "text-xs text-muted-foreground"
                             }
                         >
-                            {t("admin.compose.detailsHint")}
+                            {form.details.length > DETAILS_MAX
+                                ? t("admin.compose.detailsTooLong", {
+                                      count: form.details.length,
+                                      max: DETAILS_MAX
+                                  })
+                                : t("admin.compose.detailsHint")}
                         </span>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
