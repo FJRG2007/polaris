@@ -58,11 +58,22 @@ function Sortable({
     children: React.ReactNode;
 }) {
     const [over, setOver] = useState<DropEdge | null>(null);
+    const [inField, setInField] = useState(false);
 
     return (
         <li
-            draggable={!disabled}
+            draggable={!disabled && !inField}
+            onPointerDownCapture={(event) =>
+                setInField(
+                    event.target instanceof Element &&
+                        event.target.closest("input, textarea, select, [contenteditable='true']") !== null
+                )
+            }
             onDragStart={(event) => {
+                if (inField) {
+                    event.preventDefault();
+                    return;
+                }
                 event.stopPropagation();
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", id);
@@ -431,7 +442,7 @@ function useOverlay<Row>(
         onError("");
         const result = await runAction(call, onError);
         if (!result || result.error) {
-            setOverlay(null);
+            setOverlay((current) => (current?.view === next ? null : current));
             if (result?.error) onError(result.error);
         }
         onChanged();
@@ -458,7 +469,7 @@ function MoveButtons({
     const t = useTranslations("tasksDetail");
     if (count < 2) return null;
     const style =
-        "rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
+        "rounded p-2.5 text-muted-foreground md:p-1 transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
     return (
         <>
             <button
@@ -753,7 +764,7 @@ export function ChecklistSection({
                                                             );
                                                             onChanged();
                                                         }}
-                                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                                        className="rounded p-2.5 text-muted-foreground md:p-1 transition-colors hover:bg-muted hover:text-danger"
                                                     >
                                                         <Trash2 className="size-3.5" />
                                                     </button>
@@ -862,7 +873,7 @@ export function ChecklistSection({
                                                                 );
                                                                 onChanged();
                                                             }}
-                                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                            className="rounded p-2.5 text-muted-foreground md:p-1 transition-colors hover:bg-muted hover:text-foreground"
                                                         >
                                                             <ArrowUpRight className="size-3.5" />
                                                         </button>
@@ -881,7 +892,7 @@ export function ChecklistSection({
                                                                 );
                                                                 onChanged();
                                                             }}
-                                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                                            className="rounded p-2.5 text-muted-foreground md:p-1 transition-colors hover:bg-muted hover:text-danger"
                                                         >
                                                             <X className="size-3.5" />
                                                         </button>
@@ -1037,7 +1048,7 @@ export function DependencySection({
                                     );
                                     onChanged();
                                 }}
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                className="rounded p-2.5 text-muted-foreground md:p-1 transition-colors hover:bg-muted hover:text-danger"
                             >
                                 <X className="size-3.5" />
                             </button>
