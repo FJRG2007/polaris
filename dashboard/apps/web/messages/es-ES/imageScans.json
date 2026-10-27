@@ -1,7 +1,7 @@
 {
     "title": "Imagen",
-    "scanNow": "Analizar ahora",
-    "scanAgain": "Analizar de nuevo",
+    "scanNow": "Analizar",
+    "scanAgain": "Reanalizar",
     "queued": "Análisis en cola. Empieza en menos de un minuto.",
     "scannedAt": "Analizada {when}",
     "notYet": "Aún no se ha analizado.",
@@ -16,22 +16,22 @@
     "tryAgain": "Reintentar",
     "none": "Ninguna vulnerabilidad conocida en esta imagen.",
     "filters": "Filtrar hallazgos",
-    "fixedOnly": "Con corrección",
+    "fixedOnly": "Con arreglo",
     "vulnerability": "Vulnerabilidad",
     "severity": "Gravedad",
     "package": "Paquete",
-    "fix": "Corregida en",
+    "fix": "Arreglo",
     "layer": "Capa",
     "noMatch": "Ningún hallazgo coincide con estos filtros.",
-    "noFix": "Sin corrección aún",
+    "noFix": "Sin parche",
     "openAdvisory": "Abrir el aviso de {id}",
     "level": {
         "critical": "Crítica",
         "high": "Alta",
         "medium": "Media",
         "low": "Baja",
-        "negligible": "Insignificante",
-        "unknown": "Desconocida"
+        "negligible": "Mínima",
+        "unknown": "Sin datos"
     },
     "errors": {
         "failed": "Algo salió mal. Inténtalo de nuevo.",

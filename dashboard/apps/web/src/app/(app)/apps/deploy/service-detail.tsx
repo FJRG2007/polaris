@@ -219,6 +219,12 @@ export function ServiceDetail({
     const [tab, setTab] = useState<Tab>(
         linked && tabs.includes(linked) ? linked : "Deployments"
     );
+    // A link followed while the panel is open (the deploy check's "See
+    // findings") moves it to that tab too.
+    useEffect(() => {
+        if (linked && tabs.includes(linked)) setTab(linked);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [linked]);
     const [full, setFull] = useState(false);
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
     const dots = tabAttention(app.attention, t);

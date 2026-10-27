@@ -824,7 +824,8 @@
         "blockTitle": "Block vulnerable releases",
         "blockShort": "Hold back a release whose image has a critical vulnerability with a known fix.",
         "blockHint": "Checked against the latest scan of the same image on this server. Off, such a release still goes live and carries a warning. A held-back release can be deployed anyway from its row, and who did it is recorded.",
-        "blockFailed": "Could not save this setting"
+        "blockFailed": "Could not save this setting",
+        "seeFindings": "See all findings"
     },
     "dependencies": {
         "title": "Dependencies",

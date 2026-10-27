@@ -824,7 +824,8 @@
         "blockTitle": "Bloquear versiones vulnerables",
         "blockShort": "Retiene una versión cuya imagen tiene una vulnerabilidad crítica con arreglo conocido.",
         "blockHint": "Se comprueba con el último análisis de la misma imagen en este servidor. Desactivado, esa versión se publica igualmente con un aviso. Una versión retenida se puede desplegar así desde su fila, y queda registrado quién lo hizo.",
-        "blockFailed": "No se pudo guardar este ajuste"
+        "blockFailed": "No se pudo guardar este ajuste",
+        "seeFindings": "Ver hallazgos"
     },
     "dependencies": {
         "title": "Dependencias",

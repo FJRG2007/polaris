@@ -8,7 +8,9 @@
  * and recorded on the new deployment by the server.
  */
 
+import Link from "next/link";
 import * as deployActions from "./actions";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge, Button, cn } from "@polaris/ui";
 import { useProjectCan } from "./access-context";
@@ -55,6 +57,10 @@ export function SecurityNote({
     const [confirm, confirmation] = useConfirm();
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    const pathname = usePathname();
+    const params = new URLSearchParams(useSearchParams()?.toString() ?? "");
+    params.set("tab", "vulnerabilities");
+    const findingsHref = `${pathname}?${params.toString()}`;
     const found = deployment.security;
     if (!found) return null;
 
@@ -107,6 +113,14 @@ export function SecurityNote({
                     {t("security.where", { package: found.package, fixedIn: found.fixedIn })}
                 </span>
             </p>
+            <Link
+                href={findingsHref}
+                replace
+                scroll={false}
+                className="w-fit text-primary underline-offset-2 hover:underline"
+            >
+                {t("security.seeFindings")}
+            </Link>
             {held && <p className="text-muted-foreground">{t("security.refused")}</p>}
             {deployment.securityOverrideAt && (
                 <p className="text-muted-foreground">{t("security.overridden")}</p>

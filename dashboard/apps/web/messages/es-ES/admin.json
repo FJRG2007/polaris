@@ -2487,7 +2487,7 @@
                 "description": "Proveedores de identidad SAML y los dominios de correo que entran con ellos."
             },
             "images": {
-                "title": "Imágenes de Polaris",
+                "title": "Imágenes",
                 "description": "Vulnerabilidades en las imágenes de Polaris."
             }
         }
@@ -3773,7 +3773,7 @@
         }
     },
     "images": {
-        "title": "Imágenes de Polaris",
+        "title": "Imágenes",
         "description": "Vulnerabilidades conocidas en las imágenes que Polaris ejecuta en esta máquina.",
         "emptyTitle": "Aún sin analizar",
         "emptyBody": "Polaris analiza sus propias imágenes por su cuenta en unas horas tras arrancar o actualizarse."
