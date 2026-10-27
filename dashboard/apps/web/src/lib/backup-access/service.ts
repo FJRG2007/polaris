@@ -962,7 +962,7 @@ async function announce(state: FlipState, domain: string): Promise<void> {
         await notices
             .createNotification({
                 userId,
-                href: "/admin/domains#backup-access",
+                href: "/admin/domains/remote-access#backup-access",
                 type: on ? "domain.backup-on" : "domain.backup-off",
                 level: on ? "warning" : "success",
                 title: on

@@ -470,6 +470,25 @@
             "title": "Dominios",
             "description": "Elige los dominios que usa Polaris para el panel y para los enlaces que reparte."
         },
+        "pages": {
+            "remoteAccess": {
+                "title": "Acceso remoto",
+                "description": "Formas de entrar desde fuera cuando tu router no acepta conexiones entrantes."
+            },
+            "ports": {
+                "title": "Puertos",
+                "description": "Los puertos que los servidores de juegos y las llamadas necesitan abiertos en tu router, y si responden.",
+                "empty": "Nada en este servidor necesita un puerto abierto ahora mismo. Los servidores de juegos y las llamadas muestran aquí sus puertos cuando lo necesiten."
+            },
+            "certificates": {
+                "title": "Certificados",
+                "description": "Confía en Polaris en tu red local y elige la dirección a la que escribe la autoridad de certificación."
+            },
+            "security": {
+                "title": "Seguridad de dominios",
+                "description": "Cada dominio que conoce Polaris, revisado en busca de suplantación y problemas de DNS, registro y HTTPS."
+            }
+        },
         "tryAgain": "Reintentar",
         "saved": "Guardado.",
         "errors": {

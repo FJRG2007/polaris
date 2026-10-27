@@ -1352,7 +1352,7 @@ function RouterAdviceNote({
                 )}
                 {advice.key === "cert:untrusted" ? (
                     <a
-                        href={`#${CERTIFICATE_CONTACT_ID}`}
+                        href={`/admin/domains/certificates#${CERTIFICATE_CONTACT_ID}`}
                         className="w-fit text-primary underline-offset-2 hover:underline"
                     >
                         {t("domainsSetup.certificateContactLink")}

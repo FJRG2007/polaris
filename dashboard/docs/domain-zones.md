@@ -180,10 +180,23 @@ layout is used to infer the strategy - the same fallback a setup saved before th
 existed gets.
 
 Everything else on `/admin/domains` is either a question the setup does not answer - the
-dashboard's own address, the sharing domain, the root certificate that makes
-`polaris.local` trusted - or the manual controls for settings the setup already wrote.
-Those (Network & exposure, DuckDNS) sit behind an **Advanced** disclosure with a Save
-each, so that one setting is never edited by two panels under one button.
+dashboard's own address, the sharing domain, the names it answers on, the DNS records -
+or the manual controls for settings the setup already wrote. Those (Network & exposure,
+DuckDNS) sit behind an **Advanced** disclosure with a Save each, so that one setting is
+never edited by two panels under one button.
+
+The rest of the subject has pages of its own under the same rail:
+
+| Page | Holds |
+| --- | --- |
+| `/admin/domains/remote-access` | Backup access (relay, Cloudflare tunnel, carrier-NAT check), Tailscale |
+| `/admin/domains/ports` | Game server ports and their policy, call ports, router steps |
+| `/admin/domains/certificates` | The `polaris.local` root certificate, the certificate contact |
+| `/admin/domains/security` | The domain security inventory |
+
+A link to an anchor that moved (`/admin/domains#backup-access` in a notification stored
+before the split) is sent on to the page that holds it - see
+`apps/web/src/app/(app)/admin/domains/moved-anchors.ts`.
 
 ### Reopening and resuming
 

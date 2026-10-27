@@ -32,7 +32,8 @@ const BADGE: Record<CheckStatus, "success" | "warning" | "danger" | "neutral"> =
 
 const LINK_LABEL: Partial<Record<string, Key>> = {
     "/admin/settings": "fix.openSettings",
-    "/admin/domains": "fix.openDomains"
+    "/admin/domains": "fix.openDomains",
+    "/admin/domains/certificates": "fix.openCertificates"
 };
 
 const BUNDLE_FILES: ReadonlyArray<{ name: string; key: Key }> = [

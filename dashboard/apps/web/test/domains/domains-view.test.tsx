@@ -41,9 +41,6 @@ describe("the domains panel before its read lands", () => {
         expect(markup).toContain("own addresses");
         expect(markup).toContain("Where Polaris answers");
         expect(markup).toContain("Domains of their own");
-        // Neither of these waits on anything, so neither may be held back by a card
-        // that does.
-        expect(markup).toContain("Trust this device");
         // The record editor's chrome is there too, its zones pulsing below it.
         expect(markup).toContain("DNS records");
         expect(markup).toContain("Advanced: exposure mode and DuckDNS");
@@ -54,6 +51,15 @@ describe("the domains panel before its read lands", () => {
 
         expect(markup).toContain("animate-pulse");
         expect(markup).not.toContain("animate-spin");
+    });
+
+    it("leaves the tunnels, ports and certificates to their own pages", () => {
+        const markup = renderToStaticMarkup(withMessages(<DomainsView />));
+
+        expect(markup).not.toContain("Trust this device");
+        expect(markup).not.toContain("Certificate contact");
+        expect(markup).not.toContain('id="backup-access"');
+        expect(markup).not.toContain('id="tailscale"');
     });
 
     it("says nothing about the game ports until it knows there are any", () => {

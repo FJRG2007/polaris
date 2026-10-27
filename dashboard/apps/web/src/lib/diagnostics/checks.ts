@@ -124,7 +124,7 @@ export function certificateVerdict(
     cert: { validTo: Date | null; trusted: boolean } | null,
     now = Date.now()
 ): Verdict {
-    const link: CheckFix = { kind: "link", href: "/admin/domains" };
+    const link: CheckFix = { kind: "link", href: "/admin/domains/certificates" };
     if (!cert || !cert.validTo) return verdict("unknown", "unreachable", { host });
     const days = Math.floor((cert.validTo.getTime() - now) / DAY_MS);
     if (days < 0) return verdict("fail", "expired", { host, days: -days }, link);

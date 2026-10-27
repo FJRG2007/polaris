@@ -470,6 +470,25 @@
             "title": "Domains",
             "description": "Choose the domains Polaris uses for the dashboard and for the links it hands out."
         },
+        "pages": {
+            "remoteAccess": {
+                "title": "Remote access",
+                "description": "Ways in from outside when your router can't take incoming connections."
+            },
+            "ports": {
+                "title": "Ports",
+                "description": "The ports game servers and calls need open on your router, and whether they answer.",
+                "empty": "Nothing on this server needs an open port right now. Game servers and calls show their ports here when they do."
+            },
+            "certificates": {
+                "title": "Certificates",
+                "description": "Trust Polaris on your local network, and set the address the certificate authority writes to."
+            },
+            "security": {
+                "title": "Domain security",
+                "description": "Every domain Polaris knows, checked for spoofing, DNS, registration and HTTPS problems."
+            }
+        },
         "tryAgain": "Try again",
         "saved": "Saved.",
         "errors": {

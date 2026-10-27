@@ -4,8 +4,9 @@
  * Domains admin panel. The guided setup owns the decisions - where the box runs, how
  * it is exposed, which domain and zones - and everything else on the page is either a
  * separate question it does not answer (the dashboard's own address, the sharing
- * domain, the full list of names it answers on, trusting the LAN certificate) or the
- * manual controls behind it.
+ * domain, the full list of names it answers on, the DNS records) or the manual
+ * controls behind it. Remote access, ports, certificates and the security inventory
+ * each have a page of their own under the same rail, so this one stays short.
  *
  * Those manual controls sit under Advanced rather than beside the setup, because they
  * are the same settings a second time: an exposure mode the setup already stored and a
@@ -13,25 +14,20 @@
  * setting is the fastest way to leave an operator unsure which one won.
  *
  * The panel reads its own data once the page is on screen, and every section is drawn
- * before that read lands: the titles, the certificate section and the Advanced toggle do
- * not depend on it, and the ones that do hold a skeleton shaped like the fields that
- * are coming. What this replaced was rendered on the server, so the navigation itself
- * waited on a tunnel daemon and a probe of every configured hostname before the
- * browser was handed anything at all - the previous page sat there, and Domains looked
+ * before that read lands: the titles and the Advanced toggle do not depend on it, and
+ * the ones that do hold a skeleton shaped like the fields that are coming. What this
+ * replaced was rendered on the server, so the navigation itself waited on a tunnel
+ * daemon and a probe of every configured hostname before the browser was handed
+ * anything at all - the previous page sat there, and Domains looked
  * like a link that did nothing.
  */
 
 import { readJson } from "@/lib/read-json";
-import { CallPortsCard } from "./call-ports-card";
-import { GamePortsCard } from "./game-ports-card";
 import { DomainSetupWizard } from "./setup-wizard";
 import { DnsRecordsCard } from "./dns-records-card";
 import { AddressFollowCard } from "./address-follow-card";
-import { BackupAccessCard } from "./backup-access-card";
-import { TailscaleCard } from "./tailscale-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
-import { CertificateContactCard } from "./certificate-contact-card";
 import { PageSection } from "@/components/page-section";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -176,15 +172,7 @@ export function DomainsView() {
                 </PendingCard>
             )}
 
-            <LocalCertificate />
-
-            {/* Beside the other certificate, and read on its own: it asks the host
-                daemon about the edge, which the overview above does not wait on. */}
-            <CertificateContactCard />
-
             <AddressFollowCard />
-            <BackupAccessCard />
-            <TailscaleCard />
 
             <DnsRecordsCard />
 
@@ -220,17 +208,6 @@ export function DomainsView() {
                     </>
                 )}
             </div>
-
-            {/* The zone check above is finished once 80 and 443 arrive, and a game
-                server answers on neither - so what it needs is asked for here
-                rather than folded into advice that disappears when the website
-                works. Renders nothing when no game server exists. */}
-            <GamePortsCard />
-
-            {/* Same reason again, for the other traffic 443 does not carry: a
-                call's audio. Renders nothing when calls run through a server
-                somebody else operates. */}
-            <CallPortsCard />
 
             {/* Below the instance's own addresses, because it is a different
                 decision: not what Polaris answers on, but what other people are
@@ -584,8 +561,9 @@ function ErrorNote({ message }: { message: string }) {
     );
 }
 
-/** The root certificate that makes the LAN hostname trusted, once, per device. */
-function LocalCertificate() {
+/** The root certificate that makes the LAN hostname trusted, once, per device.
+ *  Drawn on the Certificates page, beside the public certificate's contact. */
+export function LocalCertificate() {
     const t = useTranslations("admin");
     return (
         <PageSection title={t("domains.certificate.title")}>

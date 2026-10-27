@@ -652,7 +652,8 @@ async function recipientsFor(known: KnownDomain): Promise<{ userId: string; href
             where: { isAdmin: true, bannedAt: null, disabledAt: null },
             select: { id: true }
         });
-        for (const admin of admins) if (!out.has(admin.id)) out.set(admin.id, "/admin/domains");
+        for (const admin of admins)
+            if (!out.has(admin.id)) out.set(admin.id, "/admin/domains/security");
     }
     return [...out.entries()].map(([userId, href]) => ({ userId, href }));
 }
