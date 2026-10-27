@@ -890,3 +890,46 @@ export function verifyEdgePass(
     if (typeof payload.b !== "number" || payload.b < 1 || payload.b > 32) return false;
     return edgeChallengeAnswered(challenge, counter, payload.b);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Apps on the tailnet                                                         */
+/* -------------------------------------------------------------------------- */
+
+/** The guard path Traefik asks for the cookies an app on the tailnet is handed. */
+export const TAILNET_COOKIES_PATH = "/tailnet-cookies";
+
+/** The cookies the edge itself sets on an app's behalf: the challenge pass, the copy a
+ *  visitor sticks to (`STICKY_COOKIE`) and the release a canary visitor stays on. */
+const EDGE_APP_COOKIES: ReadonlySet<string> = new Set([
+    EDGE_PASS_COOKIE,
+    "polaris_lb",
+    "polaris_release"
+]);
+
+/** The dashboard's cookies that do not carry its prefix. */
+const DASHBOARD_COOKIES: ReadonlySet<string> = new Set(["gh_manifest_state"]);
+
+/**
+ * The Cookie header an app reached on the operator's tailnet may see, or null for none.
+ *
+ * Every app there answers on the dashboard's own ts.net name, one port each, and a
+ * browser does not keep cookies apart by port: without this, the dashboard's session
+ * would go out with every request to every app. Dropped are the dashboard's cookies -
+ * every name under the `polaris` prefix, whatever `__Secure-`/`__Host-` it carries,
+ * except the edge's own - and everything else is the app's.
+ */
+export function tailnetAppCookies(header: string | undefined | null): string | null {
+    if (!header) return null;
+    const kept = header
+        .split(";")
+        .map((part) => part.trim())
+        .filter((part) => {
+            if (part === "") return false;
+            const eq = part.indexOf("=");
+            const name = (eq < 0 ? part : part.slice(0, eq)).trim();
+            const stem = name.replace(/^__(secure|host)-/i, "");
+            if (EDGE_APP_COOKIES.has(stem)) return true;
+            return !stem.toLowerCase().startsWith("polaris") && !DASHBOARD_COOKIES.has(stem);
+        });
+    return kept.length > 0 ? kept.join("; ") : null;
+}

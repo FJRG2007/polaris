@@ -11,14 +11,16 @@
 import { useId, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { PageSection } from "@/components/page-section";
-import { authKeySchema } from "@/lib/tailscale/tailscale-model";
+import Link from "next/link";
+import { authKeySchema, FUNNEL_APP_PORTS } from "@/lib/tailscale/tailscale-model";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { TailscaleView } from "@/lib/tailscale/tailscale-service";
+import type { TailnetAppView, TailscaleView } from "@/lib/tailscale/tailscale-service";
 import { Button, ConfirmDeleteDialog, CopyButton, Input, Skeleton, Switch } from "@polaris/ui";
 import {
     connectTailscaleAction,
     disconnectTailscaleAction,
+    setTailnetAppPublicAction,
     setTailscaleTogglesAction,
     type TailscaleResult
 } from "./tailscale-actions";
@@ -74,6 +76,16 @@ export function TailscaleCard() {
         await run(() => setTailscaleTogglesAction({ serve, funnel }), {
             ...view,
             config: { ...view.config, serve, funnel }
+        });
+    }
+
+    async function setPublic(app: TailnetAppView, open: boolean) {
+        if (!view || app.public === open) return;
+        await run(() => setTailnetAppPublicAction({ hostname: app.hostname, public: open }), {
+            ...view,
+            apps: view.apps.map((entry) =>
+                entry.hostname === app.hostname ? { ...entry, public: open } : entry
+            )
         });
     }
 
@@ -211,6 +223,10 @@ export function TailscaleCard() {
                                 <Notice>{t("domains.tailscale.funnelNotAllowed")}</Notice>
                             ) : null}
 
+                            {view.config.serve ? (
+                                <AppList view={view} busy={busy} onPublic={setPublic} />
+                            ) : null}
+
                             <div>
                                 <Button
                                     size="sm"
@@ -308,8 +324,124 @@ function Address({ view }: { view: TailscaleView }) {
     );
 }
 
+function AppList(props: {
+    view: TailscaleView;
+    busy: boolean;
+    onPublic: (app: TailnetAppView, open: boolean) => void;
+}) {
+    const t = useTranslations("admin");
+    const { view } = props;
+    const connected = view.status.state === "connected";
+    return (
+        <div className="flex flex-col gap-2">
+            <div>
+                <h3 className="font-medium">{t("domains.tailscale.appsTitle")}</h3>
+                <p className="text-xs text-muted-foreground">{t("domains.tailscale.appsHint")}</p>
+            </div>
+            {view.apps.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("domains.tailscale.appsEmpty")}</p>
+            ) : (
+                <>
+                    {!connected ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("domains.tailscale.appsWaiting")}
+                        </p>
+                    ) : null}
+                    <ul className="flex flex-col divide-y divide-border">
+                        {view.apps.map((app) => (
+                            <AppRow
+                                key={app.hostname}
+                                app={app}
+                                busy={props.busy}
+                                funnelAllowed={view.status.funnelAllowed}
+                                onPublic={props.onPublic}
+                            />
+                        ))}
+                    </ul>
+                </>
+            )}
+        </div>
+    );
+}
+
+function AppRow(props: {
+    app: TailnetAppView;
+    busy: boolean;
+    funnelAllowed: boolean | null;
+    onPublic: (app: TailnetAppView, open: boolean) => void;
+}) {
+    const t = useTranslations("admin");
+    const { app } = props;
+    const name = app.appName ?? app.hostname;
+    const settings =
+        app.projectId && app.applicationId
+            ? `/apps/deploy/${app.projectId}?service=${encodeURIComponent(app.applicationId)}`
+            : null;
+    const reason =
+        props.funnelAllowed === false
+            ? t("domains.tailscale.funnelNotAllowed")
+            : !app.public && !FUNNEL_APP_PORTS.includes(app.port)
+              ? t("domains.tailscale.appPublicMoves")
+              : undefined;
+    return (
+        <li className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="flex min-w-0 flex-col gap-0.5">
+                {settings ? (
+                    <Link
+                        href={settings}
+                        className="min-w-0 truncate font-medium hover:underline"
+                        title={t("domains.tailscale.appSettings", { name })}
+                    >
+                        {name}
+                    </Link>
+                ) : (
+                    <span className="min-w-0 truncate font-medium" title={name}>
+                        {name}
+                    </span>
+                )}
+                {app.appName ? (
+                    <span
+                        className="min-w-0 truncate text-xs text-muted-foreground"
+                        title={app.hostname}
+                    >
+                        {app.hostname}
+                    </span>
+                ) : null}
+                {app.url ? (
+                    <div className="flex min-w-0 items-center gap-2">
+                        <a
+                            href={app.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="min-w-0 truncate font-mono text-xs text-primary hover:underline"
+                            title={t("domains.tailscale.appOpen", { name })}
+                        >
+                            {app.url}
+                        </a>
+                        <CopyButton value={app.url} />
+                    </div>
+                ) : null}
+                {app.public ? <Notice>{t("domains.tailscale.appPublicWarning")}</Notice> : null}
+            </div>
+            <div className="shrink-0 sm:w-56">
+                <Toggle
+                    label={t("domains.tailscale.appPublic")}
+                    ariaLabel={`${t("domains.tailscale.appPublic")}: ${name}`}
+                    hint={t("domains.tailscale.appPublicHint")}
+                    checked={app.public}
+                    disabled={props.busy || (props.funnelAllowed === false && !app.public)}
+                    reason={reason}
+                    onChange={(open) => props.onPublic(app, open)}
+                />
+            </div>
+        </li>
+    );
+}
+
 function Toggle(props: {
     label: string;
+    /** When the visible label alone does not say what is switched. */
+    ariaLabel?: string;
     hint: string;
     checked: boolean;
     disabled: boolean;
@@ -322,7 +454,7 @@ function Toggle(props: {
             <Switch
                 checked={props.checked}
                 disabled={props.disabled}
-                aria-label={props.label}
+                aria-label={props.ariaLabel ?? props.label}
                 aria-describedby={hintId}
                 onChange={props.onChange}
             />

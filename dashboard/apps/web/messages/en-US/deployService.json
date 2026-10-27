@@ -606,6 +606,8 @@
         "certExpired": "The certificate has expired.",
         "certUntrusted": "Serving a certificate browsers do not trust yet, while the real one is issued.",
         "certValid": "Certificate valid for {days} more days. Renewed automatically 30 days before it expires.",
+        "tailnetAddress": "On your tailnet",
+        "tailnetCopy": "Copy the tailnet address",
         "certValidIssuer": "Certificate from {issuer}, valid for {days} more days. Renewed automatically 30 days before it expires.",
         "tcpAdd": "Add TCP proxy",
         "tcpTo": "TCP to :{port}",

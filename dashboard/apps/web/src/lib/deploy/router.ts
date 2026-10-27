@@ -127,7 +127,7 @@ export interface Router {
 }
 
 /** Base URL of the co-located edge guard Traefik forwards auth checks to. */
-function guardUrl(): string {
+export function guardUrl(): string {
     return process.env.POLARIS_EDGE_GUARD_URL ?? "http://polaris-edge-guard:8080";
 }
 

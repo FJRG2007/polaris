@@ -420,7 +420,8 @@ export function DomainReadingView({ reading }: { reading: DomainReading | undefi
     // A generated name's certificate is only worth a line when something is wrong
     // with it; on a name somebody brought, its state is part of the setup.
     const cert = line && (dns || (line.tone !== "ok" && line.tone !== "quiet")) ? line : null;
-    if (!dns && !cert) return null;
+    const tailnet = reading.tailnet ?? null;
+    if (!dns && !cert && !tailnet) return null;
     return (
         <div className="ml-4 flex min-w-0 flex-col gap-2 pb-1 text-xs">
             {dns && (
@@ -494,6 +495,21 @@ export function DomainReadingView({ reading }: { reading: DomainReading | undefi
                     )}
                 >
                     <Lock className="size-3 shrink-0" /> {cert.text}
+                </p>
+            )}
+            {tailnet && (
+                <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                    <span className="shrink-0">{t("publicNet.tailnetAddress")}</span>
+                    <a
+                        href={tailnet}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-0 truncate font-mono text-primary hover:underline"
+                        title={tailnet}
+                    >
+                        {tailnet}
+                    </a>
+                    <CopyButton value={tailnet} label={t("publicNet.tailnetCopy")} />
                 </p>
             )}
         </div>

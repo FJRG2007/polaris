@@ -98,3 +98,28 @@ describe("an allowed request", () => {
         expect(await response.text()).toBe("");
     });
 });
+
+describe("the tailnet cookie filter", () => {
+    async function filter(cookie?: string) {
+        return await fetch(`${guardUrl}/tailnet-cookies`, {
+            headers: cookie ? { cookie } : {}
+        });
+    }
+
+    it("hands the app its own cookies and the edge's, never the dashboard's", async () => {
+        const response = await filter(
+            "__Secure-polaris.session_token=s; app_session=a; polaris-locale=es-ES; polaris.pass=p; polaris_lb=x; gh_manifest_state=g; theme=dark"
+        );
+        expect(response.status).toBe(200);
+        expect(response.headers.get("cookie")).toBe(
+            "app_session=a; polaris.pass=p; polaris_lb=x; theme=dark"
+        );
+    });
+
+    it("answers with no cookie when nothing is left, so the request loses its own", async () => {
+        const response = await filter("polaris.session_token=s; __Host-Polaris.scope=o");
+        expect(response.status).toBe(200);
+        expect(response.headers.get("cookie")).toBeNull();
+        expect((await filter()).headers.get("cookie")).toBeNull();
+    });
+});

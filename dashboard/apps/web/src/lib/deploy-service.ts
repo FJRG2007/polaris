@@ -45,6 +45,7 @@ import { releaseEnvFor, releaseImageFor } from "./app-extensions/registry";
 import { findApp } from "@/lib/apps/catalog";
 import { dropGrantsFor, dropGrantsOfGoneDomains } from "@/lib/access/grants";
 import { speaksHttp } from "@/lib/deploy/portless";
+import { holdsOnTailnet } from "@/lib/tailscale/tailscale-model";
 import { removeHostVolume } from "@/lib/deploy/host-volumes";
 import { appDataVolumeNames, noteAppDeleted } from "@/lib/deploy/host-resources";
 import { LocalRouter, type AppRoute } from "./deploy/router";
@@ -1753,6 +1754,27 @@ async function publishAppRoutes(
         }
     }
     await new LocalRouter(await deployZoneHosts(), force).sync(localRoutes);
+    // Every name this edge now routes gets its address on the tailnet too, through
+    // the same routers. Quick-tunnel names are internal and get none, and neither does
+    // a name any of whose routes has a rule the tailnet cannot keep. Best-effort and
+    // not awaited: it is not this sync's failure, and never holds it up.
+    const offTailnet = new Set(
+        localRoutes.filter((route) => !holdsOnTailnet(route)).map((route) => route.hostname)
+    );
+    const tailnetNames = localRoutes
+        .filter((route) => !route.id.startsWith("qtunnel-") && !offTailnet.has(route.hostname))
+        .map((route) => route.hostname);
+    // Without the server's own address nothing was routed this pass, which says
+    // nothing about which names are gone.
+    if (localIp)
+        void import("@/lib/tailscale/tailscale-service")
+            .then((module) => module.syncTailscaleApps(tailnetNames))
+            .catch((error: unknown) =>
+                console.error(
+                    "polaris: publishing apps on the tailnet failed:",
+                    error instanceof Error ? error.message : error
+                )
+            );
     // After the local edge, and never able to take it down with them: a server that
     // is asleep, moved or refusing a connection is a server whose own edge goes on
     // serving whatever it was already serving, and no reason for the routes on this

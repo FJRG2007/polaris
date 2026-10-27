@@ -742,7 +742,19 @@
             "funnelNotAllowed": "Your tailnet policy does not allow Funnel for this machine yet. Add the funnel attribute in the Access controls page of the Tailscale admin console.",
             "disconnect": "Disconnect",
             "disconnectTitle": "Disconnect Tailscale?",
-            "disconnectBody": "Polaris leaves your tailnet and its ts.net address stops working. The saved auth key is deleted."
+            "disconnectBody": "Polaris leaves your tailnet and its ts.net address stops working. The saved auth key is deleted.",
+            "appsTitle": "Apps on your tailnet",
+            "appsHint": "Each app with a domain also answers on its own port here, behind its guard. Apps that need sign-in or filter by IP stay off the tailnet: here every visitor appears to come from this machine.",
+            "appsEmpty": "No app is on your tailnet yet. Apps with a domain show up here, unless they need sign-in or filter by IP.",
+            "appsWaiting": "The addresses appear once Polaris is signed in to your tailnet.",
+            "appOpen": "Open {name}",
+            "appSettings": "Settings of {name}",
+            "appPublic": "Public",
+            "appPublicHint": "Anyone on the internet can open this address.",
+            "appPublicMoves": "Turning this on moves the app to port 8443 or 10000, the ones Funnel allows, so its address changes once.",
+            "appPublicFull": "Funnel allows two public apps. Make another one private first.",
+            "appPublicUnknown": "That app is no longer routed. Reload the page.",
+            "appPublicWarning": "This app is public. Anyone with the address reaches it, and all of them appear to come from this machine."
         }
     },
     "domainsPorts": {
