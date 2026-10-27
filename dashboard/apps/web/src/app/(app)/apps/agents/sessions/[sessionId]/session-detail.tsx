@@ -581,7 +581,7 @@ function WorkOutcome({
         return (
             <div className="flex flex-wrap items-start gap-3 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                <div className="min-w-0 flex-1 space-y-1">
+                <div className="min-w-0 flex-1 basis-64 space-y-1">
                     <p className="font-medium">{t("session.work.kept")}</p>
                     <p>{t(`session.work.reasons.${work.reason ?? "other"}`)}</p>
                     <p className="text-xs">{t("session.work.keptMore")}</p>

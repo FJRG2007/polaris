@@ -20,6 +20,7 @@ import { Messages } from "@/components/i18n/messages";
 import { requirePermission } from "@/lib/session";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
+import { everyAccountId } from "@/lib/mailbox/access";
 import { delegatedMailboxes } from "@/lib/mailbox/delegate";
 import { listFolders, unreadCounts } from "@/lib/mailbox/views";
 import { listIdentitiesByAccount, listLabels } from "@/lib/mailbox/labels";
@@ -34,11 +35,14 @@ export default async function MailLayout({ children }: { children: React.ReactNo
     // The labels are the person's own on every shelf, so they are read beside
     // the shelf rather than after it.
     const [shelfOrgId, labels] = await Promise.all([mailShelfFor(user.id), listLabels(user.id)]);
-    const [accounts, folders, unread, lent] = await Promise.all([
+    const [accounts, folders, unread, lent, mailboxIds] = await Promise.all([
         listAccountViews(user.id, shelfOrgId),
         listFolders(user.id, shelfOrgId),
         unreadCounts(user.id, shelfOrgId),
-        delegatedMailboxes(user.id)
+        delegatedMailboxes(user.id),
+        // Every mailbox this person has, on any shelf: what the device may keep
+        // mail for. The rail's are only the open shelf's - see `MailShell`.
+        everyAccountId(user.id)
     ]);
 
     // The addresses each mailbox may send as, so the composer can offer them
@@ -62,6 +66,7 @@ export default async function MailLayout({ children }: { children: React.ReactNo
                 viewerId={user.id}
                 shelf={shelfOrgId ?? "personal"}
                 lent={lent.length > 0}
+                mailboxIds={mailboxIds}
             >
                 {children}
             </MailShell>

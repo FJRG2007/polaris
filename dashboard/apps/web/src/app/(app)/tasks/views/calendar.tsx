@@ -247,7 +247,7 @@ export function CalendarView(props: ViewProps) {
                         <ChevronRight className="size-4" />
                     </button>
                 </div>
-                <h3 className="min-w-0 flex-1 truncate text-sm font-medium sm:text-base">
+                <h3 className="min-w-0 flex-1 basis-64 truncate text-sm font-medium sm:text-base">
                     {label}
                 </h3>
 

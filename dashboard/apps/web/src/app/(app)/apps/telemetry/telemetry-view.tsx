@@ -576,7 +576,7 @@ function ProjectAddress({
                 <span className="text-xs font-medium text-muted-foreground">
                     {t("client.reportTo")}
                 </span>
-                <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-xs">
+                <code className="min-w-0 flex-1 basis-64 truncate rounded bg-muted px-2 py-1 font-mono text-xs">
                     {dsn}
                 </code>
                 <CopyButton value={dsn} label={t("client.copy")} />

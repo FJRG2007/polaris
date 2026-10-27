@@ -40,6 +40,7 @@ import {
     type UnreadHandle
 } from "@/lib/mailbox/unread-overlay";
 import { mailCache } from "@/lib/mailbox/mail-cache";
+import { useListShelf } from "./list-shelf";
 import { useHoldConversationNotices } from "@/components/notifications/notifications-provider";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
@@ -265,8 +266,9 @@ export function MailShell({
     unread: sentUnread,
     viewerName,
     viewerId,
-    shelf,
+    shelf: serverShelf,
     lent,
+    mailboxIds,
     children
 }: {
     accounts: MailAccountView[];
@@ -280,6 +282,8 @@ export function MailShell({
     viewerId: string;
     shelf: string;
     lent: boolean;
+    /** Every mailbox this person has, whichever shelf it is on. */
+    mailboxIds: string[];
     children: ReactNode;
 }) {
     // During render rather than in an effect, and on purpose: the screens inside
@@ -324,9 +328,14 @@ export function MailShell({
     const folders = rail.folders;
     const unread = rail.unread;
     // A mailbox that is no longer linked takes what the device kept of it.
+    // Every mailbox on every shelf, not the rail's: the rail is the open
+    // shelf's alone, and handing the cache that made it refuse - and two
+    // seconds later delete - everything kept for the shelf just left, so going
+    // back to it waited on the network for what it had already drawn. The
+    // rail's are added for a mailbox linked since the layout last rendered.
     useEffect(() => {
-        mailCache.setAccounts(accounts.map((account) => account.id));
-    }, [accounts]);
+        mailCache.setAccounts([...mailboxIds, ...accounts.map((account) => account.id)]);
+    }, [mailboxIds, accounts]);
     const pathname = usePathname();
     const search = useSearchParams();
     const [composing, setComposing] = useState<ComposerSeed | null>(null);
@@ -486,7 +495,7 @@ export function MailShell({
         // The shelf this tab drew, not the header's: that is shared by every
         // tab, and another tab switching it must not move this rail - nor the
         // mailbox this tab's composer starts on.
-        void fetch(`${RAIL_PATH}?shelf=${encodeURIComponent(shelf)}`, { cache: "no-store" })
+        void fetch(`${RAIL_PATH}?shelf=${encodeURIComponent(serverShelf)}`, { cache: "no-store" })
             .then((response) => (response.ok ? response.json() : null))
             .then((body) => {
                 const parsed = railSchema.safeParse(body);
@@ -496,7 +505,7 @@ export function MailShell({
                 // The rail stays as it is, which is the last thing the server
                 // actually said. The next frame asks again.
             });
-    }, [shelf]);
+    }, [serverShelf]);
 
     // A change was confirmed: ask for the rail now, so its numbers settle on
     // the server's as soon as the server has them rather than on the next frame.
@@ -552,24 +561,9 @@ export function MailShell({
     const onFrame = settler.frame;
     useMailStream(onFrame);
 
-    /**
-     * Another shelf: personal mail for an organization's, or back.
-     *
-     * The rail is the server's and follows on its own. The list and the open
-     * conversation are the browser's, and neither had any reason to ask again -
-     * so the list kept the other shelf's mail and the conversation stayed open on
-     * a mailbox that is not on this shelf. The list is asked for again, and a
-     * conversation that was open is closed: it belongs to the shelf that was left.
-     */
-    const shownShelf = useRef(shelf);
-    useEffect(() => {
-        if (shownShelf.current === shelf) return;
-        shownShelf.current = shelf;
-        reloadLists();
-        if (search.get("open") || pathname.startsWith("/mail/t/")) {
-            router.replace("/mail", { scroll: false });
-        }
-    }, [shelf, reloadLists, router, search, pathname]);
+    // Another shelf: personal mail for an organization's, or back - see
+    // `list-shelf`.
+    const shelf = useListShelf(serverShelf, reloadLists);
 
     // Worked out for the whole rail at once, because "which colour is free" is a
     // question about the others - see `coloursFor`.
@@ -654,8 +648,8 @@ export function MailShell({
     const inView = useMemo(() => mailboxInView(pathname, folders), [pathname, folders]);
     useEffect(() => {
         if (inView && accounts.some((account) => account.id === inView))
-            rememberSender(shelf, inView);
-    }, [inView, accounts, shelf]);
+            rememberSender(serverShelf, inView);
+    }, [inView, accounts, serverShelf]);
 
     const openComposer = useCallback(
         (draft: ComposerSeed | null) => {
@@ -671,14 +665,14 @@ export function MailShell({
                           ...draft,
                           accountId: defaultSender({
                               inView,
-                              remembered: rememberedSender(shelf),
+                              remembered: rememberedSender(serverShelf),
                               visible: accounts
                           })
                       }
                     : draft
             );
         },
-        [hasMailbox, router, inView, shelf, accounts]
+        [hasMailbox, router, inView, serverShelf, accounts]
     );
 
     const value = useMemo<MailContextValue>(

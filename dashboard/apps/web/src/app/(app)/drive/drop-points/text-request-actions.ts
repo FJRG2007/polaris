@@ -49,7 +49,7 @@ const SUBMIT_REFUSALS = {
     exhausted: "errors.closed",
     ip_not_allowed: "errors.networkDenied",
     not_allowed: "errors.networkDenied",
-    country_not_allowed: "errors.locationDenied",
+    country_not_allowed: "errors.dropPointLocationDenied",
     sign_in_required: "errors.signInToSend",
     not_invited: "errors.accountDenied"
 } as const satisfies Record<Exclude<LinkCheck, { ok: true }>["reason"], string>;

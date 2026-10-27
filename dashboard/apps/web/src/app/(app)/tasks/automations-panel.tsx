@@ -390,7 +390,7 @@ export function AutomationsPanel({
                                         rule.enabled ? "text-primary" : "text-muted-foreground"
                                     )}
                                 />
-                                <div className="min-w-0 flex-1">
+                                <div className="min-w-0 flex-1 basis-64">
                                     <p className="truncate text-sm font-medium">{rule.name}</p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {optionLabel(t, "automationTrigger", rule.trigger)} -{" "}
@@ -585,7 +585,7 @@ export function FormsPanel({
                         <li key={form.id}>
                             <Card>
                                 <CardBody className="flex flex-wrap items-center gap-3 p-3">
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 basis-64">
                                         <p className="truncate text-sm font-medium">{form.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {t("forms.filesInto", {

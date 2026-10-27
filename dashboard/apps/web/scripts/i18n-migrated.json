@@ -1029,6 +1029,7 @@
         "web/src/app/(app)/mail/label/[labelId]/page.tsx",
         "web/src/app/(app)/mail/layout.tsx",
         "web/src/app/(app)/mail/list-page.tsx",
+        "web/src/app/(app)/mail/list-shelf.ts",
         "web/src/app/(app)/mail/mail-actions.ts",
         "web/src/app/(app)/mail/mail-rail.tsx",
         "web/src/app/(app)/mail/mail-search.tsx",

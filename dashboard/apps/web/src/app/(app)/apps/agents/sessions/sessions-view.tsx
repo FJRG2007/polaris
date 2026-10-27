@@ -133,7 +133,7 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                         <Card key={session.id}>
                             <CardBody className="flex flex-wrap items-center gap-3">
                                 <CircleDot className={`size-4 shrink-0 ${TONE[session.state]}`} />
-                                <div className="min-w-0 flex-1">
+                                <div className="min-w-0 flex-1 basis-64">
                                     <Link
                                         href={`/apps/agents/sessions/${session.id}`}
                                         className="block truncate text-sm font-medium hover:underline"

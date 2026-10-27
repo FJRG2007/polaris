@@ -140,7 +140,7 @@ export function DnsListsSection() {
                         ))}
                         <div className="flex flex-wrap items-center gap-2">
                             <Input
-                                className="min-w-0 flex-1"
+                                className="min-w-0 flex-1 basis-64"
                                 value={listUrl}
                                 placeholder="https://example.com/blocklist.txt"
                                 aria-label={t("lists.url")}

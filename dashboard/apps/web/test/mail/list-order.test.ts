@@ -19,7 +19,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { mailCursorOf, mailCursorWhere, mailOrderBy, type MailOrderRow } from "@/lib/mailbox/list-order";
+import {
+    mailCursorOf,
+    mailCursorWhere,
+    mailOrderBy,
+    type MailOrderRow
+} from "@/lib/mailbox/list-order";
 
 function row(id: string, at: string, size: number, pinned = false): MailOrderRow {
     return { id, lastMessageAt: at, size, pinned };
@@ -64,13 +69,13 @@ describe("where the next page starts", () => {
     });
 
     it("hands over the oldest moment when the newest are first", () => {
-        expect(mailCursorOf("newest", PAGE, 3)).toBe("0|2026-09-03T10:00:00.000Z");
+        expect(mailCursorOf("newest", PAGE, 3)).toBe("0|2026-09-03T10:00:00.000Z_ccc");
     });
 
     it("hands over the newest moment when the oldest are first", () => {
         // The edge of the page under that order, which is the far end of it from
         // where the reading started.
-        expect(mailCursorOf("oldest", PAGE, 3)).toBe("0|2026-09-05T10:00:00.000Z");
+        expect(mailCursorOf("oldest", PAGE, 3)).toBe("0|2026-09-05T10:00:00.000Z_aaa");
     });
 
     it("hands over the smallest size and its row when the largest are first", () => {
@@ -88,7 +93,7 @@ describe("where the next page starts", () => {
         // so it is never where the next page carries on from. Anchoring on it is
         // what skipped everything between it and the bottom of the page.
         const pinnedOnTop = [row("pin", "2026-01-01T00:00:00.000Z", 10, true), ...PAGE];
-        expect(mailCursorOf("newest", pinnedOnTop, 4)).toBe("0|2026-09-03T10:00:00.000Z");
+        expect(mailCursorOf("newest", pinnedOnTop, 4)).toBe("0|2026-09-03T10:00:00.000Z_ccc");
         expect(mailCursorOf("largest", pinnedOnTop, 4)).toBe("0|1200:bbb");
     });
 
@@ -106,7 +111,19 @@ describe("the page after that one", () => {
         expect(mailCursorWhere("largest", "   ")).toEqual({});
     });
 
-    it("leaves out everything already shown, by date", () => {
+    it("leaves out everything already shown, by date and by row", () => {
+        const at = new Date("2026-09-03T10:00:00.000Z");
+        expect(mailCursorWhere("newest", "0|2026-09-03T10:00:00.000Z_ccc")).toEqual({
+            pinned: false,
+            OR: [{ lastMessageAt: { lt: at } }, { lastMessageAt: at, id: { lt: "ccc" } }]
+        });
+        expect(mailCursorWhere("oldest", "0|2026-09-03T10:00:00.000Z_ccc")).toEqual({
+            pinned: false,
+            OR: [{ lastMessageAt: { gt: at } }, { lastMessageAt: at, id: { gt: "ccc" } }]
+        });
+    });
+
+    it("still reads a cursor by date alone, as one written before the row was in it", () => {
         expect(mailCursorWhere("newest", "0|2026-09-03T10:00:00.000Z")).toEqual({
             pinned: false,
             lastMessageAt: { lt: new Date("2026-09-03T10:00:00.000Z") }
@@ -226,7 +243,9 @@ function walk(everything: readonly MailOrderRow[], limit: number): string[] {
     const seen: string[] = [];
     let cursor = "";
     for (let page = 0; page < 20; page += 1) {
-        const remaining = everything.filter((one) => admits(mailCursorWhere("largest", cursor), one));
+        const remaining = everything.filter((one) =>
+            admits(mailCursorWhere("largest", cursor), one)
+        );
         const drawn = [...remaining].sort(byLargest).slice(0, limit);
         seen.push(...drawn.map((one) => one.id));
         cursor = mailCursorOf("largest", drawn, limit);
@@ -266,3 +285,71 @@ function admits(where: Record<string, unknown>, one: MailOrderRow): boolean {
         return true;
     });
 }
+
+/**
+ * Conversations that share a moment.
+ *
+ * A batch imported or synced together lands on one timestamp more often than
+ * not. A cursor of the moment alone asked for everything strictly older than
+ * the page's last row, and every conversation on that same moment that had not
+ * fitted on the page was never shown.
+ */
+describe("a walk by date through conversations that share a moment", () => {
+    function walkByDate(sort: "newest" | "oldest", rows: MailOrderRow[], limit: number): string[] {
+        const order = (left: MailOrderRow, right: MailOrderRow): number => {
+            if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+            const way = sort === "newest" ? -1 : 1;
+            if (left.lastMessageAt !== right.lastMessageAt)
+                return left.lastMessageAt < right.lastMessageAt ? -way : way;
+            return left.id < right.id ? -way : way;
+        };
+        const admitsByDate = (where: Record<string, unknown>, one: MailOrderRow): boolean => {
+            if (where.pinned !== undefined && where.pinned !== one.pinned) return false;
+            const clauses = where.OR as Record<string, unknown>[] | undefined;
+            if (!clauses) {
+                const moment = where.lastMessageAt as { lt?: Date; gt?: Date } | Date | undefined;
+                if (moment === undefined) return true;
+                const at = new Date(one.lastMessageAt).getTime();
+                if (moment instanceof Date) {
+                    const id = where.id as { lt?: string; gt?: string };
+                    if (at !== moment.getTime()) return false;
+                    return id.lt !== undefined ? one.id < id.lt : one.id > (id.gt ?? "");
+                }
+                if (moment.lt) return at < moment.lt.getTime();
+                return at > (moment.gt?.getTime() ?? -Infinity);
+            }
+            return clauses.some((clause) => admitsByDate(clause, one));
+        };
+        const seen: string[] = [];
+        let cursor = "";
+        for (let turn = 0; turn < 20; turn += 1) {
+            const where = mailCursorWhere(sort, cursor);
+            const drawn = rows
+                .filter((one) => admitsByDate(where, one))
+                .sort(order)
+                .slice(0, limit);
+            seen.push(...drawn.map((one) => one.id));
+            cursor = mailCursorOf(sort, drawn, limit);
+            if (!cursor) break;
+        }
+        expect(new Set(seen).size).toBe(seen.length);
+        return seen;
+    }
+
+    const SAME = "2026-09-04T10:00:00.000Z";
+    const ROWS = [
+        row("a1", "2026-09-05T10:00:00.000Z", 1),
+        row("b2", SAME, 1),
+        row("c3", SAME, 1),
+        row("d4", SAME, 1),
+        row("e5", "2026-09-03T10:00:00.000Z", 1)
+    ];
+
+    it("shows every one of them once, newest first", () => {
+        expect(walkByDate("newest", ROWS, 2)).toEqual(["a1", "d4", "c3", "b2", "e5"]);
+    });
+
+    it("shows every one of them once, oldest first", () => {
+        expect(walkByDate("oldest", ROWS, 2)).toEqual(["e5", "b2", "c3", "d4", "a1"]);
+    });
+});

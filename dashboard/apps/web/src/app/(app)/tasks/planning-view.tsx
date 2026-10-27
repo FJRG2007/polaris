@@ -174,7 +174,7 @@ export function SprintsView({
                                 <CardBody className="flex flex-col gap-3 p-4">
                                     <div className="flex flex-wrap items-center gap-3">
                                         <CalendarRange className="size-4 text-muted-foreground" />
-                                        <div className="min-w-0 flex-1">
+                                        <div className="min-w-0 flex-1 basis-64">
                                             <p className="truncate font-medium">
                                                 {sprint.name}
                                                 <span className="ml-2 text-xs font-normal text-muted-foreground">

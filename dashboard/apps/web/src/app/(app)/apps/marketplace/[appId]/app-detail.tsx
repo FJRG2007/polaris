@@ -301,7 +301,7 @@ export function AppInstallPanel({
                             <CardBody className="flex min-w-0 flex-wrap items-center gap-3 py-3">
                                 <Link
                                     href={openHref(item)}
-                                    className="min-w-0 flex-1 truncate text-sm font-medium hover:underline"
+                                    className="min-w-0 flex-1 basis-64 truncate text-sm font-medium hover:underline"
                                     title={item.name}
                                 >
                                     {item.name}

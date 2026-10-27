@@ -63,7 +63,13 @@ describe("the mailbox on screen", () => {
     });
 
     it("is nobody in a merged view, a label, a conversation or settings", () => {
-        for (const path of ["/mail", "/mail/starred", "/mail/label/x", "/mail/t/x", "/mail/settings/general"]) {
+        for (const path of [
+            "/mail",
+            "/mail/starred",
+            "/mail/label/x",
+            "/mail/t/x",
+            "/mail/settings/general"
+        ]) {
             expect(mailboxInView(path, folders), path).toBeNull();
         }
     });
@@ -87,7 +93,9 @@ describe("where a new message starts", () => {
     });
 
     it("is never a mailbox from another shelf, or one since removed", () => {
-        expect(defaultSender({ inView: ELSEWHERE, remembered: ELSEWHERE, visible: shelf })).toBe(WORK);
+        expect(defaultSender({ inView: ELSEWHERE, remembered: ELSEWHERE, visible: shelf })).toBe(
+            WORK
+        );
     });
 
     it("is nothing at all with no mailbox on the shelf", () => {
@@ -117,13 +125,13 @@ describe("who asks", () => {
         const open = shell.slice(shell.indexOf("const openComposer = useCallback"));
         const body = open.slice(0, open.indexOf("const value = useMemo"));
         expect(body).toContain("draft && !draft.accountId");
-        expect(body).toContain("remembered: rememberedSender(shelf)");
+        expect(body).toContain("remembered: rememberedSender(serverShelf)");
         expect(body).toContain("visible: accounts");
     });
 
     it("remembers the mailbox somebody is in, and the one they sent from", async () => {
         const shell = await readFile(`${SRC}app/(app)/mail/mail-shell.tsx`, "utf8");
-        expect(shell).toContain("rememberSender(shelf, inView)");
+        expect(shell).toContain("rememberSender(serverShelf, inView)");
         const composer = await readFile(`${SRC}app/(app)/mail/composer.tsx`, "utf8");
         expect(composer).toContain("rememberSender(shelf, accountId)");
     });

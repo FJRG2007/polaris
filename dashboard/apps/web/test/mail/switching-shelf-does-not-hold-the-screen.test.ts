@@ -40,7 +40,9 @@ describe("the shelf switch in the header", () => {
 
     it("says so when the shelf could not be switched", async () => {
         const source = await readFile(`${SRC}components/scope-switcher.tsx`, "utf8");
-        expect(source).toContain("if (outcome.error) toast.show({ title: outcome.error });");
+        expect(source).toMatch(
+            /if \(outcome\.error\) \{[^}]*toast\.show\(\{ title: outcome\.error \}\);/
+        );
     });
 });
 
