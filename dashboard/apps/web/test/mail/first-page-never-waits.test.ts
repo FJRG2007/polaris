@@ -54,7 +54,7 @@ describe("a folder's first page", () => {
         const page = await ask("role=trash");
         expect(reachForOlder).not.toHaveBeenCalled();
         expect(page.threads.map((thread) => thread.id)).toEqual(["t1"]);
-        expect(page.cursor).toBe(`0|${held.lastMessageAt}`);
+        expect(page.cursor).toBe(`0|${held.lastMessageAt}_${held.id}`);
     });
 
     it("hands an empty folder a cursor that still reaches the server", async () => {
@@ -108,7 +108,7 @@ describe("asking past the first page", () => {
         expect(reachForOlder).toHaveBeenCalledTimes(1);
         expect(listThreads.mock.calls[1][1]).toMatchObject({ cursor: `0|${held.lastMessageAt}` });
         expect(page.threads.map((thread) => thread.id)).toEqual(["t9"]);
-        expect(page.cursor).toBe(`0|${last.lastMessageAt}`);
+        expect(page.cursor).toBe(`0|${last.lastMessageAt}_${last.id}`);
     });
 
     it("stops once the server has nothing older to give", async () => {
