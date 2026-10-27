@@ -216,15 +216,19 @@ export function ServiceDetail({
     const can = useProjectCan();
     const tabs = TABS.filter((name) => TAB_CAPABILITY[name].some(can));
     const linked = tabFromQuery(useSearchParams()?.get("tab"));
-    const [tab, setTab] = useState<Tab>(
-        linked && tabs.includes(linked) ? linked : "Deployments"
-    );
+    const [tab, setTab] = useState<Tab>(linked && tabs.includes(linked) ? linked : "Deployments");
     // A link followed while the panel is open (the deploy check's "See
     // findings") moves it to that tab too.
     useEffect(() => {
         if (linked && tabs.includes(linked)) setTab(linked);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [linked]);
+    function selectTab(name: Tab) {
+        setTab(name);
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", name.toLowerCase());
+        window.history.replaceState(null, "", url);
+    }
     const [full, setFull] = useState(false);
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
     const dots = tabAttention(app.attention, t);
@@ -286,7 +290,7 @@ export function ServiceDetail({
                         <button
                             key={name}
                             type="button"
-                            onClick={() => setTab(name)}
+                            onClick={() => selectTab(name)}
                             className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors ${
                                 tab === name
                                     ? "border-primary text-foreground"

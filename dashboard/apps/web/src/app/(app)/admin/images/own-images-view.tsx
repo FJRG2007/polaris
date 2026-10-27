@@ -57,14 +57,32 @@ export function OwnImagesView() {
         void load();
     }, [load]);
 
-    // The image an alert linked to opens once the list has arrived.
+    // The image an alert linked to opens once the list has arrived, also when
+    // a newer scan of it has replaced the linked one since.
+    const [linkedRef, setLinkedRef] = useState<{ scan: string; ref: string | null } | null>(null);
     useEffect(() => {
-        if (!images || !linked) return;
+        if (!images || !linked || linkedRef?.scan === linked) return;
         const image = images.find((row) => row.scan.id === linked);
+        if (image) return setLinkedRef({ scan: linked, ref: image.ref });
+        let cancelled = false;
+        void actions
+            .ownScanRefAction(linked)
+            .catch(() => ({ error: "failed" }) as const)
+            .then((result) => {
+                if (!cancelled)
+                    setLinkedRef({ scan: linked, ref: "ref" in result ? result.ref : null });
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [images, linked, linkedRef]);
+    // Opened once per link; later reloads of the list keep what the reader chose.
+    useEffect(() => {
+        const image = linkedRef?.ref ? images?.find((row) => row.ref === linkedRef.ref) : null;
         if (!image) return;
         setOpen(image.ref);
         if (image.scan.state === "done") void readFindings(image.scan.id);
-    }, [images, linked, readFindings]);
+    }, [linkedRef, readFindings]);
 
     const busy = images?.some((image) => scanBusy(image.scan));
     useEffect(() => {

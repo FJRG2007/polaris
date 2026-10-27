@@ -11,10 +11,10 @@
 import { relativeTime } from "@/lib/relative-time";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { ImageFindingRow, ImageScanView } from "@/lib/security/image-findings";
+import type { Counted, ImageFindingRow, ImageScanView } from "@/lib/security/image-findings";
 import { Badge, TagList, VulnerabilityTable, type VulnerabilityTableLabels } from "@polaris/ui";
 
-const COUNTED = ["critical", "high", "medium", "low"] as const;
+const COUNTED = ["critical", "high", "medium", "low"] as const satisfies readonly Counted[];
 const ERRORS = new Set([
     "failed",
     "notFound",

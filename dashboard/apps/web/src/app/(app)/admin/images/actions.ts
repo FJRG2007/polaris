@@ -10,6 +10,7 @@ import { requireAdmin } from "@/lib/session";
 import {
     ownImageFindings,
     ownImages,
+    ownScanRef,
     queueOwnImageScan,
     type ImageFindingRow,
     type OwnImage,
@@ -39,6 +40,22 @@ export async function ownImageFindingsAction(
         return findings ? { findings } : { error: "notFound" };
     } catch (caught) {
         console.error("polaris: an own image scan's findings could not be read:", caught);
+        return { error: "failed" };
+    }
+}
+
+/** The image reference a linked scan was of, so an alert's older scan still opens its image. */
+export async function ownScanRefAction(
+    input: unknown
+): Promise<{ ref: string } | { error: "failed" | "notFound" }> {
+    await requireAdmin();
+    const id = scanId.safeParse(input);
+    if (!id.success) return { error: "notFound" };
+    try {
+        const ref = await ownScanRef(id.data);
+        return ref ? { ref } : { error: "notFound" };
+    } catch (caught) {
+        console.error("polaris: an own image scan could not be read:", caught);
         return { error: "failed" };
     }
 }

@@ -12,15 +12,13 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
+import { newestPerRef, OWN_SCANS, ownScansWhere } from "./own-images";
 
 /** One scan's stored findings are capped at this by the scans themselves. */
 const MAX_FINDINGS = 500;
-/** Polaris's own images are read from this many newest scans. */
-const OWN_SCANS = 200;
 const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
 
-export const COUNTED = ["critical", "high", "medium", "low"] as const;
-export type Counted = (typeof COUNTED)[number];
+export type Counted = "critical" | "high" | "medium" | "low";
 export type ScanState = "queued" | "running" | "done" | "failed";
 
 export interface ImageScanView {
@@ -142,9 +140,9 @@ async function runningImage(applicationId: string): Promise<string | null> {
 
 /**
  * What the scans say about the image a service runs: the newest image scan of
- * this service, or of the image reference it runs now (a scan the server's own
- * listing queued names the reference, not the service) - the same match the
- * deploy check reads.
+ * the image reference it runs now, whether this service's or one the server's
+ * own listing queued - the same match the deploy check reads. A service that
+ * runs nothing shows its own newest scan.
  */
 export async function serviceImageFindings(applicationId: string): Promise<{
     image: string | null;
@@ -161,10 +159,7 @@ export async function serviceImageFindings(applicationId: string): Promise<{
         where: {
             targetId: app.targetId,
             kind: "image",
-            OR: [
-                { input: { contains: JSON.stringify(applicationId) } },
-                ...(image ? [{ input: { contains: JSON.stringify(image) } }] : [])
-            ]
+            input: { contains: JSON.stringify(image ?? applicationId) }
         },
         orderBy: { createdAt: "desc" },
         select: SCAN_SELECT
@@ -197,7 +192,10 @@ export async function queueServiceImageScan(
             targetId: app.targetId,
             kind: "image",
             state: { in: ["queued", "running"] },
-            input: { contains: JSON.stringify(applicationId) }
+            AND: [
+                { input: { contains: JSON.stringify(applicationId) } },
+                { input: { contains: JSON.stringify(image) } }
+            ]
         },
         select: { id: true }
     });
@@ -240,17 +238,14 @@ function ownInput(raw: string): z.infer<typeof ownInputSchema> {
     return parsed.success ? parsed.data : { imageId: null, ref: null, users: [] };
 }
 
-/** Newest scan per image reference; `rows` arrive newest first. Pure. */
-export function newestPerRef<T extends { label: string }>(rows: readonly T[]): T[] {
-    const seen = new Map<string, T>();
-    for (const row of rows) if (!seen.has(row.label)) seen.set(row.label, row);
-    return [...seen.values()];
-}
-
-/** Polaris's own images on this machine, each with its newest scan, worst first. */
-export async function ownImages(): Promise<OwnImage[]> {
+/**
+ * Polaris's own images on this machine, each with its newest scan, worst first.
+ * Only references scanned within the same window the Settings summary counts,
+ * so an image an update replaced drops off as the summary drops it.
+ */
+export async function ownImages(now = new Date()): Promise<OwnImage[]> {
     const rows = await prisma.securityScan.findMany({
-        where: { source: "polaris", kind: "image", target: { kind: "local" } },
+        where: ownScansWhere(now),
         orderBy: { createdAt: "desc" },
         take: OWN_SCANS,
         select: { ...SCAN_SELECT, label: true, input: true, imageId: true }
@@ -273,6 +268,15 @@ export async function ownImages(): Promise<OwnImage[]> {
             b.scan.counts.high - a.scan.counts.high ||
             a.ref.localeCompare(b.ref)
     );
+}
+
+/** The image reference one of Polaris's own scans was of; null when it is not one of those. */
+export async function ownScanRef(scanId: string): Promise<string | null> {
+    const scan = await prisma.securityScan.findFirst({
+        where: { id: scanId, source: "polaris", kind: "image", target: { kind: "local" } },
+        select: { label: true, input: true }
+    });
+    return scan ? (ownInput(scan.input).ref ?? scan.label) : null;
 }
 
 /** One of Polaris's own scans' findings; null when the scan is not one of those. */

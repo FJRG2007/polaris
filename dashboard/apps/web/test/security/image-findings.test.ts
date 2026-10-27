@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 
-import { newestPerRef, scanView } from "@/lib/security/image-findings";
+import { scanView } from "@/lib/security/image-findings";
+import { newestPerRef } from "@/lib/security/own-images";
 
 const row = (over: Partial<Parameters<typeof scanView>[0]> = {}) => ({
     id: "fixture-scan",
