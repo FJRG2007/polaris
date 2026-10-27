@@ -55,7 +55,9 @@ describe("what travels", () => {
     it("is refused to anybody without a session", async () => {
         const route = await readFile(`${SRC}app/api/access/stream/route.ts`, "utf8");
         // The refusal is worded in the reader's language; what matters is that it is a 401.
-        expect(route).toContain('if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });');
+        // Whitespace is folded so the formatter's line breaks do not matter.
+        const flat = route.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")");
+        expect(flat).toContain('if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });');
     });
 
     it("is coalesced, because moving somebody between roles is several writes", async () => {

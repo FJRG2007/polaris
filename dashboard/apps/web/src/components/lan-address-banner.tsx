@@ -6,7 +6,8 @@
  * Shown on every screen to whoever manages the system for a week after a move,
  * because bookmarks, phones and other devices still point at the old address and
  * the person who has to fix that is the one reading this. Carries both addresses
- * that keep working, ready to copy. Dismissed per move, in this browser.
+ * that keep working, ready to copy. Dismissed per move, in this browser. Shown
+ * the moment a move is recorded, not on the next poll.
  */
 
 import { Network, X } from "lucide-react";
@@ -14,6 +15,7 @@ import { CopyButton } from "@/components/copy-button";
 import type { LanMoveNotice } from "@/lib/lan-address-follow";
 import { useCallback, useEffect, useState } from "react";
 import { useLiveRead } from "@/components/use-live-resource";
+import { useNoticeFrames } from "@/components/use-notice-frames";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { lanAddressMoveAction } from "@/app/(app)/lan-address-actions";
 
@@ -35,11 +37,12 @@ export function LanAddressBanner() {
     useEffect(() => setDismissed(readDismissed()), []);
 
     const load = useCallback(() => lanAddressMoveAction(), []);
-    const { data: move } = useLiveRead<LanMoveNotice | null>({
+    const { data: move, refresh } = useLiveRead<LanMoveNotice | null>({
         load,
         cacheKey: "lan-address-move",
         intervalMs: REFRESH_MS
     });
+    useNoticeFrames("lan", refresh);
     if (!move || dismissed === move.at) return null;
 
     const dismiss = () => {

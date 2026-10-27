@@ -26,6 +26,7 @@ import * as notices from "@/lib/notification-service";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { getHostLanIp, getHostLanIps } from "@/lib/host-address";
+import { publishNoticeChange } from "@/lib/shell-notices-live";
 
 /** The address the last pass saw. Written only by this module. */
 export const LAN_ADDRESS_KEY = "network.lanAddress";
@@ -109,6 +110,7 @@ export async function followLanAddress(
 
     console.info(`polaris: this machine's LAN address moved from ${change.from} to ${change.to}`);
     await recordMove(steps, change.from, change.to).catch(() => undefined);
+    publishNoticeChange({ topic: "lan", reach: { permission: "system.manage" } });
     await steps
         .certificate()
         .catch((error: unknown) =>

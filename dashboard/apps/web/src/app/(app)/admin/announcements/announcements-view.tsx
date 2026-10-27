@@ -11,7 +11,8 @@
  */
 
 import type { Locale } from "@polaris/core";
-import { Copy, Pencil, Square, Undo2 } from "lucide-react";
+import Link from "next/link";
+import { Copy, ExternalLink, MessageSquarePlus, Pencil, Square, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     Badge,
@@ -20,6 +21,12 @@ import {
     CardBody,
     Checkbox,
     ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     EmptyState,
     Input,
     Select,
@@ -31,19 +38,23 @@ import type { HistoryRow } from "@/lib/announcements/service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { fillPlaceholders, formatDuration } from "@/lib/announcements/placeholders";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { AnnouncementMarkdown } from "@/components/announcements/announcement-markdown";
 import {
     composeSchema,
     DEFAULT_LEAD_MINUTES,
+    DETAILS_MAX,
     HISTORY_PAGE,
     NOBODY,
     normalizeCompose,
+    UPDATE_MAX,
     SEVERITIES,
     TEMPLATES,
     type ComposeInput,
     type TemplateId
 } from "@/lib/announcements/schema";
 import {
+    addAnnouncementUpdateAction,
     composeOfAction,
     countAudienceAction,
     endAnnouncementAction,
@@ -68,6 +79,7 @@ function blank(templates: Texts): ComposeInput {
         severity: "info",
         title: templates.generic?.title ?? "",
         body: "",
+        details: "",
         linkUrl: null,
         linkLabel: null,
         audience: { ...NOBODY, everyone: true },
@@ -161,6 +173,9 @@ export function AnnouncementsView({
     const [reach, setReach] = useState<number | null>(null);
     const [pending, startTransition] = useTransition();
     const [retracting, setRetracting] = useState<HistoryRow | null>(null);
+    const [updating, setUpdating] = useState<HistoryRow | null>(null);
+    const [updateText, setUpdateText] = useState("");
+    const [updateError, setUpdateError] = useState<string | null>(null);
 
     const loadHistory = useCallback(() => historyAction(), []);
     const { data: latest, refresh: refreshLatest } = useLiveRead<HistoryRow[]>({
@@ -328,6 +343,18 @@ export function AnnouncementsView({
             refresh();
         });
 
+    const addUpdate = (row: HistoryRow) =>
+        startTransition(async () => {
+            const result = await addAnnouncementUpdateAction({ id: row.id, body: updateText });
+            if (!result.ok) {
+                setUpdateError(result.error);
+                return;
+            }
+            toast.show({ title: t("admin.history.updated") });
+            setUpdating(null);
+            setUpdateText("");
+        });
+
     // Preview: this browser's language and zone, which is what one reader sees.
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const when = new Intl.DateTimeFormat(locale, {
@@ -450,6 +477,30 @@ export function AnnouncementsView({
                                 : t("admin.compose.edited")}
                         </span>
                     </label>
+                    <div className="flex flex-col gap-1 text-sm">
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("admin.compose.detailsLabel")}
+                        </span>
+                        <RichTextEditor
+                            value={form.details}
+                            placeholder={t("admin.compose.detailsPlaceholder")}
+                            onChange={(details) => set("details", details)}
+                        />
+                        <span
+                            className={
+                                form.details.length > DETAILS_MAX
+                                    ? "text-xs text-destructive"
+                                    : "text-xs text-muted-foreground"
+                            }
+                        >
+                            {form.details.length > DETAILS_MAX
+                                ? t("admin.compose.detailsTooLong", {
+                                      count: form.details.length,
+                                      max: DETAILS_MAX
+                                  })
+                                : t("admin.compose.detailsHint")}
+                        </span>
+                    </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex min-w-0 flex-col gap-1 text-sm">
                             <span className="text-xs font-medium text-muted-foreground">
@@ -781,6 +832,32 @@ export function AnnouncementsView({
                                         </div>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1">
+                                        <Button
+                                            asChild
+                                            size="icon"
+                                            variant="ghost"
+                                            aria-label={t("admin.history.viewDetails")}
+                                            title={t("admin.history.viewDetails")}
+                                        >
+                                            <Link href={`/announcements/${row.id}`}>
+                                                <ExternalLink className="size-4" aria-hidden />
+                                            </Link>
+                                        </Button>
+                                        {row.phase !== "retracted" ? (
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    setUpdateText("");
+                                                    setUpdateError(null);
+                                                    setUpdating(row);
+                                                }}
+                                                aria-label={t("admin.history.addUpdate")}
+                                                title={t("admin.history.addUpdate")}
+                                            >
+                                                <MessageSquarePlus className="size-4" aria-hidden />
+                                            </Button>
+                                        ) : null}
                                         {row.editable ? (
                                             <Button
                                                 size="icon"
@@ -849,6 +926,40 @@ export function AnnouncementsView({
                     </Button>
                 ) : null}
             </section>
+            <Dialog
+                open={updating !== null}
+                onOpenChange={(open) => (open ? null : setUpdating(null))}
+            >
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{t("admin.history.updateTitle")}</DialogTitle>
+                        <DialogDescription>{t("admin.history.updateBody")}</DialogDescription>
+                    </DialogHeader>
+                    <Textarea
+                        value={updateText}
+                        rows={5}
+                        maxLength={UPDATE_MAX}
+                        placeholder={t("admin.history.updatePlaceholder")}
+                        aria-invalid={updateError ? true : undefined}
+                        onChange={(event) => {
+                            setUpdateText(event.target.value);
+                            setUpdateError(null);
+                        }}
+                    />
+                    {updateError ? <p className="text-xs text-destructive">{updateError}</p> : null}
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setUpdating(null)}>
+                            {t("admin.compose.cancel")}
+                        </Button>
+                        <Button
+                            onClick={() => (updating ? addUpdate(updating) : undefined)}
+                            disabled={pending || updateText.trim().length === 0}
+                        >
+                            {t("admin.history.updateConfirm")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <ConfirmDeleteDialog
                 open={retracting !== null}
                 onOpenChange={(open) => (open ? null : setRetracting(null))}

@@ -119,6 +119,16 @@ export async function resolveViewAs(
     return { mode: "role", ...common, label: role.name, grants: roleGrants(role.permissions) };
 }
 
+/** The account this session is looking at Polaris as, or null. One read, no clearing:
+ *  for a caller that only needs to know whom to follow, not to act as them. */
+export async function viewedUserId(sessionId: string): Promise<string | null> {
+    const row = await prisma.sessionState.findUnique({
+        where: { sessionId },
+        select: { viewAsUserId: true, viewAsRoleId: true, viewAsAt: true }
+    });
+    return row && isLive(row) ? row.viewAsUserId : null;
+}
+
 /** A role's grants as a plain list. The wildcard is written out in full, so a
  *  preview of the administrator role behaves like one rather than like an empty
  *  role - what it does NOT carry across is the admin flag, which is the part a

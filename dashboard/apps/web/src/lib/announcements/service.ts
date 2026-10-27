@@ -9,7 +9,9 @@
  * same bell row instead of stacking three, and a retraction take it back.
  *
  * The banner is matched live against the audience and the clock, so an edit or
- * a reschedule is right on the next page load with nothing to invalidate.
+ * a reschedule is right on the next read with nothing to invalidate. Every
+ * write that changes what a banner shows says so on the shell's live channel
+ * (`shell-notices-live`), so the tabs it concerns read it again at once.
  */
 
 import { prisma } from "@polaris/db";
@@ -18,6 +20,7 @@ import type { Locale } from "@polaris/core";
 import { notify } from "@/lib/notifications/dispatch";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { renderFor, type Reader, type RenderInput } from "./templates";
+import { publishNoticeChange } from "@/lib/shell-notices-live";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { audiencePages, countAudience, matchesAudience, membershipOf } from "./audience";
 import {
@@ -26,6 +29,7 @@ import {
     bannerShowing,
     FINISHED_SHOWN_MS,
     levelFor,
+    nextChangeIn,
     noticeDue,
     phaseAt,
     type Phase
@@ -43,6 +47,8 @@ export const NOTICE_EVENT = "instance.announcement";
 export const CRITICAL_EVENT = "instance.announcement.critical";
 const BANNER_LIMIT = 5;
 const BANNER_SCAN = 200;
+/** Updates a details page lists; past this an announcement wants a new one. */
+const UPDATES_SHOWN = 100;
 const HISTORY_MAX = 1000;
 const CLOCK_BATCH = 50;
 const SEND_CONCURRENCY = 20;
@@ -56,6 +62,11 @@ export function conditionKeyFor(id: string): string {
 export type AnnouncementRow = NonNullable<
     Awaited<ReturnType<typeof prisma.announcement.findUnique>>
 >;
+
+/** Tell the open tabs of these audiences that their banners changed. */
+export function announceBannerChange(...audiences: AudienceSpec[]): void {
+    publishNoticeChange({ topic: "announcements", reach: { audiences } });
+}
 
 export function readAudience(raw: string): AudienceSpec {
     try {
@@ -126,6 +137,7 @@ export function columnsFor(input: ComposeInput, now: Date) {
         severity: input.severity,
         title: input.title,
         body: input.body,
+        details: input.details,
         linkUrl: input.linkUrl,
         linkLabel: input.linkUrl ? input.linkLabel : null,
         vars: JSON.stringify({ affected: input.affected }),
@@ -151,6 +163,7 @@ export function composeFrom(row: AnnouncementRow): ComposeInput {
         severity: row.severity as ComposeInput["severity"],
         title: row.title,
         body: row.body,
+        details: row.details,
         linkUrl: row.linkUrl,
         linkLabel: row.linkLabel,
         audience: readAudience(row.audience),
@@ -267,6 +280,7 @@ export async function advance(row: AnnouncementRow, now: Date): Promise<Phase | 
         data: { noticedPhase: due, sendCursor: null, sendLease: lease }
     });
     if (claimed.count !== 1) return null;
+    if (row.showBanner) announceBannerChange(readAudience(row.audience));
     await deliver(row, due, lease);
     return due;
 }
@@ -335,6 +349,7 @@ export async function createAnnouncement(actorId: string, input: ComposeInput, n
     const row = await prisma.announcement.create({
         data: { ...columns, reach, createdById: actorId }
     });
+    announceBannerChange(input.audience);
     // Due now: sent here rather than a minute from now by the clock.
     void advance(row, now).catch((error) =>
         console.error("polaris: sending an announcement failed:", error)
@@ -362,6 +377,8 @@ export async function updateAnnouncement(id: string, input: ComposeInput, now = 
         where: { id },
         data: { ...columns, reach, noticedPhase: null, sendCursor: null, sendLease: null }
     });
+    // The audience it had and the one it has: somebody taken out of it loses the banner.
+    announceBannerChange(readAudience(row.audience), input.audience);
     void advance(updated, now).catch(() => null);
     return updated;
 }
@@ -373,6 +390,8 @@ export async function retractAnnouncement(id: string, now = new Date()): Promise
         data: { retractedAt: now }
     });
     if (done.count === 0) return false;
+    const row = await prisma.announcement.findUnique({ where: { id }, select: { audience: true } });
+    announceBannerChange(row ? readAudience(row.audience) : { ...NOBODY, everyone: true });
     await prisma.notification.deleteMany({ where: { conditionKey: conditionKeyFor(id) } });
     return true;
 }
@@ -397,10 +416,12 @@ export async function endAnnouncement(
             where: { id },
             data: { windowEnd: now, endsAt: new Date(now.getTime() + FINISHED_SHOWN_MS) }
         });
+        announceBannerChange(readAudience(row.audience));
         void advance(updated, now).catch(() => null);
         return "ended";
     }
     await prisma.announcement.update({ where: { id }, data: { endsAt: now } });
+    announceBannerChange(readAudience(row.audience));
     return "ended";
 }
 
@@ -412,6 +433,8 @@ export interface BannerView {
     body: string;
     linkUrl: string | null;
     linkLabel: string | null;
+    /** Where "See details" goes, when there is more to read than the banner says. */
+    detailsUrl: string | null;
     dismissible: boolean;
     /** The moment a countdown counts to: the window's start while it is upcoming. */
     countdownTo: string | null;
@@ -437,6 +460,40 @@ export async function bannersFor(
     reader: Reader,
     now = new Date()
 ): Promise<BannerView[]> {
+    return (await readBanners(userId, reader, now)).banners;
+}
+
+/** The banners, and how long until one of them - or one not up yet - changes phase. */
+export interface BannerState {
+    banners: BannerView[];
+    /** Milliseconds from the server's now, so a tab's own clock being off does not matter. */
+    nextChangeInMs: number | null;
+}
+
+/** What a tab draws now and when it should read again by itself. */
+export async function bannerStateFor(
+    userId: string,
+    reader: Reader,
+    now = new Date()
+): Promise<BannerState> {
+    const [read, ahead] = await Promise.all([
+        readBanners(userId, reader, now),
+        prisma.announcement.findFirst({
+            where: { showBanner: true, retractedAt: null, startsAt: { gt: now } },
+            orderBy: { startsAt: "asc" },
+            select: { startsAt: true }
+        })
+    ]);
+    const edges = [read.nextChangeInMs, ahead ? ahead.startsAt.getTime() - now.getTime() : null];
+    const due = edges.filter((edge): edge is number => edge !== null);
+    return { banners: read.banners, nextChangeInMs: due.length > 0 ? Math.min(...due) : null };
+}
+
+async function readBanners(
+    userId: string,
+    reader: Reader,
+    now: Date
+): Promise<{ banners: BannerView[]; nextChangeInMs: number | null }> {
     const rows = await prisma.announcement.findMany({
         where: {
             showBanner: true,
@@ -445,9 +502,10 @@ export async function bannersFor(
             OR: [{ endsAt: null }, { endsAt: { gt: now } }]
         },
         orderBy: { startsAt: "desc" },
-        take: BANNER_SCAN
+        take: BANNER_SCAN,
+        include: { _count: { select: { updates: true } } }
     });
-    if (rows.length === 0) return [];
+    if (rows.length === 0) return { banners: [], nextChangeInMs: null };
     let member: Awaited<ReturnType<typeof membershipOf>> | undefined;
     const dismissals = await prisma.announcementDismissal.findMany({
         where: { userId, announcementId: { in: rows.map((row) => row.id) } },
@@ -466,7 +524,10 @@ export async function bannersFor(
         }
         showing.push({ row, phase, severity: row.severity, startsAt: row.startsAt });
     }
-    return sortBanners(showing)
+    const edges = rows
+        .map((row) => nextChangeIn(row, now))
+        .filter((edge): edge is number => edge !== null);
+    const banners = sortBanners(showing)
         .slice(0, BANNER_LIMIT)
         .map(({ row, phase }) => {
             const text = renderFor(renderInput(row), phase, reader);
@@ -478,13 +539,121 @@ export async function bannersFor(
                 body: text.body,
                 linkUrl: row.linkUrl,
                 linkLabel: row.linkLabel,
+                detailsUrl: hasDetails(row, row._count?.updates ?? 0) ? detailsPath(row.id) : null,
                 dismissible: bannerDismissible(row.severity, phase),
                 countdownTo:
                     phase === "upcoming" && row.windowStart ? row.windowStart.toISOString() : null
             };
         });
+    return { banners, nextChangeInMs: edges.length > 0 ? Math.min(...edges) : null };
 }
 
+/** The page an announcement's details are read on. */
+export function detailsPath(id: string): string {
+    return `/announcements/${id}`;
+}
+
+/**
+ * Whether there is more to read than the banner says: written details, an
+ * update added since, or a maintenance window, whose page lists the window and
+ * what it touches.
+ */
+export function hasDetails(
+    row: Pick<AnnouncementRow, "kind" | "details">,
+    updates: number
+): boolean {
+    return row.kind === "maintenance" || (row.details ?? "").trim().length > 0 || updates > 0;
+}
+
+export interface AnnouncementDetails {
+    id: string;
+    kind: string;
+    severity: string;
+    phase: Phase;
+    title: string;
+    body: string;
+    details: string;
+    linkUrl: string | null;
+    linkLabel: string | null;
+    windowStart: string | null;
+    windowEnd: string | null;
+    affected: string[];
+    startsAt: string;
+    updates: { id: string; body: string; createdAt: string }[];
+}
+
+/**
+ * One announcement as its details page shows it, or null when this reader may
+ * not read it: not in its audience, taken back, or not started yet. An
+ * administrator reads any of them, so the history can link to the page.
+ */
+export async function detailsFor(
+    userId: string,
+    isAdmin: boolean,
+    id: string,
+    reader: Reader,
+    now = new Date()
+): Promise<AnnouncementDetails | null> {
+    const row = await prisma.announcement.findUnique({
+        where: { id },
+        include: {
+            updates: {
+                orderBy: { createdAt: "asc" },
+                take: UPDATES_SHOWN,
+                select: { id: true, body: true, createdAt: true }
+            }
+        }
+    });
+    if (!row) return null;
+    if (!isAdmin) {
+        if (row.retractedAt || row.startsAt > now) return null;
+        const audience = readAudience(row.audience);
+        if (!audience.everyone && !matchesAudience(await membershipOf(userId), audience))
+            return null;
+    }
+    const phase = phaseAt(row, now);
+    const text = renderFor(renderInput(row), phase, reader);
+    return {
+        id: row.id,
+        kind: row.kind,
+        severity: row.severity,
+        phase,
+        title: text.title,
+        body: text.body,
+        details: row.details,
+        linkUrl: row.linkUrl,
+        linkLabel: row.linkLabel,
+        windowStart: row.windowStart?.toISOString() ?? null,
+        windowEnd: row.windowEnd?.toISOString() ?? null,
+        affected: readAffected(row.vars),
+        startsAt: row.startsAt.toISOString(),
+        updates: (row.updates ?? []).map((one) => ({
+            id: one.id,
+            body: one.body,
+            createdAt: one.createdAt.toISOString()
+        }))
+    };
+}
+
+/** Add an update to an announcement still standing, and tell its audience's tabs. */
+export async function addAnnouncementUpdate(
+    actorId: string,
+    id: string,
+    body: string,
+    now = new Date()
+): Promise<boolean> {
+    const row = await prisma.announcement.findUnique({
+        where: { id },
+        select: { audience: true, retractedAt: true }
+    });
+    if (!row || row.retractedAt) return false;
+    await prisma.announcementUpdate.create({
+        data: { announcementId: id, body, createdById: actorId, createdAt: now }
+    });
+    // The first update is what gives a banner its "See details".
+    announceBannerChange(readAudience(row.audience));
+    return true;
+}
 /** Close a banner for one reader, for the phase it is in. Refused when it may not be closed. */
 export async function dismissBanner(
     userId: string,
@@ -502,6 +671,8 @@ export async function dismissBanner(
         create: { announcementId: id, userId, phase },
         update: { phase, dismissedAt: now }
     });
+    // The reader's other tabs close it too.
+    announceBannerChange({ ...NOBODY, userIds: [userId] });
     return true;
 }
 

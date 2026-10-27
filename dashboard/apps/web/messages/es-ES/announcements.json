@@ -50,7 +50,8 @@
             "upcoming": "Mantenimiento programado",
             "inProgress": "Mantenimiento en curso",
             "finished": "Mantenimiento terminado"
-        }
+        },
+        "details": "Ver detalles"
     },
     "admin": {
         "title": "Avisos",
@@ -101,7 +102,11 @@
             "save": "Guardar cambios",
             "cancel": "Cancelar",
             "translated": "Se traduce para cada lector mientras no cambies el texto.",
-            "edited": "El texto editado se muestra tal como lo escribiste, en todos los idiomas."
+            "edited": "El texto editado se muestra tal como lo escribiste, en todos los idiomas.",
+            "detailsLabel": "Detalles",
+            "detailsHint": "Se muestran en su propia página tras \"Ver detalles\". Opcional.",
+            "detailsTooLong": "Demasiado largo: {count, number} de {max, number} caracteres.",
+            "detailsPlaceholder": "Qué se ve afectado, los plazos, qué esperar"
         },
         "severity": {
             "info": "Info",
@@ -131,7 +136,8 @@
             "rateLimited": "Demasiados envíos en la última hora. Vuelve a intentarlo en {minutes} min.",
             "notEditable": "Ya ha empezado, así que no se puede editar. Termínalo o envía uno nuevo.",
             "gone": "Ese aviso ya no existe.",
-            "failed": "No ha funcionado. Inténtalo de nuevo."
+            "failed": "No ha funcionado. Inténtalo de nuevo.",
+            "update": "Escribe la novedad (hasta 4000 caracteres)."
         },
         "history": {
             "title": "Enviados y programados",
@@ -155,7 +161,14 @@
             "cancelled": "Cancelado",
             "sent": "Enviado",
             "saved": "Guardado",
-            "older": "Ver más"
+            "older": "Ver más",
+            "addUpdate": "Publicar novedad",
+            "updateTitle": "Publicar novedad",
+            "updateBody": "Se añade a la página de detalles y los banners de los lectores muestran \"Ver detalles\".",
+            "updatePlaceholder": "La actualización está tardando más de lo previsto.",
+            "updateConfirm": "Publicar",
+            "updated": "Novedad publicada.",
+            "viewDetails": "Ver página de detalles"
         },
         "phase": {
             "scheduled": "Programado",
@@ -166,5 +179,14 @@
             "ended": "Fin",
             "retracted": "Retirado"
         }
+    },
+    "details": {
+        "back": "Volver",
+        "notFound": "Este aviso no está disponible.",
+        "window": "Ventana",
+        "affected": "Afecta a",
+        "updates": "Novedades",
+        "noDetails": "No hay más detalles.",
+        "posted": "Publicado {when}"
     }
 }

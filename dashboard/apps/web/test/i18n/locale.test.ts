@@ -44,6 +44,7 @@ vi.mock("next/headers", () => ({
     headers: async () => new Headers(acceptLanguage ? { "accept-language": acceptLanguage } : {})
 }));
 vi.mock("@/lib/session", () => ({ resolveSession: vi.fn(async () => session) }));
+vi.mock("@/lib/view-as-service", () => ({ viewedUserId: vi.fn(async () => null) }));
 vi.mock("@/lib/request-context", () => ({ clientIp: vi.fn(async () => "203.0.113.9") }));
 vi.mock("@/lib/geo-service", () => ({
     resolveGeo: vi.fn(() =>

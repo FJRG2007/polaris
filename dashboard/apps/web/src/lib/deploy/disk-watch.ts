@@ -24,6 +24,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getLocalServerName } from "@/lib/local-server";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { publishNoticeChange } from "@/lib/shell-notices-live";
 import { ImageStoreBusy, LOCAL_MACHINE } from "@/lib/deploy/image-store-lock";
 import { hostSpace, reclaimHostSpace } from "@/lib/deploy/host-space";
 import { parseEngineSize, sweepReleaseImages } from "@/lib/deploy/release-retention";
@@ -199,6 +200,17 @@ export async function lastDiskReadings(): Promise<DiskReading[]> {
 export async function keepDiskReading(reading: DiskReading): Promise<void> {
     const kept = (await lastDiskReadings()).filter((one) => one.machine !== reading.machine);
     await setSetting(KEY, JSON.stringify([...kept, reading]));
+    publishNoticeChange({ topic: "disk", reach: { permission: "system.manage" } });
+}
+
+/** Whether the warning every administrator sees reads differently now: a machine's level moved. */
+export function diskLevelsChanged(before: DiskReading[], after: DiskReading[]): boolean {
+    const levels = (readings: DiskReading[]) =>
+        readings
+            .map((one) => `${one.machine}:${one.level}`)
+            .sort()
+            .join(",");
+    return levels(before) !== levels(after);
 }
 
 /**
@@ -299,5 +311,7 @@ export async function watchDisks(): Promise<DiskReading[]> {
         readings.push(reading);
     }
     await setSetting(KEY, JSON.stringify(readings));
+    if (diskLevelsChanged([...last.values()], readings))
+        publishNoticeChange({ topic: "disk", reach: { permission: "system.manage" } });
     return readings;
 }

@@ -3,6 +3,8 @@
     "files": [
         "web/src/app/(app)/admin/announcements/announcements-view.tsx",
         "web/src/app/(app)/admin/announcements/page.tsx",
+        "web/src/app/(app)/announcements/[id]/page.tsx",
+        "web/src/app/(app)/announcements/[id]/not-found.tsx",
         "web/src/components/announcements/announcement-banner-list.tsx",
         "web/src/components/announcements/announcement-markdown.tsx",
         "web/src/components/announcements/announcement-banners.tsx",
