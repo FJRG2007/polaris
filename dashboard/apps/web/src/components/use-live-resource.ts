@@ -161,7 +161,10 @@ export function useLiveRead<T>({
         setKept(true);
     }, []);
 
-    useEffect(() => {
+    // Before the browser paints, like the mount's seed above: in an effect, the
+    // frame after a key change drew the previous subject's reading under the
+    // new one - another shelf's mail for a frame, then its own kept copy.
+    useLayoutEffect(() => {
         if (seededFor.current === cacheKey) return;
         seededFor.current = cacheKey;
         shown.current = started.current + 1;

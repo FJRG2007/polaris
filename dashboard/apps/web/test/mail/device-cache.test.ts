@@ -12,7 +12,9 @@
  * underneath them is a thin pass-through.
  */
 
-import { describe, expect, it } from "vitest";
+import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import {
     MAIL_CACHE_LIMITS,
     createMailCache,
@@ -264,5 +266,54 @@ describe("how much it keeps", () => {
             2_000
         );
         expect(doomed).toEqual([]);
+    });
+});
+
+/**
+ * Switching shelf, and back.
+ *
+ * The rail only lists the open shelf's mailboxes. Handing the cache those made
+ * it refuse, and two seconds later delete, everything kept for the shelf just
+ * left - so going back to it waited on the network for lists it had drawn a
+ * minute before. The shell hands it every mailbox the person has instead.
+ */
+describe("a shelf switch", () => {
+    it("keeps what the shelf left behind, when told every mailbox", async () => {
+        vi.useFakeTimers();
+        try {
+            const backend = memoryBackend();
+            const cache = createMailCache(
+                () => backend,
+                () => "b1"
+            );
+            cache.setOwner(ANA);
+            cache.write("list", `personal.account=${HOME}`, { threads: ["home"] }, HOME);
+            cache.write("list", `org.account=${WORK}`, { threads: ["work"] }, WORK);
+            await settle();
+            // On the organization's shelf, with every mailbox known.
+            cache.setAccounts([WORK, HOME]);
+            await vi.advanceTimersByTimeAsync(5_000);
+            await settle();
+            expect(await cache.read("list", `personal.account=${HOME}`)).toEqual({
+                threads: ["home"]
+            });
+            expect(await cache.read("list", `org.account=${WORK}`)).toEqual({ threads: ["work"] });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("is told every mailbox by the shell, not only the open shelf's", () => {
+        const shell = readFileSync(
+            resolve(__dirname, "../../src/app/(app)/mail/mail-shell.tsx"),
+            "utf8"
+        );
+        const layout = readFileSync(
+            resolve(__dirname, "../../src/app/(app)/mail/layout.tsx"),
+            "utf8"
+        );
+        expect(shell).toContain("mailCache.setAccounts([...mailboxIds,");
+        expect(layout).toContain("everyAccountId(user.id)");
+        expect(layout).toContain("mailboxIds={mailboxIds}");
     });
 });

@@ -267,6 +267,7 @@ export function MailShell({
     viewerId,
     shelf,
     lent,
+    mailboxIds,
     children
 }: {
     accounts: MailAccountView[];
@@ -280,6 +281,8 @@ export function MailShell({
     viewerId: string;
     shelf: string;
     lent: boolean;
+    /** Every mailbox this person has, whichever shelf it is on. */
+    mailboxIds: string[];
     children: ReactNode;
 }) {
     // During render rather than in an effect, and on purpose: the screens inside
@@ -324,9 +327,14 @@ export function MailShell({
     const folders = rail.folders;
     const unread = rail.unread;
     // A mailbox that is no longer linked takes what the device kept of it.
+    // Every mailbox on every shelf, not the rail's: the rail is the open
+    // shelf's alone, and handing the cache that made it refuse - and two
+    // seconds later delete - everything kept for the shelf just left, so going
+    // back to it waited on the network for what it had already drawn. The
+    // rail's are added for a mailbox linked since the layout last rendered.
     useEffect(() => {
-        mailCache.setAccounts(accounts.map((account) => account.id));
-    }, [accounts]);
+        mailCache.setAccounts([...mailboxIds, ...accounts.map((account) => account.id)]);
+    }, [mailboxIds, accounts]);
     const pathname = usePathname();
     const search = useSearchParams();
     const [composing, setComposing] = useState<ComposerSeed | null>(null);
