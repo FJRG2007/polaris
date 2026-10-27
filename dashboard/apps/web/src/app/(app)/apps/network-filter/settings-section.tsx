@@ -116,7 +116,7 @@ export function DnsSettingsSection() {
                             </span>
                         ) : null}
                     </label>
-                    <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                    <label className="flex min-w-0 flex-1 basis-64 flex-col gap-1 text-sm">
                         <span>{t("history.namesFrom")}</span>
                         <Input
                             className="w-full sm:w-48"

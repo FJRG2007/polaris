@@ -74,7 +74,7 @@ export function DnsLocalSection() {
                     ))}
                     <div className="flex flex-wrap items-center gap-2">
                         <Input
-                            className="min-w-0 flex-1"
+                            className="min-w-0 flex-1 basis-64"
                             value={recordName}
                             placeholder="nas.home"
                             aria-label={t("records.name")}

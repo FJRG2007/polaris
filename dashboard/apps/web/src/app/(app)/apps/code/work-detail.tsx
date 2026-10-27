@@ -115,7 +115,7 @@ export function WorkDetail({
 
             <div className="flex flex-wrap items-start gap-3">
                 <StateIcon state={item.state} kind={item.kind} />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-64">
                     <h1 className="text-[1.0625rem] font-semibold leading-tight tracking-tight">
                         {item.title} <span className="text-muted-foreground">#{item.number}</span>
                     </h1>

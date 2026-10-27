@@ -159,7 +159,7 @@ function Row({
     return (
         <li className="flex flex-wrap items-center gap-3 px-3 py-2.5">
             <SenderFace name={subscription.senderName} address={subscription.sender} />
-            <span className="min-w-0 flex-1">
+            <span className="min-w-0 flex-1 basis-64">
                 <span
                     className="block truncate text-[13px] font-medium"
                     title={subscription.sender}

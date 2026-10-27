@@ -49,7 +49,7 @@ export function DnsNetworkCard({ onName }: { onName: (address: string) => void }
     return (
         <Card>
             <CardHeader className="flex flex-row flex-wrap items-start gap-2">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-64">
                     <CardTitle>{t("network.title")}</CardTitle>
                     <p className="text-xs text-muted-foreground">{t("network.intro")}</p>
                 </div>
