@@ -42,6 +42,8 @@ import { HostdClient } from "@polaris/hostd-client";
 import { callServer } from "@/lib/chat/call-server";
 import { detectPublicIp } from "@/lib/network-service";
 import { localDockerDriver } from "@/lib/docker-service";
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { callNodeIpFile } from "@/lib/chat/call-keys";
 import { getSetting, setSetting } from "@/lib/setting-store";
 
 /** The address this line had when it was last looked at, and when it changed.
@@ -49,6 +51,8 @@ import { getSetting, setSetting } from "@/lib/setting-store";
  *  call it was learned in. */
 const SEEN = "chat.calls.publicIpSeen";
 const CHANGED_AT = "chat.calls.publicIpChangedAt";
+/** The advertised-address override the media server last restarted with. */
+const NODE_IP_APPLIED = "chat.calls.nodeIpApplied";
 
 /** The compose service the media server runs as. */
 const CALL_SERVICE = "livekit";
@@ -185,6 +189,35 @@ export async function repairCallAddress(): Promise<{ ok: boolean; message: strin
         ok: true,
         message: t("callRepair.restarting")
     };
+}
+
+/**
+ * Point the media server at the address callers must use: the relay's while it
+ * serves, else none (it asks STUN, the direct path). Writes the file its
+ * entrypoint reads and restarts it when the answer changed, which is the only
+ * moment it reads it. Answers whether the server now advertises `ip`.
+ */
+export async function syncCallNodeIp(ip: string | null): Promise<boolean> {
+    const file = callNodeIpFile();
+    const before = (await readFile(file, "utf8").catch(() => "")).trim() || null;
+    // Applied means written and the server restarted since: a failed restart is
+    // tried again on the next pass rather than forgotten.
+    if (before === ip && ((await getSetting(NODE_IP_APPLIED)) ?? "") === (ip ?? "")) return true;
+    const endpoint = await callServer().catch(() => null);
+    // A server somebody else runs learns its own address.
+    if (!endpoint?.shipped) return false;
+    try {
+        if (ip) await writeFile(file, `${ip}
+`, { encoding: "utf8", mode: 0o644 });
+        else await rm(file, { force: true });
+    } catch {
+        // No shared volume here (the limited edition): nothing to point.
+        return false;
+    }
+    const container = await callContainer();
+    if (!container || !(await restart(container.id))) return false;
+    await setSetting(NODE_IP_APPLIED, ip ?? "");
+    return true;
 }
 
 /**

@@ -306,6 +306,18 @@ services:
         else
           echo "polaris: no default route to narrow to; offering every local address" >&2
         fi
+        # While the domain is served through the operator's own relay, callers
+        # reach the media at the relay's address, and STUN would answer the
+        # carrier's shared one on a CGNAT line. The dashboard writes the relay's
+        # address here and restarts this container; absent, STUN decides.
+        node_ip=$$(sed -n '1{s/[^0-9.]//g;p;}' /call-keys/node-ip 2>/dev/null)
+        case "$$node_ip" in
+          *.*.*.*)
+            LIVEKIT_CONFIG=$$(printf '%s\n' "$$LIVEKIT_CONFIG" | sed "s|^\( *\)use_external_ip: true$$|\1node_ip: $$node_ip|")
+            export LIVEKIT_CONFIG
+            echo "polaris: advertising calls on the relay address $$node_ip" >&2
+            ;;
+        esac
         exec /livekit-server
     environment:
       # Held here rather than in a mounted file: one place to read, and nothing

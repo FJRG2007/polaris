@@ -31,6 +31,15 @@ function keysDir(): string {
     return process.env.POLARIS_CALL_KEYS_DIR ?? "/call-keys";
 }
 
+/**
+ * The address the media server must advertise instead of asking STUN, read by
+ * its entrypoint at start. Present only while the relay serves: a carrier-NAT
+ * line's STUN answer is the carrier's shared address, which takes nothing in.
+ */
+export function callNodeIpFile(): string {
+    return join(keysDir(), "node-ip");
+}
+
 /** The file LiveKit is pointed at by `key_file` in the compose config. */
 export function callKeyFile(): string {
     return join(keysDir(), "keys.yaml");
