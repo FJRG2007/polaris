@@ -310,9 +310,9 @@ describe("a conversation opened after the ring arrived", () => {
         fireEvent.click(screen.getByText("silence here"));
 
         await vi.waitFor(() => expect(screen.getByTestId("silenced").textContent).toBe("yes"));
-        expect(
-            (screen.getByLabelText("Silence the ring") as HTMLButtonElement).disabled
-        ).toBe(true);
+        expect((screen.getByLabelText("Silence the ring") as HTMLButtonElement).disabled).toBe(
+            true
+        );
         expect(screen.getByTestId("ring").textContent).toBe("m1");
     });
 });

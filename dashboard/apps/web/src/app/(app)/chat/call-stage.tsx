@@ -68,7 +68,12 @@ export function CallStage({
     // The caller is seated when it starts ringing, but the roster may not have
     // been read yet: their face is drawn from the ring until it has.
     const callerSeated = caller !== null && people.some((person) => person.userId === caller.id);
-    const faces: readonly { key: string; person: VoicePresence | null; id: string; name: string }[] = [
+    const faces: readonly {
+        key: string;
+        person: VoicePresence | null;
+        id: string;
+        name: string;
+    }[] = [
         ...(caller && !callerSeated && caller.id
             ? [{ key: `ring:${caller.id}`, person: null, id: caller.id, name: caller.name }]
             : []),

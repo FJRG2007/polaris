@@ -60,12 +60,7 @@ import {
     type NoticeStanding
 } from "@/lib/desktop-notify";
 import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
-import {
-    publishCardRings,
-    shownStages,
-    stageShown,
-    subscribeStages
-} from "@/lib/chat/call-stage";
+import { publishCardRings, shownStages, stageShown, subscribeStages } from "@/lib/chat/call-stage";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging, willBeHeard } from "@/lib/call-sounds";

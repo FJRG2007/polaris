@@ -42,9 +42,9 @@ describe("ringAfter", () => {
 
     it("ignores calls in other conversations", () => {
         expect(ringAfter(null, frame({ channelId: "c2" }), "ada", "c1", 100)).toBeNull();
-        expect(ringAfter(ringing, frame({ channelId: "c2", state: "ended" }), "ada", "c1", 200)).toBe(
-            ringing
-        );
+        expect(
+            ringAfter(ringing, frame({ channelId: "c2", state: "ended" }), "ada", "c1", 200)
+        ).toBe(ringing);
     });
 
     it("keeps the first ring when the same call rings again", () => {
@@ -52,8 +52,12 @@ describe("ringAfter", () => {
     });
 
     it("stops when the call ends or empties", () => {
-        expect(ringAfter(ringing, frame({ state: "ended", count: 0 }), "ada", "c1", 200)).toBeNull();
-        expect(ringAfter(ringing, frame({ state: "moved", count: 0 }), "ada", "c1", 200)).toBeNull();
+        expect(
+            ringAfter(ringing, frame({ state: "ended", count: 0 }), "ada", "c1", 200)
+        ).toBeNull();
+        expect(
+            ringAfter(ringing, frame({ state: "moved", count: 0 }), "ada", "c1", 200)
+        ).toBeNull();
     });
 
     it("stops when this reader answered it somewhere", () => {
@@ -70,7 +74,13 @@ describe("ringAfter", () => {
 
     it("leaves a different call's ring alone", () => {
         expect(
-            ringAfter(ringing, frame({ meetingId: "m0", state: "ended", count: 0 }), "ada", "c1", 200)
+            ringAfter(
+                ringing,
+                frame({ meetingId: "m0", state: "ended", count: 0 }),
+                "ada",
+                "c1",
+                200
+            )
         ).toBe(ringing);
     });
 });
@@ -105,7 +115,9 @@ describe("stageMode", () => {
     });
 
     it("drops a ring for a call that was replaced", () => {
-        expect(stageMode({ ...base, ring: ringing, live: { ...live, meetingId: "m2" } })).toBe("live");
+        expect(stageMode({ ...base, ring: ringing, live: { ...live, meetingId: "m2" } })).toBe(
+            "live"
+        );
     });
 
     it("shows nothing once this reader is in the call", () => {
