@@ -10,7 +10,8 @@
  * that removes what Polaris can safely remove there. Never a volume: for those
  * it offers the way to move a service's data to another location.
  *
- * Hidden for this tab once dismissed, until the level gets worse.
+ * Hidden for this tab once dismissed, until the level gets worse. Read again
+ * the moment the disk watch keeps a reading that changes what this says.
  */
 
 import Link from "next/link";
@@ -19,6 +20,7 @@ import { useCallback, useEffect, useState } from "react";
 import { HardDrive, Loader2, X } from "lucide-react";
 import type { DiskReading } from "@/lib/deploy/disk-watch";
 import { useLiveRead } from "@/components/use-live-resource";
+import { useNoticeFrames } from "@/components/use-notice-frames";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ActiveMoveView } from "@/lib/storage-moves/service";
 import { moveSize, movePhaseText, moveTarget } from "@/components/storage-move-words";
@@ -55,6 +57,7 @@ export function DiskAlertBanner() {
         cacheKey: "disk-alerts",
         intervalMs: REFRESH_MS
     });
+    useNoticeFrames("disk", refresh);
 
     const shown = (data ?? []).filter((one) => !dismissed.includes(`${one.machine}:${one.level}`));
     // Asked only while a warning is up: a move under way is why the disk is about

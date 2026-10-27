@@ -109,3 +109,14 @@ export function nextChangeIn(item: PhaseInput, now: Date): number | null {
         .map((edge) => edge.getTime() - at);
     return edges.length > 0 ? Math.min(...edges) : null;
 }
+
+/** A tab never waits longer than this to read its banners again by itself. */
+export const REREAD_MAX_MS = 6 * 60 * 60_000;
+/** Read just after a boundary rather than on it, so the server already agrees. */
+export const REREAD_SLACK_MS = 1000;
+
+/** How long a tab waits before reading its banners again, given the next change. */
+export function rereadDelay(nextChangeInMs: number | null): number {
+    if (nextChangeInMs === null) return REREAD_MAX_MS;
+    return Math.min(Math.max(nextChangeInMs, 0) + REREAD_SLACK_MS, REREAD_MAX_MS);
+}

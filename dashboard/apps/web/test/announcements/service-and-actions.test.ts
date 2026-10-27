@@ -6,7 +6,8 @@ const db = vi.hoisted(() => ({
         findUnique: vi.fn(),
         updateMany: vi.fn(),
         update: vi.fn(),
-        create: vi.fn()
+        create: vi.fn(),
+        findFirst: vi.fn()
     },
     announcementDismissal: { findMany: vi.fn(), upsert: vi.fn() },
     notification: { deleteMany: vi.fn() },
@@ -35,6 +36,7 @@ vi.mock("@/lib/i18n/request", async () => {
 });
 
 import * as service from "@/lib/announcements/service";
+import { subscribeNotices, type NoticeChange } from "@/lib/shell-notices-live";
 import * as actions from "@/app/(app)/admin/announcements/actions";
 
 const now = new Date("2026-11-02T09:00:00Z");
@@ -332,5 +334,79 @@ describe("permissions and limits", () => {
         });
         rateLimit.mockResolvedValueOnce({ ok: false, retryAfterMs: 120_000 });
         expect(await actions.saveAnnouncementAction(null, valid)).toMatchObject({ ok: false });
+    });
+});
+
+describe("telling the open tabs", () => {
+    const heard: NoticeChange[] = [];
+    let stop: () => void = () => undefined;
+    beforeEach(() => {
+        heard.length = 0;
+        stop = subscribeNotices((change) => heard.push(change));
+    });
+    const audiences = () =>
+        heard.map((change) => (typeof change.reach === "object" ? change.reach.audiences : change.reach));
+    const ana = { everyone: false, roleIds: [], groupIds: [], orgIds: [], userIds: ["0190f3c6-0000-7000-8000-0000000000b1"] };
+    const group = { everyone: false, roleIds: [], groupIds: [MY_GROUP], orgIds: [], userIds: [] };
+
+    it("a published one goes to its audience", async () => {
+        db.announcement.create.mockResolvedValue(row({ audience: JSON.stringify(group), sendNotice: false }));
+        await service.createAnnouncement("admin", { ...service.composeFrom(row({ audience: JSON.stringify(group) })) }, now);
+        stop();
+        expect(heard.every((change) => change.topic === "announcements")).toBe(true);
+        expect(audiences()[0]).toEqual([group]);
+    });
+
+    it("an edit goes to the audience it had and the one it has", async () => {
+        const later = { startsAt: new Date(now.getTime() + 3_600_000) };
+        db.announcement.findUnique.mockResolvedValue(row({ ...later, audience: JSON.stringify(ana) }));
+        db.announcement.update.mockResolvedValue(row({ ...later, audience: JSON.stringify(group), sendNotice: false }));
+        const input = service.composeFrom(row({ ...later, audience: JSON.stringify(group) }));
+        expect(await service.updateAnnouncement(ID, input, now)).not.toBeNull();
+        stop();
+        expect(audiences()[0]).toEqual([ana, group]);
+    });
+
+    it("a withdrawn one goes to its audience", async () => {
+        db.announcement.updateMany.mockResolvedValue({ count: 1 });
+        db.announcement.findUnique.mockResolvedValue({ audience: JSON.stringify(group) });
+        await service.retractAnnouncement(ID, now);
+        stop();
+        expect(audiences()).toEqual([[group]]);
+    });
+
+    it("an ended one goes to its audience", async () => {
+        db.announcement.findUnique.mockResolvedValue(row({ audience: JSON.stringify(group) }));
+        expect(await service.endAnnouncement(ID, now)).toBe("ended");
+        stop();
+        expect(audiences()).toEqual([[group]]);
+    });
+
+    it("a closed one goes only to the reader who closed it", async () => {
+        db.announcement.findUnique.mockResolvedValue(row());
+        expect(await service.dismissBanner("u1", ID, now)).toBe(true);
+        stop();
+        expect(audiences()).toEqual([[{ ...ana, userIds: ["u1"] }]]);
+    });
+
+    it("says when the next boundary is, counting one not up yet", async () => {
+        const windowStart = new Date(now.getTime() + 3_600_000);
+        db.announcement.findMany.mockResolvedValue([
+            row({
+                kind: "maintenance",
+                template: "maintenanceScheduled",
+                localized: true,
+                windowStart,
+                windowEnd: new Date(windowStart.getTime() + 3_600_000)
+            })
+        ]);
+        db.announcement.findFirst.mockResolvedValue({ startsAt: new Date(now.getTime() + 600_000) });
+        const reader = { locale: "en-US" as const, timeZone: "UTC" };
+        const state = await service.bannerStateFor("u1", reader, now);
+        stop();
+        expect(state.banners).toHaveLength(1);
+        expect(state.nextChangeInMs).toBe(600_000);
+        db.announcement.findFirst.mockResolvedValue(null);
+        expect((await service.bannerStateFor("u1", reader, now)).nextChangeInMs).toBe(3_600_000);
     });
 });

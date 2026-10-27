@@ -17,6 +17,11 @@
  * redraws in it (see `LocaleWatcher`). Never coalesced - it is one write, and
  * the tabs should follow it as fast as the tab that made it.
  *
+ * The notices above the page ride here as well (see `shell-notices-live`): a
+ * frame naming the notice that changed, delivered to the accounts it is for, so
+ * an announcement published, edited or withdrawn reaches every open tab without
+ * a reload. The tab reads the notice again; the frame carries nothing else.
+ *
  * Node runtime for Prisma, and never cached.
  */
 
@@ -24,6 +29,8 @@ import { resolveSession } from "@/lib/session";
 import { subscribeLocale } from "@/lib/i18n/locale-live";
 import { concerns, subscribeAccess } from "@/lib/access-live";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { membershipOf } from "@/lib/announcements/audience";
+import { noticeReaches, subscribeNotices } from "@/lib/shell-notices-live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,9 +52,11 @@ export async function GET(request: Request): Promise<Response> {
     // Held rather than read off `session` inside the closures: the narrowing
     // above does not survive into a callback.
     const readerId = session.id;
+    const reader = { id: session.id, isAdmin: session.isAdmin };
     const encoder = new TextEncoder();
     let unsubscribe: (() => void) | null = null;
     let unsubscribeLocale: (() => void) | null = null;
+    let unsubscribeNotices: (() => void) | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     let pending: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
@@ -63,6 +72,8 @@ export async function GET(request: Request): Promise<Response> {
         unsubscribe = null;
         unsubscribeLocale?.();
         unsubscribeLocale = null;
+        unsubscribeNotices?.();
+        unsubscribeNotices = null;
     }
 
     const stream = new ReadableStream<Uint8Array>({
@@ -96,6 +107,17 @@ export async function GET(request: Request): Promise<Response> {
                 if (closed || change.userId !== readerId) return;
                 sequence += 1;
                 write(`data: ${JSON.stringify({ kind: "locale", locale: change.locale, seq: sequence })}\n\n`);
+            });
+
+            unsubscribeNotices = subscribeNotices((change) => {
+                if (closed) return;
+                void noticeReaches(change, reader, () => membershipOf(readerId))
+                    .then((reaches) => {
+                        if (!reaches || closed) return;
+                        sequence += 1;
+                        write(`data: ${JSON.stringify({ kind: "notices", topic: change.topic, seq: sequence })}\n\n`);
+                    })
+                    .catch(() => undefined);
             });
 
             request.signal.addEventListener("abort", () => {

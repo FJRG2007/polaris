@@ -4,7 +4,10 @@
  * The announcements showing for this reader, stacked at the top of the screen.
  *
  * Arrives with the page (see `AnnouncementBanners`), so there is nothing to
- * wait for and nothing shifts after the first paint. Closing one hides it at
+ * wait for and nothing shifts after the first paint. After that it follows
+ * along: the live channel says when one is published, edited, withdrawn or
+ * closed in another tab, and a timer reads again at the next phase boundary
+ * (maintenance ahead, under way, over), so nobody has to reload. Closing one hides it at
  * once and is undone if the server refuses; critical ones and maintenance under
  * way have no close button. A countdown ticks while maintenance is ahead.
  */
@@ -12,12 +15,17 @@
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import type { Locale } from "@polaris/core";
-import { useEffect, useState, useTransition } from "react";
-import type { BannerView } from "@/lib/announcements/service";
+import { rereadDelay } from "@/lib/announcements/phase";
+import { useNoticeFrames } from "@/components/use-notice-frames";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import type { BannerState, BannerView } from "@/lib/announcements/service";
 import { AnnouncementMarkdown } from "./announcement-markdown";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatDuration } from "@/lib/announcements/placeholders";
-import { dismissAnnouncementAction } from "@/app/(app)/announcement-actions";
+import {
+    announcementBannersAction,
+    dismissAnnouncementAction
+} from "@/app/(app)/announcement-actions";
 import { AlertTriangle, CheckCircle2, Info, Megaphone, Wrench, X } from "lucide-react";
 
 const TONE: Record<string, string> = {
@@ -54,14 +62,39 @@ function useNow(enabled: boolean): number {
     return now;
 }
 
+/**
+ * The banners as the server last said, read again on a live frame and at the
+ * next phase boundary. An answer that arrives after a newer one is dropped.
+ */
+export function useLiveBanners(initial: BannerState, read: () => Promise<BannerState>): BannerState {
+    const [state, setState] = useState(initial);
+    const asked = useRef(0);
+    const reread = useCallback(() => {
+        const ticket = ++asked.current;
+        read()
+            .then((next) => {
+                if (ticket === asked.current) setState(next);
+            })
+            // A failed read keeps what is on screen; the next frame or boundary tries again.
+            .catch(() => undefined);
+    }, [read]);
+    useNoticeFrames("announcements", reread);
+    useEffect(() => {
+        const timer = window.setTimeout(reread, rereadDelay(state.nextChangeInMs));
+        return () => window.clearTimeout(timer);
+    }, [state, reread]);
+    return state;
+}
+
 export function AnnouncementBannerList({
-    banners,
+    initial,
     locale
 }: {
-    banners: BannerView[];
+    initial: BannerState;
     locale: Locale;
 }) {
     const t = useTranslations("announcements");
+    const { banners } = useLiveBanners(initial, announcementBannersAction);
     const [hidden, setHidden] = useState<readonly string[]>([]);
     const [, startTransition] = useTransition();
     const now = useNow(banners.some((banner) => banner.countdownTo !== null));
