@@ -12,7 +12,13 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 
 const live = vi.hoisted(() => ({
     refresh: vi.fn(),
-    state: { data: null, loading: false, error: "Request failed (500)", stale: null, refreshing: false }
+    state: {
+        data: null,
+        loading: false,
+        error: "Request failed (500)",
+        stale: null,
+        refreshing: false
+    }
 }));
 
 vi.mock("@/components/use-live-resource", () => ({

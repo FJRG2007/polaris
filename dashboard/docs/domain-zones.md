@@ -188,12 +188,12 @@ never edited by two panels under one button.
 The rest of the subject has pages of its own, under the Domains heading of the
 Platform rail:
 
-| Page | Holds |
-| --- | --- |
+| Page                           | Holds                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------- |
 | `/admin/domains/remote-access` | Backup access (relay, Cloudflare tunnel, carrier-NAT check), Tailscale |
-| `/admin/domains/ports` | Game server ports and their policy, call ports, router steps |
-| `/admin/domains/certificates` | The `polaris.local` root certificate, the certificate contact |
-| `/admin/domains/security` | The domain security inventory |
+| `/admin/domains/ports`         | Game server ports and their policy, call ports, router steps           |
+| `/admin/domains/certificates`  | The `polaris.local` root certificate, the certificate contact          |
+| `/admin/domains/security`      | The domain security inventory                                          |
 
 A link to an anchor that moved (`/admin/domains#backup-access` in a notification stored
 before the split) is sent on to the page that holds it - see
