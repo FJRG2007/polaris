@@ -30,7 +30,7 @@ import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { ClipDialog } from "./clip-dialog";
 import { MicSlot } from "./mic-slot";
-import { AttachMenu } from "./attach-menu";
+import { MicSettings } from "./mic-settings";
 import { speechRecognizer, useDictation, usePrivateDictation } from "./use-dictation";
 import { VideoPreview } from "@/components/video-preview";
 import { ImageViewer } from "@/components/image-viewer";
@@ -53,26 +53,38 @@ import {
     type RecordedSound
 } from "./voice-recorder";
 import {
+    BarChart3,
+    Camera,
+    ChevronDown,
     CornerUpLeft,
     Eye,
     EyeOff,
     HardDrive,
+    Image as ImageIcon,
+    Mic,
     MicOff,
     Paperclip,
     SendHorizontal,
     Square,
     Trash2,
+    Video,
     X
 } from "lucide-react";
-import { Button, cn, isDirty, shortcutPressed, useShortcutHint } from "@polaris/ui";
 import {
-    attachItems,
-    composerSlot,
+    Button,
+    cn,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+    isDirty,
+    shortcutPressed,
+    useShortcutHint
+} from "@polaris/ui";
+import {
     dictationEngine,
     privateDictation,
     problemKey,
-    setPrivateDictation,
-    type AttachItem
+    setPrivateDictation
 } from "./dictation-logic";
 import { SendButton } from "./send-button";
 import { SavedDraftsBar, useSavedDrafts } from "./saved-drafts";
@@ -403,11 +415,15 @@ export function Composer({
         : dictationEngine({ browser: browserSpeech, private: canPrivate, preferPrivate });
     /** The "Private dictation" switch is in the mic menu: there is a choice. */
     const privateSwitch = browserSpeech && canPrivate;
-    const dictation = useDictation({ engine, locale, onText: (text) => hand(text) });
+    const dictation = useDictation({
+        engine,
+        locale,
+        onText: (text) => hand(text),
+        // The browser's recognizer cannot be used here (Brave's never answers):
+        // the mic stays, on Polaris's own transcription.
+        onBrowserUnusable: () => setBrowserSpeech(false)
+    });
     const dictationKey = useShortcutHint("chat.dictate");
-    /** A voice message may be recorded here: it is a file, so only where files
-     *  may be sent, and never over a call, which has the microphone. */
-    const voiceAllowed = mayAttach && recordable && !inCall;
 
     /**
      * What was left in this box last time, put back.
@@ -950,37 +966,6 @@ export function Composer({
         dictation.start();
     };
 
-    /** What the end of the box offers: see `composerSlot`. */
-    const micAvailable = !inCall && (engine !== null || voiceAllowed);
-    const slot = composerSlot({
-        editing: Boolean(editing),
-        blank,
-        staged: files.length > 0 || kept.length > 0,
-        micAvailable,
-        dictating: dictation.active
-    });
-
-    const menuItems = attachItems({
-        mayAttach,
-        handheld,
-        clippable,
-        inCall,
-        poll: onPoll !== undefined,
-        micMenu: micAvailable
-    });
-
-    const pickAttach = (item: AttachItem) => {
-        if (item === "file") setPicking(true);
-        else if (item === "gallery") gallery.current?.click();
-        else if (item === "camera") camera.current?.click();
-        else if (item === "clip") setClipping(true);
-        else if (item === "mic") setMicMenu(true);
-        else if (item === "poll") {
-            setPollError("");
-            setPolling(true);
-        }
-    };
-
     return (
         <div
             ref={box}
@@ -1313,15 +1298,104 @@ export function Composer({
                 <div className="flex items-center gap-0.5 px-2 pb-1.5">
                     {!editing && (
                         <>
-                            {/* One "+" for everything that is not typing:
-                                what is in it is what this room allows. */}
-                            <AttachMenu
-                                items={menuItems}
-                                disabled={disabled}
-                                full={files.length >= rules.maxAttachments}
-                                sheet={handheld}
-                                onPick={pickAttach}
-                            />
+                            {/* Gone rather than disabled where the instance
+                                allows no files at all: a permanently dead
+                                button is a promise the room cannot keep. */}
+                            {mayAttach && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={() => setPicking(true)}
+                                    aria-label={t("composer.attachAFile")}
+                                    title={t("composer.attachAFile")}
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <Paperclip className="size-4" />
+                                </button>
+                            )}
+                            {/* A picture is most of what anybody sends, and
+                                finding it through a file dialog that offers
+                                every document on the device is the long way
+                                round. Filtered to images and video, which is
+                                what a phone answers with its gallery. */}
+                            {mayAttach && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={() => gallery.current?.click()}
+                                    aria-label={t("composer.sendAPhotoOrVideo")}
+                                    title={t("composer.photoOrVideo")}
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <ImageIcon className="size-4" />
+                                </button>
+                            )}
+                            {/* Straight to the camera, on the devices that have
+                                one worth opening. The picture is staged like any
+                                other so it can still be thought better of. */}
+                            {mayAttach && handheld && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={() => camera.current?.click()}
+                                    aria-label={t("composer.takeAPhotoOrVideo")}
+                                    title={t("composer.camera")}
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <Camera className="size-4" />
+                                </button>
+                            )}
+                            {/* Only where a file may be sent at all, since a
+                                recording is one - and only in a browser that can
+                                record, rather than as a button that apologises
+                                when it is pressed. */}
+                            {mayAttach && recordable && !inCall && (
+                                <MicButton
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onStart={() => {
+                                        dictation.stop();
+                                        voice.start();
+                                    }}
+                                />
+                            )}
+                            {/* Beside the microphone, because it is the same
+                                offer one step further: some things are faster
+                                said than typed, and some are faster shown than
+                                said. Only where a file may be sent, since what
+                                it makes is one, and only in a browser that can
+                                share a screen - which is no phone. */}
+                            {mayAttach && clippable && !inCall && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={() => setClipping(true)}
+                                    aria-label={t("composer.recordAVideoClip")}
+                                    title={t("composer.recordAClip")}
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <Video className="size-4" />
+                                </button>
+                            )}
+                            {/* A question with answers under it, which is a
+                                message of its own rather than something that
+                                goes with what is in the box - so it opens a
+                                dialog and sends from there. Not drawn at all
+                                where a poll has nowhere to go. */}
+                            {onPoll && (
+                                <button
+                                    type="button"
+                                    disabled={disabled}
+                                    onClick={() => {
+                                        setPollError("");
+                                        setPolling(true);
+                                    }}
+                                    aria-label={t("composer.createAPoll")}
+                                    title={t("composer.createAPoll")}
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <BarChart3 className="size-4" />
+                                </button>
+                            )}
                             <EmojiPicker
                                 disabled={disabled}
                                 custom={emoji?.custom ?? null}
@@ -1374,11 +1448,13 @@ export function Composer({
                             </>
                         ) : (
                             <>
-                                {slot !== "send" && (
+                                {/* Dictation, beside Send rather than in place of
+                                    anything: it types into the box, it sends
+                                    nothing. */}
+                                {engine && (
                                     <MicSlot
                                         disabled={disabled}
                                         engine={engine}
-                                        voiceAllowed={voiceAllowed}
                                         dictating={dictation.active}
                                         level={dictation.level}
                                         handheld={handheld}
@@ -1386,12 +1462,6 @@ export function Composer({
                                         menuOpen={micMenu}
                                         onMenuOpenChange={setMicMenu}
                                         onDictate={toggleDictation}
-                                        onVoiceStart={() => {
-                                            dictation.stop();
-                                            voice.start();
-                                        }}
-                                        onVoiceStop={voice.stop}
-                                        onVoiceCancel={voice.cancel}
                                         privateChoice={
                                             privateSwitch
                                                 ? {
@@ -1408,30 +1478,26 @@ export function Composer({
                                 )}
                                 {/* Sending later and putting it aside are behind
                                     the chevron - see `SendButton`. */}
-                                {slot !== "mic" && (
-                                    <SendButton
-                                        disabled={
-                                            disabled || tooLong || (blank && files.length === 0)
-                                        }
-                                        onSend={() => void submit(body)}
-                                        onSchedule={
-                                            onSchedule
-                                                ? () => {
-                                                      setScheduleError("");
-                                                      setScheduling(true);
-                                                  }
-                                                : undefined
-                                        }
-                                        onSaveDraft={draftKey ? putAside : undefined}
-                                        draftRefusal={
-                                            files.length > 0
-                                                ? "Drafts keep text only. Send or remove the files first."
-                                                : blank
-                                                  ? "Write something first."
-                                                  : undefined
-                                        }
-                                    />
-                                )}
+                                <SendButton
+                                    disabled={disabled || tooLong || (blank && files.length === 0)}
+                                    onSend={() => void submit(body)}
+                                    onSchedule={
+                                        onSchedule
+                                            ? () => {
+                                                  setScheduleError("");
+                                                  setScheduling(true);
+                                              }
+                                            : undefined
+                                    }
+                                    onSaveDraft={draftKey ? putAside : undefined}
+                                    draftRefusal={
+                                        files.length > 0
+                                            ? "Drafts keep text only. Send or remove the files first."
+                                            : blank
+                                              ? "Write something first."
+                                              : undefined
+                                    }
+                                />
                             </>
                         )}
                     </span>
@@ -1512,6 +1578,69 @@ export function Composer({
                 />
             )}
         </div>
+    );
+}
+
+/**
+ * Record, and set up what records.
+ *
+ * The button starts the recording and the chevron beside it opens everything
+ * about the microphone - which one, how much is done to what it hears, and how
+ * loud it goes out. The same shape the call controls use, and for the same
+ * reason: those are decided once, and they must not slow down the thing that is
+ * decided every time.
+ *
+ * Always there, unlike before: it used to appear only where a second microphone
+ * existed, which hid the noise and level settings from every laptop with one
+ * built-in microphone - the machines that need them most.
+ *
+ * Every choice behind it is this browser's and is shared with calls and clips:
+ * see `MicSettings`.
+ */
+function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => void }) {
+    const t = useTranslations("chat");
+    const many = true;
+
+    return (
+        <span className="flex items-center">
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={onStart}
+                aria-label={t("composer.recordAVoiceMessage")}
+                title={t("composer.recordAVoiceMessage")}
+                className={cn(
+                    "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
+                    many && "rounded-r-none pr-1"
+                )}
+            >
+                <Mic className="size-4" />
+            </button>
+            {many && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            disabled={disabled}
+                            aria-label={t("composer.microphoneSettings")}
+                            title={t("composer.microphoneSettings")}
+                            className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                        >
+                            <ChevronDown className="size-3" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    {/* Upward: the composer is at the bottom of the screen.
+                        The settings are drawn rather than listed as menu items,
+                        because one of them is a slider and a menu that closes on
+                        every press is no place for one - a plain button inside a
+                        menu surface is not an option, so nothing closes when one
+                        is pressed. */}
+                    <DropdownMenuContent align="start" side="top" className="w-72">
+                        <MicSettings className="p-1" />
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
+        </span>
     );
 }
 

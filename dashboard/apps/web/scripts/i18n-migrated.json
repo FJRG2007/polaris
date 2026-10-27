@@ -838,7 +838,6 @@
         "web/src/app/(app)/chat/chat-sidebar.tsx",
         "web/src/app/(app)/chat/clip-dialog.tsx",
         "web/src/app/(app)/chat/composer.tsx",
-        "web/src/app/(app)/chat/attach-menu.tsx",
         "web/src/app/(app)/chat/dictation-logic.ts",
         "web/src/app/(app)/chat/mic-slot.tsx",
         "web/src/app/(app)/chat/use-dictation.ts",

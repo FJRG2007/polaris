@@ -1,8 +1,7 @@
 /**
  * The decisions behind the composer's mic, with nothing in them that needs a
- * browser: which button sits at the end of the box, what a press on the mic
- * means, which engine turns speech into text, and which attach actions a room
- * allows. Kept apart from the components so each one can be asserted on its own.
+ * browser: what a press on the mic means and which engine turns speech into
+ * text. Kept apart from the components so each one can be asserted on its own.
  */
 
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -19,27 +18,6 @@ export const SHORTEST_VOICE_MS = 1000;
 /** How far a held press slides before it means something. */
 export const SLIDE_CANCEL_PX = 80;
 export const SLIDE_LOCK_PX = 60;
-
-/** What the end of the box offers: the mic for an empty box, Send for anything
- *  that can go, and both while dictation runs into a box that has text. */
-export type ComposerSlot = "mic" | "send" | "both";
-
-export function composerSlot(state: {
-    /** Rewriting a message, which always ends in saving it. */
-    editing: boolean;
-    /** No text that would be sent. */
-    blank: boolean;
-    /** Files waiting to go with the message. */
-    staged: boolean;
-    /** Whether there is a mic to offer at all - dictation or a voice message. */
-    micAvailable: boolean;
-    /** Whether dictation is running now. */
-    dictating: boolean;
-}): ComposerSlot {
-    if (state.editing || !state.micAvailable) return "send";
-    if (state.dictating) return state.blank && !state.staged ? "mic" : "both";
-    return state.blank && !state.staged ? "mic" : "send";
-}
 
 /** The two ways speech becomes text: the browser's own recognizer, or Polaris's
  *  transcription of the recording. */
@@ -93,37 +71,6 @@ export function slideOutcome(dx: number, dy: number): "cancel" | "lock" | null {
     return null;
 }
 
-/** An attach action in the "+" menu. */
-export type AttachItem = "file" | "gallery" | "camera" | "clip" | "poll" | "mic";
-
-/**
- * The attach actions a box offers, in the order they are listed. Gone rather
- * than disabled where the room does not allow them - a dead item is a promise
- * the room cannot keep - with the same rules the separate buttons had.
- */
-export function attachItems(room: {
-    /** Files may be sent here at all. */
-    mayAttach: boolean;
-    /** A phone or tablet, which is where a camera item opens a camera. */
-    handheld: boolean;
-    /** The browser can share a screen to record a clip. */
-    clippable: boolean;
-    inCall: boolean;
-    /** There is somewhere for a poll to go. */
-    poll: boolean;
-    /** A mic menu to reach. Listed here only on a phone, which has no chevron
-     *  beside the mic. */
-    micMenu: boolean;
-}): AttachItem[] {
-    const items: AttachItem[] = [];
-    if (room.mayAttach) items.push("file", "gallery");
-    if (room.mayAttach && room.handheld) items.push("camera");
-    if (room.mayAttach && room.clippable && !room.inCall) items.push("clip");
-    if (room.poll) items.push("poll");
-    if (room.micMenu && room.handheld) items.push("mic");
-    return items;
-}
-
 /** Why dictation stopped, as a code the screen has a sentence for. */
 export type DictationProblem =
     | "micBlocked"
@@ -134,6 +81,7 @@ export type DictationProblem =
     | "language"
     | "notSetUp"
     | "tooMany"
+    | "unavailable"
     | "failed";
 
 /** The sentence for each problem. */
@@ -146,6 +94,7 @@ export const PROBLEM_KEYS: Readonly<Record<DictationProblem, NamespaceKey<"chat"
     language: "dictation.problem.language",
     notSetUp: "dictation.problem.notSetUp",
     tooMany: "dictation.problem.tooMany",
+    unavailable: "dictation.problem.unavailable",
     failed: "dictation.problem.failed"
 };
 
@@ -194,6 +143,17 @@ export function browserProblem(code: string): DictationProblem | null {
     }
 }
 
+/**
+ * Browser errors that say the recognizer's service will not work from here,
+ * whatever is tried next: Brave ships the recognizer but its service always
+ * answers `network`, and `service-not-allowed` is the browser refusing it.
+ * These switch dictation to Polaris's own transcription instead of an error.
+ * A `network` while offline is only the connection, and stays an error.
+ */
+export function browserUnusable(code: string, online: boolean): boolean {
+    return (code === "network" && online) || code === "service-not-allowed";
+}
+
 /** Polaris's transcription error codes as problems. */
 export function privateProblem(code: string): DictationProblem {
     if (code === "no_voice_provider") return "notSetUp";
@@ -220,6 +180,11 @@ export function speechLang(locale: string): string {
 
 const HINT_KEY = "polaris.chat.dictation-hint";
 const PRIVATE_KEY = "polaris.chat.dictation-private";
+const BROWSER_UNUSABLE_KEY = "polaris.chat.dictation-browser-unusable";
+/** How long a recognizer that failed is passed over before it is tried again:
+ *  a setting the person can change (Siri on a Mac) or a service that comes
+ *  back is not given up on for good. */
+export const BROWSER_UNUSABLE_MS = 24 * 60 * 60 * 1000;
 
 /** Whether the "tap to dictate, hold for a voice message" hint was seen in
  *  this browser. Unreadable storage counts as seen, so a hint that cannot be
@@ -253,6 +218,28 @@ export function setPrivateDictation(on: boolean): void {
     try {
         if (on) window.localStorage.setItem(PRIVATE_KEY, "1");
         else window.localStorage.removeItem(PRIVATE_KEY);
+    } catch {
+        // Applies to this visit only.
+    }
+}
+
+/** Whether the browser's recognizer is known not to work in this browser: it
+ *  is Brave, or it failed in a way it will fail again within the last
+ *  `BROWSER_UNUSABLE_MS`. Remembered per browser, so the mic goes straight to
+ *  Polaris's transcription meanwhile. */
+export function browserSpeechUnusable(now: number = Date.now()): boolean {
+    if (typeof navigator !== "undefined" && "brave" in navigator) return true;
+    try {
+        const at = Number(window.localStorage.getItem(BROWSER_UNUSABLE_KEY));
+        return at > 0 && at <= now && now - at < BROWSER_UNUSABLE_MS;
+    } catch {
+        return false;
+    }
+}
+
+export function markBrowserSpeechUnusable(now: number = Date.now()): void {
+    try {
+        window.localStorage.setItem(BROWSER_UNUSABLE_KEY, String(now));
     } catch {
         // Applies to this visit only.
     }

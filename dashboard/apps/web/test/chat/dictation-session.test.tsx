@@ -8,7 +8,7 @@
  * before the microphone opened never turns into a recording.
  */
 
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const transcribe = vi.hoisted(() => vi.fn());
@@ -78,6 +78,17 @@ function fakeStream() {
     return { stream, track };
 }
 
+const stored = new Map<string, string>();
+Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+        getItem: (key: string) => stored.get(key) ?? null,
+        setItem: (key: string, value: string) => void stored.set(key, value),
+        removeItem: (key: string) => void stored.delete(key),
+        clear: () => stored.clear()
+    }
+});
+
 function micAnswers(answer: () => Promise<MediaStream>) {
     Object.defineProperty(navigator, "mediaDevices", {
         configurable: true,
@@ -92,12 +103,14 @@ beforeEach(() => {
     (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition =
         FakeRecognizer;
     vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+    window.localStorage.clear();
 });
 
 afterEach(() => {
     cleanup();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
 });
 
 describe("browser dictation", () => {
@@ -126,6 +139,66 @@ describe("browser dictation", () => {
         expect(onText).not.toHaveBeenCalled();
         expect(recognizer.aborted).toBe(true);
         expect(result.current.active).toBe(false);
+    });
+});
+
+describe("a browser whose recognizer cannot work here", () => {
+    function polarisAnswers(available: boolean) {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response(JSON.stringify({ available }), { status: 200 }))
+        );
+    }
+
+    it("says what to do in Polaris when it cannot transcribe either", async () => {
+        polarisAnswers(false);
+        const onBrowserUnusable = vi.fn();
+        const { result } = renderHook(() =>
+            useDictation({ engine: "browser", locale: "en-US", onText: vi.fn(), onBrowserUnusable })
+        );
+        act(() => result.current.start());
+        act(() => FakeRecognizer.last!.onerror?.({ error: "network" }));
+        expect(result.current.active).toBe(true);
+        await waitFor(() => expect(result.current.problem).toBe("unavailable"));
+        expect(result.current.active).toBe(false);
+        expect(onBrowserUnusable).not.toHaveBeenCalled();
+        expect(window.localStorage.getItem("polaris.chat.dictation-browser-unusable")).toBeNull();
+    });
+
+    it("calls a network error while offline the connection, and switches nothing", () => {
+        vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+        const onBrowserUnusable = vi.fn();
+        const { result } = renderHook(() =>
+            useDictation({ engine: "browser", locale: "en-US", onText: vi.fn(), onBrowserUnusable })
+        );
+        act(() => result.current.start());
+        act(() => FakeRecognizer.last!.onerror?.({ error: "network" }));
+        expect(result.current.problem).toBe("network");
+        expect(result.current.active).toBe(false);
+        expect(onBrowserUnusable).not.toHaveBeenCalled();
+        expect(window.localStorage.getItem("polaris.chat.dictation-browser-unusable")).toBeNull();
+    });
+
+    it("carries on with Polaris's transcription, with no error", async () => {
+        // Past the tab's cached answer from the test before.
+        const now = Date.now.bind(Date);
+        vi.spyOn(Date, "now").mockImplementation(() => now() + 3_600_000);
+        polarisAnswers(true);
+        micAnswers(() => new Promise(() => undefined));
+        const onBrowserUnusable = vi.fn();
+        const { result } = renderHook(() =>
+            useDictation({ engine: "browser", locale: "en-US", onText: vi.fn(), onBrowserUnusable })
+        );
+        act(() => result.current.start());
+        act(() => FakeRecognizer.last!.onerror?.({ error: "service-not-allowed" }));
+        await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalled());
+        expect(onBrowserUnusable).toHaveBeenCalledOnce();
+        expect(
+            window.localStorage.getItem("polaris.chat.dictation-browser-unusable")
+        ).not.toBeNull();
+        expect(result.current.problem).toBeNull();
+        expect(result.current.active).toBe(true);
+        act(() => result.current.cancel());
     });
 });
 
