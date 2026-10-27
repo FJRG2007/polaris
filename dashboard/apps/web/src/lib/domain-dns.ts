@@ -290,8 +290,9 @@ async function checkRouter(): Promise<RouterAdvice | null> {
     try {
         const host = await polarisZoneHost();
         if (!host) return null;
-        const { environment } = await getLocalEnvironment();
-        return await reportRouterAdvice(environment, host);
+        // A carrier NAT detected now outranks an answer given on another line.
+        const { acting } = await getLocalEnvironment();
+        return await reportRouterAdvice(acting, host);
     } catch {
         return null;
     }

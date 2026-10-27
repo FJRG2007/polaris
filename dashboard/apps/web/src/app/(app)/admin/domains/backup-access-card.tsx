@@ -17,6 +17,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { BackupConfig, BackupView } from "@/lib/backup-access/service";
+import { INBOUND_FEATURES, carries, type InboundPath } from "@/lib/backup-access/inbound";
 
 const STATUS_URL = "/api/admin/domains/backup-access";
 const MODES = ["automatic", "always", "manual"] as const;
@@ -62,6 +63,7 @@ export function BackupAccessCard() {
                 </div>
             ) : (
                 <div className="flex flex-col gap-4 text-sm">
+                    <LineReach view={view} />
                     <StateLine view={view} />
 
                     <Choice label={t("domains.backup.path")}>
@@ -99,6 +101,8 @@ export function BackupAccessCard() {
                             {t("domains.backup.paths.relay")}
                         </Pick>
                     </Choice>
+
+                    <PathsCompared view={view} />
 
                     {!view.cloudflare ? (
                         <p className="text-xs text-muted-foreground">
@@ -327,5 +331,113 @@ function Problem({ view }: { view: BackupView }) {
                 ? t(`domains.backup.problems.${probe.problem}`, { detail: probe.detail ?? "-" })
                 : t("domains.backup.conflicts", { names: probe.conflicts.join(", ") })}
         </p>
+    );
+}
+
+/** The path visitors use right now, or null when none reaches the house. */
+function activePath(view: BackupView): InboundPath | null {
+    if (view.state.serving === "backup") return view.config.path;
+    return view.reach?.cgnat ? null : "direct";
+}
+
+/**
+ * Whether the line itself takes visitors, and what works on the path in use. A
+ * carrier NAT is said in words with the reason it was recognised, and the way
+ * out is the path picker right below.
+ */
+function LineReach({ view }: { view: BackupView }) {
+    const t = useTranslations("admin");
+    const reach = view.reach;
+    const active = activePath(view);
+    return (
+        <div className="flex flex-col gap-2">
+            {reach?.cgnat ? (
+                <p
+                    role="status"
+                    className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground"
+                >
+                    {t(
+                        reach.certain
+                            ? "domains.backup.cgnat.title"
+                            : "domains.backup.cgnat.titleSuspected",
+                        {
+                            ip: reach.publicIp ?? "-"
+                        }
+                    )}{" "}
+                    {reach.reason ? t(`domains.backup.cgnat.reasons.${reach.reason}`) : null}{" "}
+                    {view.config.path
+                        ? t("domains.backup.cgnat.covered")
+                        : t(`domains.backup.cgnat.pick.${view.recommended}`)}
+                </p>
+            ) : null}
+            <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">
+                    {active
+                        ? t("domains.backup.works.on", {
+                              path: t(`domains.backup.paths.${active}`)
+                          })
+                        : t("domains.backup.works.none")}
+                </span>
+                <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-xs sm:grid-cols-2">
+                    {INBOUND_FEATURES.filter((feature) => feature !== "everyone").map((feature) => {
+                        const on = active !== null && carries(active, feature);
+                        return (
+                            <li key={feature} className="flex min-w-0 gap-2">
+                                <span className={on ? "text-success" : "text-danger"}>
+                                    {on
+                                        ? t("domains.backup.works.yes")
+                                        : t("domains.backup.works.no")}
+                                </span>
+                                <span className="min-w-0 truncate">
+                                    {t(`domains.backup.features.${feature}`)}
+                                </span>
+                            </li>
+                        );
+                    })}
+                </ul>
+                {view.calls === "local-only" ? (
+                    <p className="text-xs text-muted-foreground">
+                        {t("domains.backup.works.callsLocal")}
+                    </p>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+const COMPARED: readonly InboundPath[] = ["relay", "tunnel", "tailscale"];
+
+/** The ways in side by side, the recommended one marked, each with its catch. */
+function PathsCompared({ view }: { view: BackupView }) {
+    const t = useTranslations("admin");
+    if (!view.reach?.cgnat && view.config.path) return null;
+    return (
+        <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">
+                {t("domains.backup.compare.title")}
+            </span>
+            <ul className="flex flex-col gap-1.5 text-xs">
+                {COMPARED.map((path) => (
+                    <li key={path} className="min-w-0 break-words">
+                        <span className="font-medium">{t(`domains.backup.paths.${path}`)}</span>
+                        {view.recommended === path ? (
+                            <span className="ml-2 text-success">
+                                {t("domains.backup.compare.recommended")}
+                            </span>
+                        ) : null}
+                        <span className="block text-muted-foreground">
+                            {t(`domains.backup.compare.${path}`)}
+                        </span>
+                        {path === "tailscale" ? (
+                            <a href="#tailscale" className="text-primary hover:underline">
+                                {view.tailscale
+                                    ? t("domains.backup.compare.tailscaleOpen")
+                                    : t("domains.backup.compare.tailscaleSetUp")}
+                            </a>
+                        ) : null}
+                    </li>
+                ))}
+            </ul>
+        </div>
     );
 }

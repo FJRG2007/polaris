@@ -77,6 +77,19 @@ import {
     type RecordOp
 } from "./records";
 import { relayConfigs, relayPorts, relayProject, relaySpec } from "./relay";
+import { CALL_PORTS } from "@/lib/chat/call-ports";
+import { getTailscaleHost } from "@/lib/tailscale/tailscale-service";
+import { syncCallNodeIp } from "@/lib/chat/call-address-watch";
+import { refreshInboundReach, readInboundReach } from "./inbound-service";
+import {
+    callNodeIp,
+    callReach,
+    cgnatVerdict,
+    recommendPath,
+    type CallReach,
+    type InboundPath,
+    type InboundReach
+} from "./inbound";
 import { combineVerdicts, outsideScript, readOutside, type OutsideAnswer } from "./outside-check";
 
 const TTL_KEY = "backupAccess.ttl";
@@ -191,26 +204,40 @@ export interface BackupView {
     readonly relay: { address: string; tcp: number[]; udp: number[] } | null;
     readonly servers: { id: string; name: string }[];
     readonly cloudflare: boolean;
+    /** Whether visitors can reach the line itself; null before the first check. */
+    readonly reach: InboundReach | null;
+    /** Tailscale is connected here, so its private way in is open. */
+    readonly tailscale: boolean;
+    /** The path Polaris recommends for this line. */
+    readonly recommended: InboundPath;
+    /** How a caller outside the house reaches the call media now. */
+    readonly calls: CallReach;
 }
 
 export async function backupView(): Promise<BackupView> {
-    const [zones, config, state, probe, tunnel, relay, token, servers] = await Promise.all([
-        getDomainZones().catch(() => null),
-        readConfig(),
-        getSetting(BACKUP_STATE_KEY).then(readState),
-        getSetting(PROBE_KEY).then((raw) => parse(probeSchema, raw)),
-        getSetting(TUNNEL_KEY).then((raw) => parse(tunnelSchema, raw)),
-        getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw)),
-        loadCloudflareToken().catch(() => null),
-        prisma.deployTarget
-            .findMany({
-                where: { status: "active", kind: { not: "local" }, owner: { isAdmin: true } },
-                select: { id: true, name: true },
-                orderBy: { name: "asc" },
-                take: 100
-            })
-            .catch(() => [])
-    ]);
+    const [zones, config, state, probe, tunnel, relay, token, servers, reach, tailscale] =
+        await Promise.all([
+            getDomainZones().catch(() => null),
+            readConfig(),
+            getSetting(BACKUP_STATE_KEY).then(readState),
+            getSetting(PROBE_KEY).then((raw) => parse(probeSchema, raw)),
+            getSetting(TUNNEL_KEY).then((raw) => parse(tunnelSchema, raw)),
+            getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw)),
+            loadCloudflareToken().catch(() => null),
+            prisma.deployTarget
+                .findMany({
+                    where: { status: "active", kind: { not: "local" }, owner: { isAdmin: true } },
+                    select: { id: true, name: true },
+                    orderBy: { name: "asc" },
+                    take: 100
+                })
+                .catch(() => []),
+            readInboundReach().catch(() => null),
+            getTailscaleHost()
+                .then(Boolean)
+                .catch(() => false)
+        ]);
+    const cgnat = reach?.cgnat ?? false;
     return {
         configured: Boolean(zones?.baseDomain),
         config,
@@ -219,7 +246,21 @@ export async function backupView(): Promise<BackupView> {
         tunnelReady: tunnel !== null,
         relay: relay ? { address: relay.address, tcp: relay.tcp, udp: relay.udp } : null,
         servers,
-        cloudflare: Boolean(token)
+        cloudflare: Boolean(token),
+        reach,
+        tailscale,
+        recommended: recommendPath({
+            cgnat,
+            hasServer: servers.length > 0,
+            cloudflare: Boolean(token),
+            tailscale
+        }),
+        calls: callReach({
+            cgnat,
+            serving: state.serving,
+            path: config.path,
+            relayAddress: relay?.address ?? null
+        })
     };
 }
 
@@ -267,13 +308,31 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     // While on backup, a path that failed to warm is still the one serving.
     if (!target && saved && config.path) target = saved.target;
 
-    const measured = await measure(before, previous.serving, uplink, config.relayTargetId);
+    const { evidence, ...measured } = await measure(
+        before,
+        previous.serving,
+        uplink,
+        config.relayTargetId
+    );
+    const reach = uplink
+        ? await refreshInboundReach({
+              publicIp: evidence.ip,
+              outside: evidence.outside,
+              hairpin: evidence.hairpin
+          }).catch(() => null)
+        : null;
+    // A carrier NAT takes no visitors whatever the probes say: a hairpin to the
+    // carrier's address can even answer from somebody else's router.
+    const cgnat = cgnatVerdict(reach, evidence.ip);
+    const verdict: Verdict =
+        cgnat.down && measured.verdict !== "no-uplink" ? "down" : measured.verdict;
     const now = new Date();
     const decision = decide(previous, {
         mode: config.mode,
         manualOn: config.manualOn,
         pathReady: target !== null,
-        verdict: measured.verdict,
+        verdict,
+        failToFlip: cgnat.failToFlip,
         now
     });
 
@@ -317,18 +376,28 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             problem = problem ?? "failed";
             detail = detail ?? message(caught);
         }
+        try {
+            const serving = (await getSetting(BACKUP_STATE_KEY).then(readState)).serving;
+            const relay = parse(relaySchema, await getSetting(RELAY_KEY));
+            await syncCallNodeIp(
+                callNodeIp({ serving, path: config.path, relayAddress: relay?.address ?? null })
+            );
+        } catch (caught) {
+            console.error("polaris: could not point the call server at the relay:", caught);
+        }
     }
     await setSetting(
         PROBE_KEY,
         JSON.stringify({
             ...measured,
+            verdict,
             checkedAt: now.toISOString(),
             problem,
             detail,
             conflicts
         } satisfies Probe)
     );
-    return { verdict: measured.verdict, move: moved };
+    return { verdict, move: moved };
 }
 
 class PathRefusal extends Error {
@@ -569,7 +638,9 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
     // The ports the installed game servers publish, as the router is asked to
     // forward them; a server added or removed changes what both ends carry.
     const games = await forwardedPorts().catch(() => []);
-    const ports = relayPorts(games.flatMap((row) => row.ports));
+    // The call media rides the relay too: without it a call through the relay
+    // joins and carries no sound.
+    const ports = relayPorts([...games.flatMap((row) => row.ports), ...CALL_PORTS]);
     // Fresh keys start with no ports, so they always bring both ends up again; a
     // relay brought up before UDP was carried stored none, so one with UDP game
     // ports comes up again with them.
@@ -691,7 +762,7 @@ async function measure(
     serving: FlipState["serving"],
     uplink: boolean,
     relayTargetId: string | null
-): Promise<Omit<Probe, "checkedAt" | "problem" | "detail" | "conflicts">> {
+): Promise<Measured> {
     const [published, tunnel, relay] = await Promise.all([
         getSetting(PUBLISHED_KEY),
         getSetting(TUNNEL_KEY),
@@ -704,7 +775,8 @@ async function measure(
             latency: { direct: null, tunnel: null, relay: null },
             calibrated,
             from: null,
-            lastIp: before?.lastIp ?? null
+            lastIp: before?.lastIp ?? null,
+            evidence: { ip: null, outside: null, hairpin: false }
         };
     const [direct, tunnelMs, relayMs, ip] = await Promise.all([
         published ? connectTime(published, 443) : Promise.resolve(null),
@@ -730,9 +802,23 @@ async function measure(
         latency: { direct: direct ?? outside?.answer.ms ?? null, tunnel: tunnelMs, relay: relayMs },
         calibrated: nowCalibrated,
         from: outside?.from ?? null,
-        lastIp: ip ?? before?.lastIp ?? null
+        lastIp: ip ?? before?.lastIp ?? null,
+        evidence: {
+            ip,
+            // Only a check aimed at the address the line has now says anything about it.
+            outside: ip && outside ? outside.answer.verdict : null,
+            hairpin: direct !== null && ip !== null && ip === published
+        }
     };
 }
+
+type Measured = Omit<Probe, "checkedAt" | "problem" | "detail" | "conflicts"> & {
+    readonly evidence: {
+        readonly ip: string | null;
+        readonly outside: "up" | "down" | null;
+        readonly hairpin: boolean;
+    };
+};
 
 /**
  * The cloud server that checks from outside: the relay's own when the relay path

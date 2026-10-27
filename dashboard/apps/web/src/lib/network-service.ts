@@ -11,6 +11,7 @@
  */
 
 import { getSetting, setSetting } from "./setting-store";
+import { actingEnvironment, INBOUND_KEY, lineIsCgnat, readReach } from "./backup-access/inbound";
 import { deployZoneBase, zoneDnsVerified } from "./domain-zones";
 import { DEFAULT_SUBDOMAIN_BASE, magicDomain } from "@polaris/deploy";
 import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
@@ -116,7 +117,16 @@ export async function detectLocalEnvironment(force = false): Promise<ServerEnvir
     } else {
         // Only worth the echo-service walk when the box's own address says nothing.
         const externalIp = await detectPublicIp(force);
-        if (externalIp) environment = isCarrierGradeNat(externalIp) ? "home-cgnat" : "home-nat";
+        // The echo services see the carrier's shared address on a CGNAT line, which
+        // looks public: the stored inbound verdict for that same address is what
+        // tells the two apart.
+        const reach = readReach(await getSetting(INBOUND_KEY));
+        if (externalIp)
+            environment =
+                isCarrierGradeNat(externalIp) ||
+                (lineIsCgnat(reach) && reach?.publicIp === externalIp)
+                    ? "home-cgnat"
+                    : "home-nat";
     }
     await setSetting(KEYS.detectedEnvironment, environment);
     await setSetting(KEYS.detectedEnvironmentAt, String(Date.now()));
@@ -131,6 +141,9 @@ export interface LocalEnvironment {
     detected: ServerEnvironment;
     /** True when the operator answered, so the value is not just a guess. */
     confirmed: boolean;
+    /** What safety decisions act on: a carrier NAT detected now wins over an
+     *  answer given while the line was another one. */
+    acting: ServerEnvironment;
 }
 
 /** Where the Polaris box lives, preferring the operator's answer over detection:
@@ -143,10 +156,22 @@ export async function getLocalEnvironment(force = false): Promise<LocalEnvironme
     // it stands rather than running a fresh one behind a render.
     if (answered && !force) {
         const detected = asEnvironment(await getSetting(KEYS.detectedEnvironment)) ?? "unknown";
-        return { environment: answered, detected, confirmed: true };
+        const reach = readReach(await getSetting(INBOUND_KEY));
+        return {
+            environment: answered,
+            detected,
+            confirmed: true,
+            acting: actingEnvironment(answered, detected, reach)
+        };
     }
     const detected = await detectLocalEnvironment(force);
-    return { environment: answered ?? detected, detected, confirmed: Boolean(answered) };
+    const reach = readReach(await getSetting(INBOUND_KEY));
+    return {
+        environment: answered ?? detected,
+        detected,
+        confirmed: Boolean(answered),
+        acting: actingEnvironment(answered, detected, reach)
+    };
 }
 
 /** Store the operator's answer for the local box ("unknown" clears it, so

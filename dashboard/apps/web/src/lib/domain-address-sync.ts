@@ -31,6 +31,7 @@
 import { prisma } from "@polaris/db";
 import { isPublicIpv4, PUBLIC_IP_CHANGED_EVENT } from "@polaris/core";
 import { backupAccessActive } from "@/lib/backup-access";
+import { INBOUND_KEY, mayPublish, readReach } from "@/lib/backup-access/inbound";
 import { publicA } from "@/lib/dns/authoritative";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import * as notices from "@/lib/notification-service";
@@ -73,7 +74,8 @@ const REACH_GRACE_MS = 2 * 60 * 1000;
 /** What Cloudflare's "automatic" TTL (1) means in seconds. */
 const AUTO_TTL_S = 300;
 
-export type FollowProblem = "no-token" | "api" | "conflict" | "failed" | "unreached";
+export type FollowProblem =
+    "no-token" | "api" | "conflict" | "failed" | "unreached" | "cgnat" | "not-public";
 
 /** What the last run found, as Admin -> Domains shows it. */
 export interface FollowStatus {
@@ -295,6 +297,19 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
     const from = lastSeen && lastSeen !== current ? lastSeen : null;
     if (from) await announceChange(from, current);
     if (lastSeen !== current) await setSetting(LAST_SEEN_KEY, current);
+
+    // An address behind a carrier NAT takes no visitors: pointing the records at it
+    // sends them to somebody else's router. The records stay where they are and
+    // backup access, when a path is chosen, takes them over.
+    const gate = mayPublish({
+        ip: current,
+        reach: readReach(await getSetting(INBOUND_KEY)),
+        backupServing: false
+    });
+    if (gate.refusal === "cgnat" || gate.refusal === "not-public") {
+        await save({ ip: current, problem: gate.refusal, detail: null, reachBy: null });
+        return { ...NOTHING, from, to: current, skipped: "The address takes no visitors" };
+    }
 
     const token = await loadCloudflareToken().catch(() => null);
     if (!token) {

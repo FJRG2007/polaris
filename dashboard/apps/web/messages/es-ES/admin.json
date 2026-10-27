@@ -620,7 +620,9 @@
                 "api": "No se pudo leer Cloudflare: {detail}",
                 "conflict": "Estos nombres apuntan a una dirección que Polaris no escribió, así que no se tocaron: {detail}",
                 "failed": "Algunos registros no se pudieron actualizar: {detail}",
-                "unreached": "Los resolvedores públicos siguen respondiendo otra dirección pasado el TTL. Revisa los registros de abajo."
+                "unreached": "Los resolvedores públicos siguen respondiendo otra dirección pasado el TTL. Revisa los registros de abajo.",
+                "cgnat": "Los registros DNS no se han apuntado a {ip}: esta línea no recibe visitas (CGNAT). <link>Elige una vía en Acceso de respaldo</link>.",
+                "notPublic": "Los registros DNS no se han apuntado a {ip}: no es una dirección pública, así que nadie de fuera puede llegar a ella. <link>Elige una vía en Acceso de respaldo</link>."
             }
         },
         "acme": {
@@ -659,7 +661,9 @@
                 "off": "Nada",
                 "direct": "Directa",
                 "tunnel": "Túnel de Cloudflare",
-                "relay": "Relé propio"
+                "relay": "Relé propio",
+                "tailscale": "Tailscale",
+                "ipv6": "IPv6"
             },
             "modes": {
                 "automatic": "Automático",
@@ -704,7 +708,51 @@
             },
             "tcpCarried": "El relé lleva TCP {ports}.",
             "fromOutside": "desde {server}",
-            "fromInside": "desde este servidor"
+            "fromInside": "desde este servidor",
+            "cgnat": {
+                "title": "Esta línea no recibe visitas desde internet: {ip} lo comparte el proveedor (CGNAT).",
+                "titleSuspected": "Esta línea no recibe visitas desde internet en {ip}.",
+                "reasons": {
+                    "carrier-address": "Este servidor tiene una dirección del operador.",
+                    "router-wan": "La dirección del router no es la que ve internet.",
+                    "starlink": "Es una dirección de Starlink y nada de fuera ha llegado a ella.",
+                    "no-inbound": "Una comprobación desde tu servidor en la nube no pudo entrar.",
+                    "address-mismatch": "La línea sale por más de una dirección."
+                },
+                "covered": "El dominio sigue disponible por la vía elegida abajo.",
+                "pick": {
+                    "relay": "Elige Relé propio abajo para mantener el dominio, las llamadas y los juegos.",
+                    "tunnel": "Elige Túnel de Cloudflare abajo para mantener las webs.",
+                    "tailscale": "Configura Tailscale para entrar a Polaris desde tus dispositivos.",
+                    "direct": "Elige una vía abajo para mantener el dominio accesible.",
+                    "ipv6": "Quien tenga IPv6 aún llega al dominio; elige una vía abajo para el resto."
+                }
+            },
+            "works": {
+                "on": "Funcionando ahora por {path}",
+                "none": "Ahora mismo nada llega a este servidor desde fuera",
+                "yes": "Funciona",
+                "no": "No",
+                "callsLocal": "Las llamadas solo funcionan dentro de casa: ninguna vía lleva el audio a quien está fuera. El relé propio sí."
+            },
+            "features": {
+                "web": "Panel y webs",
+                "ownDomain": "Tu dominio",
+                "calls": "Llamadas con gente de fuera",
+                "games": "Juegos",
+                "mail": "Correo entrante"
+            },
+            "compare": {
+                "title": "Vías de entrada cuando la línea no recibe visitas",
+                "recommended": "Recomendada",
+                "relay": "Lo lleva todo: tu dominio, llamadas, juegos y correo. Necesita uno de tus servidores en la nube; crece con su tamaño.",
+                "tunnel": "Gratis. Solo webs en tu dominio: sin llamadas, juegos ni correo. Necesita el DNS del dominio en Cloudflare.",
+                "tailscale": "Gratis. Tus dispositivos entran a Polaris en privado; webs solo con un nombre .ts.net, nunca en tu dominio.",
+                "tailscaleOpen": "Abrir Tailscale",
+                "tailscaleSetUp": "Configurar Tailscale",
+                "ipv6": "Gratis. Solo llega a quien tiene IPv6 en su conexión.",
+                "direct": "Tu propia línea, cuando recibe visitas: todo funciona."
+            }
         },
         "tailscale": {
             "title": "Acceso remoto con Tailscale",
