@@ -148,9 +148,10 @@ export function browserProblem(code: string): DictationProblem | null {
  * whatever is tried next: Brave ships the recognizer but its service always
  * answers `network`, and `service-not-allowed` is the browser refusing it.
  * These switch dictation to Polaris's own transcription instead of an error.
+ * A `network` while offline is only the connection, and stays an error.
  */
-export function browserUnusable(code: string): boolean {
-    return code === "network" || code === "service-not-allowed";
+export function browserUnusable(code: string, online: boolean): boolean {
+    return (code === "network" && online) || code === "service-not-allowed";
 }
 
 /** Polaris's transcription error codes as problems. */
@@ -180,6 +181,10 @@ export function speechLang(locale: string): string {
 const HINT_KEY = "polaris.chat.dictation-hint";
 const PRIVATE_KEY = "polaris.chat.dictation-private";
 const BROWSER_UNUSABLE_KEY = "polaris.chat.dictation-browser-unusable";
+/** How long a recognizer that failed is passed over before it is tried again:
+ *  a setting the person can change (Siri on a Mac) or a service that comes
+ *  back is not given up on for good. */
+export const BROWSER_UNUSABLE_MS = 24 * 60 * 60 * 1000;
 
 /** Whether the "tap to dictate, hold for a voice message" hint was seen in
  *  this browser. Unreadable storage counts as seen, so a hint that cannot be
@@ -219,20 +224,22 @@ export function setPrivateDictation(on: boolean): void {
 }
 
 /** Whether the browser's recognizer is known not to work in this browser: it
- *  is Brave, or it failed in a way it will fail again. Remembered per browser,
- *  so the mic goes straight to Polaris's transcription next time. */
-export function browserSpeechUnusable(): boolean {
+ *  is Brave, or it failed in a way it will fail again within the last
+ *  `BROWSER_UNUSABLE_MS`. Remembered per browser, so the mic goes straight to
+ *  Polaris's transcription meanwhile. */
+export function browserSpeechUnusable(now: number = Date.now()): boolean {
     if (typeof navigator !== "undefined" && "brave" in navigator) return true;
     try {
-        return window.localStorage.getItem(BROWSER_UNUSABLE_KEY) === "1";
+        const at = Number(window.localStorage.getItem(BROWSER_UNUSABLE_KEY));
+        return at > 0 && at <= now && now - at < BROWSER_UNUSABLE_MS;
     } catch {
         return false;
     }
 }
 
-export function markBrowserSpeechUnusable(): void {
+export function markBrowserSpeechUnusable(now: number = Date.now()): void {
     try {
-        window.localStorage.setItem(BROWSER_UNUSABLE_KEY, "1");
+        window.localStorage.setItem(BROWSER_UNUSABLE_KEY, String(now));
     } catch {
         // Applies to this visit only.
     }

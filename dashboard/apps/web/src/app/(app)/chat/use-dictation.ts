@@ -260,13 +260,12 @@ export function useDictation(options: {
     }, [fail, stop]);
 
     /**
-     * The browser's recognizer will not work here: remember that for this
-     * browser and carry on with Polaris's transcription, without a word about
-     * it - unless Polaris cannot transcribe either, which is the one thing said.
+     * The browser's recognizer will not work here: carry on with Polaris's
+     * transcription, without a word about it, and remember that for this
+     * browser - unless Polaris cannot transcribe either, which is the one thing
+     * said, and then nothing is remembered.
      */
     const fallBack = useCallback(() => {
-        markBrowserSpeechUnusable();
-        latest.current.onBrowserUnusable?.();
         let dropped = false;
         const mine = () => {
             dropped = true;
@@ -278,8 +277,10 @@ export function useDictation(options: {
         void askPrivateDictation().then((available) => {
             if (dropped || ending.current !== mine) return;
             ending.current = null;
-            if (available && recordingType()) startPrivate();
-            else fail("unavailable");
+            if (!available || !recordingType()) return fail("unavailable");
+            markBrowserSpeechUnusable();
+            latest.current.onBrowserUnusable?.();
+            startPrivate();
         });
     }, [fail, startPrivate]);
 
@@ -324,7 +325,7 @@ export function useDictation(options: {
                 // stopped talking.
                 if (event.error === "no-speech" && ++silent < 2) return;
                 wanted = false;
-                if (browserUnusable(event.error)) return fallBack();
+                if (browserUnusable(event.error, navigator.onLine !== false)) return fallBack();
                 fail(browserProblem(event.error));
             };
             recognizer.onend = () => {
@@ -449,19 +450,33 @@ function micProblem(error: unknown): DictationProblem {
 
 /** How long one answer about private dictation is trusted in this tab. */
 const PRIVATE_TTL_MS = 5 * 60_000;
-let privateAnswer: { at: number; value: Promise<boolean> } | null = null;
+let privateAnswer: { at: number; value: Promise<boolean>; known?: boolean } | null = null;
 
 /** Whether Polaris can transcribe for this person, asked once per tab and only
  *  when it matters. A failed question is a no: the mic falls back rather than
  *  offering an engine that may not answer. */
 function askPrivateDictation(): Promise<boolean> {
     if (privateAnswer && Date.now() - privateAnswer.at < PRIVATE_TTL_MS) return privateAnswer.value;
-    const value = fetch("/api/polar/transcribe", { headers: { Accept: "application/json" } })
+    const answer: NonNullable<typeof privateAnswer> = {
+        at: Date.now(),
+        value: Promise.resolve(false)
+    };
+    answer.value = fetch("/api/polar/transcribe", { headers: { Accept: "application/json" } })
         .then((response) => (response.ok ? response.json() : null))
         .then((data: unknown) => (data as { available?: unknown } | null)?.available === true)
-        .catch(() => false);
-    privateAnswer = { at: Date.now(), value };
-    return value;
+        .catch(() => false)
+        .then((available) => {
+            answer.known = available;
+            return available;
+        });
+    privateAnswer = answer;
+    return answer.value;
+}
+
+/** The answer already in hand, so a render need not wait a tick for it. */
+function knownPrivateDictation(): boolean | undefined {
+    if (!privateAnswer || Date.now() - privateAnswer.at >= PRIVATE_TTL_MS) return undefined;
+    return privateAnswer.known;
 }
 
 /** Private dictation's availability, asked only while `wanted`. */
@@ -477,5 +492,5 @@ export function usePrivateDictation(wanted: boolean): boolean {
             live = false;
         };
     }, [wanted]);
-    return available;
+    return wanted ? (knownPrivateDictation() ?? available) : available;
 }

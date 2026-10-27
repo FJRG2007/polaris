@@ -6,7 +6,7 @@
 
 import * as core from "@polaris/core";
 import { webCatalogs } from "../../messages";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as logic from "@/app/(app)/chat/dictation-logic";
 
 describe("tap and hold", () => {
@@ -85,10 +85,33 @@ describe("dictation problems", () => {
     });
 
     it("gives up on the browser's recognizer only where it will fail again", () => {
-        expect(logic.browserUnusable("network")).toBe(true);
-        expect(logic.browserUnusable("service-not-allowed")).toBe(true);
-        expect(logic.browserUnusable("not-allowed")).toBe(false);
-        expect(logic.browserUnusable("no-speech")).toBe(false);
+        expect(logic.browserUnusable("network", true)).toBe(true);
+        expect(logic.browserUnusable("service-not-allowed", true)).toBe(true);
+        expect(logic.browserUnusable("not-allowed", true)).toBe(false);
+        expect(logic.browserUnusable("no-speech", true)).toBe(false);
+    });
+
+    it("keeps a network error while offline an error, not a switch", () => {
+        expect(logic.browserUnusable("network", false)).toBe(false);
+        expect(logic.browserUnusable("service-not-allowed", false)).toBe(true);
+    });
+
+    it("passes over a failed recognizer for a day, not for good", () => {
+        const stored = new Map<string, string>();
+        vi.stubGlobal("window", {
+            localStorage: {
+                getItem: (key: string) => stored.get(key) ?? null,
+                setItem: (key: string, value: string) => void stored.set(key, value)
+            }
+        });
+        const at = 1_800_000_000_000;
+        expect(logic.browserSpeechUnusable(at)).toBe(false);
+        logic.markBrowserSpeechUnusable(at);
+        expect(logic.browserSpeechUnusable(at + logic.BROWSER_UNUSABLE_MS - 1)).toBe(true);
+        expect(logic.browserSpeechUnusable(at + logic.BROWSER_UNUSABLE_MS)).toBe(false);
+        stored.set("polaris.chat.dictation-browser-unusable", "1");
+        expect(logic.browserSpeechUnusable(at)).toBe(false);
+        vi.unstubAllGlobals();
     });
 
     it("maps Polaris's transcription codes", () => {

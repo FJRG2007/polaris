@@ -1455,17 +1455,13 @@ export function Composer({
                                     <MicSlot
                                         disabled={disabled}
                                         engine={engine}
-                                        voiceAllowed={false}
                                         dictating={dictation.active}
                                         level={dictation.level}
-                                        handheld={false}
+                                        handheld={handheld}
                                         shortcut={dictationKey}
                                         menuOpen={micMenu}
                                         onMenuOpenChange={setMicMenu}
                                         onDictate={toggleDictation}
-                                        onVoiceStart={voice.start}
-                                        onVoiceStop={voice.stop}
-                                        onVoiceCancel={voice.cancel}
                                         privateChoice={
                                             privateSwitch
                                                 ? {

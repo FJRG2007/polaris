@@ -217,6 +217,37 @@ describe("dictation and Send", () => {
         expect(screen.getByRole("status").textContent).toContain("Listening");
         expect(screen.queryByRole("alert")).toBeNull();
     });
+
+    it("keeps the stop button through a switch to Polaris mid-session", async () => {
+        withRecorder();
+        withRecognizer();
+        privateAvailable(true);
+        const now = Date.now.bind(Date);
+        vi.spyOn(Date, "now").mockImplementation(() => now() + 7_200_000);
+        chatBox();
+        fireEvent.click(await screen.findByRole("button", { name: "Dictate (Alt+M)" }), {
+            detail: 0
+        });
+        const stops = () =>
+            screen
+                .queryAllByRole("button", { name: "Stop dictating" })
+                .filter((button) => button.getAttribute("aria-pressed") === "true").length;
+        const seen: number[] = [];
+        const watch = new MutationObserver(() => seen.push(stops()));
+        watch.observe(document.body, { childList: true, subtree: true });
+        act(() => FakeRecognizer.last!.onerror?.({ error: "service-not-allowed" }));
+        await waitFor(() =>
+            expect(
+                window.localStorage.getItem("polaris.chat.dictation-browser-unusable")
+            ).not.toBeNull()
+        );
+        await act(async () => undefined);
+        watch.disconnect();
+        expect(stops()).toBe(1);
+        expect(seen.every((count) => count === 1)).toBe(true);
+        expect(screen.getByRole("status").textContent).toContain("Listening");
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
 });
 
 describe("dictation", () => {
@@ -365,6 +396,43 @@ describe("tap and hold on the mic", () => {
         fireEvent.pointerUp(mic, { button: 0 });
         expect(calls.onVoiceStop).not.toHaveBeenCalled();
         expect(calls.onVoiceCancel).not.toHaveBeenCalled();
+    });
+
+    it("opens its settings as a sheet on a phone, from the chevron", () => {
+        vi.useRealTimers();
+        let open = false;
+        const { rerender } = render(
+            <MicSlot
+                disabled={false}
+                engine="browser"
+                dictating={false}
+                level={0}
+                handheld
+                shortcut=""
+                menuOpen={open}
+                onMenuOpenChange={(next) => (open = next)}
+                onDictate={() => undefined}
+                privateChoice={null}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Dictation settings" }));
+        expect(open).toBe(true);
+        rerender(
+            <MicSlot
+                disabled={false}
+                engine="browser"
+                dictating={false}
+                level={0}
+                handheld
+                shortcut=""
+                menuOpen
+                onMenuOpenChange={(next) => (open = next)}
+                onDictate={() => undefined}
+                privateChoice={null}
+            />
+        );
+        expect(screen.getByRole("dialog")).toBeDefined();
     });
 
     it("shows the one-time hint until it is acknowledged", () => {

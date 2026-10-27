@@ -12,7 +12,7 @@
  *
  * Everything about the microphone - which one, how much noise is removed, how
  * loud, and which engine dictates - is in its menu: the chevron or a right-click
- * on a computer, a sheet on a phone.
+ * on a computer, the chevron opening a sheet on a phone.
  */
 
 import { MicSettings } from "./mic-settings";
@@ -44,7 +44,7 @@ import {
 export function MicSlot({
     disabled,
     engine,
-    voiceAllowed,
+    voiceAllowed = false,
     dictating,
     level,
     handheld,
@@ -60,7 +60,7 @@ export function MicSlot({
     disabled: boolean;
     engine: DictationEngine | null;
     /** A voice message may be sent here. */
-    voiceAllowed: boolean;
+    voiceAllowed?: boolean;
     dictating: boolean;
     /** 0 to 100, drawn as the red ring while dictating. */
     level: number;
@@ -72,9 +72,9 @@ export function MicSlot({
     onMenuOpenChange: (open: boolean) => void;
     /** Start or stop dictation. */
     onDictate: () => void;
-    onVoiceStart: () => void;
-    onVoiceStop: () => void;
-    onVoiceCancel: () => void;
+    onVoiceStart?: () => void;
+    onVoiceStop?: () => void;
+    onVoiceCancel?: () => void;
     /** The "Private dictation" switch, where both engines exist. */
     privateChoice: { on: boolean; onChange: (on: boolean) => void } | null;
 }) {
@@ -113,7 +113,7 @@ export function MicSlot({
         if (dictating) return onDictate();
         const action = tapAction({ engine, voiceAllowed });
         if (action === "dictate") onDictate();
-        else if (action === "voice") onVoiceStart();
+        else if (action === "voice") onVoiceStart?.();
     };
 
     const finishHold = (outcome: "send" | "cancel") => {
@@ -125,8 +125,8 @@ export function MicSlot({
         if (!current.voiceAt) return;
         // A slip of the finger is not a message.
         if (outcome === "cancel" || Date.now() - current.voiceAt < SHORTEST_VOICE_MS)
-            onVoiceCancel();
-        else onVoiceStop();
+            onVoiceCancel?.();
+        else onVoiceStop?.();
     };
 
     const label = dictating
@@ -165,7 +165,7 @@ export function MicSlot({
                     if (action !== "voice") return;
                     setHolding(true);
                     current.voiceAt = Date.now();
-                    onVoiceStart();
+                    onVoiceStart?.();
                 }, HOLD_MS);
             }}
             onPointerMove={(event) => {
@@ -212,11 +212,10 @@ export function MicSlot({
                 if (!handheld) onMenuOpenChange(true);
             }}
             className={cn(
-                "relative touch-none select-none rounded p-1.5 transition-colors [-webkit-touch-callout:none] disabled:opacity-50",
+                "relative touch-none select-none rounded rounded-r-none p-1.5 pr-1 transition-colors [-webkit-touch-callout:none] disabled:opacity-50",
                 dictating
                     ? "bg-danger-soft text-danger"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                !handheld && "rounded-r-none pr-1"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
         >
             {dictating ? (
@@ -239,13 +238,16 @@ export function MicSlot({
         </button>
     );
 
+    const chevron =
+        "rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50";
+
     const body = (
         <MicMenuBody
             voiceAllowed={voiceAllowed}
             privateChoice={privateChoice}
             onVoice={() => {
                 onMenuOpenChange(false);
-                onVoiceStart();
+                onVoiceStart?.();
             }}
             item={!handheld}
         />
@@ -280,15 +282,27 @@ export function MicSlot({
             )}
             {button}
             {handheld ? (
-                <Dialog open={menuOpen} onOpenChange={onMenuOpenChange}>
-                    <DialogContent
-                        aria-describedby={undefined}
-                        className="bottom-0 left-0 top-auto w-full max-w-full translate-x-0 translate-y-0 rounded-b-none pb-[max(1rem,env(safe-area-inset-bottom))] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
+                <>
+                    <button
+                        type="button"
+                        disabled={disabled}
+                        aria-label={t("dictation.settings")}
+                        title={t("dictation.settings")}
+                        onClick={() => onMenuOpenChange(true)}
+                        className={chevron}
                     >
-                        <DialogTitle className="pb-2">{t("dictation.settings")}</DialogTitle>
-                        {body}
-                    </DialogContent>
-                </Dialog>
+                        <ChevronDown className="size-3" />
+                    </button>
+                    <Dialog open={menuOpen} onOpenChange={onMenuOpenChange}>
+                        <DialogContent
+                            aria-describedby={undefined}
+                            className="bottom-0 left-0 top-auto w-full max-w-full translate-x-0 translate-y-0 rounded-b-none pb-[max(1rem,env(safe-area-inset-bottom))] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
+                        >
+                            <DialogTitle className="pb-2">{t("dictation.settings")}</DialogTitle>
+                            {body}
+                        </DialogContent>
+                    </Dialog>
+                </>
             ) : (
                 <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
                     <DropdownMenuTrigger asChild>
@@ -297,7 +311,7 @@ export function MicSlot({
                             disabled={disabled}
                             aria-label={t("dictation.settings")}
                             title={t("dictation.settings")}
-                            className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            className={chevron}
                         >
                             <ChevronDown className="size-3" />
                         </button>
