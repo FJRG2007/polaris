@@ -308,7 +308,9 @@ function AccountRow({
     return (
         <li className="rounded-md border border-border bg-card px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-3">
-                <div className="min-w-0 flex-1">
+                {/* A basis, so the switches wrap onto their own line before the
+                    address and its state are squeezed to a few letters. */}
+                <div className="min-w-0 flex-1 basis-64">
                     <p className="flex items-center gap-2 text-[13px] font-medium">
                         {account.color ? (
                             <span
