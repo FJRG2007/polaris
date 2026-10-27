@@ -5,9 +5,11 @@
  * so the choice can be asserted without a host.
  */
 
-/** Container plumbing on the host: not internal, and not an address any other
- *  machine on the network can reach - so never the one to advertise. */
-const VIRTUAL = /^(docker|br-|veth|virbr|cni|flannel|kube|tailscale|zt)/;
+/** Container and VM plumbing and VPN tunnels on the host: not internal, and not
+ *  an address the other machines on this network reach the server by - so never
+ *  the one to advertise. The call server's start script skips the same names. */
+const VIRTUAL =
+    /^(docker|br-|veth|virbr|cni|flannel|kube|tailscale|zt|wg|tun|tap|podman|lxcbr|lxdbr|vboxnet|vmnet)/;
 
 /** Wireless interface names, across the naming schemes in use: wlan0, wlp2s0,
  *  wlx.., and the older ath0 / ra0 of embedded drivers. */
@@ -51,6 +53,8 @@ export function lanAddresses(interfaces, routeTable) {
         for (const addr of addrs ?? []) {
             if (addr.family !== "IPv4" && addr.family !== 4) continue;
             if (addr.internal) continue;
+            // Self-assigned when no lease came: nobody else on the network has it.
+            if (String(addr.address).startsWith("169.254.")) continue;
             found.push({ name, address: addr.address });
         }
     }

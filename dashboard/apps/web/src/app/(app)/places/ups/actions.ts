@@ -16,6 +16,7 @@ import { spendGrant, type LiveGrant } from "@/lib/access/grants";
 import * as core from "@polaris/core";
 import { upsNearby, upsStanding } from "@/lib/ups/ups-access";
 import { recordAudit } from "@/lib/audit-service";
+import { getHostLanIp } from "@/lib/host-address";
 import { hostSubject } from "@/lib/metrics-shared";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import * as upsData from "@/lib/ups/ups-data";
@@ -317,7 +318,17 @@ export async function setUpsVarAction(
 /** The login another machine's upsmon types, for a UPS offered to the network. */
 export async function upsNetworkLoginAction(
     id: string
-): Promise<UpsActionResult<{ user: string; password: string; port: number; upsName: string }>> {
+): Promise<
+    UpsActionResult<{
+        user: string;
+        password: string;
+        port: number;
+        upsName: string;
+        /** The address the other machine dials: the one this server prefers on
+         *  the LAN, or null when it is not known and the line names a placeholder. */
+        address: string | null;
+    }>
+> {
     const user = await requirePermission("system.manage");
     try {
         const upsId = idSchema.parse(id);
@@ -333,7 +344,8 @@ export async function upsNetworkLoginAction(
             targetType: "ups",
             targetId: upsId
         });
-        return { ok: true, value: { ...upsService.netserverLogin(), upsName } };
+        const address = await getHostLanIp().catch(() => null);
+        return { ok: true, value: { ...upsService.netserverLogin(), upsName, address } };
     } catch (error) {
         return refused(error);
     }

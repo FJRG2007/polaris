@@ -67,4 +67,35 @@ describe("the LAN addresses", () => {
     it("is empty on a machine with no network", () => {
         expect(lanAddresses({ lo: interfaces.lo }, "")).toEqual([]);
     });
+
+    it("advertises the cable on a machine with cable and WiFi on one network", () => {
+        const table = routes(
+            "wlp2s0\t00000000\t0101A8C0\t0003\t0\t0\t600\t00000000\t0\t0\t0",
+            "br0\t00000000\t0101A8C0\t0003\t0\t0\t100\t00000000\t0\t0\t0"
+        );
+        const both = {
+            wlp2s0: [v4("192.168.1.149")],
+            br0: [v4("192.168.1.142")],
+            virbr0: [v4("192.168.122.1")]
+        };
+        expect(lanAddresses(both, table)).toEqual(["192.168.1.142", "192.168.1.149"]);
+    });
+
+    it("never advertises a VPN tunnel, even one that carries the default route", () => {
+        const table = routes(
+            "wg0\t00000000\t00000000\t0001\t0\t0\t50\t00000000\t0\t0\t0",
+            "br0\t00000000\t0101A8C0\t0003\t0\t0\t100\t00000000\t0\t0\t0"
+        );
+        const tunnelled = {
+            wg0: [v4("10.8.0.2")],
+            tun0: [v4("10.9.0.2")],
+            br0: [v4("192.168.1.142")]
+        };
+        expect(lanAddresses(tunnelled, table)).toEqual(["192.168.1.142"]);
+    });
+
+    it("never advertises a self-assigned address", () => {
+        const unleased = { eth1: [v4("169.254.10.4")], br0: [v4("192.168.1.142")] };
+        expect(lanAddresses(unleased, "")).toEqual(["192.168.1.142"]);
+    });
 });

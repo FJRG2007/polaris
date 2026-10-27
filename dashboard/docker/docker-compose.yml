@@ -292,7 +292,7 @@ services:
           route=$$(ip "$$1" route get "$$2" 2>/dev/null)
           dev=$$(printf '%s\n' "$$route" | sed -n 's/.* dev \([^ ]*\).*/\1/p')
           case "$$dev" in
-            ""|docker*|br-*|veth*|virbr*|cni*|flannel*|kube*|tailscale*|zt*|wg*|tun*) return ;;
+            ""|docker*|br-*|veth*|virbr*|cni*|flannel*|kube*|tailscale*|zt*|wg*|tun*|tap*|podman*|lxcbr*|lxdbr*|vboxnet*|vmnet*) return ;;
           esac
           printf '%s\n' "$$route" | sed -n 's/.* src \([0-9a-fA-F][0-9a-fA-F.:]*\).*/\1/p'
         }

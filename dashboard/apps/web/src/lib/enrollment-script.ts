@@ -952,10 +952,20 @@ if [ "\$PLATFORM" = "darwin" ]; then
 else
     ADDR_LIST=\$(ip -4 -o addr show scope global 2>/dev/null | awk '{ print \$4 }' | cut -d/ -f1)
     [ -n "\$ADDR_LIST" ] || ADDR_LIST=\$(hostname -I 2>/dev/null | tr ' ' '\\n')
+    # The default route's source first: a machine on cable and WiFi in the same
+    # network holds two addresses there, and the one it reaches the router by is
+    # the one to keep.
+    ROUTE_SRC=\$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \\([0-9.]*\\).*/\\1/p')
+    [ -z "\$ROUTE_SRC" ] || ADDR_LIST="\$ROUTE_SRC \$ADDR_LIST"
 fi
 ADDRESSES=""
+ADDR_COUNT=0
 for addr in \$ADDR_LIST; do
     [ -n "\$addr" ] || continue
+    # Once each, and no more than Polaris accepts in one claim.
+    case ",\$ADDRESSES," in *",\\"\$addr\\","*) continue ;; esac
+    [ "\$ADDR_COUNT" -lt 16 ] || break
+    ADDR_COUNT=\$((ADDR_COUNT + 1))
     if [ -z "\$ADDRESSES" ]; then ADDRESSES="\\"\$addr\\""; else ADDRESSES="\$ADDRESSES,\\"\$addr\\""; fi
 done`;
 }

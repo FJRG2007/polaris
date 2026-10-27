@@ -46,6 +46,7 @@ export function UpsSettingsPanel({
         password: string;
         port: number;
         upsName: string;
+        address: string | null;
     } | null>(null);
     const [what, setWhat] = useState<upsSettings.ExportKind>("samples");
     const [days, setDays] = useState<(typeof EXPORT_DAYS)[number]>("30");
@@ -300,10 +301,10 @@ export function UpsSettingsPanel({
                             <p>{t("ups.settings.networkHow")}</p>
                             <div className="flex min-w-0 items-center gap-2">
                                 <code className="min-w-0 flex-1 truncate text-xs">
-                                    {`MONITOR ${login.upsName}@<${t("ups.settings.thisMachine")}>:${login.port} 1 ${login.user} ${login.password} secondary`}
+                                    {`MONITOR ${login.upsName}@${login.address ?? `<${t("ups.settings.thisMachine")}>`}:${login.port} 1 ${login.user} ${login.password} secondary`}
                                 </code>
                                 <CopyButton
-                                    value={`MONITOR ${login.upsName}@<${t("ups.settings.thisMachine")}>:${login.port} 1 ${login.user} ${login.password} secondary`}
+                                    value={`MONITOR ${login.upsName}@${login.address ?? `<${t("ups.settings.thisMachine")}>`}:${login.port} 1 ${login.user} ${login.password} secondary`}
                                     label={t("ups.settings.copyLine")}
                                 />
                             </div>
