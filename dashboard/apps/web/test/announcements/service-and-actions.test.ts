@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({
     },
     announcementDismissal: { findMany: vi.fn(), upsert: vi.fn() },
     notification: { deleteMany: vi.fn() },
-    user: { count: vi.fn(), findMany: vi.fn() }
+    user: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() }
 }));
 const notify = vi.hoisted(() => vi.fn(async () => ({ inapp: "sent" })));
 const requireAdmin = vi.hoisted(() => vi.fn());
@@ -37,6 +37,8 @@ import * as actions from "@/app/(app)/admin/announcements/actions";
 
 const now = new Date("2026-11-02T09:00:00Z");
 const ID = "0190f3c6-0000-7000-8000-000000000001";
+const MY_GROUP = "0190f3c6-0000-7000-8000-0000000000a1";
+const OTHER_GROUP = "0190f3c6-0000-7000-8000-0000000000a2";
 
 function row(overrides: Record<string, unknown> = {}) {
     return {
@@ -60,6 +62,8 @@ function row(overrides: Record<string, unknown> = {}) {
         leadMinutes: null,
         notifySteps: false,
         noticedPhase: null,
+        sendCursor: null,
+        sendLease: null,
         reach: 1,
         createdById: null,
         createdAt: now,
@@ -73,6 +77,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     db.announcementDismissal.findMany.mockResolvedValue([]);
     db.user.count.mockResolvedValue(1);
+    db.user.findFirst.mockResolvedValue({ roles: [], groups: [], orgMemberships: [] });
 });
 
 describe("banner visibility", () => {
@@ -92,8 +97,21 @@ describe("banner visibility", () => {
             row({ id: "c", audience: JSON.stringify({ everyone: false, roleIds: [], groupIds: ["g"], orgIds: [], userIds: [] }) })
         ]);
         db.announcementDismissal.findMany.mockResolvedValue([{ announcementId: ID, phase: "live" }]);
-        db.user.count.mockResolvedValue(0);
         expect(await service.bannersFor("u1", reader, now)).toEqual([]);
+    });
+
+    it("matches every targeted banner against one read of the reader's memberships", async () => {
+        const groupOnly = (id: string, groupId: string) =>
+            row({ id, title: id, audience: JSON.stringify({ everyone: false, roleIds: [], groupIds: [groupId], orgIds: [], userIds: [] }) });
+        db.announcement.findMany.mockResolvedValue([
+            ...Array.from({ length: 30 }, (_, at) => groupOnly(`other-${at}`, OTHER_GROUP)),
+            groupOnly("mine", MY_GROUP)
+        ]);
+        db.user.findFirst.mockResolvedValue({ roles: [], groups: [{ groupId: MY_GROUP }], orgMemberships: [] });
+        const banners = await service.bannersFor("u1", reader, now);
+        expect(banners.map((one) => one.id)).toEqual(["mine"]);
+        expect(db.user.findFirst).toHaveBeenCalledTimes(1);
+        expect(db.user.count).not.toHaveBeenCalled();
     });
 
     it("counts down to maintenance ahead", async () => {
@@ -126,8 +144,14 @@ describe("the clock", () => {
         expect(await service.runAnnouncementClock(now)).toEqual({ sent: 1 });
         expect(db.announcement.updateMany).toHaveBeenCalledWith({
             where: { id: ID, noticedPhase: null, retractedAt: null },
-            data: { noticedPhase: "live" }
+            data: { noticedPhase: "live", sendCursor: null, sendLease: expect.any(Date) }
         });
+        expect(db.announcement.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { sendCursor: "u2", sendLease: expect.any(Date) } })
+        );
+        expect(db.announcement.updateMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({ data: { sendCursor: null, sendLease: null } })
+        );
         expect(notify).toHaveBeenCalledTimes(2);
         expect(notify).toHaveBeenCalledWith(
             expect.objectContaining({ event: "instance.announcement.critical", condition: `announcement:${ID}` })
@@ -139,6 +163,51 @@ describe("the clock", () => {
         db.announcement.updateMany.mockResolvedValue({ count: 0 });
         expect(await service.runAnnouncementClock(now)).toEqual({ sent: 0 });
         expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("only reads rows that may still owe a notice, and pages through all of them", async () => {
+        const page = Array.from({ length: 50 }, (_, at) => row({ id: `r${at}`, noticedPhase: "live" }));
+        db.announcement.findMany.mockResolvedValueOnce(page).mockResolvedValueOnce([]);
+        await service.runAnnouncementClock(now);
+        const first = db.announcement.findMany.mock.calls[0]![0];
+        expect(first.where.AND[1]).toEqual({
+            OR: [{ noticedPhase: null }, { notifySteps: true }, { sendLease: { lte: new Date(now.getTime() - 5 * 60_000) } }]
+        });
+        expect(db.announcement.findMany.mock.calls[1]![0]).toMatchObject({ cursor: { id: "r49" }, skip: 1 });
+    });
+
+    it("resumes a send that died partway after the last reader it reached", async () => {
+        const lease = new Date(now.getTime() - 10 * 60_000);
+        db.announcement.findMany.mockResolvedValue([row({ noticedPhase: "live", sendLease: lease, sendCursor: "u1" })]);
+        db.announcement.updateMany.mockResolvedValue({ count: 1 });
+        db.user.findMany.mockResolvedValueOnce([{ id: "u2" }]);
+        await service.runAnnouncementClock(now);
+        expect(db.announcement.updateMany).toHaveBeenCalledWith({
+            where: { id: ID, noticedPhase: "live", sendLease: lease, retractedAt: null },
+            data: { sendLease: expect.any(Date) }
+        });
+        expect(db.user.findMany.mock.calls[0]![0].where).toEqual({
+            AND: [expect.anything(), { id: { gt: "u1" } }]
+        });
+        expect(notify).toHaveBeenCalledTimes(1);
+        expect(notify).toHaveBeenCalledWith(expect.objectContaining({ userId: "u2" }));
+    });
+
+    it("leaves a send that is still making progress to its runner", async () => {
+        db.announcement.findMany.mockResolvedValue([row({ noticedPhase: "live", sendLease: new Date(now.getTime() - 60_000) })]);
+        await service.runAnnouncementClock(now);
+        expect(db.announcement.updateMany).not.toHaveBeenCalled();
+        expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a retraction during a send stops it and takes back what went out after", async () => {
+        db.announcement.findMany.mockResolvedValue([row()]);
+        db.announcement.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+        db.announcement.findUnique.mockResolvedValue({ retractedAt: now });
+        db.user.findMany.mockResolvedValueOnce(Array.from({ length: 200 }, (_, at) => ({ id: `u${String(at).padStart(3, "0")}` })));
+        await service.runAnnouncementClock(now);
+        expect(db.user.findMany).toHaveBeenCalledTimes(1);
+        expect(db.notification.deleteMany).toHaveBeenCalledWith({ where: { conditionKey: `announcement:${ID}` } });
     });
 
     it("retracting takes the notices off every bell", async () => {

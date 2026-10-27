@@ -505,6 +505,14 @@
             "label": "Update installed on its own",
             "description": "A scheduled or automatic update ran, and how it went."
         },
+        "instanceAnnouncement": {
+            "label": "Announcement from your administrator",
+            "description": "A message an administrator of this instance sent to you or a group you are in."
+        },
+        "instanceAnnouncementCritical": {
+            "label": "Critical announcement",
+            "description": "An urgent message from an administrator, such as an outage. Always reaches the bell."
+        },
         "polarChatReady": {
             "label": "Polar finished while you were away",
             "description": "A Polar answer finished, stopped or needs you while you were elsewhere."

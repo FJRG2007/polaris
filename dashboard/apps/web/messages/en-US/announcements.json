@@ -154,7 +154,8 @@
             "ended": "Ended",
             "cancelled": "Cancelled",
             "sent": "Sent",
-            "saved": "Saved"
+            "saved": "Saved",
+            "older": "Show more"
         },
         "phase": {
             "scheduled": "Scheduled",

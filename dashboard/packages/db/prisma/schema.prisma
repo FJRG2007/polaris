@@ -15988,6 +15988,10 @@ model Announcement {
     notifySteps  Boolean   @default(false)
     // The last phase a notice went out for; the clock compares against it.
     noticedPhase String?
+    // A send under way: the last reader it reached and when it last made
+    // progress. The clock resumes one whose lease went stale.
+    sendCursor   String?   @db.Uuid
+    sendLease    DateTime?
     reach        Int       @default(0)
     createdById  String?   @db.Uuid
     createdAt    DateTime  @default(now())

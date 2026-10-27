@@ -35,6 +35,7 @@ import { AnnouncementMarkdown } from "@/components/announcements/announcement-ma
 import {
     composeSchema,
     DEFAULT_LEAD_MINUTES,
+    HISTORY_PAGE,
     NOBODY,
     normalizeCompose,
     SEVERITIES,
@@ -162,11 +163,43 @@ export function AnnouncementsView({
     const [retracting, setRetracting] = useState<HistoryRow | null>(null);
 
     const loadHistory = useCallback(() => historyAction(), []);
-    const { data: history, refresh } = useLiveRead<HistoryRow[]>({
+    const { data: latest, refresh: refreshLatest } = useLiveRead<HistoryRow[]>({
         load: loadHistory,
         cacheKey: "admin-announcements",
         intervalMs: 60_000
     });
+    // Older pages, read on request after the newest one the live read keeps fresh.
+    const [older, setOlder] = useState<readonly HistoryRow[]>([]);
+    const [olderDone, setOlderDone] = useState(false);
+    const [loadingOlder, setLoadingOlder] = useState(false);
+    const history = useMemo(() => {
+        if (latest == null) return null;
+        const seen = new Set(latest.map((row) => row.id));
+        return [...latest, ...older.filter((row) => !seen.has(row.id))];
+    }, [latest, older]);
+    const hasOlder = latest != null && (older.length === 0 ? latest.length >= HISTORY_PAGE : !olderDone);
+
+    const showOlder = () => {
+        const last = history?.[history.length - 1];
+        if (!last) return;
+        setLoadingOlder(true);
+        void historyAction({ after: last.id, take: HISTORY_PAGE })
+            .then((rows) => {
+                setOlder((current) => [...current, ...rows]);
+                setOlderDone(rows.length < HISTORY_PAGE);
+            })
+            .catch(() => toast.show({ title: t("admin.errors.failed") }))
+            .finally(() => setLoadingOlder(false));
+    };
+
+    // Re-read what is listed, the older pages included, after something changed.
+    const refresh = () => {
+        refreshLatest();
+        if (older.length === 0 || !history) return;
+        void historyAction({ take: Math.min(history.length + 1, 1000) })
+            .then((rows) => setOlder(rows))
+            .catch(() => null);
+    };
 
     const input = useMemo<ComposeInput>(
         () =>
@@ -609,6 +642,11 @@ export function AnnouncementsView({
                         })}
                     </ul>
                 )}
+                {hasOlder ? (
+                    <Button variant="ghost" className="self-center" onClick={showOlder} disabled={loadingOlder}>
+                        {t("admin.history.older")}
+                    </Button>
+                ) : null}
             </section>
             <ConfirmDeleteDialog
                 open={retracting !== null}

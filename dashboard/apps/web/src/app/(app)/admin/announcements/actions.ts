@@ -21,6 +21,7 @@ import {
     announcementIdSchema,
     audienceSchema,
     composeSchema,
+    HISTORY_PAGE,
     normalizeCompose,
     type ComposeInput
 } from "@/lib/announcements/schema";
@@ -49,9 +50,17 @@ export async function findRecipientsAction(query: string): Promise<{ results: { 
     return { results: await findAccountsAsAdmin(term.data, 20) };
 }
 
-export async function historyAction(): Promise<announcements.HistoryRow[]> {
+const historyPageSchema = z.object({
+    after: announcementIdSchema.nullable().default(null),
+    take: z.number().int().min(1).max(1000).default(HISTORY_PAGE)
+});
+
+/** The newest page, or `take` rows after the row `after` for the ones older than it. */
+export async function historyAction(page: unknown = {}): Promise<announcements.HistoryRow[]> {
     await requireAdmin();
-    return announcements.listHistory();
+    const parsed = historyPageSchema.safeParse(page);
+    if (!parsed.success) return [];
+    return announcements.listHistory(parsed.data);
 }
 
 /** Parse and normalize, naming the field and the reason the form shows. */

@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS "Announcement" (
     "leadMinutes" INTEGER,
     "notifySteps" BOOLEAN NOT NULL DEFAULT false,
     "noticedPhase" TEXT,
+    "sendCursor" UUID,
+    "sendLease" TIMESTAMP(3),
     "reach" INTEGER NOT NULL DEFAULT 0,
     "createdById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -32,6 +34,9 @@ CREATE TABLE IF NOT EXISTS "Announcement" (
     "retractedAt" TIMESTAMP(3),
     CONSTRAINT "Announcement_pkey" PRIMARY KEY ("id")
 );
+
+ALTER TABLE "Announcement" ADD COLUMN IF NOT EXISTS "sendCursor" UUID;
+ALTER TABLE "Announcement" ADD COLUMN IF NOT EXISTS "sendLease" TIMESTAMP(3);
 
 CREATE INDEX IF NOT EXISTS "Announcement_showBanner_retractedAt_startsAt_endsAt_idx" ON "Announcement"("showBanner", "retractedAt", "startsAt", "endsAt");
 CREATE INDEX IF NOT EXISTS "Announcement_retractedAt_startsAt_idx" ON "Announcement"("retractedAt", "startsAt");

@@ -19,7 +19,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { renderFor, type Reader, type RenderInput } from "./templates";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
-import { audiencePages, countAudience, inAudience } from "./audience";
+import { audiencePages, countAudience, matchesAudience, membershipOf } from "./audience";
 import {
     bannerDismissible,
     bannerHidden,
@@ -33,6 +33,7 @@ import {
 import {
     audienceSchema,
     DEFAULT_LEAD_MINUTES,
+    HISTORY_PAGE,
     NOBODY,
     type AudienceSpec,
     type ComposeInput
@@ -41,9 +42,12 @@ import {
 export const NOTICE_EVENT = "instance.announcement";
 export const CRITICAL_EVENT = "instance.announcement.critical";
 const BANNER_LIMIT = 5;
-const HISTORY_LIMIT = 50;
+const BANNER_SCAN = 200;
+const HISTORY_MAX = 1000;
 const CLOCK_BATCH = 50;
 const SEND_CONCURRENCY = 20;
+/** A send that has not finished a page in this long has died, and the clock resumes it. */
+const SEND_STALE_MS = 5 * 60_000;
 
 export function conditionKeyFor(id: string): string {
     return `announcement:${id}`;
@@ -176,10 +180,24 @@ async function deliverTo(row: AnnouncementRow, phase: Phase, userId: string): Pr
     });
 }
 
-/** Tell every reader in the audience about this phase. Returns how many. */
-export async function deliver(row: AnnouncementRow, phase: Phase): Promise<number> {
+/** A notice that went out after its announcement was retracted comes back off the bells. */
+async function takeBackIfRetracted(id: string): Promise<void> {
+    const row = await prisma.announcement.findUnique({ where: { id }, select: { retractedAt: true } });
+    if (row?.retractedAt) await prisma.notification.deleteMany({ where: { conditionKey: conditionKeyFor(id) } });
+}
+
+/**
+ * Tell every reader in the audience about this phase, after `from` when it
+ * resumes. Returns how many it reached.
+ *
+ * The send holds a lease on the row and moves a cursor with it after each page,
+ * so one that dies partway is picked up by the clock where it stopped. It stops
+ * as soon as it loses the lease - retracted, edited, or taken over by a resume.
+ */
+export async function deliver(row: AnnouncementRow, phase: Phase, lease: Date, from: string | null = null): Promise<number> {
     let reached = 0;
-    for await (const page of audiencePages(readAudience(row.audience))) {
+    let held = lease;
+    for await (const page of audiencePages(readAudience(row.audience), from)) {
         for (let at = 0; at < page.length; at += SEND_CONCURRENCY) {
             const slice = page.slice(at, at + SEND_CONCURRENCY);
             await Promise.all(
@@ -191,7 +209,22 @@ export async function deliver(row: AnnouncementRow, phase: Phase): Promise<numbe
             );
             reached += slice.length;
         }
+        const next = new Date();
+        const kept = await prisma.announcement.updateMany({
+            where: { id: row.id, noticedPhase: phase, sendLease: held, retractedAt: null },
+            data: { sendCursor: page[page.length - 1], sendLease: next }
+        });
+        if (kept.count !== 1) {
+            await takeBackIfRetracted(row.id);
+            return reached;
+        }
+        held = next;
     }
+    const done = await prisma.announcement.updateMany({
+        where: { id: row.id, noticedPhase: phase, sendLease: held, retractedAt: null },
+        data: { sendCursor: null, sendLease: null }
+    });
+    if (done.count !== 1) await takeBackIfRetracted(row.id);
     return reached;
 }
 
@@ -210,32 +243,61 @@ export async function advance(row: AnnouncementRow, now: Date): Promise<Phase | 
         notifySteps: row.notifySteps
     });
     if (!due) return null;
+    const lease = new Date();
     const claimed = await prisma.announcement.updateMany({
         where: { id: row.id, noticedPhase: row.noticedPhase, retractedAt: null },
-        data: { noticedPhase: due }
+        data: { noticedPhase: due, sendCursor: null, sendLease: lease }
     });
     if (claimed.count !== 1) return null;
-    await deliver(row, due);
+    await deliver(row, due, lease);
     return due;
 }
 
-/** The scheduled job: every row that may owe a notice now. */
-export async function runAnnouncementClock(now: Date = new Date()): Promise<{ sent: number }> {
-    const rows = await prisma.announcement.findMany({
-        where: {
-            retractedAt: null,
-            sendNotice: true,
-            startsAt: { lte: now },
-            OR: [{ endsAt: null }, { endsAt: { gt: now } }]
-        },
-        orderBy: { startsAt: "asc" },
-        take: CLOCK_BATCH
+/** Pick up a send that died partway, after the last reader it reached. */
+export async function resume(row: AnnouncementRow, now: Date): Promise<boolean> {
+    if (!row.sendLease || !row.noticedPhase) return false;
+    if (now.getTime() - row.sendLease.getTime() < SEND_STALE_MS) return false;
+    const lease = new Date();
+    const claimed = await prisma.announcement.updateMany({
+        where: { id: row.id, noticedPhase: row.noticedPhase, sendLease: row.sendLease, retractedAt: null },
+        data: { sendLease: lease }
     });
+    if (claimed.count !== 1) return false;
+    await deliver(row, row.noticedPhase as Phase, lease, row.sendCursor);
+    return true;
+}
+
+/**
+ * The scheduled job: every row that may still owe a notice - never announced,
+ * maintenance with steps still to tell, or a send that stopped partway. One
+ * already told is left out, so open-ended ones never crowd out the rest.
+ */
+export async function runAnnouncementClock(now: Date = new Date()): Promise<{ sent: number }> {
+    const stale = new Date(now.getTime() - SEND_STALE_MS);
     let sent = 0;
-    for (const row of rows) {
-        if (await advance(row, now).catch(() => null)) sent += 1;
+    let after: string | null = null;
+    for (;;) {
+        const rows: AnnouncementRow[] = await prisma.announcement.findMany({
+            where: {
+                retractedAt: null,
+                sendNotice: true,
+                startsAt: { lte: now },
+                AND: [
+                    { OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
+                    { OR: [{ noticedPhase: null }, { notifySteps: true }, { sendLease: { lte: stale } }] }
+                ]
+            },
+            orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+            ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+            take: CLOCK_BATCH
+        });
+        for (const row of rows) {
+            if (await advance(row, now).catch(() => null)) sent += 1;
+            else await resume(row, now).catch(() => false);
+        }
+        if (rows.length < CLOCK_BATCH) return { sent };
+        after = rows[rows.length - 1]!.id;
     }
-    return { sent };
 }
 
 export async function createAnnouncement(actorId: string, input: ComposeInput, now = new Date()) {
@@ -265,7 +327,7 @@ export async function updateAnnouncement(id: string, input: ComposeInput, now = 
     const reach = await countAudience(input.audience);
     const updated = await prisma.announcement.update({
         where: { id },
-        data: { ...columns, reach, noticedPhase: null }
+        data: { ...columns, reach, noticedPhase: null, sendCursor: null, sendLease: null }
     });
     void advance(updated, now).catch(() => null);
     return updated;
@@ -341,9 +403,10 @@ export async function bannersFor(userId: string, reader: Reader, now = new Date(
             OR: [{ endsAt: null }, { endsAt: { gt: now } }]
         },
         orderBy: { startsAt: "desc" },
-        take: 20
+        take: BANNER_SCAN
     });
     if (rows.length === 0) return [];
+    let member: Awaited<ReturnType<typeof membershipOf>> | undefined;
     const dismissals = await prisma.announcementDismissal.findMany({
         where: { userId, announcementId: { in: rows.map((row) => row.id) } },
         select: { announcementId: true, phase: true }
@@ -354,7 +417,10 @@ export async function bannersFor(userId: string, reader: Reader, now = new Date(
         const phase = phaseAt(row, now);
         if (!bannerShowing(phase) || bannerHidden(phase, closed.get(row.id), row.severity)) continue;
         const audience = readAudience(row.audience);
-        if (!audience.everyone && !(await inAudience(userId, audience))) continue;
+        if (!audience.everyone) {
+            member ??= await membershipOf(userId);
+            if (!matchesAudience(member, audience)) continue;
+        }
         showing.push({ row, phase, severity: row.severity, startsAt: row.startsAt });
     }
     return sortBanners(showing)
@@ -382,7 +448,7 @@ export async function dismissBanner(userId: string, id: string, now = new Date()
     const phase = phaseAt(row, now);
     if (!bannerShowing(phase) || !bannerDismissible(row.severity, phase)) return false;
     const audience = readAudience(row.audience);
-    if (!audience.everyone && !(await inAudience(userId, audience))) return false;
+    if (!audience.everyone && !matchesAudience(await membershipOf(userId), audience)) return false;
     await prisma.announcementDismissal.upsert({
         where: { announcementId_userId: { announcementId: id, userId } },
         create: { announcementId: id, userId, phase },
@@ -411,9 +477,19 @@ export interface HistoryRow {
     editable: boolean;
 }
 
-/** The newest announcements with their reach and how many readers opened them. Three reads. */
-export async function listHistory(now = new Date()): Promise<HistoryRow[]> {
-    const rows = await prisma.announcement.findMany({ orderBy: { createdAt: "desc" }, take: HISTORY_LIMIT });
+/**
+ * Announcements newest first with their reach and how many readers opened
+ * them, `take` at a time after the row `after`. Three reads.
+ */
+export async function listHistory(
+    { after = null, take = HISTORY_PAGE }: { after?: string | null; take?: number } = {},
+    now = new Date()
+): Promise<HistoryRow[]> {
+    const rows = await prisma.announcement.findMany({
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+        take: Math.min(Math.max(1, take), HISTORY_MAX)
+    });
     if (rows.length === 0) return [];
     const [reads, dismissed] = await Promise.all([
         prisma.notification.groupBy({

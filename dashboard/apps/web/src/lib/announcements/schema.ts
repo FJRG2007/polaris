@@ -37,6 +37,8 @@ export const LINK_LABEL_MAX = 40;
 /** A day ahead unless the administrator says otherwise. */
 export const DEFAULT_LEAD_MINUTES = 24 * 60;
 export const LEAD_MAX_MINUTES = 14 * 24 * 60;
+/** How many history rows the admin screen reads at a time. */
+export const HISTORY_PAGE = 50;
 
 const uuid = z.string().uuid();
 const ids = z.array(uuid).max(500);

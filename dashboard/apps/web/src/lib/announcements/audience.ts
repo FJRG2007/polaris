@@ -3,9 +3,10 @@
  *
  * One `where` over accounts, built from the pick (everyone, roles, groups,
  * organizations, people - any combination, as a union) and always leaving out
- * banned and disabled accounts. The live count on the compose screen, the send
- * and the banner's "is this for you" all read the same clause, so the number
- * the administrator was shown is the number it went to.
+ * banned and disabled accounts. The live count on the compose screen and the
+ * send read the same clause, so the number the administrator was shown is the
+ * number it went to; the banner's "is this for you" is that clause answered in
+ * memory (`matchesAudience`), from one read of the reader's memberships.
  */
 
 import type { AudienceSpec } from "./schema";
@@ -29,18 +30,54 @@ export async function countAudience(audience: AudienceSpec): Promise<number> {
     return prisma.user.count({ where: audienceWhere(audience) });
 }
 
-/** Whether one account is in the audience. */
-export async function inAudience(userId: string, audience: AudienceSpec): Promise<boolean> {
-    const found = await prisma.user.count({ where: { AND: [{ id: userId }, audienceWhere(audience)] } });
-    return found > 0;
+/** What one account belongs to, read once to match it against many audiences. */
+export interface Membership {
+    id: string;
+    roleIds: ReadonlySet<string>;
+    groupIds: ReadonlySet<string>;
+    orgIds: ReadonlySet<string>;
+}
+
+/** One read for an account's roles, groups and organizations; null when it is banned or disabled. */
+export async function membershipOf(userId: string): Promise<Membership | null> {
+    const user = await prisma.user.findFirst({
+        where: { id: userId, ...VISIBLE_USER },
+        select: {
+            roles: { select: { roleId: true } },
+            groups: { select: { groupId: true } },
+            orgMemberships: { select: { orgId: true } }
+        }
+    });
+    if (!user) return null;
+    return {
+        id: userId,
+        roleIds: new Set(user.roles.map((one) => one.roleId)),
+        groupIds: new Set(user.groups.map((one) => one.groupId)),
+        orgIds: new Set(user.orgMemberships.map((one) => one.orgId))
+    };
+}
+
+/** `audienceWhere` answered in memory for an account already read with `membershipOf`. */
+export function matchesAudience(member: Membership | null, audience: AudienceSpec): boolean {
+    if (!member) return false;
+    if (audience.everyone) return true;
+    return (
+        audience.roleIds.some((id) => member.roleIds.has(id)) ||
+        audience.groupIds.some((id) => member.groupIds.has(id)) ||
+        audience.orgIds.some((id) => member.orgIds.has(id)) ||
+        audience.userIds.includes(member.id)
+    );
 }
 
 const PAGE = 200;
 
-/** Every account in the audience, a page at a time by id, so a large instance is never one read. */
-export async function* audiencePages(audience: AudienceSpec): AsyncGenerator<string[]> {
+/**
+ * Every account in the audience, a page at a time by id, so a large instance is
+ * never one read. `from` resumes after the last account a send reached.
+ */
+export async function* audiencePages(audience: AudienceSpec, from: string | null = null): AsyncGenerator<string[]> {
     const where = audienceWhere(audience);
-    let after: string | null = null;
+    let after: string | null = from;
     for (;;) {
         const rows: { id: string }[] = await prisma.user.findMany({
             where: after ? { AND: [where, { id: { gt: after } }] } : where,
