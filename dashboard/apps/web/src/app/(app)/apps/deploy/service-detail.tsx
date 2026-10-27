@@ -25,6 +25,8 @@ import type { HttpLogEntry } from "@polaris/deploy";
 import { VariablesEditor } from "./variables-editor";
 import { SecurityChip, SecurityNote } from "./deployment-security";
 import { DependenciesPanel } from "./dependencies-panel";
+import { useSearchParams } from "next/navigation";
+import { ImageVulnerabilitiesPanel } from "./image-vulnerabilities-panel";
 import { LinkedGroupsPanel } from "./variable-groups";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
@@ -78,6 +80,7 @@ import {
     Activity,
     ArrowUpRight,
     Braces,
+    Bug,
     Clock,
     FolderOpen,
     HardDrive,
@@ -133,6 +136,7 @@ const TABS = [
     "Volumes",
     "Cron",
     "Notes",
+    "Vulnerabilities",
     "Settings"
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -148,6 +152,7 @@ const TAB_LABEL = {
     Volumes: "tabs.volumes",
     Cron: "tabs.cron",
     Notes: "tabs.notes",
+    Vulnerabilities: "tabs.vulnerabilities",
     Settings: "tabs.settings"
 } as const satisfies Record<Tab, string>;
 
@@ -168,6 +173,8 @@ const TAB_CAPABILITY: Record<Tab, readonly ProjectCapability[]> = {
     // gated again inside, on the console.
     Cron: ["logs.read"],
     Notes: ["project.read"],
+    // Reading findings is reading the project; scanning again asks for deploy.run inside.
+    Vulnerabilities: ["project.read"],
     // Settings holds three separate jobs - how the service is built, where it
     // answers, and removing it - so any one of them is enough to open it, and the
     // sections inside are gated one by one.
@@ -206,11 +213,14 @@ export function ServiceDetail({
     onClose: () => void;
 }) {
     const t = useTranslations("deployService");
-    const [tab, setTab] = useState<Tab>("Deployments");
-    const [full, setFull] = useState(false);
-    const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
     const can = useProjectCan();
     const tabs = TABS.filter((name) => TAB_CAPABILITY[name].some(can));
+    const linked = tabFromQuery(useSearchParams()?.get("tab"));
+    const [tab, setTab] = useState<Tab>(
+        linked && tabs.includes(linked) ? linked : "Deployments"
+    );
+    const [full, setFull] = useState(false);
+    const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
     const dots = tabAttention(app.attention, t);
 
     return (
@@ -327,6 +337,13 @@ export function ServiceDetail({
                             {tab === "Volumes" && <VolumesTab app={app} />}
                             {tab === "Cron" && <CronPanel applicationId={app.id} />}
                             {tab === "Notes" && <NotesTab applicationId={app.id} />}
+                            {tab === "Vulnerabilities" && (
+                                <div className="flex min-w-0 flex-col gap-5">
+                                    <ImageVulnerabilitiesPanel applicationId={app.id} />
+                                    {/* Built from a repository: its lockfiles are what a deploy reads. */}
+                                    {isGit && <DependenciesPanel applicationId={app.id} />}
+                                </div>
+                            )}
                         </TabFrame>
                     )}
                     {tab === "Settings" && (
@@ -357,8 +374,15 @@ const TAB_FRAME: Record<
     Files: { icon: FolderOpen, intro: "tabIntro.files", card: false },
     Volumes: { icon: HardDrive, intro: "tabIntro.volumes", card: false },
     Cron: { icon: Clock, intro: "tabIntro.cron", card: false },
-    Notes: { icon: MessageSquare, intro: "tabIntro.notes", card: true }
+    Notes: { icon: MessageSquare, intro: "tabIntro.notes", card: true },
+    Vulnerabilities: { icon: Bug, intro: "tabIntro.vulnerabilities", card: true }
 };
+
+/** The tab a link opens on (`?tab=vulnerabilities`, as an alert links it). Pure. */
+export function tabFromQuery(value: string | null | undefined): Tab | null {
+    const wanted = value?.trim().toLowerCase();
+    return TABS.find((name) => name.toLowerCase() === wanted) ?? null;
+}
 
 /** A tab drawn in the same shape as the Settings sections: icon, title, one
  *  line, and the content on one card. */
@@ -1083,11 +1107,6 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                         </div>
                     )}
                 </>
-            )}
-
-            {/* Built from a repository: its lockfiles are what a deploy reads. */}
-            {(app.sourceType === "dockerfile" || app.sourceType === "nixpacks") && (
-                <DependenciesPanel applicationId={app.id} />
             )}
 
             <ServiceActivity applicationId={app.id} />

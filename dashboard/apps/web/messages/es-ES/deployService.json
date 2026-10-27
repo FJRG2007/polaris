@@ -8,6 +8,7 @@
         "volumes": "Volúmenes",
         "cron": "Cron",
         "notes": "Notas",
+        "vulnerabilities": "Vulnerabilidades",
         "settings": "Ajustes",
         "security": "Seguridad",
         "analytics": "Analítica",
@@ -672,7 +673,8 @@
         "files": "Los archivos dentro del contenedor en marcha.",
         "volumes": "Almacenamiento que sobrevive a un despliegue, montado en el contenedor.",
         "cron": "Comandos que el servicio ejecuta según un horario, dentro de su contenedor.",
-        "notes": "Notas para quien se ocupe de este servicio después."
+        "notes": "Notas para quien se ocupe de este servicio después.",
+        "vulnerabilities": "Lo que encontraron los análisis en la imagen que ejecuta y en sus dependencias."
     },
     "cutover": {
         "open": "Mover a otro servicio",
