@@ -38,6 +38,7 @@
 import { notify } from "@/lib/notifications/dispatch";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { prisma, VISIBLE_USER } from "@polaris/db";
+import { HostdClient } from "@polaris/hostd-client";
 import { callServer } from "@/lib/chat/call-server";
 import { detectPublicIp } from "@/lib/network-service";
 import { localDockerDriver } from "@/lib/docker-service";
@@ -127,7 +128,14 @@ export async function watchCallAddress(): Promise<CallAddressState> {
     // the same question every ten minutes for the life of the deployment.
     if (container.startedAt && container.startedAt > changedAt) {
         await setSetting(CHANGED_AT, null);
-        return { current, changedAt, startedAt: container.startedAt, stale: false, healed: false, cannotHeal: null };
+        return {
+            current,
+            changedAt,
+            startedAt: container.startedAt,
+            stale: false,
+            healed: false,
+            cannotHeal: null
+        };
     }
 
     const healed = await restart(container.id);
@@ -204,8 +212,37 @@ export async function callAddressFacts(): Promise<{
     };
 }
 
+/**
+ * Restart this deployment's own media server for a reason other than the public
+ * address: it picks the one local address it offers when it starts, so a machine
+ * whose preferred address changed needs it started again (`lan-address-follow`).
+ * "absent" when there is no container to restart - the limited edition, or a
+ * server somebody else runs - which is nothing to retry.
+ */
+export async function restartCallServer(): Promise<"restarted" | "absent" | "failed"> {
+    let container: CallContainer | null;
+    try {
+        container = await findCallContainer();
+    } catch {
+        // A daemon that is down for now is a restart to try again; no daemon at
+        // all is the limited edition, which has nothing to restart.
+        return (await new HostdClient().configured()) ? "failed" : "absent";
+    }
+    if (!container) return "absent";
+    return (await restart(container.id)) ? "restarted" : "failed";
+}
+
+type CallContainer = { id: string; startedAt: string | null };
+
 /** The media server's container, if this deployment runs one. */
-async function callContainer(): Promise<{ id: string; startedAt: string | null } | null> {
+async function callContainer(): Promise<CallContainer | null> {
+    // No engine to ask. Not a fault: the limited edition has none, and this is
+    // simply a question it cannot answer.
+    return findCallContainer().catch(() => null);
+}
+
+/** Null when the engine answered without one; throws when it did not answer. */
+async function findCallContainer(): Promise<CallContainer | null> {
     let driver: ReturnType<typeof localDockerDriver> | null = null;
     try {
         driver = localDockerDriver();
@@ -214,10 +251,6 @@ async function callContainer(): Promise<{ id: string; startedAt: string | null }
         if (!found) return null;
         const detail = await driver.inspect(found.id).catch(() => null);
         return { id: found.id, startedAt: detail?.startedAt ?? null };
-    } catch {
-        // No engine to ask. Not a fault: the limited edition has none, and this
-        // is simply a question it cannot answer.
-        return null;
     } finally {
         await driver?.dispose().catch(() => undefined);
     }

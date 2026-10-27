@@ -215,8 +215,9 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         key: "lan-address-follow",
         // Every minute, and first at boot: a server that comes back on another
         // lease leaves its DNS server unable to start and every device in the
-        // house without names, so this sets how long that lasts. A quiet pass
-        // reads one file, one setting and two rows.
+        // house without names, so this sets how long that lasts. It also
+        // restarts the call server when the preferred address changes. A quiet
+        // pass reads one file, two settings and two rows.
         everyMs: MINUTE,
         // Leased: two web containers during an update would both redeploy the
         // DNS server and both announce the move.

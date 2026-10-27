@@ -10,11 +10,13 @@
  * - the network filter's DNS server, whose port 53 is bound to one address and
  *   cannot start without it (`dns-blocker/service.ts#followHostAddress`);
  * - the local certificate, whose names include the addresses a browser types;
- * - the people who reach Polaris by its address, who are told where it is now.
+ * - the people who reach Polaris by its address, who are told where it is now;
+ * - the call server, which offers only the default route's address and reads it
+ *   when it starts (see the `livekit` service in docker-compose.yml).
  *
  * Run as a leased scheduled job (`lan-address-follow`), first at boot, so an
  * install updated after it already moved is repaired the first time it starts.
- * A pass that finds nothing changed reads one file and one setting, plus two rows
+ * A pass that finds nothing changed reads one file and two settings, plus two rows
  * when the network filter is on.
  */
 
@@ -31,6 +33,8 @@ export const LAN_ADDRESS_KEY = "network.lanAddress";
 export const LAN_HISTORY_KEY = "network.lanAddressHistory";
 const HISTORY_MAX = 10;
 export const LAN_MOVED_TYPE = "network.lan-address-moved";
+/** The preferred address the call server was last started on. */
+export const CALLS_LAN_KEY = "chat.calls.lanAddress";
 
 export type LanAddressChange =
     | { readonly kind: "none" }
@@ -63,6 +67,8 @@ export interface LanFollowSteps {
     /** Move the DNS server; null when it had nothing to move. */
     readonly dns: () => Promise<{ from: string; to: string } | null>;
     readonly certificate: () => Promise<void>;
+    /** Restart the call server; false when it could not be restarted. */
+    readonly calls: () => Promise<boolean>;
     readonly announce: (from: string, to: string, dnsMoved: boolean) => Promise<void>;
 }
 
@@ -96,6 +102,9 @@ export async function followLanAddress(
         );
         return null;
     });
+    await followCalls(steps, current).catch((error: unknown) =>
+        console.error("polaris: the call server could not follow this machine's address:", error)
+    );
     if (change.kind !== "moved") return { change, dnsMoved: dns !== null };
 
     console.info(`polaris: this machine's LAN address moved from ${change.from} to ${change.to}`);
@@ -109,6 +118,24 @@ export async function followLanAddress(
         .announce(change.from, change.to, dns !== null)
         .catch((error: unknown) => console.error("polaris: address move not announced:", error));
     return { change, dnsMoved: dns !== null };
+}
+
+/**
+ * Restart the call server when the preferred address is not the one it started
+ * on. Unlike a move this includes cable and WiFi trading places while both are
+ * held: the server offers one local address, and the best one is now the other.
+ * A first sighting only records - the server started on what is preferred now -
+ * and a restart that fails is tried again on the next pass.
+ */
+async function followCalls(steps: LanFollowSteps, current: string | null): Promise<void> {
+    if (!current) return;
+    const last = await steps.read(CALLS_LAN_KEY);
+    if (last === current) return;
+    if (last) {
+        console.info(`polaris: restarting the call server to offer ${current} instead of ${last}`);
+        if (!(await steps.calls())) return;
+    }
+    await steps.write(CALLS_LAN_KEY, current);
 }
 
 async function recordMove(steps: LanFollowSteps, from: string, to: string): Promise<void> {
@@ -149,6 +176,9 @@ function defaultSteps(): LanFollowSteps {
         write: (key, value) => setSetting(key, value),
         dns: async () => (await import("@/lib/dns-blocker/service")).followHostAddress(),
         certificate: async () => (await import("@/lib/local-ca-service")).ensureLocalCa(),
+        calls: async () =>
+            (await (await import("@/lib/chat/call-address-watch")).restartCallServer()) !==
+            "failed",
         announce: announceMove
     };
 }
