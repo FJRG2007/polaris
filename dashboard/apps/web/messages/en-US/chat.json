@@ -497,7 +497,9 @@
         "inputProfile": "Input profile",
         "outputDevice": "Output device",
         "systemDefault": "System default",
-        "voiceSettings": "Voice settings"
+        "voiceSettings": "Voice settings",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out"
     },
     "meetingRoom": {
         "meeting": "Meeting",
@@ -1073,7 +1075,8 @@
             "louder": "Arrives {db} dB louder than the others",
             "same": "Arrives about as loud as the others",
             "unknown": "Not heard long enough to compare"
-        }
+        },
+        "unmuteStream": "Unmute stream"
     },
     "search": {
         "searchWidth": "Search width",

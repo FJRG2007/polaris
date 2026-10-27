@@ -70,6 +70,39 @@ export function useWatchedStreams(): readonly string[] {
 }
 
 // ---------------------------------------------------------------------------
+// What somebody stopped watching
+// ---------------------------------------------------------------------------
+
+/** How many calls' decisions are kept at once - only the recent ones matter. */
+const STOPPED_CALLS = 16;
+const stoppedByCall = new Map<string, readonly string[]>();
+
+/**
+ * The streams this reader stopped watching in a call, as the room last said.
+ *
+ * Held outside the room because the room is drawn by whatever conversation is
+ * open: walking to another one and back mounts it again, and a share somebody
+ * turned off must not come back on just because they read a message elsewhere.
+ * The room drops a key as its share ends, so a share started again is watched.
+ */
+export function stoppedStreams(meetingId: string): readonly string[] {
+    return stoppedByCall.get(meetingId) ?? EMPTY;
+}
+
+/** Said by the room whenever its list of stopped streams changes. */
+export function rememberStopped(meetingId: string, keys: readonly string[]): void {
+    stoppedByCall.delete(meetingId);
+    if (keys.length === 0) return;
+    stoppedByCall.set(meetingId, [...keys]);
+    // Oldest first, so the call held longest without a change goes first.
+    while (stoppedByCall.size > STOPPED_CALLS) {
+        const oldest = stoppedByCall.keys().next().value;
+        if (oldest === undefined) break;
+        stoppedByCall.delete(oldest);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Popping a stream out
 // ---------------------------------------------------------------------------
 

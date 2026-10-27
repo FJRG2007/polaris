@@ -497,7 +497,9 @@
         "inputProfile": "Perfil de voz",
         "outputDevice": "Salida de audio",
         "systemDefault": "Predeterminado",
-        "voiceSettings": "Ajustes de voz"
+        "voiceSettings": "Ajustes de voz",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar"
     },
     "meetingRoom": {
         "meeting": "Reunión",
@@ -1073,7 +1075,8 @@
             "louder": "Llega {db} dB más alto que el resto",
             "same": "Llega casi igual de alto que el resto",
             "unknown": "Aún no se ha oído lo bastante"
-        }
+        },
+        "unmuteStream": "Activar sonido"
     },
     "search": {
         "searchWidth": "Ancho",

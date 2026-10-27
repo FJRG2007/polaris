@@ -297,18 +297,7 @@ export function StreamMenu({
                 </ContextMenuItem>
                 {canPopOut() && (
                     <ContextMenuItem
-                        onSelect={() => {
-                            if (popped) {
-                                closePopOut();
-                                return;
-                            }
-                            void popOut(streamKey, stream).then((opened) => {
-                                // A browser that refused the window still owes
-                                // the reader the stream, so it goes on the
-                                // stage instead of nothing happening at all.
-                                if (!opened && !watching) onWatch();
-                            });
-                        }}
+                        onSelect={() => togglePopOut(popped, streamKey, stream, watching, onWatch)}
                     >
                         <PictureInPicture2 className="size-3.5" />
                         {popped ? t("callMenus.closePopOut") : t("callMenus.popOut")}
@@ -395,5 +384,116 @@ export function StreamMenu({
                 </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>
+    );
+}
+
+/**
+ * Open a stream's floating window, or close it.
+ *
+ * A browser that refused the window still owes the reader the stream, so it goes
+ * on the stage instead of nothing happening at all.
+ */
+function togglePopOut(
+    popped: boolean,
+    streamKey: string,
+    stream: MediaStream,
+    watching: boolean,
+    onWatch: () => void
+): void {
+    if (popped) {
+        closePopOut();
+        return;
+    }
+    void popOut(streamKey, stream).then((opened) => {
+        if (!opened && !watching) onWatch();
+    });
+}
+
+/**
+ * The stream's own sound, on the picture: a button that mutes it and a slider
+ * beside it. The same volume and mute as its right-click menu - they are one
+ * setting, reached from two places.
+ */
+export function StreamVolumeControl({
+    name,
+    person,
+    hasSound
+}: Pick<React.ComponentProps<typeof StreamMenu>, "name" | "person" | "hasSound">) {
+    const t = useTranslations("chat");
+    const [volume, setVolume] = useCallVolume(streamVolumeKey(person));
+    const [muted, setMuted] = useStreamMuted(person);
+    const silent = muted || volume === 0;
+    const title = !hasSound
+        ? t("callMenus.thisStreamHasNoSound")
+        : muted
+          ? t("callMenus.unmuteStream")
+          : t("callMenus.muteStream");
+
+    return (
+        <span className="flex min-w-0 items-center gap-1 rounded bg-background/80 pr-1.5">
+            <button
+                type="button"
+                onClick={() => setMuted(!muted)}
+                disabled={!hasSound}
+                aria-pressed={hasSound ? muted : undefined}
+                aria-label={title}
+                title={title}
+                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            >
+                {silent || !hasSound ? (
+                    <VolumeX className="size-3.5" />
+                ) : (
+                    <Volume2 className="size-3.5" />
+                )}
+            </button>
+            {hasSound && (
+                <input
+                    type="range"
+                    min={0}
+                    max={MAX_VOLUME}
+                    step={0.05}
+                    value={muted ? 0 : volume}
+                    aria-label={t("callMenus.howLoud", { name })}
+                    aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)}%`}
+                    onChange={(event) => {
+                        const next = Number(event.target.value);
+                        setVolume(next);
+                        if (next > 0 && muted) setMuted(false);
+                    }}
+                    // Narrow on a phone, where the tile is too: the menu still
+                    // has the full-width one.
+                    className="w-14 min-w-0 accent-primary sm:w-20"
+                />
+            )}
+        </span>
+    );
+}
+
+/** The stream in a window of its own, from a button on the picture. Nothing
+ *  where the browser cannot do it. */
+export function PopOutButton({
+    streamKey,
+    stream,
+    watching,
+    onWatch
+}: Pick<
+    React.ComponentProps<typeof StreamMenu>,
+    "streamKey" | "stream" | "watching" | "onWatch"
+>) {
+    const t = useTranslations("chat");
+    const popped = usePoppedStream() === streamKey;
+    if (!canPopOut()) return null;
+    const label = popped ? t("callMenus.closePopOut") : t("callMenus.popOut");
+    return (
+        <button
+            type="button"
+            onClick={() => togglePopOut(popped, streamKey, stream, watching, onWatch)}
+            aria-pressed={popped}
+            aria-label={label}
+            title={label}
+            className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
+        >
+            <PictureInPicture2 className="size-3.5" />
+        </button>
     );
 }
