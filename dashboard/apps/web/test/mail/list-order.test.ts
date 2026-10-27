@@ -19,7 +19,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { mailCursorOf, mailCursorWhere, mailOrderBy, type MailOrderRow } from "@/lib/mailbox/list-order";
+import {
+    mailCursorOf,
+    mailCursorWhere,
+    mailOrderBy,
+    type MailOrderRow
+} from "@/lib/mailbox/list-order";
 
 function row(id: string, at: string, size: number, pinned = false): MailOrderRow {
     return { id, lastMessageAt: at, size, pinned };
@@ -238,7 +243,9 @@ function walk(everything: readonly MailOrderRow[], limit: number): string[] {
     const seen: string[] = [];
     let cursor = "";
     for (let page = 0; page < 20; page += 1) {
-        const remaining = everything.filter((one) => admits(mailCursorWhere("largest", cursor), one));
+        const remaining = everything.filter((one) =>
+            admits(mailCursorWhere("largest", cursor), one)
+        );
         const drawn = [...remaining].sort(byLargest).slice(0, limit);
         seen.push(...drawn.map((one) => one.id));
         cursor = mailCursorOf("largest", drawn, limit);

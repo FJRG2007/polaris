@@ -34,7 +34,7 @@ function catalogFiles(): string[] {
 /** Reads one JSON string starting at the opening quote; returns it and the index after it. */
 function readString(text: string, start: number): [string, number] {
     let end = start + 1;
-    while (text[end] !== "\"") end += text[end] === "\\" ? 2 : 1;
+    while (text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
     return [JSON.parse(text.slice(start, end + 1)) as string, end + 1];
 }
 
@@ -52,7 +52,7 @@ function duplicateKeys(text: string): string[] {
     let index = 0;
     while (index < text.length) {
         const char = text[index];
-        if (char === "\"") {
+        if (char === '"') {
             const [value, next] = readString(text, index);
             index = next;
             const frame = frames.at(-1);
@@ -83,15 +83,19 @@ function duplicateKeys(text: string): string[] {
 
 describe("duplicateKeys", () => {
     it("finds a key repeated in one object, by its path", () => {
-        expect(duplicateKeys("{\"errors\": {\"a\": \"x\", \"b\": {\"a\": 1}, \"a\": \"y\"}}")).toEqual(["errors.a"]);
+        expect(duplicateKeys('{"errors": {"a": "x", "b": {"a": 1}, "a": "y"}}')).toEqual([
+            "errors.a"
+        ]);
     });
 
     it("lets the same key appear in different objects", () => {
-        expect(duplicateKeys("{\"a\": {\"x\": 1}, \"b\": {\"x\": 2}, \"c\": [{\"x\": 1}, {\"x\": 2}]}")).toEqual([]);
+        expect(duplicateKeys('{"a": {"x": 1}, "b": {"x": 2}, "c": [{"x": 1}, {"x": 2}]}')).toEqual(
+            []
+        );
     });
 
     it("is not fooled by braces, quotes or keys inside values", () => {
-        expect(duplicateKeys("{\"a\": \"{\\\"a\\\": 1}\", \"b\": \"a\"}")).toEqual([]);
+        expect(duplicateKeys('{"a": "{\\"a\\": 1}", "b": "a"}')).toEqual([]);
     });
 });
 
@@ -99,7 +103,9 @@ describe("the catalogs", () => {
     const files = catalogFiles();
 
     it("include the dashboard's, so this cannot pass by reading nothing", () => {
-        expect(files.some((file) => file.replace(/\\/g, "/").includes("/web/messages/en-US/"))).toBe(true);
+        expect(
+            files.some((file) => file.replace(/\\/g, "/").includes("/web/messages/en-US/"))
+        ).toBe(true);
     });
 
     it.each(files.map((file) => [file.slice(APPS.length + 1).replace(/\\/g, "/"), file]))(

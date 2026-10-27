@@ -62,7 +62,5 @@ export function shelfAhead(
     switching: ShelfAnnouncement | null,
     followsHeader: boolean
 ): string {
-    return followsHeader && switching !== null && switching.from === server
-        ? switching.to
-        : server;
+    return followsHeader && switching !== null && switching.from === server ? switching.to : server;
 }

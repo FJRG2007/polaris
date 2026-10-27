@@ -94,7 +94,9 @@ export function mailCursorOf(sort: MailSort, rows: readonly MailOrderRow[], limi
     const open = rows.filter((row) => !row.pinned);
     const half = open.length > 0 ? open : rows;
     const edge = half.reduce((held, row) => (further(sort, row, held) ? row : held));
-    const at = bySize(sort) ? `${edge.size}:${edge.id}` : `${edge.lastMessageAt}${MOMENT_ROW}${edge.id}`;
+    const at = bySize(sort)
+        ? `${edge.size}:${edge.id}`
+        : `${edge.lastMessageAt}${MOMENT_ROW}${edge.id}`;
     return `${edge.pinned ? "1" : "0"}|${at}`;
 }
 
@@ -111,7 +113,8 @@ function further(sort: MailSort, row: MailOrderRow, held: MailOrderRow): boolean
             row.lastMessageAt > held.lastMessageAt ||
             (row.lastMessageAt === held.lastMessageAt && row.id > held.id)
         );
-    if (sort === "largest") return row.size < held.size || (row.size === held.size && row.id < held.id);
+    if (sort === "largest")
+        return row.size < held.size || (row.size === held.size && row.id < held.id);
     return row.size > held.size || (row.size === held.size && row.id > held.id);
 }
 

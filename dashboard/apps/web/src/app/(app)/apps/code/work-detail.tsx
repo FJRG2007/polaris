@@ -69,7 +69,7 @@ export function WorkDetail({
     const load = useCallback(async () => {
         const result = await actions.readWorkAction(target);
         if (result.error || !result.item) {
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- target is three primitives, listed individually
+            // eslint-disable-next-line react-hooks/exhaustive-deps -- target is three primitives, listed individually
             setError(result.error ?? t("detail.openFailed"));
             return;
         }
