@@ -12757,6 +12757,9 @@ model MailThread {
     messages MailMessage[]
 
     @@index([accountId, lastMessageAt])
+    // A list's own order and its next page: pinned first, then newest (or
+    // oldest), with the id breaking a tie - see `mailbox/list-order`.
+    @@index([accountId, pinned, lastMessageAt, id])
     @@index([accountId, subjectKey])
     // The list read by size, which is the one order that is not a date.
     @@index([accountId, size])

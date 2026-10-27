@@ -10,8 +10,11 @@
  *
  * Two shapes of cursor, for the two kinds of order:
  *
- * - **by time**, the moment of the page's edge, which is what a mail list has
- *   always been paged on;
+ * - **by time**, the moment of the page's edge and the id of that row. A
+ *   moment alone was what a mail list was paged on, and it skipped every
+ *   conversation that shared the edge's moment and fell on the next page - a
+ *   batch imported or synced together lands on one timestamp more often than
+ *   not. A cursor of the moment alone is still read, as it was;
  * - **by size**, the size of the page's edge together with the id of that row,
  *   because sizes tie constantly - a folder of short replies is a hundred
  *   conversations of the same few kilobytes, and a cursor of size alone would
@@ -31,6 +34,10 @@
  */
 
 import type { MailSort } from "@polaris/core";
+
+/** Between the moment and the row in a cursor by time. Never part of an ISO
+ *  moment or a row id, so the two split back apart unambiguously. */
+const MOMENT_ROW = "_";
 
 /** One `orderBy` entry, as Prisma takes them. */
 export type MailOrderBy = Readonly<Record<string, "asc" | "desc">>;
@@ -59,10 +66,10 @@ export interface MailOrderRow {
  * cursor below cannot survive.
  */
 export function mailOrderBy(sort: MailSort): MailOrderBy[] {
-    if (sort === "oldest") return [{ pinned: "desc" }, { lastMessageAt: "asc" }];
+    if (sort === "oldest") return [{ pinned: "desc" }, { lastMessageAt: "asc" }, { id: "asc" }];
     if (sort === "largest") return [{ pinned: "desc" }, { size: "desc" }, { id: "desc" }];
     if (sort === "smallest") return [{ pinned: "desc" }, { size: "asc" }, { id: "asc" }];
-    return [{ pinned: "desc" }, { lastMessageAt: "desc" }];
+    return [{ pinned: "desc" }, { lastMessageAt: "desc" }, { id: "desc" }];
 }
 
 /** Whether an order is read by size rather than by time. */
@@ -87,15 +94,23 @@ export function mailCursorOf(sort: MailSort, rows: readonly MailOrderRow[], limi
     const open = rows.filter((row) => !row.pinned);
     const half = open.length > 0 ? open : rows;
     const edge = half.reduce((held, row) => (further(sort, row, held) ? row : held));
-    const at = bySize(sort) ? `${edge.size}:${edge.id}` : edge.lastMessageAt;
+    const at = bySize(sort) ? `${edge.size}:${edge.id}` : `${edge.lastMessageAt}${MOMENT_ROW}${edge.id}`;
     return `${edge.pinned ? "1" : "0"}|${at}`;
 }
 
 /** Whether `row` is further along the order than `held` - the row a page would
  *  end on, within the half of the list it is in. */
 function further(sort: MailSort, row: MailOrderRow, held: MailOrderRow): boolean {
-    if (sort === "newest") return row.lastMessageAt < held.lastMessageAt;
-    if (sort === "oldest") return row.lastMessageAt > held.lastMessageAt;
+    if (sort === "newest")
+        return (
+            row.lastMessageAt < held.lastMessageAt ||
+            (row.lastMessageAt === held.lastMessageAt && row.id < held.id)
+        );
+    if (sort === "oldest")
+        return (
+            row.lastMessageAt > held.lastMessageAt ||
+            (row.lastMessageAt === held.lastMessageAt && row.id > held.id)
+        );
     if (sort === "largest") return row.size < held.size || (row.size === held.size && row.id < held.id);
     return row.size > held.size || (row.size === held.size && row.id > held.id);
 }
@@ -130,9 +145,19 @@ export function mailCursorWhere(sort: MailSort, cursor: string): Record<string, 
  *  this order cannot make sense of. */
 function pastEdge(sort: MailSort, edge: string): Record<string, unknown> | null {
     if (!bySize(sort)) {
-        const at = new Date(edge);
+        const split = edge.indexOf(MOMENT_ROW);
+        const at = new Date(split < 0 ? edge : edge.slice(0, split));
         if (Number.isNaN(at.getTime())) return null;
-        return { lastMessageAt: sort === "oldest" ? { gt: at } : { lt: at } };
+        const past = sort === "oldest" ? { gt: at } : { lt: at };
+        const id = split < 0 ? "" : edge.slice(split + 1);
+        // A cursor written before the row was part of it: the moment alone.
+        if (!id) return { lastMessageAt: past };
+        return {
+            OR: [
+                { lastMessageAt: past },
+                { lastMessageAt: at, id: sort === "oldest" ? { gt: id } : { lt: id } }
+            ]
+        };
     }
 
     const split = edge.indexOf(":");
