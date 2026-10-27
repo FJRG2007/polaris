@@ -1,0 +1,170 @@
+{
+    "templates": {
+        "generic": {
+            "title": "Un mensaje de tu administrador",
+            "body": "Escribe aquí tu mensaje."
+        },
+        "maintenanceScheduled": {
+            "title": "Mantenimiento programado el {start}",
+            "body": "Polaris estará en mantenimiento desde el {start} hasta el {end} ({duration}). Afecta a: {affected}. Guarda tu trabajo antes de que empiece."
+        },
+        "maintenanceInProgress": {
+            "title": "Mantenimiento en curso",
+            "body": "Hay un mantenimiento en curso hasta el {end}. Afecta a: {affected}. Algunas cosas pueden no funcionar hasta que termine."
+        },
+        "maintenanceFinished": {
+            "title": "Mantenimiento terminado",
+            "body": "El mantenimiento ha terminado y todo vuelve a funcionar. Gracias por tu paciencia."
+        },
+        "updateAvailable": {
+            "title": "Llega una actualización",
+            "body": "El {start} se instalará una nueva versión de Polaris. Puede no estar disponible durante unos minutos."
+        },
+        "updateApplied": {
+            "title": "Polaris actualizado",
+            "body": "Ya está instalada una nueva versión de Polaris. Recarga las pestañas abiertas para usarla."
+        },
+        "newFeature": {
+            "title": "Novedades en Polaris",
+            "body": "Hay una función nueva para probar. Échale un vistazo y cuéntanos qué te parece."
+        },
+        "incident": {
+            "title": "Servicio degradado",
+            "body": "Estamos viendo problemas con {affected}. Estamos trabajando en ello y publicaremos una actualización aquí."
+        },
+        "policyChange": {
+            "title": "Cambian nuestras políticas",
+            "body": "Las normas de uso de esta instancia cambian el {start}. Lee las novedades."
+        }
+    },
+    "vars": {
+        "noEnd": "hasta nuevo aviso",
+        "everything": "todo Polaris"
+    },
+    "banner": {
+        "region": "Avisos",
+        "dismiss": "Cerrar",
+        "startsIn": "Empieza en {time}",
+        "startsNow": "Empieza ya",
+        "phase": {
+            "upcoming": "Mantenimiento programado",
+            "inProgress": "Mantenimiento en curso",
+            "finished": "Mantenimiento terminado"
+        }
+    },
+    "admin": {
+        "title": "Avisos",
+        "description": "Avisa a la gente de esta instancia de mantenimientos, actualizaciones y cualquier otra cosa, en la campana, como banner o ambos.",
+        "new": "Nuevo aviso",
+        "compose": {
+            "editTitle": "Editar aviso",
+            "kind": "Tipo",
+            "kindAnnouncement": "Aviso",
+            "kindMaintenance": "Mantenimiento",
+            "template": "Empezar desde",
+            "severity": "Gravedad",
+            "titleLabel": "Título",
+            "bodyLabel": "Mensaje",
+            "bodyHint": "Admite **negrita**, *cursiva*, `código`, [enlaces](https://example.com) y viñetas con -. '{start}', '{end}', '{duration}' y '{affected}' se rellenan para cada lector.",
+            "linkUrl": "Enlace botón",
+            "linkLabel": "Texto botón",
+            "linkHint": "Una ruta de Polaris como /drive, o una dirección https.",
+            "audience": "Destinatarios",
+            "everyone": "Todos",
+            "roles": "Roles",
+            "groups": "Grupos",
+            "orgs": "Organizaciones",
+            "people": "Personas",
+            "peopleLabel": "Añadir gente",
+            "reaches": "{count, plural, =0 {Aún no llega a nadie} one {Llega a # persona} other {Llega a # personas}}",
+            "counting": "Contando...",
+            "delivery": "Cómo",
+            "sendNotice": "Notificación",
+            "sendNoticeHint": "En la campana, y por correo u otros canales donde cada persona los haya configurado. Los críticos siempre llegan a la campana.",
+            "showBanner": "Banner",
+            "showBannerHint": "Arriba en todas las pantallas mientras esté activo.",
+            "startsAt": "Desde",
+            "endsAt": "Mostrar hasta",
+            "startsNow": "Déjalo vacío para empezar ya.",
+            "noEnd": "Déjalo vacío para mantenerlo hasta que lo termines.",
+            "windowStart": "Inicio",
+            "windowEnd": "Fin",
+            "lead": "Aviso previo",
+            "leadHours": "{count, plural, =0 {Solo cuando empiece} one {# hora antes} other {# horas antes}}",
+            "affected": "Qué se ve afectado",
+            "affectedHint": "Opcional. Separado por comas, p. ej. Correo, Drive.",
+            "notifySteps": "Notificar también cuando empiece y cuando termine",
+            "preview": "Vista previa",
+            "previewHint": "Cada lector ve las fechas en su idioma y su zona horaria.",
+            "send": "Enviar",
+            "schedule": "Programar",
+            "save": "Guardar cambios",
+            "cancel": "Cancelar",
+            "translated": "Se traduce para cada lector mientras no cambies el texto.",
+            "edited": "El texto editado se muestra tal como lo escribiste, en todos los idiomas."
+        },
+        "severity": {
+            "info": "Info",
+            "success": "Éxito",
+            "warning": "Aviso",
+            "critical": "Crítico"
+        },
+        "template": {
+            "generic": "Vacío",
+            "maintenanceScheduled": "Mantenimiento programado",
+            "maintenanceInProgress": "Mantenimiento en curso",
+            "maintenanceFinished": "Mantenimiento terminado",
+            "updateAvailable": "Actualización",
+            "updateApplied": "Actualizado",
+            "newFeature": "Función nueva",
+            "incident": "Incidencia o servicio degradado",
+            "policyChange": "Cambio de normas"
+        },
+        "errors": {
+            "audience": "Elige quién lo recibe.",
+            "delivery": "Elige notificación, banner o ambos.",
+            "window": "Indica cuándo empieza y termina el mantenimiento.",
+            "order": "El final tiene que ser posterior al inicio.",
+            "link": "Usa una ruta de Polaris o una dirección https.",
+            "title": "Añade un título.",
+            "invalid": "Revisa los campos marcados.",
+            "rateLimited": "Demasiados envíos en la última hora. Vuelve a intentarlo en {minutes} min.",
+            "notEditable": "Ya ha empezado, así que no se puede editar. Termínalo o envía uno nuevo.",
+            "gone": "Ese aviso ya no existe.",
+            "failed": "No ha funcionado. Inténtalo de nuevo."
+        },
+        "history": {
+            "title": "Enviados y programados",
+            "empty": "Aún no has enviado nada.",
+            "emptyHint": "Aquí aparecen los avisos que envíes o programes.",
+            "audienceEveryone": "Todos",
+            "audiencePicked": "{count, plural, one {# selección} other {# selecciones}}",
+            "reach": "{count, plural, one {# persona} other {# personas}}",
+            "read": "{count} leídos",
+            "dismissed": "{count} cerrados",
+            "edit": "Editar",
+            "duplicate": "Duplicar",
+            "retract": "Retirar",
+            "end": "Terminar",
+            "cancelMaintenance": "Cancelar mantenimiento",
+            "retractTitle": "¿Retirar este aviso?",
+            "retractBody": "Desaparece de todos los banners y su notificación se borra de todas las campanas.",
+            "retractConfirm": "Retirar",
+            "retracted": "Retirado",
+            "ended": "Fin",
+            "cancelled": "Cancelado",
+            "sent": "Enviado",
+            "saved": "Guardado",
+            "older": "Ver más"
+        },
+        "phase": {
+            "scheduled": "Programado",
+            "live": "Visible",
+            "upcoming": "Anunciado",
+            "inProgress": "En curso",
+            "finished": "Terminado",
+            "ended": "Fin",
+            "retracted": "Retirado"
+        }
+    }
+}

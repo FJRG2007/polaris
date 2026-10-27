@@ -505,6 +505,14 @@
             "label": "Actualizado automáticamente",
             "description": "Se ha ejecutado una actualización programada o automática, y cómo ha ido."
         },
+        "instanceAnnouncement": {
+            "label": "Aviso de la administración",
+            "description": "Un mensaje que un administrador de esta instancia te ha enviado a ti o a un grupo del que formas parte."
+        },
+        "instanceAnnouncementCritical": {
+            "label": "Aviso crítico",
+            "description": "Un mensaje urgente de un administrador, como una caída del servicio. Siempre llega a la campana."
+        },
         "polarChatReady": {
             "label": "Polar acabó mientras no estabas",
             "description": "Una respuesta de Polar acabó, se paró o te necesita mientras estabas fuera."

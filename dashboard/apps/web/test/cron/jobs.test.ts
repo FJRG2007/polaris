@@ -89,6 +89,9 @@ describe("the work Polaris runs on a schedule", () => {
             // same minute both see the same crossing and both tell somebody. An
             // alarm that arrives twice is one people learn to ignore.
             "alarms",
+            // An announcement fans out to every reader, so two clocks in the same
+            // minute would both send it and everybody would be told twice.
+            "announcements",
             // Two sweeps would both see the same stopped server off its place and
             // both start moving it, and the second copy fails on the first's lease.
             "app-storage",

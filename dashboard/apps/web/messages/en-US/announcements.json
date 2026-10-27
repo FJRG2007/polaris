@@ -1,0 +1,170 @@
+{
+    "templates": {
+        "generic": {
+            "title": "A message from your administrator",
+            "body": "Write your message here."
+        },
+        "maintenanceScheduled": {
+            "title": "Scheduled maintenance on {start}",
+            "body": "Polaris will be under maintenance from {start} to {end} ({duration}). Affected: {affected}. Save your work before it starts."
+        },
+        "maintenanceInProgress": {
+            "title": "Maintenance in progress",
+            "body": "Maintenance is under way until {end}. Affected: {affected}. Some things may not work until it ends."
+        },
+        "maintenanceFinished": {
+            "title": "Maintenance finished",
+            "body": "Maintenance is over and everything is back. Thanks for your patience."
+        },
+        "updateAvailable": {
+            "title": "An update is coming",
+            "body": "A new version of Polaris will be installed on {start}. It may be unavailable for a few minutes."
+        },
+        "updateApplied": {
+            "title": "Polaris was updated",
+            "body": "A new version of Polaris is installed. Reload any open tabs to get it."
+        },
+        "newFeature": {
+            "title": "Something new in Polaris",
+            "body": "There is a new feature to try. Have a look and tell us what you think."
+        },
+        "incident": {
+            "title": "Service degraded",
+            "body": "We are seeing problems with {affected}. We are working on it and will post an update here."
+        },
+        "policyChange": {
+            "title": "Our policies are changing",
+            "body": "The rules for using this instance change on {start}. Please read what is new."
+        }
+    },
+    "vars": {
+        "noEnd": "until further notice",
+        "everything": "all of Polaris"
+    },
+    "banner": {
+        "region": "Announcements",
+        "dismiss": "Dismiss",
+        "startsIn": "Starts in {time}",
+        "startsNow": "Starting now",
+        "phase": {
+            "upcoming": "Scheduled maintenance",
+            "inProgress": "Maintenance in progress",
+            "finished": "Maintenance finished"
+        }
+    },
+    "admin": {
+        "title": "Announcements",
+        "description": "Tell people on this instance about maintenance, updates and anything else, on the bell, as a banner, or both.",
+        "new": "New announcement",
+        "compose": {
+            "editTitle": "Edit announcement",
+            "kind": "Type",
+            "kindAnnouncement": "Announcement",
+            "kindMaintenance": "Maintenance window",
+            "template": "Start from",
+            "severity": "Severity",
+            "titleLabel": "Title",
+            "bodyLabel": "Message",
+            "bodyHint": "Supports **bold**, *italic*, `code`, [links](https://example.com) and - bullets. '{start}', '{end}', '{duration}' and '{affected}' are filled in for each reader.",
+            "linkUrl": "Button link",
+            "linkLabel": "Button text",
+            "linkHint": "A path in Polaris such as /drive, or an https address.",
+            "audience": "Who gets it",
+            "everyone": "Everyone",
+            "roles": "Roles",
+            "groups": "Groups",
+            "orgs": "Organizations",
+            "people": "People",
+            "peopleLabel": "Add people",
+            "reaches": "{count, plural, =0 {Reaches nobody yet} one {Reaches # person} other {Reaches # people}}",
+            "counting": "Counting...",
+            "delivery": "How",
+            "sendNotice": "Notification",
+            "sendNoticeHint": "On the bell, and by mail or other channels where people set them up. Critical ones always reach the bell.",
+            "showBanner": "Banner",
+            "showBannerHint": "At the top of every screen while it is active.",
+            "startsAt": "Show from",
+            "endsAt": "Show until",
+            "startsNow": "Leave empty to start now.",
+            "noEnd": "Leave empty to keep it up until you end it.",
+            "windowStart": "Starts",
+            "windowEnd": "Ends",
+            "lead": "Announce ahead",
+            "leadHours": "{count, plural, =0 {Only when it starts} one {# hour before} other {# hours before}}",
+            "affected": "What is affected",
+            "affectedHint": "Optional. Comma-separated, e.g. Mail, Drive.",
+            "notifySteps": "Also notify when it starts and when it ends",
+            "preview": "Preview text",
+            "previewHint": "Each reader sees the dates in their own language and time zone.",
+            "send": "Send",
+            "schedule": "Schedule",
+            "save": "Save changes",
+            "cancel": "Cancel",
+            "translated": "Translated for each reader while you leave the text as it is.",
+            "edited": "Edited text is shown as you wrote it, in every language."
+        },
+        "severity": {
+            "info": "Info",
+            "success": "Success",
+            "warning": "Warning",
+            "critical": "Critical"
+        },
+        "template": {
+            "generic": "Blank",
+            "maintenanceScheduled": "Scheduled maintenance",
+            "maintenanceInProgress": "Maintenance in progress",
+            "maintenanceFinished": "Maintenance finished",
+            "updateAvailable": "Update coming",
+            "updateApplied": "Update installed",
+            "newFeature": "New feature",
+            "incident": "Incident or degraded service",
+            "policyChange": "Policy change"
+        },
+        "errors": {
+            "audience": "Pick who gets it.",
+            "delivery": "Choose a notification, a banner, or both.",
+            "window": "Set when maintenance starts and ends.",
+            "order": "The end has to be after the start.",
+            "link": "Use a path in Polaris or an https address.",
+            "title": "Add a title.",
+            "invalid": "Check the highlighted fields.",
+            "rateLimited": "Too many sends in the last hour. Try again in {minutes} min.",
+            "notEditable": "It has already started, so it can no longer be edited. End it or send a new one.",
+            "gone": "That announcement no longer exists.",
+            "failed": "That did not work. Try again."
+        },
+        "history": {
+            "title": "Sent and scheduled",
+            "empty": "Nothing sent yet.",
+            "emptyHint": "Announcements you send or schedule are listed here.",
+            "audienceEveryone": "Everyone",
+            "audiencePicked": "{count, plural, one {# pick} other {# picks}}",
+            "reach": "{count, plural, one {# person} other {# people}}",
+            "read": "{count} read",
+            "dismissed": "{count} dismissed",
+            "edit": "Edit",
+            "duplicate": "Duplicate",
+            "retract": "Retract",
+            "end": "End now",
+            "cancelMaintenance": "Cancel maintenance",
+            "retractTitle": "Retract this announcement?",
+            "retractBody": "It comes off every banner and its notification is removed from every bell.",
+            "retractConfirm": "Retract",
+            "retracted": "Retracted",
+            "ended": "Ended",
+            "cancelled": "Cancelled",
+            "sent": "Sent",
+            "saved": "Saved",
+            "older": "Show more"
+        },
+        "phase": {
+            "scheduled": "Scheduled",
+            "live": "Showing",
+            "upcoming": "Announced",
+            "inProgress": "In progress",
+            "finished": "Finished",
+            "ended": "Ended",
+            "retracted": "Retracted"
+        }
+    }
+}

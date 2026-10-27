@@ -1030,6 +1030,27 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "instance.announcement",
+        group: "system",
+        label: "Announcement from your administrator",
+        description:
+            "A message an administrator of this instance sent to you or a group you are in.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "instance.announcement.critical",
+        group: "system",
+        label: "Critical announcement",
+        description:
+            "An urgent message from an administrator, such as an outage. Always reaches the bell.",
+        level: "danger",
+        // Critical by the administrator's choice: it is the one way to reach
+        // everybody about an outage, so quiet hours and a muted rule do not hold it.
+        critical: true,
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "polar.chatReady",
         group: "polar",
         label: "Polar finished while you were away",
