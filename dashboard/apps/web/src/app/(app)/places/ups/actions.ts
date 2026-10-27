@@ -316,9 +316,7 @@ export async function setUpsVarAction(
 }
 
 /** The login another machine's upsmon types, for a UPS offered to the network. */
-export async function upsNetworkLoginAction(
-    id: string
-): Promise<
+export async function upsNetworkLoginAction(id: string): Promise<
     UpsActionResult<{
         user: string;
         password: string;
