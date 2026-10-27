@@ -17,6 +17,7 @@ import {
     type HostAction
 } from "../model/specs";
 import * as images from "../model/images";
+import { unstampLog } from "../model/parse";
 import {
     parseContainerState,
     quoteArgv,
@@ -62,8 +63,11 @@ async function logsOf(ports: RuntimePorts, name: string): Promise<string> {
             size += buffer.length;
             parts.push(buffer);
         })
-        .catch(() => undefined);
-    return Buffer.concat(parts).toString("utf8");
+        .catch((caught) =>
+            console.error(`polaris: security scan output of ${name} cut short:`, caught)
+        );
+    // Read with the engine's stamps, which a JSON report must not keep.
+    return unstampLog(Buffer.concat(parts).toString("utf8"));
 }
 
 /** Bring a one-off container up, wait for it to exit, read what it printed and

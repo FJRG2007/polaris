@@ -43,6 +43,8 @@
         "timeout": "The scan took too long and was stopped.",
         "imageMissing": "The image is no longer on the server. Redeploy, then scan again.",
         "noRoom": "Not enough free disk on the server to check this image. Free some space, then try again.",
+        "scannerFailed": "The vulnerability scanner stopped with an error. Try again.",
+        "reportUnreadable": "The scanner's report could not be read. Update Polaris from Settings, then scan again.",
         "daemonOutdated": "This needs a newer Polaris. Update from Settings, then try again.",
         "noDaemon": "This Polaris runs without its host service, so it cannot scan images here."
     }

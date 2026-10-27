@@ -43,6 +43,8 @@
         "timeout": "El análisis tardó demasiado y se detuvo.",
         "imageMissing": "La imagen ya no está en el servidor. Vuelve a desplegar y analiza de nuevo.",
         "noRoom": "No hay espacio libre suficiente en el servidor para comprobar esta imagen. Libera espacio e inténtalo de nuevo.",
+        "scannerFailed": "El analizador de vulnerabilidades se detuvo con un error. Inténtalo de nuevo.",
+        "reportUnreadable": "No se pudo leer el informe del analizador. Actualiza Polaris desde Ajustes y vuelve a analizar.",
         "daemonOutdated": "Esto necesita un Polaris más reciente. Actualiza desde Ajustes y vuelve a intentarlo.",
         "noDaemon": "Este Polaris funciona sin su servicio de host y no puede analizar imágenes aquí."
     }

@@ -21,6 +21,8 @@ const ERRORS = new Set([
     "notRunning",
     "noApp",
     "scanError",
+    "scannerFailed",
+    "reportUnreadable",
     "lost",
     "timeout",
     "imageMissing",
