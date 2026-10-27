@@ -620,7 +620,8 @@
                 "api": "Cloudflare could not be read: {detail}",
                 "conflict": "These names point at an address Polaris did not write, so they were left alone: {detail}",
                 "failed": "Some records could not be updated: {detail}",
-                "unreached": "Public resolvers still answer another address after the record's TTL. Check the records below."
+                "unreached": "Public resolvers still answer another address after the record's TTL. Check the records below.",
+                "cgnat": "The DNS records were not pointed at {ip}: this line takes no visitors (carrier-grade NAT). <link>Choose a way in under Backup access</link>."
             }
         },
         "acme": {
@@ -659,7 +660,9 @@
                 "off": "Off",
                 "direct": "Direct",
                 "tunnel": "Cloudflare tunnel",
-                "relay": "Own relay"
+                "relay": "Own relay",
+                "tailscale": "Tailscale",
+                "ipv6": "IPv6"
             },
             "modes": {
                 "automatic": "Automatic",
@@ -704,7 +707,50 @@
             },
             "tcpCarried": "The relay carries TCP {ports}.",
             "fromOutside": "from {server}",
-            "fromInside": "from this server"
+            "fromInside": "from this server",
+            "cgnat": {
+                "title": "This line takes no visitors from the internet: {ip} is shared by the provider (carrier-grade NAT).",
+                "reasons": {
+                    "carrier-address": "This server has a carrier address.",
+                    "router-wan": "The router's own address is not the one the internet sees.",
+                    "starlink": "It is a Starlink address, and nothing from outside has reached it.",
+                    "no-inbound": "A check from your cloud server could not get in.",
+                    "address-mismatch": "The line answers from more than one address."
+                },
+                "covered": "The domain is kept on the path chosen below.",
+                "pick": {
+                    "relay": "Choose Own relay below to keep the domain, calls and games reachable.",
+                    "tunnel": "Choose Cloudflare tunnel below to keep the websites reachable.",
+                    "tailscale": "Set up Tailscale to reach Polaris from your own devices.",
+                    "direct": "Choose a path below to keep the domain reachable.",
+                    "ipv6": "Visitors with IPv6 can still reach the domain; choose a path below for everyone else."
+                }
+            },
+            "works": {
+                "on": "Working now through {path}",
+                "none": "Nothing reaches this server from outside right now",
+                "yes": "Works",
+                "no": "Off",
+                "callsLocal": "Calls work inside the house only: no path carries call audio for people outside. Own relay carries it."
+            },
+            "features": {
+                "web": "Dashboard and websites",
+                "ownDomain": "Your own domain",
+                "calls": "Calls with people outside",
+                "games": "Game servers",
+                "mail": "Incoming mail"
+            },
+            "compare": {
+                "title": "Ways in when the line takes no visitors",
+                "recommended": "Recommended",
+                "relay": "Carries everything: your domain, calls, game servers and mail. Needs one of your cloud servers; grows with its size.",
+                "tunnel": "Free. Websites on your domain only - no calls, game servers or mail. Needs the domain's DNS on Cloudflare.",
+                "tailscale": "Free. Your own devices reach Polaris privately; websites only on a .ts.net name, never on your domain.",
+                "tailscaleOpen": "Open Tailscale",
+                "tailscaleSetUp": "Set up Tailscale",
+                "ipv6": "Free. Reaches only visitors whose own connection has IPv6.",
+                "direct": "Your own line, when it takes visitors: everything works."
+            }
         },
         "tailscale": {
             "title": "Remote access with Tailscale",
