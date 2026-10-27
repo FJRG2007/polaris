@@ -20,7 +20,9 @@ import {
 
 const idSchema = z.string().uuid();
 
-export async function serviceImageFindingsAction(applicationId: unknown): Promise<
+export async function serviceImageFindingsAction(
+    applicationId: unknown
+): Promise<
     | { error: "failed" }
     | { image: string | null; scan: ImageScanView | null; findings: ImageFindingRow[] }
 > {
