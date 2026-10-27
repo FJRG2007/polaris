@@ -259,6 +259,46 @@ services:
     # address - which every device in the house can already reach, with no
     # router rule - and, once discovery confirms it, the public one as well.
     network_mode: host
+    # One local address, worked out each time the server starts.
+    #
+    # Left to itself the server offers every address the machine holds, and a
+    # machine on cable and WiFi in the same house holds two on the same network.
+    # A browser then has two equally good ways in and keeps trading one for the
+    # other: a call on this deployment switched path every two seconds for
+    # twenty-five minutes, and every switch starts the video's bandwidth estimate
+    # again from nothing, so the picture never got past blurry.
+    #
+    # So it is given the address the machine itself would use to reach the
+    # internet - the default route with the lowest metric, the same choice the
+    # local-name responder makes - plus the public one STUN finds from it. The
+    # kernel answers that question (`ip route get`, the image's busybox; nothing
+    # is sent), so it is right on cable, on WiFi, and after a move. When the
+    # route goes through a container bridge or a VPN tunnel, or there is no route
+    # yet, nothing is narrowed and the exclusions below are what applies.
+    #
+    # It is worked out here rather than written into .env or the configuration
+    # by the dashboard, so it needs nothing an existing install does not have and
+    # is right again on every start. When the machine's preferred address
+    # changes, the dashboard restarts this container (`lan-address-follow`), and
+    # that start is what picks the new one up.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        route=$$(ip -4 route get 1.1.1.1 2>/dev/null)
+        dev=$$(printf '%s\n' "$$route" | sed -n 's/.* dev \([^ ]*\).*/\1/p')
+        src=$$(printf '%s\n' "$$route" | sed -n 's/.* src \([0-9][0-9.]*\).*/\1/p')
+        case "$$dev" in
+          ""|docker*|br-*|veth*|virbr*|cni*|flannel*|kube*|tailscale*|zt*|wg*|tun*) src="" ;;
+        esac
+        if [ -n "$$src" ]; then
+          LIVEKIT_CONFIG=$$(printf '%s\n' "$$LIVEKIT_CONFIG" | sed "s|^\( *\)# includes: default-route address$$|\1includes: [$$src/32]|")
+          export LIVEKIT_CONFIG
+          echo "polaris: offering calls on $$src ($$dev) and the public address" >&2
+        else
+          echo "polaris: no default route to narrow to; offering every local address" >&2
+        fi
+        exec /livekit-server
     environment:
       # Held here rather than in a mounted file: one place to read, and nothing
       # to keep in step with a host path that moves during a self-update.
@@ -340,6 +380,10 @@ services:
           # there is no name to write down. An address there is always in one of
           # these blocks.
           ips:
+            # Replaced at start by the default route's address (see the
+            # entrypoint above). An include list makes LiveKit ignore the
+            # exclusions, so they only ever apply when there is no such route.
+            # includes: default-route address
             excludes:
               # Docker's default pool: docker0 at 172.17, then a /16 per network
               # it creates, from 172.18 upwards. Written as the four blocks that

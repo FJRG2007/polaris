@@ -101,3 +101,40 @@ describe("the addresses a call may be answered on", () => {
         expect(COMPOSE).toContain("advertise_internal_ip: true");
     });
 });
+
+describe("the one local address a call is offered", () => {
+    // The livekit service's own start script, as compose hands it to the shell.
+    const service = COMPOSE.slice(COMPOSE.search(/^ {2}livekit:/m));
+    const script = service.slice(
+        service.indexOf("    entrypoint:"),
+        service.indexOf("    environment:")
+    );
+    const MARKER = "# includes: default-route address";
+
+    it("asks the kernel for the default route's address and starts the server itself", () => {
+        expect(script).toContain("ip -4 route get");
+        expect(script).toContain("exec /livekit-server");
+    });
+
+    it("escapes every dollar sign, so compose leaves the shell's variables alone", () => {
+        // A single `$` is compose interpolation: `$src` would become an empty
+        // string from .env and the address would never be written in.
+        expect(script.replace(/\$\$/g, "")).not.toContain("$");
+    });
+
+    it("has exactly one place for the address, inside the ips block, which the script fills", () => {
+        const lines = COMPOSE.split(/\r?\n/);
+        const at = lines.findIndex((line) => line.trim() === MARKER);
+        expect(lines.filter((line) => line.trim() === MARKER)).toHaveLength(1);
+        expect(script).toContain(MARKER);
+        // An include written there sits beside the exclusions, in rtc.ips.
+        const indent = (line: string) => line.length - line.trimStart().length;
+        const excludes = lines.findIndex(
+            (line, index) => index > at && line.trim() === "excludes:"
+        );
+        const ips = lines.slice(0, at).findLastIndex((line) => line.trim() === "ips:");
+        expect(indent(lines[at]!)).toBe(indent(lines[excludes]!));
+        expect(indent(lines[ips]!)).toBeLessThan(indent(lines[at]!));
+        expect(lines.slice(ips + 1, at).every((line) => line.trim().startsWith("#"))).toBe(true);
+    });
+});

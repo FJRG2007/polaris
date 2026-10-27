@@ -20,7 +20,7 @@ vi.mock("@/lib/host-address", () => ({
     getHostLanIps: async () => []
 }));
 
-const { followLanAddress, lanAddressChange, LAN_ADDRESS_KEY, LAN_HISTORY_KEY } =
+const { followLanAddress, lanAddressChange, CALLS_LAN_KEY, LAN_ADDRESS_KEY, LAN_HISTORY_KEY } =
     await import("@/lib/lan-address-follow");
 
 function harness(
@@ -39,6 +39,7 @@ function harness(
         }),
         dns: vi.fn(async () => (dnsMoves && last && current ? { from: last, to: current } : null)),
         certificate: vi.fn(async () => undefined),
+        calls: vi.fn(async () => true),
         announce: vi.fn(async () => undefined)
     };
     return { steps, store };
@@ -139,5 +140,63 @@ describe("followLanAddress", () => {
         expect(store.get(LAN_ADDRESS_KEY)).toBe("192.168.1.20");
         expect(steps.write).not.toHaveBeenCalled();
         expect(steps.announce).not.toHaveBeenCalled();
+    });
+});
+
+describe("the call server following the preferred address", () => {
+    it("records the address on first sight without restarting anything", async () => {
+        const { steps, store } = harness("192.168.1.142", "192.168.1.142");
+        await followLanAddress(steps);
+        expect(store.get(CALLS_LAN_KEY)).toBe("192.168.1.142");
+        expect(steps.calls).not.toHaveBeenCalled();
+    });
+
+    it("restarts it when cable and WiFi trade places, even with both held", async () => {
+        const { steps, store } = harness("192.168.1.149", "192.168.1.142", false, ["192.168.1.142"]);
+        store.set(CALLS_LAN_KEY, "192.168.1.142");
+        await followLanAddress(steps);
+        expect(steps.calls).toHaveBeenCalledOnce();
+        expect(store.get(CALLS_LAN_KEY)).toBe("192.168.1.149");
+        // Not a move: nobody is told, and the next pass is quiet.
+        expect(steps.announce).not.toHaveBeenCalled();
+        await followLanAddress(steps);
+        expect(steps.calls).toHaveBeenCalledOnce();
+    });
+
+    it("restarts it on a move", async () => {
+        const { steps, store } = harness("10.0.0.5", "192.168.1.20");
+        store.set(CALLS_LAN_KEY, "192.168.1.20");
+        await followLanAddress(steps);
+        expect(steps.calls).toHaveBeenCalledOnce();
+        expect(steps.announce).toHaveBeenCalledOnce();
+    });
+
+    it("tries again on the next pass when the restart failed", async () => {
+        const { steps, store } = harness("192.168.1.149", "192.168.1.149");
+        store.set(CALLS_LAN_KEY, "192.168.1.142");
+        steps.calls.mockResolvedValueOnce(false);
+        await followLanAddress(steps);
+        expect(store.get(CALLS_LAN_KEY)).toBe("192.168.1.142");
+        await followLanAddress(steps);
+        expect(steps.calls).toHaveBeenCalledTimes(2);
+        expect(store.get(CALLS_LAN_KEY)).toBe("192.168.1.149");
+    });
+
+    it("does not let a failing restart stop the rest of the pass", async () => {
+        const { steps, store } = harness("10.0.0.5", "192.168.1.20");
+        store.set(CALLS_LAN_KEY, "192.168.1.20");
+        steps.calls.mockRejectedValueOnce(new Error("no engine"));
+        const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        await followLanAddress(steps);
+        errors.mockRestore();
+        expect(steps.certificate).toHaveBeenCalledOnce();
+        expect(steps.announce).toHaveBeenCalledOnce();
+    });
+
+    it("leaves it alone while the address is unknown", async () => {
+        const { steps, store } = harness(null, "192.168.1.20");
+        store.set(CALLS_LAN_KEY, "192.168.1.20");
+        await followLanAddress(steps);
+        expect(steps.calls).not.toHaveBeenCalled();
     });
 });

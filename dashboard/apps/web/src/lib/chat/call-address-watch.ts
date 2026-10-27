@@ -204,6 +204,19 @@ export async function callAddressFacts(): Promise<{
     };
 }
 
+/**
+ * Restart this deployment's own media server for a reason other than the public
+ * address: it picks the one local address it offers when it starts, so a machine
+ * whose preferred address changed needs it started again (`lan-address-follow`).
+ * "absent" when there is no container to restart - the limited edition, or a
+ * server somebody else runs - which is nothing to retry.
+ */
+export async function restartCallServer(): Promise<"restarted" | "absent" | "failed"> {
+    const container = await callContainer();
+    if (!container) return "absent";
+    return (await restart(container.id)) ? "restarted" : "failed";
+}
+
 /** The media server's container, if this deployment runs one. */
 async function callContainer(): Promise<{ id: string; startedAt: string | null } | null> {
     let driver: ReturnType<typeof localDockerDriver> | null = null;
