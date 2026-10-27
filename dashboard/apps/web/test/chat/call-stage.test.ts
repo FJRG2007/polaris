@@ -5,6 +5,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    cardRingIn,
+    cardRingsKey,
+    publishCardRings,
     ringAfter,
     ringExpired,
     showStage,
@@ -133,6 +136,28 @@ describe("showStage", () => {
         expect(stageShown("m1")).toBe(false);
         expect(shownStages()).toBe("");
         expect(heard).toBe(4);
+        stop();
+    });
+});
+
+describe("publishCardRings", () => {
+    it("says what the card rings about, per conversation, and only when it changes", () => {
+        let heard = 0;
+        const stop = subscribeStages(() => heard++);
+        const card = { ...ringing, channelId: "c1", silenced: false };
+        publishCardRings([card]);
+        publishCardRings([{ ...card }]);
+        expect(heard).toBe(1);
+        expect(cardRingIn("c1")).toEqual(card);
+        expect(cardRingIn("c2")).toBeNull();
+
+        publishCardRings([{ ...card, silenced: true }]);
+        expect(heard).toBe(2);
+        expect(cardRingIn("c1")?.silenced).toBe(true);
+
+        publishCardRings([]);
+        expect(cardRingIn("c1")).toBeNull();
+        expect(cardRingsKey()).toBe("");
         stop();
     });
 });

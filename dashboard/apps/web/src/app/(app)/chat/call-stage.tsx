@@ -16,7 +16,7 @@ import { LiveBadge, callBadgeOf } from "./call-roster";
 import { Avatar } from "@/components/avatar";
 import { showStage } from "@/lib/chat/call-stage";
 import type { VoicePresence } from "@/lib/chat/meetings";
-import { ChevronUp, PhoneCall, Video, X } from "lucide-react";
+import { BellOff, ChevronUp, PhoneCall, Video, X } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { SeatMenu, type RosterModeration } from "./call-moderation-menu";
@@ -38,6 +38,8 @@ export function CallStage({
     busy = false,
     onJoin,
     onDecline,
+    silenced = false,
+    onSilence,
     onHide,
     moderation
 }: {
@@ -50,6 +52,10 @@ export function CallStage({
     busy?: boolean;
     onJoin: (withVideo: boolean) => void;
     onDecline: () => void;
+    /** Whether the ring has already been silenced, here or in the corner card. */
+    silenced?: boolean;
+    /** Stop the sound and keep the call, while it rings. */
+    onSilence?: () => void;
     onHide: () => void;
     moderation?: RosterModeration;
 }) {
@@ -85,6 +91,18 @@ export function CallStage({
                         ? t("callStage.calling", { name: caller.name })
                         : callSummary(count)}
                 </span>
+                {ringing && onSilence && (
+                    <button
+                        type="button"
+                        onClick={onSilence}
+                        disabled={silenced}
+                        aria-label={t("callStage.silence")}
+                        title={t("callStage.silence")}
+                        className="rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
+                    >
+                        <BellOff className="size-4" />
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={onHide}

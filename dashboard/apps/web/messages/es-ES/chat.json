@@ -1503,7 +1503,8 @@
         "calling": "{name} te está llamando",
         "incomingCall": "Llamada entrante",
         "joinWithVideo": "Entrar con vídeo",
-        "decline": "Rechazar"
+        "decline": "Rechazar",
+        "silence": "Silenciar el tono"
     },
     "saved": {
         "backToConversations": "Volver a conversaciones",

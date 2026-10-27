@@ -1503,7 +1503,8 @@
         "calling": "{name} is calling",
         "incomingCall": "Incoming call",
         "joinWithVideo": "Join with video",
-        "decline": "Decline"
+        "decline": "Decline",
+        "silence": "Silence the ring"
     },
     "saved": {
         "backToConversations": "Back to conversations",

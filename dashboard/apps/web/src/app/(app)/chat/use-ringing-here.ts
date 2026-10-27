@@ -7,23 +7,43 @@
  * through the channel the tabs already share: a call the card declined or
  * answered stops ringing here, and one declined here stops the card - in this
  * tab and in every other one.
+ *
+ * What the card is still ringing about counts too: a conversation opened after
+ * the ring arrived - from the desktop notice, which is how most people get
+ * there - never saw the frame, and still has to ring.
  */
 
 import { useChatStream } from "./use-chat-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { playCallSound, RING_FOR_MS } from "@/lib/call-sounds";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
-import { ringAfter, ringExpired, type StageRing } from "@/lib/chat/call-stage";
+import {
+    cardRingIn,
+    cardRingsKey,
+    ringAfter,
+    ringExpired,
+    subscribeStages,
+    type StageRing
+} from "@/lib/chat/call-stage";
 import { CALLS_CHANNEL, callTabMessageSchema, type CallTabMessage } from "@/lib/chat/call-tabs";
 
 export function useRingingHere(
     channelId: string,
     viewerId: string,
     inCall: string | null
-): { ring: StageRing | null; decline: () => void } {
+): { ring: StageRing | null; silenced: boolean; decline: () => void; silence: () => void } {
     const scope = useSessionScope();
-    const [ring, setRing] = useState<StageRing | null>(null);
+    const [heard, setRing] = useState<StageRing | null>(null);
+    useSyncExternalStore(subscribeStages, cardRingsKey, () => "");
+    const card = cardRingIn(channelId);
+    // The card's ring first: it is the one that knows about silencing, and the
+    // one that was there before this conversation was opened.
+    const ring: StageRing | null =
+        card && card.meetingId !== inCall
+            ? { meetingId: card.meetingId, callerId: card.callerId, name: card.name, at: card.at }
+            : heard;
+    const silenced = card !== null && card.meetingId === ring?.meetingId && card.silenced;
     const peers = useRef<PeerChannel<CallTabMessage> | null>(null);
 
     // Another conversation is another set of calls.
@@ -60,15 +80,15 @@ export function useRingingHere(
 
     // Stops when a telephone would, like the corner card.
     useEffect(() => {
-        if (!ring) return;
-        const left = Math.max(0, ring.at + RING_FOR_MS - Date.now());
+        if (!heard) return;
+        const left = Math.max(0, heard.at + RING_FOR_MS - Date.now());
         const timer = setTimeout(() => {
             setRing((current) =>
                 current && ringExpired(current, Date.now(), RING_FOR_MS) ? null : current
             );
         }, left);
         return () => clearTimeout(timer);
-    }, [ring]);
+    }, [heard]);
 
     const decline = useCallback(() => {
         if (!ring) return;
@@ -77,5 +97,12 @@ export function useRingingHere(
         setRing(null);
     }, [ring]);
 
-    return { ring, decline };
+    /** Stop the sound, keep the call - the card's middle answer, said to it and
+     *  to every other tab the way the card says it. */
+    const silence = useCallback(() => {
+        if (!ring) return;
+        peers.current?.post({ kind: "silenced", meetingId: ring.meetingId });
+    }, [ring]);
+
+    return { ring, silenced, decline, silence };
 }

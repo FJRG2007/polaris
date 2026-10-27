@@ -195,12 +195,16 @@ describe("the call stage", () => {
 });
 
 function Ringing({ channelId = "c1" }: { channelId?: string }) {
-    const { ring, decline } = useRingingHere(channelId, "ada", null);
+    const { ring, decline, silenced, silence } = useRingingHere(channelId, "ada", null);
     return (
         <div>
             <span data-testid="ring">{ring ? ring.meetingId : "none"}</span>
+            <span data-testid="silenced">{silenced ? "yes" : "no"}</span>
             <button type="button" onClick={decline}>
                 decline here
+            </button>
+            <button type="button" onClick={silence}>
+                silence here
             </button>
         </div>
     );
@@ -246,6 +250,89 @@ describe("ringing in the conversation", () => {
         send(ring("m1"));
         fireEvent.click(await screen.findByLabelText("Decline"));
         expect(screen.getByTestId("ring").textContent).toBe("none");
+    });
+});
+
+describe("a conversation opened after the ring arrived", () => {
+    it("rings from what the corner card is still ringing about", async () => {
+        const view = render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
+        send(ring("m1"));
+        expect(await screen.findByText("Grace is calling")).toBeTruthy();
+
+        // Opened now, from the notice: the frame has already gone by.
+        view.rerender(
+            <>
+                <IncomingCalls viewerId="ada" />
+                <Ringing />
+            </>
+        );
+        expect(screen.getByTestId("ring").textContent).toBe("m1");
+
+        // Not for another conversation.
+        view.rerender(
+            <>
+                <IncomingCalls viewerId="ada" />
+                <Ringing channelId="c2" />
+            </>
+        );
+        expect(screen.getByTestId("ring").textContent).toBe("none");
+    });
+
+    it("declining it stops the card", async () => {
+        const view = render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
+        send(ring("m1"));
+        await screen.findByText("Grace is calling");
+        view.rerender(
+            <>
+                <IncomingCalls viewerId="ada" />
+                <Ringing />
+            </>
+        );
+
+        fireEvent.click(screen.getByText("decline here"));
+
+        await vi.waitFor(() => expect(screen.queryByText("Grace is calling")).toBeNull());
+        expect(screen.getByTestId("ring").textContent).toBe("none");
+    });
+
+    it("silencing it silences the card, and the call keeps ringing on screen", async () => {
+        const view = render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
+        send(ring("m1"));
+        await screen.findByText("Grace is calling");
+        view.rerender(
+            <>
+                <IncomingCalls viewerId="ada" />
+                <Ringing />
+            </>
+        );
+        expect(screen.getByTestId("silenced").textContent).toBe("no");
+
+        fireEvent.click(screen.getByText("silence here"));
+
+        await vi.waitFor(() => expect(screen.getByTestId("silenced").textContent).toBe("yes"));
+        expect(
+            (screen.getByLabelText("Silence the ring") as HTMLButtonElement).disabled
+        ).toBe(true);
+        expect(screen.getByTestId("ring").textContent).toBe("m1");
+    });
+});
+
+describe("the stage's silence button", () => {
+    it("shows only while ringing, and is spent once silenced", () => {
+        const onSilence = vi.fn();
+        stage({ caller: { id: "grace", name: "Grace" }, onSilence });
+        fireEvent.click(screen.getByRole("button", { name: "Silence the ring" }));
+        expect(onSilence).toHaveBeenCalledTimes(1);
+        cleanup();
+
+        stage({ caller: { id: "grace", name: "Grace" }, onSilence, silenced: true });
+        expect(
+            (screen.getByRole("button", { name: "Silence the ring" }) as HTMLButtonElement).disabled
+        ).toBe(true);
+        cleanup();
+
+        stage({ onSilence });
+        expect(screen.queryByRole("button", { name: "Silence the ring" })).toBeNull();
     });
 });
 

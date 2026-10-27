@@ -7,6 +7,7 @@
  */
 import { MessagesWrapper } from "../setup/i18n";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
+import { publishCardRings } from "@/lib/chat/call-stage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 
@@ -166,7 +167,10 @@ beforeEach(() => {
     });
     Element.prototype.scrollIntoView = () => undefined;
 });
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    publishCardRings([]);
+});
 
 /** The newest handler each mounted hook gave the stream, called with one frame. */
 function send(frame: unknown): void {
@@ -235,5 +239,30 @@ describe("a group call ringing at somebody reading the group", () => {
         expect(within(stage).queryByTestId("ring-pulse")).toBeNull();
         expect(within(stage).queryByRole("button", { name: "Decline" })).toBeNull();
         expect(within(stage).getByRole("button", { name: "Join with video" })).toBeTruthy();
+    });
+});
+
+describe("a group opened while the call is still ringing", () => {
+    it("rings on the stage with decline and silence, though the ring frame went by", async () => {
+        // The corner card heard the ring before this conversation was opened.
+        publishCardRings([
+            {
+                meetingId: "m1",
+                channelId: "c1",
+                callerId: "bo",
+                name: "Bo Diaz",
+                at: Date.now(),
+                silenced: false
+            }
+        ]);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
+
+        const stage = await screen.findByRole("region", { name: "Incoming call" });
+        expect(within(stage).getAllByTestId("ring-pulse")).toHaveLength(1);
+        expect(within(stage).getByRole("button", { name: "Silence the ring" })).toBeTruthy();
+        fireEvent.click(within(stage).getByRole("button", { name: "Decline" }));
+        await vi.waitFor(() =>
+            expect(screen.queryByRole("region", { name: "Incoming call" })).toBeNull()
+        );
     });
 });

@@ -125,3 +125,41 @@ export function subscribeStages(listener: () => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
 }
+
+/**
+ * What the corner card is ringing about right now, in this tab.
+ *
+ * The card is mounted with the shell and hears every ring, so it is the one
+ * place that knows a call is still ringing when somebody opens the
+ * conversation after the ring arrived - from the desktop notice, say, which
+ * is how most people get there. The stage reads it from here rather than only
+ * from a frame that went by before it was mounted.
+ */
+export interface CardRing extends StageRing {
+    readonly channelId: string;
+    readonly silenced: boolean;
+}
+
+let cardRings: readonly CardRing[] = [];
+let cardKey = "";
+
+/** Said by the corner card whenever what it is ringing about changes. */
+export function publishCardRings(rings: readonly CardRing[]): void {
+    const key = rings
+        .map((ring) => `${ring.meetingId}:${ring.channelId}:${ring.at}:${ring.silenced ? 1 : 0}`)
+        .join(",");
+    if (key === cardKey) return;
+    cardRings = rings;
+    cardKey = key;
+    changed();
+}
+
+/** A key that changes whenever what the card rings about does, for `useSyncExternalStore`. */
+export function cardRingsKey(): string {
+    return cardKey;
+}
+
+/** The call the card is ringing about in `channelId`, if any. */
+export function cardRingIn(channelId: string): CardRing | null {
+    return cardRings.find((ring) => ring.channelId === channelId) ?? null;
+}

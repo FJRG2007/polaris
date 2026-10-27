@@ -2510,6 +2510,8 @@ export function ChannelView({
                             // into the line, still one press from joining.
                             setHidden(true);
                         }}
+                        silenced={ringingHere.silenced}
+                        onSilence={ringingHere.silence}
                         onHide={() => setHidden(true)}
                         moderation={rosterModeration}
                     />

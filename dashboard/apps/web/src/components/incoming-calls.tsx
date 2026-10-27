@@ -60,7 +60,12 @@ import {
     type NoticeStanding
 } from "@/lib/desktop-notify";
 import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
-import { shownStages, stageShown, subscribeStages } from "@/lib/chat/call-stage";
+import {
+    publishCardRings,
+    shownStages,
+    stageShown,
+    subscribeStages
+} from "@/lib/chat/call-stage";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging, willBeHeard } from "@/lib/call-sounds";
@@ -609,6 +614,22 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
      * stays: the sound, the notice, and the card the moment the stage goes.
      */
     useSyncExternalStore(subscribeStages, shownStages, () => "");
+
+    // And what is ringing, for the stage of a conversation opened after the
+    // ring arrived. Cleared when this goes, so nothing rings on from it.
+    useEffect(() => {
+        publishCardRings(
+            showing.map((entry) => ({
+                meetingId: entry.meetingId,
+                channelId: entry.channelId,
+                callerId: entry.userId,
+                name: entry.name,
+                at: entry.at,
+                silenced: silenced.includes(entry.meetingId)
+            }))
+        );
+    });
+    useEffect(() => () => publishCardRings([]), []);
     const cards = showing.filter((entry) => !stageShown(entry.meetingId));
 
     if (cards.length === 0 && missed.length === 0) return null;
