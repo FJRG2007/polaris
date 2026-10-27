@@ -2034,9 +2034,6 @@
             "server": "No se pudo conectar con el servidor del juego. Inténtalo en un momento."
         }
     },
-    "attachMenu": {
-        "add": "Añadir"
-    },
     "dictation": {
         "start": "Dictar",
         "startWithKey": "Dictar ({key})",
@@ -2050,6 +2047,7 @@
         "gotIt": "Entendido",
         "slideHint": "Suelta para enviar. Desliza a la izquierda para cancelar, arriba para bloquear.",
         "voiceMessage": "Mensaje de voz",
+        "settings": "Ajustes de dictado",
         "private": "Dictado privado",
         "privateHelp": "Lo escribe Polaris en lugar de tu navegador.",
         "problem": {
@@ -2061,6 +2059,7 @@
             "language": "El dictado no está disponible en este idioma en este navegador.",
             "notSetUp": "El dictado aún no está disponible aquí. Tus administradores pueden activarlo.",
             "tooMany": "Demasiados dictados por ahora. Espera un minuto y vuelve a intentarlo.",
+            "unavailable": "Este navegador no puede dictar. Envía un mensaje de voz o pide a tus administradores que activen el dictado.",
             "failed": "No se ha podido escribir. Vuelve a intentarlo."
         },
         "problemWithPrivate": {

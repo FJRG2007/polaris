@@ -8,7 +8,7 @@
  * before the microphone opened never turns into a recording.
  */
 
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const transcribe = vi.hoisted(() => vi.fn());
@@ -92,12 +92,18 @@ beforeEach(() => {
     (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition =
         FakeRecognizer;
     vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+    try {
+        window.localStorage.clear();
+    } catch {
+        // No storage here: nothing was remembered.
+    }
 });
 
 afterEach(() => {
     cleanup();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
 });
 
 describe("browser dictation", () => {
@@ -126,6 +132,45 @@ describe("browser dictation", () => {
         expect(onText).not.toHaveBeenCalled();
         expect(recognizer.aborted).toBe(true);
         expect(result.current.active).toBe(false);
+    });
+});
+
+describe("a browser whose recognizer cannot work here", () => {
+    function polarisAnswers(available: boolean) {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response(JSON.stringify({ available }), { status: 200 }))
+        );
+    }
+
+    it("says what to do in Polaris when it cannot transcribe either", async () => {
+        polarisAnswers(false);
+        const onBrowserUnusable = vi.fn();
+        const { result } = renderHook(() =>
+            useDictation({ engine: "browser", locale: "en-US", onText: vi.fn(), onBrowserUnusable })
+        );
+        act(() => result.current.start());
+        act(() => FakeRecognizer.last!.onerror?.({ error: "network" }));
+        expect(onBrowserUnusable).toHaveBeenCalledOnce();
+        await waitFor(() => expect(result.current.problem).toBe("unavailable"));
+        expect(result.current.active).toBe(false);
+    });
+
+    it("carries on with Polaris's transcription, with no error", async () => {
+        // Past the tab's cached answer from the test before.
+        const now = Date.now.bind(Date);
+        vi.spyOn(Date, "now").mockImplementation(() => now() + 3_600_000);
+        polarisAnswers(true);
+        micAnswers(() => new Promise(() => undefined));
+        const { result } = renderHook(() =>
+            useDictation({ engine: "browser", locale: "en-US", onText: vi.fn() })
+        );
+        act(() => result.current.start());
+        act(() => FakeRecognizer.last!.onerror?.({ error: "service-not-allowed" }));
+        await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalled());
+        expect(result.current.problem).toBeNull();
+        expect(result.current.active).toBe(true);
+        act(() => result.current.cancel());
     });
 });
 

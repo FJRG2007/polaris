@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 /**
- * The composer with fewer buttons: one "+" holding what the room allows, and a
- * mic that shares Send's place - dictating into the box on a tap, never sending.
+ * The composer keeps every button it always had - attach, photo or video,
+ * voice message, clip, poll - with dictation as one more control beside Send,
+ * typing into the box on a tap and never sending.
  *
  * The browser's recognizer is a stand-in here; no microphone is opened and no
  * sound is played.
@@ -85,7 +86,11 @@ beforeEach(() => {
 });
 afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     delete (window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
+    delete (navigator as { brave?: unknown }).brave;
+    Reflect.deleteProperty(navigator, "mediaDevices");
 });
 
 function chatBox(extra: Partial<React.ComponentProps<typeof Composer>> = {}) {
@@ -108,54 +113,109 @@ function withRecognizer() {
     (window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition = FakeRecognizer;
 }
 
-describe("the + menu", () => {
-    it("holds the attach actions the room allows, and nothing else in the toolbar", async () => {
-        const user = userEvent.setup();
+/** A browser that can record, with a microphone that is never opened. */
+function withRecorder() {
+    vi.stubGlobal(
+        "MediaRecorder",
+        class {
+            static isTypeSupported = () => true;
+        }
+    );
+    Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: () => new Promise(() => undefined) }
+    });
+}
+
+/** Polaris's answer to whether it can transcribe. */
+function privateAvailable(available: boolean) {
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify({ available }), { status: 200 }))
+    );
+}
+
+/** The toolbar's buttons, in the order they are drawn. */
+function toolbar(): string[] {
+    return screen
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label") ?? "")
+        .filter(Boolean);
+}
+
+describe("the toolbar", () => {
+    it("shows every attach button in its place, with no + menu", async () => {
+        withRecorder();
         chatBox();
-        expect(screen.queryByRole("button", { name: "Attach a file" })).toBeNull();
-        expect(screen.queryByRole("button", { name: "Create a poll" })).toBeNull();
-        await user.click(screen.getByRole("button", { name: "Add" }));
-        const items = screen.getAllByRole("menuitem").map((item) => item.textContent);
-        // No camera on a computer, and no clip where the screen cannot be shared.
-        expect(items).toEqual(["Attach a file", "Photo or video", "Create a poll"]);
-    });
-
-    it("lists only the poll where files are not allowed", async () => {
-        const user = userEvent.setup();
-        chatBox({ attachable: false });
-        await user.click(screen.getByRole("button", { name: "Add" }));
-        expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+        await screen.findByRole("button", { name: "Record a voice message" });
+        const names = toolbar();
+        const order = [
+            "Attach a file",
+            "Send a photo or video",
+            "Record a voice message",
+            "Microphone settings",
             "Create a poll"
-        ]);
+        ];
+        expect(names.filter((name) => order.includes(name))).toEqual(order);
+        expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
     });
 
-    it("is not drawn when the room allows none of them", () => {
-        chatBox({ attachable: false, onPoll: undefined });
-        expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+    it("keeps only the poll where files are not allowed", () => {
+        withRecorder();
+        chatBox({ attachable: false });
+        expect(screen.getByRole("button", { name: "Create a poll" })).toBeDefined();
+        expect(screen.queryByRole("button", { name: "Attach a file" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Record a voice message" })).toBeNull();
+    });
+
+    it("keeps the voice message button beside dictation", async () => {
+        withRecorder();
+        withRecognizer();
+        chatBox();
+        await screen.findByRole("button", { name: "Dictate (Alt+M)" });
+        expect(screen.getByRole("button", { name: "Record a voice message" })).toBeDefined();
+        expect(screen.getByRole("button", { name: "Attach a file" })).toBeDefined();
     });
 });
 
-describe("the mic and Send", () => {
-    it("is Send alone where there is nothing to dictate or record with", () => {
+describe("dictation and Send", () => {
+    it("is Send alone where there is nothing to dictate with", () => {
         chatBox();
         expect(screen.getByRole("button", { name: "Send" })).toBeDefined();
         expect(screen.queryByRole("button", { name: /Dictate/ })).toBeNull();
     });
 
-    it("shows the mic on an empty box, with its key in the label", async () => {
+    it("shows the dictation button beside Send, with its key in the label", async () => {
         withRecognizer();
         chatBox();
         const mic = await screen.findByRole("button", { name: "Dictate (Alt+M)" });
         expect(mic.getAttribute("aria-pressed")).toBe("false");
-        expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+        expect(screen.getByRole("button", { name: "Send" })).toBeDefined();
     });
 
-    it("shows Send instead once there is text", async () => {
+    it("keeps both once there is text", async () => {
         withRecognizer();
         keepDraft(KEY, "already written");
         chatBox();
-        await screen.findByRole("button", { name: "Send" });
-        expect(screen.queryByRole("button", { name: /Dictate/ })).toBeNull();
+        await screen.findByRole("button", { name: "Dictate (Alt+M)" });
+        expect(screen.getByRole("button", { name: "Send" })).toBeDefined();
+    });
+
+    it("dictates with Polaris in Brave, whose recognizer never works", async () => {
+        withRecorder();
+        withRecognizer();
+        privateAvailable(true);
+        Object.defineProperty(navigator, "brave", { configurable: true, value: {} });
+        // Past the tab's cached answer from the tests before.
+        const now = Date.now.bind(Date);
+        vi.spyOn(Date, "now").mockImplementation(() => now() + 3_600_000);
+        chatBox();
+        fireEvent.click(await screen.findByRole("button", { name: "Dictate (Alt+M)" }), {
+            detail: 0
+        });
+        expect(FakeRecognizer.last).toBeNull();
+        expect(screen.getByRole("status").textContent).toContain("Listening");
+        expect(screen.queryByRole("alert")).toBeNull();
     });
 });
 

@@ -12,12 +12,11 @@
  *
  * Everything about the microphone - which one, how much noise is removed, how
  * loud, and which engine dictates - is in its menu: the chevron or a right-click
- * on a computer, a sheet on a phone (reached from the "+" sheet and from the
- * dictation strip, since a hold on a phone is the voice message).
+ * on a computer, a sheet on a phone.
  */
 
 import { MicSettings } from "./mic-settings";
-import { ChevronDown, Mic, Square } from "lucide-react";
+import { AudioLines, ChevronDown, Mic, Square } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -231,6 +230,9 @@ export function MicSlot({
                     />
                     <Square className="size-4 fill-current" />
                 </>
+            ) : engine ? (
+                // Not the voice message's mic: this one types, it records nothing.
+                <AudioLines className="size-4" />
             ) : (
                 <Mic className="size-4" />
             )}
@@ -283,9 +285,7 @@ export function MicSlot({
                         aria-describedby={undefined}
                         className="bottom-0 left-0 top-auto w-full max-w-full translate-x-0 translate-y-0 rounded-b-none pb-[max(1rem,env(safe-area-inset-bottom))] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
                     >
-                        <DialogTitle className="pb-2">
-                            {t("composer.microphoneSettings")}
-                        </DialogTitle>
+                        <DialogTitle className="pb-2">{t("dictation.settings")}</DialogTitle>
                         {body}
                     </DialogContent>
                 </Dialog>
@@ -295,8 +295,8 @@ export function MicSlot({
                         <button
                             type="button"
                             disabled={disabled}
-                            aria-label={t("composer.microphoneSettings")}
-                            title={t("composer.microphoneSettings")}
+                            aria-label={t("dictation.settings")}
+                            title={t("dictation.settings")}
                             className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                         >
                             <ChevronDown className="size-3" />

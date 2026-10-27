@@ -26,7 +26,10 @@ import { MAX_VOICE_SECONDS, recordingType } from "./voice-recorder";
 import { transcribeAudio } from "@/lib/polar/transcribe-audio";
 import {
     browserProblem,
+    browserSpeechUnusable,
+    browserUnusable,
     chunkReady,
+    markBrowserSpeechUnusable,
     privateProblem,
     speechLang,
     type DictationEngine,
@@ -56,9 +59,10 @@ interface RecognizerResultEvent {
 
 type RecognizerConstructor = new () => Recognizer;
 
-/** The browser's recognizer, prefixed or not, or null where there is none. */
+/** The browser's recognizer, prefixed or not, or null where there is none or
+ *  it is known not to work here (see `browserSpeechUnusable`). */
 export function speechRecognizer(): RecognizerConstructor | null {
-    if (typeof window === "undefined") return null;
+    if (typeof window === "undefined" || browserSpeechUnusable()) return null;
     const found = window as unknown as {
         SpeechRecognition?: RecognizerConstructor;
         webkitSpeechRecognition?: RecognizerConstructor;
@@ -98,6 +102,9 @@ export function useDictation(options: {
     locale: string;
     /** Text that is final, to be put in at the caret. */
     onText: (text: string) => void;
+    /** The browser's recognizer turned out not to work here; dictation carries
+     *  on with Polaris's transcription where it can. */
+    onBrowserUnusable?: () => void;
 }): Dictation {
     const [active, setActive] = useState(false);
     const [interim, setInterim] = useState("");
@@ -129,95 +136,6 @@ export function useDictation(options: {
         },
         [stop]
     );
-
-    const startBrowser = useCallback(() => {
-        const Constructor = speechRecognizer();
-        if (!Constructor) return fail("failed");
-        let wanted = true;
-        let quick = 0;
-        let silent = 0;
-        let startedAt = 0;
-        let dropped = false;
-        let recognizer: Recognizer;
-        const open = () => {
-            recognizer = new Constructor();
-            recognizer.lang = speechLang(latest.current.locale);
-            recognizer.continuous = true;
-            recognizer.interimResults = true;
-            recognizer.maxAlternatives = 1;
-            recognizer.onresult = (event) => {
-                if (dropped) return;
-                let guess = "";
-                for (let at = event.resultIndex; at < event.results.length; at++) {
-                    const result = event.results[at]!;
-                    const text = result[0].transcript;
-                    if (result.isFinal) {
-                        const said = text.trim();
-                        if (said) latest.current.onText(said);
-                    } else {
-                        guess += text;
-                    }
-                }
-                setInterim(guess.trim());
-                quick = 0;
-                silent = 0;
-            };
-            recognizer.onsoundstart = () => setLevel(60);
-            recognizer.onsoundend = () => setLevel(0);
-            recognizer.onerror = (event) => {
-                if (!wanted) return;
-                // "no-speech" ends a quiet stretch, and listening goes on after
-                // it - twice in a row with nothing said is somebody who has
-                // stopped talking.
-                if (event.error === "no-speech" && ++silent < 2) return;
-                wanted = false;
-                fail(browserProblem(event.error));
-            };
-            recognizer.onend = () => {
-                setInterim("");
-                if (!wanted) return;
-                // Ended by itself: a phone does after each phrase. Listening
-                // again keeps one tap one session.
-                quick = Date.now() - startedAt < 1000 ? quick + 1 : 0;
-                if (quick >= QUICK_RESTARTS) {
-                    wanted = false;
-                    return fail("noSpeech");
-                }
-                try {
-                    open();
-                } catch {
-                    wanted = false;
-                    fail("failed");
-                }
-            };
-            startedAt = Date.now();
-            recognizer.start();
-        };
-        try {
-            open();
-        } catch {
-            return fail("failed");
-        }
-        setActive(true);
-        ending.current = () => {
-            wanted = false;
-            try {
-                // `stop` hands back what was heard so far as a final result.
-                recognizer.stop();
-            } catch {
-                // Already ended.
-            }
-        };
-        leftovers.current.add(() => {
-            dropped = true;
-            wanted = false;
-            try {
-                recognizer.abort();
-            } catch {
-                // Already ended.
-            }
-        });
-    }, [fail]);
 
     const startPrivate = useCallback(() => {
         const type = recordingType();
@@ -340,6 +258,120 @@ export function useDictation(options: {
             release();
         });
     }, [fail, stop]);
+
+    /**
+     * The browser's recognizer will not work here: remember that for this
+     * browser and carry on with Polaris's transcription, without a word about
+     * it - unless Polaris cannot transcribe either, which is the one thing said.
+     */
+    const fallBack = useCallback(() => {
+        markBrowserSpeechUnusable();
+        latest.current.onBrowserUnusable?.();
+        let dropped = false;
+        const mine = () => {
+            dropped = true;
+        };
+        ending.current = mine;
+        leftovers.current.add(() => {
+            dropped = true;
+        });
+        void askPrivateDictation().then((available) => {
+            if (dropped || ending.current !== mine) return;
+            ending.current = null;
+            if (available && recordingType()) startPrivate();
+            else fail("unavailable");
+        });
+    }, [fail, startPrivate]);
+
+    const startBrowser = useCallback(() => {
+        const Constructor = speechRecognizer();
+        if (!Constructor) return fail("failed");
+        let wanted = true;
+        let quick = 0;
+        let silent = 0;
+        let startedAt = 0;
+        let dropped = false;
+        let recognizer: Recognizer;
+        const open = () => {
+            recognizer = new Constructor();
+            recognizer.lang = speechLang(latest.current.locale);
+            recognizer.continuous = true;
+            recognizer.interimResults = true;
+            recognizer.maxAlternatives = 1;
+            recognizer.onresult = (event) => {
+                if (dropped) return;
+                let guess = "";
+                for (let at = event.resultIndex; at < event.results.length; at++) {
+                    const result = event.results[at]!;
+                    const text = result[0].transcript;
+                    if (result.isFinal) {
+                        const said = text.trim();
+                        if (said) latest.current.onText(said);
+                    } else {
+                        guess += text;
+                    }
+                }
+                setInterim(guess.trim());
+                quick = 0;
+                silent = 0;
+            };
+            recognizer.onsoundstart = () => setLevel(60);
+            recognizer.onsoundend = () => setLevel(0);
+            recognizer.onerror = (event) => {
+                if (!wanted) return;
+                // "no-speech" ends a quiet stretch, and listening goes on after
+                // it - twice in a row with nothing said is somebody who has
+                // stopped talking.
+                if (event.error === "no-speech" && ++silent < 2) return;
+                wanted = false;
+                if (browserUnusable(event.error)) return fallBack();
+                fail(browserProblem(event.error));
+            };
+            recognizer.onend = () => {
+                setInterim("");
+                if (!wanted) return;
+                // Ended by itself: a phone does after each phrase. Listening
+                // again keeps one tap one session.
+                quick = Date.now() - startedAt < 1000 ? quick + 1 : 0;
+                if (quick >= QUICK_RESTARTS) {
+                    wanted = false;
+                    return fail("noSpeech");
+                }
+                try {
+                    open();
+                } catch {
+                    wanted = false;
+                    fail("failed");
+                }
+            };
+            startedAt = Date.now();
+            recognizer.start();
+        };
+        try {
+            open();
+        } catch {
+            return fail("failed");
+        }
+        setActive(true);
+        ending.current = () => {
+            wanted = false;
+            try {
+                // `stop` hands back what was heard so far as a final result.
+                recognizer.stop();
+            } catch {
+                // Already ended.
+            }
+        };
+        leftovers.current.add(() => {
+            dropped = true;
+            wanted = false;
+            try {
+                recognizer.abort();
+            } catch {
+                // Already ended.
+            }
+        });
+    }, [fail, fallBack]);
 
     const start = useCallback(() => {
         if (ending.current) return;

@@ -1,33 +1,13 @@
 /**
- * The composer's mic decisions: which button ends the box, what a press means,
- * which engine dictates, which attach items a room offers, and the words for
- * every problem in both languages.
+ * The composer's mic decisions: what a press means, which engine dictates,
+ * when the browser's recognizer is given up on, and the words for every
+ * problem in both languages.
  */
 
 import * as core from "@polaris/core";
 import { webCatalogs } from "../../messages";
 import { describe, expect, it } from "vitest";
 import * as logic from "@/app/(app)/chat/dictation-logic";
-
-const box = { editing: false, blank: true, staged: false, micAvailable: true, dictating: false };
-
-describe("the mic and Send slot", () => {
-    it("shows the mic on an empty box and Send once there is something to send", () => {
-        expect(logic.composerSlot(box)).toBe("mic");
-        expect(logic.composerSlot({ ...box, blank: false })).toBe("send");
-        expect(logic.composerSlot({ ...box, staged: true })).toBe("send");
-    });
-
-    it("keeps Save while editing and Send where there is no mic", () => {
-        expect(logic.composerSlot({ ...box, editing: true })).toBe("send");
-        expect(logic.composerSlot({ ...box, micAvailable: false })).toBe("send");
-    });
-
-    it("keeps the stop button beside Send while dictation fills the box", () => {
-        expect(logic.composerSlot({ ...box, dictating: true })).toBe("mic");
-        expect(logic.composerSlot({ ...box, dictating: true, blank: false })).toBe("both");
-    });
-});
 
 describe("tap and hold", () => {
     it("tells a tap from a hold by time", () => {
@@ -94,39 +74,6 @@ describe("the dictation engine", () => {
     });
 });
 
-describe("the attach menu", () => {
-    const room = {
-        mayAttach: true,
-        handheld: false,
-        clippable: true,
-        inCall: false,
-        poll: true,
-        micMenu: true
-    };
-
-    it("lists every item a computer allows, without a camera or a mic entry", () => {
-        expect(logic.attachItems(room)).toEqual(["file", "gallery", "clip", "poll"]);
-    });
-
-    it("adds the camera and the mic menu on a phone", () => {
-        expect(logic.attachItems({ ...room, handheld: true, clippable: false })).toEqual([
-            "file",
-            "gallery",
-            "camera",
-            "poll",
-            "mic"
-        ]);
-    });
-
-    it("hides what the room does not allow", () => {
-        expect(logic.attachItems({ ...room, mayAttach: false })).toEqual(["poll"]);
-        expect(logic.attachItems({ ...room, inCall: true })).toEqual(["file", "gallery", "poll"]);
-        expect(
-            logic.attachItems({ ...room, mayAttach: false, poll: false, micMenu: false })
-        ).toEqual([]);
-    });
-});
-
 describe("dictation problems", () => {
     it("maps the browser's error codes, staying quiet on a stop that was asked for", () => {
         expect(logic.browserProblem("aborted")).toBeNull();
@@ -135,6 +82,13 @@ describe("dictation problems", () => {
         expect(logic.browserProblem("network")).toBe("network");
         expect(logic.browserProblem("audio-capture")).toBe("noMic");
         expect(logic.browserProblem("something-new")).toBe("failed");
+    });
+
+    it("gives up on the browser's recognizer only where it will fail again", () => {
+        expect(logic.browserUnusable("network")).toBe(true);
+        expect(logic.browserUnusable("service-not-allowed")).toBe(true);
+        expect(logic.browserUnusable("not-allowed")).toBe(false);
+        expect(logic.browserUnusable("no-speech")).toBe(false);
     });
 
     it("maps Polaris's transcription codes", () => {
@@ -169,7 +123,6 @@ describe("dictation problems", () => {
             }
         }
         expect(webCatalogs.translator("es-ES", "chat")("dictation.start")).toBe("Dictar");
-        expect(webCatalogs.translator("es-ES", "chat")("attachMenu.add")).toBe("Añadir");
     });
 });
 
