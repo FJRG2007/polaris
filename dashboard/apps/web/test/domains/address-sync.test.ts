@@ -447,3 +447,39 @@ describe("a run", () => {
         expect(settings.has("network.dnsWrittenIps")).toBe(false);
     });
 });
+
+describe("a line that takes no visitors", () => {
+    const cgnatReach = (publicIp: string) =>
+        JSON.stringify({
+            checkedAt: "2026-01-01T00:00:00.000Z",
+            publicIp,
+            cgnat: true,
+            certain: true,
+            reason: "starlink",
+            inboundProven: false
+        });
+
+    it("leaves the records alone and tells the administrators once", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        settings.set("network.inboundReach", cgnatReach(NEW));
+        await syncZoneAddress();
+        await syncZoneAddress();
+        expect(repoint).not.toHaveBeenCalled();
+        const open = ofType("domain.address-cgnat");
+        expect(open).toHaveLength(1);
+        expect(open[0]!.conditionKey).toBe("domain.address-cgnat");
+        expect(open[0]!.title).toBe("domainAddress.cgnatTitle");
+    });
+
+    it("closes the notice once the line may be published again", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        settings.set("network.inboundReach", cgnatReach(NEW));
+        await syncZoneAddress();
+        settings.delete("network.inboundReach");
+        await syncZoneAddress();
+        expect(repoint).toHaveBeenCalled();
+        const rows = ofType("domain.address-cgnat");
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.conditionKey).toBeNull();
+    });
+});
