@@ -30,15 +30,17 @@ describe("the dependency order migration", () => {
     it("only adds: two columns and two indexes, nothing dropped or deleted", () => {
         expect(statements).toMatch(/ADD COLUMN IF NOT EXISTS "blockingOrder" DOUBLE PRECISION/);
         expect(statements).toMatch(/ADD COLUMN IF NOT EXISTS "waitingOrder" DOUBLE PRECISION/);
-        expect(statements).toMatch(/CREATE INDEX IF NOT EXISTS "TaskDependency_blockerId_blockingOrder_idx"/);
-        expect(statements).toMatch(/CREATE INDEX IF NOT EXISTS "TaskDependency_blockedId_waitingOrder_idx"/);
+        expect(statements).toMatch(
+            /CREATE INDEX IF NOT EXISTS "TaskDependency_blockerId_blockingOrder_idx"/
+        );
+        expect(statements).toMatch(
+            /CREATE INDEX IF NOT EXISTS "TaskDependency_blockedId_waitingOrder_idx"/
+        );
         expect(statements).not.toMatch(/\bDROP\b|\bDELETE\b|\bTRUNCATE\b/i);
     });
 
     it("numbers each task's lists by when the link was made, spaced like every other order", () => {
-        expect(statements).toContain(
-            `SET "blockingOrder" = ranked.position * ${core.ORDER_STEP}`
-        );
+        expect(statements).toContain(`SET "blockingOrder" = ranked.position * ${core.ORDER_STEP}`);
         expect(statements).toContain(`SET "waitingOrder" = ranked.position * ${core.ORDER_STEP}`);
         expect(statements).toContain(
             'ROW_NUMBER() OVER (PARTITION BY "blockerId" ORDER BY "createdAt", "id")'
@@ -59,13 +61,15 @@ describe("the dependency order migration", () => {
     });
 
     it("ends with the columns the schema declares", () => {
-        expect(statements).toContain(
-            `ALTER COLUMN "blockingOrder" SET DEFAULT ${core.ORDER_STEP}`
-        );
+        expect(statements).toContain(`ALTER COLUMN "blockingOrder" SET DEFAULT ${core.ORDER_STEP}`);
         expect(statements).toContain(`ALTER COLUMN "waitingOrder" SET DEFAULT ${core.ORDER_STEP}`);
         expect(statements).toContain('ALTER COLUMN "blockingOrder" SET NOT NULL');
         expect(statements).toContain('ALTER COLUMN "waitingOrder" SET NOT NULL');
-        expect(schema).toMatch(new RegExp(`blockingOrder\\s+Float\\s+@default\\(${core.ORDER_STEP}\\)`));
-        expect(schema).toMatch(new RegExp(`waitingOrder\\s+Float\\s+@default\\(${core.ORDER_STEP}\\)`));
+        expect(schema).toMatch(
+            new RegExp(`blockingOrder\\s+Float\\s+@default\\(${core.ORDER_STEP}\\)`)
+        );
+        expect(schema).toMatch(
+            new RegExp(`waitingOrder\\s+Float\\s+@default\\(${core.ORDER_STEP}\\)`)
+        );
     });
 });

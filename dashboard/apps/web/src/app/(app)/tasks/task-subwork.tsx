@@ -25,7 +25,17 @@ import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
 import { AvatarStack, ProgressBar, StatusDot, StatusMarker } from "./pickers";
 import type { ChecklistView, DependencyView } from "@/lib/tasks/task-service";
 import * as order from "./subwork-order";
-import { ArrowUpRight, Ban, Check, ChevronDown, ChevronUp, Link2, Plus, Trash2, X } from "lucide-react";
+import {
+    ArrowUpRight,
+    Ban,
+    Check,
+    ChevronDown,
+    ChevronUp,
+    Link2,
+    Plus,
+    Trash2,
+    X
+} from "lucide-react";
 import { Button, Card, CardBody, Checkbox, cn, ConfirmDeleteDialog, Input } from "@polaris/ui";
 
 /**
@@ -66,7 +76,9 @@ function Sortable({
             onPointerDownCapture={(event) =>
                 setInField(
                     event.target instanceof Element &&
-                        event.target.closest("input, textarea, select, [contenteditable='true']") !== null
+                        event.target.closest(
+                            "input, textarea, select, [contenteditable='true']"
+                        ) !== null
                 )
             }
             onDragStart={(event) => {
@@ -394,7 +406,11 @@ export function SubtaskSection({
                 title={tt("deleteTask.title")}
                 question={tt.rich("deleteTask.question", {
                     name: deleting?.name ?? "",
-                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
                 })}
                 description={tt("deleteTask.description")}
                 confirmLabel={tt("deleteTask.title")}
@@ -668,7 +684,9 @@ export function ChecklistSection({
         void apply(
             shown.map((checklist) => ({
                 ...checklist,
-                items: checklist.items.map((item) => (item.id === itemId ? { ...item, name } : item))
+                items: checklist.items.map((item) =>
+                    item.id === itemId ? { ...item, name } : item
+                )
             })),
             () => actions.renameChecklistItemAction(taskId, itemId, name)
         );
@@ -701,9 +719,7 @@ export function ChecklistSection({
             )}
 
             {shown.length === 0 && !adding && (
-                <p className="text-xs text-muted-foreground">
-                    {t("subwork.checklistsEmpty")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("subwork.checklistsEmpty")}</p>
             )}
 
             <ul className="flex flex-col gap-3">
@@ -746,12 +762,17 @@ export function ChecklistSection({
                                                                 delta
                                                             );
                                                             if (position)
-                                                                placeChecklist(checklist.id, position);
+                                                                placeChecklist(
+                                                                    checklist.id,
+                                                                    position
+                                                                );
                                                         }}
                                                     />
                                                     <button
                                                         type="button"
-                                                        aria-label={t("subwork.removeNamed", { name: checklist.name })}
+                                                        aria-label={t("subwork.removeNamed", {
+                                                            name: checklist.name
+                                                        })}
                                                         title={t("subwork.removeChecklist")}
                                                         onClick={async () => {
                                                             await runAction(
@@ -845,11 +866,12 @@ export function ChecklistSection({
                                                             index={itemIndex}
                                                             count={checklist.items.length}
                                                             onMove={(delta) => {
-                                                                const position = order.shiftPosition(
-                                                                    checklist.items,
-                                                                    item.id,
-                                                                    delta
-                                                                );
+                                                                const position =
+                                                                    order.shiftPosition(
+                                                                        checklist.items,
+                                                                        item.id,
+                                                                        delta
+                                                                    );
                                                                 if (position)
                                                                     placeStepAt(
                                                                         item.id,
@@ -860,7 +882,9 @@ export function ChecklistSection({
                                                         />
                                                         <button
                                                             type="button"
-                                                            aria-label={t("subwork.promoteNamed", { name: item.name })}
+                                                            aria-label={t("subwork.promoteNamed", {
+                                                                name: item.name
+                                                            })}
                                                             title={t("subwork.promote")}
                                                             onClick={async () => {
                                                                 await runAction(
@@ -879,7 +903,9 @@ export function ChecklistSection({
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            aria-label={t("subwork.removeNamed", { name: item.name })}
+                                                            aria-label={t("subwork.removeNamed", {
+                                                                name: item.name
+                                                            })}
                                                             title={t("subwork.removeStep")}
                                                             onClick={async () => {
                                                                 await runAction(
@@ -1064,20 +1090,22 @@ export function DependencySection({
             <h3 className="text-sm font-medium">{t("subwork.dependencies")}</h3>
 
             {shown.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                    {t("subwork.dependenciesEmpty")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("subwork.dependenciesEmpty")}</p>
             )}
 
             {waitingOn.length > 0 && (
                 <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">{t("subwork.waitingOn")}</p>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">
+                        {t("subwork.waitingOn")}
+                    </p>
                     {list("waitingOn", waitingOn)}
                 </div>
             )}
             {blocking.length > 0 && (
                 <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">{t("subwork.blocking")}</p>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">
+                        {t("subwork.blocking")}
+                    </p>
                     {list("blocking", blocking)}
                 </div>
             )}
@@ -1092,7 +1120,9 @@ export function DependencySection({
                             }
                             className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
-                            {direction === "waitingOn" ? t("subwork.thisWaitsOn") : t("subwork.thisBlocks")}
+                            {direction === "waitingOn"
+                                ? t("subwork.thisWaitsOn")
+                                : t("subwork.thisBlocks")}
                         </button>
                         <Input
                             value={query}

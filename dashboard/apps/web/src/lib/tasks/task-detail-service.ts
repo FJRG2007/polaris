@@ -604,7 +604,9 @@ export async function dispatchDueReminders(now = new Date()): Promise<number> {
                     userId: reminder.userId,
                     event: "tasks.due",
                     title: reminder.task.name,
-                    body: reminder.note || translate(await getUserLocale(reminder.userId), "tasks.notify.reminder"),
+                    body:
+                        reminder.note ||
+                        translate(await getUserLocale(reminder.userId), "tasks.notify.reminder"),
                     href: `/tasks/t/${reminder.taskId}`,
                     shelf: { orgId: reminder.task.space.orgId }
                 });

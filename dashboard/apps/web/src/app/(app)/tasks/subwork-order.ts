@@ -66,7 +66,9 @@ export function placeStep(
     destinationId: string,
     position: DropPosition
 ): ChecklistView[] {
-    const item = checklists.flatMap((checklist) => checklist.items).find((step) => step.id === itemId);
+    const item = checklists
+        .flatMap((checklist) => checklist.items)
+        .find((step) => step.id === itemId);
     if (!item || !checklists.some((checklist) => checklist.id === destinationId))
         return [...checklists];
     return checklists.map((checklist) => {

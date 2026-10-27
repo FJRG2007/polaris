@@ -54,9 +54,9 @@ describe("placing a row", () => {
     it("knows a drop back on its own place is no move", () => {
         const next = order.placeRow(rows, "b", { beforeId: "a", afterId: "c" });
         expect(order.samePlace(rows, next)).toBe(true);
-        expect(order.samePlace(rows, order.placeRow(rows, "b", { beforeId: "c", afterId: "d" }))).toBe(
-            false
-        );
+        expect(
+            order.samePlace(rows, order.placeRow(rows, "b", { beforeId: "c", afterId: "d" }))
+        ).toBe(false);
     });
 });
 
@@ -93,12 +93,12 @@ describe("placing a step", () => {
     });
 
     it("changes nothing for a step or checklist that is not there", () => {
-        expect(order.placeStep(checklists, "gone", "build", { beforeId: null, afterId: null })).toEqual(
-            checklists
-        );
-        expect(order.placeStep(checklists, "s1", "gone", { beforeId: null, afterId: null })).toEqual(
-            checklists
-        );
+        expect(
+            order.placeStep(checklists, "gone", "build", { beforeId: null, afterId: null })
+        ).toEqual(checklists);
+        expect(
+            order.placeStep(checklists, "s1", "gone", { beforeId: null, afterId: null })
+        ).toEqual(checklists);
     });
 });
 

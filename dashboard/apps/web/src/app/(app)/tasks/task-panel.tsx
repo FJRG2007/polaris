@@ -448,7 +448,10 @@ export function TaskPanel({
                 // old name back - and the dialog hears the key before the field
                 // does, so without this the same press also closed the task.
                 onEscapeKeyDown={(event) => {
-                    if (event.target instanceof Element && event.target.closest("[data-keeps-escape]"))
+                    if (
+                        event.target instanceof Element &&
+                        event.target.closest("[data-keeps-escape]")
+                    )
                         event.preventDefault();
                 }}
             >
