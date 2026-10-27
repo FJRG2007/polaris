@@ -17,11 +17,11 @@
  */
 
 import { firstName } from "@polaris/core";
-import { sizeLabel, widgetLabel } from "./widget-names";
+import { sizeLabel, widgetDescription, widgetLabel } from "./widget-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { WidgetCard } from "./widget-card";
 import { ShortcutPicker } from "./shortcut-picker";
-import { CustomizeDialog } from "./customize-dialog";
+import { CustomizeDialog, type CustomizeRow } from "./customize-dialog";
 import { saveOverviewPreferencesAction } from "./actions";
 import { packOverviewSpans } from "@/lib/overview/pack";
 import { useShelfScope } from "@/components/shelf-scope";
@@ -31,7 +31,13 @@ import { emptyOverviewCards, writeEmptyCardsCookie } from "@/lib/overview/empty-
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import { CalendarWidget } from "./widgets/calendar";
 import { DnsBlockerWidget } from "./widgets/dns-blocker";
-import { AppWidgetCatalog, AppWidgetGridItems, useAppWidgets } from "./app-widgets";
+import {
+    AppWidgetCatalog,
+    AppWidgetItem,
+    appWidgetKindOf,
+    useAppWidgetLive,
+    useAppWidgets
+} from "./app-widgets";
 import type { AppWidgetKind } from "@/lib/overview/app-widgets";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -48,6 +54,7 @@ import {
 import {
     ArrowDown,
     ArrowUp,
+    Blocks,
     EyeOff,
     GripVertical,
     LayoutGrid,
@@ -67,9 +74,15 @@ import {
     cn
 } from "@polaris/ui";
 import {
+    appCardKey,
+    moveOverviewCard,
+    orderOverviewCards,
     overviewArranged,
     rankOverviewLayout,
     resolveOverviewLayout,
+    OVERVIEW_WIDGET_SIZES,
+    type AppWidgetPreference,
+    type OverviewCardKey,
     type OverviewPreferences,
     type OverviewShortcut,
     type OverviewWidgetId,
@@ -84,6 +97,28 @@ interface Arrangement {
     shortcuts: OverviewShortcut[];
     greeting: boolean;
     arranged: boolean;
+    /** Both kinds of card in one order; undefined until somebody arranges them
+     *  (see `orderOverviewCards`). */
+    order: OverviewCardKey[] | undefined;
+}
+
+/** One card on the grid: one of the Overview's own, or one an app added. */
+type GridCard =
+    | { key: OverviewWidgetId; widget: OverviewWidgetPreference; app?: undefined }
+    | { key: `app:${string}`; widget?: undefined; app: AppWidgetPreference; kind: AppWidgetKind };
+
+function cardHidden(card: GridCard): boolean {
+    return card.app ? card.app.hidden : card.widget.hidden;
+}
+
+/** The widths a card can be drawn at. An app's card can take any of them. */
+function cardSizes(card: GridCard): readonly OverviewWidgetSize[] {
+    return card.app ? OVERVIEW_WIDGET_SIZES : overviewWidget(card.key).sizes;
+}
+
+/** The width a card is drawn at before the grid fits it to the row. */
+function drawnSize(card: GridCard): OverviewWidgetSize {
+    return card.app ? card.app.size : overviewSize(card.key, card.widget.size);
 }
 
 export interface OverviewApp {
@@ -189,9 +224,8 @@ export function OverviewGrid({
     });
     const settled = useRef(false);
     const appState = useAppWidgets(preferences.appWidgets);
-    const appCardsShown = appState.cards.some((card) =>
-        appKinds.some((kind) => kind.app === card.app && kind.kind === card.kind)
-    );
+    const live = useAppWidgetLive(appState, appKinds);
+    const [order, setOrder] = useState<OverviewCardKey[] | undefined>(preferences.order);
     const [shortcuts, setShortcuts] = useState<OverviewShortcut[]>(preferences.shortcuts);
     const [greeting, setGreeting] = useState(preferences.greeting);
     const [data, setData] = useState<OverviewData>({});
@@ -204,8 +238,8 @@ export function OverviewGrid({
     // gesture most people reach for; it is not the only one, because it does not
     // exist for a keyboard and does not fire on a touch screen - the same moves
     // are on every card's own menu and in the customize panel.
-    const [dragged, setDragged] = useState<OverviewWidgetId | null>(null);
-    const [over, setOver] = useState<OverviewWidgetId | null>(null);
+    const [dragged, setDragged] = useState<OverviewCardKey | null>(null);
+    const [over, setOver] = useState<OverviewCardKey | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
     const [nonce, setNonce] = useState(0);
     // Bumped when the visit history is thrown away, so the card that reads it out
@@ -224,7 +258,8 @@ export function OverviewGrid({
         widgets: layout,
         shortcuts: preferences.shortcuts,
         greeting: preferences.greeting,
-        arranged
+        arranged,
+        order: preferences.order
     });
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const gridRef = useRef<HTMLDivElement | null>(null);
@@ -238,6 +273,17 @@ export function OverviewGrid({
         () => preferences.widgets.filter((widget) => !available.includes(widget.id)),
         [preferences.widgets, available]
     );
+    /** The same for the order: the cards above, and app cards whose app does not
+     *  offer them right now. */
+    const unseenKeys = useMemo(
+        (): OverviewCardKey[] => [
+            ...unseen.map((widget) => widget.id),
+            ...appState.cards
+                .filter((card) => !appWidgetKindOf(card, appKinds))
+                .map((card) => appCardKey(card.id))
+        ],
+        [unseen, appState.cards, appKinds]
+    );
 
     const persist = useCallback(
         (next: Arrangement) => {
@@ -245,6 +291,7 @@ export function OverviewGrid({
             setShortcuts(next.shortcuts);
             setGreeting(next.greeting);
             setArranged(next.arranged);
+            setOrder(next.order);
             setFailure(null);
             if (saveTimer.current) clearTimeout(saveTimer.current);
             saveTimer.current = setTimeout(() => {
@@ -254,12 +301,16 @@ export function OverviewGrid({
                     setShortcuts(previous.shortcuts);
                     setGreeting(previous.greeting);
                     setArranged(previous.arranged);
+                    setOrder(previous.order);
                 };
                 void saveOverviewPreferencesAction({
                     widgets: [...next.widgets, ...unseen],
                     shortcuts: next.shortcuts,
                     greeting: next.greeting,
-                    arranged: next.arranged
+                    arranged: next.arranged,
+                    // Cards not drawn right now keep a place in the order, like
+                    // their arrangement above.
+                    ...(next.order ? { order: [...next.order, ...unseenKeys] } : {})
                 })
                     .then((result) => {
                         if (!result.error) {
@@ -276,56 +327,86 @@ export function OverviewGrid({
                     });
             }, SAVE_DEBOUNCE_MS);
         },
-        [unseen, t]
+        [unseen, unseenKeys, t]
     );
 
-    const current = (): Arrangement => ({ widgets, shortcuts, greeting, arranged });
+    const current = (): Arrangement => ({ widgets, shortcuts, greeting, arranged, order });
 
     const displayed = useMemo(
         () => rankOverviewLayout(widgets, { arranged, placed, empty }),
         [widgets, arranged, placed, empty]
     );
 
+    /** Every card on the grid, both kinds, hidden ones included, in one order. */
+    const cards = useMemo((): GridCard[] => {
+        const byKey = new Map<OverviewCardKey, GridCard>();
+        for (const widget of displayed) byKey.set(widget.id, { key: widget.id, widget });
+        const apps: OverviewCardKey[] = [];
+        for (const app of appState.cards) {
+            const kind = appWidgetKindOf(app, appKinds);
+            if (!kind) continue;
+            const key = appCardKey(app.id);
+            byKey.set(key, { key, app, kind });
+            apps.push(key);
+        }
+        return orderOverviewCards(
+            displayed.map((widget) => widget.id),
+            apps,
+            order
+        ).flatMap((key) => byKey.get(key) ?? []);
+    }, [displayed, appState.cards, appKinds, order]);
+
     /** Moving a card is the reader taking the order over: from here on it is
-     *  theirs, starting from the order they were looking at. */
-    function reorder(from: number, to: number): void {
-        if (from < 0 || to < 0 || from === to || from >= displayed.length || to >= displayed.length)
-            return;
-        const next = [...displayed];
-        const [held] = next.splice(from, 1);
-        next.splice(to, 0, held!);
-        persist({ ...current(), widgets: next, arranged: true });
+     *  theirs, starting from the order they were looking at. The Overview's own
+     *  cards keep the same order in their own list, which is what a tab opened
+     *  before the shared order existed reads. */
+    function arrange(keys: OverviewCardKey[]): void {
+        const byId = new Map(widgets.map((widget) => [widget.id as OverviewCardKey, widget]));
+        persist({
+            ...current(),
+            widgets: keys.flatMap((key) => byId.get(key) ?? []),
+            order: keys,
+            arranged: true
+        });
     }
 
-    function move(id: OverviewWidgetId, direction: -1 | 1): void {
-        const index = displayed.findIndex((widget) => widget.id === id);
-        reorder(index, index + direction);
+    function move(key: OverviewCardKey, direction: -1 | 1): void {
+        const keys = cards.map((card) => card.key);
+        const target = keys[keys.indexOf(key) + direction];
+        if (keys.includes(key) && target) arrange(moveOverviewCard(keys, key, target));
     }
 
     /** Drop one card where another one is. Both are named rather than counted,
      *  since the grid draws only the cards that are on and their positions in the
-     *  stored list are not the positions on screen. */
-    function moveOnto(id: OverviewWidgetId, target: OverviewWidgetId): void {
-        if (id === target) return;
-        reorder(
-            displayed.findIndex((widget) => widget.id === id),
-            displayed.findIndex((widget) => widget.id === target)
-        );
+     *  stored lists are not the positions on screen. Either may be an app's. */
+    function moveOnto(key: OverviewCardKey, target: OverviewCardKey): void {
+        const keys = cards.map((card) => card.key);
+        if (key === target || !keys.includes(key) || !keys.includes(target)) return;
+        arrange(moveOverviewCard(keys, key, target));
     }
 
-    function toggle(id: OverviewWidgetId, visible: boolean): void {
+    /** The app card a key names, when it is one. */
+    function appOf(key: OverviewCardKey): AppWidgetPreference | undefined {
+        return cards.find((card) => card.key === key)?.app;
+    }
+
+    function toggle(key: OverviewCardKey, visible: boolean): void {
+        const app = appOf(key);
+        if (app) return appState.hide(app.id, !visible);
         persist({
             ...current(),
             widgets: widgets.map((widget) =>
-                widget.id === id ? { ...widget, hidden: !visible } : widget
+                widget.id === key ? { ...widget, hidden: !visible } : widget
             )
         });
     }
 
-    function resize(id: OverviewWidgetId, size: OverviewWidgetSize): void {
+    function resize(key: OverviewCardKey, size: OverviewWidgetSize): void {
+        const app = appOf(key);
+        if (app) return appState.resize(app.id, size);
         persist({
             ...current(),
-            widgets: widgets.map((widget) => (widget.id === id ? { ...widget, size } : widget))
+            widgets: widgets.map((widget) => (widget.id === key ? { ...widget, size } : widget))
         });
     }
 
@@ -346,11 +427,14 @@ export function OverviewGrid({
     }
 
     function reset(): void {
+        appState.reset(appKinds);
         persist({
             widgets: resolveOverviewLayout({ ...preferences, widgets: [] }, available),
             shortcuts,
             greeting: true,
-            arranged: false
+            arranged: false,
+            // Every card back where it ships, the apps' after the Overview's own.
+            order: []
         });
     }
 
@@ -479,7 +563,7 @@ export function OverviewGrid({
         setNonce((value) => value + 1);
     }
 
-    const visible = useMemo(() => displayed.filter((widget) => !widget.hidden), [displayed]);
+    const visible = useMemo(() => cards.filter((card) => !cardHidden(card)), [cards]);
 
     // How many columns the grid ended up with. Read off the tracks the browser
     // worked out rather than worked out again here: the grid sizes itself against
@@ -511,10 +595,10 @@ export function OverviewGrid({
     const spans = useMemo(() => {
         if (columns <= 0) return null;
         return packOverviewSpans(
-            visible.map((widget) => {
-                const { sizes } = overviewWidget(widget.id);
+            visible.map((card) => {
+                const sizes = cardSizes(card);
                 return {
-                    preferred: COLUMNS[overviewSize(widget.id, widget.size)],
+                    preferred: COLUMNS[drawnSize(card)],
                     min: COLUMNS[sizes[0] ?? "sm"],
                     max: COLUMNS[sizes[sizes.length - 1] ?? "xl"]
                 };
@@ -522,6 +606,29 @@ export function OverviewGrid({
             columns
         );
     }, [visible, columns]);
+
+    /** Every card as the Customize panel lists it, in the grid's order. */
+    const rows = cards.map((card): CustomizeRow =>
+        card.app
+            ? {
+                  key: card.key,
+                  label: card.kind.label,
+                  description: card.kind.hint,
+                  icon: Blocks,
+                  sizes: OVERVIEW_WIDGET_SIZES,
+                  size: card.app.size,
+                  hidden: card.app.hidden
+              }
+            : {
+                  key: card.key,
+                  label: widgetLabel(t, card.key, overviewWidget(card.key).label),
+                  description: widgetDescription(t, card.key, overviewWidget(card.key).description),
+                  icon: overviewWidget(card.key).icon,
+                  sizes: overviewWidget(card.key).sizes,
+                  size: card.widget.size,
+                  hidden: card.widget.hidden
+              }
+    );
 
     return (
         <div className="flex flex-col gap-4">
@@ -568,7 +675,7 @@ export function OverviewGrid({
                 </p>
             ) : null}
 
-            {visible.length === 0 && !appCardsShown ? (
+            {visible.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-16 text-center">
                     <LayoutGrid className="size-6 text-muted-foreground" aria-hidden="true" />
                     <p className="text-sm text-muted-foreground">{t("allOff")}</p>
@@ -578,20 +685,57 @@ export function OverviewGrid({
                 </div>
             ) : (
                 <div ref={gridRef} className="overview-grid">
-                    {visible.map((widget, index) => {
-                        const entry = overviewWidget(widget.id);
-                        const label = widgetLabel(t, widget.id, entry.label);
+                    {visible.map((card, index) => {
+                        const entry = card.app ? null : overviewWidget(card.key);
+                        const label = card.app
+                            ? card.kind.label
+                            : widgetLabel(t, card.key, entry!.label);
+                        const size = drawnSize(card);
+                        const grip = (
+                            <WidgetGrip
+                                label={label}
+                                onStart={() => setDragged(card.key)}
+                                onEnd={() => {
+                                    setDragged(null);
+                                    setOver(null);
+                                }}
+                            />
+                        );
+                        const menu = (
+                            <WidgetMenu
+                                label={label}
+                                sizes={cardSizes(card)}
+                                size={size}
+                                first={index === 0}
+                                last={index === visible.length - 1}
+                                onMove={(direction) => move(card.key, direction)}
+                                onResize={(next) => resize(card.key, next)}
+                                onHide={() => toggle(card.key, false)}
+                                onConfigure={
+                                    card.app ? () => live.configure(card.app, card.kind) : undefined
+                                }
+                                onRemove={card.app ? () => appState.remove(card.app.id) : undefined}
+                                onClear={
+                                    card.key === "recent"
+                                        ? () => {
+                                              clearRecentPlaces();
+                                              setHistoryNonce((value) => value + 1);
+                                          }
+                                        : undefined
+                                }
+                            />
+                        );
                         return (
                             <div
-                                key={widget.id}
-                                data-widget={widget.id}
+                                key={card.key}
+                                data-widget={card.key}
                                 style={spans ? { gridColumn: `span ${spans[index]}` } : undefined}
                                 className={cn(
                                     "min-w-0 rounded-lg transition-opacity",
-                                    SPAN[overviewSize(widget.id, widget.size)],
-                                    dragged === widget.id && "opacity-40",
-                                    over === widget.id &&
-                                        dragged !== widget.id &&
+                                    SPAN[size],
+                                    dragged === card.key && "opacity-40",
+                                    over === card.key &&
+                                        dragged !== card.key &&
                                         "ring-2 ring-primary"
                                 )}
                                 onDragOver={(event) => {
@@ -600,79 +744,60 @@ export function OverviewGrid({
                                     // default for a dragover is "not a target".
                                     event.preventDefault();
                                     event.dataTransfer.dropEffect = "move";
-                                    setOver(widget.id);
+                                    setOver(card.key);
                                 }}
                                 onDragLeave={() =>
-                                    setOver((held) => (held === widget.id ? null : held))
+                                    setOver((held) => (held === card.key ? null : held))
                                 }
                                 onDrop={(event) => {
                                     event.preventDefault();
-                                    if (dragged) moveOnto(dragged, widget.id);
+                                    if (dragged) moveOnto(dragged, card.key);
                                     setDragged(null);
                                     setOver(null);
                                 }}
                             >
-                                <WidgetCard
-                                    title={label}
-                                    icon={entry.icon}
-                                    href={entry.href}
-                                    grip={
-                                        <WidgetGrip
-                                            label={label}
-                                            onStart={() => setDragged(widget.id)}
-                                            onEnd={() => {
-                                                setDragged(null);
-                                                setOver(null);
-                                            }}
-                                        />
-                                    }
-                                    menu={
-                                        <WidgetMenu
-                                            label={label}
-                                            sizes={entry.sizes}
-                                            size={overviewSize(widget.id, widget.size)}
-                                            first={index === 0}
-                                            last={index === visible.length - 1}
-                                            onMove={(direction) => move(widget.id, direction)}
-                                            onResize={(size) => resize(widget.id, size)}
-                                            onHide={() => toggle(widget.id, false)}
-                                            onClear={
-                                                widget.id === "recent"
-                                                    ? () => {
-                                                          clearRecentPlaces();
-                                                          setHistoryNonce((value) => value + 1);
-                                                      }
-                                                    : undefined
-                                            }
-                                        />
-                                    }
-                                >
-                                    <WidgetBody
-                                        id={widget.id}
-                                        data={
-                                            pending === null || pending.has(widget.id)
-                                                ? undefined
-                                                : data
-                                        }
-                                        apps={apps}
-                                        shortcuts={shortcuts}
-                                        historyNonce={historyNonce}
-                                        onAdd={() => setPicking(true)}
-                                        onRemove={unpin}
+                                {card.app ? (
+                                    <AppWidgetItem
+                                        card={card.app}
+                                        kind={card.kind}
+                                        live={live}
+                                        grip={grip}
+                                        menu={menu}
                                     />
-                                </WidgetCard>
+                                ) : (
+                                    <WidgetCard
+                                        title={label}
+                                        icon={entry!.icon}
+                                        href={entry!.href}
+                                        grip={grip}
+                                        menu={menu}
+                                    >
+                                        <WidgetBody
+                                            id={card.key}
+                                            data={
+                                                pending === null || pending.has(card.key)
+                                                    ? undefined
+                                                    : data
+                                            }
+                                            apps={apps}
+                                            shortcuts={shortcuts}
+                                            historyNonce={historyNonce}
+                                            onAdd={() => setPicking(true)}
+                                            onRemove={unpin}
+                                        />
+                                    </WidgetCard>
+                                )}
                             </div>
                         );
                     })}
-                    {/* The installed apps' cards, after the Overview's own. */}
-                    <AppWidgetGridItems state={appState} kinds={appKinds} />
                 </div>
             )}
+            {live.setupDialog}
 
             <CustomizeDialog
                 open={customizing}
                 onOpenChange={setCustomizing}
-                layout={displayed}
+                layout={rows}
                 greeting={greeting}
                 onMove={move}
                 onMoveOnto={moveOnto}
@@ -809,7 +934,9 @@ function WidgetMenu({
     onMove,
     onResize,
     onHide,
-    onClear
+    onClear,
+    onConfigure,
+    onRemove
 }: {
     label: string;
     sizes: readonly OverviewWidgetSize[];
@@ -821,6 +948,10 @@ function WidgetMenu({
     onHide: () => void;
     /** Only for the cards that hold something of the reader's to throw away. */
     onClear?: () => void;
+    /** An app's card: choosing what it watches. */
+    onConfigure?: () => void;
+    /** An app's card: taking it off the Overview, with what it watches. */
+    onRemove?: () => void;
 }) {
     const t = useTranslations("home");
     return (
@@ -835,7 +966,16 @@ function WidgetMenu({
                     <MoreVertical className="size-4" aria-hidden="true" />
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-48">
+                {onConfigure ? (
+                    <>
+                        <DropdownMenuItem onSelect={onConfigure}>
+                            <Settings2 className="size-4" aria-hidden="true" />
+                            {t("appCards.change")}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                    </>
+                ) : null}
                 <DropdownMenuItem disabled={first} onSelect={() => onMove(-1)}>
                     <ArrowUp className="size-4" aria-hidden="true" />
                     {t("card.moveUp")}
@@ -870,6 +1010,12 @@ function WidgetMenu({
                     <EyeOff className="size-4" aria-hidden="true" />
                     {t("card.hide")}
                 </DropdownMenuItem>
+                {onRemove ? (
+                    <DropdownMenuItem variant="danger" onSelect={onRemove}>
+                        <Trash2 className="size-4" aria-hidden="true" />
+                        {t("appCards.remove")}
+                    </DropdownMenuItem>
+                ) : null}
             </DropdownMenuContent>
         </DropdownMenu>
     );

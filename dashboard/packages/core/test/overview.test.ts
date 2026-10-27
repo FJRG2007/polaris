@@ -18,6 +18,8 @@ const {
     MAX_RECENT_PLACES,
     OVERVIEW_WIDGET_IDS,
     mergeRecentPlaces,
+    moveOverviewCard,
+    orderOverviewCards,
     overviewArranged,
     overviewPreferencesSchema,
     parseOverviewPreferences,
@@ -53,7 +55,8 @@ describe("parseOverviewPreferences", () => {
         });
         expect(parseOverviewPreferences(stored)).toEqual({
             widgets: [{ id: "usage", size: "lg", hidden: true }],
-            appWidgets: [appWidget],
+            // Cards saved before they could be hidden read as shown.
+            appWidgets: [{ ...appWidget, hidden: false }],
             shortcuts: [{ label: "Deploy", href: "/apps/deploy", context: "Apps" }],
             greeting: false
         });
@@ -272,5 +275,73 @@ describe("cards with nothing to show", () => {
             })
         ).toBe(false);
         expect(parseOverviewPreferences(JSON.stringify({ arranged: true })).arranged).toBe(true);
+    });
+});
+
+describe("the one order both kinds of card share", () => {
+    const builtIns = ["shortcuts", "usage", "services"] as const;
+    const apps = ["app:card0001", "app:card0002"] as const;
+
+    it("puts the apps' cards after the Overview's own until somebody arranges them", () => {
+        expect(orderOverviewCards(builtIns, apps, undefined)).toEqual([
+            "shortcuts",
+            "usage",
+            "services",
+            "app:card0001",
+            "app:card0002"
+        ]);
+    });
+
+    it("keeps the order the reader arranged, across kinds", () => {
+        const order = ["app:card0002", "usage", "shortcuts", "app:card0001", "services"] as const;
+        expect(orderOverviewCards(builtIns, apps, order)).toEqual(order);
+    });
+
+    it("loses no card and draws none twice", () => {
+        const order = ["usage", "app:card0001", "usage", "app:gone0000", "app:card0001"] as const;
+        const drawn = orderOverviewCards(builtIns, apps, order);
+        expect([...drawn].sort()).toEqual([...builtIns, ...apps].sort());
+        // A new Overview card follows its neighbour; a new app card goes last.
+        expect(drawn).toEqual(["shortcuts", "usage", "services", "app:card0001", "app:card0002"]);
+        expect(orderOverviewCards(builtIns, apps, ["app:card0001", "services"])).toEqual([
+            "shortcuts",
+            "usage",
+            "app:card0001",
+            "services",
+            "app:card0002"
+        ]);
+    });
+
+    it("drops one card where another is, whichever kind either is", () => {
+        const keys = orderOverviewCards(builtIns, apps, undefined);
+        expect(moveOverviewCard(keys, "app:card0002", "shortcuts")).toEqual([
+            "app:card0002",
+            "shortcuts",
+            "usage",
+            "services",
+            "app:card0001"
+        ]);
+        expect(moveOverviewCard(keys, "usage", "app:card0002")).toEqual([
+            "shortcuts",
+            "services",
+            "app:card0001",
+            "app:card0002",
+            "usage"
+        ]);
+        expect(moveOverviewCard(keys, "usage", "usage")).toEqual(keys);
+        expect(moveOverviewCard(keys, "app:nope0000", "usage")).toEqual(keys);
+    });
+
+    it("stores app cards and the order, and refuses keys that name nothing", () => {
+        const parsed = overviewPreferencesSchema.parse({
+            order: ["usage", "app:card0001"],
+            appWidgets: [{ id: "card0001", app: "places", kind: "devices", hidden: true }]
+        });
+        expect(parsed.order).toEqual(["usage", "app:card0001"]);
+        expect(parsed.appWidgets[0]?.hidden).toBe(true);
+        expect(overviewPreferencesSchema.parse({}).order).toBeUndefined();
+        for (const bad of [["nope"], ["app:../x"], ["app:"], [42]]) {
+            expect(overviewPreferencesSchema.safeParse({ order: bad }).success).toBe(false);
+        }
     });
 });

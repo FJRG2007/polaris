@@ -4,7 +4,6 @@
  * every other app page somebody was not given.
  */
 
-import { PAGE_FILL } from "@polaris/ui";
 import { host } from "@polaris/app-host";
 import { notFound } from "next/navigation";
 import { findGame } from "../../../games/registry";
@@ -27,9 +26,5 @@ export default async function GamesPage({
         if (!findGame(id)) notFound();
         return <GamePlayer gameId={id} />;
     }
-    return (
-        <div className={PAGE_FILL}>
-            <GamesScreen />
-        </div>
-    );
+    return <GamesScreen />;
 }

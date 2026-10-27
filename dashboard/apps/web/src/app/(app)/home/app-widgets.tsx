@@ -7,7 +7,9 @@
  * Held apart from the Overview's own cards because they are a different kind of
  * thing - an app's, watching what the reader picked - and saved on their own,
  * so arranging the Overview never writes them away and adding one never races a
- * card being moved. Drawn in the same grid, in the same frame.
+ * card being moved. Drawn in the same grid, in the same frame, and arranged with
+ * the Overview's own cards in one order: the grid gives each the same handle,
+ * drop target and menu (see `overview-grid`).
  *
  * What they show is read stale-while-revalidate: the last answer this tab had
  * paints at once, the request behind it replaces it when it lands, and the
@@ -16,7 +18,6 @@
  */
 
 import { WidgetCard } from "./widget-card";
-import { sizeLabel } from "./widget-names";
 import { AppWidgetBody, withPressed } from "./app-widget-card";
 import type { AppWidgetInput } from "@/lib/app-extensions/types";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,24 +26,10 @@ import { useUnmountSignal } from "@/lib/poll-fetch";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AppWidgetSetup, type AppWidgetSetupSubject } from "./app-widget-setup";
 import type { AppWidgetKind, AppWidgetReadout } from "@/lib/overview/app-widgets";
-import { Blocks, MoreVertical, Settings2, Trash2, ArrowUp, ArrowDown } from "lucide-react";
-import {
-    OVERVIEW_WIDGET_SIZES,
-    MAX_APP_WIDGETS,
-    type AppWidgetPreference,
-    type OverviewWidgetSize
-} from "@polaris/core";
+import { Blocks } from "lucide-react";
+import { MAX_APP_WIDGETS, type AppWidgetPreference, type OverviewWidgetSize } from "@polaris/core";
 import { actOnAppWidgetAction, saveAppWidgetsAction } from "./app-widget-actions";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-    cn,
-    useToast
-} from "@polaris/ui";
+import { useToast } from "@polaris/ui";
 
 /** How often the cards are read again while the page is in front. */
 export const APP_WIDGET_REFRESH_MS = 30_000;
@@ -54,13 +41,6 @@ let kept: { at: number; cards: Record<string, AppWidgetReadout> } | null = null;
 function newCardId(): string {
     return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 }
-
-const SPAN: Record<OverviewWidgetSize, string> = {
-    sm: "overview-card",
-    md: "overview-card overview-card-md",
-    lg: "overview-card overview-card-lg",
-    xl: "overview-card overview-card-xl"
-};
 
 /**
  * The cards, their arrangement and saving it. Saved on its own action; a save
@@ -105,7 +85,14 @@ export function useAppWidgets(initial: readonly AppWidgetPreference[]) {
             if (cards.length >= MAX_APP_WIDGETS) return;
             save([
                 ...cards,
-                { id: newCardId(), app: kind.app, kind: kind.kind, size: kind.defaultSize, targets }
+                {
+                    id: newCardId(),
+                    app: kind.app,
+                    kind: kind.kind,
+                    size: kind.defaultSize,
+                    targets,
+                    hidden: false
+                }
             ]);
         },
         retarget: (id: string, targets: string[]) =>
@@ -113,14 +100,13 @@ export function useAppWidgets(initial: readonly AppWidgetPreference[]) {
         resize: (id: string, size: OverviewWidgetSize) =>
             save(cards.map((card) => (card.id === id ? { ...card, size } : card))),
         remove: (id: string) => save(cards.filter((card) => card.id !== id)),
-        move: (id: string, by: -1 | 1) => {
-            const from = cards.findIndex((card) => card.id === id);
-            const to = from + by;
-            if (from < 0 || to < 0 || to >= cards.length) return;
-            const next = [...cards];
-            const [held] = next.splice(from, 1);
-            next.splice(to, 0, held!);
-            save(next);
+        hide: (id: string, hidden: boolean) =>
+            save(cards.map((card) => (card.id === id ? { ...card, hidden } : card))),
+        reset: (kinds: readonly AppWidgetKind[]) => {
+            const shipped = (card: AppWidgetPreference) =>
+                appWidgetKindOf(card, kinds)?.defaultSize ?? card.size;
+            if (cards.every((card) => !card.hidden && card.size === shipped(card))) return;
+            save(cards.map((card) => ({ ...card, size: shipped(card), hidden: false })));
         },
         full: cards.length >= MAX_APP_WIDGETS
     };
@@ -128,18 +114,21 @@ export function useAppWidgets(initial: readonly AppWidgetPreference[]) {
 
 export type AppWidgetsState = ReturnType<typeof useAppWidgets>;
 
+/** The kind an app card is, when its app still offers it. A card whose app no
+ *  longer does is not drawn - it is kept in the layout for when the app is
+ *  back, like an Overview card the reader cannot see this week. */
+export function appWidgetKindOf(
+    card: AppWidgetPreference,
+    kinds: readonly AppWidgetKind[]
+): AppWidgetKind | undefined {
+    return kinds.find((kind) => kind.app === card.app && kind.kind === card.kind);
+}
+
 /**
- * The cards themselves, as items of the Overview's grid. Renders nothing for a
- * card whose app no longer offers it - it is kept in the layout for when the app
- * is back, like an Overview card the reader cannot see this week.
+ * What the cards on the grid show, and pressing their controls: read once the
+ * stored cards change and every half minute while the page is in front.
  */
-export function AppWidgetGridItems({
-    state,
-    kinds
-}: {
-    state: AppWidgetsState;
-    kinds: readonly AppWidgetKind[];
-}) {
+export function useAppWidgetLive(state: AppWidgetsState, kinds: readonly AppWidgetKind[]) {
     const t = useTranslations("home");
     const toast = useToast();
     const [readouts, setReadouts] = useState<Record<string, AppWidgetReadout>>(
@@ -148,13 +137,11 @@ export function AppWidgetGridItems({
     const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
     const [setup, setSetup] = useState<(AppWidgetSetupSubject & { id: string }) | null>(null);
 
-    const shown = state.cards.filter((card) =>
-        kinds.some((kind) => kind.app === card.app && kind.kind === card.kind)
-    );
     // Read again whenever what the stored cards watch changes, not on every
-    // render and not before the server has the change.
+    // render and not before the server has the change. A hidden card is not
+    // read: nothing on screen would show the answer.
     const watching = state.stored
-        .filter((card) => kinds.some((kind) => kind.app === card.app && kind.kind === card.kind))
+        .filter((card) => !card.hidden && appWidgetKindOf(card, kinds))
         .map((card) => `${card.id}=${card.targets.join(",")}`)
         .join("|");
 
@@ -206,58 +193,21 @@ export function AppWidgetGridItems({
         void read();
     }
 
-    return (
-        <>
-            {shown.map((card, index) => {
-                const kind = kinds.find((one) => one.app === card.app && one.kind === card.kind)!;
-                return (
-                    <div
-                        key={card.id}
-                        data-app-widget={card.id}
-                        className={cn("min-w-0", SPAN[card.size])}
-                    >
-                        <WidgetCard
-                            title={kind.label}
-                            icon={Blocks}
-                            menu={
-                                <AppWidgetMenu
-                                    label={kind.label}
-                                    size={card.size}
-                                    first={index === 0}
-                                    last={index === shown.length - 1}
-                                    onConfigure={() =>
-                                        setSetup({
-                                            id: card.id,
-                                            app: card.app,
-                                            kind: card.kind,
-                                            label: kind.label,
-                                            targets: card.targets
-                                        })
-                                    }
-                                    onMove={(by) => state.move(card.id, by)}
-                                    onResize={(size) => state.resize(card.id, size)}
-                                    onRemove={() => state.remove(card.id)}
-                                />
-                            }
-                        >
-                            <AppWidgetBody
-                                readout={readouts[card.id]}
-                                busy={busy}
-                                onAct={(input) => void act(card.id, input)}
-                                onConfigure={() =>
-                                    setSetup({
-                                        id: card.id,
-                                        app: card.app,
-                                        kind: card.kind,
-                                        label: kind.label,
-                                        targets: card.targets
-                                    })
-                                }
-                            />
-                        </WidgetCard>
-                    </div>
-                );
-            })}
+    return {
+        readouts,
+        busy,
+        act,
+        /** Ask what one card should watch. */
+        configure: (card: AppWidgetPreference, kind: AppWidgetKind) =>
+            setSetup({
+                id: card.id,
+                app: card.app,
+                kind: card.kind,
+                label: kind.label,
+                targets: card.targets
+            }),
+        /** The dialog that asks it, drawn once beside the grid. */
+        setupDialog: (
             <AppWidgetSetup
                 subject={setup}
                 onCancel={() => setSetup(null)}
@@ -266,74 +216,36 @@ export function AppWidgetGridItems({
                     setSetup(null);
                 }}
             />
-        </>
-    );
+        )
+    };
 }
 
-function AppWidgetMenu({
-    label,
-    size,
-    first,
-    last,
-    onConfigure,
-    onMove,
-    onResize,
-    onRemove
+export type AppWidgetLive = ReturnType<typeof useAppWidgetLive>;
+
+/** One app card, in the frame every Overview card is drawn in. The grid gives
+ *  it the handle and menu every card has. */
+export function AppWidgetItem({
+    card,
+    kind,
+    live,
+    grip,
+    menu
 }: {
-    label: string;
-    size: OverviewWidgetSize;
-    first: boolean;
-    last: boolean;
-    onConfigure: () => void;
-    onMove: (by: -1 | 1) => void;
-    onResize: (size: OverviewWidgetSize) => void;
-    onRemove: () => void;
+    card: AppWidgetPreference;
+    kind: AppWidgetKind;
+    live: AppWidgetLive;
+    grip?: React.ReactNode;
+    menu?: React.ReactNode;
 }) {
-    const t = useTranslations("home");
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <button
-                    type="button"
-                    title={t("card.arrange", { name: label })}
-                    aria-label={t("card.arrange", { name: label })}
-                    className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <MoreVertical className="size-4" aria-hidden="true" />
-                </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onSelect={onConfigure}>
-                    <Settings2 className="size-4" aria-hidden="true" />
-                    {t("appCards.change")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled={first} onSelect={() => onMove(-1)}>
-                    <ArrowUp className="size-4" aria-hidden="true" />
-                    {t("card.moveUp")}
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled={last} onSelect={() => onMove(1)}>
-                    <ArrowDown className="size-4" aria-hidden="true" />
-                    {t("card.moveDown")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>{t("card.width")}</DropdownMenuLabel>
-                {OVERVIEW_WIDGET_SIZES.map((option) => (
-                    <DropdownMenuItem
-                        key={option}
-                        onSelect={() => onResize(option)}
-                        className={cn(option === size && "text-primary")}
-                    >
-                        {sizeLabel(t, option)}
-                    </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="danger" onSelect={onRemove}>
-                    <Trash2 className="size-4" aria-hidden="true" />
-                    {t("appCards.remove")}
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+        <WidgetCard title={kind.label} icon={Blocks} grip={grip} menu={menu}>
+            <AppWidgetBody
+                readout={live.readouts[card.id]}
+                busy={live.busy}
+                onAct={(input) => void live.act(card.id, input)}
+                onConfigure={() => live.configure(card, kind)}
+            />
+        </WidgetCard>
     );
 }
 

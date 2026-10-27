@@ -983,6 +983,7 @@
         "web/src/app/(app)/drive/viewer/word-editor.tsx",
         "web/src/app/(app)/error.tsx",
         "web/src/app/(app)/home/actions.ts",
+        "web/src/app/(app)/home/app-widgets.tsx",
         "web/src/app/(app)/home/customize-dialog.tsx",
         "web/src/app/(app)/home/overview-grid.tsx",
         "web/src/app/(app)/home/shortcut-picker.tsx",

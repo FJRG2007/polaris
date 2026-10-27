@@ -14,7 +14,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { overviewPreferencesSchema } from "@polaris/core";
-import { getOverviewPreferences, saveOverviewPreferences } from "@/lib/overview/prefs-service";
+import { getOverviewPreferences, updateOverviewPreferences } from "@/lib/overview/prefs-service";
 import {
     actOnAppWidget,
     appWidgetInputSchema,
@@ -48,7 +48,8 @@ export async function readAppWidgetsAction(): Promise<{
 }> {
     const user = await requireUser();
     const preferences = await getOverviewPreferences(user.id);
-    return { cards: await readAppWidgets(preferences.appWidgets) };
+    // A hidden card shows nothing, so nothing is asked of its app.
+    return { cards: await readAppWidgets(preferences.appWidgets.filter((card) => !card.hidden)) };
 }
 
 /**
@@ -65,8 +66,10 @@ export async function saveAppWidgetsAction(input: unknown): Promise<{ error?: st
     if (ids.size !== parsed.data.length) {
         return { error: (await getTranslations("home"))("errors.layoutNotSaved") };
     }
-    const current = await getOverviewPreferences(user.id);
-    await saveOverviewPreferences(user.id, { ...current, appWidgets: parsed.data });
+    await updateOverviewPreferences(user.id, (current) => ({
+        ...current,
+        appWidgets: parsed.data
+    }));
     return {};
 }
 

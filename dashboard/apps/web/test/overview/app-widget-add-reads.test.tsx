@@ -26,7 +26,8 @@ vi.mock("@/app/(app)/home/app-widget-actions", () => ({
 vi.mock("@/app/(app)/home/home-polls", () => ({ appWidgets }));
 
 import {
-    AppWidgetGridItems,
+    AppWidgetItem,
+    useAppWidgetLive,
     useAppWidgets,
     type AppWidgetsState
 } from "@/app/(app)/home/app-widgets";
@@ -43,8 +44,15 @@ const KIND: AppWidgetKind = {
 
 function Harness({ onState }: { onState: (state: AppWidgetsState) => void }) {
     const state = useAppWidgets([]);
+    const live = useAppWidgetLive(state, [KIND]);
     onState(state);
-    return <AppWidgetGridItems state={state} kinds={[KIND]} />;
+    return (
+        <>
+            {state.cards.map((card) => (
+                <AppWidgetItem key={card.id} card={card} kind={KIND} live={live} />
+            ))}
+        </>
+    );
 }
 
 describe("adding a card to the Overview", () => {

@@ -5,7 +5,6 @@
  * browser.
  */
 
-import { PAGE_FILL } from "@polaris/ui";
 import { notFound } from "next/navigation";
 import { parseLanding } from "../../../../../model/landing";
 import { requireSecurityUser } from "../../../../../lib/access";
@@ -24,9 +23,5 @@ export default async function SecurityPage({
     const raw = (await params).path;
     if (raw && (Array.isArray(raw) ? raw.length > 0 : true)) notFound();
     const landing = parseLanding(searchParams ? await searchParams : null);
-    return (
-        <div className={PAGE_FILL}>
-            <SecurityView landing={landing} />
-        </div>
-    );
+    return <SecurityView landing={landing} />;
 }

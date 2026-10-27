@@ -14,7 +14,7 @@
 import { requireUser } from "@/lib/session";
 import { overviewPreferencesSchema } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
-import { getOverviewPreferences, saveOverviewPreferences } from "@/lib/overview/prefs-service";
+import { updateOverviewPreferences } from "@/lib/overview/prefs-service";
 
 export async function saveOverviewPreferencesAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -30,10 +30,14 @@ export async function saveOverviewPreferencesAction(input: unknown): Promise<{ e
     // from a screen that does not send them - which is every save of the grid,
     // and every tab opened before apps could add cards - keeps the stored ones
     // rather than writing them away.
-    const sent = typeof input === "object" && input !== null && "appWidgets" in input;
-    const appWidgets = sent
-        ? parsed.data.appWidgets
-        : (await getOverviewPreferences(user.id)).appWidgets;
-    await saveOverviewPreferences(user.id, { ...parsed.data, appWidgets });
+    // The same for the order both kinds share: a tab opened before the two could
+    // be arranged together does not send it, and must not undo it.
+    const sends = (key: string): boolean =>
+        typeof input === "object" && input !== null && key in input;
+    await updateOverviewPreferences(user.id, (stored) => ({
+        ...parsed.data,
+        appWidgets: sends("appWidgets") ? parsed.data.appWidgets : stored.appWidgets,
+        order: sends("order") ? parsed.data.order : stored.order
+    }));
     return {};
 }
